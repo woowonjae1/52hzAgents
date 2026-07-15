@@ -3,10 +3,14 @@ package config
 
 // 导入必要的系统和文件操作库。
 import (
+	"bufio"         // 流式读取 TCP 响应。
 	"encoding/json" // 解析与序列化 JSON 配置。
 	"fmt"           // 格式化错误信息。
+	"net"           // 发起 TCP 控制信道连接。
 	"os"            // 操作系统调用及环境变量读取。
 	"path/filepath" // 跨平台路径拼接。
+	"strings"       // 端口字符串处理。
+	"time"          // 拨号超时设定。
 )
 
 // WorkspaceConfig 代表本地配置中的单个 Workspace 连接参数。
@@ -39,23 +43,14 @@ var LoadedConfig GlobalConfig
 // configFilename 保存本地配置的文件名称。
 const configFilename = "config.json"
 
-// GetConfigDir 获取本地配置目录的绝对路径（支持检测并平滑迁移 openagents 旧配置）。
+// GetConfigDir 获取本地配置目录的绝对路径（确保目录存在）。
 func GetConfigDir() (string, error) {
-	home, err := os.UserHomeDir() // 获取用户主目录（在 Windows 上通常是 C:\Users\Username）。
+	home, err := os.UserHomeDir() // 获取用户主目录。
 	if err != nil {
 		return "", err
 	}
 
 	newDir := filepath.Join(home, ".52hzagents") // 推荐的新路径。
-	oldDir := filepath.Join(home, ".openagents") // 兼容迁移的旧路径。
-
-	// 检查新配置文件夹是否存在。
-	if _, err := os.Stat(newDir); os.IsNotExist(err) {
-		// 如果新目录不存在，但旧的 openagents 目录存在，则自动执行静默更名迁移。
-		if _, errOld := os.Stat(oldDir); errOld == nil {
-			_ = os.Rename(oldDir, newDir) // 试图进行重命名迁移。
-		}
-	}
 
 	// 确保新目录结构已被创建。
 	err = os.MkdirAll(newDir, 0755)
@@ -71,14 +66,23 @@ func LoadConfig() error {
 
 	filePath := filepath.Join(dir, configFilename) // 拼接完整配置文件路径。
 
-	// 如果配置文件本身不存在，则赋初值并写入。
+	// 如果新配置不存在，尝试从旧的 ~/.openagents 目录下只读复制 config.json。
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		LoadedConfig = GlobalConfig{
-			DaemonPort: "127.0.0.1:52000",                   // 默认本地后台控制端口设为 52000。
-			Workspaces: make(map[string]WorkspaceConfig),   // 初始化空字典。
-			Agents:     make(map[string]AgentConfig),       // 初始化空字典。
+		home, _ := os.UserHomeDir()
+		oldFilePath := filepath.Join(home, ".openagents", configFilename)
+		
+		// 如果旧配置存在，读取并保存到新位置
+		if oldData, errOld := os.ReadFile(oldFilePath); errOld == nil {
+			_ = os.WriteFile(filePath, oldData, 0644)
+		} else {
+			// 旧配置也不存在，初始化默认配置
+			LoadedConfig = GlobalConfig{
+				DaemonPort: "127.0.0.1:52000",                 // 默认本地后台控制端口。
+				Workspaces: make(map[string]WorkspaceConfig), // 初始化空字典。
+				Agents:     make(map[string]AgentConfig),     // 初始化空字典。
+			}
+			return SaveConfig()
 		}
-		return SaveConfig() // 写入初始版本配置文件。
 	}
 
 	// 读取配置文件内容。
@@ -221,11 +225,52 @@ func DisconnectAgent(name string) error {
 	return SaveConfig() // 持久化保存到磁盘。
 }
 
-// SendDaemonCommand 向守护进程的 daemon.cmd 文件写入指令行。
+// SendDaemonCommand 发送指令给守护进程。它会首先尝试 TCP 控制信道，若失败则退避到旧的文件 IPC (daemon.cmd)。
 func SendDaemonCommand(command string) error {
-	dir, err := GetConfigDir()
-	if err != nil {
-		return err
+	port := LoadedConfig.DaemonPort
+	// 如果配置的端口不含冒号，默认绑定到 127.0.0.1
+	if !strings.Contains(port, ":") {
+		port = "127.0.0.1:" + port
+	} else if strings.HasPrefix(port, ":") {
+		port = "127.0.0.1" + port
+	}
+
+	// 尝试建立本地 TCP 连接（超时时间设为 2 秒）。
+	conn, err := net.DialTimeout("tcp", port, 2*time.Second)
+	if err == nil {
+		defer conn.Close()
+
+		// 发送指令行，必须以换行符结尾以便服务端按行读取。
+		_, err = conn.Write([]byte(command + "\n"))
+		if err != nil {
+			return err
+		}
+
+		// 流式读取服务端的单行 JSON 回复。
+		reader := bufio.NewReader(conn)
+		respData, err := reader.ReadBytes('\n')
+		if err != nil {
+			return err
+		}
+
+		var resp struct {
+			Success bool   `json:"success"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(respData, &resp); err != nil {
+			return err
+		}
+
+		if !resp.Success {
+			return fmt.Errorf("daemon error: %s", resp.Message)
+		}
+		return nil
+	}
+
+	// 如果 TCP 拨号失败，退避到文件级 IPC (写入 daemon.cmd)
+	dir, errDir := GetConfigDir()
+	if errDir != nil {
+		return errDir
 	}
 
 	cmdFile := filepath.Join(dir, "daemon.cmd") // 拼接指令文件路径。

@@ -8,6 +8,7 @@ import (
 	"fmt"          // 拼接格式化字符串。
 	"io"           // 关闭管道输入输出。
 	"log"          // 打印守护系统日志。
+	"net"          // TCP 端口监听接收 (控制信道重构)。
 	"os"           // 系统环境变量及文件操作。
 	"os/exec"      // 启动并控制外部子进程。
 	"path/filepath" // 跨平台拼接路径。
@@ -51,6 +52,7 @@ type Daemon struct {
 	stoppedAgents map[string]bool              // 被手动停止的智能体集合
 	connected     map[string]bool              // 期望连接到工作区的智能体集合 (阶段三新增)
 	bridges       map[string]*wsclient.Bridge  // 各智能体当前活跃的工作区桥接会话 (阶段三新增)
+	listener      net.Listener                 // TCP 监听控制信道句柄 (重构 TCP 新增)
 	isShutdown    chan struct{}                // 关机通道信号
 	mu            sync.Mutex                   // 操作并发锁，防范 start/stop 同步冲突 (阶段二新增)
 }
@@ -101,6 +103,9 @@ func (d *Daemon) Start() error {
 	// 立即写入一次当前状态文件。
 	d.writeStatus()
 
+	// 开启本地 TCP 控制信道监听服务 (重构 TCP 新增)。
+	d.startTCPServer()
+
 	// 开启 200ms 一次的指令轮询。
 	cmdTicker := time.NewTicker(200 * time.Millisecond)
 	// 开启 5s 一次的状态写入。
@@ -111,7 +116,7 @@ func (d *Daemon) Start() error {
 		for {
 			select {
 			case <-cmdTicker.C:
-				d.processCommands() // 轮询执行来自命令行写入的指令。
+				d.processCommands() // 轮询执行来自命令行写入 of 的指令。
 			case <-statusTicker.C:
 				d.writeStatus() // 定期刷新状态文件。
 			case <-d.isShutdown:
@@ -128,6 +133,12 @@ func (d *Daemon) Start() error {
 // Stop 停止守护进程并释放所有已分配的资源。
 func (d *Daemon) Stop() {
 	log.Println("Daemon shutting down...")
+	
+	// 在广播退出信号前，主动关闭本地 TCP 监听句柄以打破 Accept 阻塞 (重构 TCP 新增)。
+	if d.listener != nil {
+		_ = d.listener.Close()
+	}
+
 	close(d.isShutdown) // 广播关闭心跳协程。
 
 	d.mu.Lock()
@@ -137,7 +148,7 @@ func (d *Daemon) Stop() {
 		br.Close()
 	}
 	d.bridges = make(map[string]*wsclient.Bridge)
-	// 遍历杀掉所有正在运行的 Agent 子进程。
+	// 遍历杀掉所有正在运行 of Agent 子进程。
 	for name, cmd := range d.activeCmds {
 		log.Printf("Killing process for agent %s (PID: %d)", name, cmd.Process.Pid)
 		_ = cmd.Process.Kill()
@@ -471,6 +482,128 @@ func (d *Daemon) writeStatus() {
 	}
 }
 
+// startTCPServer 启动 TCP 命令服务，用于低延迟监听客户端的指令请求。
+func (d *Daemon) startTCPServer() {
+	port := config.LoadedConfig.DaemonPort
+	// 如果配置的端口不含冒号，默认绑定到 127.0.0.1
+	if !strings.Contains(port, ":") {
+		port = "127.0.0.1:" + port
+	} else if strings.HasPrefix(port, ":") {
+		port = "127.0.0.1" + port
+	}
+
+	listener, err := net.Listen("tcp", port)
+	if err != nil {
+		log.Printf("Failed to start TCP listener on %s: %v", port, err)
+		return
+	}
+	d.listener = listener
+	log.Printf("TCP command listener started on %s", port)
+
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				// 如果是由于监听套接字已关闭导致的错误（比如 daemon 退出），则直接退出循环，避免忙轮询。
+				if strings.Contains(err.Error(), "use of closed network connection") {
+					return
+				}
+				// 额外监听退出通道以防万一。
+				select {
+				case <-d.isShutdown:
+					return
+				default:
+				}
+				log.Printf("TCP accept error: %v", err)
+				continue
+			}
+			go d.handleTCPConnection(conn)
+		}
+	}()
+}
+
+// handleTCPConnection 处理单个 TCP 客户端控制请求。
+func (d *Daemon) handleTCPConnection(conn net.Conn) {
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	// 读取单行命令（以换行符结尾）。
+	data, err := reader.ReadBytes('\n')
+	if err != nil {
+		return
+	}
+
+	cmd := strings.TrimSpace(string(data))
+	if cmd == "" {
+		return
+	}
+
+	log.Printf("TCP received command: %s", cmd)
+
+	// 执行指令并获取结果。
+	err = d.executeSingleCommand(cmd)
+
+	// 返回 JSON 格式结果。
+	response := map[string]interface{}{
+		"success": err == nil,
+	}
+	if err != nil {
+		response["message"] = err.Error()
+	} else {
+		response["message"] = "Command executed successfully"
+	}
+
+	respData, _ := json.Marshal(response)
+	_, _ = conn.Write(append(respData, '\n'))
+}
+
+// executeSingleCommand 解析并执行单条指令，供文件 IPC 与 TCP IPC 共享使用。
+func (d *Daemon) executeSingleCommand(cmd string) error {
+	// 如果命令需要指定 Agent，先检验 Agent 存在性提供即时报错。
+	if strings.HasPrefix(cmd, "stop:") || strings.HasPrefix(cmd, "start:") ||
+		strings.HasPrefix(cmd, "restart:") || strings.HasPrefix(cmd, "connect:") ||
+		strings.HasPrefix(cmd, "disconnect:") {
+		
+		parts := strings.SplitN(cmd, ":", 2)
+		if len(parts) == 2 {
+			agentName := strings.TrimSpace(parts[1])
+			if _, exists := config.LoadedConfig.Agents[agentName]; !exists {
+				return fmt.Errorf("agent '%s' not found in config.json", agentName)
+			}
+		}
+	}
+
+	// 路由解析指令。
+	if strings.HasPrefix(cmd, "stop:") {
+		agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "stop:"))
+		d.handleStopAgent(agentName)
+	} else if strings.HasPrefix(cmd, "start:") {
+		agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "start:"))
+		d.handleStartAgent(agentName)
+	} else if strings.HasPrefix(cmd, "restart:") {
+		agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "restart:"))
+		d.handleRestartAgent(agentName)
+	} else if strings.HasPrefix(cmd, "connect:") {
+		agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "connect:"))
+		d.handleConnectAgent(agentName)
+	} else if strings.HasPrefix(cmd, "disconnect:") {
+		agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "disconnect:"))
+		d.handleDisconnectAgent(agentName)
+	} else if cmd == "reload" {
+		d.handleReloadConfig()
+	} else if cmd == "stop_all_and_exit" {
+		// 在独立协程中延迟半秒关闭守护进程，以给当前的 TCP 连接返回响应报文的时间。
+		go func() {
+			time.Sleep(500 * time.Millisecond)
+			d.Stop()
+			os.Exit(0)
+		}()
+	} else {
+		return fmt.Errorf("unknown command: %s", cmd)
+	}
+	return nil
+}
+
 // processCommands 读取并轮询 daemon.cmd。
 func (d *Daemon) processCommands() {
 	// 如果指令文件不存在，则直接返回。
@@ -500,30 +633,8 @@ func (d *Daemon) processCommands() {
 			continue
 		}
 
-		log.Printf("Received command: %s", cmd)
-
-		// 路由解析指令。
-		if strings.HasPrefix(cmd, "stop:") {
-			agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "stop:"))
-			d.handleStopAgent(agentName)
-		} else if strings.HasPrefix(cmd, "start:") {
-			agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "start:"))
-			d.handleStartAgent(agentName)
-		} else if strings.HasPrefix(cmd, "restart:") {
-			agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "restart:"))
-			d.handleRestartAgent(agentName)
-		} else if strings.HasPrefix(cmd, "connect:") { // 阶段三：连接指定 Agent 到工作区。
-			agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "connect:"))
-			d.handleConnectAgent(agentName)
-		} else if strings.HasPrefix(cmd, "disconnect:") { // 阶段三：断开指定 Agent 的工作区连接。
-			agentName := strings.TrimSpace(strings.TrimPrefix(cmd, "disconnect:"))
-			d.handleDisconnectAgent(agentName)
-		} else if cmd == "reload" {
-			d.handleReloadConfig()
-		} else if cmd == "stop_all_and_exit" { // 新增：供 runDown 发送退出指令。
-			d.Stop()
-			os.Exit(0)
-		}
+		log.Printf("Received fallback file command: %s", cmd)
+		_ = d.executeSingleCommand(cmd)
 	}
 }
 

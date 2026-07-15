@@ -47,3 +47,8 @@ func GetEntry(agentType string) *RegistryEntry {
 	}
 	return nil
 }
+
+// GetAllEntries 获取所有已注册的智能体运行时列表副本。
+func GetAllEntries() []RegistryEntry {
+	return catalog
+}

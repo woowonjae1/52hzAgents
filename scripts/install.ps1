@@ -208,23 +208,45 @@ if (Test-Path $corePkg) {
 }
 
 if ($latestVer -and ($latestVer -ne $installedVer)) {
-    $tarballUrl = "https://registry.npmjs.org/$NPM_PACKAGE/-/agent-launcher-$latestVer.tgz"
-    $tgz = Join-Path $env:TEMP "agent-launcher.tgz"
-    Invoke-WebRequest -Uri $tarballUrl -OutFile $tgz -UseBasicParsing
-    New-Item -ItemType Directory -Force -Path $coreDir | Out-Null
-    tar -xzf $tgz -C $coreDir --strip-components=1
-    Remove-Item $tgz -Force -ErrorAction SilentlyContinue
+    $localConnector = "packages\agent-connector"
+    if (Test-Path $localConnector) {
+        Info "Installing from local repository packages\agent-connector..."
+        New-Item -ItemType Directory -Force -Path $coreDir | Out-Null
+        Copy-Item -Path "$localConnector\*" -Destination $coreDir -Recurse -Force
+    } else {
+        try {
+            $tarballUrl = "https://registry.npmjs.org/$NPM_PACKAGE/-/agent-launcher-$latestVer.tgz"
+            $tgz = Join-Path $env:TEMP "agent-launcher.tgz"
+            Invoke-WebRequest -Uri $tarballUrl -OutFile $tgz -UseBasicParsing
+            New-Item -ItemType Directory -Force -Path $coreDir | Out-Null
+            tar -xzf $tgz -C $coreDir --strip-components=1
+            Remove-Item $tgz -Force -ErrorAction SilentlyContinue
+        } catch {
+            Fail "Failed to download $NPM_PACKAGE from registry: $_"
+        }
+    }
+
     # Install blessed (TUI dep) via direct tarball - avoids npm --prefix pruning other packages
     $blessedDir = Join-Path $prefixDir "node_modules\blessed"
     $blessedVer = "0.1.81"
     if (-not (Test-Path (Join-Path $blessedDir "package.json"))) {
-        $bv = & npm view blessed version 2>$null
-        if ($bv) { $blessedVer = $bv }
-        $blessedTgz = Join-Path $env:TEMP "blessed.tgz"
-        Invoke-WebRequest -Uri "https://registry.npmjs.org/blessed/-/blessed-$blessedVer.tgz" -OutFile $blessedTgz -UseBasicParsing
-        New-Item -ItemType Directory -Force -Path $blessedDir | Out-Null
-        tar -xzf $blessedTgz -C $blessedDir --strip-components=1
-        Remove-Item $blessedTgz -Force -ErrorAction SilentlyContinue
+        $localBlessed = "node_modules\blessed"
+        if (Test-Path $localBlessed) {
+            New-Item -ItemType Directory -Force -Path $blessedDir | Out-Null
+            Copy-Item -Path "$localBlessed\*" -Destination $blessedDir -Recurse -Force
+        } else {
+            try {
+                $bv = & npm view blessed version 2>$null
+                if ($bv) { $blessedVer = $bv }
+                $blessedTgz = Join-Path $env:TEMP "blessed.tgz"
+                Invoke-WebRequest -Uri "https://registry.npmjs.org/blessed/-/blessed-$blessedVer.tgz" -OutFile $blessedTgz -UseBasicParsing
+                New-Item -ItemType Directory -Force -Path $blessedDir | Out-Null
+                tar -xzf $blessedTgz -C $blessedDir --strip-components=1
+                Remove-Item $blessedTgz -Force -ErrorAction SilentlyContinue
+            } catch {
+                Warn "Failed to download blessed library, TUI mode may have issues."
+            }
+        }
     }
 
     # Create package.json at prefix to prevent npm --prefix from pruning core packages
@@ -262,27 +284,66 @@ if ($latestVer -and ($latestVer -ne $installedVer)) {
             Set-Content -Path $prefixPkg -Value $pkgJson
         }
     }
-
-    # Create bin shims
-    # Uses %~dp0-relative paths so cmd.exe OEM code page doesn't corrupt
-    # non-ASCII characters in home directory paths (e.g. C:\Users\<non-ascii-name>\...)
-    # Matches the launcher's shim format (2-line, no setlocal).
-    $shimDir = Join-Path $prefixDir "node_modules\.bin"
-    New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
-    foreach ($name in @("agn", "openagents", "agent-connector")) {
-        # We write a distinct "$name.cmd" (not the package's .js bin), so unlike
-        # the POSIX shim we can't clobber the real entrypoint. Remove any
-        # pre-existing file first anyway, so a stale/read-only shim from an older
-        # install can't block the overwrite.
-        $shimPath = Join-Path $shimDir "$name.cmd"
-        Remove-Item -Force -ErrorAction SilentlyContinue -Path $shimPath
-        $shimContent = "@echo off`r`n`"%~dp0..\..\node.exe`" `"%~dp0..\@openagents-org\agent-launcher\bin\agent-connector.js`" %*`r`n"
-        Set-Content -Path $shimPath -Value $shimContent -NoNewline
-    }
     Ok "$NPM_PACKAGE v$latestVer installed"
 } elseif ($installedVer) {
     Ok "Already up to date ($installedVer)"
 }
+
+# =========================================================================
+# Step 2b: Build or download the native Go agn binary
+# =========================================================================
+Info "Installing native Go agn engine..."
+$goBinDir = Join-Path $env:USERPROFILE ".52hzagents\bin"
+New-Item -ItemType Directory -Force -Path $goBinDir | Out-Null
+$goAgnTarget = Join-Path $goBinDir "agn.exe"
+
+$goCmd = Get-Command go -ErrorAction SilentlyContinue
+if ($goCmd -and (Test-Path "packages\agn_go")) {
+    Info "Compiling native Go agn from local source..."
+    $env:GOPROXY = "https://goproxy.cn,direct"
+    Start-Process -FilePath $goCmd.Source -ArgumentList "build", "-o", $goAgnTarget, "." -WorkingDirectory "packages\agn_go" -NoNewWindow -Wait
+} else {
+    Info "Downloading pre-built Go agn binary..."
+    $arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
+    $url = "https://github.com/woowonjae1/52hzAgents/releases/latest/download/agn-windows-$arch.exe"
+    try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest -Uri $url -OutFile $goAgnTarget -UseBasicParsing
+    } catch {
+        Warn "Failed to download pre-built Go binary. You can build it manually inside packages/agn_go."
+    }
+}
+
+# Create bin shims
+# Uses %~dp0-relative paths so cmd.exe OEM code page doesn't corrupt
+# non-ASCII characters in home directory paths (e.g. C:\Users\<non-ascii-name>\...)
+# Matches the launcher's shim format (2-line, no setlocal).
+$shimDir = Join-Path $prefixDir "node_modules\.bin"
+New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
+
+if (Test-Path $goAgnTarget) {
+    # 复制原生 Go 客户端至执行目录，提供原生速度，无需 node 转发
+    Copy-Item $goAgnTarget "$shimDir\agn.exe" -Force
+    Copy-Item $goAgnTarget "$shimDir\openagents.exe" -Force
+    # 移除可能残留的旧 cmd shim 防止命名冲突
+    Remove-Item -Force -ErrorAction SilentlyContinue -Path "$shimDir\agn.cmd"
+    Remove-Item -Force -ErrorAction SilentlyContinue -Path "$shimDir\openagents.cmd"
+} else {
+    # Fallback to Node shims if Go binary not available
+    foreach ($name in @("agn", "openagents")) {
+        $shimPath = "$shimDir\$name.cmd"
+        Remove-Item -Force -ErrorAction SilentlyContinue -Path $shimPath
+        $shimContent = "@echo off`r`n`"%~dp0..\..\node.exe`" `"%~dp0..\@openagents-org\agent-launcher\bin\agent-connector.js`" %*`r`n"
+        Set-Content -Path $shimPath -Value $shimContent -NoNewline
+    }
+}
+
+# 保持 agent-connector 为 Node.js 包装层，服务旧接口调用
+$acShimPath = "$shimDir\agent-connector.cmd"
+Remove-Item -Force -ErrorAction SilentlyContinue -Path $acShimPath
+$acShimContent = "@echo off`r`n`"%~dp0..\..\node.exe`" `"%~dp0..\@openagents-org\agent-launcher\bin\agent-connector.js`" %*`r`n"
+Set-Content -Path $acShimPath -Value $acShimContent -NoNewline
+
 
 $env:PATH = "$prefixDir\node_modules\.bin;$prefixDir;$env:PATH"
 

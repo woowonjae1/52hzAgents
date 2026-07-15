@@ -199,15 +199,27 @@ if [ -f "$CORE_DIR/package.json" ]; then
 fi
 
 if [ -n "$LATEST_VER" ] && [ "$LATEST_VER" != "$INSTALLED_VER" ]; then
-    TARBALL_URL="https://registry.npmjs.org/$NPM_PACKAGE/-/agent-launcher-${LATEST_VER}.tgz"
-    mkdir -p "$CORE_DIR"
-    curl -fsSL "$TARBALL_URL" | tar xz -C "$CORE_DIR" --strip-components=1
+    if [ -d "packages/agent-connector" ]; then
+        info "Installing from local repository packages/agent-connector..."
+        mkdir -p "$CORE_DIR"
+        cp -R packages/agent-connector/* "$CORE_DIR/"
+    else
+        TARBALL_URL="https://registry.npmjs.org/$NPM_PACKAGE/-/agent-launcher-${LATEST_VER}.tgz"
+        mkdir -p "$CORE_DIR"
+        curl -fsSL "$TARBALL_URL" | tar xz -C "$CORE_DIR" --strip-components=1
+    fi
+
     # Install blessed (TUI dep) via direct tarball — avoids npm --prefix pruning other packages
     BLESSED_DIR="$PREFIX_DIR/node_modules/blessed"
     if [ ! -f "$BLESSED_DIR/package.json" ]; then
-        BLESSED_VER=$($NPM view blessed version 2>/dev/null || echo "0.1.81")
-        mkdir -p "$BLESSED_DIR"
-        curl -fsSL "https://registry.npmjs.org/blessed/-/blessed-${BLESSED_VER}.tgz" | tar xz -C "$BLESSED_DIR" --strip-components=1
+        if [ -d "node_modules/blessed" ]; then
+            mkdir -p "$BLESSED_DIR"
+            cp -R node_modules/blessed/* "$BLESSED_DIR/"
+        else
+            BLESSED_VER=$($NPM view blessed version 2>/dev/null || echo "0.1.81")
+            mkdir -p "$BLESSED_DIR"
+            curl -fsSL "https://registry.npmjs.org/blessed/-/blessed-${BLESSED_VER}.tgz" | tar xz -C "$BLESSED_DIR" --strip-components=1
+        fi
     fi
     # Create package.json at prefix so future npm --save --prefix installs don't prune core packages
     if [ ! -f "$PREFIX_DIR/package.json" ]; then
@@ -224,20 +236,51 @@ if [ -n "$LATEST_VER" ] && [ "$LATEST_VER" != "$INSTALLED_VER" ]; then
             require('fs').writeFileSync(f,JSON.stringify(p));
         " 2>/dev/null
     fi
+    # =========================================================================
+    # Step 2b: Build or download the native Go agn binary
+    # =========================================================================
+    info "Installing native Go agn engine..."
+    GO_BIN_DIR="$HOME/.52hzagents/bin"
+    mkdir -p "$GO_BIN_DIR"
+    ext=""
+    if [ "$OS" = "windows" ]; then
+        ext=".exe"
+    fi
+    GO_AGN_TARGET="$GO_BIN_DIR/agn$ext"
+
+    # 尝试从本地源码编译 (如果本地安装了 Go 环境)
+    if command -v go >/dev/null 2>&1 && [ -d "packages/agn_go" ]; then
+        info "Compiling native Go agn from local source..."
+        (cd packages/agn_go && GOPROXY="https://goproxy.cn,direct" go build -o "$GO_AGN_TARGET" .)
+    else
+        # 否则尝试从 GitHub Release 下载预编译版本
+        info "Downloading pre-built Go agn binary..."
+        RELEASE_URL="https://github.com/woowonjae1/52hzAgents/releases/latest/download/agn-${OS}-${ARCH}${ext}"
+        curl -fsSL "$RELEASE_URL" -o "$GO_AGN_TARGET" || warn "Failed to download pre-built Go binary. You can build it manually inside packages/agn_go."
+        chmod +x "$GO_AGN_TARGET" 2>/dev/null || true
+    fi
+
     # Create bin shims (tarball install doesn't create .bin entries)
     BIN_SHIM_DIR="$PREFIX_DIR/node_modules/.bin"
     mkdir -p "$BIN_SHIM_DIR"
-    for name in agn openagents agent-connector; do
-        # rm first: `npm install` may have created "$name" as a SYMLINK into the
-        # package's bin (…/agent-launcher/bin/agent-connector.js). A bare `>`
-        # redirect follows that symlink and overwrites the real JS entrypoint
-        # with this shell shim — which then fails to parse as JS ("SyntaxError:
-        # Unexpected string") and breaks every `agn` invocation. Removing it
-        # first makes the redirect create a fresh regular file (the shim).
-        rm -f "$BIN_SHIM_DIR/$name"
-        printf '#!/bin/sh\nexec "$(dirname "$0")/../../bin/node" "$(dirname "$0")/../@openagents-org/agent-launcher/bin/agent-connector.js" "$@"\n' > "$BIN_SHIM_DIR/$name"
-        chmod +x "$BIN_SHIM_DIR/$name"
-    done
+    
+    # 优先将原生的 Go 客户端复制为 agn 和 openagents 执行命令，提供原生速度
+    if [ -f "$GO_AGN_TARGET" ]; then
+        rm -f "$BIN_SHIM_DIR/agn$ext" "$BIN_SHIM_DIR/openagents$ext"
+        cp "$GO_AGN_TARGET" "$BIN_SHIM_DIR/agn$ext"
+        cp "$GO_AGN_TARGET" "$BIN_SHIM_DIR/openagents$ext"
+        chmod +x "$BIN_SHIM_DIR/agn$ext" "$BIN_SHIM_DIR/openagents$ext" 2>/dev/null || true
+    else
+        rm -f "$BIN_SHIM_DIR/agn" "$BIN_SHIM_DIR/openagents"
+        printf '#!/bin/sh\nexec "$(dirname "$0")/../../bin/node" "$(dirname "$0")/../@openagents-org/agent-launcher/bin/agent-connector.js" "$@"\n' > "$BIN_SHIM_DIR/agn"
+        printf '#!/bin/sh\nexec "$(dirname "$0")/../../bin/node" "$(dirname "$0")/../@openagents-org/agent-launcher/bin/agent-connector.js" "$@"\n' > "$BIN_SHIM_DIR/openagents"
+        chmod +x "$BIN_SHIM_DIR/agn" "$BIN_SHIM_DIR/openagents" 2>/dev/null || true
+    fi
+
+    # 保持 agent-connector 为 Node.js 包装层，服务特定旧脚本调用
+    rm -f "$BIN_SHIM_DIR/agent-connector"
+    printf '#!/bin/sh\nexec "$(dirname "$0")/../../bin/node" "$(dirname "$0")/../@openagents-org/agent-launcher/bin/agent-connector.js" "$@"\n' > "$BIN_SHIM_DIR/agent-connector"
+    chmod +x "$BIN_SHIM_DIR/agent-connector" 2>/dev/null || true
 elif [ -n "$INSTALLED_VER" ]; then
     info "Already up to date ($INSTALLED_VER)"
 fi

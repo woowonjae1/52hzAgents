@@ -17,6 +17,7 @@ import (
 
 	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/config"   // 本地配置。
 	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/daemon"   // 后台守护进程。
+	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/install"  // 运行包安装器 (阶段四新增)。
 	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/registry" // 智能体注册表。
 )
 
@@ -72,6 +73,12 @@ func main() {
 		runConnect() // 连接智能体到工作区并建立双向桥接（阶段三）。
 	case "disconnect":
 		runDisconnect() // 断开智能体的工作区连接（阶段三）。
+	case "install":
+		runInstall() // 安装特定智能体运行时环境（阶段四新增）。
+	case "runtimes":
+		runRuntimes() // 查看可用与已安装的智能体类型列表（阶段四新增）。
+	case "env":
+		runEnv() // 配置或查询类型级的环境变量（阶段四新增）。
 	case "version", "-v", "--version":
 		fmt.Printf("agn Launcher Version: %s (Go Edition)\n", version)
 	case "help", "-h", "--help":
@@ -99,6 +106,9 @@ Commands:
   restart <name>              Restart a specific agent
   connect <name> <token>      Connect an agent to a workspace (bidirectional bridge)
   disconnect <name>           Disconnect an agent from its workspace
+  install <type>              Install agent runtime environment
+  runtimes                    List available and installed runtimes
+  env [type]                  Manage environment configuration variables
   version                     Show version
   help                        Show this help
 
@@ -523,3 +533,131 @@ func runDisconnect() {
 
 	fmt.Printf("Disconnected agent '%s' from its workspace.\n", name)
 }
+
+// ============================================================================
+// 阶段四命令实现：安装器、运行时环境与环境变量配置
+// ============================================================================
+
+// runInstall 调用安装器拉起指定 Agent 的二进制文件下载与隔离部署。
+func runInstall() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn install <agent-type>")
+		os.Exit(1)
+	}
+
+	agentType := os.Args[2]
+	fmt.Printf("Installing agent runtime environment: %s...\n", agentType)
+	
+	if err := install.InstallAgent(agentType); err != nil {
+		fmt.Printf("Installation failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Agent runtime '%s' installed successfully.\n", agentType)
+}
+
+// runRuntimes 列出内嵌注册表的所有可用 Agent 运行时，并显示其是否在本地已安装。
+func runRuntimes() {
+	entries := registry.GetAllEntries()
+	if len(entries) == 0 {
+		fmt.Println("Registry is empty or failed to load.")
+		return
+	}
+
+	fmt.Println("Available Agent Runtimes:")
+	fmt.Println("--------------------------------------------------------------------------------")
+	fmt.Printf("%-20s %-12s %-40s\n", "NAME", "INSTALLED", "DESCRIPTION")
+	fmt.Println("--------------------------------------------------------------------------------")
+
+	for _, entry := range entries {
+		installedStatus := "[ ] No"
+		if install.IsAgentInstalled(entry.Name) {
+			installedStatus = "[x] Yes"
+		}
+		
+		// 截短描述信息防止排版错位。
+		desc := entry.Description
+		if len(desc) > 38 {
+			desc = desc[:35] + "..."
+		}
+		fmt.Printf("%-20s %-12s %-40s\n", entry.Name, installedStatus, desc)
+	}
+	fmt.Println("--------------------------------------------------------------------------------")
+}
+
+// runEnv 管理特定 Agent 运行时的全局类型环境变量文件（位于 ~/.52hzagents/env/）。
+func runEnv() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage:")
+		fmt.Println("  agn env <agent-type>                Show current env values")
+		fmt.Println("  agn env <agent-type> KEY=VALUE      Set env value")
+		os.Exit(1)
+	}
+
+	agentType := os.Args[2]
+	configDir, err := config.GetConfigDir()
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 拼接该类智能体的环境变量专用文件路径。
+	envDir := filepath.Join(configDir, "env")
+	_ = os.MkdirAll(envDir, 0755)
+	envFile := filepath.Join(envDir, agentType+".env")
+
+	// 1. 如果没有后续参数，读取并打印当前已配的环境变量。
+	if len(os.Args) == 3 {
+		data, err := os.ReadFile(envFile)
+		if err != nil {
+			fmt.Printf("No environment variables configured for '%s' yet.\n", agentType)
+			return
+		}
+		fmt.Printf("Environment variables for '%s':\n", agentType)
+		fmt.Println(string(data))
+		return
+	}
+
+	// 2. 如果携带了 KEY=VALUE 的参数，解析并持久化写入。
+	kvStr := os.Args[3]
+	parts := strings.SplitN(kvStr, "=", 2)
+	if len(parts) != 2 {
+		fmt.Println("Error: env argument must be in KEY=VALUE format")
+		os.Exit(1)
+	}
+	key := strings.TrimSpace(parts[0])
+	val := strings.TrimSpace(parts[1])
+
+	// 简单读取现有文件以支持增量合并写入。
+	envMap := make(map[string]string)
+	if data, err := os.ReadFile(envFile); err == nil {
+		lines := strings.Split(string(data), "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			partsSub := strings.SplitN(line, "=", 2)
+			if len(partsSub) == 2 {
+				envMap[strings.TrimSpace(partsSub[0])] = strings.TrimSpace(partsSub[1])
+			}
+		}
+	}
+
+	// 更新或增加值。
+	envMap[key] = val
+
+	// 重新写回文件。
+	var sb strings.Builder
+	for k, v := range envMap {
+		sb.WriteString(fmt.Sprintf("%s=%s\n", k, v))
+	}
+
+	if err := os.WriteFile(envFile, []byte(sb.String()), 0644); err != nil {
+		fmt.Printf("Error saving env configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Successfully updated environment variable for '%s': %s=%s\n", agentType, key, val)
+}
+
