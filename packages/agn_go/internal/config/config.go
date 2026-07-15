@@ -210,6 +210,20 @@ func ConnectAgent(name, network, token, endpoint, channel string) error {
 	return SaveConfig() // 持久化保存到磁盘。
 }
 
+func StoreWorkspace(id, slug, name, token, endpoint string) error {
+	if LoadedConfig.Workspaces == nil {
+		LoadedConfig.Workspaces = make(map[string]WorkspaceConfig)
+	}
+	key := slug
+	if key == "" {
+		key = id
+	}
+	LoadedConfig.Workspaces[key] = WorkspaceConfig{
+		ID: id, Name: name, Token: token, Endpoint: endpoint, Channel: "general",
+	}
+	return SaveConfig()
+}
+
 // DisconnectAgent 解除指定 Agent 与工作区的绑定关系并持久化（阶段三新增）。
 func DisconnectAgent(name string) error {
 	// 校验目标 Agent 是否存在。

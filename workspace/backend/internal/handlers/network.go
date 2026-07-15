@@ -50,7 +50,7 @@ func JoinNetwork(c *gin.Context) {
 		err = db.DB.Where("id = ? OR slug = ?", req.Network, req.Network).First(&workspace).Error
 	} else {
 		// 如果未传工作区标识，尝试通过全局 Token 反查对应的工作区（适用于公开接入场景）。
-		err = db.DB.Where("password_hash = ? AND status != ?", req.Token, "deleted").First(&workspace).Error
+		err = db.DB.Where("(password_hash = ? OR password_hash = ?) AND status != ?", req.Token, hashWorkspaceToken(req.Token), "deleted").First(&workspace).Error
 	}
 
 	// 如果没找到匹配的工作区，返回 404。
@@ -112,6 +112,10 @@ func JoinNetwork(c *gin.Context) {
 
 	// 更新工作区最后的活跃时间。
 	db.DB.Model(&workspace).Update("last_activity_at", now)
+	var defaultChannel models.Channel
+	if db.DB.Where("workspace_id = ? AND name = ?", workspace.ID, "general").First(&defaultChannel).Error == nil {
+		db.DB.FirstOrCreate(&models.ChannelMember{ChannelID: defaultChannel.ID, AgentName: req.AgentName})
+	}
 
 	// 构造 Agent 接入事件，并广播到消息通道中。
 	payloadData := map[string]interface{}{

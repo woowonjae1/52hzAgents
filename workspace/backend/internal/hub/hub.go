@@ -3,6 +3,7 @@ package hub
 
 // 引入 sync 用于读写锁安全，并且用于保存并管理多个连接的协程安全。
 import (
+	"strings"
 	"log"  // 导入日志库，用于输出注册、注销和广播的统计日志。
 	"sync" // 导入互斥锁库，保证 map 在多协程并发读写时的安全。
 )
@@ -99,7 +100,9 @@ func (h *EventHub) run() {
 				}
 
 				// 检查客户端的通道过滤器。如果客户端设置了通道过滤器，且与消息通道不一致，直接跳过。
-				if client.ChannelName != "" && client.ChannelName != msg.ChannelName {
+				clientChannel := strings.TrimPrefix(client.ChannelName, "channel/")
+				messageChannel := strings.TrimPrefix(msg.ChannelName, "channel/")
+				if clientChannel != "" && clientChannel != messageChannel {
 					continue
 				}
 

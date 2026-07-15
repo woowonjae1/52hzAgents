@@ -3,6 +3,7 @@ package scheduler
 
 // 导入包依赖，处理 JSON、日志以及数据库操作。
 import (
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"encoding/json" // 编码事件负载。
 	"log"           // 打印到期任务触发日志。
 	"time"          // 控制轮询间隔与到期比对。
@@ -25,6 +26,7 @@ func StartScheduler() {
 
 		// 无限循环监听计时器 Tick 信号。
 		for range ticker.C {
+			expireStaleAgents()
 			fireDueTimers()    // 执行到期 Timers 触发扫描。
 			fireDueRoutines()  // 执行到期 Routines 触发扫描。
 		}
@@ -32,6 +34,13 @@ func StartScheduler() {
 }
 
 // fireDueTimers 扫描并触发到期的单次定时消息提醒。
+func expireStaleAgents() {
+	cutoff := time.Now().UTC().Add(-time.Duration(config.GlobalConfig.AgentTimeoutSeconds) * time.Second)
+	db.DB.Model(&models.WorkspaceMember{}).
+		Where("status = ? AND last_heartbeat IS NOT NULL AND last_heartbeat < ?", "online", cutoff).
+		Updates(map[string]interface{}{"status": "offline", "session_id": nil})
+}
+
 func fireDueTimers() {
 	now := time.Now().UTC() // 获取当前的 UTC 时刻。
 	var dueTimers []models.TimerRecord // 声明列表存放被捕获的到期定时器。

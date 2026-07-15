@@ -3,6 +3,9 @@ package main
 
 // 导入必要的库文件用于命令行参数解析、系统信号捕获、系统调用及配置文件操作。
 import (
+	"bytes"
+	"io"
+	"net/http"
 	"encoding/json" // 解析状态 JSON。
 	"flag"          // 标准命令行参数解析。
 	"fmt"           // 终端格式化输出。
@@ -71,6 +74,8 @@ func main() {
 		runRestart() // 重启特定智能体。
 	case "connect":
 		runConnect() // 连接智能体到工作区并建立双向桥接（阶段三）。
+	case "workspace":
+		runWorkspace()
 	case "disconnect":
 		runDisconnect() // 断开智能体的工作区连接（阶段三）。
 	case "install":
@@ -105,6 +110,8 @@ Commands:
   stop <name>                 Stop a specific agent
   restart <name>              Restart a specific agent
   connect <name> <token>      Connect an agent to a workspace (bidirectional bridge)
+  workspace create [name]     Create a workspace and save its token
+  workspace list              List saved workspaces
   disconnect <name>           Disconnect an agent from its workspace
   install <type>              Install agent runtime environment
   runtimes                    List available and installed runtimes
@@ -433,6 +440,70 @@ func runRestart() {
 
 // runConnect 将指定智能体连接到工作区，持久化连接参数并通知守护进程建立双向桥接。
 // 用法: agn connect <name> <token> [--endpoint URL] [--network ID|slug] [--channel NAME]
+func runWorkspace() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn workspace <create|list> [name] [--endpoint URL]")
+		return
+	}
+	switch os.Args[2] {
+	case "list":
+		if len(config.LoadedConfig.Workspaces) == 0 {
+			fmt.Println("No saved workspaces.")
+			return
+		}
+		for key, workspace := range config.LoadedConfig.Workspaces {
+			fmt.Printf("%-24s %-20s %s\n", key, workspace.Name, workspace.Endpoint)
+		}
+	case "create":
+		name := "My Workspace"
+		endpoint := "http://localhost:8000"
+		for i := 3; i < len(os.Args); i++ {
+			arg := os.Args[i]
+			if (arg == "--endpoint" || arg == "-endpoint") && i+1 < len(os.Args) {
+				endpoint = strings.TrimRight(os.Args[i+1], "/")
+				i++
+			} else if strings.HasPrefix(arg, "--endpoint=") {
+				endpoint = strings.TrimRight(strings.TrimPrefix(arg, "--endpoint="), "/")
+			} else if !strings.HasPrefix(arg, "-") {
+				name = arg
+			}
+		}
+		body, _ := json.Marshal(map[string]string{"name": name})
+		resp, err := http.Post(endpoint+"/v1/workspaces", "application/json", bytes.NewReader(body))
+		if err != nil {
+			fmt.Printf("Error creating workspace: %v\n", err)
+			return
+		}
+		defer resp.Body.Close()
+		data, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusCreated {
+			fmt.Printf("Server returned %d: %s\n", resp.StatusCode, strings.TrimSpace(string(data)))
+			return
+		}
+		var created struct {
+			ID string `json:"id"`
+			Slug string `json:"slug"`
+			Name string `json:"name"`
+			Token string `json:"token"`
+		}
+		if err := json.Unmarshal(data, &created); err != nil || created.Token == "" {
+			fmt.Println("Server returned an invalid workspace response.")
+			return
+		}
+		if err := config.StoreWorkspace(created.ID, created.Slug, created.Name, created.Token, endpoint); err != nil {
+			fmt.Printf("Workspace created, but saving local config failed: %v\n", err)
+			return
+		}
+		fmt.Printf("Workspace created: %s\n", created.Name)
+		fmt.Printf("  Slug:  %s\n", created.Slug)
+		fmt.Printf("  Token: %s\n", created.Token)
+		fmt.Printf("  URL:   http://localhost:3000/%s?token=%s\n", created.Slug, created.Token)
+		fmt.Printf("Connect an agent with: agn connect <name> %s --network %s --endpoint %s\n", created.Token, created.Slug, endpoint)
+	default:
+		fmt.Printf("Unknown workspace command: %s\n", os.Args[2])
+	}
+}
+
 func runConnect() {
 	// 手动解析位置参数与可选 flag（Go flag 包不支持位置参数与 flag 混排）。
 	remaining := os.Args[2:]

@@ -3,6 +3,7 @@ package handlers
 
 // 导入必要的库文件，处理 Web 协议、长连接、并发和 JSON 编解码。
 import (
+	"crypto/sha256"
 	"encoding/json" // 用于将事件结构体编码为 JSON 字节流或解码请求。
 	"fmt"           // 用于进行字符串格式化拼接。
 	"log"           // 用于输出连接断开或消息处理过程中的错误日志。
@@ -44,11 +45,18 @@ func verifyWorkspaceAccess(workspace *models.Workspace, token string) bool {
 		return true
 	}
 	// 如果客户端携带的 Token 与工作区密码哈希一致，则校验成功通过。
-	if token != "" && token == *workspace.PasswordHash {
-		return true
+	if token != "" {
+		hash := hashWorkspaceToken(token)
+		if token == *workspace.PasswordHash || hash == *workspace.PasswordHash {
+			return true
+		}
 	}
 	// 其余情况（如 Firebase OAuth 校验）在自托管模式下默认按校验失败处理。
 	return false
+}
+
+func hashWorkspaceToken(token string) string {
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(token)))
 }
 
 // resolveWorkspace 通过 Network 的 ID 或 Slug 检索对应工作区实体。
@@ -103,6 +111,12 @@ func SendEvent(c *gin.Context) {
 	eventID := uuid.New().String()
 	// 获取当前的高精度毫秒级 Unix 时间戳。
 	nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+	if err := materializeEvent(workspace.ID, &req, nowUnixMs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to apply event"})
+		return
+	}
+	payloadBytes, _ = json.Marshal(req.Payload)
+	metaBytes, _ = json.Marshal(req.Metadata)
 
 	// 创建 GORM 对应的数据表记录对象。
 	eventRec := models.EventRecord{
@@ -124,7 +138,7 @@ func SendEvent(c *gin.Context) {
 	}
 
 	// 将整条事件记录打包序列化为 JSON 字符串，以便广播。
-	fullEventBytes, err := json.Marshal(gin.H{
+	fullEvent := gin.H{
 		"id":         eventRec.ID,
 		"network":    eventRec.NetworkID,
 		"type":       eventRec.Type,
@@ -134,7 +148,8 @@ func SendEvent(c *gin.Context) {
 		"metadata":   req.Metadata,
 		"timestamp":  eventRec.Timestamp,
 		"visibility": eventRec.Visibility,
-	})
+	}
+	fullEventBytes, err := json.Marshal(fullEvent)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to marshal full event payload"})
 		return
@@ -148,10 +163,7 @@ func SendEvent(c *gin.Context) {
 	})
 
 	// 返回成功响应，包含已生成的 event_id。
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
-		"event_id": eventID,
-	})
+	c.JSON(http.StatusOK, fullEvent)
 }
 
 // StreamEventsSSE 处理 GET /v1/events/stream 接口，建立单向服务器发送事件长连接（SSE）。
@@ -329,6 +341,9 @@ func StreamEventsWS(c *gin.Context) {
 			// 生成并持久化数据。
 			eventID := uuid.New().String()
 			nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+			if err := materializeEvent(workspace.ID, &parsedReq, nowUnixMs); err != nil {
+				continue
+			}
 
 			payloadBytes, _ := json.Marshal(parsedReq.Payload)
 			metaBytes, _ := json.Marshal(parsedReq.Metadata)
@@ -347,11 +362,12 @@ func StreamEventsWS(c *gin.Context) {
 
 			// 保存入库。
 			if err := db.DB.Create(&eventRec).Error; err == nil {
+				fullEvent, _ := json.Marshal(eventResponse(eventRec))
 				// 广播至全局。
 				hub.GlobalHub.Broadcast(hub.BroadcastMsg{
 					WorkspaceID: workspace.ID,
 					ChannelName: parsedReq.Target,
-					Payload:     string(message),
+					Payload:     string(fullEvent),
 				})
 			}
 		}

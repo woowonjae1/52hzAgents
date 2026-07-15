@@ -36,6 +36,21 @@ func main() { // 服务程序运行主入口函数。
 
 	// Initialize Gin router
 	router := gin.Default() // 使用默认日志与恢复中间件初始化 Gin。
+	router.Use(func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if origin != "" {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Workspace-Token")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		}
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
 
 	// Core API routes
 	v1 := router.Group("/v1") // 注册 v1 API 版本的路由组。
@@ -51,12 +66,16 @@ func main() { // 服务程序运行主入口函数。
 
 		// 注册实时事件接口路由组：
 		v1.POST("/events", handlers.SendEvent) // 客户端或 Agent 提交新事件的接口。
+		v1.GET("/events", handlers.ListEvents)
+		v1.GET("/events/latest-per-channel", handlers.LatestEventsPerChannel)
 		v1.GET("/events/stream", handlers.StreamEventsSSE) // 建立 SSE 单向实时数据推送的接口。
 		v1.GET("/events/ws", handlers.StreamEventsWS) // 建立 WebSocket 双向实时数据流通道的接口。
 
 		// 注册工作区管理接口：
 		v1.POST("/workspaces", handlers.CreateWorkspace) // 新建工作区接口。
+		v1.POST("/ws", handlers.CreateWorkspace)
 		v1.GET("/workspaces/:workspace_id", handlers.GetWorkspace) // 获取指定工作区详情。
+		v1.PATCH("/workspaces/:workspace_id", handlers.UpdateWorkspace)
 		v1.DELETE("/workspaces/:workspace_id", handlers.DeleteWorkspace) // 软删除工作区。
 		v1.PATCH("/workspaces/:workspace_id/channels/:channel_name", handlers.PatchChannel) // 修改会话通道属性。
 		v1.GET("/workspaces/:workspace_id/channels/:channel_name", handlers.GetChannel) // 获取单通道详情。
@@ -65,6 +84,8 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/join", handlers.JoinNetwork) // Agent 登入工作区网络接口。
 		v1.POST("/leave", handlers.LeaveNetwork) // Agent 退出工作区网络接口。
 		v1.POST("/workspaces/:workspace_id/presence", handlers.UpdatePresence) // Agent 定时在线心跳保活接口。
+		v1.GET("/discover", handlers.DiscoverNetwork)
+		v1.GET("/profile", handlers.NetworkProfile)
 
 		// 注册共享文件管理接口：
 		v1.POST("/files", handlers.UploadFileMultipart) // multipart/form-data 文件上传。

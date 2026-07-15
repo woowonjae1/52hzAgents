@@ -52,7 +52,7 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
   }
 
   const json = await res.json();
-  return json.data;
+  return json && typeof json === 'object' && 'data' in json ? json.data : json;
 }
 
 export async function listMyWorkspaces(
@@ -77,6 +77,6 @@ export async function createWorkspace(
 }> {
   return authFetch('/v1/ws', {
     method: 'POST',
-    body: JSON.stringify({ agent_name: agentName, name: name || undefined }),
+    body: JSON.stringify({ agent_name: agentName, name: name || `${agentName}'s Workspace` }),
   });
 }

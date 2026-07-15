@@ -26,6 +26,7 @@ var httpClient = &http.Client{Timeout: 10 * time.Second}
 
 // Bridge 代表单个 Agent 到某个工作区的双向桥接会话上下文。
 type Bridge struct {
+	channelMu sync.RWMutex
 	Endpoint  string // 后端服务基准 URL，如 http://localhost:8000。
 	Network   string // 工作区 ID 或 Slug（用于 join 请求；为空时后端按 Token 反查）。
 	Token     string // 工作区访问令牌（X-Workspace-Token）。
@@ -176,6 +177,27 @@ func (b *Bridge) readPump() {
 			continue
 		}
 
+		var route struct {
+			Target string `json:"target"`
+			Payload struct {
+				Mentions []string `json:"mentions"`
+			} `json:"payload"`
+			Metadata struct {
+				TargetAgents []string `json:"target_agents"`
+			} `json:"metadata"`
+		}
+		_ = json.Unmarshal(message, &route)
+		inConfiguredChannel := strings.TrimPrefix(route.Target, "channel/") == strings.TrimPrefix(b.currentChannel(), "channel/")
+		targeted := containsAgent(route.Metadata.TargetAgents, b.AgentName) || containsAgent(route.Payload.Mentions, b.AgentName)
+		if !inConfiguredChannel && !targeted {
+			continue
+		}
+		if strings.HasPrefix(route.Target, "channel/") {
+			b.channelMu.Lock()
+			b.Channel = strings.TrimPrefix(route.Target, "channel/")
+			b.channelMu.Unlock()
+		}
+
 		// 裁剪空白后校验内容非空。
 		content := strings.TrimSpace(ev.Payload.Content)
 		if content == "" {
@@ -190,6 +212,21 @@ func (b *Bridge) readPump() {
 }
 
 // heartbeatPump 周期性向后端上报在线心跳，维持会话活跃。
+func containsAgent(items []string, agentName string) bool {
+	for _, item := range items {
+		if strings.TrimPrefix(item, "openagents:") == agentName {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *Bridge) currentChannel() string {
+	b.channelMu.RLock()
+	defer b.channelMu.RUnlock()
+	return b.Channel
+}
+
 func (b *Bridge) heartbeatPump() {
 	ticker := time.NewTicker(20 * time.Second) // 每 20 秒上报一次心跳。
 	defer ticker.Stop()
@@ -243,7 +280,7 @@ func (b *Bridge) SendOutput(line string) {
 	ev := map[string]interface{}{
 		"type":    "workspace.message.posted", // 聊天消息事件类型。
 		"source":  b.source,                   // 来源为本 Agent。
-		"target":  "channel/" + b.Channel,     // 精确路由到目标会话通道。
+		"target":  "channel/" + b.currentChannel(), // Reply to the channel that triggered the agent.
 		"network": b.networkID,                // 所属工作区。
 		"payload": map[string]interface{}{ // 消息负载。
 			"content":      line,   // 消息正文。

@@ -3,6 +3,8 @@ package handlers
 
 // 导入必要的系统和第三方依赖包。
 import (
+	"encoding/json"
+	"strings"
 	"crypto/sha256" // 用于加密计算工作区的密码哈希。
 	"encoding/hex"  // 用于将 SHA256 哈希字节数组转换为十六进制字符串。
 	"net/http"      // 包含标准的 HTTP 常量和响应写入方法。
@@ -16,6 +18,7 @@ import (
 
 // CreateWorkspaceRequest 代表创建工作区的请求数据。
 type CreateWorkspaceRequest struct {
+	AgentName string `json:"agent_name"`
 	Name     string `json:"name" binding:"required"` // 工作区显示名称 (必填)
 	Slug     string `json:"slug"`                    // 唯一简短访问标识 (选填)
 	Password string `json:"password"`                // 访问密码 (选填，空表示公开工作区)
@@ -46,11 +49,18 @@ func CreateWorkspace(c *gin.Context) {
 	}
 
 	// 计算密码哈希。
+	token := req.Password
 	var pwdHash *string // 声明哈希指针。
 	if req.Password != "" {
 		hash := sha256.Sum256([]byte(req.Password))            // 执行 SHA256 加密。
 		hashStr := hex.EncodeToString(hash[:])                 // 转换为 16 进制字符串。
 		pwdHash = &hashStr                                     // 指针赋值。
+	}
+	if token == "" {
+		token = "ws_" + strings.ReplaceAll(uuid.New().String(), "-", "")
+		hash := sha256.Sum256([]byte(token))
+		hashStr := hex.EncodeToString(hash[:])
+		pwdHash = &hashStr
 	}
 
 	// 构建 Workspace 数据库实体记录。
@@ -92,8 +102,11 @@ func CreateWorkspace(c *gin.Context) {
 	// 返回 201 状态码，返回创建成功的详情数据。
 	c.JSON(http.StatusCreated, gin.H{
 		"id":         wsID,
+		"workspaceId": wsID,
 		"name":       workspace.Name,
 		"slug":       workspace.Slug,
+		"token":      token,
+		"url":        "/" + workspace.Slug + "?token=" + token,
 		"status":     workspace.Status,
 		"created_at": workspace.CreatedAt,
 	})
@@ -107,6 +120,14 @@ func GetWorkspace(c *gin.Context) {
 	var ws models.Workspace
 	if err := db.DB.Where("id = ? OR slug = ?", wsID, wsID).First(&ws).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+	token := c.GetHeader("X-Workspace-Token")
+	if token == "" {
+		token = c.Query("token")
+	}
+	if !verifyWorkspaceAccess(&ws, token) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
 		return
 	}
 
@@ -125,14 +146,42 @@ func GetWorkspace(c *gin.Context) {
 	// 组装最终结果渲染返回。
 	c.JSON(http.StatusOK, gin.H{
 		"id":             ws.ID,
+		"workspaceId":    ws.ID,
 		"name":           ws.Name,
 		"slug":           ws.Slug,
 		"status":         ws.Status,
-		"created_at":     ws.CreatedAt,
+		"creatorEmail":   ws.CreatorEmail,
+		"settings":       decodeJSONMap(ws.Settings),
+		"browserfabricApiKey": nil,
+		"createdAt":      ws.CreatedAt,
+		"lastActivityAt": ws.LastActivityAt,
 		"channels":       channels,
 		"members":        members,
+		"agents":         mapWorkspaceMembers(members),
 		"collaborators":  collaborators,
 	})
+}
+
+func decodeJSONMap(raw []byte) map[string]interface{} {
+	result := map[string]interface{}{}
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &result)
+	}
+	return result
+}
+
+func mapWorkspaceMembers(members []models.WorkspaceMember) []gin.H {
+	result := make([]gin.H, 0, len(members))
+	for _, member := range members {
+		result = append(result, gin.H{
+			"agentName": member.AgentName, "role": member.Role,
+			"agentType": member.AgentType, "serverHost": member.ServerHost,
+			"workingDir": member.WorkingDir, "description": member.Description,
+			"enabledSkills": decodeJSONMap(member.EnabledSkills), "status": member.Status,
+			"lastHeartbeatAt": member.LastHeartbeat, "joinedAt": member.JoinedAt,
+		})
+	}
+	return result
 }
 
 // DeleteWorkspace 处理 DELETE /v1/workspaces/:workspace_id 接口，将工作区状态标记为删除。
@@ -143,6 +192,10 @@ func DeleteWorkspace(c *gin.Context) {
 	var ws models.Workspace
 	if err := db.DB.Where("id = ? OR slug = ?", wsID, wsID).First(&ws).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+	if !verifyWorkspaceAccess(&ws, c.GetHeader("X-Workspace-Token")) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
 		return
 	}
 
@@ -158,6 +211,7 @@ func DeleteWorkspace(c *gin.Context) {
 
 // EditChannelRequest 定义更新会话通道的请求格式。
 type EditChannelRequest struct {
+	MasterAgent             *string `json:"master_agent"`
 	Title                    *string `json:"title"`                     // 新标题
 	Status                   *string `json:"status"`                    // 状态: active | archived | deleted
 	Starred                  *bool   `json:"starred"`                   // 是否星标
@@ -174,6 +228,10 @@ func PatchChannel(c *gin.Context) {
 	workspace, err := resolveWorkspace(wsID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Network not found"})
+		return
+	}
+	if !verifyWorkspaceAccess(workspace, c.GetHeader("X-Workspace-Token")) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
 		return
 	}
 
@@ -201,6 +259,9 @@ func PatchChannel(c *gin.Context) {
 	}
 	if req.Starred != nil {
 		ch.Starred = *req.Starred
+	}
+	if req.MasterAgent != nil {
+		ch.MasterAgent = req.MasterAgent
 	}
 	if req.OrchestrationMode != nil {
 		ch.OrchestrationMode = *req.OrchestrationMode

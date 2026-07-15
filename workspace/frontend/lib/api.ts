@@ -128,8 +128,8 @@ class WorkspaceApi {
       throw new Error(`API ${res.status}: ${body}`);
     }
 
-    const json: ApiResponse<T> = await res.json();
-    return json.data;
+    const json = await res.json();
+    return (json && typeof json === 'object' && 'data' in json ? json.data : json) as T;
   }
 
   // ---------------------------------------------------------------------------
@@ -434,7 +434,8 @@ class WorkspaceApi {
     }
 
     const json = await res.json();
-    return mapFileResponse(json.data);
+    const raw = json && typeof json === 'object' && 'data' in json ? json.data : json;
+    return mapFileResponse(raw as Record<string, unknown>);
   }
 
   /** List files in the workspace. */
