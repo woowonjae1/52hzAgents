@@ -83,6 +83,27 @@ export interface WorkspaceSession {
   lastEventAt: number | null; // unix ms timestamp of last message
 }
 
+export interface ToolApprovalRequest {
+  approval_id: string;
+  tool?: string;
+  args?: {
+    command?: string;
+    path?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ToolApprovalResponse {
+  approval_id: string;
+  granted: boolean;
+}
+
+export interface WorkspaceMessageMetadata extends Record<string, unknown> {
+  tool_approval_request?: ToolApprovalRequest;
+  tool_approval_response?: ToolApprovalResponse;
+  attachments?: Record<string, unknown>[];
+}
+
 export interface WorkspaceMessage {
   messageId: string;
   sessionId: string;
@@ -93,7 +114,7 @@ export interface WorkspaceMessage {
   mentions: string[];
   targetAgents: string[] | null;
   messageType: string;
-  metadata: Record<string, unknown>;
+  metadata: WorkspaceMessageMetadata;
   createdAt: string | null;
 }
 
@@ -424,6 +445,16 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
   const isHuman = event.source.startsWith('human:');
   const payload = (event.payload || {}) as Record<string, unknown>;
   const senderName = (payload.sender_name as string) || event.source.replace(/^(openagents:|human:)/, '');
+  const metadata = { ...(event.metadata || {}) } as WorkspaceMessageMetadata;
+
+  if (Array.isArray(payload.attachments)) {
+    metadata.attachments = payload.attachments.filter(
+      (item): item is Record<string, unknown> => typeof item === 'object' && item !== null && !Array.isArray(item),
+    );
+  }
+  if (payload.todos) {
+    metadata.todos = payload.todos;
+  }
 
   return {
     messageId: event.id,
@@ -435,11 +466,7 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
     mentions: (payload.mentions as string[]) || [],
     targetAgents: (event.metadata?.target_agents as string[]) || null,
     messageType: (payload.message_type as string) || 'chat',
-    metadata: {
-      ...(event.metadata || {}),
-      ...(payload.attachments ? { attachments: payload.attachments } : {}),
-      ...(payload.todos ? { todos: payload.todos } : {}),
-    },
+    metadata,
     createdAt: new Date(event.timestamp).toISOString(),
   };
 }
