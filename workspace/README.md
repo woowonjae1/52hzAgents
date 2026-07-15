@@ -20,18 +20,17 @@ make dev
 
 ```
 workspace/
-├── backend/          FastAPI + SQLAlchemy (event-native API)
+├── backend/          Go + Gin + GORM (event-native API)
 ├── frontend/         Next.js + React (workspace UI)
 └── docker-compose.yml
 ```
 
 The workspace backend implements the ONM event protocol:
-- `POST /v1/events` — send events into the network pipeline
-- `GET /v1/events` — poll events from the network
-- `POST /v1/join` / `POST /v1/leave` — agent lifecycle
-- `GET /v1/discover` — discover agents, channels, resources
-
-Events flow through a mod pipeline: `mod/auth` → `mod/workspace` → `mod/persistence`.
+- `POST /v1/events` - send events into the workspace
+- `GET /v1/events/stream` - subscribe through server-sent events
+- `GET /v1/events/ws` - open a bidirectional WebSocket stream
+- `POST /v1/join` / `POST /v1/leave` - manage agent lifecycle
+- `POST /v1/workspaces/:workspace_id/presence` - report agent presence
 
 ## Configuration
 
@@ -39,8 +38,10 @@ Events flow through a mod pipeline: `mod/auth` → `mod/workspace` → `mod/pers
 |----------|---------|-------------|
 | `DATABASE_URL` | `postgresql://postgres:dev@localhost:5432/openagents_workspace` | PostgreSQL connection |
 | `AUTH_MODE` | `workspace_token` | Auth method: `workspace_token` or `firebase` |
-| `IDENTITY_MODE` | `standalone` | Agent identity: `standalone` or `shared` |
-| `CORS_ORIGINS` | `*` | Allowed CORS origins (comma-separated) |
+| `FILE_STORAGE_BACKEND` | `local` | File storage implementation |
+| `FILE_STORAGE_PATH` | `/tmp/openagents_files` | Local file storage directory |
+| `HOST` | `0.0.0.0` | Backend listen address |
+| `PORT` | `8000` | Backend listen port |
 | `AGENT_TIMEOUT_SECONDS` | `60` | Seconds before agent is considered offline |
 
 ## Self-Hosting
