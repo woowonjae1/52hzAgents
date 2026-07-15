@@ -1,18 +1,14 @@
 <div align="center">
 
-![OpenAgents Workspace — One workspace. All your agents work together.](docs/assets/images/workspace_cover.jpg)
+![52hzAgents Workspace — One workspace. All your agents work together.](docs/assets/images/workspace_cover.jpg)
 
-**OpenAgents Workspace** — The Collaborative OS for Agents.
+**52hzAgents Workspace** — The Collaborative OS for Agents.
 
-One workspace where all your AI agents collaborate. Open source. No account required.
+One workspace where all your AI agents collaborate. Open source. Fully self-hosted & local-first.
 
-[![npm](https://img.shields.io/npm/v/@openagents-org/agent-launcher.svg)](https://www.npmjs.com/package/@openagents-org/agent-launcher)
-[![PyPI](https://img.shields.io/pypi/v/openagents.svg)](https://pypi.org/project/openagents/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865f2?logo=discord&logoColor=white)](https://discord.gg/openagents)
-[![Twitter](https://img.shields.io/badge/Twitter-Follow-1da1f2?logo=x&logoColor=white)](https://twitter.com/OpenAgentsAI)
 
-[⭐ **Open my workspace**](https://openagents.org/api/create-workspace) · [workspace landing page](https://openagents.org/workspace) · [Setup Tutorial](https://openagents.org/docs)
+[⭐ **GitHub Repository**](https://github.com/woowonjae1/52hzAgents.git)
 
 </div>
 
@@ -57,21 +53,18 @@ agn connect my-agent <workspace-token>    # connect agent into workspace
 
 ---
 
-## Introducing OpenAgents Workspace
-📖[Detailed guidance of connecting local and cloud agents into OpenAgents Workspace](https://github.com/openagents-org/openagents/discussions/519)
-
-[Detailed Demonstration of 7 Common Functions in OpenAgents Workspace](https://github.com/openagents-org/openagents/discussions/521)
+## Introducing 52hzAgents Workspace
 
 Your agents are everywhere. One maintains your database on a server. Another manages your marketing and replies to users on Discord. A few more are building different projects in separate terminals, on separate machines. You have no single place to see them all, and no way to make them work together.
 
 When a user reports a bug, you want your marketing-bot to gather details from that user, then bring your infra agent into the same conversation to debug the logs. Today, you'd have to copy-paste between terminals, SSH into different machines, and stitch context together manually.
 
-**OpenAgents Workspace** solves this with two ideas:
+**52hzAgents Workspace** solves this with two ideas:
 
-1. **A unified workspace** for all your agents. One URL where every agent shows up, no matter where it runs. Manage them, talk to them, and see what they're doing from your browser or phone.
+1. **A unified workspace** for all your agents. One local endpoint where every agent shows up, no matter where it runs. Manage them, talk to them, and see what they're doing from your browser.
 2. **Easy collaboration** between agents. Pull any agent into a conversation thread. They share the same files, the same browser, and the same context. No glue code, no copy-pasting between terminals.
 
-Everything is open source under Apache 2.0. No vendor lock-in. No mandatory accounts.
+Everything is open source under Apache 2.0. No vendor lock-in. No mandatory accounts. Fully local-first and self-hosted.
 
 <div align="center">
 
@@ -350,9 +343,9 @@ when creating an agent and paste the key in the configuration step.
 
 ---
 
-## All OpenAgents Projects
+## All 52hzAgents Projects
 
-OpenAgents started as a Python SDK for multi-agent networking and has grown into a full platform: a **Workspace** for real-time human-agent collaboration, a **Launcher** for managing agents across platforms, and a **Network SDK** for developers building custom agent systems.
+52hzAgents is a high-performance framework and platform for multi-agent networking: a **Workspace** for real-time human-agent collaboration, a **Launcher** for managing agents across platforms, and a **Network SDK** for developers building custom agent systems.
 
 <table>
 <tr>
@@ -367,8 +360,6 @@ The browser-based collaboration layer. Humans and agents share threads, files, a
 - Invite teammates via link
 - No install needed to view
 
-**[Open a Workspace →](https://openagents.org/workspace)**
-
 </td>
 <td width="33%" valign="top">
 
@@ -381,8 +372,6 @@ The agent management layer. Install any coding agent, configure credentials, and
 - Cross-platform (macOS, Linux, Windows)
 - Desktop app or CLI
 
-**[Get the Launcher →](https://openagents.org/launcher)**
-
 </td>
 <td width="33%" valign="top">
 
@@ -394,8 +383,6 @@ The extensibility layer. Build agents that join the network, respond to events, 
 - Mod system (messaging, files, browser, games)
 - MCP and A2A protocol support
 - Self-host your own networks
-
-**[Read the Docs →](https://openagents.org/docs/getting-started/overview)**
 
 </td>
 </tr>
