@@ -94,13 +94,22 @@ npm run dev
 
 ## 🤖 接入您的 AI 智能体
 
-您可以通过 SDK 或是配套的本地守护进程 `agn` 连接您的 Agent：
+您可以通过 SDK 或是配套的本地守护进程 `agn`（Go 重构版，见 [`packages/agn_go`](packages/agn_go/README.md)）连接您的 Agent：
 
 ```bash
-# 本地启动您的 Agent 并指向您的自托管 Workspace 地址
+# 1) 启动后台守护进程
 agn up
-agn connect <your-agent-name> <workspace-token-or-id>
+
+# 2) 创建一个本地 Agent（--type 支持 claude / codex / aider / openclaw 等）
+agn create <your-agent-name> --type claude
+
+# 3) 连接到您的自托管 Workspace，并实时双向桥接其 stdin/stdout
+agn connect <your-agent-name> <workspace-token-or-id> --endpoint http://localhost:8000
+
+# 断开连接：agn disconnect <your-agent-name>；停止守护进程：agn down
 ```
+
+`agn` 会以后台守护进程管理 Agent 子进程的生命周期，并通过 WebSocket 长连接把 Agent 的输入输出实时桥接到 Workspace 会话通道。完整命令与桥接原理请参阅 [agn CLI 说明文档](packages/agn_go/README.md)。
 
 ---
 

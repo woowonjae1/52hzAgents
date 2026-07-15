@@ -20,7 +20,7 @@ import (
 	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/registry" // 智能体注册表。
 )
 
-const version = "0.3.0" // 定义客户端版本号（阶段二升级）。
+const version = "0.4.0" // 定义客户端版本号（阶段三升级：工作区连接与双向桥接）。
 
 // main 客户端入口。
 func main() {
@@ -68,6 +68,10 @@ func main() {
 		runStop() // 停止特定智能体。
 	case "restart":
 		runRestart() // 重启特定智能体。
+	case "connect":
+		runConnect() // 连接智能体到工作区并建立双向桥接（阶段三）。
+	case "disconnect":
+		runDisconnect() // 断开智能体的工作区连接（阶段三）。
 	case "version", "-v", "--version":
 		fmt.Printf("agn Launcher Version: %s (Go Edition)\n", version)
 	case "help", "-h", "--help":
@@ -93,12 +97,17 @@ Commands:
   start <name>                Start a specific agent
   stop <name>                 Stop a specific agent
   restart <name>              Restart a specific agent
+  connect <name> <token>      Connect an agent to a workspace (bidirectional bridge)
+  disconnect <name>           Disconnect an agent from its workspace
   version                     Show version
   help                        Show this help
 
 Options:
   --foreground                Run daemon in foreground (only with 'up')
   --type <type>               Agent runtime type (default: openclaw)
+  --endpoint <url>            Workspace backend base URL (default: http://localhost:8000)
+  --network <id|slug>         Workspace ID or slug (optional; resolved by token if omitted)
+  --channel <name>            Workspace channel to bridge (default: general)
 `)
 }
 
@@ -406,4 +415,111 @@ func runRestart() {
 	}
 
 	fmt.Printf("Sent restart command for '%s'\n", name)
+}
+
+// ============================================================================
+// 阶段三命令实现：工作区连接与实时双向桥接
+// ============================================================================
+
+// runConnect 将指定智能体连接到工作区，持久化连接参数并通知守护进程建立双向桥接。
+// 用法: agn connect <name> <token> [--endpoint URL] [--network ID|slug] [--channel NAME]
+func runConnect() {
+	// 手动解析位置参数与可选 flag（Go flag 包不支持位置参数与 flag 混排）。
+	remaining := os.Args[2:]
+	var positional []string
+	var endpoint, network, channel string
+
+	for i := 0; i < len(remaining); i++ {
+		arg := remaining[i]
+		switch {
+		case arg == "--endpoint" || arg == "-endpoint":
+			if i+1 < len(remaining) {
+				endpoint = remaining[i+1]
+				i++
+			}
+		case strings.HasPrefix(arg, "--endpoint="):
+			endpoint = strings.TrimPrefix(arg, "--endpoint=")
+		case arg == "--network" || arg == "-network":
+			if i+1 < len(remaining) {
+				network = remaining[i+1]
+				i++
+			}
+		case strings.HasPrefix(arg, "--network="):
+			network = strings.TrimPrefix(arg, "--network=")
+		case arg == "--channel" || arg == "-channel":
+			if i+1 < len(remaining) {
+				channel = remaining[i+1]
+				i++
+			}
+		case strings.HasPrefix(arg, "--channel="):
+			channel = strings.TrimPrefix(arg, "--channel=")
+		case !strings.HasPrefix(arg, "-"):
+			positional = append(positional, arg) // 位置参数（name, token）。
+		}
+	}
+
+	// 校验必填的位置参数。
+	if len(positional) < 2 {
+		fmt.Println("Usage: agn connect <name> <token> [--endpoint URL] [--network ID|slug] [--channel NAME]")
+		os.Exit(1)
+	}
+	name := positional[0]
+	token := positional[1]
+
+	// 校验该智能体已注册。
+	if _, exists := config.LoadedConfig.Agents[name]; !exists {
+		fmt.Printf("Error: agent '%s' not found. Run 'agn create %s' first.\n", name, name)
+		os.Exit(1)
+	}
+
+	// 持久化工作区连接绑定到 config.json。
+	if err := config.ConnectAgent(name, network, token, endpoint, channel); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 通知守护进程建立桥接（若守护进程未运行，将在下次 'agn up' 时自动重连）。
+	if err := config.SendDaemonCommand("connect:" + name); err != nil {
+		fmt.Printf("Warning: failed to notify daemon: %v\n", err)
+	}
+
+	fmt.Printf("Connecting agent '%s' to workspace...\n", name)
+	if network != "" {
+		fmt.Printf("  Network:  %s\n", network)
+	}
+	if endpoint == "" {
+		endpoint = "http://localhost:8000"
+	}
+	if channel == "" {
+		channel = "general"
+	}
+	fmt.Printf("  Endpoint: %s\n", endpoint)
+	fmt.Printf("  Channel:  %s\n", channel)
+	fmt.Println("")
+	fmt.Println("The daemon will join the workspace and bridge the agent's stdin/stdout in real time.")
+	fmt.Println("Run 'agn status' to verify, or check ~/.52hzagents/daemon.log for bridge activity.")
+}
+
+// runDisconnect 断开指定智能体的工作区连接。
+// 用法: agn disconnect <name>
+func runDisconnect() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn disconnect <name>")
+		os.Exit(1)
+	}
+
+	name := os.Args[2]
+
+	// 先通知守护进程关闭桥接会话（尽力而为）。
+	if err := config.SendDaemonCommand("disconnect:" + name); err != nil {
+		fmt.Printf("Warning: failed to notify daemon: %v\n", err)
+	}
+
+	// 解除本地配置中的工作区绑定。
+	if err := config.DisconnectAgent(name); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Disconnected agent '%s' from its workspace.\n", name)
 }

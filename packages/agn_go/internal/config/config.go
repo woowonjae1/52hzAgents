@@ -11,10 +11,11 @@ import (
 
 // WorkspaceConfig 代表本地配置中的单个 Workspace 连接参数。
 type WorkspaceConfig struct {
-	ID       string `json:"id"`       // 工作区 UUID 标识
-	Name     string `json:"name"`     // 自定义工作区名称
-	Token    string `json:"token"`    // 连接访问凭证令牌 (X-Workspace-Token)
-	Endpoint string `json:"endpoint"` // 后端服务基准 URL（如 http://localhost:8000）
+	ID       string `json:"id"`                // 工作区 UUID 或 Slug 标识（为空时后端按 Token 反查）
+	Name     string `json:"name"`              // 自定义工作区名称
+	Token    string `json:"token"`             // 连接访问凭证令牌 (X-Workspace-Token)
+	Endpoint string `json:"endpoint"`          // 后端服务基准 URL（如 http://localhost:8000）
+	Channel  string `json:"channel,omitempty"` // 桥接投递/订阅的会话通道名（默认 general，阶段三新增）
 }
 
 // AgentConfig 代表本地注册的单个 AI 智能体客户端定义。
@@ -154,6 +155,70 @@ func RemoveAgent(name string) error {
 
 	delete(LoadedConfig.Agents, name) // 从字典中删除。
 	return SaveConfig()               // 持久化保存到磁盘。
+}
+
+// ConnectAgent 将指定 Agent 绑定到某个工作区连接，并把连接参数持久化到 config.json（阶段三新增）。
+// network 可为空（后端将按 Token 反查工作区）；endpoint 与 channel 为空时使用默认值。
+func ConnectAgent(name, network, token, endpoint, channel string) error {
+	// 校验目标 Agent 是否已注册。
+	ag, exists := LoadedConfig.Agents[name]
+	if !exists {
+		return fmt.Errorf("agent '%s' not found. Run 'agn create %s' first", name, name)
+	}
+
+	// 令牌是接入工作区的必要凭证。
+	if token == "" {
+		return fmt.Errorf("workspace token is required")
+	}
+
+	// 端点与通道兜底默认值。
+	if endpoint == "" {
+		endpoint = "http://localhost:8000"
+	}
+	if channel == "" {
+		channel = "general"
+	}
+
+	// 合成工作区配置项的键：优先使用 network 标识，否则以 "ws-<agent>" 命名。
+	wsKey := network
+	if wsKey == "" {
+		wsKey = "ws-" + name
+	}
+
+	// 初始化工作区字典。
+	if LoadedConfig.Workspaces == nil {
+		LoadedConfig.Workspaces = make(map[string]WorkspaceConfig)
+	}
+
+	// 写入/更新该工作区连接参数。
+	LoadedConfig.Workspaces[wsKey] = WorkspaceConfig{
+		ID:       network,
+		Name:     wsKey,
+		Token:    token,
+		Endpoint: endpoint,
+		Channel:  channel,
+	}
+
+	// 将 Agent 绑定到该工作区连接键。
+	ag.WorkspaceID = wsKey
+	LoadedConfig.Agents[name] = ag
+
+	return SaveConfig() // 持久化保存到磁盘。
+}
+
+// DisconnectAgent 解除指定 Agent 与工作区的绑定关系并持久化（阶段三新增）。
+func DisconnectAgent(name string) error {
+	// 校验目标 Agent 是否存在。
+	ag, exists := LoadedConfig.Agents[name]
+	if !exists {
+		return fmt.Errorf("agent '%s' not found", name)
+	}
+
+	// 清空其工作区绑定。
+	ag.WorkspaceID = ""
+	LoadedConfig.Agents[name] = ag
+
+	return SaveConfig() // 持久化保存到磁盘。
 }
 
 // SendDaemonCommand 向守护进程的 daemon.cmd 文件写入指令行。
