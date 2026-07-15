@@ -1,6 +1,6 @@
 package main // 声明 main 主包。
 
-// 引入所需标准库，以及 Gin 框架和内部编写的配置、数据库、事件处理器和广播 Hub。
+// 引入所需标准库，以及 Gin 框架和内部编写的配置、数据库、事件处理器、广播 Hub 以及后台调度器。
 import (
 	"fmt" // 用于进行格式化拼接生成监听地址字符串。
 	"log" // 用于输出后台服务的启动和错误日志。
@@ -11,6 +11,7 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend_go/internal/db" // 数据库初始化与 GORM 控制包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend_go/internal/handlers" // 路由处理器实现包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend_go/internal/hub" // 消息广播 Hub 中继包。
+	"github.com/woowonjae1/52hzAgents/workspace/backend_go/internal/scheduler" // 后台定时与周期任务调度包（新增）。
 )
 
 func main() { // 服务程序运行主入口函数。
@@ -29,6 +30,9 @@ func main() { // 服务程序运行主入口函数。
 
 	// Initialize Event Hub
 	hub.InitHub() // 初始化并运行高并发的实时消息分发 Hub 中心。
+
+	// Start Background Scheduler
+	scheduler.StartScheduler() // 新增：启动后台任务调度协程，用于触发到期的 Timers 及 Routines 周期任务。
 
 	// Initialize Gin router
 	router := gin.Default() // 使用默认日志与恢复中间件初始化 Gin。
@@ -69,6 +73,18 @@ func main() { // 服务程序运行主入口函数。
 		v1.GET("/files/:file_id/info", handlers.GetFileInfo) // 获取单一文件元数据信息。
 		v1.GET("/files/:file_id", handlers.DownloadFile) // 物理文件流式下载读取接口。
 		v1.DELETE("/files/:file_id", handlers.DeleteFile) // 逻辑删除文件及其物理存储。
+
+		// 注册规划辅助接口 (Todos/Timers/Routines) —— 新增：
+		v1.PUT("/todos", handlers.PutTodos) // 批量保存并重排序代办事项。
+		v1.GET("/todos", handlers.GetTodos) // 查询指定过滤条件下的代办项。
+
+		v1.POST("/timers", handlers.CreateTimer) // 创建单次定时消息提醒计时器。
+		v1.GET("/timers", handlers.ListTimers) // 列出活跃状态的计时器。
+		v1.DELETE("/timers/:timer_id", handlers.DeleteTimer) // 取消定时提醒。
+
+		v1.POST("/routines", handlers.CreateRoutine) // 创建周期性循环执行任务。
+		v1.GET("/routines", handlers.ListRoutines) // 列出活跃中的循环任务。
+		v1.DELETE("/routines/:routine_id", handlers.DeleteRoutine) // 撤销或取消周期任务。
 	} // 结束路由组作用域。
 
 	// Legacy /health endpoint matching the health checks
