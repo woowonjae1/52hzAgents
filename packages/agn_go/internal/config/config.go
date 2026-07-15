@@ -1,0 +1,118 @@
+// Package config 负责管理 agn 客户端本地配置的加载、保存和升级。
+package config
+
+// 导入必要的系统和文件操作库。
+import (
+	"encoding/json" // 解析与序列化 JSON 配置。
+	"os"            // 操作系统调用及环境变量读取。
+	"path/filepath" // 跨平台路径拼接。
+)
+
+// WorkspaceConfig 代表本地配置中的单个 Workspace 连接参数。
+type WorkspaceConfig struct {
+	ID       string `json:"id"`       // 工作区 UUID 标识
+	Name     string `json:"name"`     // 自定义工作区名称
+	Token    string `json:"token"`    // 连接访问凭证令牌 (X-Workspace-Token)
+	Endpoint string `json:"endpoint"` // 后端服务基准 URL（如 http://localhost:8000）
+}
+
+// AgentConfig 代表本地注册的单个 AI 智能体客户端定义。
+type AgentConfig struct {
+	Name        string            `json:"name"`         // 智能体名称别名 (如 coder-claude)
+	Type        string            `json:"type"`         // 运行时类型 (如 claude, aider)
+	WorkspaceID string            `json:"workspace_id"` // 当前关联绑定的工作区 ID
+	Env         map[string]string `json:"env"`          // 该智能体专用的环境变量字典
+}
+
+// GlobalConfig 代表 ~/.52hzagents/config.json 的整体结构。
+type GlobalConfig struct {
+	DaemonPort string                     `json:"daemon_port"` // 守护进程本地通信监听 TCP 端口（如 127.0.0.1:52000）
+	Workspaces map[string]WorkspaceConfig `json:"workspaces"`  // 已配置工作区字典 (Key 为 ID 或 Slug)
+	Agents     map[string]AgentConfig     `json:"agents"`      // 已注册智能体列表字典 (Key 为 Agent 名称)
+}
+
+// LoadedConfig 保存从磁盘载入的全局配置实例。
+var LoadedConfig GlobalConfig
+
+// configFilename 保存本地配置的文件名称。
+const configFilename = "config.json"
+
+// GetConfigDir 获取本地配置目录的绝对路径（支持检测并平滑迁移 openagents 旧配置）。
+func GetConfigDir() (string, error) {
+	home, err := os.UserHomeDir() // 获取用户主目录（在 Windows 上通常是 C:\Users\Username）。
+	if err != nil {
+		return "", err
+	}
+
+	newDir := filepath.Join(home, ".52hzagents") // 推荐的新路径。
+	oldDir := filepath.Join(home, ".openagents") // 兼容迁移的旧路径。
+
+	// 检查新配置文件夹是否存在。
+	if _, err := os.Stat(newDir); os.IsNotExist(err) {
+		// 如果新目录不存在，但旧的 openagents 目录存在，则自动执行静默更名迁移。
+		if _, errOld := os.Stat(oldDir); errOld == nil {
+			_ = os.Rename(oldDir, newDir) // 试图进行重命名迁移。
+		}
+	}
+
+	// 确保新目录结构已被创建。
+	err = os.MkdirAll(newDir, 0755)
+	return newDir, err
+}
+
+// LoadConfig 从 ~/.52hzagents/config.json 载入配置。
+func LoadConfig() error {
+	dir, err := GetConfigDir() // 获取配置存储目录。
+	if err != nil {
+		return err
+	}
+
+	filePath := filepath.Join(dir, configFilename) // 拼接完整配置文件路径。
+
+	// 如果配置文件本身不存在，则赋初值并写入。
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		LoadedConfig = GlobalConfig{
+			DaemonPort: "127.0.0.1:52000",                   // 默认本地后台控制端口设为 52000。
+			Workspaces: make(map[string]WorkspaceConfig),   // 初始化空字典。
+			Agents:     make(map[string]AgentConfig),       // 初始化空字典。
+		}
+		return SaveConfig() // 写入初始版本配置文件。
+	}
+
+	// 读取配置文件内容。
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return err
+	}
+
+	// 解析 JSON 反序列化到 LoadedConfig 中。
+	if err := json.Unmarshal(data, &LoadedConfig); err != nil {
+		return err
+	}
+
+	// 兜底校验端口参数，防止为空。
+	if LoadedConfig.DaemonPort == "" {
+		LoadedConfig.DaemonPort = "127.0.0.1:52000"
+	}
+
+	return nil
+}
+
+// SaveConfig 将内存配置持久化写入到配置文件中。
+func SaveConfig() error {
+	dir, err := GetConfigDir() // 获取存储目录。
+	if err != nil {
+		return err
+	}
+
+	filePath := filepath.Join(dir, configFilename) // 配置路径。
+
+	// 序列化为 JSON 缩进格式。
+	data, err := json.MarshalIndent(LoadedConfig, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// 写入文件，权限设为 0644（所有者可读写，其他人只读）。
+	return os.WriteFile(filePath, data, 0644)
+}
