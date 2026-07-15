@@ -482,7 +482,10 @@ class ClaudeAdapter extends BaseAdapter {
       `${pfx}workspace_get_agents`,
       `${pfx}workspace_status`,
     ];
-    const mcpWriteTools = [];
+    const mcpWriteTools = [
+      `${pfx}local_execute_command`,
+      `${pfx}local_write_file`,
+    ];
 
     if (!this.disabledModules.has('files')) {
       mcpTools.push(`${pfx}workspace_list_files`, `${pfx}workspace_read_file`);
@@ -511,9 +514,11 @@ class ClaudeAdapter extends BaseAdapter {
     mcpTools.push(`${pfx}workspace_get_todos`, `${pfx}workspace_list_timers`, `${pfx}workspace_list_routines`);
     mcpWriteTools.push(`${pfx}workspace_put_todos`, `${pfx}workspace_create_timer`, `${pfx}workspace_cancel_timer`, `${pfx}workspace_create_routine`, `${pfx}workspace_cancel_routine`);
 
-    if (this._mode === 'plan') {
+    const requireApproval = (this.agentEnv && this.agentEnv.OA_REQUIRE_APPROVAL === 'true') || this._mode === 'plan';
+
+    if (requireApproval) {
       cmd.push('--permission-mode', 'plan');
-      cmd.push('--allowedTools', ...mcpTools, 'Read', 'Glob', 'Grep');
+      cmd.push('--allowedTools', ...mcpTools, ...mcpWriteTools, 'Read', 'Glob', 'Grep');
     } else {
       cmd.push('--dangerously-skip-permissions');
       cmd.push('--allowedTools', ...mcpTools, ...mcpWriteTools, 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep');
@@ -526,6 +531,7 @@ class ClaudeAdapter extends BaseAdapter {
       '--channel-name', channelName,
       '--agent-name', this.agentName,
       '--endpoint', this.endpoint,
+      '--working-dir', this.workingDir || '',
     ];
     if (this.disabledModules.has('files')) mcpArgs.push('--disable-files');
     if (this.disabledModules.has('browser')) mcpArgs.push('--disable-browser');

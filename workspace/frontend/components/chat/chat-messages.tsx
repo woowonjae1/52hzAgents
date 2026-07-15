@@ -449,10 +449,28 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                 }}
               >
                 {group.type === 'chat' ? (
-                  <ChatMessage
-                    message={group.message}
-                    agents={agents}
-                  />
+                  (() => {
+                    const approvalRequest = group.message.metadata?.tool_approval_request;
+                    let isApproved = false;
+                    let isRejected = false;
+                    if (approvalRequest && approvalRequest.approval_id) {
+                      const response = messages.find(m =>
+                        m.metadata?.tool_approval_response?.approval_id === approvalRequest.approval_id
+                      );
+                      if (response) {
+                        isApproved = !!response.metadata?.tool_approval_response?.granted;
+                        isRejected = !isApproved;
+                      }
+                    }
+                    return (
+                      <ChatMessage
+                        message={group.message}
+                        agents={agents}
+                        isApproved={isApproved}
+                        isRejected={isRejected}
+                      />
+                    );
+                  })()
                 ) : group.type === 'thinking' ? (
                   <ThinkingMessage
                     sender={group.sender}

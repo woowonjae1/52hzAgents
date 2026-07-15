@@ -846,6 +846,7 @@ async function main() {
       const agentName = flags['agent-name'] || process.env.OPENAGENTS_AGENT_NAME || 'agent';
       const endpoint = flags.endpoint || process.env.OPENAGENTS_ENDPOINT || process.env.OPENAGENTS_WORKSPACE_ENDPOINT || 'http://localhost:8000';
       const token = process.env.OA_WORKSPACE_TOKEN || '';
+      const workingDir = flags['working-dir'] || '';
       if (!workspaceId || !token) {
         print('Error: --workspace-id required and OA_WORKSPACE_TOKEN env var must be set');
         process.exitCode = 1;
@@ -854,7 +855,7 @@ async function main() {
       const disabledModules = new Set();
       if (flags['disable-files']) disabledModules.add('files');
       if (flags['disable-browser']) disabledModules.add('browser');
-      runMcpServer({ workspaceId, channelName, agentName, endpoint, token, disabledModules });
+      runMcpServer({ workspaceId, channelName, agentName, endpoint, token, disabledModules, workingDir });
     },
   };
 

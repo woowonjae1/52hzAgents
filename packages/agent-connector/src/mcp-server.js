@@ -24,6 +24,30 @@ const _activeTunnels = {};
 
 function buildToolDefs(disabledModules) {
   const tools = [
+    // -- Local command & file operations with optional user approval --
+    {
+      name: 'local_execute_command',
+      description: 'Execute a shell command in the local project directory. Use this to run git commands, compiler commands, tests, or other shell commands. The execution may be paused to ask for user approval.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'The shell command to execute.' },
+        },
+        required: ['command'],
+      },
+    },
+    {
+      name: 'local_write_file',
+      description: 'Write text content to a local file in the project directory.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'The relative or absolute file path to write to.' },
+          content: { type: 'string', description: 'The content to write into the file.' },
+        },
+        required: ['path', 'content'],
+      },
+    },
     // -- Workspace core (always enabled) --
     {
       name: 'workspace_get_history',
@@ -464,7 +488,7 @@ function isTextMime(mime) {
 // ── MCP Server ──────────────────────────────────────────────────────────────
 
 class McpServer {
-  constructor({ wsClient, workspaceId, channelName, agentName, token, disabledModules }) {
+  constructor({ wsClient, workspaceId, channelName, agentName, token, disabledModules, workingDir }) {
     this.ws = wsClient;
     this.workspaceId = workspaceId;
     this.channelName = channelName;
@@ -472,6 +496,7 @@ class McpServer {
     this.token = token;
     this.disabledModules = disabledModules || new Set();
     this.tools = buildToolDefs(this.disabledModules);
+    this.workingDir = workingDir || '';
   }
 
   start() {
@@ -534,6 +559,57 @@ class McpServer {
     const image = (data, mime) => ({ content: [{ type: 'image', data, mimeType: mime }] });
 
     switch (name) {
+      case 'local_execute_command': {
+        const command = args.command;
+        if (!command) throw new Error('command is required');
+
+        const requireApproval = process.env.OA_REQUIRE_APPROVAL === 'true';
+        if (requireApproval) {
+          const approved = await this._requestApproval('local_execute_command', { command });
+          if (!approved) {
+            throw new Error('Permission denied by user.');
+          }
+        }
+
+        const childProcess = require('child_process');
+        const cwd = this.workingDir || process.cwd();
+        try {
+          const stdout = childProcess.execSync(command, { cwd, encoding: 'utf8', timeout: 60000 });
+          return text(stdout);
+        } catch (err) {
+          return {
+            content: [{ type: 'text', text: `Command failed with error: ${err.message}\nStdout: ${err.stdout || ''}\nStderr: ${err.stderr || ''}` }],
+            isError: true,
+          };
+        }
+      }
+
+      case 'local_write_file': {
+        const filePath = args.path;
+        const content = args.content;
+        if (!filePath) throw new Error('path is required');
+        if (content === undefined) throw new Error('content is required');
+
+        const requireApproval = process.env.OA_REQUIRE_APPROVAL === 'true';
+        if (requireApproval) {
+          const approved = await this._requestApproval('local_write_file', { path: filePath, contentSnippet: content.slice(0, 200) });
+          if (!approved) {
+            throw new Error('Permission denied by user.');
+          }
+        }
+
+        const fs = require('fs');
+        const pathLib = require('path');
+        const targetPath = pathLib.isAbsolute(filePath) ? filePath : pathLib.join(this.workingDir || process.cwd(), filePath);
+        
+        try {
+          fs.mkdirSync(pathLib.dirname(targetPath), { recursive: true });
+          fs.writeFileSync(targetPath, content, 'utf8');
+          return text(`File written successfully to ${filePath}`);
+        } catch (err) {
+          throw new Error(`Failed to write file: ${err.message}`);
+        }
+      }
 
       // ── Workspace core ──
 
@@ -978,6 +1054,65 @@ class McpServer {
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
+  }
+
+  async _requestApproval(toolName, toolArgs) {
+    const approvalId = 'appr_' + Math.random().toString(36).slice(2, 11);
+    const content = `[Approval Required] Agent requests permission to run ${toolName}.`;
+    
+    this._log(`Requesting approval ${approvalId} for ${toolName}...`);
+
+    try {
+      await this.ws.sendMessage(this.workspaceId, this.channelName, this.token, content, {
+        senderType: 'agent',
+        senderName: this.agentName,
+        messageType: 'chat',
+        metadata: {
+          tool_approval_request: {
+            approval_id: approvalId,
+            tool: toolName,
+            args: toolArgs,
+          }
+        }
+      });
+    } catch (err) {
+      this._log(`Failed to send approval request: ${err.message}`);
+      return false;
+    }
+
+    const start = Date.now();
+    const timeoutMs = 300000; // 5 mins
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    
+    let lastMsgId = null;
+    try {
+      const initialMsgs = await this.ws.pollMessages(this.workspaceId, this.channelName, this.token, { limit: 1 });
+      if (initialMsgs && initialMsgs.length > 0) {
+        lastMsgId = initialMsgs[initialMsgs.length - 1].messageId;
+      }
+    } catch (err) {
+      this._log(`Failed to get initial messages: ${err.message}`);
+    }
+
+    while (Date.now() - start < timeoutMs) {
+      await sleep(1000);
+      try {
+        const msgs = await this.ws.pollMessages(this.workspaceId, this.channelName, this.token, { after: lastMsgId, limit: 10 });
+        for (const m of msgs) {
+          lastMsgId = m.messageId;
+          const resp = m.metadata && m.metadata.tool_approval_response;
+          if (resp && resp.approval_id === approvalId) {
+            this._log(`Approval response received for ${approvalId}: granted=${resp.granted}`);
+            return !!resp.granted;
+          }
+        }
+      } catch (err) {
+        this._log(`Error polling messages: ${err.message}`);
+      }
+    }
+
+    this._log(`Approval request ${approvalId} timed out.`);
+    return false;
   }
 
   _write(json) {

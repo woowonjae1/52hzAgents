@@ -8,7 +8,7 @@ const http = require('http');
 describe('WorkspaceClient', () => {
   it('constructs with default endpoint', () => {
     const client = new WorkspaceClient();
-    assert.equal(client.endpoint, 'https://workspace-endpoint.openagents.org');
+    assert.equal(client.endpoint, 'http://localhost:8000');
   });
 
   it('constructs with custom endpoint and strips trailing slash', () => {

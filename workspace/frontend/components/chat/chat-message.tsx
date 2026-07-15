@@ -113,13 +113,75 @@ function Attachments({ items }: { items: Attachment[] }) {
 interface ChatMessageProps {
   message: WorkspaceMessage;
   agents?: WorkspaceAgent[];
+  isApproved?: boolean;
+  isRejected?: boolean;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
   const [copied, setCopied] = useState(false);
+  const [localStatus, setLocalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+
+  const approvalRequest = message.metadata?.tool_approval_request;
+  const currentApproved = isApproved || localStatus === 'approved';
+  const currentRejected = isRejected || localStatus === 'rejected';
+  const hasStatus = currentApproved || currentRejected;
+
+  const handleApprove = async () => {
+    if (!approvalRequest) return;
+    setLocalStatus('approved');
+    try {
+      await workspaceApi.sendEvent({
+        type: 'workspace.message.posted',
+        source: `human:${currentUser.id || 'user'}`,
+        target: `channel/${message.sessionId}`,
+        payload: {
+          content: 'Approved command execution.',
+          sender_type: 'human',
+          sender_name: currentUser.name || 'user',
+        },
+        metadata: {
+          tool_approval_response: {
+            approval_id: approvalRequest.approval_id,
+            granted: true,
+          }
+        },
+        visibility: 'channel',
+      });
+    } catch {
+      toast.error('Failed to submit approval');
+      setLocalStatus('pending');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!approvalRequest) return;
+    setLocalStatus('rejected');
+    try {
+      await workspaceApi.sendEvent({
+        type: 'workspace.message.posted',
+        source: `human:${currentUser.id || 'user'}`,
+        target: `channel/${message.sessionId}`,
+        payload: {
+          content: 'Rejected command execution.',
+          sender_type: 'human',
+          sender_name: currentUser.name || 'user',
+        },
+        metadata: {
+          tool_approval_response: {
+            approval_id: approvalRequest.approval_id,
+            granted: false,
+          }
+        },
+        visibility: 'channel',
+      });
+    } catch {
+      toast.error('Failed to submit rejection');
+      setLocalStatus('pending');
+    }
+  };
 
   const agentNames = useMemo(() => agents.map((a) => a.agentName), [agents]);
   const agent = agents.find((a) => a.agentName === message.senderName);
@@ -223,6 +285,59 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
           <div className="text-sm leading-relaxed mt-0.5">
             <MarkdownContent content={message.content} agentNames={agentNames} />
             <Attachments items={attachments} />
+
+            {approvalRequest && (
+              <div className="mt-3 p-3 rounded-lg border bg-background/50 border-dashed space-y-2 max-w-full">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                    ⚠ Action Approval Required
+                  </span>
+                  <span className="text-[10px] text-muted-foreground uppercase font-mono">
+                    ID: {approvalRequest.approval_id}
+                  </span>
+                </div>
+                <div className="text-xs space-y-1 font-mono bg-muted p-2 rounded overflow-x-auto max-w-full">
+                  <div className="font-semibold text-foreground">Tool: {approvalRequest.tool}</div>
+                  {approvalRequest.args?.command && (
+                    <div className="text-blue-600 dark:text-blue-400 whitespace-pre-wrap">$ {approvalRequest.args.command}</div>
+                  )}
+                  {approvalRequest.args?.path && (
+                    <div className="text-green-600 dark:text-green-400">File: {approvalRequest.args.path}</div>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-2 mt-2">
+                  {hasStatus ? (
+                    <span className={cn(
+                      "text-xs font-semibold px-2 py-1 rounded",
+                      currentApproved 
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    )}>
+                      {currentApproved ? '✓ Approved' : '✗ Denied'}
+                    </span>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm"
+                        className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                        onClick={handleApprove}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-3 text-red-600 hover:text-red-700 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/20 font-semibold"
+                        onClick={handleReject}
+                      >
+                        Deny
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Copy button */}
             <div className="flex items-center gap-1 mt-1">
