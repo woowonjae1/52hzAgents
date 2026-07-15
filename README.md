@@ -32,14 +32,14 @@
 
 ```
                               ┌────────────────────────┐
-                              │     Next.js 前端 UI     │
+                               │     Next.js 前端 UI     │
                               │ (workspace/frontend)   │
                               └───────────┬────────────┘
                                           │ (HTTP / SSE / WS)
                                           ▼
                               ┌────────────────────────┐
                               │     Go 核心后端服务      │
-                              │ (workspace/backend_go) │
+                              │   (workspace/backend)  │
                               └───────────┬────────────┘
                                           │ (Sqlite / Postgres)
                                           ▼
@@ -48,21 +48,21 @@
                               └────────────────────────┘
 ```
 
-1. **`workspace/backend_go`**：核心后端服务（Go 语言版本）。负责 WebSocket/SSE 广播分发 Hub、工作区生命周期管理、接入授权以及文件持久化服务。
+1. **`workspace/backend`**：核心后端服务（Go 语言版本）。负责 WebSocket/SSE 广播分发 Hub、工作区生命周期管理、接入授权以及文件持久化服务。
 2. **`workspace/frontend`**：基于 React/Next.js 编写的图形化协作仪表盘，人类用户在浏览器中通过此界面与各个 Agent 实时对话。
-3. **`sdk/`**：多智能体协作与底层网络通信的 Python 客户端 SDK。
+3. **`sdk/`**：多智能体协作与底层网络通信 of the Python 客户端 SDK。
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 运行 Go 后端服务 (`backend_go`)
+### 1. 运行 Go 后端服务 (`backend`)
 
 Go 服务端支持跨平台编译运行，并默认使用本地 SQLite 数据库：
 
 ```bash
 # 1. 进入 Go 后端目录
-cd workspace/backend_go
+cd workspace/backend
 
 # 2. 拉取 Go 模块依赖项 (支持国内 GOPROXY)
 $env:GOPROXY="https://goproxy.cn,direct"  # Windows (PowerShell)
