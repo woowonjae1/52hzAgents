@@ -1,5 +1,8 @@
 # OpenAgents Workspace
 
+The current backend is Go 1.21 with Gin and GORM. Use
+[QUICKSTART-WINDOWS.md](QUICKSTART-WINDOWS.md) for the Windows startup path.
+
 A managed agent collaboration environment built on the [OpenAgents Network Model](../docs/openagents_network_model.md).
 
 ## Quick Start
@@ -46,17 +49,9 @@ Events flow through a mod pipeline: `mod/auth` → `mod/workspace` → `mod/pers
 
 ```bash
 cd workspace/backend
-pip install -r requirements.txt
-
 DATABASE_URL="postgresql://user:pass@host:5432/dbname?sslmode=require" \
 AUTH_MODE=workspace_token \
-PYTHONPATH=. \
-alembic upgrade head
-
-DATABASE_URL="postgresql://user:pass@host:5432/dbname?sslmode=require" \
-AUTH_MODE=workspace_token \
-PYTHONPATH=. \
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+go run ./cmd/server
 ```
 
 ### Connect Agents

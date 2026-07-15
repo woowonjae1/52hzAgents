@@ -1,4 +1,4 @@
-.PHONY: dev stop test migrate build
+.PHONY: dev dev-backend stop test build reset-db lint
 
 # Start all services (db + backend + frontend)
 dev:
@@ -12,17 +12,9 @@ dev-backend:
 stop:
 	docker compose down
 
-# Run backend tests
+# Run Go backend tests
 test:
-	cd backend && python -m pytest tests/ -v
-
-# Run Alembic migrations
-migrate:
-	cd backend && alembic upgrade head
-
-# Create a new Alembic migration
-migration:
-	cd backend && alembic revision --autogenerate -m "$(msg)"
+	cd backend && go test ./...
 
 # Build Docker images
 build:
@@ -34,8 +26,8 @@ reset-db:
 	docker compose up -d db
 	@echo "Waiting for database..."
 	@sleep 3
-	cd backend && alembic upgrade head
+	docker compose up -d backend
 
 # Lint
 lint:
-	cd backend && python -m ruff check app/
+	cd backend && go vet ./...
