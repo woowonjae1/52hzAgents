@@ -15,18 +15,19 @@ import (
 	"syscall"       // 进程信号常数。
 	"time"          // 格式化输出时间。
 
-	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/config" // 本地配置。
-	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/daemon" // 后台守护进程。
+	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/config"   // 本地配置。
+	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/daemon"   // 后台守护进程。
+	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/registry" // 智能体注册表。
 )
 
-const version = "0.2.150" // 定义客户端版本号。
+const version = "0.3.0" // 定义客户端版本号（阶段二升级）。
 
 // main 客户端入口。
 func main() {
 	// 定义命令行子命令参数。
 	upCmd := flag.NewFlagSet("up", flag.ExitOnError) // 定义 up 子命令。
 	foregroundOpt := upCmd.Bool("foreground", false, "Run daemon in the foreground") // up 命令的可选前台运行参数。
-	logToFileOpt := upCmd.Bool("log-to-file", false, "Redirect logs to daemon.log") // 新增：可选重定向日志到日志文件参数。
+	logToFileOpt := upCmd.Bool("log-to-file", false, "Redirect logs to daemon.log") // 可选重定向日志到日志文件参数。
 
 	// 如果命令行输入参数太少，打印帮助并退出。
 	if len(os.Args) < 2 {
@@ -57,6 +58,16 @@ func main() {
 		runStatus() // 查看状态。
 	case "list":
 		runList() // 列出智能体。
+	case "create":
+		runCreate() // 创建新智能体。
+	case "remove":
+		runRemove() // 移除智能体。
+	case "start":
+		runStart() // 启动特定智能体。
+	case "stop":
+		runStop() // 停止特定智能体。
+	case "restart":
+		runRestart() // 重启特定智能体。
 	case "version", "-v", "--version":
 		fmt.Printf("agn Launcher Version: %s (Go Edition)\n", version)
 	case "help", "-h", "--help":
@@ -77,13 +88,23 @@ Commands:
   down                        Stop daemon
   status                      Show agent status
   list                        List configured agents
+  create <name> [--type T]    Create a new agent
+  remove <name>               Remove an agent
+  start <name>                Start a specific agent
+  stop <name>                 Stop a specific agent
+  restart <name>              Restart a specific agent
   version                     Show version
   help                        Show this help
 
 Options:
   --foreground                Run daemon in foreground (only with 'up')
+  --type <type>               Agent runtime type (default: openclaw)
 `)
 }
+
+// ============================================================================
+// 阶段一命令实现
+// ============================================================================
 
 // runForeground 在前台阻塞运行守护进程。
 func runForeground(logToFile bool) {
@@ -245,4 +266,144 @@ func runList() {
 		fmt.Printf("%-20s %-12s %-20s\n", name, ag.Type, ag.WorkspaceID)
 	}
 	fmt.Println("--------------------------------------------------------------------------------")
+}
+
+// ============================================================================
+// 阶段二命令实现：智能体创建/删除/启动/停止
+// ============================================================================
+
+// runCreate 创建一个新的智能体定义并写入 config.json。
+func runCreate() {
+	// 手动解析 os.Args[2:] 参数。Go 的 flag 包不支持混合顺序的位置参数与 flag 参数。
+	remaining := os.Args[2:]
+	agentType := "openclaw" // 默认类型。
+	var name string
+
+	for i := 0; i < len(remaining); i++ {
+		arg := remaining[i]
+		if arg == "--type" || arg == "-type" {
+			// 下一个参数是类型值。
+			if i+1 < len(remaining) {
+				agentType = remaining[i+1]
+				i++ // 跳过已消费的类型值。
+			}
+		} else if strings.HasPrefix(arg, "--type=") {
+			agentType = strings.TrimPrefix(arg, "--type=")
+		} else if !strings.HasPrefix(arg, "-") {
+			name = arg // 位置参数 => Agent 名称。
+		}
+	}
+
+	if name == "" {
+		fmt.Println("Usage: agn create <name> [--type <type>]")
+		os.Exit(1)
+	}
+
+	// 校验该类型是否在注册表中受支持。
+	entry := registry.GetEntry(agentType)
+	if entry == nil {
+		fmt.Printf("Error: unknown agent type '%s'.\n", agentType)
+		fmt.Println("Supported types: aider, amp, claude, cline, codex, copilot, cursor, gemini, goose, hermes, kimi, mini-swe-agent, nanoclaw, openclaw, opencode")
+		os.Exit(1)
+	}
+
+	// 调用配置模块的 AddAgent 方法向配置写入新 Agent。
+	if err := config.AddAgent(name, agentType, ""); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 尝试通知守护进程重新加载。
+	_ = config.SendDaemonCommand("reload")
+
+	fmt.Printf("Created local agent: %s (type: %s)\n", name, agentType)
+	fmt.Println("")
+	fmt.Println("This agent is local-only and will not appear in Workspace Dashboard yet.")
+	fmt.Println("")
+	fmt.Println("To connect it to a Workspace, run:")
+	fmt.Printf("  agn connect %s <workspace-token>\n", name)
+}
+
+// runRemove 移除已注册的智能体定义。
+func runRemove() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn remove <name>")
+		os.Exit(1)
+	}
+
+	name := os.Args[2] // 需要移除的 Agent 名称。
+
+	// 先通知守护进程停止该 Agent（如在运行中）。
+	_ = config.SendDaemonCommand("stop:" + name)
+
+	// 调用配置模块的 RemoveAgent 方法从配置中移除。
+	if err := config.RemoveAgent(name); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 通知守护进程重新加载配置。
+	_ = config.SendDaemonCommand("reload")
+
+	fmt.Printf("Agent '%s' removed\n", name)
+}
+
+// runStart 向守护进程发送启动特定 Agent 的指令。
+func runStart() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn start <name>")
+		os.Exit(1)
+	}
+
+	name := os.Args[2]
+
+	// 校验该 Agent 是否在配置中已注册。
+	if _, exists := config.LoadedConfig.Agents[name]; !exists {
+		fmt.Printf("Error: agent '%s' not found in config. Run 'agn create %s' first.\n", name, name)
+		os.Exit(1)
+	}
+
+	// 写入 start:<name> 到 daemon.cmd 文件。
+	if err := config.SendDaemonCommand("start:" + name); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Sent start command for '%s'\n", name)
+}
+
+// runStop 向守护进程发送停止特定 Agent 的指令。
+func runStop() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn stop <name>")
+		os.Exit(1)
+	}
+
+	name := os.Args[2]
+
+	// 写入 stop:<name> 到 daemon.cmd 文件。
+	if err := config.SendDaemonCommand("stop:" + name); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Sent stop command for '%s'\n", name)
+}
+
+// runRestart 向守护进程发送重启特定 Agent 的指令。
+func runRestart() {
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: agn restart <name>")
+		os.Exit(1)
+	}
+
+	name := os.Args[2]
+
+	// 写入 restart:<name> 到 daemon.cmd 文件。
+	if err := config.SendDaemonCommand("restart:" + name); err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Sent restart command for '%s'\n", name)
 }

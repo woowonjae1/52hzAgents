@@ -4,6 +4,7 @@ package config
 // 导入必要的系统和文件操作库。
 import (
 	"encoding/json" // 解析与序列化 JSON 配置。
+	"fmt"           // 格式化错误信息。
 	"os"            // 操作系统调用及环境变量读取。
 	"path/filepath" // 跨平台路径拼接。
 )
@@ -115,4 +116,53 @@ func SaveConfig() error {
 
 	// 写入文件，权限设为 0644（所有者可读写，其他人只读）。
 	return os.WriteFile(filePath, data, 0644)
+}
+
+// AddAgent 向全局配置中新增一条 Agent 定义并持久化。
+func AddAgent(name, agentType, workspaceID string) error {
+	// 防止空参数。
+	if name == "" {
+		return fmt.Errorf("agent name cannot be empty")
+	}
+
+	// 初始化字典。
+	if LoadedConfig.Agents == nil {
+		LoadedConfig.Agents = make(map[string]AgentConfig)
+	}
+
+	// 检查是否已经存在同名。
+	if _, exists := LoadedConfig.Agents[name]; exists {
+		return fmt.Errorf("agent '%s' already exists", name)
+	}
+
+	// 创建新的 AgentConfig 并写入到字典中。
+	LoadedConfig.Agents[name] = AgentConfig{
+		Name:        name,
+		Type:        agentType,
+		WorkspaceID: workspaceID,
+		Env:         make(map[string]string),
+	}
+
+	return SaveConfig() // 持久化保存到磁盘。
+}
+
+// RemoveAgent 从全局配置中移除指定名称的 Agent 定义并持久化。
+func RemoveAgent(name string) error {
+	if _, exists := LoadedConfig.Agents[name]; !exists {
+		return fmt.Errorf("agent '%s' not found", name)
+	}
+
+	delete(LoadedConfig.Agents, name) // 从字典中删除。
+	return SaveConfig()               // 持久化保存到磁盘。
+}
+
+// SendDaemonCommand 向守护进程的 daemon.cmd 文件写入指令行。
+func SendDaemonCommand(command string) error {
+	dir, err := GetConfigDir()
+	if err != nil {
+		return err
+	}
+
+	cmdFile := filepath.Join(dir, "daemon.cmd") // 拼接指令文件路径。
+	return os.WriteFile(cmdFile, []byte(command), 0644)
 }
