@@ -6,7 +6,7 @@ import { capture, group } from './analytics';
 import { useOpenAgentsAuth } from './openagents-auth-context';
 import { generateUserId, getStoredIdentity, storeIdentity } from './identity';
 import { networkAgentToWorkspaceAgent, networkChannelToSession } from './types';
-import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
+import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TimerItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
 
 function useWorkspaceIdentity() {
   const { user } = useOpenAgentsAuth();
@@ -108,6 +108,22 @@ interface WorkspaceContextValue {
   refreshDMConversations: () => Promise<void>;
   todos: TodoItem[];
   refreshTodos: () => Promise<void>;
+  replaceTodos: (params: {
+    source: string;
+    channel: string;
+    threadId?: string;
+    todos: Array<Pick<TodoItem, 'content' | 'status' | 'assignee'>>;
+  }) => Promise<void>;
+  timers: TimerItem[];
+  refreshTimers: () => Promise<void>;
+  createTimer: (params: {
+    source: string;
+    channel: string;
+    message: string;
+    delaySeconds: number;
+    threadId?: string;
+  }) => Promise<void>;
+  cancelTimer: (timerId: string) => Promise<void>;
   routines: RoutineItem[];
   refreshRoutines: () => Promise<void>;
   createRoutine: (params: {
@@ -200,6 +216,7 @@ export function WorkspaceProvider({
   const [browserContexts, setBrowserContexts] = useState<BrowserPersistentContext[]>([]);
   const [dmConversations, setDMConversations] = useState<DMConversation[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [timers, setTimers] = useState<TimerItem[]>([]);
   const [routines, setRoutines] = useState<RoutineItem[]>([]);
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -618,6 +635,7 @@ export function WorkspaceProvider({
       workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
       workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
       workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {});
+      workspaceApi.listTimers().then((r) => setTimers(r.timers)).catch(() => {});
       workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {});
       workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {});
       workspaceApi.listNotifications().then((r) => {
@@ -649,6 +667,41 @@ export function WorkspaceProvider({
       // Non-critical
     }
   }, []);
+
+  const replaceTodos = useCallback(async (params: {
+    source: string;
+    channel: string;
+    threadId?: string;
+    todos: Array<Pick<TodoItem, 'content' | 'status' | 'assignee'>>;
+  }) => {
+    await workspaceApi.replaceTodos(params);
+    await refreshTodos();
+  }, [refreshTodos]);
+
+  const refreshTimers = useCallback(async () => {
+    try {
+      const result = await workspaceApi.listTimers();
+      setTimers(result.timers);
+    } catch {
+      // Non-critical
+    }
+  }, []);
+
+  const createTimer = useCallback(async (params: {
+    source: string;
+    channel: string;
+    message: string;
+    delaySeconds: number;
+    threadId?: string;
+  }) => {
+    await workspaceApi.createTimer(params);
+    await refreshTimers();
+  }, [refreshTimers]);
+
+  const cancelTimer = useCallback(async (timerId: string) => {
+    await workspaceApi.cancelTimer(timerId);
+    await refreshTimers();
+  }, [refreshTimers]);
 
   const refreshRoutines = useCallback(async () => {
     try {
@@ -720,12 +773,13 @@ export function WorkspaceProvider({
   useEffect(() => {
     const refreshCollaboration = () => {
       void refreshTodos();
+      void refreshTimers();
       void refreshRoutines();
       void refreshNotifications();
     };
     const interval = window.setInterval(refreshCollaboration, 15_000);
     return () => window.clearInterval(interval);
-  }, [refreshNotifications, refreshRoutines, refreshTodos]);
+  }, [refreshNotifications, refreshRoutines, refreshTimers, refreshTodos]);
 
   const refreshKnowledge = useCallback(async () => {
     try {
@@ -859,6 +913,7 @@ export function WorkspaceProvider({
           workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {}),
           workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {}),
           workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {}),
+          workspaceApi.listTimers().then((r) => setTimers(r.timers)).catch(() => {}),
           workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {}),
           workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {}),
           workspaceApi.listNotifications().then((r) => {
@@ -1256,6 +1311,11 @@ export function WorkspaceProvider({
         refreshDMConversations,
         todos,
         refreshTodos,
+        replaceTodos,
+        timers,
+        refreshTimers,
+        createTimer,
+        cancelTimer,
         routines,
         refreshRoutines,
         createRoutine,

@@ -1002,6 +1002,38 @@ class WorkspaceApi {
     };
   }
 
+  async replaceTodos(params: {
+    source: string;
+    channel: string;
+    threadId?: string;
+    todos: Array<Pick<TodoItem, 'content' | 'status' | 'assignee'>>;
+  }): Promise<{ todos: TodoItem[] }> {
+    const raw = await this.request<{ todos: Record<string, unknown>[] }>('/v1/todos', {
+      method: 'PUT',
+      body: JSON.stringify({
+        network: this.workspaceId,
+        source: params.source,
+        channel: params.channel,
+        ...(params.threadId ? { thread_id: params.threadId } : {}),
+        todos: params.todos,
+      }),
+    });
+    return {
+      todos: (raw.todos || []).map((t): TodoItem => ({
+        id: (t.id || t.ID) as string,
+        content: (t.content || t.Content) as string,
+        status: (t.status || t.Status) as TodoItem['status'],
+        assignee: (t.assignee || t.Assignee) as string,
+        createdBy: (t.created_by || t.createdBy || t.CreatedBy || '') as string,
+        channelName: (t.channel_name || t.channelName || t.ChannelName || '') as string,
+        threadId: (t.thread_id || t.threadId || t.ThreadID || null) as string | null,
+        position: (t.position ?? t.Position ?? 0) as number,
+        createdAt: (t.created_at || t.createdAt || t.CreatedAt || null) as string | null,
+        updatedAt: (t.updated_at || t.updatedAt || t.UpdatedAt || null) as string | null,
+      })),
+    };
+  }
+
   async listTimers(channel?: string): Promise<{ timers: TimerItem[] }> {
     const params = new URLSearchParams({ network: this.workspaceId });
     if (channel) params.set('channel', channel);
@@ -1017,6 +1049,36 @@ class WorkspaceApi {
         channelName: (t.channel_name || t.channelName || t.ChannelName || '') as string,
         createdAt: (t.created_at || t.createdAt || t.CreatedAt || null) as string | null,
       })),
+    };
+  }
+
+  async createTimer(params: {
+    source: string;
+    channel: string;
+    message: string;
+    delaySeconds: number;
+    threadId?: string;
+  }): Promise<TimerItem> {
+    const raw = await this.request<Record<string, unknown>>('/v1/timers', {
+      method: 'POST',
+      body: JSON.stringify({
+        network: this.workspaceId,
+        source: params.source,
+        channel: params.channel,
+        message: params.message,
+        delay_seconds: params.delaySeconds,
+        ...(params.threadId ? { thread_id: params.threadId } : {}),
+      }),
+    });
+    return {
+      id: (raw.id || raw.ID) as string,
+      message: (raw.message || raw.Message) as string,
+      delaySeconds: (raw.delay_seconds ?? raw.delaySeconds ?? raw.DelaySeconds ?? 0) as number,
+      firesAt: (raw.fires_at || raw.firesAt || raw.FiresAt || '') as string,
+      status: (raw.status || raw.Status || 'active') as string,
+      createdBy: (raw.created_by || raw.createdBy || raw.CreatedBy || '') as string,
+      channelName: (raw.channel_name || raw.channelName || raw.ChannelName || '') as string,
+      createdAt: (raw.created_at || raw.createdAt || raw.CreatedAt || null) as string | null,
     };
   }
 
