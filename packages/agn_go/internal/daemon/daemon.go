@@ -392,7 +392,9 @@ func (d *Daemon) spawnLoop(name string, ag config.AgentConfig) {
 				br := d.bridges[name]
 				d.mu.Unlock()
 				if br != nil {
-					br.SendOutput(text)
+					if err := br.SendOutput(text); err != nil {
+						log.Printf("[%s] message delivery failed: %v", name, err)
+					}
 				}
 			}
 		}(stdout)

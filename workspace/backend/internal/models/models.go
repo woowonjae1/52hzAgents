@@ -9,16 +9,17 @@ import (
 // ---------------------------------------------------------------------------
 
 type EventRecord struct {
-	ID         string    `gorm:"primaryKey;type:text"`
-	NetworkID  string    `gorm:"type:uuid;not null;index:idx_events_network_type;index:idx_events_network_target;index:idx_events_network_timestamp"`
-	Type       string    `gorm:"type:text;not null;index:idx_events_network_type"`
-	Source     string    `gorm:"type:text;not null"`
-	Target     string    `gorm:"type:text;not null;index:idx_events_network_target"`
-	Payload    []byte    `gorm:"type:jsonb"`
-	Metadata   []byte    `gorm:"type:jsonb;column:metadata"`
-	Timestamp  int64     `gorm:"type:bigint;not null;index:idx_events_network_timestamp"`
-	Visibility string    `gorm:"type:text;default:channel"`
-	CreatedAt  time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	ID              string    `gorm:"primaryKey;type:text"`
+	NetworkID       string    `gorm:"type:uuid;not null;index:idx_events_network_type;index:idx_events_network_target;index:idx_events_network_timestamp;index:uq_events_network_client_message,unique"`
+	ClientMessageID *string   `gorm:"type:text;index:uq_events_network_client_message,unique"`
+	Type            string    `gorm:"type:text;not null;index:idx_events_network_type"`
+	Source          string    `gorm:"type:text;not null"`
+	Target          string    `gorm:"type:text;not null;index:idx_events_network_target"`
+	Payload         []byte    `gorm:"type:jsonb"`
+	Metadata        []byte    `gorm:"type:jsonb;column:metadata"`
+	Timestamp       int64     `gorm:"type:bigint;not null;index:idx_events_network_timestamp"`
+	Visibility      string    `gorm:"type:text;default:channel"`
+	CreatedAt       time.Time `gorm:"autoCreateTime;type:timestamptz"`
 }
 
 func (EventRecord) TableName() string {
@@ -74,7 +75,7 @@ type Channel struct {
 	CreatedBy                *string   `gorm:"type:text"`
 	MasterAgent              *string   `gorm:"type:text"`
 	ResumeFrom               *string   `gorm:"type:text"`
-	OrchestrationMode       string    `gorm:"type:text;default:dynamic"`
+	OrchestrationMode        string    `gorm:"type:text;default:dynamic"`
 	OrchestrationInstruction *string   `gorm:"type:text"`
 	Status                   string    `gorm:"type:text;default:active;index:idx_channels_workspace_status;index:idx_channels_status_last_event"`
 	Starred                  bool      `gorm:"type:boolean;default:false"`
@@ -138,18 +139,18 @@ func (WorkspaceCollaborator) TableName() string {
 // ---------------------------------------------------------------------------
 
 type KnowledgeEntry struct {
-	ID          string     `gorm:"primaryKey;type:text"`
-	WorkspaceID string     `gorm:"type:uuid;not null;index:idx_knowledge_workspace_status;uniqueIndex:uq_knowledge_workspace_slug"`
-	Slug        string     `gorm:"type:text;not null;uniqueIndex:uq_knowledge_workspace_slug"`
-	Title       string     `gorm:"type:text;not null"`
-	Description *string    `gorm:"type:text"`
-	StorageKey  *string    `gorm:"type:text"`
-	ContentSize *int       `gorm:"type:integer"`
-	CreatedBy   string     `gorm:"type:text;not null"`
-	UpdatedBy   *string    `gorm:"type:text"`
-	Status      string     `gorm:"type:text;not null;default:active;index:idx_knowledge_workspace_status"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime;type:timestamptz"`
-	UpdatedAt   time.Time  `gorm:"autoCreateTime;type:timestamptz"`
+	ID          string    `gorm:"primaryKey;type:text"`
+	WorkspaceID string    `gorm:"type:uuid;not null;index:idx_knowledge_workspace_status;uniqueIndex:uq_knowledge_workspace_slug"`
+	Slug        string    `gorm:"type:text;not null;uniqueIndex:uq_knowledge_workspace_slug"`
+	Title       string    `gorm:"type:text;not null"`
+	Description *string   `gorm:"type:text"`
+	StorageKey  *string   `gorm:"type:text"`
+	ContentSize *int      `gorm:"type:integer"`
+	CreatedBy   string    `gorm:"type:text;not null"`
+	UpdatedBy   *string   `gorm:"type:text"`
+	Status      string    `gorm:"type:text;not null;default:active;index:idx_knowledge_workspace_status"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	UpdatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
 }
 
 func (KnowledgeEntry) TableName() string {
@@ -182,18 +183,18 @@ func (FileRecord) TableName() string {
 // ---------------------------------------------------------------------------
 
 type BrowserTab struct {
-	ID           string     `gorm:"primaryKey;type:text"`
-	WorkspaceID  string     `gorm:"type:uuid;not null;index:idx_browser_tabs_workspace_status"`
-	URL          string     `gorm:"type:text;not null;default:about:blank"`
-	Title        *string    `gorm:"type:text"`
-	Status       string     `gorm:"type:text;not null;default:active;index:idx_browser_tabs_workspace_status"`
-	CreatedBy    string     `gorm:"type:text;not null"`
-	SharedWith   []byte     `gorm:"type:jsonb"`
-	ContextID    *string    `gorm:"type:text"`
-	SessionID    *string    `gorm:"type:text"`
-	LiveURL      *string    `gorm:"type:text"`
-	CreatedAt    time.Time  `gorm:"autoCreateTime;type:timestamptz"`
-	LastActiveAt time.Time  `gorm:"autoCreateTime;type:timestamptz"`
+	ID           string    `gorm:"primaryKey;type:text"`
+	WorkspaceID  string    `gorm:"type:uuid;not null;index:idx_browser_tabs_workspace_status"`
+	URL          string    `gorm:"type:text;not null;default:about:blank"`
+	Title        *string   `gorm:"type:text"`
+	Status       string    `gorm:"type:text;not null;default:active;index:idx_browser_tabs_workspace_status"`
+	CreatedBy    string    `gorm:"type:text;not null"`
+	SharedWith   []byte    `gorm:"type:jsonb"`
+	ContextID    *string   `gorm:"type:text"`
+	SessionID    *string   `gorm:"type:text"`
+	LiveURL      *string   `gorm:"type:text"`
+	CreatedAt    time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	LastActiveAt time.Time `gorm:"autoCreateTime;type:timestamptz"`
 }
 
 func (BrowserTab) TableName() string {
@@ -270,16 +271,16 @@ func (TodoRecord) TableName() string {
 }
 
 type TimerRecord struct {
-	ID          string    `gorm:"primaryKey;type:text"`
-	WorkspaceID string    `gorm:"type:uuid;not null;index:idx_timers_workspace_channel"`
-	ChannelName string    `gorm:"type:text;not null;index:idx_timers_workspace_channel"`
-	ThreadID    *string   `gorm:"type:text"`
-	CreatedBy   string    `gorm:"type:text;not null"`
-	Message     string    `gorm:"type:text;not null"`
+	ID           string    `gorm:"primaryKey;type:text"`
+	WorkspaceID  string    `gorm:"type:uuid;not null;index:idx_timers_workspace_channel"`
+	ChannelName  string    `gorm:"type:text;not null;index:idx_timers_workspace_channel"`
+	ThreadID     *string   `gorm:"type:text"`
+	CreatedBy    string    `gorm:"type:text;not null"`
+	Message      string    `gorm:"type:text;not null"`
 	DelaySeconds int       `gorm:"type:integer;not null"`
-	FiresAt     time.Time `gorm:"type:timestamptz;not null;index:idx_timers_fires_at_status"`
-	Status      string    `gorm:"type:text;not null;default:active;index:idx_timers_fires_at_status"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	FiresAt      time.Time `gorm:"type:timestamptz;not null;index:idx_timers_fires_at_status"`
+	Status       string    `gorm:"type:text;not null;default:active;index:idx_timers_fires_at_status"`
+	CreatedAt    time.Time `gorm:"autoCreateTime;type:timestamptz"`
 }
 
 func (TimerRecord) TableName() string {
@@ -287,23 +288,23 @@ func (TimerRecord) TableName() string {
 }
 
 type RoutineRecord struct {
-	ID                       string     `gorm:"primaryKey;type:text"`
-	WorkspaceID              string     `gorm:"type:uuid;not null;index:idx_routines_workspace_channel"`
-	ChannelName              string     `gorm:"type:text;not null;index:idx_routines_workspace_channel"`
-	ThreadID                 *string    `gorm:"type:text"`
-	CreatedBy                string     `gorm:"type:text;not null"`
-	Name                     string     `gorm:"type:text;not null"`
-	Message                  string     `gorm:"type:text;not null"`
-	Context                  *string    `gorm:"type:text"`
-	ScheduleHour             *int       `gorm:"type:integer"`
-	ScheduleMinute           *int       `gorm:"type:integer"`
-	ScheduleDays             []byte     `gorm:"type:jsonb"`
+	ID                      string     `gorm:"primaryKey;type:text"`
+	WorkspaceID             string     `gorm:"type:uuid;not null;index:idx_routines_workspace_channel"`
+	ChannelName             string     `gorm:"type:text;not null;index:idx_routines_workspace_channel"`
+	ThreadID                *string    `gorm:"type:text"`
+	CreatedBy               string     `gorm:"type:text;not null"`
+	Name                    string     `gorm:"type:text;not null"`
+	Message                 string     `gorm:"type:text;not null"`
+	Context                 *string    `gorm:"type:text"`
+	ScheduleHour            *int       `gorm:"type:integer"`
+	ScheduleMinute          *int       `gorm:"type:integer"`
+	ScheduleDays            []byte     `gorm:"type:jsonb"`
 	ScheduleIntervalMinutes *int       `gorm:"type:integer"`
-	Timezone                 string     `gorm:"type:text;default:UTC"`
-	NextFiresAt              time.Time  `gorm:"type:timestamptz;not null;index:idx_routines_next_fires_status"`
-	LastFiredAt              *time.Time `gorm:"type:timestamptz"`
-	Status                   string     `gorm:"type:text;not null;default:active;index:idx_routines_next_fires_status"`
-	CreatedAt                time.Time  `gorm:"autoCreateTime;type:timestamptz"`
+	Timezone                string     `gorm:"type:text;default:UTC"`
+	NextFiresAt             time.Time  `gorm:"type:timestamptz;not null;index:idx_routines_next_fires_status"`
+	LastFiredAt             *time.Time `gorm:"type:timestamptz"`
+	Status                  string     `gorm:"type:text;not null;default:active;index:idx_routines_next_fires_status"`
+	CreatedAt               time.Time  `gorm:"autoCreateTime;type:timestamptz"`
 }
 
 func (RoutineRecord) TableName() string {

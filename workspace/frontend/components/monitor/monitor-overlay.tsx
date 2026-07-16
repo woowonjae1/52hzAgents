@@ -56,7 +56,9 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
     const optimisticUser = updated.find((m) => m.messageId.startsWith('optimistic-user-'));
     if (optimisticUser) {
       const realUserFound = messages.some(
-        (m) => m.senderType !== 'agent' && m.content === optimisticUser.content
+        (m) => m.senderType !== 'agent' && (optimisticUser.clientMessageId
+          ? m.clientMessageId === optimisticUser.clientMessageId
+          : m.messageId === optimisticUser.messageId || m.content === optimisticUser.content)
       );
       if (realUserFound) {
         updated = updated.filter((m) => !m.messageId.startsWith('optimistic-user-'));
@@ -113,6 +115,7 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
 
       // Optimistic messages
       const timestamp = Date.now();
+      const clientMessageId = globalThis.crypto?.randomUUID?.() || `web-${timestamp}-${Math.random().toString(36).slice(2)}`;
       const userContent = content || (files.length > 0 ? files.map((f) => f.file.name).join(', ') : '');
       const userOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-user-${timestamp}`,
@@ -126,6 +129,8 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
         targetAgents: null,
         createdAt: new Date().toISOString(),
         metadata: {},
+        clientMessageId,
+        deliveryStatus: 'sending',
       };
 
       const loadingOptimisticMsg: WorkspaceMessage = {
@@ -158,17 +163,29 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
           }));
         }
 
-        await workspaceApi.sendMessage(
+        const confirmation = await workspaceApi.sendMessage(
           sessionId,
           content || (attachments ? attachments.map((a) => a.filename).join(', ') : ''),
           currentUser.name,
           mentions.length > 0 ? mentions : undefined,
           attachments,
           currentUser.id,
+          clientMessageId,
         );
+        if (confirmation.status !== 'confirmed' || !confirmation.event_id) {
+          throw new Error('Message was not confirmed by the workspace');
+        }
+        setOptimisticMessages((prev) => prev.map((message) =>
+          message.messageId === userOptimisticMsg.messageId
+            ? { ...message, deliveryStatus: 'confirmed' }
+            : message
+        ));
         forceRefresh();
       } catch {
-        setOptimisticMessages([]);
+        setOptimisticMessages((prev) => prev
+          .filter((m) => m.messageId !== loadingOptimisticMsg.messageId)
+          .map((m) => m.messageId === userOptimisticMsg.messageId ? { ...m, deliveryStatus: 'failed' } : m)
+        );
       }
     },
     [sessionId, currentUser.id, currentUser.name, forceRefresh, agents]

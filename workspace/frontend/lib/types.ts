@@ -116,6 +116,8 @@ export interface WorkspaceMessage {
   messageType: string;
   metadata: WorkspaceMessageMetadata;
   createdAt: string | null;
+  clientMessageId?: string;
+  deliveryStatus?: 'sending' | 'confirmed' | 'failed';
 }
 
 export interface WorkspaceIdentity {
@@ -341,7 +343,9 @@ export interface CloudAgentConfig {
 // ---------------------------------------------------------------------------
 
 export interface ONMEvent {
-  id: string;
+	  id: string;
+	  event_id?: string;
+	  client_message_id?: string;
   type: string;
   source: string;
   target: string;
@@ -349,6 +353,13 @@ export interface ONMEvent {
   metadata: Record<string, unknown>;
   timestamp: number;
   visibility: string;
+}
+
+export interface EventConfirmation extends ONMEvent {
+  success: boolean;
+  status: 'confirmed';
+  event_id: string;
+  duplicate: boolean;
 }
 
 export interface EventPollResponse {
@@ -468,6 +479,8 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
     messageType: (payload.message_type as string) || 'chat',
     metadata,
     createdAt: new Date(event.timestamp).toISOString(),
+    clientMessageId: event.client_message_id || undefined,
+    deliveryStatus: 'confirmed',
   };
 }
 

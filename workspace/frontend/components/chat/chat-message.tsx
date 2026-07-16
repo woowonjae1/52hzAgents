@@ -247,6 +247,15 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               {timestamp && (
                 <span className="text-xs text-muted-foreground">{timestamp}</span>
               )}
+              {isCurrentUser && message.deliveryStatus === 'sending' && (
+                <span className="text-[11px] text-muted-foreground">Sending...</span>
+              )}
+              {isCurrentUser && message.deliveryStatus === 'confirmed' && (
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Sent</span>
+              )}
+              {isCurrentUser && message.deliveryStatus === 'failed' && (
+                <span className="text-[11px] text-red-600 dark:text-red-400">Not sent</span>
+              )}
             </div>
             <div className="text-sm leading-relaxed mt-0.5">
               <MarkdownContent content={message.content} agentNames={agentNames} />

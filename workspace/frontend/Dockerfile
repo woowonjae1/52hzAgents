@@ -1,20 +1,31 @@
-FROM node:20-alpine
+FROM node:20-alpine AS dependencies
 
 WORKDIR /app
-
-ARG NEXT_PUBLIC_API_URL=https://workspace-endpoint.openagents.org
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-
-# Install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy application code
-COPY . .
+FROM node:20-alpine AS builder
 
-# Build
+WORKDIR /app
+ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
 RUN npm run build
 
-# Run
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000
+
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["node", "server.js"]

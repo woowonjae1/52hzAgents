@@ -71,6 +71,12 @@ func TestBridgeEndToEnd(t *testing.T) {
 			var ev map[string]interface{}
 			if json.Unmarshal(msg, &ev) == nil {
 				upstream <- ev
+				_ = conn.WriteJSON(map[string]interface{}{
+					"type":              "system.event.ack",
+					"status":            "confirmed",
+					"event_id":          "event-123",
+					"client_message_id": ev["client_message_id"],
+				})
 			}
 		}
 	})
@@ -154,7 +160,9 @@ func TestBridgeEndToEnd(t *testing.T) {
 	}
 
 	// 上行场景：Agent stdout 一行应被封装为聊天事件投递到工作区。
-	br.SendOutput("agent reply")
+	if err := br.SendOutput("agent reply"); err != nil {
+		t.Fatalf("SendOutput failed: %v", err)
+	}
 	select {
 	case ev := <-upstream:
 		if ev["type"] != "workspace.message.posted" {
@@ -168,6 +176,9 @@ func TestBridgeEndToEnd(t *testing.T) {
 		}
 		if ev["network"] != "net-123" {
 			t.Errorf("upstream network = %v", ev["network"])
+		}
+		if ev["client_message_id"] == "" {
+			t.Error("upstream client_message_id is empty")
 		}
 		payload, _ := ev["payload"].(map[string]interface{})
 		if payload["content"] != "agent reply" {

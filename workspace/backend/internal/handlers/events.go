@@ -8,6 +8,7 @@ import (
 	"fmt"           // 用于进行字符串格式化拼接。
 	"log"           // 用于输出连接断开或消息处理过程中的错误日志。
 	"net/http"      // 包含标准的 HTTP 常量和响应写入方法。
+	"strings"
 	"time"          // 用于定时器心跳包的 Tick 触发。
 
 	"github.com/gin-gonic/gin"                           // Gin 框架的核心上下文及路由引擎。
@@ -29,13 +30,14 @@ var upgrader = websocket.Upgrader{
 
 // SendEventRequest 代表发送事件接口 POST /v1/events 的请求体结构。
 type SendEventRequest struct {
-	Type       string                 `json:"type" binding:"required"` // 事件类型，如 workspace.message.posted (必填)
-	Source     string                 `json:"source" binding:"required"` // 事件源，如 openagents:claude (必填)
-	Target     string                 `json:"target" binding:"required"` // 路由目标，如 channel/session-abc (必填)
-	Payload    map[string]interface{} `json:"payload"`                 // 核心数据负载负载图
-	Metadata   map[string]interface{} `json:"metadata"`                // 附加元数据信息图
-	Visibility string                 `json:"visibility"`              // 消息可见度范围限制（默认为 channel）
-	Network    string                 `json:"network" binding:"required"` // 工作区 ID 或 Slug (必填)
+	ClientMessageID string                 `json:"client_message_id"`
+	Type            string                 `json:"type" binding:"required"` // 事件类型，如 workspace.message.posted (必填)
+	Source          string                 `json:"source" binding:"required"` // 事件源，如 openagents:claude (必填)
+	Target          string                 `json:"target" binding:"required"` // 路由目标，如 channel/session-abc (必填)
+	Payload         map[string]interface{} `json:"payload"`                 // 核心数据负载负载图
+	Metadata        map[string]interface{} `json:"metadata"`                // 附加元数据信息图
+	Visibility      string                 `json:"visibility"`              // 消息可见度范围限制（默认为 channel）
+	Network         string                 `json:"network" binding:"required"` // 工作区 ID 或 Slug (必填)
 }
 
 // verifyWorkspaceAccess 校验客户端请求是否拥有该工作区的合法访问权限。
@@ -93,6 +95,33 @@ func SendEvent(c *gin.Context) {
 		return
 	}
 
+	// 幂等性检查：如果携带了 client_message_id，先检查是否已存在
+	clientMessageID := strings.TrimSpace(req.ClientMessageID)
+	if clientMessageID != "" {
+		var existing models.EventRecord
+		if err := db.DB.Where("network_id = ? AND client_message_id = ?", workspace.ID, clientMessageID).First(&existing).Error; err == nil {
+			var payload map[string]interface{}
+			var metadata map[string]interface{}
+			_ = json.Unmarshal(existing.Payload, &payload)
+			_ = json.Unmarshal(existing.Metadata, &metadata)
+			c.JSON(http.StatusOK, gin.H{
+				"id":                existing.ID,
+				"network":           existing.NetworkID,
+				"type":              existing.Type,
+				"source":            existing.Source,
+				"target":            existing.Target,
+				"payload":           payload,
+				"metadata":          metadata,
+				"timestamp":         existing.Timestamp,
+				"visibility":        existing.Visibility,
+				"client_message_id": clientMessageID,
+				"status":            "confirmed",
+				"duplicate":         true,
+			})
+			return
+		}
+	}
+
 	// 序列化 Payload 图为 JSON 字节数组，准备存入数据库 JSONB 字段。
 	payloadBytes, err := json.Marshal(req.Payload)
 	if err != nil {
@@ -130,6 +159,9 @@ func SendEvent(c *gin.Context) {
 		Timestamp:  nowUnixMs,
 		Visibility: req.Visibility,
 	}
+	if clientMessageID != "" {
+		eventRec.ClientMessageID = &clientMessageID
+	}
 
 	// 将事件持久化写入数据库。如果写入失败，返回 500 服务器错误。
 	if err := db.DB.Create(&eventRec).Error; err != nil {
@@ -139,15 +171,18 @@ func SendEvent(c *gin.Context) {
 
 	// 将整条事件记录打包序列化为 JSON 字符串，以便广播。
 	fullEvent := gin.H{
-		"id":         eventRec.ID,
-		"network":    eventRec.NetworkID,
-		"type":       eventRec.Type,
-		"source":     eventRec.Source,
-		"target":     eventRec.Target,
-		"payload":    req.Payload,
-		"metadata":   req.Metadata,
-		"timestamp":  eventRec.Timestamp,
-		"visibility": eventRec.Visibility,
+		"id":                eventRec.ID,
+		"network":           eventRec.NetworkID,
+		"type":              eventRec.Type,
+		"source":            eventRec.Source,
+		"target":            eventRec.Target,
+		"payload":           req.Payload,
+		"metadata":          req.Metadata,
+		"timestamp":         eventRec.Timestamp,
+		"visibility":        eventRec.Visibility,
+		"client_message_id": clientMessageID,
+		"status":            "confirmed",
+		"duplicate":         false,
 	}
 	fullEventBytes, err := json.Marshal(fullEvent)
 	if err != nil {
@@ -325,6 +360,15 @@ func StreamEventsWS(c *gin.Context) {
 		}
 	}()
 
+	sendAck := func(ack gin.H) {
+		encoded, _ := json.Marshal(ack)
+		select {
+		case clientChan <- string(encoded):
+		case <-time.After(2 * time.Second):
+			log.Printf("WebSocket ACK dropped for client %s", clientID)
+		}
+	}
+
 	// 主 Goroutine 在此循环读取该客户端发来的上行消息。
 	for {
 		// 读取客户端发送过来的数据包。
@@ -337,39 +381,108 @@ func StreamEventsWS(c *gin.Context) {
 
 		// 解析客户端上传的 Event 结构体（若为 JSON）。
 		var parsedReq SendEventRequest
-		if err := json.Unmarshal(message, &parsedReq); err == nil {
-			// 生成并持久化数据。
-			eventID := uuid.New().String()
-			nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
-			if err := materializeEvent(workspace.ID, &parsedReq, nowUnixMs); err != nil {
+		if err := json.Unmarshal(message, &parsedReq); err != nil {
+			sendAck(gin.H{"type": "system.event.ack", "status": "rejected", "error": "invalid_json"})
+			continue
+		}
+		if parsedReq.Type == "" || parsedReq.Source == "" || parsedReq.Target == "" {
+			sendAck(gin.H{
+				"type":              "system.event.ack",
+				"status":            "rejected",
+				"client_message_id": parsedReq.ClientMessageID,
+				"error":             "missing_required_field",
+			})
+			continue
+		}
+
+		// 幂等性检查：如果携带了 client_message_id，先检查是否已存在
+		clientMessageID := strings.TrimSpace(parsedReq.ClientMessageID)
+		if clientMessageID != "" {
+			var existing models.EventRecord
+			if err := db.DB.Where("network_id = ? AND client_message_id = ?", workspace.ID, clientMessageID).First(&existing).Error; err == nil {
+				sendAck(gin.H{
+					"type":              "system.event.ack",
+					"status":            "confirmed",
+					"event_id":          existing.ID,
+					"client_message_id": clientMessageID,
+					"timestamp":         existing.Timestamp,
+					"duplicate":         true,
+				})
 				continue
 			}
-
-			payloadBytes, _ := json.Marshal(parsedReq.Payload)
-			metaBytes, _ := json.Marshal(parsedReq.Metadata)
-
-			eventRec := models.EventRecord{
-				ID:         eventID,
-				NetworkID:  workspace.ID,
-				Type:       parsedReq.Type,
-				Source:     parsedReq.Source,
-				Target:     parsedReq.Target,
-				Payload:    payloadBytes,
-				Metadata:   metaBytes,
-				Timestamp:  nowUnixMs,
-				Visibility: parsedReq.Visibility,
-			}
-
-			// 保存入库。
-			if err := db.DB.Create(&eventRec).Error; err == nil {
-				fullEvent, _ := json.Marshal(eventResponse(eventRec))
-				// 广播至全局。
-				hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-					WorkspaceID: workspace.ID,
-					ChannelName: parsedReq.Target,
-					Payload:     string(fullEvent),
-				})
-			}
 		}
+
+		// 生成并持久化数据。
+		eventID := uuid.New().String()
+		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+		if err := materializeEvent(workspace.ID, &parsedReq, nowUnixMs); err != nil {
+			sendAck(gin.H{
+				"type":              "system.event.ack",
+				"status":            "rejected",
+				"client_message_id": clientMessageID,
+				"error":             err.Error(),
+			})
+			continue
+		}
+
+		payloadBytes, _ := json.Marshal(parsedReq.Payload)
+		metaBytes, _ := json.Marshal(parsedReq.Metadata)
+
+		eventRec := models.EventRecord{
+			ID:         eventID,
+			NetworkID:  workspace.ID,
+			Type:       parsedReq.Type,
+			Source:     parsedReq.Source,
+			Target:     parsedReq.Target,
+			Payload:    payloadBytes,
+			Metadata:   metaBytes,
+			Timestamp:  nowUnixMs,
+			Visibility: parsedReq.Visibility,
+		}
+		if clientMessageID != "" {
+			eventRec.ClientMessageID = &clientMessageID
+		}
+
+		// 保存入库。
+		if err := db.DB.Create(&eventRec).Error; err != nil {
+			sendAck(gin.H{
+				"type":              "system.event.ack",
+				"status":            "rejected",
+				"client_message_id": clientMessageID,
+				"error":             err.Error(),
+			})
+			continue
+		}
+
+		fullEvent := gin.H{
+			"id":                eventRec.ID,
+			"network":           eventRec.NetworkID,
+			"type":              eventRec.Type,
+			"source":            eventRec.Source,
+			"target":            eventRec.Target,
+			"payload":           parsedReq.Payload,
+			"metadata":          parsedReq.Metadata,
+			"timestamp":         eventRec.Timestamp,
+			"visibility":        eventRec.Visibility,
+			"client_message_id": clientMessageID,
+			"status":            "confirmed",
+			"duplicate":         false,
+		}
+		fullEventBytes, _ := json.Marshal(fullEvent)
+		// 广播至全局。
+		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+			WorkspaceID: workspace.ID,
+			ChannelName: parsedReq.Target,
+			Payload:     string(fullEventBytes),
+		})
+
+		sendAck(gin.H{
+			"type":              "system.event.ack",
+			"status":            "confirmed",
+			"event_id":          eventRec.ID,
+			"client_message_id": clientMessageID,
+			"timestamp":         eventRec.Timestamp,
+			"duplicate":         false,
+		})
 	}
 }

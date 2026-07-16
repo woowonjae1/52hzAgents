@@ -277,7 +277,9 @@ export function ChatView() {
     const optimisticUser = sessionOptimisticMessages.find((m) => m.messageId.startsWith('optimistic-user-'));
     if (optimisticUser) {
       const realUserFound = sessionMessages.some(
-        (m) => m.senderType !== 'agent' && m.content === optimisticUser.content
+        (m) => m.senderType !== 'agent' && (optimisticUser.clientMessageId
+          ? m.clientMessageId === optimisticUser.clientMessageId
+          : m.messageId === optimisticUser.messageId || m.content === optimisticUser.content)
       );
       if (realUserFound) {
         removeIds.add(optimisticUser.messageId);
@@ -383,6 +385,7 @@ export function ChatView() {
 
       // Create optimistic messages for instant feedback
       const timestamp = Date.now();
+      const clientMessageId = globalThis.crypto?.randomUUID?.() || `web-${timestamp}-${Math.random().toString(36).slice(2)}`;
       const userContent = content || (files.length > 0 ? files.map((f) => f.file.name).join(', ') : '');
       const userOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-user-${timestamp}`,
@@ -396,6 +399,8 @@ export function ChatView() {
         targetAgents: null,
         createdAt: new Date().toISOString(),
         metadata: {},
+        clientMessageId,
+        deliveryStatus: 'sending',
       };
       const loadingOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-loading-${timestamp}`,
@@ -433,14 +438,23 @@ export function ChatView() {
           }));
         }
 
-        await workspaceApi.sendMessage(
+        const confirmation = await workspaceApi.sendMessage(
           currentSessionId,
           content || (attachments ? attachments.map((a) => a.filename).join(', ') : ''),
           currentUser.name,
           mentions.length > 0 ? mentions : undefined,
           attachments,
           currentUser.id,
+          clientMessageId,
         );
+        if (confirmation.status !== 'confirmed' || !confirmation.event_id) {
+          throw new Error('Message was not confirmed by the workspace');
+        }
+        setOptimisticMessages((prev) => prev.map((message) =>
+          message.messageId === userOptimisticMsg.messageId
+            ? { ...message, deliveryStatus: 'confirmed' }
+            : message
+        ));
         capture('message_sent', {
           has_attachments: (attachments?.length ?? 0) > 0,
           has_mentions: mentions.length > 0,
@@ -448,12 +462,11 @@ export function ChatView() {
         });
         forceRefresh();
       } catch {
-        // Error is visible via missing message
-        // Remove optimistic messages on error
+        // Keep the failed message visible so delivery failure is explicit.
         setOptimisticMessages((prev) =>
-          prev.filter(
-            (m) => m.messageId !== userOptimisticMsg.messageId && m.messageId !== loadingOptimisticMsg.messageId
-          )
+          prev
+            .filter((m) => m.messageId !== loadingOptimisticMsg.messageId)
+            .map((m) => m.messageId === userOptimisticMsg.messageId ? { ...m, deliveryStatus: 'failed' } : m)
         );
       }
     },

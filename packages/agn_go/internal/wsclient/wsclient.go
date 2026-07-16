@@ -1,7 +1,7 @@
 // Package wsclient 实现了 Agent 子进程与 Go 后端工作区之间的 WebSocket 双向桥接客户端。
 // 它负责：1) 通过 HTTP 完成 join/leave/presence 握手与心跳；
-//         2) 通过 WebSocket 长连接接收工作区下行消息并写入 Agent 的 stdin；
-//         3) 将 Agent 的 stdout 输出封装为聊天事件，经 WebSocket 上行投递到工作区通道。
+//  2. 通过 WebSocket 长连接接收工作区下行消息并写入 Agent 的 stdin；
+//  3. 将 Agent 的 stdout 输出封装为聊天事件，经 WebSocket 上行投递到工作区通道。
 package wsclient
 
 // 导入所需的标准库与第三方 WebSocket 库。
@@ -24,15 +24,25 @@ import (
 // httpClient 是本包共享的带超时 HTTP 客户端，防止握手请求无限阻塞。
 var httpClient = &http.Client{Timeout: 10 * time.Second}
 
+type ackResult struct {
+	Status  string
+	EventID string
+	Error   string
+}
+
 // Bridge 代表单个 Agent 到某个工作区的双向桥接会话上下文。
 type Bridge struct {
-	channelMu sync.RWMutex
-	Endpoint  string // 后端服务基准 URL，如 http://localhost:8000。
-	Network   string // 工作区 ID 或 Slug（用于 join 请求；为空时后端按 Token 反查）。
-	Token     string // 工作区访问令牌（X-Workspace-Token）。
-	AgentName string // 本 Agent 的名称别名。
-	AgentType string // 本 Agent 的运行时类型（如 claude）。
-	Channel   string // 订阅与投递所使用的会话通道名（默认 general）。
+	channelMu   sync.RWMutex
+	AckTimeout  time.Duration
+	MaxRetries  int
+	ackMu       sync.Mutex
+	pendingAcks map[string]chan ackResult
+	Endpoint    string // 后端服务基准 URL，如 http://localhost:8000。
+	Network     string // 工作区 ID 或 Slug（用于 join 请求；为空时后端按 Token 反查）。
+	Token       string // 工作区访问令牌（X-Workspace-Token）。
+	AgentName   string // 本 Agent 的名称别名。
+	AgentType   string // 本 Agent 的运行时类型（如 claude）。
+	Channel     string // 订阅与投递所使用的会话通道名（默认 general）。
 
 	networkID string          // join 成功后返回的真实工作区 UUID。
 	sessionID string          // join 成功后返回的会话 ID（用于心跳保活与事件元数据）。
@@ -47,6 +57,13 @@ type Bridge struct {
 // Connect 完成整套接入流程：HTTP join 握手 -> 建立 WebSocket 长连接 -> 启动读循环与心跳循环。
 // 参数 onMessage 是守护进程注入的回调，用于把工作区下行消息写入 Agent 的标准输入。
 func (b *Bridge) Connect(onMessage func(string)) error {
+	if b.AckTimeout <= 0 {
+		b.AckTimeout = 3 * time.Second
+	}
+	if b.MaxRetries <= 0 {
+		b.MaxRetries = 3
+	}
+	b.pendingAcks = make(map[string]chan ackResult)
 	b.onMessage = onMessage                // 保存下行消息回调。
 	b.source = "openagents:" + b.AgentName // 组装事件来源标识。
 	if b.Channel == "" {                   // 若未指定通道，则兜底为 general。
@@ -145,7 +162,7 @@ func (b *Bridge) dial() error {
 }
 
 // readPump 持续读取工作区下行消息，筛选出聊天消息并通过回调写入 Agent stdin。
-func (b *Bridge) readPump() {
+func (b *Bridge) readPumpLegacy() {
 	for {
 		// 阻塞读取一条下行文本帧。
 		_, message, err := b.conn.ReadMessage()
@@ -270,7 +287,7 @@ func (b *Bridge) sendHeartbeat() {
 }
 
 // SendOutput 将 Agent 的一行 stdout 输出封装为聊天事件，通过 WebSocket 上行投递到工作区通道。
-func (b *Bridge) SendOutput(line string) {
+func (b *Bridge) sendOutputLegacy(line string) {
 	line = strings.TrimSpace(line) // 裁剪首尾空白。
 	if line == "" {
 		return // 空行不投递。

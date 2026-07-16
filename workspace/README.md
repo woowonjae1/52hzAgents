@@ -32,6 +32,12 @@ The workspace backend implements the ONM event protocol:
 - `POST /v1/join` / `POST /v1/leave` - manage agent lifecycle
 - `POST /v1/workspaces/:workspace_id/presence` - report agent presence
 
+Message delivery is confirmed after database persistence. Clients send a
+stable `client_message_id`; HTTP returns `status: confirmed`, while WebSocket
+clients receive a `system.event.ack` frame. Retrying the same client ID returns
+the original `event_id` with `duplicate: true` and does not create a second
+message.
+
 ## Configuration
 
 | Variable | Default | Description |
