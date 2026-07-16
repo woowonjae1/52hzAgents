@@ -3,16 +3,16 @@ package scheduler
 
 // 导入包依赖，处理 JSON、日志以及数据库操作。
 import (
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"encoding/json" // 编码事件负载。
-	"log"           // 打印到期任务触发日志。
-	"time"          // 控制轮询间隔与到期比对。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
+	"log"  // 打印到期任务触发日志。
+	"time" // 控制轮询间隔与到期比对。
 
-	"github.com/google/uuid"                            // 生成事件唯一 UUID 主键。
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 数据库操作。
+	"github.com/google/uuid"                                               // 生成事件唯一 UUID 主键。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"       // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/handlers" // 引入 ComputeNextFiresAt 算法。
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 内存广播 Hub。
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 表模型结构体。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"      // 内存广播 Hub。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"   // 表模型结构体。
 )
 
 // StartScheduler 启动定时任务常驻协程，每 5 秒进行一次库扫描。
@@ -27,8 +27,8 @@ func StartScheduler() {
 		// 无限循环监听计时器 Tick 信号。
 		for range ticker.C {
 			expireStaleAgents()
-			fireDueTimers()    // 执行到期 Timers 触发扫描。
-			fireDueRoutines()  // 执行到期 Routines 触发扫描。
+			fireDueTimers()   // 执行到期 Timers 触发扫描。
+			fireDueRoutines() // 执行到期 Routines 触发扫描。
 		}
 	}()
 }
@@ -42,7 +42,7 @@ func expireStaleAgents() {
 }
 
 func fireDueTimers() {
-	now := time.Now().UTC() // 获取当前的 UTC 时刻。
+	now := time.Now().UTC()            // 获取当前的 UTC 时刻。
 	var dueTimers []models.TimerRecord // 声明列表存放被捕获的到期定时器。
 
 	// 检索状态为 active 且 fires_at 小于等于当前时间的前 50 条记录。
@@ -57,7 +57,10 @@ func fireDueTimers() {
 		tx := db.DB.Begin()
 
 		// 原子更新定时器状态为已触发 fired。
-		if err := tx.Model(&timer).Update("status", "fired").Error; err != nil {
+		claim := tx.Model(&models.TimerRecord{}).
+			Where("id = ? AND status = ?", timer.ID, "active").
+			Update("status", "fired")
+		if claim.Error != nil || claim.RowsAffected == 0 {
 			tx.Rollback() // 异常回滚。
 			continue
 		}
@@ -105,7 +108,9 @@ func fireDueTimers() {
 		}
 
 		// 提交事务。
-		tx.Commit()
+		if err := tx.Commit().Error; err != nil {
+			continue
+		}
 
 		// 序列化后推送广播。
 		fullEventBytes, _ := json.Marshal(map[string]interface{}{
@@ -125,6 +130,10 @@ func fireDueTimers() {
 			ChannelName: "channel/" + timer.ChannelName,
 			Payload:     string(fullEventBytes),
 		})
+		timer.Status = "fired"
+		if err := handlers.PublishWorkspaceStateEvent(timer.WorkspaceID, "workspace.timer.fired", "system:timer", timer.ChannelName, map[string]interface{}{"timer": timer}); err != nil {
+			log.Printf("Timer %s fired but its state event could not be published: %v", timer.ID, err)
+		}
 
 		log.Printf("Timer %s successfully fired in channel: %s", timer.ID, timer.ChannelName)
 	}
@@ -132,7 +141,7 @@ func fireDueTimers() {
 
 // fireDueRoutines 扫描并触发周期性循环定时任务。
 func fireDueRoutines() {
-	now := time.Now().UTC() // 当前 UTC 时间。
+	now := time.Now().UTC()                // 当前 UTC 时间。
 	var dueRoutines []models.RoutineRecord // 存储临时结果。
 
 	// 检索状态为 active 且下一次触发时间小于当前时间的前 50 条周期任务。
@@ -157,7 +166,7 @@ func fireDueRoutines() {
 		// 在高并发多副本运行下，只有 GORM 影响行数大于 0 的才算抢占成功，避免重复触发。
 		res := tx.Model(&r).Where("next_fires_at = ? AND status = ?", r.NextFiresAt, "active").
 			Updates(map[string]interface{}{
-				"next_fires_at":  nextFire,
+				"next_fires_at": nextFire,
 				"last_fired_at": now,
 			})
 
@@ -206,7 +215,9 @@ func fireDueRoutines() {
 		}
 
 		// 提交抢占成功后的所有数据写入。
-		tx.Commit()
+		if err := tx.Commit().Error; err != nil {
+			continue
+		}
 
 		// 广播给前端或 Agent 连接器。
 		fullEventBytes, _ := json.Marshal(map[string]interface{}{
@@ -226,6 +237,11 @@ func fireDueRoutines() {
 			ChannelName: "channel/" + r.ChannelName,
 			Payload:     string(fullEventBytes),
 		})
+		r.NextFiresAt = nextFire
+		r.LastFiredAt = &now
+		if err := handlers.PublishWorkspaceStateEvent(r.WorkspaceID, "workspace.routine.fired", "system:routine", r.ChannelName, map[string]interface{}{"routine": r}); err != nil {
+			log.Printf("Routine %s fired but its state event could not be published: %v", r.ID, err)
+		}
 
 		log.Printf("Routine %s (Name: %s) successfully fired in channel: %s", r.ID, r.Name, r.ChannelName)
 	}

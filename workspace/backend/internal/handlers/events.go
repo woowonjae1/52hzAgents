@@ -9,11 +9,12 @@ import (
 	"log"           // 用于输出连接断开或消息处理过程中的错误日志。
 	"net/http"      // 包含标准的 HTTP 常量和响应写入方法。
 	"strings"
-	"time"          // 用于定时器心跳包的 Tick 触发。
+	"time" // 用于定时器心跳包的 Tick 触发。
 
-	"github.com/gin-gonic/gin"                           // Gin 框架的核心上下文及路由引擎。
-	"github.com/google/uuid"                            // 用于生成客户端唯一的 Session ID。
-	"github.com/gorilla/websocket"                      // 业界主流的 WebSocket 升级和协议工具。
+	"github.com/gin-gonic/gin"     // Gin 框架的核心上下文及路由引擎。
+	"github.com/google/uuid"       // 用于生成客户端唯一的 Session ID。
+	"github.com/gorilla/websocket" // 业界主流的 WebSocket 升级和协议工具。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 本地 GORM 数据库连接包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 自研的内存级多路复用广播 Hub。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 表结构模型映射定义。
@@ -24,19 +25,19 @@ var upgrader = websocket.Upgrader{
 	ReadBufferSize:  2048, // 读取消息的缓冲区大小为 2KB。
 	WriteBufferSize: 2048, // 写入消息的缓冲区大小为 2KB。
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 开启跨域，允许本地和第三方 Agent 通过任何域名连接。
+		return config.GlobalConfig != nil && config.GlobalConfig.IsAllowedOrigin(r.Header.Get("Origin"))
 	},
 }
 
 // SendEventRequest 代表发送事件接口 POST /v1/events 的请求体结构。
 type SendEventRequest struct {
 	ClientMessageID string                 `json:"client_message_id"`
-	Type            string                 `json:"type" binding:"required"` // 事件类型，如 workspace.message.posted (必填)
-	Source          string                 `json:"source" binding:"required"` // 事件源，如 openagents:claude (必填)
-	Target          string                 `json:"target" binding:"required"` // 路由目标，如 channel/session-abc (必填)
-	Payload         map[string]interface{} `json:"payload"`                 // 核心数据负载负载图
-	Metadata        map[string]interface{} `json:"metadata"`                // 附加元数据信息图
-	Visibility      string                 `json:"visibility"`              // 消息可见度范围限制（默认为 channel）
+	Type            string                 `json:"type" binding:"required"`    // 事件类型，如 workspace.message.posted (必填)
+	Source          string                 `json:"source" binding:"required"`  // 事件源，如 openagents:claude (必填)
+	Target          string                 `json:"target" binding:"required"`  // 路由目标，如 channel/session-abc (必填)
+	Payload         map[string]interface{} `json:"payload"`                    // 核心数据负载负载图
+	Metadata        map[string]interface{} `json:"metadata"`                   // 附加元数据信息图
+	Visibility      string                 `json:"visibility"`                 // 消息可见度范围限制（默认为 channel）
 	Network         string                 `json:"network" binding:"required"` // 工作区 ID 或 Slug (必填)
 }
 
@@ -106,6 +107,7 @@ func SendEvent(c *gin.Context) {
 			_ = json.Unmarshal(existing.Metadata, &metadata)
 			c.JSON(http.StatusOK, gin.H{
 				"id":                existing.ID,
+				"event_id":          existing.ID,
 				"network":           existing.NetworkID,
 				"type":              existing.Type,
 				"source":            existing.Source,
@@ -172,6 +174,7 @@ func SendEvent(c *gin.Context) {
 	// 将整条事件记录打包序列化为 JSON 字符串，以便广播。
 	fullEvent := gin.H{
 		"id":                eventRec.ID,
+		"event_id":          eventRec.ID,
 		"network":           eventRec.NetworkID,
 		"type":              eventRec.Type,
 		"source":            eventRec.Source,
@@ -235,7 +238,7 @@ func StreamEventsSSE(c *gin.Context) {
 
 	// 生成当前 SSE 客户端的唯一连接 ID，并在全局总线中注册。
 	clientID := uuid.New().String()
-	channelFilter := c.Query("channel") // 可选的特定通道监听过滤器（例如 general）。
+	channelFilter := c.Query("channel")  // 可选的特定通道监听过滤器（例如 general）。
 	clientChan := make(chan string, 100) // 创建带 100 缓冲的消息分发通道。
 
 	sseClient := &hub.Client{
@@ -254,7 +257,7 @@ func StreamEventsSSE(c *gin.Context) {
 	// 开启一个心跳计时器，每 30 秒向流管道发送一次 keepalive，防止代理断连。
 	keepaliveTicker := time.NewTicker(30 * time.Second)
 	defer func() {
-		keepaliveTicker.Stop()          // 关闭计时器释放资源。
+		keepaliveTicker.Stop()              // 关闭计时器释放资源。
 		hub.GlobalHub.Unregister(sseClient) // 发生断连时，立刻从 EventHub 中注销该客户端。
 	}()
 
@@ -328,7 +331,7 @@ func StreamEventsWS(c *gin.Context) {
 
 	// 生成当前连接的唯一 ID，并配置总线客户端信息。
 	clientID := uuid.New().String()
-	channelFilter := c.Query("channel") // 可选过滤。
+	channelFilter := c.Query("channel")  // 可选过滤。
 	clientChan := make(chan string, 100) // 缓冲区大小设定为 100。
 
 	wsClient := &hub.Client{
@@ -343,7 +346,7 @@ func StreamEventsWS(c *gin.Context) {
 
 	// 声明连接清理的 Defer 方法。
 	defer func() {
-		wsConn.Close()                  // 断开 WebSocket 底层连接。
+		wsConn.Close()                     // 断开 WebSocket 底层连接。
 		hub.GlobalHub.Unregister(wsClient) // 从在线总线中剔除该客户端。
 	}()
 
@@ -456,6 +459,7 @@ func StreamEventsWS(c *gin.Context) {
 
 		fullEvent := gin.H{
 			"id":                eventRec.ID,
+			"event_id":          eventRec.ID,
 			"network":           eventRec.NetworkID,
 			"type":              eventRec.Type,
 			"source":            eventRec.Source,

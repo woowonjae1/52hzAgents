@@ -104,11 +104,13 @@ func TestBridgeEndToEnd(t *testing.T) {
 
 	// 构造被测桥接客户端。
 	br := &Bridge{
-		Endpoint:  server.URL,
-		Token:     "secret",
-		AgentName: "coder",
-		AgentType: "claude",
-		Channel:   "dev",
+		Endpoint:            server.URL,
+		Token:               "secret",
+		AgentName:           "coder",
+		AgentType:           "claude",
+		Channel:             "dev",
+		ReconnectDelay:      10 * time.Millisecond,
+		ReconnectMaxRetries: 3,
 	}
 
 	// onMessage 回调：把下行消息收集到通道，模拟写入 Agent stdin。
@@ -135,6 +137,7 @@ func TestBridgeEndToEnd(t *testing.T) {
 	_ = conn.WriteJSON(map[string]interface{}{
 		"type":    "workspace.message.posted",
 		"source":  "openagents:human",
+		"target":  "channel/dev",
 		"payload": map[string]interface{}{"content": "hello agent"},
 	})
 	select {
@@ -150,6 +153,7 @@ func TestBridgeEndToEnd(t *testing.T) {
 	_ = conn.WriteJSON(map[string]interface{}{
 		"type":    "workspace.message.posted",
 		"source":  "openagents:coder", // 即 br.source。
+		"target":  "channel/dev",
 		"payload": map[string]interface{}{"content": "echo of myself"},
 	})
 	select {
@@ -160,6 +164,18 @@ func TestBridgeEndToEnd(t *testing.T) {
 	}
 
 	// 上行场景：Agent stdout 一行应被封装为聊天事件投递到工作区。
+	_ = conn.WriteJSON(map[string]interface{}{
+		"type":    "workspace.message.posted",
+		"source":  "openagents:human",
+		"target":  "channel/other",
+		"payload": map[string]interface{}{"content": "wrong channel"},
+	})
+	select {
+	case got := <-toStdin:
+		t.Fatalf("foreign-channel message should be filtered, but stdin got %q", got)
+	case <-time.After(500 * time.Millisecond):
+	}
+
 	if err := br.SendOutput("agent reply"); err != nil {
 		t.Fatalf("SendOutput failed: %v", err)
 	}
@@ -189,6 +205,29 @@ func TestBridgeEndToEnd(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("timed out waiting for upstream event")
+	}
+
+	// A dropped socket should reconnect without creating a new agent session.
+	_ = conn.Close()
+	var reconnected *websocket.Conn
+	select {
+	case reconnected = <-serverWS:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for websocket reconnect")
+	}
+	_ = reconnected.WriteJSON(map[string]interface{}{
+		"type":    "workspace.message.posted",
+		"source":  "openagents:human",
+		"target":  "channel/dev",
+		"payload": map[string]interface{}{"content": "after reconnect"},
+	})
+	select {
+	case got := <-toStdin:
+		if got != "after reconnect" {
+			t.Fatalf("reconnected stdin got %q, want %q", got, "after reconnect")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for downstream message after reconnect")
 	}
 
 	// 直接触发一次心跳，验证 presence 接口按契约被调用。

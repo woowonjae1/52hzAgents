@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -9,7 +9,7 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { workspaceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { CloudAgentConfig } from '@/lib/types';
+import type { AgentApproval, AgentLogEntry, AgentRuntime, CloudAgentConfig } from '@/lib/types';
 
 export function AgentProfilePanel() {
   const { selectedAgentName, setSelectedAgentName, isMobile, setViewMode } = useLayout();
@@ -19,6 +19,41 @@ export function AgentProfilePanel() {
   const agent = agents.find((a) => a.agentName === selectedAgentName);
 
   const isCloud = agent?.agentType?.startsWith('cloud:') ?? false;
+  const [runtime, setRuntime] = useState<AgentRuntime | null>(null);
+  const [logs, setLogs] = useState<AgentLogEntry[]>([]);
+  const [approvals, setApprovals] = useState<AgentApproval[]>([]);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
+
+  const refreshDiagnostics = useCallback(async () => {
+    if (!agent) return;
+    setLoadingDiagnostics(true);
+    try {
+      const [nextRuntime, nextLogs, nextApprovals] = await Promise.all([
+        workspaceApi.getAgentRuntime(agent.agentName),
+        workspaceApi.listAgentLogs(agent.agentName, 20),
+        workspaceApi.listAgentApprovals('pending'),
+      ]);
+      setRuntime(nextRuntime);
+      setLogs(nextLogs);
+      setApprovals(nextApprovals.filter((approval) => approval.agentName === agent.agentName));
+    } catch {
+      // A local/cloud agent may not expose bridge diagnostics.
+    } finally {
+      setLoadingDiagnostics(false);
+    }
+  }, [agent]);
+
+  useEffect(() => { void refreshDiagnostics(); }, [refreshDiagnostics]);
+
+  const resolveApproval = useCallback(async (approval: AgentApproval, status: 'approved' | 'rejected') => {
+    try {
+      await workspaceApi.resolveAgentApproval(approval.id, status);
+      setApprovals((current) => current.filter((item) => item.id !== approval.id));
+      toast.success(status === 'approved' ? 'Approval granted' : 'Approval rejected');
+    } catch {
+      toast.error('Failed to resolve approval');
+    }
+  }, []);
 
   // Cloud agent config
   const [cloudConfig, setCloudConfig] = useState<CloudAgentConfig | null>(null);
@@ -327,6 +362,44 @@ export function AgentProfilePanel() {
               </div>
             </div>
           )}
+
+          {/* Runtime, approvals, and bridge diagnostics */}
+          <div className="rounded-lg border overflow-hidden">
+            <div className="px-3.5 py-2.5 border-b flex items-center gap-1.5">
+              <Activity className="size-3 text-indigo-500" />
+              <span className="text-xs font-medium">Runtime & approvals</span>
+              <button onClick={() => void refreshDiagnostics()} className="ml-auto text-muted-foreground hover:text-foreground" title="Refresh diagnostics">
+                <RefreshCw className={cn('size-3', loadingDiagnostics && 'animate-spin')} />
+              </button>
+            </div>
+            <div className="divide-y">
+              <div className="px-3.5 py-2.5 text-xs flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Bridge health</span>
+                {runtime ? (
+                  <span className={cn('font-medium capitalize', runtime.healthStatus === 'healthy' ? 'text-emerald-600' : runtime.healthStatus === 'unhealthy' ? 'text-red-600' : 'text-amber-600')}>
+                    {runtime.processStatus} · {runtime.healthStatus}
+                  </span>
+                ) : <span className="text-muted-foreground">No runtime report</span>}
+              </div>
+              {runtime?.lastError && <p className="px-3.5 py-2 text-[11px] text-red-600 bg-red-50/50 dark:bg-red-950/20 break-words">{runtime.lastError}</p>}
+              {approvals.map((approval) => (
+                <div key={approval.id} className="px-3.5 py-2.5">
+                  <div className="text-xs font-medium break-words">Approval: {approval.action}</div>
+                  <div className="mt-2 flex gap-1.5">
+                    <button onClick={() => void resolveApproval(approval, 'approved')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-emerald-600 text-white hover:bg-emerald-700"><ShieldCheck className="size-3" />Approve</button>
+                    <button onClick={() => void resolveApproval(approval, 'rejected')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded border text-red-600 hover:bg-red-50"><ShieldX className="size-3" />Reject</button>
+                  </div>
+                </div>
+              ))}
+              {logs.slice(0, 5).map((entry) => (
+                <div key={entry.id} className="px-3.5 py-2 text-[11px] font-mono flex gap-1.5">
+                  <Terminal className={cn('size-3 shrink-0 mt-0.5', entry.level === 'error' ? 'text-red-500' : 'text-muted-foreground')} />
+                  <span className="break-all">{entry.message}</span>
+                </div>
+              ))}
+              {!runtime && approvals.length === 0 && logs.length === 0 && <p className="px-3.5 py-3 text-xs text-muted-foreground">No bridge diagnostics yet.</p>}
+            </div>
+          </div>
 
           {/* Installed Skills */}
           {(() => {

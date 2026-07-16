@@ -32,26 +32,29 @@ type ackResult struct {
 
 // Bridge 代表单个 Agent 到某个工作区的双向桥接会话上下文。
 type Bridge struct {
-	channelMu   sync.RWMutex
-	AckTimeout  time.Duration
-	MaxRetries  int
-	ackMu       sync.Mutex
-	pendingAcks map[string]chan ackResult
-	Endpoint    string // 后端服务基准 URL，如 http://localhost:8000。
-	Network     string // 工作区 ID 或 Slug（用于 join 请求；为空时后端按 Token 反查）。
-	Token       string // 工作区访问令牌（X-Workspace-Token）。
-	AgentName   string // 本 Agent 的名称别名。
-	AgentType   string // 本 Agent 的运行时类型（如 claude）。
-	Channel     string // 订阅与投递所使用的会话通道名（默认 general）。
+	channelMu           sync.RWMutex
+	AckTimeout          time.Duration
+	MaxRetries          int
+	ReconnectDelay      time.Duration
+	ReconnectMaxRetries int
+	ackMu               sync.Mutex
+	pendingAcks         map[string]chan ackResult
+	Endpoint            string // 后端服务基准 URL，如 http://localhost:8000。
+	Network             string // 工作区 ID 或 Slug（用于 join 请求；为空时后端按 Token 反查）。
+	Token               string // 工作区访问令牌（X-Workspace-Token）。
+	AgentName           string // 本 Agent 的名称别名。
+	AgentType           string // 本 Agent 的运行时类型（如 claude）。
+	Channel             string // 订阅与投递所使用的会话通道名（默认 general）。
 
-	networkID string          // join 成功后返回的真实工作区 UUID。
-	sessionID string          // join 成功后返回的会话 ID（用于心跳保活与事件元数据）。
-	source    string          // 事件来源标识，固定为 openagents:<AgentName>。
-	conn      *websocket.Conn // 底层 WebSocket 长连接句柄。
-	onMessage func(string)    // 收到工作区下行消息时的回调（由守护进程注入，用于写入 Agent stdin）。
-	stopCh    chan struct{}   // 关闭广播信号通道，用于终止心跳等后台协程。
-	writeMu   sync.Mutex      // WebSocket 写操作互斥锁（gorilla/websocket 不允许并发写同一连接）。
-	closeOnce sync.Once       // 保证 Close 逻辑只被执行一次。
+	networkID   string          // join 成功后返回的真实工作区 UUID。
+	sessionID   string          // join 成功后返回的会话 ID（用于心跳保活与事件元数据）。
+	source      string          // 事件来源标识，固定为 openagents:<AgentName>。
+	conn        *websocket.Conn // 底层 WebSocket 长连接句柄。
+	onMessage   func(string)    // 收到工作区下行消息时的回调（由守护进程注入，用于写入 Agent stdin）。
+	stopCh      chan struct{}   // 关闭广播信号通道，用于终止心跳等后台协程。
+	writeMu     sync.Mutex      // WebSocket 写操作互斥锁（gorilla/websocket 不允许并发写同一连接）。
+	closeOnce   sync.Once       // 保证 Close 逻辑只被执行一次。
+	reconnectMu sync.Mutex
 }
 
 // Connect 完成整套接入流程：HTTP join 握手 -> 建立 WebSocket 长连接 -> 启动读循环与心跳循环。
@@ -62,6 +65,12 @@ func (b *Bridge) Connect(onMessage func(string)) error {
 	}
 	if b.MaxRetries <= 0 {
 		b.MaxRetries = 3
+	}
+	if b.ReconnectDelay <= 0 {
+		b.ReconnectDelay = time.Second
+	}
+	if b.ReconnectMaxRetries <= 0 {
+		b.ReconnectMaxRetries = 5
 	}
 	b.pendingAcks = make(map[string]chan ackResult)
 	b.onMessage = onMessage                // 保存下行消息回调。
@@ -157,8 +166,65 @@ func (b *Bridge) dial() error {
 		return err
 	}
 
+	b.writeMu.Lock()
+	previous := b.conn
 	b.conn = conn // 保存连接句柄。
+	b.writeMu.Unlock()
+	if previous != nil && previous != conn {
+		_ = previous.Close()
+	}
 	return nil
+}
+
+func (b *Bridge) isStopped() bool {
+	if b.stopCh == nil {
+		return true
+	}
+	select {
+	case <-b.stopCh:
+		return true
+	default:
+		return false
+	}
+}
+
+// reconnect restores a dropped WebSocket without creating a second agent
+// session. Joining again would revoke the still-valid session used by the
+// running bridge, so reconnecting only performs the WebSocket handshake.
+func (b *Bridge) reconnect() {
+	b.reconnectMu.Lock()
+	defer b.reconnectMu.Unlock()
+
+	for attempt := 1; attempt <= b.ReconnectMaxRetries; attempt++ {
+		if b.isStopped() {
+			return
+		}
+		if attempt > 1 {
+			timer := time.NewTimer(b.ReconnectDelay)
+			select {
+			case <-b.stopCh:
+				timer.Stop()
+				return
+			case <-timer.C:
+			}
+		}
+		if err := b.dial(); err == nil {
+			if b.isStopped() {
+				b.writeMu.Lock()
+				if b.conn != nil {
+					_ = b.conn.Close()
+					b.conn = nil
+				}
+				b.writeMu.Unlock()
+				return
+			}
+			log.Printf("[bridge:%s] websocket reconnected", b.AgentName)
+			go b.readPump()
+			return
+		} else {
+			log.Printf("[bridge:%s] websocket reconnect attempt %d/%d failed: %v", b.AgentName, attempt, b.ReconnectMaxRetries, err)
+		}
+	}
 }
 
 // readPump 持续读取工作区下行消息，筛选出聊天消息并通过回调写入 Agent stdin。
@@ -195,7 +261,7 @@ func (b *Bridge) readPumpLegacy() {
 		}
 
 		var route struct {
-			Target string `json:"target"`
+			Target  string `json:"target"`
 			Payload struct {
 				Mentions []string `json:"mentions"`
 			} `json:"payload"`
@@ -286,6 +352,69 @@ func (b *Bridge) sendHeartbeat() {
 	_ = resp.Body.Close()
 }
 
+// ReportRuntime persists the bridge's local process health. The backend checks
+// the session ID, so a superseded bridge cannot overwrite a newer agent run.
+func (b *Bridge) ReportRuntime(processStatus, healthStatus string, pid *int, restartCount int, lastError string) error {
+	if b.networkID == "" || b.sessionID == "" {
+		return fmt.Errorf("bridge session is not established")
+	}
+	body := map[string]interface{}{
+		"session_id": b.sessionID, "process_status": processStatus,
+		"health_status": healthStatus, "pid": pid, "restart_count": restartCount,
+	}
+	if lastError != "" {
+		body["last_error"] = lastError
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/v1/workspaces/%s/agents/%s/runtime", b.Endpoint, b.networkID, url.PathEscape(b.AgentName))
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Workspace-Token", b.Token)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("runtime report returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
+// SendLog stores a bridge diagnostic without sending it as a chat message.
+func (b *Bridge) SendLog(level, message string) error {
+	if b.networkID == "" || b.sessionID == "" || strings.TrimSpace(message) == "" {
+		return nil
+	}
+	data, err := json.Marshal(map[string]string{"session_id": b.sessionID, "level": level, "message": message})
+	if err != nil {
+		return err
+	}
+	endpoint := fmt.Sprintf("%s/v1/workspaces/%s/agents/%s/logs", b.Endpoint, b.networkID, url.PathEscape(b.AgentName))
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Workspace-Token", b.Token)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("agent log returned status %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // SendOutput 将 Agent 的一行 stdout 输出封装为聊天事件，通过 WebSocket 上行投递到工作区通道。
 func (b *Bridge) sendOutputLegacy(line string) {
 	line = strings.TrimSpace(line) // 裁剪首尾空白。
@@ -295,10 +424,10 @@ func (b *Bridge) sendOutputLegacy(line string) {
 
 	// 组装上行事件（字段与后端 SendEventRequest 严格对应）。
 	ev := map[string]interface{}{
-		"type":    "workspace.message.posted", // 聊天消息事件类型。
-		"source":  b.source,                   // 来源为本 Agent。
+		"type":    "workspace.message.posted",      // 聊天消息事件类型。
+		"source":  b.source,                        // 来源为本 Agent。
 		"target":  "channel/" + b.currentChannel(), // Reply to the channel that triggered the agent.
-		"network": b.networkID,                // 所属工作区。
+		"network": b.networkID,                     // 所属工作区。
 		"payload": map[string]interface{}{ // 消息负载。
 			"content":      line,   // 消息正文。
 			"message_type": "chat", // 消息类型标记为普通聊天。

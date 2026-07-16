@@ -23,15 +23,29 @@ func requestWorkspace(c *gin.Context) (*models.Workspace, bool) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
 		return nil, false
 	}
-	token := c.GetHeader("X-Workspace-Token")
-	if token == "" {
-		token = c.Query("token")
-	}
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return nil, false
 	}
 	return workspace, true
+}
+
+// workspaceToken returns the workspace credential from the canonical header,
+// while retaining query-token compatibility for existing shared workspace links.
+func workspaceToken(c *gin.Context) string {
+	if token := c.GetHeader("X-Workspace-Token"); token != "" {
+		return token
+	}
+	return c.Query("token")
+}
+
+// authorizeWorkspace consistently enforces the workspace credential for every
+// route that mutates or exposes workspace-scoped resources.
+func authorizeWorkspace(c *gin.Context, workspace *models.Workspace) bool {
+	if verifyWorkspaceAccess(workspace, workspaceToken(c)) {
+		return true
+	}
+	c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
+	return false
 }
 
 func UpdateWorkspace(c *gin.Context) {
@@ -97,11 +111,11 @@ func DiscoverNetwork(c *gin.Context) {
 			"address": "channel/" + channel.Name, "title": channel.Title,
 			"master": channel.MasterAgent, "orchestration_mode": channel.OrchestrationMode,
 			"orchestration_instruction": channel.OrchestrationInstruction,
-			"participants": participants, "created_at": channel.CreatedAt.UnixMilli(),
+			"participants":              participants, "created_at": channel.CreatedAt.UnixMilli(),
 			"last_event_at": channel.LastEventAt, "status": channel.Status, "starred": channel.Starred,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"agents": agents, "channels": channelItems, "mods": []string{}, "resources": []string{"files", "todos", "timers", "routines"}})
+	c.JSON(http.StatusOK, gin.H{"agents": agents, "channels": channelItems, "mods": []string{}, "resources": []string{"files", "todos", "timers", "routines", "notifications"}})
 }
 
 func NetworkProfile(c *gin.Context) {
@@ -114,7 +128,7 @@ func NetworkProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id": workspace.ID, "slug": workspace.Slug, "name": workspace.Name,
 		"status": workspace.Status, "access": gin.H{"policy": "workspace_token", "min_verification": 0},
-		"capabilities": []string{"events", "files", "todos", "timers", "routines"}, "agents_online": online,
+		"capabilities": []string{"events", "files", "todos", "timers", "routines", "notifications"}, "agents_online": online,
 	})
 }
 

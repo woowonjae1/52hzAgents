@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -13,6 +14,8 @@ type Config struct {
 	Host                string
 	Port                int
 	AgentTimeoutSeconds int
+	RequestsPerMinute   int
+	CORSOrigins         []string
 }
 
 var GlobalConfig *Config
@@ -59,6 +62,25 @@ func LoadConfig() {
 		}
 	}
 
+	rateLimitStr := os.Getenv("REQUESTS_PER_MINUTE")
+	rateLimit := 120
+	if rateLimitStr != "" {
+		if parsed, err := strconv.Atoi(rateLimitStr); err == nil && parsed > 0 {
+			rateLimit = parsed
+		}
+	}
+
+	corsOrigins := os.Getenv("CORS_ORIGINS")
+	if corsOrigins == "" {
+		corsOrigins = "http://localhost:3000,http://localhost:3001"
+	}
+	allowedOrigins := make([]string, 0)
+	for _, origin := range strings.Split(corsOrigins, ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			allowedOrigins = append(allowedOrigins, origin)
+		}
+	}
+
 	GlobalConfig = &Config{
 		DatabaseURL:         dbURL,
 		AuthMode:            authMode,
@@ -67,5 +89,22 @@ func LoadConfig() {
 		Host:                host,
 		Port:                port,
 		AgentTimeoutSeconds: timeout,
+		RequestsPerMinute:   rateLimit,
+		CORSOrigins:         allowedOrigins,
 	}
+}
+
+// IsAllowedOrigin reports whether a browser Origin may use credentialed CORS
+// or establish a WebSocket connection. Requests without Origin are non-browser
+// clients and are authenticated by their workspace token instead.
+func (c *Config) IsAllowedOrigin(origin string) bool {
+	if origin == "" {
+		return true
+	}
+	for _, allowed := range c.CORSOrigins {
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
 }

@@ -21,23 +21,18 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { EmptyState } from '@/components/chat/empty-state';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 
+import { Network } from 'lucide-react';
+
 function WorkspaceLoadingScreen() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-5">
-        <img
-          src="/logo-icon.png"
-          alt="OpenAgents"
-          className="size-16 animate-[pulse_2s_ease-in-out_infinite] dark:hidden"
-        />
-        <img
-          src="/logo-white.png"
-          alt="OpenAgents"
-          className="size-16 animate-[pulse_2s_ease-in-out_infinite] hidden dark:block"
-        />
+      <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
+        <div className="size-16 flex items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Network className="size-8" />
+        </div>
         <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight">OpenAgents</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Workspace</p>
+          <h1 className="text-xl font-semibold tracking-tight">Workspace</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Loading...</p>
         </div>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">

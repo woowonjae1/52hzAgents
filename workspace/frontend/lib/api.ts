@@ -1,11 +1,15 @@
 import type {
   AgentCatalogEntry,
+  AgentApproval,
+  AgentLogEntry,
+  AgentRuntime,
   ApiResponse,
   BrowserPersistentContext,
   BrowserTab,
   CloudAgentConfig,
   CloudAgentProvider,
   DMConversation,
+  EventConfirmation,
   EventPollResponse,
   KnowledgeEntry,
   MessagePollResponse,
@@ -46,17 +50,44 @@ function mapCustomSkill(raw: Record<string, unknown>): WorkspaceCustomSkill {
   };
 }
 
-/** Map snake_case file response from backend to camelCase WorkspaceFile. */
+/** Parse the schedule_days/ScheduleDays field robustly. */
+function parseScheduleDays(rawDays: unknown): number[] | null {
+  if (!rawDays) return null;
+  if (Array.isArray(rawDays)) {
+    return rawDays.map(Number);
+  }
+  if (typeof rawDays === 'string') {
+    try {
+      const decoded = atob(rawDays);
+      const parsed = JSON.parse(decoded);
+      if (Array.isArray(parsed)) {
+        return parsed.map(Number);
+      }
+    } catch {
+      try {
+        const parsed = JSON.parse(rawDays);
+        if (Array.isArray(parsed)) {
+          return parsed.map(Number);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return null;
+}
+
+/** Map snake_case or PascalCase file response from backend to camelCase WorkspaceFile. */
 function mapFileResponse(raw: Record<string, unknown>): WorkspaceFile {
   return {
-    id: raw.id as string,
-    filename: raw.filename as string,
-    contentType: (raw.content_type || raw.contentType || 'application/octet-stream') as string,
-    size: raw.size as number,
-    uploadedBy: (raw.uploaded_by || raw.uploadedBy || 'unknown') as string,
-    channelName: (raw.channel_name ?? raw.channelName ?? null) as string | null,
-    status: (raw.status || 'active') as string,
-    createdAt: (raw.created_at || raw.createdAt || null) as string | null,
+    id: (raw.id || raw.ID) as string,
+    filename: (raw.filename || raw.Filename) as string,
+    contentType: (raw.content_type || raw.contentType || raw.ContentType || 'application/octet-stream') as string,
+    size: (raw.size ?? raw.Size ?? 0) as number,
+    uploadedBy: (raw.uploaded_by || raw.uploadedBy || raw.UploadedBy || 'unknown') as string,
+    channelName: (raw.channel_name ?? raw.channelName ?? raw.ChannelName ?? null) as string | null,
+    status: (raw.status || raw.Status || 'active') as string,
+    createdAt: (raw.created_at || raw.createdAt || raw.CreatedAt || null) as string | null,
   };
 }
 
@@ -337,7 +368,8 @@ class WorkspaceApi {
     mentions?: string[],
     attachments?: { fileId: string; filename: string; contentType: string; url: string }[],
     senderId?: string,
-  ): Promise<ONMEvent> {
+    clientMessageId?: string,
+  ): Promise<EventConfirmation> {
     return this.sendEvent({
       type: 'workspace.message.posted',
       source: `human:${senderId || senderName}`,
@@ -351,6 +383,7 @@ class WorkspaceApi {
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       },
       visibility: 'channel',
+      client_message_id: clientMessageId,
     });
   }
 
@@ -837,9 +870,10 @@ class WorkspaceApi {
     payload?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
     visibility?: string;
-  }): Promise<ONMEvent> {
+    client_message_id?: string;
+  }): Promise<EventConfirmation> {
     const network = this.requireWorkspace();
-    return this.request<ONMEvent>('/v1/events', {
+    return this.request<EventConfirmation>('/v1/events', {
       method: 'POST',
       body: JSON.stringify({ ...event, network }),
     });
@@ -954,16 +988,16 @@ class WorkspaceApi {
     const raw = await this.request<{ todos: Record<string, unknown>[] }>(`/v1/todos?${params}`);
     return {
       todos: (raw.todos || []).map((t): TodoItem => ({
-        id: t.id as string,
-        content: t.content as string,
-        status: t.status as TodoItem['status'],
-        assignee: t.assignee as string,
-        createdBy: (t.created_by || '') as string,
-        channelName: (t.channel_name || '') as string,
-        threadId: (t.thread_id || null) as string | null,
-        position: (t.position || 0) as number,
-        createdAt: (t.created_at || null) as string | null,
-        updatedAt: (t.updated_at || null) as string | null,
+        id: (t.id || t.ID) as string,
+        content: (t.content || t.Content) as string,
+        status: (t.status || t.Status) as TodoItem['status'],
+        assignee: (t.assignee || t.Assignee) as string,
+        createdBy: (t.created_by || t.createdBy || t.CreatedBy || '') as string,
+        channelName: (t.channel_name || t.channelName || t.ChannelName || '') as string,
+        threadId: (t.thread_id || t.threadId || t.ThreadID || null) as string | null,
+        position: (t.position ?? t.Position ?? 0) as number,
+        createdAt: (t.created_at || t.createdAt || t.CreatedAt || null) as string | null,
+        updatedAt: (t.updated_at || t.updatedAt || t.UpdatedAt || null) as string | null,
       })),
     };
   }
@@ -974,14 +1008,14 @@ class WorkspaceApi {
     const raw = await this.request<{ timers: Record<string, unknown>[] }>(`/v1/timers?${params}`);
     return {
       timers: (raw.timers || []).map((t): TimerItem => ({
-        id: t.id as string,
-        message: t.message as string,
-        delaySeconds: (t.delay_seconds || 0) as number,
-        firesAt: (t.fires_at || '') as string,
-        status: (t.status || 'active') as string,
-        createdBy: (t.created_by || '') as string,
-        channelName: (t.channel_name || '') as string,
-        createdAt: (t.created_at || null) as string | null,
+        id: (t.id || t.ID) as string,
+        message: (t.message || t.Message) as string,
+        delaySeconds: (t.delay_seconds ?? t.delaySeconds ?? t.DelaySeconds ?? 0) as number,
+        firesAt: (t.fires_at || t.firesAt || t.FiresAt || '') as string,
+        status: (t.status || t.Status || 'active') as string,
+        createdBy: (t.created_by || t.createdBy || t.CreatedBy || '') as string,
+        channelName: (t.channel_name || t.channelName || t.ChannelName || '') as string,
+        createdAt: (t.created_at || t.createdAt || t.CreatedAt || null) as string | null,
       })),
     };
   }
@@ -1007,21 +1041,21 @@ class WorkspaceApi {
     const raw = await this.request<{ routines: Record<string, unknown>[] }>(`/v1/routines?${params}`);
     return {
       routines: (raw.routines || []).map((r) => ({
-        id: r.id as string,
-        name: r.name as string,
-        message: r.message as string,
-        context: (r.context || null) as string | null,
-        scheduleHour: (r.schedule_hour || 0) as number,
-        scheduleMinute: (r.schedule_minute || 0) as number,
-        scheduleDays: (r.schedule_days || null) as number[] | null,
-        scheduleIntervalMinutes: (r.schedule_interval_minutes || null) as number | null,
-        timezone: (r.timezone || 'UTC') as string,
-        nextFiresAt: (r.next_fires_at || '') as string,
-        lastFiredAt: (r.last_fired_at || null) as string | null,
-        status: (r.status || 'active') as string,
-        createdBy: (r.created_by || '') as string,
-        channelName: (r.channel_name || '') as string,
-        createdAt: (r.created_at || null) as string | null,
+        id: (r.id || r.ID) as string,
+        name: (r.name || r.Name) as string,
+        message: (r.message || r.Message) as string,
+        context: (r.context ?? r.Context ?? null) as string | null,
+        scheduleHour: (r.schedule_hour ?? r.scheduleHour ?? r.ScheduleHour ?? 0) as number,
+        scheduleMinute: (r.schedule_minute ?? r.scheduleMinute ?? r.ScheduleMinute ?? 0) as number,
+        scheduleDays: parseScheduleDays(r.schedule_days ?? r.scheduleDays ?? r.ScheduleDays),
+        scheduleIntervalMinutes: (r.schedule_interval_minutes ?? r.scheduleIntervalMinutes ?? r.ScheduleIntervalMinutes ?? null) as number | null,
+        timezone: (r.timezone || r.Timezone || 'UTC') as string,
+        nextFiresAt: (r.next_fires_at || r.nextFiresAt || r.NextFiresAt || '') as string,
+        lastFiredAt: (r.last_fired_at || r.lastFiredAt || r.LastFiredAt || null) as string | null,
+        status: (r.status || r.Status || 'active') as string,
+        createdBy: (r.created_by || r.createdBy || r.CreatedBy || '') as string,
+        channelName: (r.channel_name || r.channelName || r.ChannelName || '') as string,
+        createdAt: (r.created_at || r.createdAt || r.CreatedAt || null) as string | null,
       })),
     };
   }
@@ -1044,21 +1078,21 @@ class WorkspaceApi {
       }),
     });
     return {
-      id: raw.id as string,
-      name: raw.name as string,
-      message: raw.message as string,
-      context: (raw.context || null) as string | null,
-      scheduleHour: (raw.schedule_hour || 0) as number,
-      scheduleMinute: (raw.schedule_minute || 0) as number,
-      scheduleDays: (raw.schedule_days || null) as number[] | null,
-      scheduleIntervalMinutes: (raw.schedule_interval_minutes || null) as number | null,
-      timezone: (raw.timezone || 'UTC') as string,
-      nextFiresAt: (raw.next_fires_at || '') as string,
-      lastFiredAt: (raw.last_fired_at || null) as string | null,
-      status: (raw.status || 'active') as string,
-      createdBy: (raw.created_by || '') as string,
-      channelName: (raw.channel_name || '') as string,
-      createdAt: (raw.created_at || null) as string | null,
+      id: (raw.id || raw.ID) as string,
+      name: (raw.name || raw.Name) as string,
+      message: (raw.message || raw.Message) as string,
+      context: (raw.context ?? raw.Context ?? null) as string | null,
+      scheduleHour: (raw.schedule_hour ?? raw.scheduleHour ?? raw.ScheduleHour ?? 0) as number,
+      scheduleMinute: (raw.schedule_minute ?? raw.scheduleMinute ?? raw.ScheduleMinute ?? 0) as number,
+      scheduleDays: parseScheduleDays(raw.schedule_days ?? raw.scheduleDays ?? raw.ScheduleDays),
+      scheduleIntervalMinutes: (raw.schedule_interval_minutes ?? raw.scheduleIntervalMinutes ?? raw.ScheduleIntervalMinutes ?? null) as number | null,
+      timezone: (raw.timezone || raw.Timezone || 'UTC') as string,
+      nextFiresAt: (raw.next_fires_at || raw.nextFiresAt || raw.NextFiresAt || '') as string,
+      lastFiredAt: (raw.last_fired_at || raw.lastFiredAt || raw.LastFiredAt || null) as string | null,
+      status: (raw.status || raw.Status || 'active') as string,
+      createdBy: (raw.created_by || raw.createdBy || raw.CreatedBy || '') as string,
+      channelName: (raw.channel_name || raw.channelName || raw.ChannelName || '') as string,
+      createdAt: (raw.created_at || raw.createdAt || raw.CreatedAt || null) as string | null,
     };
   }
 
@@ -1075,23 +1109,23 @@ class WorkspaceApi {
     if (opts?.status) params.set('status', opts.status);
     if (opts?.isRead !== undefined) params.set('is_read', String(opts.isRead));
     if (opts?.limit) params.set('limit', String(opts.limit));
-    const raw = await this.request<{ notifications: Record<string, unknown>[]; unread_count: number }>(`/v1/notifications?${params}`);
+    const raw = await this.request<{ notifications: Record<string, unknown>[]; unread_count: number; unreadCount: number }>(`/v1/notifications?${params}`);
     return {
       notifications: (raw.notifications || []).map((n): NotificationItem => ({
-        id: n.id as string,
-        title: n.title as string,
-        message: n.message as string,
-        priority: (n.priority || 'normal') as NotificationItem['priority'],
-        isRead: !!(n.is_read),
-        createdBy: (n.created_by || '') as string,
-        channelName: (n.channel_name ?? null) as string | null,
-        threadId: (n.thread_id ?? null) as string | null,
-        linkUrl: (n.link_url ?? null) as string | null,
-        status: (n.status || 'active') as string,
-        createdAt: (n.created_at || null) as string | null,
-        readAt: (n.read_at || null) as string | null,
+        id: (n.id || n.ID) as string,
+        title: (n.title || n.Title) as string,
+        message: (n.message || n.Message) as string,
+        priority: (n.priority || n.Priority || 'normal') as NotificationItem['priority'],
+        isRead: !!(n.is_read || n.IsRead || n.isRead),
+        createdBy: (n.created_by || n.createdBy || n.CreatedBy || '') as string,
+        channelName: (n.channel_name ?? n.channelName ?? n.ChannelName ?? null) as string | null,
+        threadId: (n.thread_id ?? n.threadId ?? n.ThreadID ?? null) as string | null,
+        linkUrl: (n.link_url ?? n.linkUrl ?? n.LinkURL ?? null) as string | null,
+        status: (n.status || n.Status || 'active') as string,
+        createdAt: (n.created_at || n.createdAt || n.CreatedAt || null) as string | null,
+        readAt: (n.read_at || n.readAt || n.ReadAt || null) as string | null,
       })),
-      unreadCount: raw.unread_count || 0,
+      unreadCount: raw.unread_count || raw.unreadCount || 0,
     };
   }
 
@@ -1105,6 +1139,75 @@ class WorkspaceApi {
 
   async dismissNotification(notificationId: string): Promise<void> {
     await this.request<unknown>(`/v1/notifications/${notificationId}`, { method: 'DELETE' });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Agent runtime / diagnostics / approvals
+  // ---------------------------------------------------------------------------
+
+  private mapAgentRuntime(raw: Record<string, unknown>): AgentRuntime {
+    return {
+      workspaceId: (raw.workspace_id || '') as string,
+      agentName: (raw.agent_name || '') as string,
+      processStatus: (raw.process_status || 'stopped') as AgentRuntime['processStatus'],
+      healthStatus: (raw.health_status || 'unknown') as AgentRuntime['healthStatus'],
+      pid: (raw.pid ?? null) as number | null,
+      restartCount: (raw.restart_count ?? 0) as number,
+      lastError: (raw.last_error ?? null) as string | null,
+      updatedAt: (raw.updated_at ?? null) as string | null,
+    };
+  }
+
+  async getAgentRuntime(agentName: string): Promise<AgentRuntime | null> {
+    try {
+      const raw = await this.request<Record<string, unknown>>(`/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentName)}/runtime`);
+      return this.mapAgentRuntime(raw);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('API 404:')) return null;
+      throw error;
+    }
+  }
+
+  async listAgentLogs(agentName: string, limit = 50): Promise<AgentLogEntry[]> {
+    const raw = await this.request<{ logs: Record<string, unknown>[] }>(`/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentName)}/logs?limit=${limit}`);
+    return (raw.logs || []).map((log) => ({
+      id: (log.id || '') as string,
+      agentName: (log.agent_name || agentName) as string,
+      level: (log.level || 'info') as AgentLogEntry['level'],
+      message: (log.message || '') as string,
+      createdAt: (log.created_at ?? null) as string | null,
+    }));
+  }
+
+  async listAgentApprovals(status?: AgentApproval['status']): Promise<AgentApproval[]> {
+    const params = new URLSearchParams({ network: this.workspaceId });
+    if (status) params.set('status', status);
+    const raw = await this.request<{ approvals: Record<string, unknown>[] }>(`/v1/approvals?${params}`);
+    return (raw.approvals || []).map((approval) => ({
+      id: (approval.id || '') as string,
+      agentName: (approval.agent_name || '') as string,
+      requestedBy: (approval.requested_by || '') as string,
+      action: (approval.action || '') as string,
+      details: (approval.details ?? null) as Record<string, unknown> | null,
+      status: (approval.status || 'pending') as AgentApproval['status'],
+      resolvedBy: (approval.resolved_by ?? null) as string | null,
+      resolvedAt: (approval.resolved_at ?? null) as string | null,
+      createdAt: (approval.created_at ?? null) as string | null,
+    }));
+  }
+
+  async resolveAgentApproval(approvalId: string, status: 'approved' | 'rejected'): Promise<AgentApproval> {
+    const raw = await this.request<Record<string, unknown>>(`/v1/approvals/${encodeURIComponent(approvalId)}`, {
+      method: 'PATCH', body: JSON.stringify({ status, resolved_by: 'human:user' }),
+    });
+    return {
+      id: (raw.id || '') as string, agentName: (raw.agent_name || '') as string,
+      requestedBy: (raw.requested_by || '') as string, action: (raw.action || '') as string,
+      details: (raw.details ?? null) as Record<string, unknown> | null,
+      status: (raw.status || status) as AgentApproval['status'],
+      resolvedBy: (raw.resolved_by ?? null) as string | null, resolvedAt: (raw.resolved_at ?? null) as string | null,
+      createdAt: (raw.created_at ?? null) as string | null,
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -1142,12 +1245,12 @@ class WorkspaceApi {
     const params = new URLSearchParams({ network: this.workspaceId, channel, source });
     const raw = await this.request<{ todos: Record<string, unknown>[] }>(`/v1/todos?${params}`);
     const todos = raw.todos || [];
-    const hasActive = todos.some((t) => t.status === 'pending' || t.status === 'in_progress');
+    const hasActive = todos.some((t) => (t.status || t.Status) === 'pending' || (t.status || t.Status) === 'in_progress');
     if (!hasActive) return;
     const updated = todos.map((t) => ({
-      content: t.content as string,
-      status: (t.status === 'pending' || t.status === 'in_progress') ? 'cancelled' : t.status as string,
-      assignee: t.assignee as string,
+      content: (t.content || t.Content) as string,
+      status: ((t.status || t.Status) === 'pending' || (t.status || t.Status) === 'in_progress') ? 'cancelled' : (t.status || t.Status) as string,
+      assignee: (t.assignee || t.Assignee) as string,
     }));
     await this.request<unknown>('/v1/todos', {
       method: 'PUT',

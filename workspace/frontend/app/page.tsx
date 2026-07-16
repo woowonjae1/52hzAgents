@@ -571,6 +571,11 @@ export default function HomePage() {
     );
   }
 
+  // Bypass landing page and show dashboard directly on local/custom domains
+  if (!openAgentsAuth.isOpenAgentsDomain) {
+    return <Dashboard />;
+  }
+
   // Logged in via either auth system → show dashboard
   if (user || openAgentsAuth.user) return <Dashboard />;
 

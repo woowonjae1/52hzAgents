@@ -6,8 +6,8 @@ import (
 	"net/http" // 包含标准的 HTTP 常量和响应写入方法。
 	"time"     // 用于计算 Timer 到期触发时刻。
 
-	"github.com/gin-gonic/gin"                           // Gin 框架路由控制。
-	"github.com/google/uuid"                            // 生成实体 UUID 主键。
+	"github.com/gin-gonic/gin"                                           // Gin 框架路由控制。
+	"github.com/google/uuid"                                             // 生成实体 UUID 主键。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 表结构模型声明。
 )
@@ -39,9 +39,7 @@ func CreateTimer(c *gin.Context) {
 	}
 
 	// 校验工作区权限。
-	token := c.GetHeader("X-Workspace-Token")
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return
 	}
 
@@ -74,6 +72,10 @@ func CreateTimer(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to schedule timer"})
 		return
 	}
+	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.timer.created", req.Source, req.Channel, gin.H{"timer": record}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish timer update"})
+		return
+	}
 
 	// 返回成功。
 	c.JSON(http.StatusOK, record)
@@ -95,9 +97,7 @@ func ListTimers(c *gin.Context) {
 	}
 
 	// 验证工作区权限。
-	token := c.GetHeader("X-Workspace-Token")
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return
 	}
 
@@ -135,6 +135,14 @@ func DeleteTimer(c *gin.Context) {
 	}
 
 	// 如果定时器已经是取消或触发完毕，直接返回。
+	workspace, err := resolveWorkspace(record.WorkspaceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+	if !authorizeWorkspace(c, workspace) {
+		return
+	}
 	if record.Status == "cancelled" {
 		c.JSON(http.StatusOK, gin.H{"success": true})
 		return
@@ -143,6 +151,11 @@ func DeleteTimer(c *gin.Context) {
 	// 标记修改其状态为已取消 (cancelled)。
 	if err := db.DB.Model(&record).Update("status", "cancelled").Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel timer"})
+		return
+	}
+	record.Status = "cancelled"
+	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.timer.cancelled", record.CreatedBy, record.ChannelName, gin.H{"timer": record}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish timer update"})
 		return
 	}
 

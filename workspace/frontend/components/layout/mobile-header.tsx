@@ -9,8 +9,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Menu, MessageSquare, FileText, Globe, Plus } from 'lucide-react';
-import Image from 'next/image';
+import { Menu, MessageSquare, FileText, Globe, Plus, Network } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { SidebarContent } from './sidebar-content';
 import { useLayout, type ViewMode } from './layout-context';
@@ -70,9 +69,8 @@ export function MobileHeader() {
               </SheetContent>
             </Sheet>
 
-            <div className="size-7 shrink-0">
-              <Image src="/logo-black.png" alt="OpenAgents" width={28} height={28} className="size-full object-contain dark:hidden" />
-              <Image src="/logo-white.png" alt="OpenAgents" width={28} height={28} className="size-full object-contain hidden dark:block" />
+            <div className="size-7 shrink-0 flex items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Network className="size-4" />
             </div>
 
             <span className="text-sm font-medium truncate">

@@ -21,6 +21,11 @@ ENV HOST=0.0.0.0 \
     FILE_STORAGE_BACKEND=local \
     FILE_STORAGE_PATH=/var/lib/openagents/files
 
-RUN mkdir -p /var/lib/openagents/files
+RUN addgroup -S openagents && adduser -S -G openagents openagents && \
+    mkdir -p /var/lib/openagents/files && \
+    chown -R openagents:openagents /var/lib/openagents
+USER openagents
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -q -O /dev/null http://127.0.0.1:8000/v1/health || exit 1
 ENTRYPOINT ["/usr/local/bin/workspace-backend"]

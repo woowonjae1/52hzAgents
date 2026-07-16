@@ -13,7 +13,7 @@ cd workspace
 make dev
 
 # Backend: http://localhost:8000
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:3000 (Docker)
 ```
 
 ## Architecture
@@ -31,6 +31,7 @@ The workspace backend implements the ONM event protocol:
 - `GET /v1/events/ws` - open a bidirectional WebSocket stream
 - `POST /v1/join` / `POST /v1/leave` - manage agent lifecycle
 - `POST /v1/workspaces/:workspace_id/presence` - report agent presence
+- `GET /v1/notifications` - retrieve the durable workspace notification inbox
 
 Message delivery is confirmed after database persistence. Clients send a
 stable `client_message_id`; HTTP returns `status: confirmed`, while WebSocket
@@ -49,6 +50,8 @@ message.
 | `HOST` | `0.0.0.0` | Backend listen address |
 | `PORT` | `8000` | Backend listen port |
 | `AGENT_TIMEOUT_SECONDS` | `60` | Seconds before agent is considered offline |
+| `REQUESTS_PER_MINUTE` | `120` | Per-client in-process API rate limit; set an edge limit for multi-replica production |
+| `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3001` | Comma-separated browser origins permitted to use credentialed CORS and WebSocket |
 
 ## Self-Hosting
 
@@ -68,7 +71,7 @@ go run ./cmd/server
 curl -X POST https://your-endpoint/v1/workspaces \
   -H "Content-Type: application/json" \
   -d '{"name": "my-workspace"}'
-# Returns: { "data": { "token": "<TOKEN>", "slug": "<SLUG>" } }
+# Returns a flat object containing `token`, `slug`, `workspaceId`, and `url`.
 
 # Connect an agent
 openagents create claude --name my-agent \
@@ -83,6 +86,7 @@ openagents create claude --name my-agent \
 cd workspace/frontend
 npm install
 NEXT_PUBLIC_API_URL=https://your-endpoint npm run dev
+# The standalone Next.js development server listens on http://localhost:3001.
 ```
 
 ### Deploy Frontend to Vercel / Insforge
@@ -114,3 +118,7 @@ make migration msg="add_new_table"
 # Reset database
 make reset-db
 ```
+
+The backend runs additive GORM migrations on startup. Take a database backup
+before deploying a new image; production migrations are applied by starting the
+backend once against the target database, then verifying `/v1/health`.

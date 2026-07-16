@@ -1,13 +1,10 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
 import Script from 'next/script';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/lib/auth-context';
 import { OpenAgentsAuthProvider } from '@/lib/openagents-auth-context';
 import '@/styles/globals.css';
-
-const inter = Inter({ subsets: ['latin'] });
 
 // Analytics identifiers are injected via Vercel env vars (Project → Settings →
 // Environment Variables) rather than hardcoded. NEXT_PUBLIC_* values are inlined
@@ -19,7 +16,7 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://d.openagen
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 export const metadata: Metadata = {
-  title: 'OpenAgents Workspace',
+  title: 'Agent Workspace',
   description: 'Interact with your AI agents in real time',
   icons: {
     icon: [
@@ -71,7 +68,7 @@ export default function RootLayout({
         </>
         )}
       </head>
-      <body className={`${inter.className} bg-zinc-100 dark:bg-zinc-900`}>
+      <body className="bg-zinc-100 font-sans dark:bg-zinc-900">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <OpenAgentsAuthProvider>

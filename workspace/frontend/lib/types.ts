@@ -295,6 +295,37 @@ export interface NotificationItem {
   readAt: string | null;
 }
 
+export interface AgentRuntime {
+  workspaceId: string;
+  agentName: string;
+  processStatus: 'starting' | 'running' | 'stopped' | 'failed';
+  healthStatus: 'unknown' | 'healthy' | 'degraded' | 'unhealthy';
+  pid: number | null;
+  restartCount: number;
+  lastError: string | null;
+  updatedAt: string | null;
+}
+
+export interface AgentLogEntry {
+  id: string;
+  agentName: string;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  message: string;
+  createdAt: string | null;
+}
+
+export interface AgentApproval {
+  id: string;
+  agentName: string;
+  requestedBy: string;
+  action: string;
+  details: Record<string, unknown> | null;
+  status: 'pending' | 'approved' | 'rejected';
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string | null;
+}
+
 // ---------------------------------------------------------------------------
 // Agent catalog (supported client types)
 // ---------------------------------------------------------------------------

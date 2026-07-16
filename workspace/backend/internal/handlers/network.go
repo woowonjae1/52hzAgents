@@ -7,8 +7,8 @@ import (
 	"net/http"      // 包含标准的 HTTP 常量和响应写入方法。
 	"time"          // 用于时间戳的捕获与心跳更新。
 
-	"github.com/gin-gonic/gin"                           // Gin 框架控制。
-	"github.com/google/uuid"                            // 用于生成 Session ID。
+	"github.com/gin-gonic/gin"                                           // Gin 框架控制。
+	"github.com/google/uuid"                                             // 用于生成 Session ID。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 数据库操作全局连接。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 内存消息 Hub 单例。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 数据结构体模型。
@@ -16,12 +16,12 @@ import (
 
 // JoinRequest 代表 Agent 登入工作区的请求载荷。
 type JoinRequest struct {
-	Network    string `json:"network"`     // 工作区 ID 或 Slug
-	Token      string `json:"token"`       // 访问 Token
+	Network    string `json:"network"`                       // 工作区 ID 或 Slug
+	Token      string `json:"token"`                         // 访问 Token
 	AgentName  string `json:"agent_name" binding:"required"` // 智能体唯一标识名称 (必填)
-	AgentType  string `json:"agent_type"`  // 智能体类型（如 claude）
-	ServerHost string `json:"server_host"` // 智能体运行机器宿主主机地址
-	WorkingDir string `json:"working_dir"` // 智能体运行所在的本地工作路径
+	AgentType  string `json:"agent_type"`                    // 智能体类型（如 claude）
+	ServerHost string `json:"server_host"`                   // 智能体运行机器宿主主机地址
+	WorkingDir string `json:"working_dir"`                   // 智能体运行所在的本地工作路径
 }
 
 // JoinResponse 包含 Agent 成功加入工作区后的鉴权结果元数据。
@@ -195,7 +195,14 @@ func LeaveNetwork(c *gin.Context) {
 	// 寻找并更新成员的在线状态。
 	var member models.WorkspaceMember
 	memberErr := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, req.AgentName).First(&member).Error
+	if !authorizeWorkspace(c, workspace) {
+		return
+	}
 	if memberErr == nil {
+		if member.SessionID != nil && *member.SessionID != req.SessionID {
+			c.JSON(http.StatusConflict, gin.H{"error": "session_revoked"})
+			return
+		}
 		member.Status = "offline" // 设定为离线。
 		db.DB.Save(&member)       // 保存更新。
 	}
@@ -268,6 +275,9 @@ func UpdatePresence(c *gin.Context) {
 	}
 
 	// 锁定匹配的成员实体。
+	if !authorizeWorkspace(c, workspace) {
+		return
+	}
 	var member models.WorkspaceMember
 	memberErr := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, req.AgentName).First(&member).Error
 	if memberErr != nil {

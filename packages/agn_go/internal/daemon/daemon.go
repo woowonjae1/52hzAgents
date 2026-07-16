@@ -3,20 +3,20 @@ package daemon
 
 // 导入所需的包依赖。
 import (
-	"bufio"        // 按行流式读取子进程输出。
+	"bufio"         // 按行流式读取子进程输出。
 	"encoding/json" // 序列化与反序列化 JSON。
-	"fmt"          // 拼接格式化字符串。
-	"io"           // 关闭管道输入输出。
-	"log"          // 打印守护系统日志。
-	"net"          // TCP 端口监听接收 (控制信道重构)。
-	"os"           // 系统环境变量及文件操作。
-	"os/exec"      // 启动并控制外部子进程。
+	"fmt"           // 拼接格式化字符串。
+	"io"            // 关闭管道输入输出。
+	"log"           // 打印守护系统日志。
+	"net"           // TCP 端口监听接收 (控制信道重构)。
+	"os"            // 系统环境变量及文件操作。
+	"os/exec"       // 启动并控制外部子进程。
 	"path/filepath" // 跨平台拼接路径。
-	"runtime"      // 获取运行平台操作系统。
-	"strconv"      // 类型转换。
-	"strings"      // 字符串处理。
-	"sync"         // 进程操作线程锁。
-	"time"         // 时间计时器。
+	"runtime"       // 获取运行平台操作系统。
+	"strconv"       // 类型转换。
+	"strings"       // 字符串处理。
+	"sync"          // 进程操作线程锁。
+	"time"          // 时间计时器。
 
 	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/config"   // 本地配置包。
 	"github.com/woowonjae1/52hzAgents/packages/agn_go/internal/registry" // 嵌入式注册表。
@@ -42,19 +42,19 @@ type DaemonStatus struct {
 
 // Daemon 代表守护进程的运行上下文。
 type Daemon struct {
-	configDir     string                 // 配置文件夹路径
-	statusFile    string                 // daemon.status.json 文件路径
-	pidFile       string                 // daemon.pid 文件路径
-	cmdFile       string                 // daemon.cmd 文件路径
-	logFile       string                 // daemon.log 文件路径
-	processes     map[string]AgentState        // 各个智能体的当前状态机字典
-	activeCmds    map[string]*exec.Cmd         // 记录当前活跃的外部子进程句柄 (阶段二新增)
-	stoppedAgents map[string]bool              // 被手动停止的智能体集合
-	connected     map[string]bool              // 期望连接到工作区的智能体集合 (阶段三新增)
-	bridges       map[string]*wsclient.Bridge  // 各智能体当前活跃的工作区桥接会话 (阶段三新增)
-	listener      net.Listener                 // TCP 监听控制信道句柄 (重构 TCP 新增)
-	isShutdown    chan struct{}                // 关机通道信号
-	mu            sync.Mutex                   // 操作并发锁，防范 start/stop 同步冲突 (阶段二新增)
+	configDir     string                      // 配置文件夹路径
+	statusFile    string                      // daemon.status.json 文件路径
+	pidFile       string                      // daemon.pid 文件路径
+	cmdFile       string                      // daemon.cmd 文件路径
+	logFile       string                      // daemon.log 文件路径
+	processes     map[string]AgentState       // 各个智能体的当前状态机字典
+	activeCmds    map[string]*exec.Cmd        // 记录当前活跃的外部子进程句柄 (阶段二新增)
+	stoppedAgents map[string]bool             // 被手动停止的智能体集合
+	connected     map[string]bool             // 期望连接到工作区的智能体集合 (阶段三新增)
+	bridges       map[string]*wsclient.Bridge // 各智能体当前活跃的工作区桥接会话 (阶段三新增)
+	listener      net.Listener                // TCP 监听控制信道句柄 (重构 TCP 新增)
+	isShutdown    chan struct{}               // 关机通道信号
+	mu            sync.Mutex                  // 操作并发锁，防范 start/stop 同步冲突 (阶段二新增)
 }
 
 // NewDaemon 构造并初始化 Daemon 实例。
@@ -133,7 +133,7 @@ func (d *Daemon) Start() error {
 // Stop 停止守护进程并释放所有已分配的资源。
 func (d *Daemon) Stop() {
 	log.Println("Daemon shutting down...")
-	
+
 	// 在广播退出信号前，主动关闭本地 TCP 监听句柄以打破 Accept 阻塞 (重构 TCP 新增)。
 	if d.listener != nil {
 		_ = d.listener.Close()
@@ -376,7 +376,12 @@ func (d *Daemon) spawnLoop(name string, ag config.AgentConfig) {
 
 		// 阶段三：若处于连接态且成功打开了 stdin 管道，则建立工作区双向桥接会话。
 		if wantBridge && stdinPipe != nil {
-			d.startBridge(name, ag, stdinPipe)
+			if br := d.startBridge(name, ag, stdinPipe); br != nil {
+				pid := cmd.Process.Pid
+				if err := br.ReportRuntime("running", "healthy", &pid, state.Restarts, ""); err != nil {
+					log.Printf("Agent [%s] runtime report failed: %v", name, err)
+				}
+			}
 		}
 
 		// 开启辅助协程流式按行读取子进程 Stdout 与 Stderr，并加上 Agent 统一前缀合并输出到全局 daemon.log 中。
@@ -402,7 +407,14 @@ func (d *Daemon) spawnLoop(name string, ag config.AgentConfig) {
 		go func(r io.Reader) {
 			scanner := bufio.NewScanner(r)
 			for scanner.Scan() {
-				log.Printf("[%s][stderr] %s", name, scanner.Text())
+				text := scanner.Text()
+				log.Printf("[%s][stderr] %s", name, text)
+				d.mu.Lock()
+				br := d.bridges[name]
+				d.mu.Unlock()
+				if br != nil {
+					_ = br.SendLog("error", text)
+				}
 			}
 		}(stderr)
 
@@ -414,6 +426,7 @@ func (d *Daemon) spawnLoop(name string, ag config.AgentConfig) {
 		delete(d.activeCmds, name) // 从运行中列表中剥离。
 		// 阶段三：进程退出时同步关闭其工作区桥接会话（会向后端上报离线）。
 		if br, ok := d.bridges[name]; ok {
+			_ = br.ReportRuntime("stopped", "unknown", nil, d.processes[name].Restarts, "")
 			br.Close()
 			delete(d.bridges, name)
 		}
@@ -565,7 +578,7 @@ func (d *Daemon) executeSingleCommand(cmd string) error {
 	if strings.HasPrefix(cmd, "stop:") || strings.HasPrefix(cmd, "start:") ||
 		strings.HasPrefix(cmd, "restart:") || strings.HasPrefix(cmd, "connect:") ||
 		strings.HasPrefix(cmd, "disconnect:") {
-		
+
 		parts := strings.SplitN(cmd, ":", 2)
 		if len(parts) == 2 {
 			agentName := strings.TrimSpace(parts[1])
@@ -699,12 +712,12 @@ func (d *Daemon) handleRestartAgent(name string) {
 
 // startBridge 为指定 Agent 建立到工作区的 WebSocket 双向桥接会话（阶段三新增）。
 // stdin 为该 Agent 子进程的标准输入写入端，用于把工作区下行消息喂给 Agent。
-func (d *Daemon) startBridge(name string, ag config.AgentConfig, stdin io.WriteCloser) {
+func (d *Daemon) startBridge(name string, ag config.AgentConfig, stdin io.WriteCloser) *wsclient.Bridge {
 	// 解析该 Agent 绑定的工作区连接参数。
 	ws, ok := config.LoadedConfig.Workspaces[ag.WorkspaceID]
 	if !ok {
 		log.Printf("Agent [%s] has no resolvable workspace binding (%s), skip bridging", name, ag.WorkspaceID)
-		return
+		return nil
 	}
 
 	// 构造桥接客户端实例。
@@ -727,7 +740,7 @@ func (d *Daemon) startBridge(name string, ag config.AgentConfig, stdin io.WriteC
 	// 发起连接（join + WebSocket + 心跳）。
 	if err := br.Connect(onMessage); err != nil {
 		log.Printf("Agent [%s] workspace bridge connect failed: %v", name, err)
-		return
+		return nil
 	}
 
 	// 记录活跃桥接会话。
@@ -736,6 +749,7 @@ func (d *Daemon) startBridge(name string, ag config.AgentConfig, stdin io.WriteC
 	d.mu.Unlock()
 
 	log.Printf("Agent [%s] bridged to workspace (endpoint: %s, channel: %s)", name, ws.Endpoint, br.Channel)
+	return br
 }
 
 // handleConnectAgent 将指定 Agent 标记为连接态并（重）启动，使其在下次生命周期中建立工作区桥接（阶段三新增）。
@@ -772,8 +786,8 @@ func (d *Daemon) handleDisconnectAgent(name string) {
 
 	d.mu.Lock()
 	d.connected[name] = false // 取消连接态标记。
-	br := d.bridges[name]      // 取出当前桥接会话。
-	delete(d.bridges, name)    // 从活跃桥接表中移除。
+	br := d.bridges[name]     // 取出当前桥接会话。
+	delete(d.bridges, name)   // 从活跃桥接表中移除。
 	d.mu.Unlock()
 
 	// 优雅关闭桥接（会向后端上报离线）。

@@ -8,24 +8,24 @@ import (
 	"net/http"      // 包含标准的 HTTP 常量和响应写入方法。
 	"time"          // 用于计算 Routine 的触发时间。
 
-	"github.com/gin-gonic/gin"                           // Gin 框架路由控制。
-	"github.com/google/uuid"                            // 生成 UUID。
+	"github.com/gin-gonic/gin"                                           // Gin 框架路由控制。
+	"github.com/google/uuid"                                             // 生成 UUID。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 表结构模型声明。
 )
 
 // CreateRoutineRequest 代表创建循环定时任务的请求数据载荷。
 type CreateRoutineRequest struct {
-	Network         string  `json:"network" binding:"required"`          // 工作区 ID 或 Slug (必填)
-	Source          string  `json:"source" binding:"required"`           // 来源 Agent (必填)
-	Name            string  `json:"name" binding:"required"`             // 周期任务别名 (必填)
-	Message         string  `json:"message" binding:"required"`          // 触发时向通道发布的消息文本 (必填)
-	Context         string  `json:"context"`                             // 定时任务执行的背景上下文
-	Hour            *int    `json:"hour"`                                // 时 (0-23)
-	Minute          *int    `json:"minute"`                              // 分 (0-59)
-	Days            []int   `json:"days"`                                // 周期生效星期天数组 (0=周一, 6=周日)
-	IntervalMinutes *int    `json:"interval_minutes"`                    // 间隔分钟数（与每日定时互斥）
-	ThreadID        *string `json:"thread_id"`                           // 可选的指定会话线程 ID
+	Network         string  `json:"network" binding:"required"` // 工作区 ID 或 Slug (必填)
+	Source          string  `json:"source" binding:"required"`  // 来源 Agent (必填)
+	Name            string  `json:"name" binding:"required"`    // 周期任务别名 (必填)
+	Message         string  `json:"message" binding:"required"` // 触发时向通道发布的消息文本 (必填)
+	Context         string  `json:"context"`                    // 定时任务执行的背景上下文
+	Hour            *int    `json:"hour"`                       // 时 (0-23)
+	Minute          *int    `json:"minute"`                     // 分 (0-59)
+	Days            []int   `json:"days"`                       // 周期生效星期天数组 (0=周一, 6=周日)
+	IntervalMinutes *int    `json:"interval_minutes"`           // 间隔分钟数（与每日定时互斥）
+	ThreadID        *string `json:"thread_id"`                  // 可选的指定会话线程 ID
 }
 
 // ComputeNextFiresAt 接收当前参数并计算下一次周期触发的具体时刻。
@@ -147,9 +147,7 @@ func CreateRoutine(c *gin.Context) {
 	}
 
 	// 校验工作区权限。
-	token := c.GetHeader("X-Workspace-Token")
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return
 	}
 
@@ -212,26 +210,30 @@ func CreateRoutine(c *gin.Context) {
 
 	// 组装 RoutineRecord 对象。
 	record := models.RoutineRecord{
-		ID:                       routineID,
-		WorkspaceID:              workspace.ID,
-		ChannelName:              chName,
-		ThreadID:                 req.ThreadID,
-		CreatedBy:                targetAgent,
-		Name:                     req.Name,
-		Message:                  req.Message,
-		Context:                  &req.Context,
-		ScheduleHour:             req.Hour,
-		ScheduleMinute:           req.Minute,
-		ScheduleDays:             daysBytes,
+		ID:                      routineID,
+		WorkspaceID:             workspace.ID,
+		ChannelName:             chName,
+		ThreadID:                req.ThreadID,
+		CreatedBy:               targetAgent,
+		Name:                    req.Name,
+		Message:                 req.Message,
+		Context:                 &req.Context,
+		ScheduleHour:            req.Hour,
+		ScheduleMinute:          req.Minute,
+		ScheduleDays:            daysBytes,
 		ScheduleIntervalMinutes: req.IntervalMinutes,
-		NextFiresAt:              nextFire,
-		Status:                   "active", // 设置为活跃。
-		CreatedAt:                time.Now(),
+		NextFiresAt:             nextFire,
+		Status:                  "active", // 设置为活跃。
+		CreatedAt:               time.Now(),
 	}
 
 	// 持久化记录。
 	if err := db.DB.Create(&record).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create routine"})
+		return
+	}
+	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.routine.created", req.Source, chName, gin.H{"routine": record}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish routine update"})
 		return
 	}
 
@@ -255,9 +257,7 @@ func ListRoutines(c *gin.Context) {
 	}
 
 	// 校验工作区权限。
-	token := c.GetHeader("X-Workspace-Token")
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return
 	}
 
@@ -289,8 +289,21 @@ func DeleteRoutine(c *gin.Context) {
 	}
 
 	// 将状态更新为已取消 (cancelled)。
+	workspace, err := resolveWorkspace(record.WorkspaceID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+	if !authorizeWorkspace(c, workspace) {
+		return
+	}
 	if err := db.DB.Model(&record).Update("status", "cancelled").Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel routine"})
+		return
+	}
+	record.Status = "cancelled"
+	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.routine.cancelled", record.CreatedBy, record.ChannelName, gin.H{"routine": record}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish routine update"})
 		return
 	}
 

@@ -9,8 +9,8 @@ import (
 	"strings"       // 提供辅助字符串处理函数。
 	"time"          // 记录更新时刻。
 
-	"github.com/gin-gonic/gin"                           // Gin 框架路由控制。
-	"github.com/google/uuid"                            // 为新增实体分配随机 UUID。
+	"github.com/gin-gonic/gin"                                           // Gin 框架路由控制。
+	"github.com/google/uuid"                                             // 为新增实体分配随机 UUID。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 事件广播总线。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 数据结构体模型。
@@ -25,11 +25,11 @@ type PutTodoItem struct {
 
 // PutTodosRequest 代表批量修改 Todos 列表的请求载荷。
 type PutTodosRequest struct {
-	Network  string        `json:"network" binding:"required"`  // 工作区标识 (必填)
-	Source   string        `json:"source" binding:"required"`   // 请求来源（智能体或人，如 openagents:claude） (必填)
-	Channel  string        `json:"channel"`                     // 所属会话通道名称
-	ThreadID *string       `json:"thread_id"`                   // 可选的具体线程 ID
-	Todos    []PutTodoItem `json:"todos"`                       // 待覆盖保存的代办项列表
+	Network  string        `json:"network" binding:"required"` // 工作区标识 (必填)
+	Source   string        `json:"source" binding:"required"`  // 请求来源（智能体或人，如 openagents:claude） (必填)
+	Channel  string        `json:"channel"`                    // 所属会话通道名称
+	ThreadID *string       `json:"thread_id"`                  // 可选的具体线程 ID
+	Todos    []PutTodoItem `json:"todos"`                      // 待覆盖保存的代办项列表
 }
 
 // getAgentNameFromSource 解析源路径获取纯粹的 Agent 名称。
@@ -58,10 +58,14 @@ func PutTodos(c *gin.Context) {
 	}
 
 	// 验证 Token。
-	token := c.GetHeader("X-Workspace-Token")
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return
+	}
+	for _, item := range req.Todos {
+		if item.Status != "pending" && item.Status != "in_progress" && item.Status != "completed" && item.Status != "cancelled" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "todo status must be pending, in_progress, completed, or cancelled"})
+			return
+		}
 	}
 
 	// 初始化通道默认值。
@@ -124,7 +128,10 @@ func PutTodos(c *gin.Context) {
 	}
 
 	// 提交事务。
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save todos"})
+		return
+	}
 
 	// 构建以发布消息形式同步任务面板到讨论区的汇总文本。
 	var contentBuilder strings.Builder
@@ -183,6 +190,10 @@ func PutTodos(c *gin.Context) {
 		ChannelName: "channel/" + channelName,
 		Payload:     string(fullEventBytes),
 	})
+	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.todos.updated", req.Source, channelName, gin.H{"todos": records, "thread_id": req.ThreadID}); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish todo update"})
+		return
+	}
 
 	// 返回成功。
 	c.JSON(http.StatusOK, gin.H{"todos": records})
@@ -204,9 +215,7 @@ func GetTodos(c *gin.Context) {
 	}
 
 	// 权限验证。
-	token := c.GetHeader("X-Workspace-Token")
-	if !verifyWorkspaceAccess(workspace, token) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+	if !authorizeWorkspace(c, workspace) {
 		return
 	}
 

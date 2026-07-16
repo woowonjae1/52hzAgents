@@ -171,7 +171,7 @@ export function EmptyState() {
                   <span className="text-xs text-muted-foreground">— Desktop App (recommended)</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground mb-2.5">
-                  Download the OpenAgents Launcher for a visual setup experience.
+                  Download the Desktop Launcher for a visual setup experience.
                 </p>
                 <div className="flex gap-2">
                   {[
@@ -212,7 +212,7 @@ export function EmptyState() {
                 <div className="space-y-3">
                   <CliStep
                     step="1"
-                    label="Install the OpenAgents CLI — macOS / Linux"
+                    label="Install the CLI — macOS / Linux"
                     command="curl -fsSL https://openagents.org/install.sh | bash"
                     isCopied={isCopied}
                     onCopy={(cmd) => {

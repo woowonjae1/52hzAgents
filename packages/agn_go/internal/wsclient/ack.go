@@ -54,6 +54,9 @@ func (b *Bridge) readPump() {
 		_, message, err := b.conn.ReadMessage()
 		if err != nil {
 			log.Printf("[bridge:%s] websocket read closed: %v", b.AgentName, err)
+			if !b.isStopped() {
+				go b.reconnect()
+			}
 			return
 		}
 
@@ -64,9 +67,14 @@ func (b *Bridge) readPump() {
 			ClientMessageID string `json:"client_message_id"`
 			Error           string `json:"error"`
 			Source          string `json:"source"`
+			Target          string `json:"target"`
 			Payload         struct {
-				Content string `json:"content"`
+				Content  string   `json:"content"`
+				Mentions []string `json:"mentions"`
 			} `json:"payload"`
+			Metadata struct {
+				TargetAgents []string `json:"target_agents"`
+			} `json:"metadata"`
 		}
 		if err := json.Unmarshal(message, &envelope); err != nil {
 			continue
@@ -81,6 +89,16 @@ func (b *Bridge) readPump() {
 		}
 		if envelope.Type != "workspace.message.posted" || envelope.Source == b.source {
 			continue
+		}
+		inConfiguredChannel := strings.TrimPrefix(envelope.Target, "channel/") == strings.TrimPrefix(b.currentChannel(), "channel/")
+		targeted := containsAgent(envelope.Metadata.TargetAgents, b.AgentName) || containsAgent(envelope.Payload.Mentions, b.AgentName)
+		if !inConfiguredChannel && !targeted {
+			continue
+		}
+		if strings.HasPrefix(envelope.Target, "channel/") {
+			b.channelMu.Lock()
+			b.Channel = strings.TrimPrefix(envelope.Target, "channel/")
+			b.channelMu.Unlock()
 		}
 		content := strings.TrimSpace(envelope.Payload.Content)
 		if content != "" && b.onMessage != nil {
@@ -102,7 +120,7 @@ func (b *Bridge) SendOutput(line string) error {
 	event := map[string]interface{}{
 		"type":              "workspace.message.posted",
 		"source":            b.source,
-		"target":            "channel/" + b.Channel,
+		"target":            "channel/" + b.currentChannel(),
 		"network":           b.networkID,
 		"client_message_id": clientMessageID,
 		"payload": map[string]interface{}{
@@ -128,6 +146,11 @@ func (b *Bridge) SendOutput(line string) error {
 		}
 		b.writeMu.Unlock()
 		if err != nil {
+			// A failed write means the socket is no longer trustworthy. Restore
+			// the transport before retrying the same idempotent message ID.
+			if !b.isStopped() {
+				b.reconnect()
+			}
 			if attempt == b.MaxRetries {
 				return fmt.Errorf("send message: %w", err)
 			}

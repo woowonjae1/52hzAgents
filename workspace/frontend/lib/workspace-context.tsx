@@ -714,6 +714,19 @@ export function WorkspaceProvider({
     }
   }, [notifications, refreshNotifications]);
 
+  // Collaboration state is persisted server-side. Poll these lightweight
+  // resources so updates from other agents are reflected even if the browser
+  // was not attached to the channel that emitted the state event.
+  useEffect(() => {
+    const refreshCollaboration = () => {
+      void refreshTodos();
+      void refreshRoutines();
+      void refreshNotifications();
+    };
+    const interval = window.setInterval(refreshCollaboration, 15_000);
+    return () => window.clearInterval(interval);
+  }, [refreshNotifications, refreshRoutines, refreshTodos]);
+
   const refreshKnowledge = useCallback(async () => {
     try {
       const result = await workspaceApi.listKnowledge();

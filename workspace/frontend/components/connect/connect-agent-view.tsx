@@ -400,7 +400,7 @@ function LocalAgentsTab({
                 <span className="text-xs text-muted-foreground">— Desktop App (recommended)</span>
               </div>
               <p className="text-[11px] text-muted-foreground mb-2">
-                Download the OpenAgents launcher for a visual setup experience.
+                Download the Desktop launcher for a visual setup experience.
               </p>
               <div className="flex gap-2">
                 <a
@@ -446,7 +446,7 @@ function LocalAgentsTab({
               {/* Step 1: Install CLI */}
               <div className="space-y-3">
                 <div>
-                  <span className="text-[11px] text-muted-foreground">1. Install the OpenAgents CLI</span>
+                  <span className="text-[11px] text-muted-foreground">1. Install the CLI</span>
                   <div className="relative group mt-1">
                     <pre className="bg-zinc-900 text-zinc-100 rounded-md px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
                       <span className="text-zinc-500">$ </span>

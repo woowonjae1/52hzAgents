@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Image from 'next/image';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, Network } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLayout } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -40,9 +39,8 @@ export function SidebarHeader() {
 
   return (
     <div className="flex items-center gap-2.5 shrink-0 px-3.5 py-4">
-      <div className="size-8 shrink-0">
-        <Image src="/logo-black.png" alt="OpenAgents" width={32} height={32} className="size-full object-contain dark:hidden" />
-        <Image src="/logo-white.png" alt="OpenAgents" width={32} height={32} className="size-full object-contain hidden dark:block" />
+      <div className="size-8 shrink-0 flex items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Network className="size-5" />
       </div>
       <div className="flex-1 min-w-0">
         {editing ? (
