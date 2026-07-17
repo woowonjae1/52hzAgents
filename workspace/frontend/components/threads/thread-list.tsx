@@ -253,14 +253,14 @@ export function ThreadList() {
           </button>
         )}
         <div className="flex items-center w-full gap-1">
-          <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-input text-muted-foreground">
-            <Search className="size-3.5" />
+          <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/80 focus-within:border-zinc-400 dark:border-zinc-800/80 dark:focus-within:border-zinc-700 text-muted-foreground transition-all">
+            <Search className="size-3.5 opacity-60" />
             <input
               type="text"
               placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="text-xs bg-transparent outline-none flex-1 placeholder:text-muted-foreground"
+              className="text-xs bg-transparent outline-none flex-1 placeholder:text-muted-foreground/70 font-medium text-zinc-900 dark:text-zinc-50"
             />
             {searching && (
               <div className="size-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
@@ -350,10 +350,10 @@ export function ThreadList() {
                 }}
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-all relative group cursor-pointer',
-                  isSelected ? 'bg-zinc-100 dark:bg-zinc-800 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
+                  isSelected ? 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-100 shadow-xs scale-[0.99]' : 'border border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
                   'has-data-[state=open]:bg-zinc-50 dark:has-data-[state=open]:bg-zinc-800/50',
                   isActive && 'thread-wip',
-                  isCompleted && !isSelected && 'bg-amber-50 dark:bg-amber-900/20 ring-1 ring-amber-200/60 dark:ring-amber-700/40 animate-[glow_2s_ease-in-out_infinite]'
+                  isCompleted && !isSelected && 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40 animate-[glow_2s_ease-in-out_infinite]'
                 )}
               >
                 {/* Avatar stack — show only channel participants */}
