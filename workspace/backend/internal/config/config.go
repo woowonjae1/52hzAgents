@@ -16,6 +16,11 @@ type Config struct {
 	AgentTimeoutSeconds int
 	RequestsPerMinute   int
 	CORSOrigins         []string
+	RouterLLMEnabled    bool
+	RouterLLMProvider   string
+	RouterLLMModel      string
+	RouterLLMAPIKey     string
+	RouterLLMBaseURL    string
 }
 
 var GlobalConfig *Config
@@ -81,6 +86,16 @@ func LoadConfig() {
 		}
 	}
 
+	routerEnabled := parseBoolEnv("ROUTER_LLM_ENABLED", true)
+	routerProvider := strings.ToLower(strings.TrimSpace(os.Getenv("ROUTER_LLM_PROVIDER")))
+	if routerProvider == "" {
+		routerProvider = "anthropic"
+	}
+	routerKey := strings.TrimSpace(os.Getenv("ROUTER_LLM_API_KEY"))
+	if routerKey == "" && routerProvider == "anthropic" {
+		routerKey = strings.TrimSpace(os.Getenv("ANTHROPIC_API_KEY"))
+	}
+
 	GlobalConfig = &Config{
 		DatabaseURL:         dbURL,
 		AuthMode:            authMode,
@@ -91,7 +106,20 @@ func LoadConfig() {
 		AgentTimeoutSeconds: timeout,
 		RequestsPerMinute:   rateLimit,
 		CORSOrigins:         allowedOrigins,
+		RouterLLMEnabled:    routerEnabled,
+		RouterLLMProvider:   routerProvider,
+		RouterLLMModel:      strings.TrimSpace(os.Getenv("ROUTER_LLM_MODEL")),
+		RouterLLMAPIKey:     routerKey,
+		RouterLLMBaseURL:    strings.TrimRight(strings.TrimSpace(os.Getenv("ROUTER_LLM_BASE_URL")), "/"),
 	}
+}
+
+func parseBoolEnv(name string, fallback bool) bool {
+	value := strings.TrimSpace(strings.ToLower(os.Getenv(name)))
+	if value == "" {
+		return fallback
+	}
+	return value == "true" || value == "1" || value == "yes"
 }
 
 // IsAllowedOrigin reports whether a browser Origin may use credentialed CORS

@@ -358,6 +358,10 @@ export function ChatView() {
       return;
     }
     const lastMsg = displayMessages[displayMessages.length - 1];
+    // A user message can replace the optimistic loading indicator before the
+    // local CLI has emitted its first status update. Keep the session active in
+    // that gap so the Stop button stays available for the whole request.
+    if (lastMsg.senderType !== 'agent') return;
     const isTerminalStatus = /stopped|stopping failed/i.test(lastMsg.content);
     const isAgentWorking = lastMsg.senderType === 'agent' && !isTerminalStatus && (
       lastMsg.messageType === 'status' ||
@@ -421,6 +425,9 @@ export function ChatView() {
         userOptimisticMsg,
         loadingOptimisticMsg,
       ]);
+      // Make cancellation available immediately, rather than waiting for a
+      // remote agent to publish its first status event.
+      setSessionActive(currentSessionId, true);
       setScrollKey((k) => k + 1);
 
       try {
@@ -470,7 +477,7 @@ export function ChatView() {
         );
       }
     },
-    [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents]
+    [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive]
   );
 
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');

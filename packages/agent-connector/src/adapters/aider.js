@@ -401,11 +401,24 @@ class AiderAdapter extends BaseAdapter {
 
   async _onControlAction(action, payload) {
     if (action === 'stop') {
-      for (const [channel, proc] of Object.entries(this._channelProcesses)) {
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (channel) {
         this._stoppingChannels.add(channel);
-        await this._stopProcess(proc);
-        delete this._channelProcesses[channel];
+        const proc = this._channelProcesses[channel];
+        if (proc) {
+          await this._stopProcess(proc);
+          delete this._channelProcesses[channel];
+        }
+        delete this._channelQueues[channel];
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
+      } else {
+        for (const [ch, proc] of Object.entries(this._channelProcesses)) {
+          this._stoppingChannels.add(ch);
+          await this._stopProcess(proc);
+          delete this._channelProcesses[ch];
+          delete this._channelQueues[ch];
+          try { await this.sendStatus(ch, 'Execution stopped by user'); } catch {}
+        }
       }
       return;
     }

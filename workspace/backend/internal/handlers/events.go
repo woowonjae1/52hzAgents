@@ -143,6 +143,10 @@ func SendEvent(c *gin.Context) {
 	// 获取当前的高精度毫秒级 Unix 时间戳。
 	nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
 	if err := materializeEvent(workspace.ID, &req, nowUnixMs); err != nil {
+		if err == errSessionRevoked {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "session_revoked: another client is now running as this agent"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to apply event"})
 		return
 	}

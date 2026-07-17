@@ -77,6 +77,44 @@ describe('Daemon', () => {
     assert.equal(result.OPENCODE_MODEL, 'custom-model');
   });
 
+  it('_buildAgentEnv keeps Codex on native login when no local API config is saved', () => {
+    const config = new Config(tmpDir);
+    const env = new EnvManager(tmpDir);
+    const reg = new Registry(tmpDir);
+    const daemon = new Daemon(config, env, reg);
+    const previousKey = process.env.OPENAI_API_KEY;
+    const previousBaseUrl = process.env.OPENAI_BASE_URL;
+
+    try {
+      process.env.OPENAI_API_KEY = 'inherited-key';
+      process.env.OPENAI_BASE_URL = 'https://unexpected.example/v1';
+      const result = daemon._buildAgentEnv({ name: 'local-codex', type: 'codex' });
+      assert.equal(result.OPENAI_API_KEY, undefined);
+      assert.equal(result.OPENAI_BASE_URL, undefined);
+    } finally {
+      if (previousKey === undefined) delete process.env.OPENAI_API_KEY;
+      else process.env.OPENAI_API_KEY = previousKey;
+      if (previousBaseUrl === undefined) delete process.env.OPENAI_BASE_URL;
+      else process.env.OPENAI_BASE_URL = previousBaseUrl;
+    }
+  });
+
+  it('_buildAgentEnv passes an explicitly saved Codex API configuration', () => {
+    const config = new Config(tmpDir);
+    const env = new EnvManager(tmpDir);
+    const reg = new Registry(tmpDir);
+    const daemon = new Daemon(config, env, reg);
+
+    env.save('codex', {
+      OPENAI_API_KEY: 'local-key',
+      OPENAI_BASE_URL: 'https://api.example/v1',
+    });
+
+    const result = daemon._buildAgentEnv({ name: 'local-codex', type: 'codex' });
+    assert.equal(result.OPENAI_API_KEY, 'local-key');
+    assert.equal(result.OPENAI_BASE_URL, 'https://api.example/v1');
+  });
+
   it('_getLaunchCommand returns command from registry', () => {
     const config = new Config(tmpDir);
     const env = new EnvManager(tmpDir);

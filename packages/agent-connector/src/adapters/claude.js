@@ -80,19 +80,27 @@ class ClaudeAdapter extends BaseAdapter {
     if (action === 'stop') {
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
       if (channel) {
-        const pp = this._persistentProcs[channel];
-        if (pp) pp.userStopped = true;
-      }
-      if (channel && this._channelProcesses[channel]) {
-        this._log(`Stopping process for channel=${channel}`);
         this._stoppingChannels.add(channel);
+        const pp = this._persistentProcs[channel];
+        if (pp) {
+          pp.userStopped = true;
+          this._killPersistentProc(channel);
+        }
         const proc = this._channelProcesses[channel];
-        await this._stopProcess(proc);
-        delete this._channelProcesses[channel];
+        if (proc) {
+          this._log(`Stopping process for channel=${channel}`);
+          await this._stopProcess(proc);
+          delete this._channelProcesses[channel];
+        }
         delete this._channelQueues[channel];
         await this._postStopNotice(channel);
       } else {
-        for (const pp of Object.values(this._persistentProcs)) pp.userStopped = true;
+        for (const ch of Object.keys(this._persistentProcs)) {
+          this._stoppingChannels.add(ch);
+          const pp = this._persistentProcs[ch];
+          pp.userStopped = true;
+          this._killPersistentProc(ch);
+        }
         await this._stopAllProcesses('Execution stopped by user.');
       }
       return;

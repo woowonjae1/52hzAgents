@@ -723,7 +723,22 @@ class Daemon {
     const mergedSaved = { ...saved, ...(agentCfg.env || {}) };
     const resolved = this.envManager.resolve(type, mergedSaved, this.registry);
     const merged = { ...mergedSaved, ...resolved };
-    return { ...process.env, ...merged };
+    const env = { ...process.env, ...merged };
+
+    // Codex is a local CLI agent by default. An inherited key/base URL from
+    // the launcher process must not silently replace `codex login` unless the
+    // user explicitly configured that value for this local agent type.
+    // Direct API mode remains available through `wwj env codex` (or per-agent
+    // env), which puts the value in `merged`.
+    if (type === 'codex') {
+      for (const key of ['OPENAI_API_KEY', 'OPENAI_BASE_URL']) {
+        if (!Object.prototype.hasOwnProperty.call(merged, key) || !merged[key]) {
+          delete env[key];
+        }
+      }
+    }
+
+    return env;
   }
 
   _agentConfigFingerprint(agentCfg) {

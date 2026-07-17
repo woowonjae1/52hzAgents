@@ -27,7 +27,17 @@ function Stop-ManagedProcesses {
             if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
                 # Go and Next spawn child processes. taskkill /T prevents those
                 # children from surviving a restart of this development script.
-                & taskkill.exe /PID $processId /T /F 2>$null | Out-Null
+                # A wrapper can already have exited while its child is being
+                # reaped. Treat that race as a successful cleanup instead of
+                # aborting the whole local restart.
+                try {
+                    $kill = Start-Process -FilePath taskkill.exe -ArgumentList @('/PID', "$processId", '/T', '/F') -WindowStyle Hidden -Wait -PassThru
+                    if ($kill.ExitCode -ne 0) {
+                        Write-Verbose "Could not terminate recorded process $processId (it may already be exiting)."
+                    }
+                } catch {
+                    Write-Verbose "Could not terminate recorded process ${processId}: $($_.Exception.Message)"
+                }
             }
         }
     } finally {
@@ -79,7 +89,10 @@ try {
     Stop-ManagedProcesses
     Remove-Item $backendLog, $frontendLog -Force -ErrorAction SilentlyContinue
 
-    $backendCommand = "Set-Location -LiteralPath '$backendPath'; `$env:DATABASE_URL = 'postgresql://postgres:dev@localhost:5432/openagents_workspace'; `$env:AUTH_MODE = 'workspace_token'; `$env:CORS_ORIGINS = 'http://localhost:3000'; `$env:FILE_STORAGE_PATH = '$(Join-Path $runtimePath 'files')'; & go run ./cmd/server *>> '$backendLog'"
+    # Three local CLI agents poll independently. Keep the local development
+    # backend comfortably above that normal traffic level without weakening
+    # production deployments, which configure their own limit.
+    $backendCommand = "Set-Location -LiteralPath '$backendPath'; `$env:DATABASE_URL = 'postgresql://postgres:dev@localhost:5432/openagents_workspace'; `$env:AUTH_MODE = 'workspace_token'; `$env:CORS_ORIGINS = 'http://localhost:3000'; `$env:REQUESTS_PER_MINUTE = '600'; `$env:FILE_STORAGE_PATH = '$(Join-Path $runtimePath 'files')'; & go run ./cmd/server *>> '$backendLog'"
     $frontendCommand = "Set-Location -LiteralPath '$frontendPath'; `$env:NEXT_PUBLIC_API_URL = 'http://localhost:8000'; & '$frontendPath\node_modules\.bin\next.cmd' dev -p 3000 *>> '$frontendLog'"
 
     $backend = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $backendCommand) -WindowStyle Hidden -PassThru

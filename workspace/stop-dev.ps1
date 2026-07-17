@@ -11,7 +11,14 @@ $state = Get-Content $statePath -Raw | ConvertFrom-Json
 foreach ($property in @('backendPid', 'frontendPid')) {
     $processId = $state.$property
     if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
-        & taskkill.exe /PID $processId /T /F 2>$null | Out-Null
+        try {
+            $kill = Start-Process -FilePath taskkill.exe -ArgumentList @('/PID', "$processId", '/T', '/F') -WindowStyle Hidden -Wait -PassThru
+            if ($kill.ExitCode -ne 0) {
+                Write-Verbose "Could not terminate recorded process $processId (it may already be exiting)."
+            }
+        } catch {
+            Write-Verbose "Could not terminate recorded process ${processId}: $($_.Exception.Message)"
+        }
     }
 }
 Remove-Item $statePath -Force

@@ -393,7 +393,9 @@ export function WorkspaceProvider({
 
   const stopAllAgents = useCallback(async (targetSessionId?: string) => {
     const sessionIds = targetSessionId
-      ? (activeSessionIds.has(targetSessionId) ? [targetSessionId] : [])
+      // A request can be in flight before the first agent status event arrives.
+      // A targeted stop must still reach its agents during that interval.
+      ? [targetSessionId]
       : Array.from(activeSessionIds);
     if (sessionIds.length === 0) return;
 

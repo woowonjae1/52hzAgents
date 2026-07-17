@@ -80,6 +80,7 @@ class BaseAdapter {
     // Per-channel task tracking for parallel execution
     this._channelBusy = new Set();
     this._channelQueues = {};
+    this._stoppingChannels = new Set();
     // Cached workspace.browser_enabled. Populated lazily on first read so we
     // don't pay an HTTP roundtrip per message — adapters that toggle the
     // workspace flag must reconnect/restart to pick up the change (matches
@@ -643,6 +644,14 @@ class BaseAdapter {
         const msgId = msg.id || msg.messageId;
         if (msgId && this._processedIds.has(msgId)) continue;
         if (msg.messageType === 'status') continue;
+
+        // Ignore messages sent by this agent itself to prevent self-looping
+        const sender = msg.senderName || msg.senderType;
+        if (sender === this.agentName) {
+          if (msgId) this._processedIds.add(msgId);
+          continue;
+        }
+
         // Handle queue cancellation signals from frontend
         if (msg.messageType === 'queue_cancel') {
           if (msgId) this._processedIds.add(msgId);
@@ -749,12 +758,18 @@ class BaseAdapter {
     try {
       await this._handleMessage(msg);
     } catch (e) {
-      this._log(`Error in channel worker for ${channel}: ${e.message}`);
-      try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
+      if (!this._stoppingChannels.has(channel)) {
+        this._log(`Error in channel worker for ${channel}: ${e.message}`);
+        try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
+      }
     }
 
     // Drain queue
     while (true) {
+      if (this._stoppingChannels.has(channel)) {
+        this._stoppingChannels.delete(channel);
+        break;
+      }
       const queue = this._channelQueues[channel];
       if (!queue || queue.length === 0) break;
       const nextMsg = queue.shift();
@@ -764,8 +779,10 @@ class BaseAdapter {
       try {
         await this._handleMessage(nextMsg);
       } catch (e) {
-        this._log(`Error processing queued message in ${channel}: ${e.message}`);
-        try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
+        if (!this._stoppingChannels.has(channel)) {
+          this._log(`Error processing queued message in ${channel}: ${e.message}`);
+          try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
+        }
       }
     }
     this._channelBusy.delete(channel);

@@ -143,6 +143,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
           sender_name: currentUser.name || 'user',
         },
         metadata: {
+          target_agents: [message.senderName],
           tool_approval_response: {
             approval_id: approvalRequest.approval_id,
             granted: true,
@@ -170,6 +171,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
           sender_name: currentUser.name || 'user',
         },
         metadata: {
+          target_agents: [message.senderName],
           tool_approval_response: {
             approval_id: approvalRequest.approval_id,
             granted: false,

@@ -185,8 +185,47 @@ func ListEvents(c *gin.Context) {
 	if c.Query("sort") == "desc" || c.Query("before") != "" {
 		order = "timestamp desc"
 	}
+	targetAgent := strings.TrimSpace(c.Query("target_agents"))
+	var streamHead models.EventRecord
+	hasStreamHead := false
+	if targetAgent != "" {
+		// A targeted poll can return no event even while unrelated traffic is
+		// advancing. Capture the unfiltered head so the connector can advance
+		// its cursor past that traffic (the original next_cursor contract).
+		headQuery := db.DB.Where("network_id = ?", workspace.ID)
+		if channel := c.Query("channel"); channel != "" {
+			headQuery = headQuery.Where("target = ?", "channel/"+strings.TrimPrefix(channel, "channel/"))
+		}
+		if target := c.Query("target"); target != "" {
+			headQuery = headQuery.Where("target = ?", target)
+		}
+		if eventType := c.Query("type"); eventType != "" {
+			if eventType == "workspace.message" {
+				headQuery = headQuery.Where("type LIKE ?", "workspace.message%")
+			} else {
+				headQuery = headQuery.Where("type = ?", eventType)
+			}
+		}
+		hasStreamHead = headQuery.Order("timestamp desc").First(&streamHead).Error == nil
+	}
 	var records []models.EventRecord
-	query.Order(order).Limit(limit + 1).Find(&records)
+	if targetAgent == "" {
+		query.Order(order).Limit(limit + 1).Find(&records)
+	} else if db.DB.Dialector.Name() == "postgres" {
+		targetJSON, _ := json.Marshal(map[string][]string{"target_agents": {targetAgent}})
+		query.Where("(metadata::jsonb @> ?::jsonb OR (source LIKE 'human:%' AND NOT (metadata::jsonb ? 'target_agents')))", string(targetJSON)).Order(order).Limit(limit + 1).Find(&records)
+	} else {
+		// Keep filtering on the server so connectors do not repeatedly download
+		// every other agent's traffic. JSON decoding here remains portable across
+		// SQLite development and PostgreSQL production.
+		var candidates []models.EventRecord
+		query.Order(order).Limit(5000).Find(&candidates)
+		for _, record := range candidates {
+			if eventTargetsAgent(record, targetAgent) {
+				records = append(records, record)
+			}
+		}
+	}
 	hasMore := len(records) > limit
 	if hasMore {
 		records = records[:limit]
@@ -199,7 +238,15 @@ func ListEvents(c *gin.Context) {
 	if len(records) > 0 {
 		oldestID, newestID = records[0].ID, records[len(records)-1].ID
 	}
-	c.JSON(http.StatusOK, gin.H{"events": events, "has_more": hasMore, "oldest_id": oldestID, "newest_id": newestID})
+	response := gin.H{"events": events, "has_more": hasMore, "oldest_id": oldestID, "newest_id": newestID}
+	if targetAgent != "" {
+		nextCursor := newestID
+		if !hasMore && hasStreamHead {
+			nextCursor = streamHead.ID
+		}
+		response["next_cursor"] = nextCursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func LatestEventsPerChannel(c *gin.Context) {
@@ -265,13 +312,23 @@ func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64
 		var channel models.Channel
 		if db.DB.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error == nil {
 			db.DB.Model(&channel).Update("last_event_at", timestamp)
-			var members []models.ChannelMember
-			db.DB.Where("channel_id = ?", channel.ID).Find(&members)
-			targets := make([]string, 0, len(members))
-			for _, member := range members {
-				targets = append(targets, member.AgentName)
+			targets, routed, err := routeMessage(workspaceID, &channel, req)
+			if err != nil {
+				return err
 			}
-			req.Metadata["target_agents"] = targets
+			if routed {
+				req.Metadata["target_agents"] = targets
+				// Preserve the original convenience: a human can mention a known
+				// local agent that was not yet a channel member, and the selected
+				// agent is added so subsequent polling can receive the thread.
+				if isHumanSource(req.Source) && !strings.HasPrefix(channel.Name, "routines:") {
+					for _, target := range targets {
+						if target != noResponseAgent {
+							db.DB.FirstOrCreate(&models.ChannelMember{ChannelID: channel.ID, AgentName: target})
+						}
+					}
+				}
+			}
 		}
 	}
 	return nil
