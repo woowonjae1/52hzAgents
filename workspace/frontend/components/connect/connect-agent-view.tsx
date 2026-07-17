@@ -467,11 +467,11 @@ function LocalAgentsTab({
                   <div className="relative group mt-1">
                     <pre className="bg-zinc-900 text-zinc-100 rounded-md px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
                       <span className="text-zinc-500">$ </span>
-                      <span className="text-emerald-400">agn install {selectedEntry.name}</span>
+                      <span className="text-emerald-400">wwj install {selectedEntry.name}</span>
                     </pre>
                     <button
                       className="absolute top-1.5 right-1.5 size-6 flex items-center justify-center rounded bg-zinc-700/80 hover:bg-zinc-600 text-zinc-300 hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(`agn install ${selectedEntry.name}`)}
+                      onClick={() => copyToClipboard(`wwj install ${selectedEntry.name}`)}
                     >
                       {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
                     </button>
@@ -484,12 +484,12 @@ function LocalAgentsTab({
                   <div className="relative group mt-1">
                     <pre className="bg-zinc-900 text-zinc-100 rounded-md px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
                       <span className="text-zinc-500">$ </span>
-                      <span className="text-emerald-400">agn create my-{selectedEntry.name} --type {selectedEntry.name}</span>
+                      <span className="text-emerald-400">wwj create my-{selectedEntry.name} --type {selectedEntry.name}</span>
                     </pre>
                     <button
                       type="button"
                       className="absolute top-1.5 right-1.5 size-6 flex items-center justify-center rounded bg-zinc-700/80 hover:bg-zinc-600 text-zinc-300 hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(`agn create my-${selectedEntry.name} --type ${selectedEntry.name}`)}
+                      onClick={() => copyToClipboard(`wwj create my-${selectedEntry.name} --type ${selectedEntry.name}`)}
                     >
                       {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
                     </button>
@@ -502,11 +502,11 @@ function LocalAgentsTab({
                   <div className="relative group mt-1">
                     <pre className="bg-zinc-900 text-zinc-100 rounded-md px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
                       <span className="text-zinc-500">$ </span>
-                      <span className="text-emerald-400">agn connect my-{selectedEntry.name} {token.slice(0, 8)}...</span>
+                      <span className="text-emerald-400">wwj connect my-{selectedEntry.name} {token.slice(0, 8)}...</span>
                     </pre>
                     <button
                       className="absolute top-1.5 right-1.5 size-6 flex items-center justify-center rounded bg-zinc-700/80 hover:bg-zinc-600 text-zinc-300 hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard(`agn connect my-${selectedEntry.name} ${token}`)}
+                      onClick={() => copyToClipboard(`wwj connect my-${selectedEntry.name} ${token}`)}
                     >
                       {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
                     </button>
@@ -519,12 +519,12 @@ function LocalAgentsTab({
                   <div className="relative group mt-1">
                     <pre className="bg-zinc-900 text-zinc-100 rounded-md px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
                       <span className="text-zinc-500">$ </span>
-                      <span className="text-emerald-400">agn up</span>
+                      <span className="text-emerald-400">wwj up</span>
                     </pre>
                     <button
                       type="button"
                       className="absolute top-1.5 right-1.5 size-6 flex items-center justify-center rounded bg-zinc-700/80 hover:bg-zinc-600 text-zinc-300 hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard('agn up')}
+                      onClick={() => copyToClipboard('wwj up')}
                     >
                       {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
                     </button>
@@ -540,12 +540,12 @@ function LocalAgentsTab({
                   <div className="relative group mt-1">
                     <pre className="bg-zinc-900 text-zinc-100 rounded-md px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
                       <span className="text-zinc-500">$ </span>
-                      <span className="text-emerald-400">agn status</span>
+                      <span className="text-emerald-400">wwj status</span>
                     </pre>
                     <button
                       type="button"
                       className="absolute top-1.5 right-1.5 size-6 flex items-center justify-center rounded bg-zinc-700/80 hover:bg-zinc-600 text-zinc-300 hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-                      onClick={() => copyToClipboard('agn status')}
+                      onClick={() => copyToClipboard('wwj status')}
                     >
                       {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
                     </button>

@@ -7,6 +7,20 @@ A managed agent collaboration environment built on the [OpenAgents Network Model
 
 ## Quick Start
 
+### Windows native development (recommended while coding)
+
+```powershell
+# From the repository root. Keeps only PostgreSQL in Docker.
+.\workspace\dev.ps1
+```
+
+This runs the Go backend and Next.js frontend locally at
+http://localhost:8000 and http://localhost:3000. Frontend edits refresh
+automatically; logs and process IDs are kept in `workspace/.dev/`. Stop the
+native processes with `./workspace/stop-dev.ps1`.
+
+### Docker integration / release verification
+
 ```bash
 # Start everything (PostgreSQL + backend + frontend)
 cd workspace

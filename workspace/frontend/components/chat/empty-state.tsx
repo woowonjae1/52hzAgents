@@ -240,15 +240,15 @@ export function EmptyState() {
                   <CliStep
                     step="2"
                     label={`Install the ${selectedEntry.label} runtime`}
-                    command={`agn install ${selectedEntry.name}`}
+                    command={`wwj install ${selectedEntry.name}`}
                     isCopied={isCopied}
                     onCopy={copyToClipboard}
                   />
                   <CliStep
                     step="3"
                     label="Connect to this workspace"
-                    command={`agn connect my-${selectedEntry.name} ${token.slice(0, 8)}...`}
-                    copyCommand={`agn connect my-${selectedEntry.name} ${token}`}
+                    command={`wwj connect my-${selectedEntry.name} ${token.slice(0, 8)}...`}
+                    copyCommand={`wwj connect my-${selectedEntry.name} ${token}`}
                     isCopied={isCopied}
                     onCopy={copyToClipboard}
                   />

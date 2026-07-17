@@ -1,6 +1,22 @@
 # OpenAgents Workspace on Windows
 
-## Docker Desktop path
+## Native development path (recommended while coding)
+
+This uses Docker only for PostgreSQL, so frontend edits use Next.js hot reload
+and backend changes do not require image builds.
+
+```powershell
+cd D:\code\52hzAgent\openagents-develop
+.\workspace\dev.ps1
+```
+
+Open the workspace at http://localhost:3000. Stop local app processes with:
+
+```powershell
+.\workspace\stop-dev.ps1
+```
+
+## Docker Desktop path (integration / release verification)
 
 Docker Desktop must report `Engine running` before the commands below can work.
 If Docker reports that virtualization was not detected, enable Intel VT-x or
@@ -23,7 +39,7 @@ Stop the stack with:
 docker compose down
 ```
 
-## Native development path
+## Manual native development path
 
 Install Go 1.21+, Node.js 20+, and PostgreSQL 16. Start PostgreSQL with a
 database named `openagents_workspace`, user `postgres`, and password `dev`.
