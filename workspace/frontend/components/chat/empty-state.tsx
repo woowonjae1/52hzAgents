@@ -27,11 +27,18 @@ export function EmptyState() {
     setLoading(true);
     workspaceApi
       .getAgentCatalog()
-      .then((entries) => { if (!cancelled) setCatalog(entries); })
+      .then((entries) => {
+        if (!cancelled) {
+          setCatalog(entries);
+          if (entries.length > 0 && !selectedAgent) {
+            setSelectedAgent(entries[0].name);
+          }
+        }
+      })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [token]);
+  }, [token, selectedAgent]);
 
   // The onboarding view auto-shows when a workspace is open with no agent connected.
   // It's a conditional render (no route/pageview), so fire an explicit event here.
@@ -77,86 +84,57 @@ export function EmptyState() {
 
   return (
     <div className="flex flex-col items-center justify-center h-full overflow-y-auto p-6 sm:p-8 bg-zinc-50 dark:bg-zinc-950">
-      <div className="w-full max-w-lg space-y-8 py-8 flex flex-col items-center">
-        {/* Back to the agent picker */}
-        {selectedEntry && (
-          <button
-            onClick={() => setSelectedAgent(null)}
-            className="self-start inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-3.5" />
-            Back to agents
-          </button>
-        )}
-
-        {/* Header */}
-        {!selectedEntry && (
-          <div className="text-center space-y-2.5">
-            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Connect an Agent</h2>
-            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              Select an agent below to obtain the command line connection launcher.
-            </p>
-          </div>
-        )}
-
-        {/* Agent catalog grid */}
-        {!selectedEntry && (loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
+      <div className="w-full max-w-md flex flex-col items-center">
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-muted-foreground">
             <Loader2 className="size-4 animate-spin mr-2" />
-            <span className="text-sm">Loading agents...</span>
+            <span className="text-xs">Loading onboarding...</span>
           </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full">
-            {catalog.map((entry) => {
-              const isSelected = selectedAgent === entry.name;
-              return (
-                <button
-                  key={entry.name}
-                  onClick={() => setSelectedAgent(isSelected ? null : entry.name)}
-                  className={cn(
-                    'flex flex-col items-center gap-3 px-4 py-5 rounded-xl border bg-card text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
-                    isSelected
-                      ? 'border-zinc-900 dark:border-zinc-50 ring-1 ring-zinc-900 dark:ring-zinc-50'
-                      : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700',
-                  )}
-                >
-                  <div className="size-12 flex items-center justify-center rounded-lg bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800/40">
-                    <AgentIcon name={entry.name} size={36} />
-                  </div>
-                  <div className="min-w-0 w-full">
-                    <div className="text-sm font-semibold leading-tight truncate">{entry.label}</div>
-                    <div className="text-[10px] text-muted-foreground mt-1 truncate">
-                      {entry.tags?.[0] || 'Agent'}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ))}
+        ) : selectedEntry ? (
+          <div className="w-full flex flex-col items-center animate-in fade-in duration-200">
+            {/* Horizontal Agent Switcher */}
+            {catalog.length > 1 && (
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-zinc-200/50 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-900/50 mb-8 max-w-full">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 pl-1.5 shrink-0">Switch Agent:</span>
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 pr-1.5">
+                  {catalog.map((entry) => (
+                    <button
+                      key={entry.name}
+                      onClick={() => setSelectedAgent(entry.name)}
+                      className={cn(
+                        'size-6 rounded-md flex items-center justify-center p-0.5 border transition-all shrink-0 hover:bg-zinc-100 dark:hover:bg-zinc-800',
+                        selectedAgent === entry.name
+                          ? 'border-zinc-900 bg-white dark:border-zinc-100 dark:bg-zinc-900 scale-105 shadow-xs'
+                          : 'border-transparent opacity-60 hover:opacity-100'
+                      )}
+                      title={entry.label}
+                    >
+                      <AgentIcon name={entry.name} size={16} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* Selected agent — Connection illustration / cover design */}
-        {selectedEntry && (
-          <div className="w-full flex flex-col items-center text-center animate-in fade-in slide-in-from-top-2 duration-200">
             {/* Agent Large Cover Image */}
-            <div className="size-24 flex items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 shadow-md border border-zinc-200/60 dark:border-zinc-800/80 p-4 mb-5 relative group overflow-hidden">
-              <AgentIcon name={selectedEntry.name} size={64} />
+            <div className="size-20 flex items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 shadow-md border border-zinc-200/60 dark:border-zinc-800/80 p-3 mb-4 relative group overflow-hidden">
+              <AgentIcon name={selectedEntry.name} size={52} />
             </div>
 
-            <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 mb-1">
+            <h3 className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-50 mb-1">
               {selectedEntry.label}
             </h3>
             
-            <p className="text-xs text-muted-foreground max-w-sm mb-6">
+            <p className="text-xs text-muted-foreground max-w-sm mb-6 text-center">
               {selectedEntry.description}
             </p>
 
             {/* Run connection command box */}
-            <div className="w-full bg-zinc-900 dark:bg-black border border-zinc-800 rounded-xl p-4 mb-4 relative group">
-              <div className="text-[10px] text-zinc-500 font-mono mb-2 text-left uppercase tracking-wider">
+            <div className="w-full bg-zinc-900 dark:bg-black border border-zinc-800 rounded-xl p-4 mb-4 relative group text-left">
+              <div className="text-[10px] text-zinc-500 font-mono mb-2 uppercase tracking-wider">
                 Run command to connect:
               </div>
-              <pre className="text-zinc-100 text-xs font-mono text-left select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
+              <pre className="text-zinc-100 text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
                 {`wwj connect my-${selectedEntry.name} ${token}`}
               </pre>
               <button
@@ -176,7 +154,7 @@ export function EmptyState() {
 
             {/* Token details */}
             {token && (
-              <div className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-card text-xs font-medium text-muted-foreground">
+              <div className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-card text-xs font-medium text-muted-foreground mb-6">
                 <div className="flex items-center gap-1.5">
                   <Key className="size-3.5" />
                   <span>Workspace Token</span>
@@ -192,27 +170,27 @@ export function EmptyState() {
                 </button>
               </div>
             )}
-          </div>
-        )}
 
-        {/* Cloud agents fallback */}
-        {!selectedEntry && (
-          <div className="w-full text-center space-y-3 pt-2">
-            <div className="flex items-center gap-3 justify-center">
-              <div className="w-12 border-t" />
-              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">or</span>
-              <div className="w-12 border-t" />
+            {/* Cloud agents fallback */}
+            <div className="w-full text-center space-y-3.5">
+              <div className="flex items-center gap-3 justify-center">
+                <div className="w-12 border-t border-zinc-200/50 dark:border-zinc-800/50" />
+                <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-muted-foreground">or</span>
+                <div className="w-12 border-t border-zinc-200/50 dark:border-zinc-800/50" />
+              </div>
+              <button
+                onClick={() => setViewMode('connect')}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-card hover:bg-zinc-50/50 dark:hover:bg-zinc-900/30 transition-colors text-xs group"
+              >
+                <Cloud className="size-4 text-muted-foreground opacity-70" />
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">Try Cloud Agents</span>
+                <span className="text-muted-foreground font-normal">| No install needed</span>
+                <ChevronRight className="size-3 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </button>
             </div>
-            <button
-              onClick={() => setViewMode('connect')}
-              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-card hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors text-sm group"
-            >
-              <Cloud className="size-4 text-muted-foreground" />
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">Try Cloud Agents</span>
-              <span className="text-xs text-muted-foreground font-normal">| No install needed</span>
-              <ChevronRight className="size-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-            </button>
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">No agents available in catalog</p>
         )}
       </div>
     </div>
