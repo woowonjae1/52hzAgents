@@ -205,13 +205,13 @@ export function ConnectAgentView() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
-        <h2 className="text-sm font-semibold">Connect Agents</h2>
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-200/60 dark:border-zinc-800/60 shrink-0">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Connect Agents</h2>
         <button
           onClick={() => setViewMode('threads')}
-          className="size-7 flex items-center justify-center rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+          className="size-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
           title="Close"
         >
           <X className="size-4" />
@@ -219,35 +219,35 @@ export function ConnectAgentView() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b shrink-0">
+      <div className="flex border-b border-zinc-200/60 dark:border-zinc-800/60 shrink-0 bg-zinc-50/30 dark:bg-zinc-950/10">
         <button
           onClick={() => setActiveTab('local')}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors relative',
+            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold transition-colors relative border-r border-zinc-200/60 dark:border-zinc-800/60',
             activeTab === 'local'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'text-zinc-900 dark:text-zinc-50 bg-white dark:bg-zinc-900'
+              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10',
           )}
         >
-          <Terminal className="size-3.5" />
+          <Terminal className="size-3.5 opacity-60" />
           Local Agents
           {activeTab === 'local' && (
-            <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-foreground rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900 dark:bg-zinc-100" />
           )}
         </button>
         <button
           onClick={() => setActiveTab('cloud')}
           className={cn(
-            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium transition-colors relative',
+            'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold transition-colors relative',
             activeTab === 'cloud'
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
+              ? 'text-zinc-900 dark:text-zinc-50 bg-white dark:bg-zinc-900'
+              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/10',
           )}
         >
-          <Cloud className="size-3.5" />
+          <Cloud className="size-3.5 opacity-60" />
           Cloud Agents
           {activeTab === 'cloud' && (
-            <span className="absolute bottom-0 left-4 right-4 h-0.5 bg-foreground rounded-full" />
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-zinc-900 dark:bg-zinc-100" />
           )}
         </button>
       </div>
@@ -342,10 +342,10 @@ function LocalAgentsTab({
               key={entry.name}
               onClick={() => onSelectAgent(isSelected ? null : entry.name)}
               className={cn(
-                'flex items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all',
+                'flex items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all shadow-xs',
                 isSelected
-                  ? 'border-foreground/20 bg-zinc-50 dark:bg-zinc-800/50 ring-1 ring-foreground/10'
-                  : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30',
+                  ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50/50 dark:bg-zinc-900/50'
+                  : 'border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10',
               )}
             >
               <div className="size-8 shrink-0 flex items-center justify-center">
@@ -509,73 +509,73 @@ function CloudAgentsTab({
         {/* Back button */}
         <button
           onClick={() => onSelectProvider(null)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1 text-[11px] font-bold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors mb-2"
         >
-          <ChevronRight className="size-3 rotate-180" />
+          <ChevronRight className="size-3.5 rotate-180" />
           All providers
         </button>
 
-        <div className="rounded-lg border bg-zinc-50/50 dark:bg-zinc-900/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="px-4 py-3 border-b bg-background">
+        <div className="rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="px-4 py-3.5 border-b border-zinc-100 dark:border-zinc-800/40 bg-zinc-50/40 dark:bg-zinc-900/40">
             <div className="flex items-center gap-2.5">
               <div className="size-8 flex items-center justify-center shrink-0">
                 <ProviderIcon name={selectedProviderInfo.name} size={32} />
               </div>
               <div>
-                <h3 className="text-sm font-semibold">{selectedProviderInfo.label}</h3>
-                <p className="text-[11px] text-muted-foreground">
+                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50 tracking-tight">{selectedProviderInfo.label}</h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   {isCustomProvider ? 'Connect any OpenAI-compatible endpoint' : 'Configure and add a cloud agent'}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-4">
             {/* Custom endpoint: Base URL */}
             {isCustomProvider && (
               <div className="space-y-1.5">
-                <Label htmlFor="cloud-base-url" className="text-xs">Endpoint URL</Label>
+                <Label htmlFor="cloud-base-url" className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Endpoint URL</Label>
                 <Input
                   id="cloud-base-url"
                   value={cfgBaseUrl}
                   onChange={(e) => setCfgBaseUrl(e.target.value)}
                   placeholder="https://api.example.com"
-                  className="text-sm font-mono h-9"
+                  className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
                 />
-                <p className="text-[10px] text-muted-foreground">/v1 is appended automatically if needed</p>
+                <p className="text-[9px] text-muted-foreground">/v1 is appended automatically if needed</p>
               </div>
             )}
 
             {/* Model selector — list for known providers, text input for custom */}
             {isCustomProvider ? (
               <div className="space-y-1.5">
-                <Label htmlFor="cloud-model" className="text-xs">Model Name</Label>
+                <Label htmlFor="cloud-model" className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Model Name</Label>
                 <Input
                   id="cloud-model"
                   value={cfgModel}
                   onChange={(e) => setCfgModel(e.target.value)}
                   placeholder="e.g. gpt-4o, deepseek-chat, qwen-turbo"
-                  className="text-sm font-mono h-9"
+                  className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
                 />
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label className="text-xs">Model</Label>
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Model</Label>
                 <div className="grid grid-cols-1 gap-1">
                   {selectedProviderInfo.models.map((m) => (
                     <button
                       key={m.id}
                       onClick={() => setCfgModel(m.id)}
                       className={cn(
-                        'flex items-center gap-2.5 px-3 py-2 rounded-md border text-xs text-left transition-colors',
+                        'flex items-center gap-2.5 px-3 py-2 rounded-lg border text-xs text-left transition-colors shadow-xs',
                         cfgModel === m.id
-                          ? 'border-foreground/20 bg-background ring-1 ring-foreground/5'
-                          : 'border-transparent hover:bg-background/60',
+                          ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50/50 dark:bg-zinc-900/50 font-bold'
+                          : 'border-transparent hover:bg-zinc-100/40 dark:hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
                       )}
                     >
-                      <CategoryIcon category={m.category} className="size-3.5 shrink-0" />
-                      <span className="font-medium flex-1">{m.label}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                      <CategoryIcon category={m.category} className="size-3.5 shrink-0 opacity-70" />
+                      <span className="flex-1 truncate">{m.label}</span>
+                      <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">
                         {m.category}
                       </span>
                     </button>
@@ -589,9 +589,9 @@ function CloudAgentsTab({
               <>
                 <a
                   href={`${process.env.NEXT_PUBLIC_API_URL || 'https://workspace-endpoint.openagents.org'}/v1/cloud-agents/google/auth?network=${encodeURIComponent(workspaceId)}&agent_name=${encodeURIComponent(cfgName || 'gemini')}&model=${encodeURIComponent(cfgModel || 'gemini-3.5-flash')}`}
-                  className="flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-zinc-900 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors text-sm font-medium"
+                  className="flex items-center justify-center gap-2.5 w-full px-3 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors text-xs font-semibold"
                 >
-                  <svg viewBox="0 0 24 24" className="size-4" xmlns="http://www.w3.org/2000/svg">
+                  <svg viewBox="0 0 24 24" className="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
                     <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
                     <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -600,36 +600,36 @@ function CloudAgentsTab({
                   Sign in with Google
                 </a>
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 border-t" />
-                  <span className="text-[10px] text-muted-foreground">or use API key</span>
-                  <div className="flex-1 border-t" />
+                  <div className="flex-1 border-t border-zinc-200/50 dark:border-zinc-800/50" />
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-muted-foreground">or use API key</span>
+                  <div className="flex-1 border-t border-zinc-200/50 dark:border-zinc-800/50" />
                 </div>
               </>
             )}
 
             {/* Agent name */}
             <div className="space-y-1.5">
-              <Label htmlFor="cloud-name" className="text-xs">Agent Name</Label>
+              <Label htmlFor="cloud-name" className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">Agent Name</Label>
               <Input
                 id="cloud-name"
                 value={cfgName}
                 onChange={(e) => setCfgName(e.target.value)}
                 placeholder="e.g. chatgpt"
-                className="text-sm h-9"
+                className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
               />
-              <p className="text-[10px] text-muted-foreground">Use this to @mention the agent in chat</p>
+              <p className="text-[9px] text-muted-foreground">Use this to @mention the agent in chat</p>
             </div>
 
             {/* API Key */}
             <div className="space-y-1.5">
-              <Label htmlFor="cloud-key" className="text-xs">API Key</Label>
+              <Label htmlFor="cloud-key" className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">API Key</Label>
               <Input
                 id="cloud-key"
                 type="password"
                 value={cfgKey}
                 onChange={(e) => setCfgKey(e.target.value)}
                 placeholder="sk-..."
-                className="text-sm font-mono h-9"
+                className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0 font-mono"
               />
             </div>
 
@@ -637,19 +637,19 @@ function CloudAgentsTab({
             <div>
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
               >
                 {showAdvanced ? 'Hide' : 'Show'} advanced options
               </button>
               {showAdvanced && (
-                <div className="mt-2">
-                  <Label htmlFor="cloud-prompt" className="text-xs">System Prompt</Label>
+                <div className="mt-2.5">
+                  <Label htmlFor="cloud-prompt" className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">System Prompt</Label>
                   <Textarea
                     id="cloud-prompt"
                     value={cfgPrompt}
                     onChange={(e) => setCfgPrompt(e.target.value)}
                     placeholder="Custom instructions for this agent..."
-                    className="text-sm min-h-[50px] mt-1.5"
+                    className="text-xs min-h-[60px] mt-1.5 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
                   />
                 </div>
               )}
@@ -659,7 +659,7 @@ function CloudAgentsTab({
             <Button
               onClick={onAdd}
               disabled={saving || !cfgName || !cfgKey || !cfgModel || (isCustomProvider && !cfgBaseUrl)}
-              className="w-full"
+              className="w-full bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-semibold h-9 rounded-lg shadow-xs"
               size="sm"
             >
               {saving && <Loader2 className="size-3.5 animate-spin mr-1.5" />}
@@ -682,24 +682,23 @@ function CloudAgentsTab({
         return (
           <div key={group.label}>
             <div className="flex items-center gap-2 mb-1.5 px-0.5">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{group.label}</span>
-              <div className="flex-1 border-t" />
+              <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">{group.label}</span>
+              <div className="flex-1 border-t border-zinc-200/50 dark:border-zinc-800/50" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {groupProviders.map((p) => {
-                const brand = getProviderBrand(p.name);
                 return (
                   <button
                     key={p.name}
                     onClick={() => onSelectProvider(p.name)}
-                    className="flex items-center gap-2 px-2.5 py-2 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30 text-left transition-all"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/20 dark:hover:bg-zinc-900/10 text-left transition-all shadow-xs"
                   >
                     <div className="size-6 shrink-0 flex items-center justify-center">
                       <ProviderIcon name={p.name} size={22} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-medium leading-tight truncate">{p.label}</div>
-                      <div className="text-[9px] text-muted-foreground">{p.models.length} models</div>
+                      <div className="text-xs font-semibold leading-tight truncate text-zinc-900 dark:text-zinc-50">{p.label}</div>
+                      <div className="text-[9px] text-zinc-400 dark:text-zinc-500 font-mono mt-0.5">{p.models.length} models</div>
                     </div>
                   </button>
                 );
@@ -711,33 +710,33 @@ function CloudAgentsTab({
 
       {/* Connected cloud agents */}
       {cloudAgents.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-2 mt-5">
           <div className="flex items-center gap-2 px-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Connected</span>
-            <div className="flex-1 border-t" />
+            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Connected</span>
+            <div className="flex-1 border-t border-zinc-200/50 dark:border-zinc-800/50" />
           </div>
           {cloudAgents.map((agent) => (
             <div
               key={agent.agentName}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border bg-background"
+              className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 shadow-xs"
             >
               <div className="size-7 flex items-center justify-center shrink-0">
                 <ProviderIcon name={agent.provider} size={28} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium">@{agent.agentName}</span>
-                  <CategoryIcon category={agent.category} className="size-2.5" />
+                  <span className="text-xs font-bold text-zinc-900 dark:text-zinc-50">@{agent.agentName}</span>
+                  <CategoryIcon category={agent.category} className="size-3 opacity-60" />
                 </div>
-                <div className="text-[10px] text-muted-foreground">{agent.model}</div>
+                <div className="text-[9px] font-mono text-zinc-400 dark:text-zinc-500 mt-0.5">{agent.model}</div>
               </div>
-              <span className="text-[10px] text-muted-foreground font-mono">{agent.apiKeyMasked}</span>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono pr-2">{agent.apiKeyMasked}</span>
               <button
                 onClick={() => onRemove(agent.agentName)}
-                className="size-6 flex items-center justify-center rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 transition-colors"
+                className="size-6 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-zinc-400 hover:text-red-600 transition-colors"
                 title="Remove"
               >
-                <Trash2 className="size-3" />
+                <Trash2 className="size-3.5" />
               </button>
             </div>
           ))}
