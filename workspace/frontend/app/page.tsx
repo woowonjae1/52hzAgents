@@ -376,31 +376,33 @@ function CreateWorkspaceForm({
   };
 
   return (
-    <Card className="border-dashed">
-      <CardContent className="p-4">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <h3 className="font-medium text-sm">New Workspace</h3>
-          <div className="space-y-2">
+    <Card className="border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm rounded-xl">
+      <CardContent className="p-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 tracking-tight">Create New Workspace</h3>
+          <div className="space-y-2.5">
             <Input
-              placeholder="Agent name (required)"
+              placeholder="Agent Name (e.g. coder-agent)"
               value={agentName}
               onChange={(e) => setAgentName(e.target.value)}
               required
               autoFocus
+              className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
             />
             <Input
-              placeholder="Workspace name (optional)"
+              placeholder="Workspace Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
             />
           </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>}
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={loading}>
-              {loading ? <Loader2 className="size-3 animate-spin mr-1" /> : <Plus className="size-3 mr-1" />}
+            <Button type="submit" size="sm" disabled={loading} className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-semibold h-8 rounded-lg">
+              {loading ? <Loader2 className="size-3.5 animate-spin mr-1" /> : <Plus className="size-3.5 mr-1" />}
               Create
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="h-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground">
               Cancel
             </Button>
           </div>
@@ -419,28 +421,31 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 
   return (
     <Card
-      className="cursor-pointer border border-zinc-200 dark:border-zinc-800 bg-card hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150"
+      className="cursor-pointer border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
       onClick={() => router.push(`/${workspace.slug}?token=${workspace.token}`)}
     >
-      <CardContent className="p-4 space-y-3.5">
-        <div className="flex items-start justify-between gap-2">
+      <CardContent className="p-4 space-y-4">
+        <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
-            <h3 className="font-semibold text-sm text-foreground tracking-tight truncate">{workspace.name}</h3>
-            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{workspace.slug}</p>
+            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 tracking-tight truncate">{workspace.name}</h3>
+            <p className="text-[9px] text-muted-foreground font-mono mt-1 truncate" title={workspace.slug}>
+              ID: {workspace.slug}
+            </p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-zinc-200/50 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-900/50">
             <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-emerald-500' : 'bg-zinc-500'}`} />
-            <span className="text-[11px] font-medium text-muted-foreground capitalize">{workspace.status}</span>
+            <span className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 capitalize">{workspace.status}</span>
           </div>
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-1">
+        
+        <div className="flex items-center gap-3.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800/40 pt-3">
           <span className="flex items-center gap-1">
-            <Users className="size-3.5" />
+            <Users className="size-3.5 text-zinc-400" />
             {workspace.agentCount} agent{workspace.agentCount !== 1 ? 's' : ''}
           </span>
           {workspace.lastActivityAt && (
             <span className="flex items-center gap-1">
-              <Clock className="size-3.5" />
+              <Clock className="size-3.5 text-zinc-400" />
               {timeAgo(workspace.lastActivityAt)}
             </span>
           )}
@@ -479,17 +484,17 @@ function Dashboard() {
   }, [load]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50">
       {/* Header */}
-      <header className="border-b bg-card">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Bot className="size-5 text-primary" />
-            <h1 className="font-semibold">Workspaces</h1>
+      <header className="border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Bot className="size-4 text-zinc-500" />
+            <h1 className="font-bold text-sm tracking-tight">Workspaces</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <span className="text-[11px] font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
+            <Button variant="ghost" size="sm" onClick={logout} className="size-8 p-0 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground">
               <LogOut className="size-4" />
             </Button>
           </div>
@@ -497,29 +502,32 @@ function Dashboard() {
       </header>
 
       {/* Content */}
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         {/* Actions bar */}
-        <div className="flex items-center justify-between mb-6">
-          <p className="text-sm text-muted-foreground">
-            {loading ? 'Loading...' : `${workspaces.length} workspace${workspaces.length !== 1 ? 's' : ''}`}
-          </p>
+        <div className="flex items-center justify-between border-b border-zinc-200/40 dark:border-zinc-800/40 pb-4">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">Manage Workspaces</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {loading ? 'Loading...' : `${workspaces.length} active developer workspace${workspaces.length !== 1 ? 's' : ''}`}
+            </p>
+          </div>
           {!showCreate && (
-            <Button size="sm" onClick={() => setShowCreate(true)}>
-              <Plus className="size-4 mr-1" />
+            <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-semibold shadow-xs">
+              <Plus className="size-3.5 mr-1" />
               New Workspace
             </Button>
           )}
         </div>
 
         {error && (
-          <div className="mb-6 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+          <div className="p-3.5 rounded-xl border border-red-200/30 bg-red-500/5 text-red-600 dark:text-red-400 text-xs font-medium">
             {error}
           </div>
         )}
 
         {/* Create form */}
         {showCreate && (
-          <div className="mb-6">
+          <div className="animate-in fade-in duration-200">
             <CreateWorkspaceForm
               onCreated={() => {
                 setShowCreate(false);

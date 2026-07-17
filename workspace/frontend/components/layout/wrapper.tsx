@@ -62,41 +62,41 @@ export function Wrapper() {
   // ── Mobile layout: single-pane with list/detail switching ──
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen w-full [&_.container-fluid]:px-5">
+      <div className="flex flex-col h-screen w-full bg-zinc-50 dark:bg-zinc-950 [&_.container-fluid]:px-5">
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
           {/* Full-screen views (no list/detail split) */}
           {!hasAgents && viewMode === 'threads' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <EmptyState />
             </div>
           ) : viewMode === 'connect' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <ConnectAgentView />
             </div>
           ) : viewMode === 'tasks' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <TasksView />
             </div>
           ) : viewMode === 'timers' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <TimersView />
             </div>
           ) : viewMode === 'inbox' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <InboxView />
             </div>
           ) : viewMode === 'skills' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <SkillsView />
             </div>
           ) : viewMode === 'knowledge' ? (
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <KnowledgeView />
             </div>
           ) : mobilePane === 'list' ? (
             /* List pane — full width */
-            <div className="h-full mx-2 my-1.5 bg-background overflow-hidden border border-input rounded-xl shadow-xs flex flex-col">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
               {viewMode === 'threads' && <ThreadList />}
               {viewMode === 'files' && <FileList />}
               {viewMode === 'browser' && <BrowserTabList />}
@@ -104,7 +104,7 @@ export function Wrapper() {
             </div>
           ) : (
             /* Detail pane — full width, edge-to-edge on mobile */
-            <div className="relative h-full bg-background overflow-hidden">
+            <div className="relative h-full bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               {(viewMode === 'threads' || viewMode === 'routines') && (
                 <main className="h-full" role="content">
                   <ChatView />

@@ -224,41 +224,43 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── Human message — Slack style ──
+  // ── Human message — inline style ──
   if (isHuman) {
     const isCurrentUser = !!message.senderId && message.senderId === currentUser.id;
     const displayName = isCurrentUser
       ? 'You'
       : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');
-    const seed = message.senderId || message.senderName || 'human';
 
     return (
-      <div className="py-1.5">
-        <div className="flex items-start gap-2">
+      <div className="py-2.5">
+        <div className="flex items-start gap-3">
           <div
-            className="size-9 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-400"
+            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/50 dark:border-zinc-700/40 text-zinc-600 dark:text-zinc-400"
           >
             <User className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2">
-              <span className="text-[15px] font-bold text-foreground">{displayName}</span>
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{displayName}</span>
               {timestamp && (
-                <span className="text-xs text-muted-foreground">{timestamp}</span>
-              )}
-              {isCurrentUser && message.deliveryStatus === 'sending' && (
-                <span className="text-[11px] text-muted-foreground">Sending...</span>
-              )}
-              {isCurrentUser && message.deliveryStatus === 'confirmed' && (
-                <span className="text-[11px] text-emerald-600 dark:text-emerald-400">Sent</span>
-              )}
-              {isCurrentUser && message.deliveryStatus === 'failed' && (
-                <span className="text-[11px] text-red-600 dark:text-red-400">Not sent</span>
+                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono font-medium ml-auto">{timestamp}</span>
               )}
             </div>
-            <div className="text-sm leading-relaxed mt-0.5">
+            <div className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
               <MarkdownContent content={message.content} agentNames={agentNames} />
               <Attachments items={attachments} />
+              
+              <div className="flex items-center gap-3.5 mt-2 text-[10px] font-medium">
+                {isCurrentUser && message.deliveryStatus === 'sending' && (
+                  <span className="text-zinc-400">Sending...</span>
+                )}
+                {isCurrentUser && message.deliveryStatus === 'confirmed' && (
+                  <span className="text-emerald-600 dark:text-emerald-400">✓ Sent</span>
+                )}
+                {isCurrentUser && message.deliveryStatus === 'failed' && (
+                  <span className="text-red-600 dark:text-red-400">✗ Failed to send</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -266,36 +268,36 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── Agent message — Slack style ──
+  // ── Agent message — nested card style ──
   return (
-    <div className="py-1.5">
-      <div className="flex items-start gap-2">
-        <AgentAvatar name={message.senderName} size={36} square className="mt-0.5" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[15px] font-bold text-foreground truncate">
+    <div className="py-2.5">
+      <div className="flex items-start gap-3">
+        <AgentAvatar name={message.senderName} size={32} square className="mt-1 shrink-0" />
+        <div className="flex-1 min-w-0 bg-white dark:bg-zinc-900/50 border border-zinc-200/70 dark:border-zinc-800/60 rounded-xl p-4 shadow-xs">
+          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-zinc-100 dark:border-zinc-800/30">
+            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-50 truncate">
               {message.senderName}
             </span>
             {agent && (
               <span className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
+                'text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 border border-zinc-200/40 dark:border-zinc-800/30',
                 agent.role === 'master'
-                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                  : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/20'
+                  : 'bg-zinc-100/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
               )}>
                 {agent.role}
               </span>
             )}
             {timestamp && (
-              <span className="text-xs text-muted-foreground">{timestamp}</span>
+              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium ml-auto font-mono">{timestamp}</span>
             )}
           </div>
-          <div className="text-sm leading-relaxed mt-0.5">
+          <div className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
             <MarkdownContent content={message.content} agentNames={agentNames} />
             <Attachments items={attachments} />
 
             {approvalRequest && (
-              <div className="mt-3 p-3.5 rounded-lg border bg-zinc-50/50 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 space-y-2.5 max-w-full">
+              <div className="mt-3.5 p-3.5 rounded-lg border bg-zinc-50/50 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 space-y-2.5 max-w-full">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
@@ -349,7 +351,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             )}
 
             {/* Copy button */}
-            <div className="flex items-center gap-1 mt-1">
+            <div className="flex items-center gap-1 mt-2.5">
               <Button
                 variant="ghost"
                 size="sm"

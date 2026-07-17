@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { memo, type ReactNode, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -8,6 +9,7 @@ import { getAgentColor } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { MermaidBlock } from './mermaid-block';
 import { getMermaidSource, hasOpenMermaidFence } from './mermaid-utils';
+import { toast } from 'sonner';
 
 // Stable plugin arrays — avoids re-creating on every render
 const remarkPlugins = [remarkGfm];
@@ -147,10 +149,34 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
           />
         );
       }
+
+      // Attempt to extract language class
+      const codeElement = React.Children.only(children) as React.ReactElement<{ className?: string; children?: React.ReactNode }>;
+      const className = codeElement?.props?.className || '';
+      const match = /language-(\w+)/.exec(className);
+      const language = match ? match[1].toUpperCase() : 'CODE';
+
       return (
-        <pre className="my-2 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 overflow-x-auto text-[13px] leading-relaxed font-mono">
-          {children}
-        </pre>
+        <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 font-mono shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-900 bg-zinc-900/60 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+            <span>{language}</span>
+            <button
+              onClick={() => {
+                const text = codeElement?.props?.children;
+                if (text) {
+                  navigator.clipboard.writeText(String(text).trim());
+                  toast.success('Code copied to clipboard');
+                }
+              }}
+              className="hover:text-zinc-200 transition-colors"
+            >
+              Copy
+            </button>
+          </div>
+          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed">
+            {children}
+          </pre>
+        </div>
       );
     },
 

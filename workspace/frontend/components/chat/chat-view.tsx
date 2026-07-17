@@ -509,9 +509,9 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-zinc-900">
       {/* Thread header */}
-      <div className="flex items-center gap-2 px-2 lg:px-4 py-2 lg:py-3 border-b shrink-0">
+      <div className="flex items-center gap-2 px-3 lg:px-5 py-2.5 lg:py-3.5 border-b border-zinc-200/60 dark:border-zinc-800/60 shrink-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md sticky top-0 z-10">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Back button — mobile only */}
           {isMobile && (
@@ -523,10 +523,10 @@ export function ChatView() {
             </button>
           )}
           {isDM ? (
-            <h2 className="text-sm font-semibold truncate flex items-center gap-1.5">
-              <MessageSquare className="size-3.5 text-muted-foreground" />
+            <h2 className="text-xs font-bold tracking-tight truncate flex items-center gap-1.5 text-zinc-900 dark:text-zinc-50">
+              <MessageSquare className="size-3.5 text-zinc-400" />
               {currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-medium">
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold border border-zinc-200/30 dark:border-zinc-800/30">
                 read-only
               </span>
             </h2>
@@ -540,12 +540,12 @@ export function ChatView() {
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}
-              className="text-sm font-semibold bg-transparent border-b border-primary outline-none min-w-0 max-w-[300px]"
+              className="text-xs font-bold tracking-tight bg-transparent border-b border-zinc-400 dark:border-zinc-600 outline-none min-w-0 max-w-[300px] text-zinc-900 dark:text-zinc-50 h-6"
               autoFocus
             />
           ) : (
             <h2
-              className="text-sm font-semibold truncate cursor-pointer hover:text-primary transition-colors"
+              className="text-xs font-bold tracking-tight truncate cursor-pointer hover:text-zinc-500 dark:hover:text-zinc-300 transition-colors text-zinc-900 dark:text-zinc-50"
               onClick={startEditingTitle}
               title="Click to rename"
             >
@@ -686,12 +686,12 @@ export function ChatView() {
           {/* All steps toggle */}
           {hasStatusMessages && (
             <Button
-              variant={showAllSteps ? 'outline' : 'ghost'}
+              variant="ghost"
               size="sm"
               onClick={() => setShowAllSteps((prev) => !prev)}
               className={cn(
-                'gap-1.5 h-7 text-xs font-medium',
-                showAllSteps && 'border-primary/30 text-primary bg-primary/5'
+                'gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
+                showAllSteps && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200/50 dark:border-zinc-700/50'
               )}
               title={showAllSteps ? 'Showing all intermediate steps' : 'Showing only latest steps'}
             >
@@ -702,15 +702,15 @@ export function ChatView() {
           {/* Browser live preview toggle */}
           {!isMobile && (
             <Button
-              variant={splitBrowser && showBrowserPreview ? 'outline' : 'ghost'}
+              variant="ghost"
               size="sm"
               onClick={() => {
                 if (!splitBrowser) setSplitBrowser(true);
                 setShowBrowserPreview(!(splitBrowser && showBrowserPreview));
               }}
               className={cn(
-                'gap-1.5 h-7 text-xs font-medium',
-                splitBrowser && showBrowserPreview && 'border-primary/30 text-primary bg-primary/5'
+                'gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
+                splitBrowser && showBrowserPreview && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200/50 dark:border-zinc-700/50'
               )}
               title={splitBrowser && showBrowserPreview ? 'Hide browser preview' : 'Show browser preview'}
             >
@@ -737,7 +737,7 @@ export function ChatView() {
             variant="ghost"
             size="sm"
             onClick={() => setShareDialogOpen(true)}
-            className="gap-1.5 h-7 text-xs font-medium"
+            className="gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
             title="Share conversation"
           >
             <Share2 className="size-3.5" />

@@ -51,16 +51,18 @@ function NavButton({
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-2 px-2.5 h-8 rounded-md text-[13px] transition-all duration-100',
+        'w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-xs transition-all duration-150',
         active
-          ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-950 dark:text-zinc-50 font-medium'
-          : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 font-normal'
+          ? 'bg-zinc-100/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-50 font-bold border border-zinc-200/20 dark:border-zinc-800/20 shadow-xs'
+          : 'hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 font-medium'
       )}
     >
-      <span className={active ? 'opacity-100' : 'opacity-60'}>{icon}</span>
-      <span className="flex-1 text-left">{label}</span>
+      <span className={cn('size-4 flex items-center justify-center shrink-0 transition-opacity', active ? 'opacity-100' : 'opacity-50')}>{icon}</span>
+      <span className="flex-1 text-left truncate">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className="text-xs text-muted-foreground">{count}</span>
+        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 border border-zinc-200/30 dark:border-zinc-800/30 shrink-0">
+          {count}
+        </span>
       )}
     </button>
   );
@@ -122,13 +124,13 @@ export function SidebarContent() {
   // ── Collapsed sidebar ──
   if (!isSidebarOpen) {
     return (
-      <div className="flex flex-col h-full min-h-0">
-        <div className="flex justify-center px-2.5 py-1">
+      <div className="flex flex-col h-full min-h-0 bg-zinc-50 dark:bg-zinc-950">
+        <div className="flex justify-center px-2.5 py-2 border-b border-zinc-200/40 dark:border-zinc-800/40">
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 onClick={handleNewThread}
-                className="size-9 rounded-lg bg-primary flex items-center justify-center text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="size-8.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 flex items-center justify-center transition-colors shadow-xs"
               >
                 <Plus className="size-4" />
               </button>
@@ -203,19 +205,19 @@ export function SidebarContent() {
       <div className="flex flex-col h-full min-h-0">
         <ScrollArea className="flex-1 min-h-0">
           {/* New Thread button */}
-          <div className="px-3.5 pb-3">
+          <div className="px-3.5 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/40 mb-3">
             <button
               onClick={handleNewThread}
-              className="w-full h-9 flex items-center justify-center gap-2 rounded-lg bg-primary text-primary-foreground text-[13px] font-medium hover:bg-primary/90 transition-colors"
+              className="w-full h-8.5 flex items-center justify-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-bold shadow-xs transition-colors"
             >
-              <Plus className="size-4" />
+              <Plus className="size-3.5" />
               <span>New Thread</span>
             </button>
           </div>
 
           {/* Agents */}
           <div className="px-2.5">
-            <p className="text-xs font-normal text-muted-foreground px-2 py-1.5 mb-0.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 py-2 mb-0.5">
               Agents ({onlineCount}/{recentAgents.length})
             </p>
             <div className="space-y-0.5 max-h-48 overflow-y-auto">
@@ -223,10 +225,10 @@ export function SidebarContent() {
                 <button
                   key={agent.agentName}
                   onClick={() => setSelectedAgentName(agent.agentName)}
-                  className="w-full flex items-center gap-2 px-2 h-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer group transition-colors"
+                  className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 cursor-pointer group transition-colors"
                 >
-                  <AgentAvatar name={agent.agentName} size={20} status={agent.status} showStatus />
-                  <span className="text-[13px] font-normal text-foreground group-hover:text-primary truncate text-left">
+                  <AgentAvatar name={agent.agentName} size={18} status={agent.status} showStatus />
+                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-50 truncate text-left">
                     {agent.agentName}
                   </span>
                 </button>
@@ -236,7 +238,7 @@ export function SidebarContent() {
             {/* Online Users */}
             {onlineUsers.length > 0 && (
               <>
-                <p className="text-xs font-normal text-muted-foreground px-2 py-1.5 mb-0.5 mt-6">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 py-2 mb-0.5 mt-5">
                   <Users className="size-3 inline-block mr-1 -mt-0.5" />
                   Online ({onlineUsers.length})
                 </p>
@@ -244,10 +246,10 @@ export function SidebarContent() {
                   {onlineUsers.map((u) => (
                     <div
                       key={u.id}
-                      className="flex items-center gap-2 px-2 h-8 rounded-lg text-[13px]"
+                      className="flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-xs text-zinc-600 dark:text-zinc-400 font-medium"
                     >
-                      <div className="size-2 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="truncate text-foreground">
+                      <div className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="truncate">
                         {u.id === currentUser.id ? `${u.name} (you)` : u.name}
                       </span>
                     </div>
@@ -257,7 +259,7 @@ export function SidebarContent() {
             )}
 
             {/* Collaboration */}
-            <p className="text-xs font-normal text-muted-foreground px-2 py-1.5 mb-0.5 mt-6">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 py-2 mb-0.5 mt-5">
               Collaboration
             </p>
             <div className="space-y-0.5">
@@ -284,12 +286,7 @@ export function SidebarContent() {
           {recentAgents.length === 0 ? (
             <button
               onClick={() => setViewMode('connect')}
-              className={cn(
-                'w-full flex items-center justify-center gap-2 h-9 rounded-lg text-[13px] font-medium transition-colors',
-                viewMode === 'connect'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-primary/10 text-primary hover:bg-primary/20',
-              )}
+              className="w-full flex items-center justify-center gap-1.5 h-8.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-bold transition-colors"
             >
               <PlusSquare className="size-4" />
               Connect Your First Agent
