@@ -75,26 +75,25 @@ export function EmptyState() {
   }
 
   return (
-    <div className="flex flex-col items-center h-full overflow-y-auto p-6 sm:p-8">
-      <div className="w-full max-w-2xl space-y-6 py-8">
-        {/* Back to the agent picker — shown once an agent is selected so the
-            install instructions can take over the view without scrolling. */}
+    <div className="flex flex-col items-center justify-center h-full overflow-y-auto p-6 sm:p-8 bg-zinc-50 dark:bg-zinc-950">
+      <div className="w-full max-w-lg space-y-8 py-8 flex flex-col items-center">
+        {/* Back to the agent picker */}
         {selectedEntry && (
           <button
             onClick={() => setSelectedAgent(null)}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            className="self-start inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
           >
-            <ArrowLeft className="size-4" />
+            <ArrowLeft className="size-3.5" />
             Back to agents
           </button>
         )}
 
         {/* Header */}
         {!selectedEntry && (
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight">Connect your first agent</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto">
-              Pick an agent you already have installed, or choose one to set up.
+          <div className="text-center space-y-2.5">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Connect an Agent</h2>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              Select an agent below to obtain the command line connection launcher.
             </p>
           </div>
         )}
@@ -106,7 +105,7 @@ export function EmptyState() {
             <span className="text-sm">Loading agents...</span>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full">
             {catalog.map((entry) => {
               const isSelected = selectedAgent === entry.name;
               return (
@@ -114,18 +113,18 @@ export function EmptyState() {
                   key={entry.name}
                   onClick={() => setSelectedAgent(isSelected ? null : entry.name)}
                   className={cn(
-                    'flex flex-col items-center gap-2 px-3 py-4 rounded-xl border text-center transition-all',
+                    'flex flex-col items-center gap-3 px-4 py-5 rounded-xl border bg-card text-center transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm',
                     isSelected
-                      ? 'border-primary/30 bg-primary/[0.04] ring-1 ring-primary/10 shadow-sm'
-                      : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30',
+                      ? 'border-zinc-900 dark:border-zinc-50 ring-1 ring-zinc-900 dark:ring-zinc-50'
+                      : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700',
                   )}
                 >
-                  <div className="size-10 flex items-center justify-center">
-                    <AgentIcon name={entry.name} size={40} />
+                  <div className="size-12 flex items-center justify-center rounded-lg bg-zinc-50 dark:bg-zinc-800/50 p-1 border border-zinc-100 dark:border-zinc-800/40">
+                    <AgentIcon name={entry.name} size={36} />
                   </div>
                   <div className="min-w-0 w-full">
-                    <div className="text-sm font-medium leading-tight truncate">{entry.label}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                    <div className="text-sm font-semibold leading-tight truncate">{entry.label}</div>
+                    <div className="text-[10px] text-muted-foreground mt-1 truncate">
                       {entry.tags?.[0] || 'Agent'}
                     </div>
                   </div>
@@ -135,174 +134,84 @@ export function EmptyState() {
           </div>
         ))}
 
-        {/* Selected agent — connection instructions */}
+        {/* Selected agent — Connection illustration / cover design */}
         {selectedEntry && (
-          <div className="rounded-xl border bg-card overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-            {/* Agent header */}
-            <div className="px-5 py-4 border-b bg-muted/30">
-              <div className="flex items-center gap-3">
-                <div className="size-10 flex items-center justify-center shrink-0">
-                  <AgentIcon name={selectedEntry.name} size={40} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-semibold">{selectedEntry.label}</h3>
-                    {selectedEntry.homepage && (
-                      <a
-                        href={selectedEntry.homepage}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-                      >
-                        <ExternalLink className="size-3.5" />
-                      </a>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{selectedEntry.description}</p>
-                </div>
-              </div>
+          <div className="w-full flex flex-col items-center text-center animate-in fade-in slide-in-from-top-2 duration-200">
+            {/* Agent Large Cover Image */}
+            <div className="size-24 flex items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 shadow-md border border-zinc-200/60 dark:border-zinc-800/80 p-4 mb-5 relative group overflow-hidden">
+              <AgentIcon name={selectedEntry.name} size={64} />
             </div>
 
-            <div className="p-5 space-y-5">
-              {/* Option A: Desktop App */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold">Option A</span>
-                  <span className="text-xs text-muted-foreground">— Desktop App (recommended)</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground mb-2.5">
-                  Download the Desktop Launcher for a visual setup experience.
-                </p>
-                <div className="flex gap-2">
-                  {[
-                    { label: 'macOS', platform: 'mac-arm64', href: 'https://openagents.org/api/download/launcher/mac' },
-                    { label: 'Windows', platform: 'windows', href: 'https://openagents.org/api/download/launcher/windows' },
-                    { label: 'Linux', platform: 'linux-appimage', href: 'https://openagents.org/api/download/launcher/linux-appimage' },
-                  ].map((dl) => (
-                    <a
-                      key={dl.label}
-                      href={dl.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => capture('launcher_download_clicked', {
-                        platform: dl.platform,
-                        source: 'workspace_onboarding',
-                        agent_type: selectedEntry.name,
-                      })}
-                      className="flex-1 text-center px-3 py-2.5 text-xs font-medium rounded-lg border hover:bg-accent transition-colors"
-                    >
-                      {dl.label}
-                    </a>
-                  ))}
-                </div>
-              </div>
+            <h3 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 mb-1">
+              {selectedEntry.label}
+            </h3>
+            
+            <p className="text-xs text-muted-foreground max-w-sm mb-6">
+              {selectedEntry.description}
+            </p>
 
-              <div className="flex items-center gap-3">
-                <div className="flex-1 border-t" />
-                <span className="text-[10px] text-muted-foreground">or</span>
-                <div className="flex-1 border-t" />
+            {/* Run connection command box */}
+            <div className="w-full bg-zinc-900 dark:bg-black border border-zinc-800 rounded-xl p-4 mb-4 relative group">
+              <div className="text-[10px] text-zinc-500 font-mono mb-2 text-left uppercase tracking-wider">
+                Run command to connect:
               </div>
-
-              {/* Option B: CLI */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold">Option B</span>
-                  <span className="text-xs text-muted-foreground">— Command Line</span>
-                </div>
-                <div className="space-y-3">
-                  <CliStep
-                    step="1"
-                    label="Install the CLI — macOS / Linux"
-                    command="curl -fsSL https://openagents.org/install.sh | bash"
-                    isCopied={isCopied}
-                    onCopy={(cmd) => {
-                      capture('cli_install_copied', {
-                        source: 'workspace_onboarding',
-                        agent_type: selectedEntry.name,
-                        os: 'unix',
-                      });
-                      copyToClipboard(cmd);
-                    }}
-                  />
-                  <CliStep
-                    label="Windows (PowerShell)"
-                    command="irm https://openagents.org/install.ps1 | iex"
-                    isCopied={isCopied}
-                    onCopy={(cmd) => {
-                      capture('cli_install_copied', {
-                        source: 'workspace_onboarding',
-                        agent_type: selectedEntry.name,
-                        os: 'windows',
-                      });
-                      copyToClipboard(cmd);
-                    }}
-                  />
-                  <CliStep
-                    step="2"
-                    label={`Install the ${selectedEntry.label} runtime`}
-                    command={`wwj install ${selectedEntry.name}`}
-                    isCopied={isCopied}
-                    onCopy={copyToClipboard}
-                  />
-                  <CliStep
-                    step="3"
-                    label="Connect to this workspace"
-                    command={`wwj connect my-${selectedEntry.name} ${token.slice(0, 8)}...`}
-                    copyCommand={`wwj connect my-${selectedEntry.name} ${token}`}
-                    isCopied={isCopied}
-                    onCopy={copyToClipboard}
-                  />
-                </div>
-              </div>
-
-              {/* Token */}
-              {token && (
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <Key className="size-3.5 text-muted-foreground" />
-                    <span className="text-xs font-medium">Workspace Token</span>
-                  </div>
-                  <button
-                    onClick={handleCopyToken}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border bg-background hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors group"
-                  >
-                    <span className="flex-1 text-left font-mono text-xs text-muted-foreground truncate">
-                      {token.length > 16
-                        ? `${token.slice(0, 8)}${'•'.repeat(8)}${token.slice(-4)}`
-                        : token}
-                    </span>
-                    <span className={cn(
-                      'flex items-center gap-1 text-[11px] font-medium shrink-0 transition-colors',
-                      tokenCopied ? 'text-emerald-600' : 'text-muted-foreground group-hover:text-foreground',
-                    )}>
-                      {tokenCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                      {tokenCopied ? 'Copied' : 'Copy'}
-                    </span>
-                  </button>
-                </div>
-              )}
+              <pre className="text-zinc-100 text-xs font-mono text-left select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
+                {`wwj connect my-${selectedEntry.name} ${token}`}
+              </pre>
+              <button
+                className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
+                onClick={() => {
+                  capture('cli_install_copied', {
+                    source: 'workspace_onboarding',
+                    agent_type: selectedEntry.name,
+                    os: 'unix',
+                  });
+                  copyToClipboard(`wwj connect my-${selectedEntry.name} ${token}`);
+                }}
+              >
+                {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+              </button>
             </div>
+
+            {/* Token details */}
+            {token && (
+              <div className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-card text-xs font-medium text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <Key className="size-3.5" />
+                  <span>Workspace Token</span>
+                </div>
+                <button
+                  onClick={handleCopyToken}
+                  className="flex items-center gap-1 hover:text-foreground font-mono transition-colors"
+                >
+                  <span className="mr-1.5">
+                    {token.length > 12 ? `${token.slice(0, 6)}...${token.slice(-4)}` : token}
+                  </span>
+                  {tokenCopied ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
         {/* Cloud agents fallback */}
         {!selectedEntry && (
-        <div className="text-center space-y-2 pt-2">
-          <div className="flex items-center gap-3 justify-center">
-            <div className="w-16 border-t" />
-            <span className="text-[11px] text-muted-foreground">or</span>
-            <div className="w-16 border-t" />
+          <div className="w-full text-center space-y-3 pt-2">
+            <div className="flex items-center gap-3 justify-center">
+              <div className="w-12 border-t" />
+              <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">or</span>
+              <div className="w-12 border-t" />
+            </div>
+            <button
+              onClick={() => setViewMode('connect')}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-card hover:bg-zinc-50 dark:hover:bg-zinc-900/60 transition-colors text-sm group"
+            >
+              <Cloud className="size-4 text-muted-foreground" />
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100">Try Cloud Agents</span>
+              <span className="text-xs text-muted-foreground font-normal">| No install needed</span>
+              <ChevronRight className="size-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+            </button>
           </div>
-          <button
-            onClick={() => setViewMode('connect')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border hover:bg-accent transition-colors text-sm group"
-          >
-            <Cloud className="size-4 text-muted-foreground" />
-            <span className="font-medium">Try Cloud Agents</span>
-            <span className="text-xs text-muted-foreground">— paste an API key, no install needed</span>
-            <ChevronRight className="size-3.5 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
         )}
       </div>
     </div>
