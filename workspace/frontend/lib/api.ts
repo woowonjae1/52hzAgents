@@ -759,8 +759,16 @@ class WorkspaceApi {
   // ---------------------------------------------------------------------------
 
   async getCloudProviders(): Promise<CloudAgentProvider[]> {
-    const res = await this.request<{ providers: CloudAgentProvider[] }>('/v1/cloud-agents/providers');
-    return res.providers;
+    const res = await this.request<{ providers: any[] }>('/v1/cloud-agents/providers');
+    return (res.providers || []).map((p) => ({
+      name: p.name,
+      label: p.label,
+      models: (p.models || []).map((m: any) => ({
+        id: m.id || m.name || '',
+        category: m.category || 'chat',
+        label: m.label || m.name || '',
+      })),
+    }));
   }
 
   async listCloudAgents(): Promise<CloudAgentConfig[]> {
