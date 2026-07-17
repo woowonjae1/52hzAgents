@@ -24,13 +24,14 @@ export function EmptyState() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     workspaceApi
       .getAgentCatalog()
       .then((entries) => { if (!cancelled) setCatalog(entries); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [token]);
 
   // The onboarding view auto-shows when a workspace is open with no agent connected.
   // It's a conditional render (no route/pageview), so fire an explicit event here.
