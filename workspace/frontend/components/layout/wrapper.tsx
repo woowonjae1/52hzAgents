@@ -123,7 +123,7 @@ export function Wrapper() {
 
   // ── Desktop layout: sidebar + two panes ──
   return (
-    <div className="flex h-screen w-full [&_.container-fluid]:px-5">
+    <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 [&_.container-fluid]:px-5">
       {!isDetailExpanded && <Sidebar />}
 
       <div className="flex flex-col flex-1 min-w-0 w-full">
@@ -142,7 +142,7 @@ export function Wrapper() {
 
           {/* No agents + threads view: full-width onboarding (no thread list, no message input) */}
           {!hasAgents && viewMode === 'threads' ? (
-            <div className="relative flex-1 min-w-0 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+            <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <EmptyState />
             </div>
           ) : viewMode === 'threads' && monitorMode ? (
@@ -156,7 +156,7 @@ export function Wrapper() {
               {/* Middle pane — thread list or file list
                   Hidden for: connect view, expanded detail, or when browser preview is active */}
               {viewMode !== 'connect' && viewMode !== 'tasks' && viewMode !== 'timers' && viewMode !== 'inbox' && viewMode !== 'knowledge' && viewMode !== 'skills' && !isDetailExpanded && !(splitBrowser && showBrowserPreview && viewMode === 'threads') && (
-                <div className="shrink-0 w-[300px] xl:w-[400px] bg-background overflow-hidden border border-input rounded-xl shadow-xs flex flex-col">
+                <div className="shrink-0 w-[300px] xl:w-[400px] bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
                   {viewMode === 'threads' && <ThreadList />}
                   {viewMode === 'files' && <FileList />}
                   {viewMode === 'browser' && <BrowserTabList />}
@@ -168,18 +168,18 @@ export function Wrapper() {
               {viewMode === 'threads' && splitBrowser && showBrowserPreview ? (
                 /* Split view: chat + browser side by side (thread list hidden) */
                 <div className="flex flex-1 min-w-0 gap-2.5">
-                  <div className="relative flex-1 min-w-0 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+                  <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
                     <main className="h-full" role="content">
                       <ChatView />
                     </main>
                     {isAgentPanelOpen && <AgentProfilePanel />}
                   </div>
-                  <div className="relative flex-1 min-w-0 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+                  <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
                     <BrowserView />
                   </div>
                 </div>
               ) : (
-                <div className="relative flex-1 min-w-0 bg-background overflow-hidden border border-input rounded-xl shadow-xs">
+                <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
                   {(viewMode === 'threads' || viewMode === 'routines') && (
                     <main className="h-full" role="content">
                       <ChatView />

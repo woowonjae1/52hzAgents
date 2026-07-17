@@ -68,7 +68,7 @@ export default function RootLayout({
         </>
         )}
       </head>
-      <body className="bg-zinc-100 font-sans dark:bg-zinc-900">
+      <body className="bg-background text-foreground font-sans">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <OpenAgentsAuthProvider>
