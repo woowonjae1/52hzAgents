@@ -363,3 +363,50 @@ func ListWorkspaces(c *gin.Context) {
 		},
 	})
 }
+
+// ResolveToken 解析 Token 得到对应工作区的 ID、Slug 和 Name
+func ResolveToken(c *gin.Context) {
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	hash := hashWorkspaceToken(req.Token)
+
+	var ws models.Workspace
+	err := db.DB.Where("password_hash = ? OR password_hash = ?", req.Token, hash).First(&ws).Error
+	if err != nil {
+		var list []models.Workspace
+		if err2 := db.DB.Where("status != ?", "deleted").Find(&list).Error; err2 == nil {
+			found := false
+			for _, item := range list {
+				var settings map[string]interface{}
+				if len(item.Settings) > 0 {
+					_ = json.Unmarshal(item.Settings, &settings)
+					if settings != nil && settings["token"] == req.Token {
+						ws = item
+						found = true
+						break
+					}
+				}
+			}
+			if !found {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Workspace token not found"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Workspace token not found"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"workspace_id": ws.ID,
+		"slug":         ws.Slug,
+		"name":         ws.Name,
+	})
+}
+

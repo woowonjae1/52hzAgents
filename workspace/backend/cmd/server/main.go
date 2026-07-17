@@ -83,6 +83,7 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/ws", handlers.CreateWorkspace)
 		v1.GET("/workspaces", handlers.ListWorkspaces)
 		v1.GET("/ws", handlers.ListWorkspaces)
+		v1.POST("/token/resolve", handlers.ResolveToken)
 		v1.GET("/workspaces/:workspace_id", handlers.GetWorkspace) // 获取指定工作区详情。
 		v1.PATCH("/workspaces/:workspace_id", handlers.UpdateWorkspace)
 		v1.DELETE("/workspaces/:workspace_id", handlers.DeleteWorkspace)                    // 软删除工作区。
