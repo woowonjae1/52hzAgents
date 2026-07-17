@@ -114,7 +114,7 @@ export function TimersView() {
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border border-border bg-card divide-y divide-border">
             {activeTimers.map((timer) => (
               <div key={timer.id} className="flex items-start gap-3 px-3 py-3">
-                <Clock3 className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                <Clock3 className="mt-0.5 size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm leading-snug">{timer.message}</p>
                   <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
@@ -139,17 +139,17 @@ export function TimersView() {
           <div className="mt-4 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Reminder</label>
-              <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={3} disabled={submitting} placeholder="e.g. Check whether the deployment completed" className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              <textarea value={message} onChange={(event) => setMessage(event.target.value)} rows={3} disabled={submitting} placeholder="e.g. Check whether the deployment completed" className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors" />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Agent</label>
-              <select value={source} onChange={(event) => setSource(event.target.value)} disabled={submitting} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm">
+              <select value={source} onChange={(event) => setSource(event.target.value)} disabled={submitting} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors">
                 {availableAgents.map((agent) => <option key={agent.agentName} value={agent.agentName}>{agent.agentName}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Conversation</label>
-              <select value={channel} onChange={(event) => setChannel(event.target.value)} disabled={submitting} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm">
+              <select value={channel} onChange={(event) => setChannel(event.target.value)} disabled={submitting} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors">
                 {channels.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
               </select>
             </div>
@@ -157,14 +157,14 @@ export function TimersView() {
               <label className="text-xs font-medium text-muted-foreground">Remind after</label>
               <div className="grid grid-cols-4 gap-1.5">
                 {DELAY_PRESETS.map((preset) => (
-                  <button key={preset.seconds} type="button" onClick={() => setDelaySeconds(preset.seconds)} disabled={submitting} className={delaySeconds === preset.seconds ? 'rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground' : 'rounded-md border border-input px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted'}>
+                  <button key={preset.seconds} type="button" onClick={() => setDelaySeconds(preset.seconds)} disabled={submitting} className={delaySeconds === preset.seconds ? 'rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 px-2 py-1.5 text-xs font-semibold' : 'rounded-md border border-input px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted'}>
                     {preset.label}
                   </button>
                 ))}
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">Custom</span>
-                <Input type="number" min={1} max={31536000} value={delaySeconds} onChange={(event) => setDelaySeconds(Math.max(1, Number(event.target.value) || 1))} disabled={submitting} className="w-28" />
+                <Input type="number" min={1} max={31536000} value={delaySeconds} onChange={(event) => setDelaySeconds(Math.max(1, Number(event.target.value) || 1))} disabled={submitting} className="w-28 focus-visible:ring-0 focus-visible:border-zinc-400 dark:focus-visible:border-zinc-650 transition-colors" />
                 <span className="text-muted-foreground">seconds</span>
               </div>
             </div>

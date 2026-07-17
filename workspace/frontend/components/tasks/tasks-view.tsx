@@ -30,10 +30,10 @@ function timeAgo(dateStr: string | null): string {
 }
 
 function StatusIcon({ status }: { status: TodoStatus }) {
-  if (status === 'completed') return <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />;
-  if (status === 'in_progress') return <Loader2 className="size-4 text-blue-500 shrink-0 animate-spin" />;
+  if (status === 'completed') return <CheckCircle2 className="size-4 text-zinc-500 dark:text-zinc-400 shrink-0" />;
+  if (status === 'in_progress') return <Loader2 className="size-4 text-zinc-500 dark:text-zinc-400 shrink-0 animate-spin" />;
   if (status === 'cancelled') return <XCircle className="size-4 text-zinc-400 shrink-0" />;
-  return <Circle className="size-4 text-zinc-400 shrink-0" />;
+  return <Circle className="size-4 text-zinc-300 dark:text-zinc-700 shrink-0" />;
 }
 
 function nextStatus(status: TodoStatus): TodoStatus {
@@ -259,23 +259,23 @@ export function TasksView() {
           <div className="mt-4 space-y-4">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Task</label>
-              <textarea value={content} onChange={(event) => setContent(event.target.value)} rows={3} disabled={saving} placeholder="What needs to be done?" className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30" />
+              <textarea value={content} onChange={(event) => setContent(event.target.value)} rows={3} disabled={saving} placeholder="What needs to be done?" className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Status</label>
-                <select value={status} onChange={(event) => setStatus(event.target.value as TodoStatus)} disabled={saving} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm">
+                <select value={status} onChange={(event) => setStatus(event.target.value as TodoStatus)} disabled={saving} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors">
                   {Object.entries(STATUS_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Assignee (optional)</label>
-                <Input value={assignee} onChange={(event) => setAssignee(event.target.value)} disabled={saving} placeholder="Name" />
+                <Input value={assignee} onChange={(event) => setAssignee(event.target.value)} disabled={saving} placeholder="Name" className="focus-visible:ring-0 focus-visible:border-zinc-400 dark:focus-visible:border-zinc-650 transition-colors" />
               </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Conversation</label>
-              <select value={channel} onChange={(event) => setChannel(event.target.value)} disabled={saving || !!editing} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm">
+              <select value={channel} onChange={(event) => setChannel(event.target.value)} disabled={saving || !!editing} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors">
                 {channels.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
                 {editing && !channels.some((item) => item.id === channel) && <option value={channel}>{channel}</option>}
               </select>

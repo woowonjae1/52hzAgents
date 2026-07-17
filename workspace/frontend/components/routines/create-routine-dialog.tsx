@@ -137,7 +137,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
               placeholder="e.g. Check the deployment status and report any issues"
               rows={3}
               disabled={submitting}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors resize-none"
             />
           </div>
 
@@ -149,7 +149,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
               onChange={(e) => { setName(e.target.value); setNameManual(true); }}
               placeholder="Short label for this routine"
               disabled={submitting}
-              className="w-full px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
             />
           </div>
 
@@ -161,7 +161,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
                 disabled={submitting}
-                className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
               >
                 {onlineAgents.map((a) => (
                   <option key={a.agentName} value={a.agentName}>{a.agentName}</option>
@@ -202,6 +202,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
           </div>
 
           {/* Daily schedule config */}
+          {/* Daily schedule config */}
           {scheduleType === 'daily' && (
             <div className="space-y-3">
               <div className="flex gap-2">
@@ -211,7 +212,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                     value={hour}
                     onChange={(e) => setHour(Number(e.target.value))}
                     disabled={submitting}
-                    className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
                   >
                     {Array.from({ length: 24 }, (_, i) => (
                       <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
@@ -224,7 +225,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                     value={minute}
                     onChange={(e) => setMinute(Number(e.target.value))}
                     disabled={submitting}
-                    className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
                   >
                     {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
                       <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
@@ -243,7 +244,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                       className={cn(
                         'flex-1 text-[10px] font-medium py-1.5 rounded-md transition-colors border',
                         days.has(i)
-                          ? 'bg-blue-500 border-blue-500 text-white'
+                          ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-950 font-semibold'
                           : 'border-zinc-200 dark:border-zinc-700 text-muted-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800'
                       )}
                     >
@@ -267,7 +268,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                     className={cn(
                       'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors border',
                       intervalMinutes === preset.value
-                        ? 'bg-blue-500 border-blue-500 text-white'
+                        ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-950 font-semibold'
                         : 'border-zinc-200 dark:border-zinc-700 text-muted-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800'
                     )}
                   >
@@ -284,7 +285,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                   value={intervalMinutes}
                   onChange={(e) => setIntervalMinutes(Math.max(1, Math.min(1440, Number(e.target.value) || 1)))}
                   disabled={submitting}
-                  className="w-20 px-2 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-20 px-2 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
                 />
                 <span className="text-xs text-muted-foreground">minutes</span>
               </div>

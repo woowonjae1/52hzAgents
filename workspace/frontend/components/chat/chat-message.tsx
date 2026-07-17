@@ -236,10 +236,9 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       <div className="py-1.5">
         <div className="flex items-start gap-2">
           <div
-            className="size-9 rounded-lg shrink-0 flex items-center justify-center mt-0.5"
-            style={{ backgroundColor: humanColor(seed) }}
+            className="size-9 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-400"
           >
-            <User className="size-4 text-zinc-700" />
+            <User className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
@@ -296,22 +295,23 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             <Attachments items={attachments} />
 
             {approvalRequest && (
-              <div className="mt-3 p-3 rounded-lg border bg-background/50 border-dashed space-y-2 max-w-full">
+              <div className="mt-3 p-3.5 rounded-lg border bg-zinc-50/50 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 space-y-2.5 max-w-full">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-                    ⚠ Action Approval Required
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Action Approval Required
                   </span>
                   <span className="text-[10px] text-muted-foreground uppercase font-mono">
                     ID: {approvalRequest.approval_id}
                   </span>
                 </div>
-                <div className="text-xs space-y-1 font-mono bg-muted p-2 rounded overflow-x-auto max-w-full">
-                  <div className="font-semibold text-foreground">Tool: {approvalRequest.tool}</div>
+                <div className="text-xs space-y-1.5 font-mono bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 p-2.5 rounded overflow-x-auto max-w-full text-zinc-800 dark:text-zinc-200">
+                  <div className="font-semibold">Tool: {approvalRequest.tool}</div>
                   {approvalRequest.args?.command && (
-                    <div className="text-blue-600 dark:text-blue-400 whitespace-pre-wrap">$ {approvalRequest.args.command}</div>
+                    <div className="whitespace-pre-wrap text-zinc-600 dark:text-zinc-400 font-mono">$ {approvalRequest.args.command}</div>
                   )}
                   {approvalRequest.args?.path && (
-                    <div className="text-green-600 dark:text-green-400">File: {approvalRequest.args.path}</div>
+                    <div className="text-zinc-600 dark:text-zinc-400">File: {approvalRequest.args.path}</div>
                   )}
                 </div>
                 
@@ -320,8 +320,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                     <span className={cn(
                       "text-xs font-semibold px-2 py-1 rounded",
                       currentApproved 
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        ? "bg-zinc-100 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
+                        : "bg-zinc-100 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
                     )}>
                       {currentApproved ? '✓ Approved' : '✗ Denied'}
                     </span>
@@ -329,7 +329,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                     <>
                       <Button
                         size="sm"
-                        className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                        className="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-medium"
                         onClick={handleApprove}
                       >
                         Approve
@@ -337,7 +337,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 px-3 text-red-600 hover:text-red-700 border-red-200 dark:border-red-900/50 hover:bg-red-50 dark:hover:bg-red-950/20 font-semibold"
+                        className="h-8 px-3 text-muted-foreground border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground font-medium"
                         onClick={handleReject}
                       >
                         Deny

@@ -384,9 +384,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       )}
 
       <div className={cn(
-        'relative flex flex-col gap-2 bg-background transition-all rounded-2xl border shadow-lg p-4',
-        isDragging && 'border-primary border-dashed bg-primary/5',
-        isFocused && !isDragging && 'ring-2 ring-primary/30 border-primary/40'
+        'relative flex flex-col gap-2 bg-card transition-all duration-100 rounded-xl border border-zinc-200 dark:border-zinc-800 p-3.5',
+        isDragging && 'border-zinc-400 border-dashed bg-zinc-50 dark:bg-zinc-900/50',
+        isFocused && !isDragging && 'border-zinc-300 dark:border-zinc-700'
       )}>
         {/* Drag overlay */}
         {isDragging && (

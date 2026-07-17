@@ -419,28 +419,28 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 
   return (
     <Card
-      className="cursor-pointer transition-colors hover:border-primary/30 hover:bg-accent/5"
+      className="cursor-pointer border border-zinc-200 dark:border-zinc-800 bg-card hover:border-zinc-300 dark:hover:border-zinc-700 transition-all duration-150"
       onClick={() => router.push(`/${workspace.slug}?token=${workspace.token}`)}
     >
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-4 space-y-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-medium truncate">{workspace.name}</h3>
-            <p className="text-xs text-muted-foreground font-mono">{workspace.slug}</p>
+            <h3 className="font-semibold text-sm text-foreground tracking-tight truncate">{workspace.name}</h3>
+            <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{workspace.slug}</p>
           </div>
-          <Badge variant={workspace.status === 'active' ? 'primary' : 'secondary'} className="shrink-0 text-xs">
-            {workspace.status === 'archived' && <Archive className="size-3 mr-1" />}
-            {workspace.status}
-          </Badge>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-emerald-500' : 'bg-zinc-500'}`} />
+            <span className="text-[11px] font-medium text-muted-foreground capitalize">{workspace.status}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-1">
           <span className="flex items-center gap-1">
-            <Users className="size-3" />
+            <Users className="size-3.5" />
             {workspace.agentCount} agent{workspace.agentCount !== 1 ? 's' : ''}
           </span>
           {workspace.lastActivityAt && (
             <span className="flex items-center gap-1">
-              <Clock className="size-3" />
+              <Clock className="size-3.5" />
               {timeAgo(workspace.lastActivityAt)}
             </span>
           )}

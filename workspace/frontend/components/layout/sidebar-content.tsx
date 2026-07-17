@@ -51,10 +51,10 @@ function NavButton({
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-2 px-2 h-8 rounded-lg text-[13px] transition-colors',
+        'w-full flex items-center gap-2 px-2.5 h-8 rounded-md text-[13px] transition-all duration-100',
         active
-          ? 'bg-zinc-100 dark:bg-zinc-800 text-primary font-medium'
-          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-foreground font-normal hover:text-primary'
+          ? 'bg-zinc-100 dark:bg-zinc-900 text-zinc-950 dark:text-zinc-50 font-medium'
+          : 'hover:bg-zinc-50 dark:hover:bg-zinc-900/50 text-zinc-500 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-50 font-normal'
       )}
     >
       <span className={active ? 'opacity-100' : 'opacity-60'}>{icon}</span>
