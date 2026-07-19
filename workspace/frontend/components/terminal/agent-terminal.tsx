@@ -144,6 +144,12 @@ export function AgentTerminal() {
     });
   }, [messages]);
 
+  // Reset local log buffer and pagination markers when changing threads
+  useEffect(() => {
+    setLocalLines([]);
+    setClearedBefore(0);
+  }, [currentSessionId]);
+
   const isAgentWorking = useMemo(() => {
     const last = localLines[localLines.length - 1];
     return last?.type === 'thinking';

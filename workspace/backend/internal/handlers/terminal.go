@@ -3,8 +3,11 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +19,11 @@ type executeCommandRequest struct {
 
 // ExecuteTerminalCommand handles POST /v1/terminal/execute
 func ExecuteTerminalCommand(c *gin.Context) {
+	_, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+
 	var req executeCommandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -32,8 +40,16 @@ func ExecuteTerminalCommand(c *gin.Context) {
 		cmd = exec.CommandContext(ctx, "sh", "-c", req.Command)
 	}
 
-	// Set execution directory to workspace root
-	cmd.Dir = ".."
+	// Dynamically resolve workspace root directory
+	if wd, err := os.Getwd(); err == nil {
+		if strings.HasSuffix(filepath.ToSlash(wd), "/backend") {
+			cmd.Dir = filepath.Dir(wd)
+		} else {
+			cmd.Dir = wd
+		}
+	} else {
+		cmd.Dir = ".."
+	}
 
 	outputBytes, err := cmd.CombinedOutput()
 	output := string(outputBytes)

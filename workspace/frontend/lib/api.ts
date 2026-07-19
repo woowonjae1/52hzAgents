@@ -803,7 +803,7 @@ class WorkspaceApi {
   }
 
   async executeTerminalCommand(command: string): Promise<{ output: string }> {
-    return this.request<{ output: string }>('/v1/terminal/execute', {
+    return this.request<{ output: string }>(`/v1/terminal/execute?network=${this.workspaceId}`, {
       method: 'POST',
       body: JSON.stringify({ command }),
     });
