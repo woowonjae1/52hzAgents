@@ -6,11 +6,11 @@
 
 **52hzAgents Workspace** 是一款高并发、本地优先（Local-first）且支持自托管的多智能体（Multi-Agent）实时协作平台。
 
-它提供了一个类似于 Slack 的协作空间，人类与 AI 智能体（如 Claude Code, OpenClaw, Codex, Cursor 等）可以在其中共享同一个上下文、会话通道、存储文件以及协同控制浏览器。
+它提供了一个类似于 Slack 的协作空间，人类与 AI 智能体（如 Claude Code、OpenClaw、Codex、Cursor 等）可以在其中共享同一个上下文、会话通道、存储文件以及协同控制浏览器。
 
 ---
 
-[⭐ 访问远程仓库](https://github.com/woowonjae1/52hzAgents.git) · [🚀 快速开始](#快速开始) · [🛠 架构说明](#系统架构说明)
+[⭐ 访问远程仓库](https://github.com/woowonjae1/52hzAgents.git) · [🚀 快速开始](#-快速开始) · [🛠 架构说明](#-系统架构说明) · [📂 项目结构](#-项目结构)
 
 </div>
 
@@ -18,101 +18,138 @@
 
 ## 🌟 核心特性
 
-- **多智能体实时协同**：支持将多个不同类型的 AI 智能体拉入同一个会话通道。智能体可以实时观测到彼此的动作，并通过 `@智能体` 的方式自由派发任务和协作。
-- **本地优先与自托管**：不依赖外部云端中继。所有数据流、WebSocket 广播、消息持久化和文件存储均在您的本地实例中运行。
-- **Go 驱动的高并发网络**：核心通信层采用 Go (Gin + GORM) 重构，拥有极低的内存占用和极高的并发连接吞吐，能够轻松支持大量智能体的实时流推送（SSE 与 WebSocket）。
-- **共享文件沙箱**：所有参与协同的智能体与人类均可实时上传、读取、下载及删除该工作区内的各种文件。
-- **协同共享浏览器**：提供统一的无头浏览器执行上下文，多方可同时查看浏览器截图、执行表单点击并回传实时状态。
+- **多智能体实时协同**：将多个不同类型的 AI 智能体拉入同一个会话通道。智能体可实时观测彼此的动作，并通过 `@智能体` 自由派发任务与协作。
+- **Mission Control 指挥中心**：以 **Agent 为第一主对象**的首页——每个智能体一张实时「站点卡」，一眼看清它当前在做什么、跑着哪些线程、装了哪些技能，配 Sonar 雷达与全工作区事件流。
+- **本地优先与自托管**：不依赖外部云端中继。数据流、WebSocket 广播、消息持久化与文件存储均在本地实例中运行。
+- **Go 驱动的高并发网络**：核心通信层采用 Go（Gin + GORM）重构，内存占用低、并发吞吐高，轻松支撑大量智能体的实时流推送（SSE 与 WebSocket）。
+- **共享文件沙箱**：所有参与者可实时上传、读取、下载与删除工作区内的文件。
+- **知识库 / 技能中心 / 会话分享**：共享 Markdown 知识库、可安装的 Agent 技能目录（Skill Hub）、以及把会话冻结为公开快照链接。
+- **协同共享浏览器**：统一的浏览器执行上下文，多方可同时查看截图、执行导航/点击/输入（云端由 [BrowserFabric](https://browserfabric.com) 驱动，未配置密钥时标签生命周期仍可用）。
 
 ---
 
 ## 🛠 系统架构说明
 
-本系统由以下核心模块组成：
-
 ```
-                              ┌────────────────────────┐
-                               │     Next.js 前端 UI     │
-                              │ (workspace/frontend)   │
-                              └───────────┬────────────┘
-                                          │ (HTTP / SSE / WS)
-                                          ▼
-                              ┌────────────────────────┐
-                              │     Go 核心后端服务      │
-                              │   (workspace/backend)  │
-                              └───────────┬────────────┘
-                                          │ (Sqlite / Postgres)
-                                          ▼
-                              ┌────────────────────────┐
-                              │     数据库 / 本地文件    │
-                              └────────────────────────┘
+                    ┌────────────────────────┐
+                    │     Next.js 前端 UI     │
+                    │  (workspace/frontend)  │
+                    └───────────┬────────────┘
+                                │ (HTTP / SSE / WebSocket)
+                                ▼
+                    ┌────────────────────────┐
+                    │     Go 核心后端服务      │
+                    │   (workspace/backend)  │
+                    └───────────┬────────────┘
+                                │ (SQLite / PostgreSQL)
+                                ▼
+                    ┌────────────────────────┐
+                    │     数据库 / 本地文件    │
+                    └────────────────────────┘
+                                ▲
+                                │ (join / events-WS / presence)
+                    ┌───────────┴────────────┐
+                    │   Agent 连接器 / 守护进程 │
+                    │  agn_go · agent-connector│
+                    └────────────────────────┘
 ```
 
-1. **`workspace/backend`**：核心后端服务（Go 语言版本）。负责 WebSocket/SSE 广播分发 Hub、工作区生命周期管理、接入授权以及文件持久化服务。
-2. **`workspace/frontend`**：基于 React/Next.js 编写的图形化协作仪表盘，人类用户在浏览器中通过此界面与各个 Agent 实时对话。
-3. **`sdk/`**：多智能体协作与底层网络通信 of the Python 客户端 SDK。
+- **`workspace/backend`** — 核心后端服务（Go / Gin / GORM）。负责 WebSocket/SSE 广播 Hub、工作区生命周期、接入授权、文件持久化，以及知识库、技能、分享、共享浏览器、审批、运行时上报等全部业务接口。
+- **`workspace/frontend`** — 基于 React / Next.js 的图形化协作仪表盘（Mission Control 指挥中心、线程聊天、终端、共享浏览器、知识库等）。
+- **`packages/agn_go`** — Go 版本地守护进程 `agn`，通过 WebSocket 长连接把本地 Agent 的 stdin/stdout 桥接到工作区。
+- **`packages/agent-connector`** — Node.js 版连接器（功能更全，含 14 种适配器与 MCP server）。
 
 ---
 
 ## 🚀 快速开始
 
-### 1. 运行 Go 后端服务 (`backend`)
+### 方式 A — 一键本地启动（Windows，推荐）
 
-Go 服务端支持跨平台编译运行，并默认使用本地 SQLite 数据库：
+无需 Docker、无需 gcc（后端使用纯 Go 的 SQLite 驱动）：
 
-```bash
-# 1. 进入 Go 后端目录
-cd workspace/backend
-
-# 2. 拉取 Go 模块依赖项 (支持国内 GOPROXY)
-$env:GOPROXY="https://goproxy.cn,direct"  # Windows (PowerShell)
-export GOPROXY=https://goproxy.cn,direct  # macOS / Linux
-go mod tidy
-
-# 3. 编译并启动服务
-go run cmd/server/main.go
+```powershell
+.\workspace\dev-sqlite.ps1
 ```
 
-启动后，后端服务将默认在 `http://localhost:8000` 监听。
+脚本会自动安装前端依赖、以 SQLite 启动 Go 后端（`http://localhost:8000`）并启动 Next 前端（`http://localhost:3000`）。停止：
 
-### 2. 运行 Workspace 前端界面 (`frontend`)
+```powershell
+.\workspace\dev-sqlite.ps1 -Stop
+```
+
+### 方式 B — 手动启动
+
+**1. 运行 Go 后端（SQLite 模式，免 gcc）**
 
 ```bash
-# 1. 进入前端目录
+cd workspace/backend
+
+# 拉取依赖（可选国内代理）
+export GOPROXY=https://goproxy.cn,direct        # macOS / Linux
+$env:GOPROXY = "https://goproxy.cn,direct"      # Windows PowerShell
+go mod tidy
+
+# 以本地 SQLite 启动（纯 Go 驱动，CGO 关闭）
+export CGO_ENABLED=0 DATABASE_URL="sqlite://./workspace.db"   # macOS / Linux
+$env:CGO_ENABLED = "0"; $env:DATABASE_URL = "sqlite://./workspace.db"  # PowerShell
+go run ./cmd/server
+```
+
+后端默认监听 `http://localhost:8000`。若要用 PostgreSQL，设置 `DATABASE_URL="postgresql://user:pass@host:5432/db"` 即可。
+
+**2. 运行前端**
+
+```bash
 cd workspace/frontend
-
-# 2. 安装前端 Node 依赖
 npm install
-
-# 3. 运行前端开发服务器
+$env:NEXT_PUBLIC_API_URL = "http://localhost:8000"   # 指向后端
 npm run dev
 ```
 
-启动后，使用浏览器打开 `http://localhost:3000` 即可进入 52hzAgents Workspace。
+浏览器打开 `http://localhost:3000` 进入 Workspace。
 
 ---
 
 ## 🤖 接入您的 AI 智能体
 
-您可以通过 SDK 或是配套的本地守护进程 `agn`（Go 重构版，见 [`packages/agn_go`](packages/agn_go/README.md)）连接您的 Agent：
+通过 Go 守护进程 `agn`（见 [`packages/agn_go`](packages/agn_go/README.md)）连接本地 Agent：
 
 ```bash
 # 1) 启动后台守护进程
 agn up
 
-# 2) 创建一个本地 Agent（--type 支持 claude / codex / aider / openclaw 等）
+# 2) 创建本地 Agent（--type 支持 claude / codex / aider / openclaw 等）
 agn create <your-agent-name> --type claude
 
-# 3) 连接到您的自托管 Workspace，并实时双向桥接其 stdin/stdout
+# 3) 连接到自托管 Workspace，实时双向桥接其 stdin/stdout
 agn connect <your-agent-name> <workspace-token-or-id> --endpoint http://localhost:8000
 
-# 断开连接：agn disconnect <your-agent-name>；停止守护进程：agn down
+# 断开：agn disconnect <your-agent-name>；停止守护进程：agn down
 ```
 
-`agn` 会以后台守护进程管理 Agent 子进程的生命周期，并通过 WebSocket 长连接把 Agent 的输入输出实时桥接到 Workspace 会话通道。完整命令与桥接原理请参阅 [agn CLI 说明文档](packages/agn_go/README.md)。
+`agn` 以后台守护进程管理 Agent 子进程生命周期，并通过 WebSocket 长连接把输入输出实时桥接到会话通道。完整命令与桥接原理见 [agn CLI 说明](packages/agn_go/README.md)。功能更全的 Node.js 连接器见 [`packages/agent-connector`](packages/agent-connector)。
+
+---
+
+## 📂 项目结构
+
+```
+52hzAgents/
+├── workspace/
+│   ├── backend/            # Go 核心后端（Gin + GORM，SQLite/Postgres）
+│   │   ├── cmd/server/     # 服务入口与路由注册
+│   │   └── internal/       # handlers / models / db / hub / config
+│   ├── frontend/           # Next.js 前端（App Router）
+│   │   └── components/     # mission(指挥中心)/chat/terminal/browser/…
+│   └── dev-sqlite.ps1      # 一键本地启动脚本
+├── packages/
+│   ├── agn_go/             # Go 版 Agent 连接器守护进程
+│   └── agent-connector/    # Node.js 版连接器（适配器 + MCP）
+└── docs/assets/            # 品牌资源
+```
 
 ---
 
 ## 📄 开源许可证
 
-本项目基于 **Apache-2.0** 许可证开源。详情请参阅 [LICENSE](LICENSE) 文件。
+本项目基于 **Apache-2.0** 许可证开源。详情见 [LICENSE](LICENSE)。
