@@ -1,71 +1,73 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { PanelLeft, Network } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search, Plus, ChevronDown, PanelLeft } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export function SidebarHeader() {
-  const { sidebarToggle, isSidebarOpen } = useLayout();
-  const { workspace, renameWorkspace } = useWorkspace();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const startEditing = () => {
-    setDraft(workspace?.name || '');
-    setEditing(true);
-    setTimeout(() => inputRef.current?.select(), 0);
-  };
-
-  const commit = () => {
-    setEditing(false);
-    const trimmed = draft.trim();
-    if (trimmed && trimmed !== workspace?.name) {
-      renameWorkspace(trimmed);
-    }
-  };
-
-  if (!isSidebarOpen) {
-    return (
-      <div className="flex items-center justify-center shrink-0 px-2.5 py-3.5">
-        <Button mode="icon" variant="ghost" onClick={sidebarToggle} className="hidden lg:inline-flex shrink-0" title="Toggle sidebar">
-          <PanelLeft />
-        </Button>
-      </div>
-    );
-  }
+  const { sidebarToggle, openNewThread } = useLayout();
+  const { workspace } = useWorkspace();
 
   return (
-    <div className="flex items-center gap-2.5 shrink-0 px-3.5 py-4">
-      <div className="size-8 shrink-0 flex items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Network className="size-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        {editing ? (
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commit();
-              if (e.key === 'Escape') setEditing(false);
-            }}
-            className="text-sm font-medium bg-transparent border-b border-primary outline-none w-full min-w-0"
-            autoFocus
-          />
-        ) : (
-          <p
-            className="text-sm font-medium truncate cursor-pointer hover:text-primary transition-colors"
-            onClick={startEditing}
-            title="Click to rename"
-          >
-            {workspace?.name || 'Workspace'}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground truncate font-mono">{workspace?.slug || ''}</p>
+    <div className="flex items-center justify-between shrink-0 px-4 py-3.5 border-b border-zinc-200/40 dark:border-zinc-800/40">
+      {/* Left: Workspace Selector dropdown */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="flex items-center gap-2 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors text-left max-w-[150px] cursor-pointer outline-none">
+            <img 
+              src="/logo-icon.png" 
+              className="size-4.5 object-contain shrink-0 rounded-sm" 
+              alt="Workspace logo" 
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+            <span className="text-xs font-bold truncate text-zinc-800 dark:text-zinc-200">
+              {workspace?.name || '52hzAgents'}
+            </span>
+            <ChevronDown className="size-3.5 text-zinc-400 shrink-0" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-52">
+          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled className="font-semibold text-zinc-700 dark:text-zinc-300">
+            {workspace?.name || 'Demo Workspace'}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-zinc-400 text-xs" disabled>
+            ID: {workspace?.slug || 'slug'}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        {/* New Thread */}
+        <button
+          onClick={openNewThread}
+          className="size-7 rounded-lg hover:bg-zinc-150 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 flex items-center justify-center transition-colors cursor-pointer"
+          title="New Thread"
+        >
+          <Plus className="size-4" />
+        </button>
+
+        {/* Collapse Sidebar toggle */}
+        <button
+          onClick={sidebarToggle}
+          className="size-7 rounded-lg hover:bg-zinc-150 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 flex items-center justify-center transition-colors cursor-pointer"
+          title="Collapse Sidebar"
+        >
+          <PanelLeft className="size-4" />
+        </button>
       </div>
     </div>
   );

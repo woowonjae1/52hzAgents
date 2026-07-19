@@ -16,15 +16,15 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://d.openagen
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 export const metadata: Metadata = {
-  title: 'Agent Workspace',
-  description: 'Interact with your AI agents in real time',
+  title: '52hzAgents Workspace',
+  description: 'Interact with your AI agents in real time in a high-concurrency multi-agent collaboration space',
   icons: {
     icon: [
-      { url: '/favicon.ico', sizes: 'any' },
-      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo-icon.png', sizes: 'any' },
+      { url: '/logo-icon.png', sizes: '16x16', type: 'image/png' },
+      { url: '/logo-icon.png', sizes: '32x32', type: 'image/png' },
     ],
-    apple: '/apple-touch-icon.png',
+    apple: '/logo-icon.png',
   },
   manifest: '/site.webmanifest',
 };

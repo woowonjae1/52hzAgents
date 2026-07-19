@@ -213,67 +213,62 @@ const StepItem = memo(function StepItem({ message }: { message: WorkspaceMessage
     );
   }
 
+  // Tool calls render as a proper card (Codex / Claude Code style): a tinted
+  // icon chip, the monospace tool name, a target summary, and collapsible args.
+  if (parsed.type === 'tool_call') {
+    return (
+      <div className="my-1">
+        <button
+          type="button"
+          onClick={() => hasDetail && setExpanded(!expanded)}
+          disabled={!hasDetail}
+          className={cn(
+            'group/tool flex items-center gap-2 w-full text-left rounded-lg border px-2 py-1.5 transition-colors',
+            'border-zinc-200/70 dark:border-zinc-800/70 bg-zinc-50/60 dark:bg-zinc-900/30',
+            hasDetail && 'cursor-pointer hover:border-blue-300/60 dark:hover:border-blue-800/50 hover:bg-blue-50/40 dark:hover:bg-blue-950/10',
+          )}
+        >
+          <span className="size-5 shrink-0 rounded-md bg-blue-500/10 flex items-center justify-center">
+            <Icon className="size-3 text-blue-500" />
+          </span>
+          <span className="font-mono text-[11px] font-semibold text-foreground/80 shrink-0">{parsed.toolDisplay}</span>
+          {parsed.summary && (
+            <>
+              <span className="text-muted-foreground/30 shrink-0">›</span>
+              <span className="truncate font-mono text-[11px] text-muted-foreground/70 min-w-0 flex-1">{parsed.summary}</span>
+            </>
+          )}
+          {hasDetail && (
+            <ChevronRight className={cn('size-3.5 shrink-0 ml-auto text-muted-foreground/40 transition-transform', expanded && 'rotate-90')} />
+          )}
+        </button>
+        {expanded && parsed.args && (
+          <pre className="text-[11px] leading-relaxed bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 ml-1 mt-1 mb-1.5 overflow-x-auto max-h-56 text-zinc-300 font-mono whitespace-pre-wrap break-all">
+            {parsed.args}
+          </pre>
+        )}
+      </div>
+    );
+  }
+
+  // Thinking (bare), status, and compaction render as compact inline rows.
   return (
     <div>
-      <button
-        type="button"
-        className={cn(
-          'flex items-center gap-2 text-xs py-0.5 w-full text-left rounded transition-colors',
-          hasDetail
-            ? 'cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 -ml-1 pl-1 pr-1'
-            : 'cursor-default',
-          'text-muted-foreground'
-        )}
-        onClick={() => hasDetail && setExpanded(!expanded)}
-        disabled={!hasDetail}
-      >
+      <div className="flex items-center gap-2 text-xs py-0.5 text-muted-foreground">
         <Icon
           className={cn(
             'size-3.5 shrink-0',
             parsed.type === 'thinking' && 'text-amber-500 animate-pulse',
             parsed.type === 'compacting' && 'text-violet-500 animate-spin',
-            parsed.type === 'tool_call' && 'text-blue-500',
             parsed.type === 'status' && 'text-emerald-500'
           )}
         />
-
         {parsed.type === 'compacting' && (
           <span className="italic text-violet-500/80 animate-pulse">Vibing ...</span>
         )}
-
-        {parsed.type === 'tool_call' && (
-          <span className="flex items-center gap-1.5 min-w-0 flex-1">
-            <span className="font-mono font-medium text-foreground/70 shrink-0">
-              {parsed.toolDisplay}
-            </span>
-            {parsed.summary && (
-              <>
-                <span className="text-muted-foreground/30 shrink-0">›</span>
-                <span className="truncate text-muted-foreground/60">
-                  {parsed.summary}
-                </span>
-              </>
-            )}
-          </span>
-        )}
-
         {parsed.type === 'status' && <span>{parsed.text}</span>}
-
-        {hasDetail && (
-          <ChevronRight
-            className={cn(
-              'size-3 shrink-0 transition-transform duration-200 text-muted-foreground/40',
-              expanded && 'rotate-90'
-            )}
-          />
-        )}
-      </button>
-
-      {expanded && parsed.args && (
-        <pre className="text-[11px] leading-relaxed bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-md p-2.5 ml-[22px] mt-1 mb-1.5 overflow-x-auto max-h-48 text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all">
-          {parsed.args}
-        </pre>
-      )}
+        {parsed.type === 'thinking' && <span className="italic text-[11px]">thinking</span>}
+      </div>
     </div>
   );
 });

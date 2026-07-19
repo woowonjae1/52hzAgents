@@ -19,7 +19,7 @@ type EventRecord struct {
 	Metadata        []byte    `gorm:"type:jsonb;column:metadata"`
 	Timestamp       int64     `gorm:"type:bigint;not null;index:idx_events_network_timestamp"`
 	Visibility      string    `gorm:"type:text;default:channel"`
-	CreatedAt       time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt       time.Time `gorm:"autoCreateTime"`
 }
 
 func (EventRecord) TableName() string {
@@ -31,15 +31,15 @@ func (EventRecord) TableName() string {
 // ---------------------------------------------------------------------------
 
 type Workspace struct {
-	ID             string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ID             string    `gorm:"primaryKey;type:uuid"`
 	Slug           string    `gorm:"type:text;unique"`
 	Name           string    `gorm:"type:text;not null"`
 	CreatorEmail   *string   `gorm:"type:text"`
 	PasswordHash   *string   `gorm:"type:text"`
 	Settings       []byte    `gorm:"type:jsonb"`
 	Status         string    `gorm:"type:text;default:active"`
-	CreatedAt      time.Time `gorm:"autoCreateTime;type:timestamptz"`
-	LastActivityAt time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt      time.Time `gorm:"autoCreateTime"`
+	LastActivityAt time.Time `gorm:"autoCreateTime"`
 }
 
 func (Workspace) TableName() string {
@@ -56,10 +56,10 @@ type WorkspaceMember struct {
 	Description      *string    `gorm:"type:text" json:"description"`
 	EnabledSkills    []byte     `gorm:"type:jsonb" json:"enabled_skills"`
 	Status           string     `gorm:"type:text;default:offline" json:"status"`
-	LastHeartbeat    *time.Time `gorm:"type:timestamptz" json:"last_heartbeat"`
-	JoinedAt         time.Time  `gorm:"autoCreateTime;type:timestamptz" json:"joined_at"`
+	LastHeartbeat    *time.Time `gorm:"" json:"last_heartbeat"`
+	JoinedAt         time.Time  `gorm:"autoCreateTime" json:"joined_at"`
 	SessionID        *string    `gorm:"type:text" json:"session_id"`
-	SessionStartedAt *time.Time `gorm:"type:timestamptz" json:"session_started_at"`
+	SessionStartedAt *time.Time `gorm:"" json:"session_started_at"`
 }
 
 func (WorkspaceMember) TableName() string {
@@ -67,7 +67,7 @@ func (WorkspaceMember) TableName() string {
 }
 
 type Channel struct {
-	ID                       string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	ID                       string    `gorm:"primaryKey;type:uuid" json:"id"`
 	WorkspaceID              string    `gorm:"type:uuid;not null;index:uq_channels_ws_name,unique;index:idx_channels_workspace_status" json:"workspace_id"`
 	Name                     string    `gorm:"type:text;not null;index:uq_channels_ws_name,unique" json:"name"`
 	Title                    *string   `gorm:"type:text" json:"title"`
@@ -80,7 +80,7 @@ type Channel struct {
 	Status                   string    `gorm:"type:text;default:active;index:idx_channels_workspace_status;index:idx_channels_status_last_event" json:"status"`
 	Starred                  bool      `gorm:"type:boolean;default:false" json:"starred"`
 	LastEventAt              *int64    `gorm:"type:bigint;index:idx_channels_status_last_event" json:"last_event_at"`
-	CreatedAt                time.Time `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
+	CreatedAt                time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (Channel) TableName() string {
@@ -99,7 +99,7 @@ func (ChannelMember) TableName() string {
 type ChannelHumanMember struct {
 	ChannelID string    `gorm:"primaryKey;type:uuid"`
 	UserEmail string    `gorm:"primaryKey;type:text;index:idx_channel_human_members_email"`
-	JoinedAt  time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	JoinedAt  time.Time `gorm:"autoCreateTime"`
 }
 
 func (ChannelHumanMember) TableName() string {
@@ -107,13 +107,13 @@ func (ChannelHumanMember) TableName() string {
 }
 
 type Invitation struct {
-	ID          string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ID          string    `gorm:"primaryKey;type:uuid"`
 	WorkspaceID string    `gorm:"type:uuid;not null"`
 	TargetAgent string    `gorm:"type:text;not null"`
 	InviteToken string    `gorm:"type:text;not null;unique"`
 	Status      string    `gorm:"type:text;default:pending"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
-	ExpiresAt   time.Time `gorm:"type:timestamptz;not null"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	ExpiresAt   time.Time `gorm:"not null"`
 }
 
 func (Invitation) TableName() string {
@@ -121,12 +121,12 @@ func (Invitation) TableName() string {
 }
 
 type WorkspaceCollaborator struct {
-	ID          string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	ID          string    `gorm:"primaryKey;type:uuid" json:"id"`
 	WorkspaceID string    `gorm:"type:uuid;not null;index:idx_collaborators_workspace;uniqueIndex:uq_collaborator_workspace_email" json:"workspace_id"`
 	Email       string    `gorm:"type:text;not null;index:idx_collaborators_email;uniqueIndex:uq_collaborator_workspace_email" json:"email"`
 	Role        string    `gorm:"type:text;default:editor" json:"role"`
 	AddedBy     *string   `gorm:"type:text" json:"added_by"`
-	AddedAt     time.Time `gorm:"autoCreateTime;type:timestamptz" json:"added_at"`
+	AddedAt     time.Time `gorm:"autoCreateTime" json:"added_at"`
 	DisplayName *string   `gorm:"type:text" json:"display_name"`
 }
 
@@ -149,8 +149,8 @@ type KnowledgeEntry struct {
 	CreatedBy   string    `gorm:"type:text;not null"`
 	UpdatedBy   *string   `gorm:"type:text"`
 	Status      string    `gorm:"type:text;not null;default:active;index:idx_knowledge_workspace_status"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
-	UpdatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `gorm:"autoCreateTime"`
 }
 
 func (KnowledgeEntry) TableName() string {
@@ -171,7 +171,7 @@ type FileRecord struct {
 	UploadedBy  string    `gorm:"type:text;not null" json:"uploaded_by"`
 	ChannelName *string   `gorm:"type:text" json:"channel_name"`
 	Status      string    `gorm:"type:text;not null;default:active;index:idx_files_workspace_status" json:"status"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (FileRecord) TableName() string {
@@ -193,8 +193,8 @@ type BrowserTab struct {
 	ContextID    *string   `gorm:"type:text"`
 	SessionID    *string   `gorm:"type:text"`
 	LiveURL      *string   `gorm:"type:text"`
-	CreatedAt    time.Time `gorm:"autoCreateTime;type:timestamptz"`
-	LastActiveAt time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt    time.Time `gorm:"autoCreateTime"`
+	LastActiveAt time.Time `gorm:"autoCreateTime"`
 }
 
 func (BrowserTab) TableName() string {
@@ -210,8 +210,8 @@ type BrowserContext struct {
 	Status      string    `gorm:"type:text;not null;default:active;index:idx_browser_contexts_workspace_status"`
 	CreatedBy   string    `gorm:"type:text;not null"`
 	SharedWith  []byte    `gorm:"type:jsonb"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
-	LastUsedAt  time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	LastUsedAt  time.Time `gorm:"autoCreateTime"`
 }
 
 func (BrowserContext) TableName() string {
@@ -224,8 +224,8 @@ type BrowserUsage struct {
 	TabID           string     `gorm:"type:text;not null"`
 	SessionID       *string    `gorm:"type:text"`
 	OpenedBy        string     `gorm:"type:text;not null;index:idx_browser_usage_opened_by"`
-	StartedAt       time.Time  `gorm:"autoCreateTime;type:timestamptz;index:idx_browser_usage_started"`
-	EndedAt         *time.Time `gorm:"type:timestamptz"`
+	StartedAt       time.Time  `gorm:"autoCreateTime;index:idx_browser_usage_started"`
+	EndedAt         *time.Time `gorm:""`
 	DurationSeconds *int       `gorm:"type:integer"`
 }
 
@@ -234,14 +234,14 @@ func (BrowserUsage) TableName() string {
 }
 
 type DeviceToken struct {
-	ID          string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	ID          string    `gorm:"primaryKey;type:uuid"`
 	WorkspaceID string    `gorm:"type:uuid;not null;index:idx_device_tokens_workspace;index:idx_device_tokens_workspace_user;uniqueIndex:uq_device_token_workspace_fcm"`
 	FCMToken    string    `gorm:"type:text;not null;uniqueIndex:uq_device_token_workspace_fcm"`
 	DeviceType  string    `gorm:"type:text;not null"`
 	BundleID    *string   `gorm:"type:text"`
 	UserEmail   *string   `gorm:"type:text;index:idx_device_tokens_workspace_user"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
-	LastSeenAt  time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
+	LastSeenAt  time.Time `gorm:"autoCreateTime"`
 }
 
 func (DeviceToken) TableName() string {
@@ -262,8 +262,8 @@ type TodoRecord struct {
 	Content     string    `gorm:"type:text;not null" json:"content"`
 	Status      string    `gorm:"type:text;not null;default:pending" json:"status"`
 	Position    int       `gorm:"type:integer;not null;default:0" json:"position"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz" json:"updated_at"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"autoCreateTime" json:"updated_at"`
 }
 
 func (TodoRecord) TableName() string {
@@ -278,9 +278,9 @@ type TimerRecord struct {
 	CreatedBy    string    `gorm:"type:text;not null" json:"created_by"`
 	Message      string    `gorm:"type:text;not null" json:"message"`
 	DelaySeconds int       `gorm:"type:integer;not null" json:"delay_seconds"`
-	FiresAt      time.Time `gorm:"type:timestamptz;not null;index:idx_timers_fires_at_status" json:"fires_at"`
+	FiresAt      time.Time `gorm:"not null;index:idx_timers_fires_at_status" json:"fires_at"`
 	Status       string    `gorm:"type:text;not null;default:active;index:idx_timers_fires_at_status" json:"status"`
-	CreatedAt    time.Time `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (TimerRecord) TableName() string {
@@ -301,10 +301,10 @@ type RoutineRecord struct {
 	ScheduleDays            []byte     `gorm:"type:jsonb" json:"schedule_days"`
 	ScheduleIntervalMinutes *int       `gorm:"type:integer" json:"schedule_interval_minutes"`
 	Timezone                string     `gorm:"type:text;default:UTC" json:"timezone"`
-	NextFiresAt             time.Time  `gorm:"type:timestamptz;not null;index:idx_routines_next_fires_status" json:"next_fires_at"`
-	LastFiredAt             *time.Time `gorm:"type:timestamptz" json:"last_fired_at"`
+	NextFiresAt             time.Time  `gorm:"not null;index:idx_routines_next_fires_status" json:"next_fires_at"`
+	LastFiredAt             *time.Time `gorm:"" json:"last_fired_at"`
 	Status                  string     `gorm:"type:text;not null;default:active;index:idx_routines_next_fires_status" json:"status"`
-	CreatedAt               time.Time  `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
+	CreatedAt               time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (RoutineRecord) TableName() string {
@@ -327,8 +327,8 @@ type NotificationRecord struct {
 	ThreadID    *string    `gorm:"type:text" json:"thread_id"`
 	LinkURL     *string    `gorm:"type:text" json:"link_url"`
 	Status      string     `gorm:"type:text;not null;default:active;index:idx_notifications_workspace_status" json:"status"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime;type:timestamptz;index:idx_notifications_created_at" json:"created_at"`
-	ReadAt      *time.Time `gorm:"type:timestamptz" json:"read_at"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime;index:idx_notifications_created_at" json:"created_at"`
+	ReadAt      *time.Time `gorm:"" json:"read_at"`
 }
 
 func (NotificationRecord) TableName() string {
@@ -346,7 +346,7 @@ type AgentRuntimeRecord struct {
 	PID           *int      `gorm:"type:integer" json:"pid"`
 	RestartCount  int       `gorm:"type:integer;not null;default:0" json:"restart_count"`
 	LastError     *string   `gorm:"type:text" json:"last_error"`
-	UpdatedAt     time.Time `gorm:"autoUpdateTime;type:timestamptz" json:"updated_at"`
+	UpdatedAt     time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (AgentRuntimeRecord) TableName() string {
@@ -359,7 +359,7 @@ type AgentLogRecord struct {
 	AgentName   string    `gorm:"type:text;not null;index:idx_agent_logs_workspace_agent_created" json:"agent_name"`
 	Level       string    `gorm:"type:text;not null;default:info" json:"level"`
 	Message     string    `gorm:"type:text;not null" json:"message"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz;index:idx_agent_logs_workspace_agent_created" json:"created_at"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;index:idx_agent_logs_workspace_agent_created" json:"created_at"`
 }
 
 func (AgentLogRecord) TableName() string {
@@ -375,8 +375,8 @@ type AgentApprovalRecord struct {
 	Details     []byte     `gorm:"type:jsonb" json:"details"`
 	Status      string     `gorm:"type:text;not null;default:pending;index:idx_agent_approvals_workspace_status" json:"status"`
 	ResolvedBy  *string    `gorm:"type:text" json:"resolved_by"`
-	ResolvedAt  *time.Time `gorm:"type:timestamptz" json:"resolved_at"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
+	ResolvedAt  *time.Time `gorm:"" json:"resolved_at"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 // AuditRecord contains request metadata only. Bodies and credentials are never
@@ -389,7 +389,7 @@ type AuditRecord struct {
 	Path        string    `gorm:"type:text;not null" json:"path"`
 	StatusCode  int       `gorm:"type:integer;not null" json:"status_code"`
 	ClientIP    string    `gorm:"type:text;not null" json:"client_ip"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz;index" json:"created_at"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;index" json:"created_at"`
 }
 
 func (AuditRecord) TableName() string { return "audit_records" }
@@ -414,7 +414,7 @@ type CloudAgentConfig struct {
 	SystemPrompt *string   `gorm:"type:text" json:"system_prompt"`
 	MaxTokens    *int      `gorm:"type:integer" json:"max_tokens"`
 	Status       string    `gorm:"type:text;not null;default:active" json:"status"`
-	CreatedAt    time.Time `gorm:"autoCreateTime;type:timestamptz" json:"created_at"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (CloudAgentConfig) TableName() string {
@@ -435,7 +435,7 @@ type ShareSnapshot struct {
 	ShareToken   string    `gorm:"type:text;not null;unique;index:idx_share_snapshots_token"`
 	MessageCount int       `gorm:"type:integer;not null;default:0"`
 	Status       string    `gorm:"type:text;not null;default:active"`
-	CreatedAt    time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt    time.Time `gorm:"autoCreateTime"`
 }
 
 func (ShareSnapshot) TableName() string {
@@ -450,7 +450,7 @@ type Agent struct {
 	AgentName   string    `gorm:"primaryKey;type:text"`
 	DisplayName *string   `gorm:"type:text"`
 	AgentType   *string   `gorm:"type:text"`
-	CreatedAt   time.Time `gorm:"autoCreateTime;type:timestamptz"`
+	CreatedAt   time.Time `gorm:"autoCreateTime"`
 }
 
 func (Agent) TableName() string {

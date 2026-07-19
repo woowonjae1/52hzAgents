@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { getAgentColor } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { MermaidBlock } from './mermaid-block';
+import { DiffBlock } from './diff-block';
 import { getMermaidSource, hasOpenMermaidFence } from './mermaid-utils';
 import { toast } from 'sonner';
 
@@ -155,6 +156,11 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       const className = codeElement?.props?.className || '';
       const match = /language-(\w+)/.exec(className);
       const language = match ? match[1].toUpperCase() : 'CODE';
+
+      // Fenced ```diff / ```patch → real unified-diff renderer
+      if (language === 'DIFF' || language === 'PATCH') {
+        return <DiffBlock code={String(codeElement?.props?.children ?? '').replace(/\n$/, '')} />;
+      }
 
       return (
         <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 font-mono shadow-sm">

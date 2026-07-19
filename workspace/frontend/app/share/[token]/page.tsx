@@ -2,14 +2,12 @@
 
 import { useEffect, useState, use } from 'react';
 import Image from 'next/image';
-import Avatar from 'boring-avatars';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { Loader2 } from 'lucide-react';
 import type { SharedSnapshotMessage } from '@/lib/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://workspace-endpoint.openagents.org';
-
-const OA_PALETTE = ['#6C5CE7', '#A29BFE', '#74B9FF', '#0984E3', '#00CEC9'];
 
 interface SnapshotData {
   id: string;
@@ -32,11 +30,7 @@ function formatDate(iso: string | null): string {
 }
 
 function SenderAvatar({ name, size = 28 }: { name: string; size?: number }) {
-  return (
-    <div className="rounded-full overflow-hidden shrink-0" style={{ width: size, height: size }}>
-      <Avatar name={name} size={size} variant="beam" colors={OA_PALETTE} />
-    </div>
-  );
+  return <AgentAvatar name={name} size={size} />;
 }
 
 function SharedMessage({ message }: { message: SharedSnapshotMessage }) {
@@ -100,14 +94,14 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
   if (error || !snapshot) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
-        <Image src="/logo-icon.png" alt="OpenAgents" width={40} height={40} />
+        <Image src="/logo-icon.png" alt="52hzAgents" width={40} height={40} />
         <h1 className="text-xl font-semibold">Shared Conversation</h1>
         <p className="text-muted-foreground text-sm max-w-md text-center">{error}</p>
         <a
-          href="https://openagents.org"
+          href="https://github.com/woowonjae1/52hzAgents"
           className="text-sm text-primary hover:underline"
         >
-          Go to OpenAgents
+          Go to 52hzAgents
         </a>
       </div>
     );
@@ -119,14 +113,14 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-icon.png" alt="OpenAgents" width={24} height={24} />
+            <Image src="/logo-icon.png" alt="52hzAgents" width={24} height={24} />
             <span className="text-sm font-medium text-muted-foreground">Shared Conversation</span>
           </div>
           <a
-            href="https://openagents.org"
+            href="https://github.com/woowonjae1/52hzAgents"
             className="text-sm text-primary hover:underline"
           >
-            OpenAgents
+            52hzAgents
           </a>
         </div>
       </header>
@@ -150,14 +144,14 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
       {/* Footer */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 text-center border-t mt-8">
         <p className="text-sm text-muted-foreground mb-3">
-          This is a snapshot of a conversation on OpenAgents.
+          This is a snapshot of a conversation on 52hzAgents Workspace.
         </p>
         <a
-          href="https://openagents.org"
+          href="https://github.com/woowonjae1/52hzAgents"
           className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
         >
           <Image src="/logo-icon.png" alt="" width={16} height={16} />
-          Try OpenAgents
+          Try 52hzAgents Workspace
         </a>
       </div>
     </div>

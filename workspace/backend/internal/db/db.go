@@ -4,10 +4,10 @@ import (
 	"log"
 	"strings"
 
+	"github.com/glebarez/sqlite"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 

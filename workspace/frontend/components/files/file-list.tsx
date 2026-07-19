@@ -10,11 +10,11 @@ import { formatSize, getFileIcon, timeAgo, basename } from './file-utils';
 
 export function FileList() {
   const { files, selectedFileId, setSelectedFileId, uploadFile, deleteFile, currentFilePath } = useWorkspace();
-  const { isMobile, openMobileDetail } = useLayout();
+  const { isMobile, openMobileDetail, setActiveRightTab } = useLayout();
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  
   // Flat list of all files, sorted by most recently modified
   const recentFiles = useMemo(() => {
     // Hide .keep placeholder files
@@ -124,7 +124,11 @@ export function FileList() {
               key={file.id}
               onClick={() => {
                 setSelectedFileId(file.id);
-                if (isMobile) openMobileDetail();
+                if (isMobile) {
+                  openMobileDetail();
+                } else {
+                  setActiveRightTab('file');
+                }
               }}
               className={cn(
                 'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',

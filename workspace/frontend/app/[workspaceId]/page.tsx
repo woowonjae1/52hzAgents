@@ -102,7 +102,7 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
         <div className="flex flex-col items-center gap-2">
           <h1 className="text-xl font-semibold">Sign in to access this workspace</h1>
           <p className="text-muted-foreground text-sm text-center max-w-md">
-            Log in with your OpenAgents account to access workspaces you own, or add a token to the URL.
+            Log in with your 52hzAgents account to access workspaces you own, or add a token to the URL.
           </p>
         </div>
         <button

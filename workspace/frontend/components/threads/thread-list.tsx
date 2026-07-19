@@ -551,7 +551,7 @@ export function ThreadList() {
                           'has-data-[state=open]:bg-zinc-50 dark:has-data-[state=open]:bg-zinc-800/50'
                         )}
                       >
-                        <div className="shrink-0 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 rounded-full size-[30px] bg-white dark:bg-zinc-900">
+                        <div className="shrink-0">
                           <AvatarStack agents={
                             agents.filter((a) => session.participants.includes(a.agentName))
                           } />
