@@ -16,6 +16,19 @@ import { toast } from 'sonner';
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeHighlight];
 
+// Recursively flatten a React children tree to its raw text. rehype-highlight
+// replaces a code block's string child with an array of highlight <span>s, so
+// String(children) would yield "[object Object],…" — walk the tree instead.
+function nodeToText(node: React.ReactNode): string {
+  if (node == null || node === false || node === true) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(nodeToText).join('');
+  if (React.isValidElement(node)) {
+    return nodeToText((node.props as { children?: React.ReactNode }).children);
+  }
+  return '';
+}
+
 interface MarkdownContentProps {
   content: string;
   agentNames: string[];
@@ -159,7 +172,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
       // Fenced ```diff / ```patch → real unified-diff renderer
       if (language === 'DIFF' || language === 'PATCH') {
-        return <DiffBlock code={String(codeElement?.props?.children ?? '').replace(/\n$/, '')} />;
+        return <DiffBlock code={nodeToText(codeElement?.props?.children).replace(/\n$/, '')} />;
       }
 
       return (
@@ -168,9 +181,9 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             <span>{language}</span>
             <button
               onClick={() => {
-                const text = codeElement?.props?.children;
+                const text = nodeToText(codeElement?.props?.children).trim();
                 if (text) {
-                  navigator.clipboard.writeText(String(text).trim());
+                  navigator.clipboard.writeText(text);
                   toast.success('Code copied to clipboard');
                 }
               }}
