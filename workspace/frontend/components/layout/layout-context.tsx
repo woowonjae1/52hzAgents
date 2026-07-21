@@ -11,7 +11,9 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
-export type ViewMode = 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills';
+export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills';
+
+export type RightPanelTab = 'browser' | 'file' | 'radar' | 'terminal' | 'routines' | null;
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -40,6 +42,9 @@ interface LayoutState {
   /** Whether the browser live preview panel is currently showing */
   showBrowserPreview: boolean;
   setShowBrowserPreview: (v: boolean) => void;
+  /** Active right-hand preview panel tab */
+  activeRightTab: RightPanelTab;
+  setActiveRightTab: (tab: RightPanelTab) => void;
   /** Whether the New Thread dialog (agent picker) is open */
   newThreadOpen: boolean;
   setNewThreadOpen: (v: boolean) => void;
@@ -52,7 +57,7 @@ const LayoutContext = createContext<LayoutState | undefined>(undefined);
 export function LayoutProvider({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('threads');
+  const [viewMode, setViewMode] = useState<ViewMode>('mission');
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
@@ -66,7 +71,14 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('x-split-browser', v ? '1' : '0');
   };
 
-  const [showBrowserPreview, setShowBrowserPreview] = useState(false);
+  const [activeRightTab, setActiveRightTab] = useState<RightPanelTab>(null);
+  
+  // Compatibility computed helper
+  const showBrowserPreview = activeRightTab === 'browser';
+  const setShowBrowserPreview = (v: boolean) => {
+    setActiveRightTab(v ? 'browser' : null);
+  };
+
   const [newThreadOpen, setNewThreadOpen] = useState(false);
   const openNewThread = () => setNewThreadOpen(true);
 
@@ -120,6 +132,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setSplitBrowser: handleSetSplitBrowser,
       showBrowserPreview,
       setShowBrowserPreview,
+      activeRightTab,
+      setActiveRightTab,
       newThreadOpen,
       setNewThreadOpen,
       openNewThread,

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile } from './chat-input';
 import { ThreadStatusBar } from './thread-status-bar';
+import { StatusLine } from './status-line';
 import { EmptyState } from './empty-state';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
@@ -18,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
+import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Radar, FileText, PanelLeft, Terminal } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -136,6 +137,10 @@ export function ChatView() {
     setSplitBrowser,
     showBrowserPreview,
     setShowBrowserPreview,
+    activeRightTab,
+    setActiveRightTab,
+    isSidebarOpen,
+    sidebarToggle,
     openNewThread,
     setSelectedAgentName,
   } = useLayout();
@@ -480,25 +485,6 @@ export function ChatView() {
     [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive]
   );
 
-  // Keyboard: press Escape to stop the working agents in the current thread.
-  // Ignored while typing in an input/textarea/contenteditable so it never
-  // hijacks field-level Escape (e.g. cancelling the title edit or the composer).
-  useEffect(() => {
-    if (!currentSessionId) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      const el = document.activeElement as HTMLElement | null;
-      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-      if (typing) return;
-      if (activeSessionIds.has(currentSessionId) && !stoppingSessionIds.has(currentSessionId)) {
-        e.preventDefault();
-        stopAllAgents(currentSessionId);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [currentSessionId, activeSessionIds, stoppingSessionIds, stopAllAgents]);
-
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');
 
   if (!currentSessionId) {
@@ -539,6 +525,16 @@ export function ChatView() {
       {/* Thread header */}
       <div className="flex items-center gap-2 px-3 lg:px-5 py-2.5 lg:py-3.5 border-b border-zinc-200/60 dark:border-zinc-800/60 shrink-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md sticky top-0 z-10">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
+          {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
+          {!isMobile && !isSidebarOpen && (
+            <button
+              onClick={sidebarToggle}
+              className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors shrink-0 -ml-1 cursor-pointer"
+              title="Expand Sidebar"
+            >
+              <PanelLeft className="size-4.5" />
+            </button>
+          )}
           {/* Back button — mobile only */}
           {isMobile && (
             <button
@@ -702,23 +698,10 @@ export function ChatView() {
             <button
               onClick={() => stopAllAgents(currentSessionId!)}
               disabled={stoppingSessionIds.has(currentSessionId)}
-              title="Stop all agents in this thread (Esc)"
               className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
             >
-              {stoppingSessionIds.has(currentSessionId) ? (
-                <>
-                  <Loader2 className="size-3 animate-spin" />
-                  Stopping...
-                </>
-              ) : (
-                <>
-                  <Square className="size-3 fill-current" />
-                  Stop
-                  <kbd className="ml-0.5 hidden lg:inline text-[9px] leading-none font-sans px-1 py-0.5 rounded border border-red-300/60 dark:border-red-800/60 text-red-600/80 dark:text-red-400/80">
-                    Esc
-                  </kbd>
-                </>
-              )}
+              <Square className="size-3 fill-current" />
+              {stoppingSessionIds.has(currentSessionId) ? 'Stopping...' : 'Stop'}
             </button>
           )}
 
@@ -738,23 +721,69 @@ export function ChatView() {
             </Button>
           )}
 
-          {/* Browser live preview toggle */}
+          {/* Right workspace panels toggles (Desktop only) */}
           {!isMobile && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (!splitBrowser) setSplitBrowser(true);
-                setShowBrowserPreview(!(splitBrowser && showBrowserPreview));
-              }}
-              className={cn(
-                'gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
-                splitBrowser && showBrowserPreview && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200/50 dark:border-zinc-700/50'
-              )}
-              title={splitBrowser && showBrowserPreview ? 'Hide browser preview' : 'Show browser preview'}
-            >
-              <Globe className="size-3.5" />
-            </Button>
+            <div className="flex items-center gap-1 border-r border-zinc-200/60 dark:border-zinc-800/60 pr-1.5 mr-0.5">
+              {/* Web Sandbox */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveRightTab(activeRightTab === 'browser' ? null : 'browser')}
+                className={cn(
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
+                  activeRightTab === 'browser' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                )}
+                title="Web Sandbox Preview"
+              >
+                <Globe className="size-3.5" />
+                <span className="text-[10px] hidden xl:inline">Sandbox</span>
+              </Button>
+
+              {/* Sonar Radar */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveRightTab(activeRightTab === 'radar' ? null : 'radar')}
+                className={cn(
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
+                  activeRightTab === 'radar' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                )}
+                title="Sonar Radar Tracker"
+              >
+                <Radar className="size-3.5" />
+                <span className="text-[10px] hidden xl:inline">Radar</span>
+              </Button>
+
+              {/* File Preview */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveRightTab(activeRightTab === 'file' ? null : 'file')}
+                className={cn(
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
+                  activeRightTab === 'file' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                )}
+                title="File Preview"
+              >
+                <FileText className="size-3.5" />
+                <span className="text-[10px] hidden xl:inline">File</span>
+              </Button>
+
+              {/* Terminal Logs */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveRightTab(activeRightTab === 'terminal' ? null : 'terminal')}
+                className={cn(
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
+                  activeRightTab === 'terminal' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                )}
+                title="Terminal Logs Stream"
+              >
+                <Terminal className="size-3.5" />
+                <span className="text-[10px] hidden xl:inline">Terminal</span>
+              </Button>
+            </div>
           )}
 
           {/* Orchestration mode picker — only for multi-agent threads */}
@@ -913,6 +942,9 @@ export function ChatView() {
           />
         )}
       </div>
+
+      {/* Persistent status line — always-on thread context */}
+      {!isDM && currentSessionId && <StatusLine />}
     </div>
   );
 }

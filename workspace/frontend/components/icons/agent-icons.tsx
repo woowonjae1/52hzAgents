@@ -14,7 +14,7 @@ const ICON_BASE = '/icons/agents';
 const NEEDS_BG = new Set([
   'claude', 'codex', 'cline', 'amp', 'goose', 'openclaw', 'copilot',
   'nanoclaw', 'opencode', 'cursor', 'hermes', 'kimi', 'default',
-  'xai', 'replicate', 'elevenlabs', 'manus',
+  'xai', 'replicate', 'elevenlabs', 'manus', 'kilo', 'pi',
 ]);
 
 function IconWrapper({ name, size = 20, className }: { name: string } & IconProps) {
@@ -34,7 +34,12 @@ function IconWrapper({ name, size = 20, className }: { name: string } & IconProp
         width={needsBg ? size - 4 : size}
         height={needsBg ? size - 4 : size}
         onError={(e) => {
-          (e.target as HTMLImageElement).src = `${ICON_BASE}/default.svg`;
+          const img = e.target as HTMLImageElement;
+          if (img.src.includes('.svg')) {
+            img.src = `${ICON_BASE}/${name}.png`;
+          } else if (img.src.includes('.png')) {
+            img.src = `${ICON_BASE}/default.svg`;
+          }
         }}
       />
     </span>

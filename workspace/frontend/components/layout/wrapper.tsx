@@ -18,22 +18,25 @@ import { RoutineList } from '@/components/routines/routine-list';
 import { SkillsView } from '@/components/skills/skills-view';
 import { InboxView } from '@/components/inbox/inbox-view';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
+import { MissionControl } from '@/components/mission/mission-control';
+import { RadarPanel } from '@/components/mission/radar-panel';
 import { useWorkspace } from '@/lib/workspace-context';
 import { EmptyState } from '@/components/chat/empty-state';
+import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 
-import { Network } from 'lucide-react';
+import { Network, X } from 'lucide-react';
 
 function WorkspaceLoadingScreen() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        <div className="size-16 flex items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Network className="size-8" />
+        <div className="size-16 flex items-center justify-center rounded-xl border border-zinc-200/10 dark:border-zinc-800/10 bg-zinc-50 dark:bg-zinc-900 overflow-hidden p-2.5 shadow-md">
+          <img src="/logo-icon.png" alt="52hzAgents Logo" className="w-full h-full object-contain" />
         </div>
         <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight">Workspace</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Loading...</p>
+          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">52hzAgents Workspace</h1>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1.5 font-mono">Syncing soundwave frequencies...</p>
         </div>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
@@ -51,7 +54,7 @@ function WorkspaceLoadingScreen() {
 }
 
 export function Wrapper() {
-  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview } = useLayout();
+  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading } = useWorkspace();
   const hasAgents = agents.length > 0;
 
@@ -66,7 +69,11 @@ export function Wrapper() {
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
           {/* Full-screen views (no list/detail split) */}
-          {!hasAgents && viewMode === 'threads' ? (
+          {viewMode === 'mission' ? (
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+              <MissionControl />
+            </div>
+          ) : !hasAgents && viewMode === 'threads' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <EmptyState />
             </div>
@@ -121,27 +128,24 @@ export function Wrapper() {
     );
   }
 
-  // ── Desktop layout: sidebar + two panes ──
+  // ── Desktop layout: sidebar + center chat + collapsible right preview ──
   return (
     <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 [&_.container-fluid]:px-5">
       {!isDetailExpanded && <Sidebar />}
 
-      <div className="flex flex-col flex-1 min-w-0 w-full">
+      <div className="flex flex-col flex-grow min-w-0 w-full">
         <div className="flex grow min-h-0 overflow-hidden mx-2.5 py-2.5 gap-2.5">
-          {/* Invisible spacer for fixed sidebar */}
+          {/* Invisible spacer for fixed sidebar (260px when open, 0px when closed) */}
           {!isDetailExpanded && (
-            <div
-              className="shrink-0 transition-all duration-300"
-              style={{
-                width: isSidebarOpen
-                  ? 'var(--sidebar-width)'
-                  : 'var(--sidebar-width-collapsed)',
-              }}
+            <div 
+              className="shrink-0 transition-all duration-350" 
+              style={{ width: isSidebarOpen ? '260px' : '0px' }}
             />
           )}
 
-          {/* No agents + threads view: full-width onboarding (no thread list, no message input) */}
+          {/* Dynamic multi-pane grid based on viewMode and activeRightTab */}
           {!hasAgents && viewMode === 'threads' ? (
+            /* No agents + threads view: full-width onboarding */
             <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
               <EmptyState />
             </div>
@@ -153,49 +157,36 @@ export function Wrapper() {
             </div>
           ) : (
             <>
-              {/* Middle pane — thread list or file list
-                  Hidden for: connect view, expanded detail, or when browser preview is active */}
-              {viewMode !== 'connect' && viewMode !== 'tasks' && viewMode !== 'timers' && viewMode !== 'inbox' && viewMode !== 'knowledge' && viewMode !== 'skills' && !isDetailExpanded && !(splitBrowser && showBrowserPreview && viewMode === 'threads') && (
-                <div className="shrink-0 w-[300px] xl:w-[400px] bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
-                  {viewMode === 'threads' && <ThreadList />}
-                  {viewMode === 'files' && <FileList />}
-                  {viewMode === 'browser' && <BrowserTabList />}
-                  {viewMode === 'routines' && <RoutineList />}
-                </div>
-              )}
+              {/* Column 2: Center Chat Workspace (Always Anchor) */}
+              <div className="relative flex-grow flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
+                {viewMode === 'mission' ? (
+                  <MissionControl />
+                ) : viewMode === 'connect' ? (
+                  <ConnectAgentView />
+                ) : (
+                  <main className="h-full" role="content">
+                    <ChatView />
+                  </main>
+                )}
+                {/* Agent profile slide-over panel */}
+                {isAgentPanelOpen && <AgentProfilePanel />}
+              </div>
 
-              {/* Right pane — chat view, file preview, or connect agent */}
-              {viewMode === 'threads' && splitBrowser && showBrowserPreview ? (
-                /* Split view: chat + browser side by side (thread list hidden) */
-                <div className="flex flex-1 min-w-0 gap-2.5">
-                  <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
-                    <main className="h-full" role="content">
-                      <ChatView />
-                    </main>
-                    {isAgentPanelOpen && <AgentProfilePanel />}
-                  </div>
-                  <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
-                    <BrowserView />
-                  </div>
-                </div>
-              ) : (
-                <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
-                  {(viewMode === 'threads' || viewMode === 'routines') && (
-                    <main className="h-full" role="content">
-                      <ChatView />
-                    </main>
-                  )}
-                  {viewMode === 'files' && <FilePreview />}
-                  {viewMode === 'browser' && <BrowserView />}
-                  {viewMode === 'connect' && <ConnectAgentView />}
-                  {viewMode === 'tasks' && <TasksView />}
-                  {viewMode === 'timers' && <TimersView />}
-                  {viewMode === 'inbox' && <InboxView />}
-                  {viewMode === 'skills' && <SkillsView />}
-                  {viewMode === 'knowledge' && <KnowledgeView />}
-
-                  {/* Agent profile slide-over */}
-                  {isAgentPanelOpen && <AgentProfilePanel />}
+              {/* Column 3: Right Collapsible Preview Panel */}
+              {!isDetailExpanded && activeRightTab !== null && viewMode !== 'mission' && viewMode !== 'connect' && (
+                <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
+                  {/* Close button for right panel */}
+                  <button 
+                    onClick={() => setActiveRightTab(null)}
+                    className="absolute top-3 right-3 z-10 size-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                    title="Close preview panel"
+                  >
+                    <X className="size-4" />
+                  </button>
+                  {activeRightTab === 'browser' && <BrowserView />}
+                  {activeRightTab === 'file' && <FilePreview />}
+                  {activeRightTab === 'radar' && <RadarPanel />}
+                  {activeRightTab === 'terminal' && <AgentTerminal />}
                 </div>
               )}
             </>

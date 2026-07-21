@@ -8,12 +8,26 @@ import remarkGfm from 'remark-gfm';
 import { getAgentColor } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
 import { MermaidBlock } from './mermaid-block';
+import { DiffBlock } from './diff-block';
 import { getMermaidSource, hasOpenMermaidFence } from './mermaid-utils';
 import { toast } from 'sonner';
 
 // Stable plugin arrays — avoids re-creating on every render
 const remarkPlugins = [remarkGfm];
 const rehypePlugins = [rehypeHighlight];
+
+// Recursively flatten a React children tree to its raw text. rehype-highlight
+// replaces a code block's string child with an array of highlight <span>s, so
+// String(children) would yield "[object Object],…" — walk the tree instead.
+function nodeToText(node: React.ReactNode): string {
+  if (node == null || node === false || node === true) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(nodeToText).join('');
+  if (React.isValidElement(node)) {
+    return nodeToText((node.props as { children?: React.ReactNode }).children);
+  }
+  return '';
+}
 
 interface MarkdownContentProps {
   content: string;
@@ -156,15 +170,20 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       const match = /language-(\w+)/.exec(className);
       const language = match ? match[1].toUpperCase() : 'CODE';
 
+      // Fenced ```diff / ```patch → real unified-diff renderer
+      if (language === 'DIFF' || language === 'PATCH') {
+        return <DiffBlock code={nodeToText(codeElement?.props?.children).replace(/\n$/, '')} />;
+      }
+
       return (
         <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 font-mono shadow-sm">
           <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-900 bg-zinc-900/60 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
             <span>{language}</span>
             <button
               onClick={() => {
-                const text = codeElement?.props?.children;
+                const text = nodeToText(codeElement?.props?.children).trim();
                 if (text) {
-                  navigator.clipboard.writeText(String(text).trim());
+                  navigator.clipboard.writeText(text);
                   toast.success('Code copied to clipboard');
                 }
               }}

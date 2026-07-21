@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Plus, MessageSquare, FileText, Globe, PlusSquare, Sparkles, BookOpen,
   Settings, Copy, Check, ListTodo, CalendarClock, Timer, Inbox,
-  LogIn, LogOut, Shield, Moon, Sun, KeyRound, X, Crown, Users,
+  LogIn, LogOut, Shield, Moon, Sun, KeyRound, X, Crown, Users, Radar,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,6 +31,12 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { toast } from 'sonner';
 import type { WorkspaceCollaborator } from '@/lib/types';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
+import { ThreadList } from '@/components/threads/thread-list';
+import { FileList } from '@/components/files/file-list';
+import { TasksView } from '@/components/tasks/tasks-view';
+import { KnowledgeView } from '@/components/knowledge/knowledge-view';
+import { RoutineList } from '@/components/routines/routine-list';
+import { SkillsView } from '@/components/skills/skills-view';
 
 // ── Navigation button helper ──
 
@@ -71,13 +77,12 @@ function NavButton({
 // ── Main SidebarContent ──
 
 export function SidebarContent() {
-  const { isSidebarOpen, sidebarToggle, viewMode, setViewMode, setSelectedAgentName, openNewThread } = useLayout();
-  const { agents, sessions, files, browserTabs, workspace, token, refreshWorkspace, todos, timers, routines, knowledge, currentUser, onlineUsers, unreadNotificationCount } = useWorkspace();
-  const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
+  const { viewMode, setViewMode } = useLayout();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [claiming, setClaiming] = useState(false);
+  const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
+  const { token, refreshWorkspace, workspace } = useWorkspace();
   const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -96,278 +101,105 @@ export function SidebarContent() {
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  // Always open the agent picker so the user chooses which agents join the
-  // new session (mirrors the empty-state "New Thread" prompt).
-  const handleNewThread = () => openNewThread();
-
-  // Filter sidebar to only show online + recently-seen agents
-  const recentAgents = useMemo(() => agents.filter(isRecentAgent), [agents]);
-  const onlineCount = agents.filter((a) => a.status === 'online').length;
-  const agentNames = agents.map((a) => a.agentName);
-
-  const isUnclaimed = workspace && !workspace.creatorEmail;
-  const isOwnedByUser = workspace && user && workspace.creatorEmail === user.email;
-
-  const handleClaim = async () => {
-    setClaiming(true);
-    try {
-      await workspaceApi.claimWorkspace();
-      await refreshWorkspace();
-      toast.success('Workspace claimed successfully');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to claim workspace');
-    } finally {
-      setClaiming(false);
-    }
-  };
-
-  // ── Collapsed sidebar ──
-  if (!isSidebarOpen) {
-    return (
-      <div className="flex flex-col h-full min-h-0 bg-zinc-50 dark:bg-zinc-950">
-        <div className="flex justify-center px-2.5 py-2 border-b border-zinc-200/40 dark:border-zinc-800/40">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={handleNewThread}
-                className="size-8.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 flex items-center justify-center transition-colors shadow-xs"
-              >
-                <Plus className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">New Thread</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <div className="flex-1 flex flex-col items-center py-3 gap-2">
-          {recentAgents.map((agent) => (
-            <Tooltip key={agent.agentName}>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => setSelectedAgentName(agent.agentName)}
-                  className="cursor-pointer hover:ring-2 hover:ring-zinc-300 dark:hover:ring-zinc-600 transition-shadow rounded-full"
-                >
-                  <AgentAvatar name={agent.agentName} size={28} status={agent.status} showStatus />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">{agent.agentName}</TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-
-        <div className="px-2.5 py-3 space-y-1">
-          {isOpenAgentsDomain && !user && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={signIn} className="w-full flex items-center justify-center py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                  <LogIn className="size-4 text-muted-foreground" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Sign in</TooltipContent>
-            </Tooltip>
-          )}
-          {isOpenAgentsDomain && user && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={sidebarToggle} className="w-full flex items-center justify-center py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                  <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold">
-                    {user.email[0].toUpperCase()}
-                  </div>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">{user.email}</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button onClick={toggleTheme} className="w-full flex items-center justify-center py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                {isDark ? <Sun className="size-4 text-muted-foreground" /> : <Moon className="size-4 text-muted-foreground" />}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">{isDark ? 'Light mode' : 'Dark mode'}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button onClick={sidebarToggle} className="w-full flex items-center justify-center py-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <Settings className="size-4 text-muted-foreground" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Settings</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Expanded sidebar ──
   return (
-    <>
-      <div className="flex flex-col h-full min-h-0">
-        <ScrollArea className="flex-1 min-h-0">
-          {/* New Thread button */}
-          <div className="px-3.5 pb-4 border-b border-zinc-200/40 dark:border-zinc-800/40 mb-3">
-            <button
-              onClick={handleNewThread}
-              className="w-full h-8.5 flex items-center justify-center gap-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-bold shadow-xs transition-colors"
-            >
-              <Plus className="size-3.5" />
-              <span>New Thread</span>
+    <div className="flex flex-col h-full min-h-0 bg-zinc-50 dark:bg-zinc-950">
+      {/* Category Switcher Row */}
+      <div className="px-3 py-2.5 border-b border-zinc-200/40 dark:border-zinc-800/40 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none bg-zinc-50/50 dark:bg-zinc-950/50">
+        <CategoryTab active={viewMode === 'threads'} label="Chats" onClick={() => setViewMode('threads')} />
+        <CategoryTab active={viewMode === 'files'} label="Files" onClick={() => setViewMode('files')} />
+        <CategoryTab active={viewMode === 'tasks'} label="Tasks" onClick={() => setViewMode('tasks')} />
+        <CategoryTab active={viewMode === 'knowledge'} label="Docs" onClick={() => setViewMode('knowledge')} />
+      </div>
+
+      {/* Explorer List Area */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {viewMode === 'threads' && <ThreadList />}
+        {viewMode === 'files' && <FileList />}
+        {viewMode === 'tasks' && <TasksView />}
+        {viewMode === 'knowledge' && <KnowledgeView />}
+        {viewMode === 'routines' && <RoutineList />}
+        {viewMode === 'skills' && <SkillsView />}
+      </div>
+
+      {/* Bottom control row */}
+      <div className="shrink-0 border-t border-zinc-200/40 dark:border-zinc-800/40 px-3.5 py-3 space-y-2.5 bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-md">
+        {isOpenAgentsDomain && user && (
+          <div className="flex items-center gap-2">
+            <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold shrink-0">
+              {user.email[0].toUpperCase()}
+            </div>
+            <span className="text-[12px] text-muted-foreground truncate flex-1">{user.email}</span>
+            <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer" title="Sign out">
+              <LogOut className="size-3.5" />
             </button>
           </div>
+        )}
 
-          {/* Agents */}
-          <div className="px-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 py-2 mb-0.5">
-              Agents ({onlineCount}/{recentAgents.length})
-            </p>
-            <div className="space-y-0.5 max-h-48 overflow-y-auto">
-              {recentAgents.map((agent) => (
-                <button
-                  key={agent.agentName}
-                  onClick={() => setSelectedAgentName(agent.agentName)}
-                  className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 cursor-pointer group transition-colors"
-                >
-                  <AgentAvatar name={agent.agentName} size={18} status={agent.status} showStatus />
-                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-zinc-50 truncate text-left">
-                    {agent.agentName}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Online Users */}
-            {onlineUsers.length > 0 && (
-              <>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 py-2 mb-0.5 mt-5">
-                  <Users className="size-3 inline-block mr-1 -mt-0.5" />
-                  Online ({onlineUsers.length})
-                </p>
-                <div className="space-y-0.5">
-                  {onlineUsers.map((u) => (
-                    <div
-                      key={u.id}
-                      className="flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-xs text-zinc-600 dark:text-zinc-400 font-medium"
-                    >
-                      <div className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-                      <span className="truncate">
-                        {u.id === currentUser.id ? `${u.name} (you)` : u.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* Collaboration */}
-            <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 px-2.5 py-2 mb-0.5 mt-5">
-              Collaboration
-            </p>
-            <div className="space-y-0.5">
-              <NavButton active={viewMode === 'threads'} icon={<MessageSquare className="size-[15px]" />} label="Threads" count={sessions.filter((s) => !s.sessionId.startsWith('routine:')).length} onClick={() => setViewMode('threads')} />
-              {recentAgents.length > 0 && (
-                <>
-                  <NavButton active={viewMode === 'files'} icon={<FileText className="size-[15px]" />} label="Files" count={files.length} onClick={() => setViewMode('files')} />
-                  <NavButton active={viewMode === 'browser'} icon={<Globe className="size-[15px]" />} label="Browser" count={browserTabs.length} onClick={() => setViewMode('browser')} />
-                  <NavButton active={viewMode === 'routines'} icon={<CalendarClock className="size-[15px]" />} label="Routines" count={routines.filter((r) => r.status === 'active').length} onClick={() => setViewMode('routines')} />
-                  <NavButton active={viewMode === 'timers'} icon={<Timer className="size-[15px]" />} label="Timers" count={timers.filter((timer) => timer.status === 'active').length} onClick={() => setViewMode('timers')} />
-                  <NavButton active={viewMode === 'knowledge'} icon={<BookOpen className="size-[15px]" />} label="Knowledge" count={knowledge.length} onClick={() => setViewMode('knowledge')} />
-                  <NavButton active={viewMode === 'tasks'} icon={<ListTodo className="size-[15px]" />} label="Tasks" count={todos.filter((t) => t.status === 'pending' || t.status === 'in_progress').length} onClick={() => setViewMode('tasks')} />
-                  <NavButton active={viewMode === 'inbox'} icon={<Inbox className="size-[15px]" />} label="Inbox" count={unreadNotificationCount > 0 ? unreadNotificationCount : undefined} onClick={() => setViewMode('inbox')} />
-                  <NavButton active={viewMode === 'skills'} icon={<Sparkles className="size-[15px]" />} label="Skill Hub" onClick={() => setViewMode('skills')} />
-                </>
-              )}
-            </div>
-
-          </div>
-        </ScrollArea>
-
-        {/* Bottom section — pinned to bottom */}
-        <div className="shrink-0 px-2.5 pb-1">
-          {recentAgents.length === 0 ? (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={toggleTheme}
+            className="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+            title={isDark ? 'Light Mode' : 'Dark Mode'}
+          >
+            {isDark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
+          </button>
+          {token && (
             <button
-              onClick={() => setViewMode('connect')}
-              className="w-full flex items-center justify-center gap-1.5 h-8.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-xs font-bold transition-colors"
+              onClick={handleCopyToken}
+              className="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+              title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
             >
-              <PlusSquare className="size-4" />
-              Connect Your First Agent
+              {tokenCopied ? <Check className="size-4.5" /> : <KeyRound className="size-4.5" />}
             </button>
-          ) : (
-            <NavButton active={viewMode === 'connect'} icon={<PlusSquare className="size-[15px]" />} label="Connect Agent" onClick={() => setViewMode('connect')} />
           )}
-        </div>
-        <div className="shrink-0 border-t border-border px-2.5 py-2.5 space-y-1">
-          {/* Logged-in user details */}
-          {isOpenAgentsDomain && user && (
-            <div className="px-2 py-1.5 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold shrink-0">
-                  {user.email[0].toUpperCase()}
-                </div>
-                <span className="text-[12px] text-muted-foreground truncate flex-1">{user.email}</span>
-                <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors" title="Sign out">
-                  <LogOut className="size-3.5" />
-                </button>
-              </div>
-              {isUnclaimed && (
-                <button
-                  onClick={handleClaim}
-                  disabled={claiming}
-                  className="w-full flex items-center justify-center gap-1.5 h-7 rounded-md bg-emerald-600 text-white text-[12px] font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                >
-                  <Shield className="size-3.5" />
-                  {claiming ? 'Claiming...' : 'Claim Workspace'}
-                </button>
-              )}
-              {isOwnedByUser && (
-                <p className="text-[11px] text-emerald-600 flex items-center gap-1 px-0.5">
-                  <Shield className="size-3" /> You own this workspace
-                </p>
-              )}
-            </div>
-          )}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+            title="Settings"
+          >
+            <Settings className="size-4.5" />
+          </button>
 
-          {/* Bottom row: Sign in (left) + icon buttons (right) */}
-          <div className="flex items-center gap-1 px-1">
-            {isOpenAgentsDomain && !user && (
-              <button
-                onClick={signIn}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <LogIn className="size-[15px]" />
-                <span className="text-xs">Sign in</span>
-              </button>
-            )}
-            <div className="flex-1" />
+          <div className="flex-grow" />
+
+          {isOpenAgentsDomain && !user && (
             <button
-              onClick={toggleTheme}
-              className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-              title={isDark ? 'Light Mode' : 'Dark Mode'}
+              onClick={signIn}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             >
-              {isDark ? <Sun className="size-[15px]" /> : <Moon className="size-[15px]" />}
+              <LogIn className="size-3.5" />
+              <span>Sign in</span>
             </button>
-            {token && (
-              <button
-                onClick={handleCopyToken}
-                className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-                title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
-              >
-                {tokenCopied ? <Check className="size-[15px]" /> : <KeyRound className="size-[15px]" />}
-              </button>
-            )}
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-              title="Settings"
-            >
-              <Settings className="size-[15px]" />
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Settings Dialog */}
       <SettingsDialogPortal open={settingsOpen} onOpenChange={setSettingsOpen} workspace={workspace} refreshWorkspace={refreshWorkspace} />
-    </>
+    </div>
+  );
+}
+
+function CategoryTab({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer whitespace-nowrap outline-none border border-transparent',
+        active
+          ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 shadow-xs border-zinc-200/20 dark:border-zinc-800/20'
+          : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900/50'
+      )}
+    >
+      {label}
+    </button>
   );
 }
 

@@ -65,9 +65,9 @@ function LandingPage() {
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-icon.png" alt="OpenAgents" width={28} height={28} className="dark:hidden" />
-            <Image src="/logo-icon.png" alt="OpenAgents" width={28} height={28} className="hidden dark:block" />
-            <span className="font-semibold text-lg">OpenAgents</span>
+            <Image src="/logo-icon.png" alt="52hzAgents" width={28} height={28} className="dark:hidden" />
+            <Image src="/logo-icon.png" alt="52hzAgents" width={28} height={28} className="hidden dark:block" />
+            <span className="font-semibold text-lg">52hzAgents</span>
           </div>
           <div className="flex items-center gap-3">
             <a
@@ -104,7 +104,7 @@ function LandingPage() {
             Your agents, working together
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            OpenAgents connects your AI agents — Claude, Codex, Aider, and more — into
+            52hzAgents connects your AI agents — Claude, Codex, Aider, and more — into
             shared workspaces where they collaborate with each other and with you, in real time.
           </p>
           <div className="max-w-lg mx-auto space-y-3">
@@ -200,7 +200,7 @@ function LandingPage() {
       <section className="py-16 border-t">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
-            Why OpenAgents
+            Why 52hzAgents
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <FeatureCard
@@ -265,24 +265,24 @@ function LandingPage() {
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center space-y-6">
           <h2 className="text-2xl sm:text-3xl font-bold">Ready to get started?</h2>
           <p className="text-muted-foreground">
-            Install OpenAgents and have your first agent running in under a minute.
+            Install 52hzAgents and have your first agent running in under a minute.
           </p>
-          <CodeBlock code={`curl -fsSL https://openagents.org/install.sh | bash\nagn create my-agent --type claude --install && agn up`} className="max-w-xl mx-auto" />
+          <CodeBlock code={`curl -fsSL https://raw.githubusercontent.com/woowonjae1/52hzAgents/main/install.sh | bash\nagn create my-agent --type claude --install && agn up`} className="max-w-xl mx-auto" />
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            <a href="https://openagents.org/docs/getting-started/overview">
+            <a href="https://github.com/woowonjae1/52hzAgents">
               <Button>
                 Read the Docs
                 <ArrowRight className="size-4 ml-1" />
               </Button>
             </a>
-            <a href="https://github.com/openagents-org/openagents">
+            <a href="https://github.com/woowonjae1/52hzAgents">
               <Button variant="outline">
                 View on GitHub
               </Button>
             </a>
-            <a href="https://discord.gg/openagents">
+            <a href="https://github.com/woowonjae1/52hzAgents">
               <Button variant="outline">
-                Join Discord
+                Join Community
               </Button>
             </a>
           </div>
@@ -293,15 +293,13 @@ function LandingPage() {
       <footer className="border-t py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Image src="/logo-icon.png" alt="OpenAgents" width={20} height={20} />
-            <span>OpenAgents</span>
+            <Image src="/logo-icon.png" alt="52hzAgents" width={20} height={20} />
+            <span>52hzAgents</span>
           </div>
           <div className="flex items-center gap-4">
-            <a href="https://openagents.org" className="hover:text-foreground transition-colors">Website</a>
-            <a href="https://openagents.org/docs/getting-started/overview" className="hover:text-foreground transition-colors">Docs</a>
-            <a href="https://github.com/openagents-org/openagents" className="hover:text-foreground transition-colors">GitHub</a>
-            <a href="https://discord.gg/openagents" className="hover:text-foreground transition-colors">Discord</a>
-            <a href="https://twitter.com/OpenAgentsAI" className="hover:text-foreground transition-colors">Twitter</a>
+            <a href="https://github.com/woowonjae1/52hzAgents" className="hover:text-foreground transition-colors">GitHub</a>
+            <a href="https://github.com/woowonjae1/52hzAgents" className="hover:text-foreground transition-colors">Website</a>
+            <a href="https://github.com/woowonjae1/52hzAgents" className="hover:text-foreground transition-colors">Docs</a>
           </div>
         </div>
       </footer>
@@ -489,8 +487,8 @@ function Dashboard() {
       <header className="border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Bot className="size-4 text-zinc-500" />
-            <h1 className="font-bold text-sm tracking-tight">Workspaces</h1>
+            <Image src="/logo-icon.png" alt="52hzAgents" width={18} height={18} />
+            <h1 className="font-bold text-sm tracking-tight">52hzAgents Workspaces</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>

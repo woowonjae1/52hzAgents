@@ -137,6 +137,67 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/cloud-agents", handlers.AddCloudAgent)
 		v1.PATCH("/cloud-agents/:agent_name", handlers.UpdateCloudAgent)
 		v1.DELETE("/cloud-agents/:agent_name", handlers.RemoveCloudAgent)
+
+		// 知识库（共享 Markdown 文档）：
+		v1.POST("/knowledge", handlers.CreateKnowledge)
+		v1.GET("/knowledge", handlers.ListKnowledge)
+		v1.GET("/knowledge/by-slug/:slug", handlers.GetKnowledgeBySlug)
+		v1.GET("/knowledge/:entry_id", handlers.GetKnowledge)
+		v1.PUT("/knowledge/:entry_id", handlers.UpdateKnowledge)
+		v1.DELETE("/knowledge/:entry_id", handlers.DeleteKnowledge)
+
+		// 会话分享（公开快照）：
+		v1.POST("/shares", handlers.CreateShare)
+		v1.GET("/shares", handlers.ListShares)
+		v1.GET("/shares/public/:share_token", handlers.GetPublicShare)
+		v1.DELETE("/shares/:share_id", handlers.DeleteShare)
+
+		// 协作者与成员管理：
+		v1.GET("/workspaces/:workspace_id/collaborators", handlers.ListCollaborators)
+		v1.POST("/workspaces/:workspace_id/collaborators", handlers.AddCollaborator)
+		v1.DELETE("/workspaces/:workspace_id/collaborators/:email", handlers.RemoveCollaborator)
+		v1.PATCH("/workspaces/:workspace_id/members/:agent_name", handlers.UpdateMember)
+		v1.DELETE("/workspaces/:workspace_id/members/:agent_name", handlers.RemoveMember)
+		v1.POST("/workspaces/:workspace_id/members/:agent_name/generate-description", handlers.GenerateMemberDescription)
+
+		// 技能系统（Skill Hub）：
+		v1.GET("/workspaces/skill-catalog", handlers.GetSkillCatalog)
+		v1.POST("/workspaces/:workspace_id/members/:agent_name/skills/install", handlers.InstallSkill)
+		v1.POST("/workspaces/:workspace_id/members/:agent_name/skills/status", handlers.ReportSkillStatus)
+		v1.POST("/workspaces/:workspace_id/members/:agent_name/skills/uninstall", handlers.UninstallSkill)
+		v1.GET("/workspaces/:workspace_id/skills/custom", handlers.ListCustomSkills)
+		v1.POST("/workspaces/:workspace_id/skills/custom", handlers.RegisterCustomSkill)
+
+		// 协同共享浏览器：
+		v1.POST("/browser/tabs", handlers.OpenBrowserTab)
+		v1.GET("/browser/tabs", handlers.ListBrowserTabs)
+		v1.GET("/browser/tabs/:tab_id", handlers.GetBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/navigate", handlers.NavigateBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/reconnect", handlers.ReconnectBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/click", handlers.ClickBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/type", handlers.TypeBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/press_key", handlers.PressKeyBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/evaluate", handlers.EvaluateBrowserTab)
+		v1.GET("/browser/tabs/:tab_id/screenshot", handlers.ScreenshotBrowserTab)
+		v1.GET("/browser/tabs/:tab_id/snapshot", handlers.SnapshotBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/share", handlers.ShareBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/persist", handlers.PersistBrowserTab)
+		v1.POST("/browser/tabs/:tab_id/unpersist", handlers.UnpersistBrowserTab)
+		v1.DELETE("/browser/tabs/:tab_id", handlers.CloseBrowserTab)
+		v1.GET("/browser/contexts", handlers.ListBrowserContexts)
+		v1.DELETE("/browser/contexts/:context_id", handlers.DeleteBrowserContext)
+		v1.GET("/browser/usage", handlers.BrowserUsage)
+
+		// Real Terminal Shell Command Execution:
+		v1.POST("/terminal/execute", handlers.ExecuteTerminalCommand)
+
+		// 补充：输入指示、DM 会话、心跳、成员移除、认领与令牌轮换：
+		v1.POST("/composing", handlers.ComposingSignal)
+		v1.GET("/events/conversations", handlers.ListConversations)
+		v1.POST("/heartbeat", handlers.HeartbeatAgent)
+		v1.POST("/remove", handlers.RemoveAgentFromNetwork)
+		v1.POST("/workspaces/:workspace_id/claim", handlers.ClaimWorkspace)
+		v1.POST("/workspaces/:workspace_id/rotate-token", handlers.RotateWorkspaceToken)
 	} // 结束路由组作用域。
 
 	// Legacy /health endpoint matching the health checks
