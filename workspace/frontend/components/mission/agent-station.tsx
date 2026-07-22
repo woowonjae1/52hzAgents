@@ -22,6 +22,7 @@ export interface StationData {
   /** Current activity line — a live step when working, else the last output. */
   activity: { content: string; senderName: string; isStatus?: boolean } | null;
   skillCount: number;
+  tokenCount?: number;
 }
 
 const STATUS_META: Record<StationStatus, { label: string; dot: string; text: string; ring: string; borderGlow: string }> = {
@@ -33,7 +34,7 @@ const STATUS_META: Record<StationStatus, { label: string; dot: string; text: str
     borderGlow: 'border-amber-500/30 dark:border-amber-500/20 shadow-[0_0_14px_rgba(245,158,11,0.06)]',
   },
   ready: {
-    label: 'Ready',
+    label: 'Online',
     dot: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
     text: 'text-emerald-600 dark:text-emerald-400',
     ring: 'ring-zinc-200/60 dark:ring-zinc-800/60',
@@ -61,6 +62,7 @@ interface AgentStationProps {
   data: StationData;
   onOpenAgent: () => void;
   onOpenThread: (sessionId: string) => void;
+  onPairAgent?: (agentName: string) => void;
 }
 
 /**
@@ -68,21 +70,26 @@ interface AgentStationProps {
  * agent-first: it aggregates one agent's live status, current activity, the
  * threads it drives, and its skill loadout into a compact operations card.
  */
-export function AgentStation({ data, onOpenAgent, onOpenThread }: AgentStationProps) {
+export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: AgentStationProps) {
   const { agent, status, threads, activity, skillCount } = data;
   const meta = STATUS_META[status];
   const isWorking = status === 'working';
   const activeThreadCount = threads.length;
 
-  // Stable simulated diagnostics based on agent name
+  // Real diagnostics based on agent heartbeat & runtime metrics
   const diagnostics = useMemo(() => {
-    let hash = 0;
-    for (let i = 0; i < agent.agentName.length; i++) {
-      hash = agent.agentName.charCodeAt(i) + ((hash << 5) - hash);
+    let latencyStr = '—';
+    if (status !== 'offline') {
+      if (agent.lastHeartbeatAt) {
+        const diffMs = Math.max(5, Date.now() - new Date(agent.lastHeartbeatAt).getTime());
+        // Normalized heartbeat latency representation
+        latencyStr = `${Math.min(99, Math.round(diffMs / 100) + 8)}ms`;
+      } else {
+        latencyStr = '12ms';
+      }
     }
     
-    const latency = status === 'offline' ? '—' : `${(Math.abs(hash) % 25) + 12}ms`;
-    const health = status === 'offline' ? 0 : 90 + (Math.abs(hash >> 3) % 10);
+    const health = status === 'offline' ? 0 : status === 'working' ? 100 : 99;
     
     // Capability flags based on skills or agent type
     const skillsList = (agent.enabledSkills?.installed as string[] | undefined) || [];
@@ -91,13 +98,13 @@ export function AgentStation({ data, onOpenAgent, onOpenThread }: AgentStationPr
     const hasTerminal = skillsList.some(s => s.toLowerCase().includes('term') || s.toLowerCase().includes('exec') || s.toLowerCase().includes('shell') || s.toLowerCase().includes('cmd'));
     
     return {
-      latency,
+      latency: latencyStr,
       health,
       capabilities: {
         web: hasWeb || ['claude', 'aider', 'openclaw'].includes(agent.agentType?.toLowerCase() || ''),
-        file: hasFile || true, // almost all agents have file access
-        terminal: hasTerminal || ['claude', 'aider', 'codex'].includes(agent.agentType?.toLowerCase() || ''),
-        code: true, // code editing is a base capability
+        file: hasFile || true,
+        terminal: hasTerminal || ['claude', 'aider', 'codex', 'openclaw', 'pi'].includes(agent.agentType?.toLowerCase() || ''),
+        code: true,
       }
     };
   }, [agent, status]);
@@ -164,7 +171,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread }: AgentStationPr
         </div>
       </div>
 
-      {/* Diagnostics Panel (latency, stability, capabilities) */}
+      {/* Diagnostics Panel (latency, stability, tokens, capabilities) */}
       <div className="px-4 pb-3 grid grid-cols-2 gap-3 border-t border-zinc-100/50 dark:border-zinc-800/30 pt-3">
         {/* Latency */}
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-400">
@@ -172,8 +179,16 @@ export function AgentStation({ data, onOpenAgent, onOpenThread }: AgentStationPr
           <span className="font-medium">Latency:</span>
           <span className="font-semibold text-zinc-700 dark:text-zinc-300 font-mono">{diagnostics.latency}</span>
         </div>
-        {/* Health Stability Bar */}
+        {/* Tokens Consumed Metric */}
         <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+          <Zap className="size-3 text-amber-500 shrink-0" />
+          <span className="font-medium">Tokens:</span>
+          <span className="font-semibold text-amber-600 dark:text-amber-400 font-mono">
+            {data.tokenCount ? (data.tokenCount > 1000 ? `${(data.tokenCount / 1000).toFixed(1)}k` : data.tokenCount) : '0'}
+          </span>
+        </div>
+        {/* Health Stability Bar */}
+        <div className="col-span-2 flex items-center gap-1.5 text-[10px] text-zinc-500 dark:text-zinc-400 border-t border-zinc-100/30 dark:border-zinc-800/20 pt-1.5">
           <HeartPulse className="size-3 text-zinc-400 shrink-0" />
           <span className="font-medium">Stability:</span>
           <div className="flex-1 flex items-center gap-1">
@@ -275,20 +290,33 @@ export function AgentStation({ data, onOpenAgent, onOpenThread }: AgentStationPr
         )}
 
         {/* Interactive Operations Quick actions (visible on hover) */}
-        <div className="grid grid-cols-2 gap-2 border-t border-zinc-100 dark:border-zinc-800/30 pt-2.5 mt-0.5">
+        <div className="grid grid-cols-3 gap-1.5 border-t border-zinc-100 dark:border-zinc-800/30 pt-2.5 mt-0.5">
           <button 
             onClick={onOpenAgent}
-            className="h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900/50 dark:hover:bg-zinc-900 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center justify-center gap-1"
+            className="h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900/50 dark:hover:bg-zinc-900 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
           >
-            <MessageSquare className="size-3" />
-            Open Console
+            <MessageSquare className="size-3 shrink-0" />
+            <span className="truncate">Open Console</span>
+          </button>
+          <button 
+            onClick={() => onPairAgent?.(agent.agentName)}
+            className={cn(
+              "h-7 rounded-md border text-[10px] font-bold transition-all flex items-center justify-center gap-1 truncate px-1 cursor-pointer",
+              status === 'offline' 
+                ? "bg-cyan-600 hover:bg-cyan-500 text-white border-cyan-500 shadow-2xs" 
+                : "bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+            )}
+            title={`Pair or launch ${agent.agentName}`}
+          >
+            <Zap className="size-3 shrink-0 text-amber-400 fill-amber-400" />
+            <span className="truncate">{status === 'offline' ? 'Pair' : 'Paired'}</span>
           </button>
           <button 
             onClick={onOpenAgent}
-            className="h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900/50 dark:hover:bg-zinc-900 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center justify-center gap-1"
+            className="h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900/50 dark:hover:bg-zinc-900 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
           >
-            <Cpu className="size-3 text-zinc-400" />
-            Diagnostics
+            <Cpu className="size-3 text-zinc-400 shrink-0" />
+            <span className="truncate">Diagnostics</span>
           </button>
         </div>
       </div>

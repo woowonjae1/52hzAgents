@@ -60,7 +60,7 @@ Set-Location -LiteralPath '$backendPath'
 `$env:CGO_ENABLED = '0'
 `$env:DATABASE_URL = 'sqlite://$dbPath'
 `$env:AUTH_MODE = 'workspace_token'
-`$env:CORS_ORIGINS = 'http://localhost:3000'
+`$env:CORS_ORIGINS = '*'
 `$env:FILE_STORAGE_PATH = '$filesPath'
 `$env:REQUESTS_PER_MINUTE = '100000'
 `$env:ROUTER_LLM_ENABLED = 'false'
@@ -70,7 +70,7 @@ Set-Location -LiteralPath '$backendPath'
 $frontendCmd = @"
 Set-Location -LiteralPath '$frontendPath'
 `$env:NEXT_PUBLIC_API_URL = 'http://localhost:8000'
-& '$frontendPath\node_modules\.bin\next.cmd' dev -p 3000 *>> '$frontendLog'
+& '$frontendPath\node_modules\.bin\next.cmd' dev -p 3005 *>> '$frontendLog'
 "@
 
 $backend = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $backendCmd) -WindowStyle Hidden -PassThru
@@ -93,14 +93,14 @@ if (-not (Wait-Http 'http://localhost:8000/v1/health' 150)) {
     Stop-Managed; throw "Backend did not become ready. See $backendLog"
 }
 Write-Host 'Backend ready on http://localhost:8000' -ForegroundColor Green
-if (-not (Wait-Http 'http://localhost:3000/' 90)) {
+if (-not (Wait-Http 'http://localhost:3005/' 90)) {
     Write-Host "Frontend still starting — check $frontendLog" -ForegroundColor Yellow
 } else {
-    Write-Host 'Frontend ready on http://localhost:3000' -ForegroundColor Green
+    Write-Host 'Frontend ready on http://localhost:3005' -ForegroundColor Green
 }
 Write-Host ''
 Write-Host 'Local dev is up:' -ForegroundColor Green
-Write-Host '  Frontend: http://localhost:3000'
+Write-Host '  Frontend: http://localhost:3005'
 Write-Host '  Backend:  http://localhost:8000/v1/health'
 Write-Host "  Data/logs: $runtimePath"
 Write-Host 'Stop with: .\workspace\dev-sqlite.ps1 -Stop'

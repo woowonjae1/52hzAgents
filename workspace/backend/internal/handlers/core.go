@@ -2,14 +2,20 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
 )
 
@@ -318,9 +324,6 @@ func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64
 			}
 			if routed {
 				req.Metadata["target_agents"] = targets
-				// Preserve the original convenience: a human can mention a known
-				// local agent that was not yet a channel member, and the selected
-				// agent is added so subsequent polling can receive the thread.
 				if isHumanSource(req.Source) && !strings.HasPrefix(channel.Name, "routines:") {
 					for _, target := range targets {
 						if target != noResponseAgent {
@@ -331,5 +334,197 @@ func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64
 			}
 		}
 	}
+
+	if contentStr, ok := req.Payload["content"].(string); ok && contentStr != "" {
+		autoMaterializeMessageFiles(workspaceID, contentStr)
+	}
+
 	return nil
+}
+
+func autoMaterializeMessageFiles(workspaceID string, content string) {
+	if content == "" {
+		return
+	}
+
+	var filenames []string
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		if strings.Contains(line, ".md") || strings.Contains(line, ".py") || strings.Contains(line, ".csv") || strings.Contains(line, ".txt") || strings.Contains(line, ".json") {
+			words := strings.Fields(line)
+			for _, w := range words {
+				wClean := strings.Trim(w, " `\"'()[]:→,")
+				if strings.HasSuffix(wClean, ".md") || strings.HasSuffix(wClean, ".py") || strings.HasSuffix(wClean, ".csv") || strings.HasSuffix(wClean, ".txt") || strings.HasSuffix(wClean, ".json") {
+					if len(wClean) > 3 && !strings.Contains(wClean, "/") && !strings.Contains(wClean, "\\") {
+						filenames = append(filenames, wClean)
+					}
+				}
+			}
+		}
+	}
+
+	if len(filenames) == 0 {
+		return
+	}
+
+	basePath := config.GlobalConfig.FileStoragePath
+	wsDir := filepath.Join(basePath, workspaceID)
+	_ = os.MkdirAll(wsDir, 0755)
+
+	for _, fname := range filenames {
+		var count int64
+		db.DB.Model(&models.FileRecord{}).Where("workspace_id = ? AND filename = ?", workspaceID, fname).Count(&count)
+		if count == 0 {
+			filePath := filepath.Join(wsDir, fname)
+			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+				_ = os.WriteFile(filePath, []byte(content), 0644)
+			}
+
+			info, _ := os.Stat(filePath)
+			sizeVal := len(content)
+			if info != nil {
+				sizeVal = int(info.Size())
+			}
+
+			storageKey := fmt.Sprintf("%s/%s", workspaceID, fname)
+			cType := "application/octet-stream"
+			if strings.HasSuffix(fname, ".md") || strings.HasSuffix(fname, ".txt") {
+				cType = "text/markdown; charset=utf-8"
+			}
+			db.DB.Create(&models.FileRecord{
+				ID:          uuid.New().String(),
+				WorkspaceID: workspaceID,
+				Filename:    fname,
+				ContentType: cType,
+				Size:        sizeVal,
+				StorageKey:  storageKey,
+				UploadedBy:  "openagents:agent",
+				ChannelName: nil,
+				Status:      "active",
+				CreatedAt:   time.Now(),
+			})
+		}
+	}
+}
+
+func LaunchAgent(c *gin.Context) {
+	agentName := c.Param("agent_name")
+	network := c.Query("network")
+	if network == "" {
+		network = c.PostForm("network")
+	}
+	workspace, err := resolveWorkspace(network)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+
+	lowerName := strings.ToLower(agentName)
+	var execErr error
+
+	// Determine correct Windows CMD launcher syntax (cmd /k handles || fallback natively without PowerShell syntax errors)
+	var runCmd *exec.Cmd
+	switch {
+	case strings.Contains(lowerName, "claude"):
+		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "claude || npx -y @anthropic-ai/claude-code")
+	case strings.Contains(lowerName, "codex"):
+		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "codex || npx -y codex")
+	case strings.Contains(lowerName, "cline"):
+		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "cline || npx -y cline")
+	case strings.Contains(lowerName, "hermes"):
+		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "hermes || npx -y hermes")
+	case strings.Contains(lowerName, "kilo"):
+		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "kilo || npx -y kilo")
+	case strings.Contains(lowerName, "aider"):
+		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "aider || npx -y aider")
+	default:
+		connectorPath := filepath.Join("D:\\code\\wwj-agent-launcher", "bin", "agent-connector.js")
+		if _, err := os.Stat(connectorPath); err == nil {
+			runCmd = exec.Command("node", connectorPath, "up", "--foreground")
+			runCmd.Dir = "D:\\code\\wwj-agent-launcher"
+		} else {
+			runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", fmt.Sprintf("node bin/agent-connector.js connect --agent=%s", agentName))
+		}
+	}
+
+	if runCmd != nil {
+		execErr = runCmd.Start()
+	}
+
+	if execErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to launch agent process: %v", execErr)})
+		return
+	}
+
+	// Process launched successfully -> update database state to online
+	var member models.WorkspaceMember
+	err = db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).First(&member).Error
+	nowTime := time.Now()
+	agentTypeStr := strings.ToUpper(agentName)
+	if strings.Contains(agentName, "-") {
+		parts := strings.Split(agentName, "-")
+		agentTypeStr = strings.ToUpper(parts[0])
+	}
+	hostStr := "localhost"
+	dirStr := workspace.ID
+	descStr := fmt.Sprintf("Auto-launched %s agent runtime", agentName)
+
+	if err != nil {
+		member = models.WorkspaceMember{
+			WorkspaceID:   workspace.ID,
+			AgentName:     agentName,
+			Role:          "worker",
+			AgentType:     &agentTypeStr,
+			ServerHost:    &hostStr,
+			WorkingDir:    &dirStr,
+			Description:   &descStr,
+			EnabledSkills: []byte(`{"installed":["web_search","file_ops","terminal_exec","code_edit"]}`),
+			Status:        "online",
+			LastHeartbeat: &nowTime,
+			JoinedAt:      nowTime,
+		}
+		db.DB.Create(&member)
+	} else {
+		db.DB.Model(&member).Updates(map[string]interface{}{
+			"status":         "online",
+			"last_heartbeat": nowTime,
+			"agent_type":     agentTypeStr,
+		})
+	}
+
+	payloadBytes, _ := json.Marshal(gin.H{"agent_name": agentName, "status": "online", "action": "launched"})
+	metaBytes, _ := json.Marshal(gin.H{})
+	eventID := uuid.New().String()
+	nowMs := time.Now().UnixMilli()
+
+	record := models.EventRecord{
+		ID:        eventID,
+		NetworkID: workspace.ID,
+		Type:      "workspace.agent.control",
+		Source:    "system:launcher",
+		Target:    "openagents:" + agentName,
+		Payload:   payloadBytes,
+		Metadata:  metaBytes,
+		Timestamp: nowMs,
+		CreatedAt: time.Now(),
+	}
+	db.DB.Create(&record)
+
+	fullBytes, _ := json.Marshal(gin.H{
+		"id":        eventID,
+		"network":   workspace.ID,
+		"type":      "workspace.agent.control",
+		"source":    "system:launcher",
+		"target":    "openagents:" + agentName,
+		"payload":   gin.H{"agent_name": agentName, "status": "online", "action": "launched"},
+		"timestamp": nowMs,
+	})
+
+	hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+		WorkspaceID: workspace.ID,
+		ChannelName: "core",
+		Payload:     string(fullBytes),
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "Agent launched successfully", "agent_name": agentName, "status": "online"})
 }

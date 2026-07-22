@@ -55,10 +55,15 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
 }
 
 // Stable key for a group
-function groupKey(group: MessageGroup): string {
-  if (group.type === 'chat') return group.message.messageId;
-  if (group.type === 'thinking') return `thinking-${group.messages[0].messageId}`;
-  return `steps-${group.messages[0].messageId}`;
+function groupKey(group: MessageGroup, index: number): string {
+  if (group.type === 'chat') {
+    return group.message.messageId ? `chat-${group.message.messageId}` : `chat-idx-${index}`;
+  }
+  const firstId = group.messages[0]?.messageId;
+  if (group.type === 'thinking') {
+    return firstId ? `thinking-${firstId}-${index}` : `thinking-idx-${index}`;
+  }
+  return firstId ? `steps-${firstId}-${index}` : `steps-idx-${index}`;
 }
 
 function isTerminalStatus(msg: WorkspaceMessage) {
@@ -212,7 +217,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     estimateSize: () => 80, // rough estimate; dynamic measurement corrects it
     overscan: 10,
     getItemKey: (index) => {
-      if (index < groups.length) return groupKey(groups[index]);
+      if (index < groups.length) return groupKey(groups[index], index);
       return 'loading-indicator';
     },
   });
@@ -437,7 +442,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
             const group = groups[index];
             return (
               <div
-                key={groupKey(group)}
+                key={groupKey(group, index)}
                 ref={virtualizer.measureElement}
                 data-index={index}
                 style={{

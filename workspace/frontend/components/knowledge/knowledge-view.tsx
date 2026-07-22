@@ -21,7 +21,7 @@ function timeAgo(dateStr: string | null): string {
   return `${days}d ago`;
 }
 
-export function KnowledgeView() {
+export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }) {
   const { knowledge, refreshKnowledge, deleteKnowledge, agents } = useWorkspace();
   const { isMobile } = useLayout();
   const agentNames = agents.map((a) => a.agentName);
@@ -119,7 +119,7 @@ export function KnowledgeView() {
 
       <div className="flex-1 overflow-y-auto">
         {knowledge.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 p-4 text-center">
             <BookOpen className="size-8 opacity-30" />
             <p className="text-sm">No knowledge entries yet</p>
             <p className="text-xs opacity-60">Create shared knowledge for your agents</p>
@@ -188,6 +188,10 @@ export function KnowledgeView() {
     </div>
   );
 
+  if (sidebarOnly) {
+    return EntryList;
+  }
+
   // Detail component
   const EntryDetail = selectedEntry ? (
     <div className="h-full flex flex-col">
@@ -243,7 +247,7 @@ export function KnowledgeView() {
 
   // Desktop: split view
   return (
-    <div className="h-full flex">
+    <div className="h-full flex w-full">
       <div className="w-[300px] xl:w-[360px] shrink-0 border-r border-border overflow-hidden">
         {EntryList}
       </div>

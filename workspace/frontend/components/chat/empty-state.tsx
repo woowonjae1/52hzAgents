@@ -11,6 +11,90 @@ import { AgentIcon } from '@/components/icons/agent-icons';
 import { cn } from '@/lib/utils';
 import type { AgentCatalogEntry } from '@/lib/types';
 
+const DEFAULT_CATALOG: AgentCatalogEntry[] = [
+  {
+    name: 'claude',
+    label: 'Claude Code',
+    description: "Anthropic's official terminal agent for code generation and shell execution.",
+    install_command: 'agn install claude',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'openclaw',
+    label: 'OpenClaw',
+    description: 'A community-driven coding agent with autonomous task execution capabilities.',
+    install_command: 'agn install openclaw',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'codex',
+    label: 'Codex CLI',
+    description: 'OpenAI Codex terminal assistant for natural language shell scripting.',
+    install_command: 'agn install codex',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'aider',
+    label: 'Aider',
+    description: 'A developer-focused command line tool for coding with LLMs in git repositories.',
+    install_command: 'agn install aider',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'goose',
+    label: 'Goose',
+    description: "Block's open-source tool-using agent specialized in coding tasks.",
+    install_command: 'agn install goose',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'cline',
+    label: 'Cline',
+    description: 'An autonomous developer agent that can run commands, edit files, and build apps.',
+    install_command: 'agn install cline',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'hermes',
+    label: 'Hermes',
+    description: 'A fast and lightweight agent built for rapid software maintenance.',
+    install_command: 'agn install hermes',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'pi',
+    label: 'Pi Agent',
+    description: 'Mathematical and reasoning agent tailored for algorithmic tasks and workflows.',
+    install_command: 'wwj create pi --type pi',
+    homepage: 'https://openagents.org',
+    tags: ['coding', 'reasoning', 'cli'],
+    builtin: true,
+  },
+  {
+    name: 'custom',
+    label: 'Custom',
+    description: 'Connect any process using stdin/stdout framing or standard MCP tools.',
+    install_command: 'wwj create my-agent --type custom',
+    homepage: 'https://openagents.org',
+    tags: ['custom'],
+    builtin: true,
+  },
+];
+
 export function EmptyState() {
   const { agents, token } = useWorkspace();
   const { setViewMode } = useLayout();
@@ -29,13 +113,21 @@ export function EmptyState() {
       .getAgentCatalog()
       .then((entries) => {
         if (!cancelled) {
-          setCatalog(entries);
-          if (entries.length > 0 && !selectedAgent) {
-            setSelectedAgent(entries[0].name);
+          const validEntries = entries && entries.length > 0 ? entries : DEFAULT_CATALOG;
+          setCatalog(validEntries);
+          if (validEntries.length > 0 && !selectedAgent) {
+            setSelectedAgent(validEntries[0].name);
           }
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) {
+          setCatalog(DEFAULT_CATALOG);
+          if (!selectedAgent) {
+            setSelectedAgent(DEFAULT_CATALOG[0].name);
+          }
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [token, selectedAgent]);

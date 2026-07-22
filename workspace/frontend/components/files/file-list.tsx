@@ -66,7 +66,7 @@ export function FileList() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-1 px-2 py-3 shrink-0">
+      <div className="flex items-center gap-1 px-2 py-3 shrink-0 pr-12">
         <div className="flex items-center w-full gap-1">
           <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-muted/50 border border-input text-muted-foreground">
             <Search className="size-3.5" />

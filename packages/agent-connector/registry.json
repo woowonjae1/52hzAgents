@@ -930,5 +930,45 @@
       ],
       "not_ready_message": "mini-SWE-agent CLI detected. Configure a model through environment variables (MSWEA_MODEL_NAME + a provider key), a full config file (MSWEA_MINI_CONFIG_PATH), or the Model field before running a task."
     }
+  },
+  {
+    "name": "pi",
+    "label": "Pi Agent",
+    "description": "Mathematical and reasoning agent tailored for algorithmic tasks.",
+    "homepage": "https://openagents.org",
+    "tags": ["coding", "reasoning", "cli"],
+    "builtin": true,
+    "support": { "install": true, "workspace": true, "collaboration": true },
+    "install": {
+      "binary": "pi",
+      "api_only": true
+    },
+    "adapter": {
+      "module": "openagents.adapters.openclaw",
+      "class": "OpenClawAdapter"
+    },
+    "launch": {
+      "args": []
+    }
+  },
+  {
+    "name": "custom",
+    "label": "Custom Agent",
+    "description": "Custom agent process connected via stdin/stdout or WebSocket framing.",
+    "homepage": "https://openagents.org",
+    "tags": ["custom"],
+    "builtin": true,
+    "support": { "install": true, "workspace": true, "collaboration": true },
+    "install": {
+      "binary": "custom",
+      "api_only": true
+    },
+    "adapter": {
+      "module": "openagents.adapters.openclaw",
+      "class": "OpenClawAdapter"
+    },
+    "launch": {
+      "args": []
+    }
   }
 ]

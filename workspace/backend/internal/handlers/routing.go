@@ -170,7 +170,7 @@ func valueOrEmpty(value *string) string {
 
 func fallbackTargets(source string, master *string, participants []string, online map[string]bool, mentions []string) []string {
 	if len(mentions) > 0 {
-		return []string{mentions[0]}
+		return mentions
 	}
 	sender := agentNameFromSource(source)
 	if master != nil && *master != "" {
@@ -194,16 +194,17 @@ func fallbackTargets(source string, master *string, participants []string, onlin
 
 func masterTargets(source, master string, participants, mentions []string) []string {
 	if !isAgentSource(source) {
+		if len(mentions) > 0 {
+			return mentions
+		}
 		return []string{master}
 	}
 	sender := agentNameFromSource(source)
 	if sender != master {
 		return []string{master}
 	}
-	for _, mention := range mentions {
-		if mention != master {
-			return []string{mention}
-		}
+	if len(mentions) > 0 {
+		return mentions
 	}
 	return nil
 }

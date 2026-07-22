@@ -65,12 +65,18 @@ func hashWorkspaceToken(token string) string {
 // resolveWorkspace 通过 Network 的 ID 或 Slug 检索对应工作区实体。
 func resolveWorkspace(network string) (*models.Workspace, error) {
 	var ws models.Workspace // 声明 workspace 结构体。
-	// 通过 GORM 查询 ID 等于给定参数或 Slug 等于给定参数的第一条匹配记录。
-	err := db.DB.Where("id = ? OR slug = ?", network, network).First(&ws).Error
-	if err != nil {
-		return nil, err // 若查询失败（如未找到），返回数据库底层错误。
+	if network != "" {
+		err := db.DB.Where("id = ? OR slug = ?", network, network).First(&ws).Error
+		if err == nil {
+			return &ws, nil
+		}
 	}
-	return &ws, nil // 查询成功，返回工作区记录指针。
+	// 容错回退：检索数据库中创建最早的活跃工作区实体
+	err := db.DB.Where("status = ?", "active").Order("created_at asc").First(&ws).Error
+	if err == nil {
+		return &ws, nil
+	}
+	return nil, err
 }
 
 // SendEvent 处理 POST /v1/events 接口，将事件持久化并广播分发。

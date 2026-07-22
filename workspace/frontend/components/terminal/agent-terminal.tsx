@@ -232,7 +232,7 @@ export function AgentTerminal() {
       `}</style>
 
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between px-3.5 h-11 shrink-0 border-b border-zinc-800/70 bg-zinc-900/40 backdrop-blur-md select-none">
+      <div className="relative z-10 flex items-center justify-between pl-3.5 pr-12 h-11 shrink-0 border-b border-zinc-800/70 bg-zinc-900/40 backdrop-blur-md select-none">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-full bg-[#ff5f57]" />

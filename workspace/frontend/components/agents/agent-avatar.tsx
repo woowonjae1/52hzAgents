@@ -6,9 +6,11 @@ const OA_PALETTE = ['#6366F1', '#8B5CF6', '#06B6D4', '#10B981', '#F59E0B'];
 const KNOWN_AGENTS = [
   'aider', 'amp', 'anthropic', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor', 
   'custom', 'deepseek', 'elevenlabs', 'fal', 'fireworks', 'gemini', 'google', 'goose', 'groq', 
-  'hermes', 'kimi', 'manus', 'mistral', 'nanoclaw', 'openai', 'openclaw', 'opencode', 'openrouter', 
-  'perplexity', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
+  'hermes', 'kilo', 'kimi', 'manus', 'mistral', 'nanoclaw', 'openai', 'openclaw', 'opencode', 'openrouter', 
+  'perplexity', 'pi', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
 ];
+
+const PNG_AGENTS = ['cline', 'hermes', 'kilo', 'pi'];
 
 interface AgentAvatarProps {
   name: string;
@@ -24,6 +26,7 @@ export function AgentAvatar({ name, size = 28, status, showStatus = false, class
   
   // Find matching agent keyword
   const matchedAgent = KNOWN_AGENTS.find(k => lowercaseName.includes(k));
+  const isPng = matchedAgent ? PNG_AGENTS.includes(matchedAgent) : false;
   const isOffline = status === 'offline';
 
   return (
@@ -47,9 +50,9 @@ export function AgentAvatar({ name, size = 28, status, showStatus = false, class
       >
         {matchedAgent ? (
           <img 
-            src={`/icons/agents/${matchedAgent}.svg`} 
+            src={`/icons/agents/${matchedAgent}.${isPng ? 'png' : 'svg'}`} 
             alt={name} 
-            className="w-full h-full object-contain p-1.5 animate-[fadeIn_0.3s_ease-out]" 
+            className="w-full h-full object-contain p-1 animate-[fadeIn_0.3s_ease-out]" 
           />
         ) : (
           <Avatar name={name} size={size} variant="beam" colors={OA_PALETTE} square={square} />

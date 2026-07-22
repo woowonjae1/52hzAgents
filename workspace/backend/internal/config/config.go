@@ -130,9 +130,12 @@ func (c *Config) IsAllowedOrigin(origin string) bool {
 		return true
 	}
 	for _, allowed := range c.CORSOrigins {
-		if origin == allowed {
+		if allowed == "*" || origin == allowed {
 			return true
 		}
+	}
+	if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") || strings.HasPrefix(origin, "https://localhost:") {
+		return true
 	}
 	return false
 }

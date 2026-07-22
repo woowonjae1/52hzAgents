@@ -336,8 +336,8 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
                 </span>
               </div>
             )}
-            {group.steps.map((step) => (
-              <StepItem key={step.messageId} message={step} />
+            {group.steps.map((step, stepIdx) => (
+              <StepItem key={`${step.messageId || 'step'}-${stepIdx}`} message={step} />
             ))}
           </div>
         ))}

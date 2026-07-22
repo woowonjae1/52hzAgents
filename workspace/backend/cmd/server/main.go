@@ -96,6 +96,7 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/presence", handlers.UpdatePresence) // Agent 定时在线心跳保活接口。
 		v1.GET("/discover", handlers.DiscoverNetwork)
 		v1.GET("/profile", handlers.NetworkProfile)
+		v1.POST("/agents/:agent_name/launch", handlers.LaunchAgent)
 
 		// 注册共享文件管理接口：
 		v1.POST("/files", handlers.UploadFileMultipart)      // multipart/form-data 文件上传。

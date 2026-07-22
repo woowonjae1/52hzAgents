@@ -26,7 +26,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
-import { eventToMessage } from '@/lib/types';
+import { eventToMessage } from '@/lib/types'; 
 import type { WorkspaceMessage } from '@/lib/types';
 
 // Module-level message cache — survives component re-renders/unmounts.
@@ -127,12 +127,13 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, sessions, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
   const [showCreateRoutine, setShowCreateRoutine] = useState(false);
   const {
     isMobile,
     openMobileList,
     viewMode,
+    setViewMode,
     splitBrowser,
     setSplitBrowser,
     showBrowserPreview,
@@ -535,15 +536,18 @@ export function ChatView() {
               <PanelLeft className="size-4.5" />
             </button>
           )}
-          {/* Back button — mobile only */}
-          {isMobile && (
-            <button
-              onClick={openMobileList}
-              className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 -ml-1"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-          )}
+          {/* Return to Mission Control / Home Dashboard button */}
+          <button
+            onClick={() => {
+              setCurrentSessionId(null);
+              setViewMode('mission');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors shrink-0 -ml-1 cursor-pointer border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xs"
+            title="Return to Mission Control Home Surface"
+          >
+            <ChevronLeft className="size-3.5 text-cyan-500 shrink-0" />
+            <span className="text-[11px] font-bold">Mission Control</span>
+          </button>
           {isDM ? (
             <h2 className="text-xs font-bold tracking-tight truncate flex items-center gap-1.5 text-zinc-900 dark:text-zinc-50">
               <MessageSquare className="size-3.5 text-zinc-400" />

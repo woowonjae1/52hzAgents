@@ -158,7 +158,7 @@ export function FileGrid() {
       onDrop={handleDrop}
     >
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0">
+      <div className="flex items-center gap-2 px-4 py-3 border-b shrink-0 pr-12">
         {/* Breadcrumbs */}
         <div className="flex items-center gap-0.5 text-sm text-muted-foreground min-w-0 flex-1 overflow-x-auto">
           <button

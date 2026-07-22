@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, User, FileIcon, Download, Eye } from 'lucide-react';
+import { Copy, Check, User, FileIcon, Download, Eye, GitBranch } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
@@ -17,14 +17,6 @@ interface Attachment {
   filename: string;
   contentType: string;
   url: string;
-}
-
-function humanColor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
-  }
-  return `hsl(${hash % 360} 55% 82%)`;
 }
 
 function isPreviewable(contentType: string, filename: string): boolean {
@@ -46,7 +38,6 @@ function Attachments({ items }: { items: Attachment[] }) {
     setViewMode('files');
   }, [setSelectedFileId, setViewMode]);
 
-  // Regenerate URLs from fileId to ensure they include current auth token
   const fixedItems = useMemo(() =>
     items.map((a) => ({ ...a, url: workspaceApi.getFileUrl(a.fileId) })),
     [items]
@@ -209,7 +200,6 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     }
   };
 
-  // Status messages — subtle inline
   if (isSystem) {
     const isQueued = message.content.includes('queued');
     return (
@@ -226,7 +216,6 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── Human message — inline style ──
   if (isHuman) {
     const isCurrentUser = !!message.senderId && message.senderId === currentUser.id;
     const displayName = isCurrentUser
@@ -270,9 +259,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── Agent message — nested card style ──
   return (
-    <div className="py-2.5">
+    <div className="py-2.5 group/msg">
       <div className="flex items-start gap-3">
         <AgentAvatar name={message.senderName} size={32} square className="mt-1 shrink-0" />
         <div className="flex-1 min-w-0 bg-white dark:bg-zinc-900/50 border border-zinc-200/70 dark:border-zinc-800/60 rounded-xl p-4 shadow-xs">
@@ -352,16 +340,30 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               </div>
             )}
 
-            {/* Copy button */}
-            <div className="flex items-center gap-1 mt-2.5">
+            {/* Floating Action Toolbar */}
+            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-100/60 dark:border-zinc-800/40 opacity-80 hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-1.5 text-xs text-muted-foreground hover:text-foreground gap-1"
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 gap-1 rounded-md transition-colors"
                 onClick={handleCopy}
+                title="Copy message text"
               >
-                {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 gap-1 rounded-md transition-colors"
+                onClick={() => {
+                  navigator.clipboard.writeText(`@${message.senderName} ${message.content}`);
+                  toast.success(`Branched prompt from @${message.senderName}`);
+                }}
+                title="Fork thread from this message"
+              >
+                <GitBranch className="size-3 text-indigo-500" />
+                <span>Fork</span>
               </Button>
             </div>
           </div>

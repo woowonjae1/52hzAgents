@@ -24,6 +24,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { EmptyState } from '@/components/chat/empty-state';
 import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
+import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 
 import { Network, X } from 'lucide-react';
 
@@ -194,6 +195,7 @@ export function Wrapper() {
         </div>
       </div>
       <NewThreadDialogHost />
+      <DropzoneOverlay />
     </div>
   );
 }

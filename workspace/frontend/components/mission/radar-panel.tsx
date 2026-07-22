@@ -65,11 +65,10 @@ export function RadarPanel() {
   }, [radarAgents, selected]);
 
   const nodes = useMemo(() => {
-    return radarAgents.map((r) => {
-      let hash = 0;
-      for (let i = 0; i < r.agent.agentName.length; i++) hash = r.agent.agentName.charCodeAt(i) + ((hash << 5) - hash);
-      const angle = (Math.abs(hash) % 360) * (Math.PI / 180);
-      const radius = 14 + (Math.abs(hash >> 8) % 26);
+    const total = radarAgents.length;
+    return radarAgents.map((r, index) => {
+      const angle = (index / Math.max(1, total)) * 2 * Math.PI - Math.PI / 2;
+      const radius = r.status === 'offline' ? 40 : (index % 2 === 0 ? 22 : 35);
       return { ...r, x: 50 + radius * Math.cos(angle), y: 50 + radius * Math.sin(angle) };
     });
   }, [radarAgents]);
@@ -99,7 +98,7 @@ export function RadarPanel() {
   return (
     <div className="h-full flex flex-col bg-card overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 px-4 h-11 border-b border-zinc-100 dark:border-zinc-800/60">
+      <div className="shrink-0 flex items-center gap-2 pl-4 pr-12 h-11 border-b border-zinc-100 dark:border-zinc-800/60">
         <Radar className="size-4 text-cyan-500" />
         <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Sonar Radar</span>
         <span className="text-[11px] text-zinc-400 dark:text-zinc-500 ml-auto tabular-nums">{radarAgents.length} nodes</span>
@@ -107,37 +106,101 @@ export function RadarPanel() {
 
       {/* Radar */}
       <div className="shrink-0 px-4 pt-4 pb-2">
-        <div className="relative mx-auto w-full max-w-[220px] aspect-square rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-900/40 overflow-hidden">
+        <div className="relative mx-auto w-full max-w-[220px] aspect-square rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-md">
+          {/* Ambient Glow */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.12),transparent_70%)] pointer-events-none" />
+          
           <svg className="w-full h-full" viewBox="0 0 100 100">
-            <style>{`@keyframes radar-sweep-panel { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }`}</style>
+            <style>{`
+              @keyframes radar-sweep-panel { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+              @keyframes sonar-wave-p1 { 0% { r: 2px; opacity: 0.8; } 100% { r: 45px; opacity: 0; } }
+              @keyframes sonar-wave-p2 { 0% { r: 2px; opacity: 0.8; } 100% { r: 45px; opacity: 0; } }
+            `}</style>
+            
+            {/* Sonar Expanding Waves */}
+            <circle cx="50" cy="50" fill="none" stroke="#06b6d4" strokeWidth="0.4" style={{ animation: 'sonar-wave-p1 4s cubic-bezier(0, 0.2, 0.8, 1) infinite' }} />
+            <circle cx="50" cy="50" fill="none" stroke="#06b6d4" strokeWidth="0.4" style={{ animation: 'sonar-wave-p2 4s cubic-bezier(0, 0.2, 0.8, 1) infinite 2s' }} />
+
+            {/* Radar Guidelines */}
             {[45, 30, 15].map((r) => (
-              <circle key={r} cx="50" cy="50" r={r} fill="none" stroke="currentColor" className="text-zinc-300/40 dark:text-zinc-800/60" strokeWidth="0.5" />
+              <circle key={r} cx="50" cy="50" r={r} fill="none" stroke="rgba(6,182,212,0.15)" strokeWidth="0.5" strokeDasharray={r === 45 ? '3 3' : 'none'} />
             ))}
-            <line x1="5" y1="50" x2="95" y2="50" stroke="currentColor" className="text-zinc-300/40 dark:text-zinc-800/60" strokeWidth="0.5" />
-            <line x1="50" y1="5" x2="50" y2="95" stroke="currentColor" className="text-zinc-300/40 dark:text-zinc-800/60" strokeWidth="0.5" />
-            <line x1="50" y1="50" x2="50" y2="5" stroke="url(#radar-panel-grad)" style={{ animation: 'radar-sweep-panel 6s linear infinite', transformOrigin: '50px 50px' }} strokeWidth="1" />
+            <line x1="5" y1="50" x2="95" y2="50" stroke="rgba(6,182,212,0.15)" strokeWidth="0.5" />
+            <line x1="50" y1="5" x2="50" y2="95" stroke="rgba(6,182,212,0.15)" strokeWidth="0.5" />
+
+            {/* Laser lines */}
+            {nodes.map((n) => (
+              <line
+                key={`line-p-${n.agent.agentName}`}
+                x1="50"
+                y1="50"
+                x2={n.x}
+                y2={n.y}
+                stroke={n.status === 'working' ? '#f59e0b' : n.status === 'offline' ? 'rgba(255,255,255,0.12)' : '#10b981'}
+                strokeWidth={n.agent.agentName === selected ? '1.2' : '0.6'}
+                opacity={n.status === 'offline' ? 0.3 : 0.6}
+              />
+            ))}
+
+            {/* Rotating Fan Sector */}
+            <g style={{ transformOrigin: '50px 50px', animation: 'radar-sweep-panel 5s linear infinite' }}>
+              <path d="M 50 50 L 50 5 A 45 45 0 0 1 72.5 10.9 Z" fill="url(#radar-panel-fan)" />
+              <line x1="50" y1="50" x2="50" y2="5" stroke="#06b6d4" strokeWidth="1.2" />
+            </g>
             <defs>
-              <linearGradient id="radar-panel-grad" x1="0%" y1="100%" x2="0%" y2="0%">
-                <stop offset="0%" stopColor="transparent" />
-                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.6" />
+              <linearGradient id="radar-panel-fan" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.4" />
+                <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.02" />
               </linearGradient>
             </defs>
-            {nodes.map((n) => {
-              const isSel = n.agent.agentName === selected;
-              const col = STATUS_COLOR[n.status];
-              return (
-                <g key={n.agent.agentName} className="cursor-pointer" onClick={() => setSelected(n.agent.agentName)}>
-                  {n.status === 'working' && (
-                    <circle cx={n.x} cy={n.y} r="5" fill="none" stroke="currentColor" className="text-amber-500 animate-ping opacity-70" strokeWidth="0.5" />
-                  )}
-                  {isSel && (
-                    <circle cx={n.x} cy={n.y} r="6" fill="none" stroke="currentColor" className="text-cyan-500" strokeWidth="0.8" />
-                  )}
-                  <circle cx={n.x} cy={n.y} r={isSel ? 3 : 2.4} className={cn(col.node, 'transition-all')} />
-                </g>
-              );
-            })}
+
+            {/* Central Node Hub */}
+            <circle cx="50" cy="50" r="2.5" fill="#06b6d4" className="animate-pulse" />
           </svg>
+
+          {/* HTML Pinned Collision-Free Node Dots */}
+          {nodes.map((n) => {
+            const isSel = n.agent.agentName === selected;
+            const isWorking = n.status === 'working';
+            const isOffline = n.status === 'offline';
+
+            return (
+              <div
+                key={n.agent.agentName}
+                style={{ left: `${n.x}%`, top: `${n.y}%` }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer group/node"
+                onClick={() => setSelected(n.agent.agentName)}
+              >
+                {isWorking && (
+                  <span className="absolute -inset-1.5 rounded-full bg-amber-500/50 animate-ping" />
+                )}
+
+                <div className="relative flex flex-col items-center">
+                  <div
+                    className={cn(
+                      'size-3 rounded-full border-2 transition-all duration-200 shadow-md',
+                      isWorking
+                        ? 'bg-amber-400 border-amber-300 shadow-[0_0_8px_#f59e0b]'
+                        : isOffline
+                        ? 'bg-zinc-600 border-zinc-500 opacity-60'
+                        : 'bg-emerald-400 border-emerald-300 shadow-[0_0_8px_#10b981]',
+                      isSel && 'scale-150 ring-4 ring-cyan-400/40 z-30'
+                    )}
+                  />
+
+                  <span
+                    className={cn(
+                      'text-[9px] font-mono font-semibold tracking-tight transition-all mt-0.5 select-none pointer-events-none px-1 rounded bg-zinc-950/80 backdrop-blur-xs',
+                      isWorking ? 'text-amber-400' : isOffline ? 'text-zinc-500' : 'text-zinc-300',
+                      isSel && 'text-cyan-300 font-bold scale-110'
+                    )}
+                  >
+                    {n.agent.agentName}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

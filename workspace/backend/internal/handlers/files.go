@@ -11,6 +11,7 @@ import (
 	"os"              // 提供底层操作系统的文件读写及目录创建支持。
 	"path/filepath"   // 跨平台进行文件路径的安全拼接。
 	"strconv"         // 用于转换分页 limit 和 offset 字符串为整数。
+	"strings"         // 用于判断文件扩展名。
 	"time"            // 用于时间戳的获取（新增）。
 
 	"github.com/gin-gonic/gin"                           // Gin Web 框架路由控制。
@@ -352,6 +353,9 @@ func ListFiles(c *gin.Context) {
 		}
 	}
 
+	// 自动扫描磁盘物理文件，同步 Agent/脚本新增产生的本地文件至数据库
+	syncLocalDiskFiles(workspace.ID)
+
 	// 查询活跃中的文件列表。
 	var files []models.FileRecord
 	db.DB.Where("workspace_id = ? AND status = ?", workspace.ID, "active").
@@ -438,4 +442,105 @@ func DeleteFile(c *gin.Context) {
 
 	// 返回成功。
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// syncLocalDiskFiles 自动扫描工作区存储路径及 Agent 工作目录下的磁盘文件，将 Agent 生成的文件（如 青羊区到金牛区路线.md）自动注册到数据库
+func syncLocalDiskFiles(workspaceID string) {
+	basePath := config.GlobalConfig.FileStoragePath
+	wsDir := filepath.Join(basePath, workspaceID)
+
+	dirsToScan := []string{
+		wsDir,
+		"d:\\code\\52hzAgent\\openagents-develop",
+		"d:\\code\\52hzAgent\\openagents-develop\\workspace",
+		"D:\\code\\wwj-agent-launcher",
+	}
+
+	for idx, dirPath := range dirsToScan {
+		entries, err := os.ReadDir(dirPath)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				if idx == 0 {
+					subDir := filepath.Join(dirPath, entry.Name())
+					subEntries, err := os.ReadDir(subDir)
+					if err != nil {
+						continue
+					}
+					for _, sub := range subEntries {
+						if !sub.IsDir() {
+							info, err := sub.Info()
+							if err != nil {
+								continue
+							}
+							storageKey := fmt.Sprintf("%s/%s/%s", workspaceID, entry.Name(), sub.Name())
+							var count int64
+							db.DB.Model(&models.FileRecord{}).Where("storage_key = ?", storageKey).Count(&count)
+							if count == 0 {
+								db.DB.Create(&models.FileRecord{
+									ID:          entry.Name(),
+									WorkspaceID: workspaceID,
+									Filename:    sub.Name(),
+									ContentType: "application/octet-stream",
+									Size:        int(info.Size()),
+									StorageKey:  storageKey,
+									UploadedBy:  "openagents:agent",
+									ChannelName: nil,
+									Status:      "active",
+									CreatedAt:   info.ModTime(),
+								})
+							}
+						}
+					}
+				}
+			} else {
+				name := entry.Name()
+				lower := strings.ToLower(name)
+				if idx > 0 {
+					if !strings.HasSuffix(lower, ".md") && !strings.HasSuffix(lower, ".py") && !strings.HasSuffix(lower, ".csv") && !strings.HasSuffix(lower, ".png") && !strings.HasSuffix(lower, ".jpg") && !strings.HasSuffix(lower, ".pdf") && !strings.HasSuffix(lower, ".txt") {
+						continue
+					}
+				}
+
+				info, err := entry.Info()
+				if err != nil {
+					continue
+				}
+
+				var count int64
+				db.DB.Model(&models.FileRecord{}).Where("workspace_id = ? AND filename = ?", workspaceID, name).Count(&count)
+				if count == 0 {
+					destPath := filepath.Join(wsDir, name)
+					if idx > 0 {
+						_ = os.MkdirAll(wsDir, 0755)
+						srcPath := filepath.Join(dirPath, name)
+						data, err := os.ReadFile(srcPath)
+						if err == nil {
+							_ = os.WriteFile(destPath, data, 0644)
+						}
+					}
+
+					storageKey := fmt.Sprintf("%s/%s", workspaceID, name)
+					cType := "application/octet-stream"
+					if strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".txt") {
+						cType = "text/markdown; charset=utf-8"
+					}
+					db.DB.Create(&models.FileRecord{
+						ID:          uuid.New().String(),
+						WorkspaceID: workspaceID,
+						Filename:    name,
+						ContentType: cType,
+						Size:        int(info.Size()),
+						StorageKey:  storageKey,
+						UploadedBy:  "openagents:agent",
+						ChannelName: nil,
+						Status:      "active",
+						CreatedAt:   info.ModTime(),
+					})
+				}
+			}
+		}
+	}
 }

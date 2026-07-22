@@ -290,6 +290,14 @@ class WorkspaceApi {
     return this.request<NetworkDiscovery>(`/v1/discover?network=${this.workspaceId}`);
   }
 
+  /** Launch an agent runtime automatically in the backend. */
+  async launchAgent(agentName: string): Promise<{ message: string; agent_name: string; status: string }> {
+    return this.request<{ message: string; agent_name: string; status: string }>(
+      `/v1/agents/${encodeURIComponent(agentName)}/launch?network=${this.workspaceId}`,
+      { method: 'POST' }
+    );
+  }
+
   /** Get network profile metadata. */
   async networkProfile(): Promise<NetworkProfile> {
     return this.request<NetworkProfile>(`/v1/profile?network=${this.workspaceId}`);

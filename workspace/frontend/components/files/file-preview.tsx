@@ -151,7 +151,7 @@ export function FilePreview() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-2 lg:px-4 py-2 lg:py-3 border-b shrink-0">
+      <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-3 border-b shrink-0">
         <button
           onClick={() => {
             if (isMobile) openMobileList();

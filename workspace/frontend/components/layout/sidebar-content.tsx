@@ -116,7 +116,7 @@ export function SidebarContent() {
         {viewMode === 'threads' && <ThreadList />}
         {viewMode === 'files' && <FileList />}
         {viewMode === 'tasks' && <TasksView />}
-        {viewMode === 'knowledge' && <KnowledgeView />}
+        {viewMode === 'knowledge' && <KnowledgeView sidebarOnly />}
         {viewMode === 'routines' && <RoutineList />}
         {viewMode === 'skills' && <SkillsView />}
       </div>

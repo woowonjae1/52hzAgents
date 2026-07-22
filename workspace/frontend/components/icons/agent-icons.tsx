@@ -17,8 +17,13 @@ const NEEDS_BG = new Set([
   'xai', 'replicate', 'elevenlabs', 'manus', 'kilo', 'pi',
 ]);
 
+const PNG_AGENTS = new Set(['cline', 'hermes', 'kilo', 'pi']);
+
 function IconWrapper({ name, size = 20, className }: { name: string } & IconProps) {
   const needsBg = NEEDS_BG.has(name);
+  const isPng = PNG_AGENTS.has(name);
+  const ext = isPng ? 'png' : 'svg';
+
   return (
     <span
       className={cn(
@@ -29,15 +34,15 @@ function IconWrapper({ name, size = 20, className }: { name: string } & IconProp
       style={{ width: size, height: size }}
     >
       <img
-        src={`${ICON_BASE}/${name}.svg`}
+        src={`${ICON_BASE}/${name}.${ext}`}
         alt={name}
         width={needsBg ? size - 4 : size}
         height={needsBg ? size - 4 : size}
         onError={(e) => {
           const img = e.target as HTMLImageElement;
-          if (img.src.includes('.svg')) {
-            img.src = `${ICON_BASE}/${name}.png`;
-          } else if (img.src.includes('.png')) {
+          if (img.src.includes('.png')) {
+            img.src = `${ICON_BASE}/${name}.svg`;
+          } else if (img.src.includes('.svg')) {
             img.src = `${ICON_BASE}/default.svg`;
           }
         }}

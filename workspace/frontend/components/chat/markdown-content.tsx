@@ -138,17 +138,18 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     ),
 
     // Code
-    code: ({ className, children, ...props }) => {
-      const isBlock = className?.startsWith('language-') || className?.startsWith('hljs');
-      if (isBlock) {
+    code: ({ className, children, ...props }: { className?: string; children?: ReactNode; inline?: boolean }) => {
+      const textContent = String(children || '');
+      const isInline = props.inline ?? (!className && !textContent.includes('\n'));
+      if (isInline) {
         return (
-          <code className={cn('text-[13px]', className)} {...props}>
+          <code className="text-[13px] px-1.5 py-0.5 rounded bg-zinc-150 dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 font-mono">
             {children}
           </code>
         );
       }
       return (
-        <code className="text-[13px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">
+        <code className={cn('text-[13px] bg-transparent text-inherit p-0', className)}>
           {children}
         </code>
       );
@@ -192,7 +193,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
               Copy
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed">
+          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-zinc-100 font-mono">
             {children}
           </pre>
         </div>
