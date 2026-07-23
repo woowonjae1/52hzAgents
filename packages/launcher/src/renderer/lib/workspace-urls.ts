@@ -1,4 +1,4 @@
-const DEFAULT_WORKSPACE_WEB_BASE_URL = "https://workspace.openagents.org"
+const DEFAULT_WORKSPACE_WEB_BASE_URL = "http://localhost:3005"
 
 export function workspaceWebBaseUrl(endpoint?: string): string {
   const baseUrl = (endpoint || DEFAULT_WORKSPACE_WEB_BASE_URL).replace(/\/$/, "")

@@ -449,89 +449,39 @@ func syncLocalDiskFiles(workspaceID string) {
 	basePath := config.GlobalConfig.FileStoragePath
 	wsDir := filepath.Join(basePath, workspaceID)
 
-	dirsToScan := []string{
-		wsDir,
-		"d:\\code\\52hzAgent\\openagents-develop",
-		"d:\\code\\52hzAgent\\openagents-develop\\workspace",
-		"D:\\code\\wwj-agent-launcher",
+	// Only sync this workspace's own storage directory. Never scan external
+	// developer/repo paths — doing so pollutes the workspace file list with
+	// unrelated repo files (READMEs, scripts, etc.) and is machine-specific.
+	entries, err := os.ReadDir(wsDir)
+	if err != nil {
+		return
 	}
 
-	for idx, dirPath := range dirsToScan {
-		entries, err := os.ReadDir(dirPath)
-		if err != nil {
-			continue
-		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				if idx == 0 {
-					subDir := filepath.Join(dirPath, entry.Name())
-					subEntries, err := os.ReadDir(subDir)
-					if err != nil {
-						continue
-					}
-					for _, sub := range subEntries {
-						if !sub.IsDir() {
-							info, err := sub.Info()
-							if err != nil {
-								continue
-							}
-							storageKey := fmt.Sprintf("%s/%s/%s", workspaceID, entry.Name(), sub.Name())
-							var count int64
-							db.DB.Model(&models.FileRecord{}).Where("storage_key = ?", storageKey).Count(&count)
-							if count == 0 {
-								db.DB.Create(&models.FileRecord{
-									ID:          entry.Name(),
-									WorkspaceID: workspaceID,
-									Filename:    sub.Name(),
-									ContentType: "application/octet-stream",
-									Size:        int(info.Size()),
-									StorageKey:  storageKey,
-									UploadedBy:  "openagents:agent",
-									ChannelName: nil,
-									Status:      "active",
-									CreatedAt:   info.ModTime(),
-								})
-							}
-						}
-					}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// One level down: files an agent wrote into a sub-folder.
+			subDir := filepath.Join(wsDir, entry.Name())
+			subEntries, err := os.ReadDir(subDir)
+			if err != nil {
+				continue
+			}
+			for _, sub := range subEntries {
+				if sub.IsDir() {
+					continue
 				}
-			} else {
-				name := entry.Name()
-				lower := strings.ToLower(name)
-				if idx > 0 {
-					if !strings.HasSuffix(lower, ".md") && !strings.HasSuffix(lower, ".py") && !strings.HasSuffix(lower, ".csv") && !strings.HasSuffix(lower, ".png") && !strings.HasSuffix(lower, ".jpg") && !strings.HasSuffix(lower, ".pdf") && !strings.HasSuffix(lower, ".txt") {
-						continue
-					}
-				}
-
-				info, err := entry.Info()
+				info, err := sub.Info()
 				if err != nil {
 					continue
 				}
-
+				storageKey := fmt.Sprintf("%s/%s/%s", workspaceID, entry.Name(), sub.Name())
 				var count int64
-				db.DB.Model(&models.FileRecord{}).Where("workspace_id = ? AND filename = ?", workspaceID, name).Count(&count)
+				db.DB.Model(&models.FileRecord{}).Where("storage_key = ?", storageKey).Count(&count)
 				if count == 0 {
-					destPath := filepath.Join(wsDir, name)
-					if idx > 0 {
-						_ = os.MkdirAll(wsDir, 0755)
-						srcPath := filepath.Join(dirPath, name)
-						data, err := os.ReadFile(srcPath)
-						if err == nil {
-							_ = os.WriteFile(destPath, data, 0644)
-						}
-					}
-
-					storageKey := fmt.Sprintf("%s/%s", workspaceID, name)
-					cType := "application/octet-stream"
-					if strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".txt") {
-						cType = "text/markdown; charset=utf-8"
-					}
 					db.DB.Create(&models.FileRecord{
 						ID:          uuid.New().String(),
 						WorkspaceID: workspaceID,
-						Filename:    name,
-						ContentType: cType,
+						Filename:    filepath.ToSlash(filepath.Join(entry.Name(), sub.Name())),
+						ContentType: "application/octet-stream",
 						Size:        int(info.Size()),
 						StorageKey:  storageKey,
 						UploadedBy:  "openagents:agent",
@@ -541,6 +491,36 @@ func syncLocalDiskFiles(workspaceID string) {
 					})
 				}
 			}
+			continue
+		}
+
+		// Top-level file dropped into the workspace directory.
+		name := entry.Name()
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		var count int64
+		db.DB.Model(&models.FileRecord{}).Where("workspace_id = ? AND filename = ?", workspaceID, name).Count(&count)
+		if count == 0 {
+			lower := strings.ToLower(name)
+			storageKey := fmt.Sprintf("%s/%s", workspaceID, name)
+			cType := "application/octet-stream"
+			if strings.HasSuffix(lower, ".md") || strings.HasSuffix(lower, ".txt") {
+				cType = "text/markdown; charset=utf-8"
+			}
+			db.DB.Create(&models.FileRecord{
+				ID:          uuid.New().String(),
+				WorkspaceID: workspaceID,
+				Filename:    name,
+				ContentType: cType,
+				Size:        int(info.Size()),
+				StorageKey:  storageKey,
+				UploadedBy:  "openagents:agent",
+				ChannelName: nil,
+				Status:      "active",
+				CreatedAt:   info.ModTime(),
+			})
 		}
 	}
 }

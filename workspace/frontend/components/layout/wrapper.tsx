@@ -37,7 +37,7 @@ function WorkspaceLoadingScreen() {
         </div>
         <div className="text-center">
           <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">52hzAgents Workspace</h1>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1.5 font-mono">Syncing soundwave frequencies...</p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1.5">Loading your workspace…</p>
         </div>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
@@ -158,12 +158,26 @@ export function Wrapper() {
             </div>
           ) : (
             <>
-              {/* Column 2: Center Chat Workspace (Always Anchor) */}
+              {/* Column 2: Center Main Workspace */}
               <div className="relative flex-grow flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
                 {viewMode === 'mission' ? (
                   <MissionControl />
                 ) : viewMode === 'connect' ? (
                   <ConnectAgentView />
+                ) : viewMode === 'files' ? (
+                  <FilePreview />
+                ) : viewMode === 'tasks' ? (
+                  <TasksView />
+                ) : viewMode === 'timers' ? (
+                  <TimersView />
+                ) : viewMode === 'inbox' ? (
+                  <InboxView />
+                ) : viewMode === 'skills' ? (
+                  <SkillsView />
+                ) : viewMode === 'knowledge' ? (
+                  <KnowledgeView />
+                ) : viewMode === 'browser' ? (
+                  <BrowserView />
                 ) : (
                   <main className="h-full" role="content">
                     <ChatView />

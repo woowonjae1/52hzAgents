@@ -16,16 +16,16 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       onClick={() => !disabled && onCheckedChange(!checked)}
       className={cn(
         "relative inline-flex items-center shrink-0 outline-none border-none p-0 cursor-pointer",
-        "w-11 h-6 rounded-full transition-colors duration-200 ease-(--ease)",
-        checked ? "bg-(--accent)" : "bg-(--bg-input)",
+        "w-11 h-6 rounded-full transition-colors duration-200 ease-in-out",
+        checked ? "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.3)]" : "bg-zinc-700 hover:bg-zinc-600",
         disabled && "opacity-50 cursor-not-allowed",
         className,
       )}
     >
       <span
         className={cn(
-          "absolute top-0.75 w-4.5 h-4.5 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.2)] transition-[left] duration-200 ease-(--ease)",
-          checked ? "left-5.75" : "left-0.75",
+          "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-[left] duration-200 ease-in-out",
+          checked ? "left-[22px]" : "left-[2px]",
         )}
       />
     </button>

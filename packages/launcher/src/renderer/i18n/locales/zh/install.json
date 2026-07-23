@@ -34,7 +34,7 @@
     "comingSoon": "即将推出",
     "installed": "已安装",
     "global": "全局",
-    "globalTitle": "在 OpenAgents 之外安装（系统/全局）",
+    "globalTitle": "在 52hzAgents 之外安装（系统/全局）",
     "notInstalled": "未安装",
     "install": "安装",
     "update": "更新",
@@ -50,7 +50,7 @@
   "featuredBanner": {
     "eyebrow": "精选",
     "defaultTitle": "发现 AI 智能体",
-    "defaultDescription": "从 OpenAgents 目录中浏览、安装和更新 AI 编程智能体。",
+    "defaultDescription": "从 52hzAgents 目录中浏览、安装和更新 AI 编程智能体。",
     "open": "打开",
     "installNow": "立即安装",
     "browseAll": "浏览全部"

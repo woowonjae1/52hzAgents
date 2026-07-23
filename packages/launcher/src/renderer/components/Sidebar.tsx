@@ -12,6 +12,9 @@ import {
   Sun,
   Monitor,
   HelpCircle,
+  Network,
+  CheckSquare,
+  BookOpen
 } from "lucide-react"
 import { useShallow } from "zustand/react/shallow"
 import { useTranslation } from "react-i18next"
@@ -32,16 +35,19 @@ interface NavItem {
   section: SectionId
 }
 
-// Labels and one-line tooltips live in the i18n catalog under `nav.items.<id>`;
-// here we only keep the icon and grouping so the list stays language-agnostic.
 const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", icon: <LayoutDashboard className="w-4 h-4" />, section: "overview" },
-  { id: "install", icon: <Download className="w-4 h-4" />, section: "manage" },
-  { id: "agents", icon: <Cpu className="w-4 h-4" />, section: "manage" },
-  { id: "workspaces", icon: <Layers className="w-4 h-4" />, section: "manage" },
-  { id: "connections", icon: <Plug className="w-4 h-4" />, section: "manage" },
-  { id: "logs", icon: <FileText className="w-4 h-4" />, section: "system" },
-  { id: "settings", icon: <SettingsIcon className="w-4 h-4" />, section: "system" },
+  { id: "dashboard", icon: <LayoutDashboard className="size-4" />, section: "overview" },
+  { id: "workspaces", icon: <Layers className="size-4" />, section: "overview" },
+  
+  { id: "install", icon: <Download className="size-4" />, section: "manage" },
+  { id: "agents", icon: <Cpu className="size-4" />, section: "manage" },
+  { id: "skills", icon: <Network className="size-4" />, section: "manage" },
+  { id: "tasks", icon: <CheckSquare className="size-4" />, section: "manage" },
+  { id: "knowledge", icon: <BookOpen className="size-4" />, section: "manage" },
+  
+  { id: "connections", icon: <Plug className="size-4" />, section: "system" },
+  { id: "logs", icon: <FileText className="size-4" />, section: "system" },
+  { id: "settings", icon: <SettingsIcon className="size-4" />, section: "system" },
 ]
 
 export default function Sidebar(): React.JSX.Element {
@@ -87,34 +93,37 @@ export default function Sidebar(): React.JSX.Element {
       className={cn(
         "w-(--sidebar-width) shrink-0 h-screen",
         "flex flex-col sidebar-drag select-none",
-        "bg-[#0e1117] text-[#c1c2cb] border-r border-white/5",
+        "bg-[#060608] text-zinc-400 border-r border-zinc-800/80 shadow-[1px_0_10px_rgba(0,0,0,0.5)] z-20",
       )}
     >
       {/* Brand */}
-      <div className="px-4 pt-5 pb-4 sidebar-no-drag">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-md flex items-center justify-center text-[11px] font-bold text-white shrink-0 shadow-[0_2px_8px_rgba(99,102,241,0.35)] bg-[linear-gradient(135deg,#6366f1_0%,#4f46e5_100%)]">
-            OA
+      <div className="px-4 pt-6 pb-5 sidebar-no-drag">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="size-8 rounded-lg flex items-center justify-center text-[10.5px] font-black text-white shrink-0 shadow-[0_2px_12px_rgba(6,182,212,0.5)] bg-gradient-to-br from-cyan-400 to-blue-600 border border-cyan-300/30">
+            52
           </div>
-          <span
-            className="text-[14px] font-semibold tracking-tight text-white truncate"
-            title="OpenAgents"
-          >
-            OpenAgents
-          </span>
+          <div className="flex flex-col">
+            <span
+              className="text-[14.5px] font-bold tracking-tight text-zinc-100 truncate leading-none mb-1"
+              title="52hzAgents Workstation"
+            >
+              52hzAgents
+            </span>
+            <span className="text-[10px] text-cyan-500 font-medium tracking-wide uppercase">Workstation</span>
+          </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-2 sidebar-no-drag">
+      <nav className="flex-1 overflow-y-auto px-3 py-2 sidebar-no-drag custom-scrollbar">
         {sections.map((section) => {
           const items = NAV_ITEMS.filter((i) => i.section === section)
           return (
-            <div key={section} className="mb-5 last:mb-0">
-              <div className="px-2 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#5a5e6b]">
+            <div key={section} className="mb-6 last:mb-0">
+              <div className="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-600">
                 {t(`nav.sections.${section}`)}
               </div>
-              <ul className="m-0 p-0 list-none">
+              <ul className="m-0 p-0 list-none flex flex-col gap-0.5">
                 {items.map((item) => {
                   const active = currentTab === item.id
                   const badge = badges[item.id]
@@ -132,18 +141,21 @@ export default function Sidebar(): React.JSX.Element {
                             : setCurrentTab(item.id)
                         }}
                         className={cn(
-                          "group w-full flex items-center gap-2.5 px-2.5 py-2 mb-px",
-                          "rounded-md text-[13px] font-medium text-left cursor-pointer",
-                          "transition-colors duration-100 border-0",
+                          "group w-full flex items-center gap-3 px-3 py-2",
+                          "rounded-xl text-[13px] font-medium text-left cursor-pointer",
+                          "transition-all duration-200 border-0 relative overflow-hidden",
                           active
-                            ? "bg-[#1a1d2a] text-white"
-                            : "bg-transparent text-[#a8aabb] hover:bg-[#15171f] hover:text-[#e5e6ed]",
+                            ? "bg-cyan-500/10 text-cyan-400 font-semibold"
+                            : "bg-transparent text-zinc-400 hover:bg-zinc-900/80 hover:text-zinc-200",
                         )}
                       >
+                        {active && (
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-3/5 bg-cyan-400 rounded-r-full shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
+                        )}
                         <span
                           className={cn(
-                            "shrink-0",
-                            active ? "opacity-100" : "opacity-75",
+                            "shrink-0 transition-colors",
+                            active ? "text-cyan-400" : "text-zinc-500 group-hover:text-zinc-400",
                           )}
                         >
                           {item.icon}

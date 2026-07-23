@@ -1,6 +1,6 @@
 import path from "path"
 
-const LOCAL_CORE = path.resolve(__dirname, "../../../agent-connector")
+const LOCAL_CORE = path.resolve(__dirname, "../../../wwj")
 
 export interface GitHubProbeResult {
   ok: boolean

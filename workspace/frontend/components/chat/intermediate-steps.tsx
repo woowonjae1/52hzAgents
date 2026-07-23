@@ -15,6 +15,8 @@ import {
   ChevronRight,
   RefreshCw,
   ListTodo,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { WorkingIndicator } from './working-indicator';
@@ -157,8 +159,9 @@ function isPlaceholderThinking(message: WorkspaceMessage): boolean {
 
 // ── Step Item ──
 
-const StepItem = memo(function StepItem({ message }: { message: WorkspaceMessage }) {
+const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMessage }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Todos render as a compact checklist
   if (message.messageType === 'todos') {
@@ -243,9 +246,33 @@ const StepItem = memo(function StepItem({ message }: { message: WorkspaceMessage
           )}
         </button>
         {expanded && parsed.args && (
-          <pre className="text-[11px] leading-relaxed bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 ml-1 mt-1 mb-1.5 overflow-x-auto max-h-56 text-zinc-300 font-mono whitespace-pre-wrap break-all">
-            {parsed.args}
-          </pre>
+          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-zinc-800 bg-zinc-950/90 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1 border-b border-zinc-800/60 bg-zinc-900/40 text-[10px] text-zinc-400 font-mono">
+              <span className="flex items-center gap-1">
+                <span className="size-2 rounded-full bg-emerald-500/80 inline-block" />
+                <span>{parsed.toolDisplay || 'Terminal Output'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (parsed.args) {
+                    navigator.clipboard.writeText(parsed.args);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }
+                }}
+                className="flex items-center gap-1 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Copy parameters"
+              >
+                {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                <span>{copied ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-zinc-300 font-mono whitespace-pre-wrap break-all selection:bg-blue-500/30">
+              {parsed.args}
+            </pre>
+          </div>
         )}
       </div>
     );

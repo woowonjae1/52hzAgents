@@ -74,7 +74,7 @@
       "startedWarmingUp": "已启动 —— 仍在预热中。"
     },
     "welcome": {
-      "title": "欢迎使用 OpenAgents Launcher",
+      "title": "欢迎使用 52hzAgents Launcher",
       "subtitle": "在一处运行、配置并编排 AI 编程智能体。",
       "benefits": {
         "install": "安装智能体（Claude、Codex、Gemini、Kimi 等）",

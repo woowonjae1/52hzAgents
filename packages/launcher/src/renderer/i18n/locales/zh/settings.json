@@ -43,7 +43,7 @@
   "appearance": {
     "title": "外观",
     "theme": "主题",
-    "themeDesc": "选择 OpenAgents 的显示外观",
+    "themeDesc": "选择 52hzAgents 的显示外观",
     "modes": {
       "light": "浅色",
       "dark": "深色",
@@ -71,8 +71,8 @@
   "network": {
     "title": "网络",
     "workspaceUrl": "工作区后端地址",
-    "workspaceUrlDesc": "可选的自托管工作区服务器。留空则使用 OpenAgents 托管工作区。",
-    "workspaceUrlPlaceholder": "https://workspace-endpoint.openagents.org 或 http://localhost:8000",
+    "workspaceUrlDesc": "可选的自托管工作区服务器。留空则默认使用本地工作区。",
+    "workspaceUrlPlaceholder": "http://localhost:8000",
     "httpProxy": "HTTP 代理",
     "httpProxyDesc": "智能体与启动器进行出站 HTTP 时使用",
     "httpsProxy": "HTTPS 代理",
@@ -86,7 +86,7 @@
   "data": {
     "title": "数据目录",
     "userData": "用户数据",
-    "openagentsHome": "OpenAgents 主目录",
+    "openagentsHome": "52hzAgents 主目录",
     "logs": "日志",
     "downloads": "下载",
     "cache": "缓存",
@@ -95,7 +95,7 @@
   "language": {
     "title": "语言",
     "displayLanguage": "显示语言",
-    "displayLanguageDesc": "选择 OpenAgents 界面所使用的语言"
+    "displayLanguageDesc": "选择 52hzAgents 界面所使用的语言"
   },
   "updates": {
     "title": "更新",

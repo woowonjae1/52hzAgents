@@ -13,7 +13,7 @@ import { EventEmitter } from "events"
 // catalog comes back empty and the onboarding step shows nothing to pick.
 // Inlining the registry at build time gives the UI a guaranteed catalog so
 // "Pick your first agent" is always populated.
-import BUNDLED_REGISTRY from "../../../agent-connector/registry.json"
+import BUNDLED_REGISTRY from "../../../wwj/registry.json"
 
 const CONFIG_DIR = path.join(os.homedir(), ".openagents")
 const GLOBAL_CORE = path.join(
@@ -23,7 +23,7 @@ const GLOBAL_CORE = path.join(
   "@openagents-org",
   "agent-launcher",
 )
-const LOCAL_CORE = path.resolve(__dirname, "../../../agent-connector")
+const LOCAL_CORE = path.resolve(__dirname, "../../../wwj")
 const INSTALLED_HISTORY_FILE = path.join(
   CONFIG_DIR,
   "installed_agents_history.json",
@@ -301,7 +301,7 @@ interface HostedLoginSpec {
 
 /**
  * Readiness reason codes surfaced to the Agents list. These MUST match the
- * core's health-status REASON values (packages/agent-connector/src/adapters/
+ * core's health-status REASON values (packages/wwj/src/adapters/
  * health-status.js) so the Install page, the Agents list and the daemon share
  * one vocabulary. The renderer keys off `reason` (not the free-text message) to
  * decide whether to show "Not installed" vs "Login required".
@@ -1061,7 +1061,7 @@ function classifyTool(name: string): ChatToolCall["category"] {
   return "other"
 }
 
-// The agent adapters (see agent-connector/src/adapters/utils.js
+// The agent adapters (see wwj/src/adapters/utils.js
 // formatAttachmentsForPrompt) read attachments in camelCase — they look up
 // att.fileId, att.contentType. The workspace API stores attachments verbatim
 // and replays them through _eventToMessage. So we MUST send camelCase end to
@@ -1414,7 +1414,7 @@ export class AgentManager extends EventEmitter {
 
   reloadCore(): boolean {
     const cacheKeys = Object.keys(require.cache).filter(
-      (k) => k.includes("agent-launcher") || k.includes("agent-connector"),
+      (k) => k.includes("agent-launcher") || k.includes("agent-connector") || k.includes("wwj"),
     )
     for (const k of cacheKeys) delete require.cache[k]
     core = loadCore()

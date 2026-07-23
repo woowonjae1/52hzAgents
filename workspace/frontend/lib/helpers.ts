@@ -20,11 +20,17 @@ export function getInitials(
     : initials.join('');
 }
 
-export function timeAgo(date: Date | string): string {
+export function timeAgo(date: Date | string | number | null | undefined): string {
+  if (date === null || date === undefined) return '';
   const now = new Date();
-  const inputDate = typeof date === 'string' ? new Date(date) : date;
-  const diff = Math.floor((now.getTime() - inputDate.getTime()) / 1000);
+  // Accept Date, ISO string, or epoch milliseconds. Coerce anything else
+  // safely so a bad value renders as empty instead of throwing.
+  const inputDate = date instanceof Date ? date : new Date(date);
+  const ms = inputDate.getTime();
+  if (Number.isNaN(ms)) return '';
+  const diff = Math.floor((now.getTime() - ms) / 1000);
 
+  if (diff < 0) return 'just now';
   if (diff < 60) return 'just now';
   if (diff < 3600)
     return `${Math.floor(diff / 60)} minute${Math.floor(diff / 60) > 1 ? 's' : ''} ago`;

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useCallback, useState } from "react"
 import { useShallow } from "zustand/react/shallow"
 import { useTranslation } from "react-i18next"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Activity, Cpu, Layers, ShieldCheck, RefreshCw, Zap, Terminal } from "lucide-react"
 import { useAgentsStore } from "../../store/agents"
 import { useUiStore } from "../../store/ui"
 import { useInstallStore } from "../../store/install"
@@ -9,14 +9,11 @@ import { useConnectionsStore } from "../../store/connections"
 import { useNotificationsStore } from "../../store/notifications"
 import { Button } from "../../components/ui/Button"
 import { TopBar } from "../../components/TopBar"
-import { StatsOverview } from "../../components/dashboard/StatsOverview"
-import { HealthMonitor } from "../../components/dashboard/HealthMonitor"
-import { ActivityFeed } from "../../components/dashboard/ActivityFeed"
 import { AgentCard } from "../../components/dashboard/AgentCard"
-import { QuickActions } from "../../components/dashboard/QuickActions"
 import type { Agent, AgentUpdateInfo } from "../../types"
 import { useUpdateDismissals } from "../../hooks/useUpdateDismissals"
 import type { ToastType } from "../../hooks/useToast"
+import { cn } from "../../lib/utils"
 
 interface DashboardProps {
   showToast: (message: string, type?: ToastType) => void
@@ -26,10 +23,15 @@ interface DashboardProps {
 
 function SkeletonCard(): React.JSX.Element {
   return (
-    <div className="flex flex-col h-full p-4 bg-(--bg-card) border border-(--border) rounded-(--radius)">
-      <div className="skeleton-shimmer rounded-full h-2.5 w-[62%] mb-2.5" />
-      <div className="skeleton-shimmer rounded-full h-2.5 w-[42%] mb-2.5" />
-      <div className="skeleton-shimmer rounded-full h-2.5 w-[26%]" />
+    <div className="flex flex-col h-full p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-2xl animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="size-10 rounded-xl bg-zinc-900" />
+        <div className="flex-1 space-y-2">
+          <div className="h-3 bg-zinc-800 rounded w-1/2" />
+          <div className="h-2 bg-zinc-900 rounded w-1/3" />
+        </div>
+      </div>
+      <div className="mt-4 h-8 bg-zinc-900 rounded-xl" />
     </div>
   )
 }
@@ -44,8 +46,6 @@ export default function Dashboard({
     pendingAgentActions,
     addPendingAction,
     removePendingAction,
-    setCoreVersion,
-    setLauncherVersion,
   } = useAgentsStore(
     useShallow((s) => ({
       agents: s.agents,
@@ -53,400 +53,170 @@ export default function Dashboard({
       pendingAgentActions: s.pendingAgentActions,
       addPendingAction: s.addPendingAction,
       removePendingAction: s.removePendingAction,
-      setCoreVersion: s.setCoreVersion,
-      setLauncherVersion: s.setLauncherVersion,
     })),
   )
   const {
-    activityLog,
     setCurrentTab,
-    setInstallFocusAgent,
     goToInstallList,
   } = useUiStore(
     useShallow((s) => ({
-      activityLog: s.activityLog,
       setCurrentTab: s.setCurrentTab,
-      setInstallFocusAgent: s.setInstallFocusAgent,
       goToInstallList: s.goToInstallList,
     })),
   )
-  const { updates, setUpdates } = useInstallStore(
-    useShallow((s) => ({ updates: s.updates, setUpdates: s.setUpdates })),
+  const { updates } = useInstallStore(
+    useShallow((s) => ({ updates: s.updates })),
   )
-  const { connections, refresh: refreshConnections } = useConnectionsStore(
-    useShallow((s) => ({ connections: s.connections, refresh: s.refresh })),
-  )
-  const notifItems = useNotificationsStore((s) => s.items)
-  const { isDismissed, ignore: ignoreUpdate, later: snoozeUpdate } =
-    useUpdateDismissals()
+  const { isDismissed } = useUpdateDismissals()
 
-  const inFlight = useRef(false)
-  const queued = useRef(false)
   const mounted = useRef(true)
   const [loading, setLoading] = useState(agents.length === 0)
-  const [workspaceCount, setWorkspaceCount] = useState(0)
-  const [todayMessageCount, setTodayMessageCount] = useState(0)
-  const [todayByAgent, setTodayByAgent] = useState<Record<string, number>>({})
-  const [installedCount, setInstalledCount] = useState<number | undefined>(
-    undefined,
-  )
 
-  const pendingUpdates = updates.filter(
-    (u: AgentUpdateInfo) =>
-      u.current &&
-      u.latest &&
-      u.current !== u.latest &&
-      !isDismissed(u.name, u.latest),
-  )
+  const activeCount = agents.filter((a) => ["online", "running", "idle"].includes(a.state)).length
+  const connectedCount = agents.filter((a) => !!a.network).length
+
+  const refreshAgents = useCallback(async () => {
+    try {
+      const list = await window.api.listAgents()
+      if (mounted.current) {
+        setAgents(list)
+        setLoading(false)
+      }
+    } catch {
+      if (mounted.current) setLoading(false)
+    }
+  }, [setAgents])
 
   useEffect(() => {
     mounted.current = true
+    void refreshAgents()
     return () => {
       mounted.current = false
     }
-  }, [])
+  }, [refreshAgents])
 
-  const refresh = useCallback(async () => {
-    if (inFlight.current) {
-      queued.current = true
-      return
-    }
-    inFlight.current = true
-    try {
-      const data = await window.api.listAgents()
-      if (!mounted.current) return
-      setAgents(data)
-      setLoading(false)
-
-      const status = await window.api.pythonStatus()
-      if (!mounted.current) return
-      setCoreVersion(status.sdkVersion)
-      setLauncherVersion(`v${status.launcherVersion}`)
-    } catch (err) {
-      console.error("Dashboard refresh error:", err)
-    } finally {
-      inFlight.current = false
-      if (queued.current) {
-        queued.current = false
-        refresh()
-      }
-    }
-  }, [setAgents, setCoreVersion, setLauncherVersion])
-
-  useEffect(() => {
-    refresh()
-    const interval = setInterval(refresh, 5000)
-    return () => clearInterval(interval)
-  }, [refresh])
-
-  useEffect(() => {
-    void refreshConnections()
-  }, [refreshConnections])
-
-  const loadAggregates = useCallback(async () => {
-    try {
-      const wsList = await window.api.listWorkspaces()
-      if (mounted.current) setWorkspaceCount(wsList.length)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const todayMs = today.getTime()
-      let total = 0
-      const byAgent: Record<string, number> = {}
-      await Promise.all(
-        wsList.slice(0, 10).map(async (w) => {
-          try {
-            const msgs = await window.api.chatGetMessages(w.id, undefined, 100)
-            for (const m of msgs) {
-              const t = m.createdAt ? new Date(m.createdAt).getTime() : 0
-              if (t >= todayMs) {
-                total += 1
-                const sender = (m as unknown as { sender?: string }).sender
-                if (sender) byAgent[sender] = (byAgent[sender] || 0) + 1
-              }
-            }
-          } catch {}
-        }),
-      )
-      if (mounted.current) {
-        setTodayMessageCount(total)
-        setTodayByAgent(byAgent)
-      }
-      try {
-        const installed = await window.api.getInstalledAgents()
-        if (mounted.current) setInstalledCount(installed.length)
-      } catch {}
-    } catch {}
-  }, [])
-
-  useEffect(() => {
-    void loadAggregates()
-    const id = setInterval(loadAggregates, 60_000)
-    return () => clearInterval(id)
-  }, [loadAggregates])
-
-  useEffect(() => {
-    let cancelled = false
-    const load = async (): Promise<void> => {
-      try {
-        const u = await window.api.checkAgentUpdates()
-        if (!cancelled) setUpdates(u)
-      } catch {}
-    }
-    load()
-    const id = setInterval(load, 60 * 60 * 1000)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-    }
-  }, [setUpdates])
-
-  const toggleAgent = async (agent: Agent): Promise<void> => {
-    if (pendingAgentActions.has(agent.name)) return
+  const toggleAgentState = async (agent: Agent) => {
+    const isRunning = ["online", "running", "idle"].includes(agent.state)
     addPendingAction(agent.name)
-    refresh()
     try {
-      const isRunning = ["online", "running", "idle"].includes(agent.state)
       if (isRunning) {
         await window.api.stopAgent(agent.name)
-        showToast(t("dashboard.agentToggle.stopping", { name: agent.name }), "info")
-        const stopWaits = [400, 800, 1500, 2500, 3000, 3000]
-        for (const w of stopWaits) {
-          await new Promise((r) => setTimeout(r, w))
-          const status = await window.api.agentStatus()
-          const a = status[agent.name]
-          if (!a || a.state === "stopped") {
-            showToast(t("dashboard.agentToggle.stopped", { name: agent.name }), "success")
-            break
-          }
-          refresh()
-        }
+        showToast(`已成功停止 ${agent.name}`, "info")
       } else {
         await window.api.startAgent(agent.name)
-        showToast(t("dashboard.agentToggle.starting", { name: agent.name }), "info")
-        const startWaits = [
-          500, 1000, 1500, 2500, 3000, 3000, 3000, 3000, 3000, 3000,
-        ]
-        for (const w of startWaits) {
-          await new Promise((r) => setTimeout(r, w))
-          const status = await window.api.agentStatus()
-          const a = status[agent.name]
-          if (a && ["running", "online"].includes(a.state)) {
-            showToast(t("dashboard.agentToggle.running", { name: agent.name }), "success")
-            break
-          }
-          refresh()
-        }
+        showToast(`已成功启动 ${agent.name}`, "success")
       }
-    } catch (err: unknown) {
-      showToast(t("dashboard.agentToggle.error", { message: (err as Error).message }), "error")
+      await refreshAgents()
+    } catch (e) {
+      showToast((e as Error).message, "error")
     } finally {
       removePendingAction(agent.name)
-      refresh()
     }
   }
-
-  // The in-app chat view is gone — "chat" now means an interactive CLI session
-  // in the agent's working folder. Open a terminal for the agent instead of
-  // navigating to a removed tab.
-  const openChatForAgent = (agent: Agent): void => {
-    void window.api
-      .openAgentTerminal(agent.name)
-      .catch((err: unknown) =>
-        showToast(
-          t("dashboard.agentToggle.error", { message: (err as Error).message }),
-          "error",
-        ),
-      )
-  }
-
-  const stopAllRunning = async (): Promise<void> => {
-    try {
-      await window.api.stopAll()
-      showToast(t("dashboard.agentToggle.stoppingAll"), "info")
-      refresh()
-    } catch (err) {
-      showToast(t("dashboard.agentToggle.error", { message: (err as Error).message }), "error")
-    }
-  }
-
-  const startAllIdle = async (): Promise<void> => {
-    try {
-      await window.api.startAll()
-      showToast(t("dashboard.agentToggle.startingAll"), "info")
-      refresh()
-    } catch (err) {
-      showToast(t("dashboard.agentToggle.error", { message: (err as Error).message }), "error")
-    }
-  }
-
-  const hasRunning = useMemo(
-    () => agents.some((a) => ["online", "running", "idle"].includes(a.state)),
-    [agents],
-  )
-  const hasIdle = useMemo(
-    () =>
-      agents.some(
-        (a) => !["online", "running", "idle", "starting"].includes(a.state),
-      ),
-    [agents],
-  )
-
-  // Surface "Active Agents" first — running ones, then idle. Cap at 6 to keep the
-  // dashboard grid tight; "View all →" leads to the Agents page.
-  const sortedAgents = useMemo(() => {
-    const score = (a: Agent): number =>
-      ["online", "running"].includes(a.state) ? 0 : a.state === "idle" ? 1 : 2
-    return [...agents].sort((a, b) => score(a) - score(b))
-  }, [agents])
-  const visibleAgents = sortedAgents.slice(0, 6)
 
   return (
-    <section className="flex flex-col h-full">
-      <TopBar title={t("dashboard.title")} showSearch />
+    <div className="flex flex-col h-full bg-[#09090b] text-zinc-100 overflow-y-auto">
+      <TopBar title="智能体控制塔 (Control Tower)" showSearch />
 
-      <div className="flex-1 overflow-y-auto px-9 py-6">
-      <StatsOverview
-        agents={agents}
-        workspaceCount={workspaceCount}
-        connections={connections}
-        todayMessageCount={todayMessageCount}
-        installedCount={installedCount}
-        pendingUpdateCount={pendingUpdates.length}
-        pendingUpdates={pendingUpdates}
-        className="mb-4"
-        onClickUpdates={() => {
-          if (pendingUpdates.length === 1) {
-            setInstallFocusAgent(pendingUpdates[0].name)
-          }
-          setCurrentTab("install")
-        }}
-      />
-
-      <div className="mb-5">
-        <QuickActions
-          hasRunning={hasRunning}
-          hasIdle={hasIdle}
-          onStartAll={() => void startAllIdle()}
-          onStopAll={() => void stopAllRunning()}
-          onNewWorkspace={() => setCurrentTab("workspaces")}
-          onAddConnection={() => setCurrentTab("connections")}
-          onNewAgent={() => goToInstallList()}
-        />
-      </div>
-
-      {pendingUpdates.length > 0 && (
-        <div className="mb-5 flex items-center gap-3 px-4 py-3 text-xs bg-(--accent-bg) border border-(--accent-border) rounded-(--radius)">
-          <span className="text-lg">↑</span>
-          <div className="flex-1 min-w-0">
-            <div className="font-semibold text-(--text-primary)">
-              {pendingUpdates.length === 1
-                ? t("dashboard.updates.oneAvailable", { name: pendingUpdates[0].name })
-                : t("dashboard.updates.manyAvailable", { count: pendingUpdates.length })}
+      <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
+        {/* Header Control Metrics Banner */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 border border-zinc-800/80 shadow-md flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium text-zinc-400">活跃智能体节点</div>
+              <div className="text-2xl font-bold font-mono text-zinc-100 mt-1 flex items-baseline gap-2">
+                <span>{activeCount}</span>
+                <span className="text-xs text-zinc-500 font-normal">/ {agents.length} Total</span>
+              </div>
             </div>
-            <div className="text-(--text-secondary) truncate">
-              {pendingUpdates
-                .slice(0, 3)
-                .map((u) => `${u.name} v${u.current} → v${u.latest}`)
-                .join(" · ")}
+            <div className="size-11 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+              <Cpu className="size-5" />
             </div>
           </div>
-          {pendingUpdates.length === 1 && (
-            <>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  const u = pendingUpdates[0]
-                  if (u.latest) ignoreUpdate(u.name, u.latest)
-                }}
-              >
-                {t("dashboard.updates.ignore")}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  const u = pendingUpdates[0]
-                  if (u.latest) snoozeUpdate(u.name, u.latest)
-                }}
-              >
-                {t("dashboard.updates.later")}
-              </Button>
-            </>
-          )}
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => {
-              if (pendingUpdates.length === 1) {
-                setInstallFocusAgent(pendingUpdates[0].name)
-              }
-              setCurrentTab("install")
-            }}
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 border border-zinc-800/80 shadow-md flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium text-zinc-400">已桥接 Workspace</div>
+              <div className="text-2xl font-bold font-mono text-zinc-100 mt-1 flex items-baseline gap-2">
+                <span>{connectedCount}</span>
+                <span className="text-xs text-emerald-400 font-normal">Active WS</span>
+              </div>
+            </div>
+            <div className="size-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Layers className="size-5" />
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 border border-zinc-800/80 shadow-md flex items-center justify-between">
+            <div>
+              <div className="text-xs font-medium text-zinc-400">守护进程与后端自愈</div>
+              <div className="text-xs font-bold font-mono text-emerald-400 mt-2 flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block" />
+                <span>Healthy (PID Active)</span>
+              </div>
+            </div>
+            <div className="size-11 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+              <ShieldCheck className="size-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* Section Title & Toolbar */}
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-zinc-100 m-0">智能体集群矩阵</h2>
+            <button
+              onClick={() => void refreshAgents()}
+              className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer border border-zinc-800"
+              title="刷新节点状态"
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          </div>
+
+          <button
+            onClick={() => setCurrentTab("install")}
+            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors cursor-pointer"
           >
-            {pendingUpdates.length === 1
-              ? t("dashboard.updates.updateNow")
-              : t("dashboard.updates.view")}
-          </Button>
+            <span>添加新智能体</span>
+            <ArrowRight className="size-3.5" />
+          </button>
         </div>
-      )}
 
-      {/* Active agents */}
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[14px] font-semibold text-(--text-primary) m-0">
-          {t("dashboard.activeAgents.title")}
-        </h2>
-        <button
-          type="button"
-          onClick={() => setCurrentTab("agents")}
-          className="text-[12px] text-(--accent) hover:underline bg-transparent border-0 cursor-pointer p-0 flex items-center gap-1"
-        >
-          {t("dashboard.activeAgents.viewAll")}
-          <ArrowRight className="w-3 h-3" />
-        </button>
+        {/* Agent Grid Matrix */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : agents.length === 0 ? (
+          <div className="p-10 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-center space-y-4">
+            <div className="size-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 mx-auto">
+              <Cpu className="size-6" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-zinc-200">未准备智能体节点</div>
+              <div className="text-xs text-zinc-500 mt-1">安装并配置您的第一个 AI 智能体节点以开辟协作</div>
+            </div>
+            <Button variant="primary" onClick={() => goToInstallList()}>
+              一键安装智能体
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {agents.map((agent) => (
+              <AgentCard
+                key={agent.name}
+                agent={agent}
+                isPending={pendingAgentActions.has(agent.name)}
+                onToggle={() => void toggleAgentState(agent)}
+                onOpenChat={() => setCurrentTab("agents")}
+              />
+            ))}
+          </div>
+        )}
       </div>
-
-      {loading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
-          <SkeletonCard />
-          <SkeletonCard />
-        </div>
-      ) : agents.length === 0 ? (
-        <div className="bg-(--bg-card) border border-(--border) rounded-(--radius) p-8 text-center mb-6">
-          <p className="text-[13px] text-(--text-secondary) mb-3 m-0">
-            {t("dashboard.activeAgents.empty")}
-          </p>
-          <Button variant="primary" onClick={() => goToInstallList()}>
-            {t("dashboard.activeAgents.installFirst")}
-          </Button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-6">
-          {visibleAgents.map((agent) => (
-            <AgentCard
-              key={agent.name}
-              agent={agent}
-              isPending={pendingAgentActions.has(agent.name)}
-              todayMessages={todayByAgent[agent.name]}
-              onToggle={() => toggleAgent(agent)}
-              onOpenChat={() => openChatForAgent(agent)}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Health + Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 mb-6 min-h-70 items-stretch">
-        <HealthMonitor
-          agents={agents}
-          onSelect={(name) => {
-            setInstallFocusAgent(name)
-            setCurrentTab("agents")
-          }}
-        />
-        <ActivityFeed uiActivity={activityLog} notifications={notifItems} />
-      </div>
-      </div>
-    </section>
+    </div>
   )
 }

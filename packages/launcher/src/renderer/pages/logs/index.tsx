@@ -344,10 +344,10 @@ export default function Logs({ showToast }: LogsProps): React.JSX.Element {
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex-1 bg-(--bg-card) border border-(--border) rounded-(--radius-sm) overflow-auto font-mono text-[12px] leading-snug"
+        className="flex-1 bg-[#09090b] border border-zinc-800/80 rounded-2xl overflow-auto font-mono text-[12.5px] leading-relaxed shadow-inner"
       >
         {filtered.length === 0 ? (
-          <div className="px-4 py-6 text-center text-[12px] text-(--text-tertiary)">
+          <div className="px-4 py-8 flex flex-col items-center justify-center h-full text-[12px] text-zinc-500">
             {logLines.length === 0
               ? t("logs.empty.noLogs")
               : t("logs.empty.noMatch")}
@@ -355,56 +355,75 @@ export default function Logs({ showToast }: LogsProps): React.JSX.Element {
         ) : view === "timeline" ? (
           <TimelineView entries={filtered} />
         ) : (
-          <ul className="m-0 p-0 list-none">
-            {filtered.map(({ p, i }) => {
-              const isExpanded = expanded.has(i)
-              return (
-                <li
-                  key={i}
-                  className={cn(
-                    "px-3 py-1.5 border-b border-(--border) flex items-start gap-2 hover:bg-(--bg-input)/40",
-                    p.level === "error" && "bg-(--danger-bg)/30",
-                  )}
-                >
-                  <span className="shrink-0 text-[10px] text-(--text-tertiary) tabular-nums w-[80px]">
-                    {p.timestamp ? p.timestamp.split(/[ T]/).pop()?.slice(0, 8) : "—"}
-                  </span>
-                  <span className="shrink-0 mt-[1px]">
-                    <LogLevelBadge level={p.level} />
-                  </span>
-                  {p.source && (
-                    <span className="shrink-0 text-[10px] text-(--accent) bg-(--accent-bg) px-1.5 py-0.5 rounded-sm">
-                      {p.source}
-                    </span>
-                  )}
-                  <div className="flex-1 min-w-0 wrap-break-word">
-                    <span style={levelStyle(p.level)}>{p.message || p.raw}</span>
-                    {p.json !== null && (
-                      <div className="mt-1">
-                        <button
-                          type="button"
-                          onClick={() => toggleExpanded(i)}
-                          className="inline-flex items-center gap-1 text-[10px] text-(--text-secondary) bg-transparent border-0 cursor-pointer p-0"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="w-3 h-3" />
-                          ) : (
-                            <ChevronRight className="w-3 h-3" />
-                          )}
-                          {isExpanded ? t("logs.json.hide") : t("logs.json.show")}
-                        </button>
-                        {isExpanded && (
-                          <pre className="bg-(--bg-input) rounded-sm px-3 py-2 mt-1 overflow-x-auto text-[11px]">
-                            <JsonViewer value={p.json} collapsed={false} />
-                          </pre>
+          <div className="py-2">
+            <table className="w-full border-collapse table-fixed">
+              <colgroup>
+                <col className="w-[45px]" />
+                <col className="w-[85px]" />
+                <col className="w-[65px]" />
+                <col className="w-auto" />
+              </colgroup>
+              <tbody className="m-0 p-0 list-none">
+                {filtered.map(({ p, i }) => {
+                  const isExpanded = expanded.has(i)
+                  return (
+                    <tr
+                      key={i}
+                      className={cn(
+                        "group/log flex items-start hover:bg-zinc-900/50 transition-colors border-l-2 border-transparent hover:border-zinc-700/50",
+                        p.level === "error" && "bg-red-950/20 hover:bg-red-950/40 hover:border-red-500/50",
+                      )}
+                    >
+                      {/* Line Number */}
+                      <td className="shrink-0 pt-0.5 pb-0.5 px-2 text-right select-none text-[10px] text-zinc-700 group-hover/log:text-zinc-500 font-medium">
+                        {i + 1}
+                      </td>
+                      {/* Timestamp */}
+                      <td className="shrink-0 pt-0.5 pb-0.5 px-2 text-[10.5px] text-zinc-500 tabular-nums">
+                        {p.timestamp ? p.timestamp.split(/[ T]/).pop()?.slice(0, 8) : "—"}
+                      </td>
+                      {/* Level Badge */}
+                      <td className="shrink-0 pt-0.5 pb-0.5 px-2 mt-0.5">
+                        <LogLevelBadge level={p.level} />
+                      </td>
+                      {/* Message Content */}
+                      <td className="flex-1 min-w-0 pt-0.5 pb-0.5 px-2 pr-4 wrap-break-word">
+                        {p.source && (
+                          <span className="inline-block shrink-0 text-[10px] uppercase font-bold tracking-wider text-cyan-500 bg-cyan-500/10 px-1.5 py-px rounded-sm mr-2 border border-cyan-500/20">
+                            {p.source}
+                          </span>
                         )}
-                      </div>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+                        <span style={levelStyle(p.level)} className={cn("text-zinc-300 font-medium", p.level === "error" && "text-red-400 font-semibold")}>
+                          {p.message || p.raw}
+                        </span>
+                        {p.json !== null && (
+                          <div className="mt-1.5 mb-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(i)}
+                              className="inline-flex items-center gap-1 text-[10.5px] font-medium text-cyan-500 hover:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-0.5 rounded-sm cursor-pointer border border-cyan-500/20 transition-colors"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="w-3 h-3" />
+                              ) : (
+                                <ChevronRight className="w-3 h-3" />
+                              )}
+                              {isExpanded ? "Collapse JSON Payload" : "Inspect JSON Payload"}
+                            </button>
+                            {isExpanded && (
+                              <pre className="bg-zinc-950/80 border border-zinc-800/80 rounded-md px-3 py-2.5 mt-2 overflow-x-auto text-[11.5px] shadow-inner text-zinc-300">
+                                <JsonViewer value={p.json} collapsed={false} />
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
       </div>

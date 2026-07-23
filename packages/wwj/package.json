@@ -1,0 +1,42 @@
+{
+  "name": "@woowonjae/wwj",
+  "version": "0.1.0",
+  "description": "WWJ Launcher — install, configure, and run AI coding agents from your terminal",
+  "main": "src/index.js",
+  "bin": {
+    "wwj": "bin/agent-connector.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "build:registry": "node scripts/build-registry.js",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "wwj",
+    "ai",
+    "agent",
+    "coding",
+    "cli",
+    "launcher"
+  ],
+  "author": "WWJ",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "src/",
+    "bin/",
+    "icons/",
+    "registry.json",
+    "README.md"
+  ],
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "ws": "^8.18.0"
+  }
+}

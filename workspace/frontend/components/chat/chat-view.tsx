@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Radar, FileText, PanelLeft, Terminal } from 'lucide-react';
+import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, Terminal } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -536,17 +536,17 @@ export function ChatView() {
               <PanelLeft className="size-4.5" />
             </button>
           )}
-          {/* Return to Mission Control / Home Dashboard button */}
+          {/* Return to workspace Overview */}
           <button
             onClick={() => {
               setCurrentSessionId(null);
               setViewMode('mission');
             }}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors shrink-0 -ml-1 cursor-pointer border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xs"
-            title="Return to Mission Control Home Surface"
+            title="Back to workspace overview"
           >
-            <ChevronLeft className="size-3.5 text-cyan-500 shrink-0" />
-            <span className="text-[11px] font-bold">Mission Control</span>
+            <ChevronLeft className="size-3.5 text-zinc-400 shrink-0" />
+            <span className="text-[11px] font-bold">Overview</span>
           </button>
           {isDM ? (
             <h2 className="text-xs font-bold tracking-tight truncate flex items-center gap-1.5 text-zinc-900 dark:text-zinc-50">
@@ -743,7 +743,7 @@ export function ChatView() {
                 <span className="text-[10px] hidden xl:inline">Sandbox</span>
               </Button>
 
-              {/* Sonar Radar */}
+              {/* Agents inspector */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -752,10 +752,10 @@ export function ChatView() {
                   'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
                   activeRightTab === 'radar' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
                 )}
-                title="Sonar Radar Tracker"
+                title="Inspect agents"
               >
-                <Radar className="size-3.5" />
-                <span className="text-[10px] hidden xl:inline">Radar</span>
+                <Users className="size-3.5" />
+                <span className="text-[10px] hidden xl:inline">Agents</span>
               </Button>
 
               {/* File Preview */}

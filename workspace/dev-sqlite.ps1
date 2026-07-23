@@ -104,3 +104,7 @@ Write-Host '  Frontend: http://localhost:3005'
 Write-Host '  Backend:  http://localhost:8000/v1/health'
 Write-Host "  Data/logs: $runtimePath"
 Write-Host 'Stop with: .\workspace\dev-sqlite.ps1 -Stop'
+
+# Keep process alive so background task job object does not terminate child processes
+Wait-Process -Id $backend.Id, $frontend.Id
+

@@ -31,6 +31,7 @@ import { useNotificationsStore } from "../../store/notifications"
 import type { RuntimeInfo, UpdaterState } from "../../types"
 import type { ToastType } from "../../hooks/useToast"
 import { cn } from "../../lib/utils"
+import { HealthDashboard } from "../../components/HealthDashboard"
 
 interface SettingsProps {
   showToast: (msg: string, type?: ToastType) => void
@@ -354,31 +355,36 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
         }
       />
 
-      <div className="flex flex-1 min-h-0 gap-5 px-9 py-6">
-        <aside className="w-[200px] shrink-0">
-          <div className="flex items-center gap-2 mb-2 px-2.5 py-1.5 rounded-sm bg-(--bg-input) text-[11px]">
-            <Search className="w-3 h-3 text-(--text-tertiary)" />
+      <div className="flex flex-1 min-h-0 px-8 py-6 max-w-[1200px] mx-auto w-full gap-10">
+        <aside className="w-[220px] shrink-0 flex flex-col">
+          <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-[12px] shadow-sm">
+            <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <input
               placeholder={t("settings.searchPlaceholder")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-transparent border-0 outline-none flex-1 text-[12px]"
+              className="bg-transparent border-0 outline-none flex-1 text-[12.5px] text-zinc-200 placeholder:text-zinc-600"
             />
           </div>
-          <ul className="m-0 p-0 list-none">
+          <ul className="m-0 p-0 list-none flex flex-col gap-0.5">
             {visibleSections.map((s) => (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => setSection(s.id)}
                   className={cn(
-                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-sm text-left text-[12px] border-0 cursor-pointer mb-[2px]",
+                    "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-[13px] border-0 cursor-pointer transition-all relative overflow-hidden group",
                     section === s.id
-                      ? "bg-(--accent) text-white"
-                      : "bg-transparent text-(--text-secondary) hover:bg-(--bg-input)",
+                      ? "text-cyan-400 bg-cyan-500/10 font-medium"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40",
                   )}
                 >
-                  <span className={section === s.id ? "" : "opacity-70"}>{s.icon}</span>
+                  {section === s.id && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-1/2 bg-cyan-400 rounded-r-full shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                  )}
+                  <span className={cn("transition-colors", section === s.id ? "text-cyan-400" : "text-zinc-500 group-hover:text-zinc-400")}>
+                    {s.icon}
+                  </span>
                   {t(`settings.sections.${s.id}`)}
                 </button>
               </li>
@@ -386,7 +392,7 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
           </ul>
         </aside>
 
-        <div className="flex-1 min-w-0 overflow-y-auto pr-2">
+        <div className="flex-1 min-w-0 overflow-y-auto pr-6 custom-scrollbar pb-10">
           {section === "general" && (
             <SettingsCard title={t("settings.general.title")}>
               <Row
@@ -552,6 +558,7 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
                   className="w-full"
                 />
               </Row>
+              <HealthDashboard />
               <Separator />
               <Row
                 stacked
@@ -857,11 +864,11 @@ function SettingsCard({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="bg-(--bg-card) border border-(--border) rounded-(--radius) px-5 py-4 mb-4">
-      <h3 className="m-0 mb-3 text-[14px] font-semibold tracking-[-0.01em]">
+    <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl px-6 py-5 mb-5 shadow-sm">
+      <h3 className="m-0 mb-4 text-[14px] font-bold tracking-tight text-zinc-100 flex items-center gap-2">
         {title}
       </h3>
-      <div className="flex flex-col">{children}</div>
+      <div className="flex flex-col gap-1">{children}</div>
     </div>
   )
 }
@@ -875,35 +882,33 @@ function Row({
   label: string
   desc?: string
   children: React.ReactNode
-  /** Stack label above the control. Use for wide inputs / long descriptions
-   *  where the side-by-side layout would crush the label column. */
   stacked?: boolean
 }): React.JSX.Element {
   if (stacked) {
     return (
-      <div className="flex flex-col gap-2 py-2.5">
+      <div className="flex flex-col gap-2.5 py-3.5">
         <Label plain className="m-0 normal-case tracking-normal">
-          <span className="text-[13px] font-medium text-(--text-primary)">
+          <span className="text-[13px] font-semibold text-zinc-200">
             {label}
           </span>
           {desc && (
-            <span className="block text-[11px] text-(--text-tertiary) font-normal mt-0.5">
+            <span className="block text-[11px] text-zinc-500 font-normal mt-1 leading-relaxed">
               {desc}
             </span>
           )}
         </Label>
-        <div className="w-full">{children}</div>
+        <div className="w-full mt-1">{children}</div>
       </div>
     )
   }
   return (
-    <div className="flex items-center justify-between gap-4 py-2.5">
-      <Label plain className="m-0 normal-case tracking-normal min-w-0">
-        <span className="text-[13px] font-medium text-(--text-primary)">
+    <div className="flex items-center justify-between gap-6 py-3.5 group/row hover:bg-zinc-900/30 -mx-3 px-3 rounded-xl transition-colors">
+      <Label plain className="m-0 normal-case tracking-normal min-w-0 flex-1">
+        <span className="text-[13px] font-semibold text-zinc-200">
           {label}
         </span>
         {desc && (
-          <span className="block text-[11px] text-(--text-tertiary) font-normal mt-0.5">
+          <span className="block text-[11px] text-zinc-500 font-normal mt-1 leading-relaxed max-w-lg">
             {desc}
           </span>
         )}

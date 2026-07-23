@@ -1071,16 +1071,13 @@ function AgentSelectionStep({
                 onClick={() => setSelected(c.name)}
                 disabled={installing}
                 className={cn(
-                  "w-full h-full text-left p-3 rounded-(--radius-sm) border bg-(--bg-card) transition-colors",
-                  // Lock selection while an install is running — switching the
-                  // selected agent mid-download would desync the install from
-                  // the highlighted card.
-                  installing ? "cursor-not-allowed" : "cursor-pointer",
+                  "w-full h-full text-left p-3.5 rounded-xl border transition-all duration-150 relative overflow-hidden",
+                  installing ? "cursor-not-allowed" : "cursor-pointer hover:-translate-y-0.5",
                   active
-                    ? "border-(--accent) ring-2 ring-(--accent-border)"
+                    ? "border-[#06b6d4] bg-[#06b6d4]/10 shadow-[0_0_20px_rgba(6,182,212,0.25)] ring-1 ring-[#06b6d4]"
                     : installing
-                      ? "border-(--border) opacity-50"
-                      : "border-(--border) hover:border-(--border-hover)",
+                      ? "border-zinc-800 bg-zinc-950/40 opacity-50"
+                      : "border-zinc-800/80 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900/90 shadow-sm",
                 )}
               >
                 <div className="flex items-start gap-2.5">
