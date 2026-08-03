@@ -2693,7 +2693,6 @@ app.whenReady().then(async () => {
   }
 
   await ensureCoreLibrary()
-  await backendManager.ensureBackend().catch((err) => console.error('[BackendManager] ensureBackend failed:', err))
 
   if (
     fs.existsSync(GLOBAL_MODULES) &&
@@ -2701,6 +2700,10 @@ app.whenReady().then(async () => {
   ) {
     require("module").globalPaths.push(GLOBAL_MODULES)
   }
+
+  if (!isHeadless) createWindow()
+
+  backendManager.ensureBackend().catch((err) => console.error('[BackendManager] ensureBackend failed:', err))
 
   if (splash && !splash.isDestroyed()) {
     splash.webContents
@@ -2724,8 +2727,6 @@ app.whenReady().then(async () => {
   // post-splash desktop. IPC handlers safely return defaults while
   // agentManager is still undefined; the onboarding catalog poll retries
   // until it lands.
-  if (!isHeadless) createWindow()
-
   agentManager = new AgentManager(store)
   const networks = agentManager.getNetworks() as Array<{ endpoint?: string }>
   const initEndpoint = (store.get("workspaceEndpoint") as string) || networks[0]?.endpoint
