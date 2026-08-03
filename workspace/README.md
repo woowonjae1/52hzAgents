@@ -64,7 +64,7 @@ message.
 | `HOST` | `0.0.0.0` | Backend listen address |
 | `PORT` | `8000` | Backend listen port |
 | `AGENT_TIMEOUT_SECONDS` | `60` | Seconds before agent is considered offline |
-| `REQUESTS_PER_MINUTE` | `120` | Per-client in-process API rate limit; set an edge limit for multi-replica production |
+| `REQUESTS_PER_MINUTE` | `600` | Per-client-IP in-process API rate limit. Every agent connector and browser tab on a machine shares one IP, so budget ~50/min per tab and ~45/min per idle agent. Set an edge limit for multi-replica production |
 | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3001` | Comma-separated browser origins permitted to use credentialed CORS and WebSocket |
 
 ## Self-Hosting

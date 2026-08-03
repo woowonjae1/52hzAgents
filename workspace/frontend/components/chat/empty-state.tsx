@@ -268,7 +268,7 @@ export function EmptyState() {
                   Run command to connect:
                 </div>
                 <pre className="text-zinc-100 text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
-                  {`wwj connect my-${selectedEntry.name} ${token}`}
+                  {`wwj connect my-${selectedEntry.name} ${token || '<token>'}`}
                 </pre>
                 <button
                   className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
@@ -278,7 +278,7 @@ export function EmptyState() {
                       agent_type: selectedEntry.name,
                       os: 'unix',
                     });
-                    copyToClipboard(`wwj connect my-${selectedEntry.name} ${token}`);
+                    copyToClipboard(`wwj connect my-${selectedEntry.name} ${token || '<token>'}`);
                   }}
                 >
                   {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}

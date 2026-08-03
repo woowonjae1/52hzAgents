@@ -973,6 +973,14 @@ class ClaudeAdapter extends BaseAdapter {
           try { await this.sendResponse(msgChannel, fullResponse); } catch {}
         }
         this._resetIdleTimer(msgChannel);
+        try {
+          await this.client.postEvent(this.workspaceId, {
+            channel: msgChannel,
+            messageType: 'status',
+            content: 'idle',
+            senderName: this.agentName,
+          });
+        } catch {}
         if (!msg._todoNudge) {
           try {
             const remaining = await this.getRemainingTodos(msgChannel);
@@ -1148,6 +1156,14 @@ class ClaudeAdapter extends BaseAdapter {
         }
 
         this._resetIdleTimer(msgChannel);
+        try {
+          await this.client.postEvent(this.workspaceId, {
+            channel: msgChannel,
+            messageType: 'status',
+            content: 'idle',
+            senderName: this.agentName,
+          });
+        } catch {}
 
         if (!msg._todoNudge) {
           try {

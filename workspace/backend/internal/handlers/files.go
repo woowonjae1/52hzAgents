@@ -374,12 +374,16 @@ func ListFiles(c *gin.Context) {
 
 // GetFileInfo 处理 GET /v1/files/:file_id/info 接口，返回文件的详情元数据。
 func GetFileInfo(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
 	fileID := c.Param("file_id") // 获取路由入参。
 
-	// 根据文件 ID 锁定数据库记录。
+	// 根据文件 ID 锁定数据库记录 (带 workspace_id 隔离)
 	var record models.FileRecord
-	if err := db.DB.Where("id = ?", fileID).First(&record).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found"})
+	if err := db.DB.Where("id = ? AND workspace_id = ?", fileID, workspace.ID).First(&record).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found in this workspace"})
 		return
 	}
 
@@ -389,12 +393,16 @@ func GetFileInfo(c *gin.Context) {
 
 // DownloadFile 处理 GET /v1/files/:file_id 接口，流式返回物理文件给客户端进行下载。
 func DownloadFile(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
 	fileID := c.Param("file_id") // 获取路由入参。
 
-	// 检索文件是否存在。
+	// 检索文件是否存在 (带 workspace_id 隔离)
 	var record models.FileRecord
-	if err := db.DB.Where("id = ?", fileID).First(&record).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found"})
+	if err := db.DB.Where("id = ? AND workspace_id = ?", fileID, workspace.ID).First(&record).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found in this workspace"})
 		return
 	}
 
@@ -420,12 +428,16 @@ func DownloadFile(c *gin.Context) {
 
 // DeleteFile 处理 DELETE /v1/files/:file_id 接口，逻辑删除文件元数据并清除物理文件。
 func DeleteFile(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
 	fileID := c.Param("file_id") // 获取路由入参。
 
-	// 查询获取数据库记录。
+	// 查询获取数据库记录 (带 workspace_id 隔离)
 	var record models.FileRecord
-	if err := db.DB.Where("id = ?", fileID).First(&record).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found"})
+	if err := db.DB.Where("id = ? AND workspace_id = ?", fileID, workspace.ID).First(&record).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found in this workspace"})
 		return
 	}
 
@@ -443,6 +455,12 @@ func DeleteFile(c *gin.Context) {
 	// 返回成功。
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
+
+// diskSyncUploader marks rows created by the disk scan. It is deliberately
+// distinct from any agent address: the retired chat-scraping importer also wrote
+// "openagents:agent", which made its fabricated rows indistinguishable from
+// files an agent genuinely wrote, leaving no safe way to clean one up.
+const diskSyncUploader = "system:disk-sync"
 
 // syncLocalDiskFiles 自动扫描工作区存储路径及 Agent 工作目录下的磁盘文件，将 Agent 生成的文件（如 青羊区到金牛区路线.md）自动注册到数据库
 func syncLocalDiskFiles(workspaceID string) {
@@ -484,7 +502,7 @@ func syncLocalDiskFiles(workspaceID string) {
 						ContentType: "application/octet-stream",
 						Size:        int(info.Size()),
 						StorageKey:  storageKey,
-						UploadedBy:  "openagents:agent",
+						UploadedBy:  diskSyncUploader,
 						ChannelName: nil,
 						Status:      "active",
 						CreatedAt:   info.ModTime(),

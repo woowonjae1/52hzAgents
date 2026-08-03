@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 
+import { getApiBaseUrl } from '@/lib/config';
+
 interface ConnectAgentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -20,7 +22,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [startingAgent, setStartingAgent] = useState<string | null>(null);
 
-  const pairingCommand = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=http://localhost:8000`;
+  const pairingCommand = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=${getApiBaseUrl()}`;
 
   const copyCommand = () => {
     navigator.clipboard.writeText(pairingCommand);

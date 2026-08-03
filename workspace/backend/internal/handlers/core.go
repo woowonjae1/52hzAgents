@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -105,13 +104,26 @@ func DiscoverNetwork(c *gin.Context) {
 		})
 	}
 
+	channelIDs := make([]string, 0, len(channels))
+	for _, ch := range channels {
+		channelIDs = append(channelIDs, ch.ID)
+	}
+
+	var allMembers []models.ChannelMember
+	if len(channelIDs) > 0 {
+		db.DB.Where("channel_id IN ?", channelIDs).Find(&allMembers)
+	}
+
+	membersByChannel := make(map[string][]string)
+	for _, m := range allMembers {
+		membersByChannel[m.ChannelID] = append(membersByChannel[m.ChannelID], m.AgentName)
+	}
+
 	channelItems := make([]gin.H, 0, len(channels))
 	for _, channel := range channels {
-		var channelMembers []models.ChannelMember
-		db.DB.Where("channel_id = ?", channel.ID).Find(&channelMembers)
-		participants := make([]string, 0, len(channelMembers))
-		for _, member := range channelMembers {
-			participants = append(participants, member.AgentName)
+		participants := membersByChannel[channel.ID]
+		if participants == nil {
+			participants = []string{}
 		}
 		channelItems = append(channelItems, gin.H{
 			"address": "channel/" + channel.Name, "title": channel.Title,
@@ -149,10 +161,19 @@ func eventResponse(record models.EventRecord) gin.H {
 	if metadata == nil {
 		metadata = map[string]interface{}{}
 	}
+	// client_message_id must survive the round trip: the web client reconciles
+	// its optimistic copy of a sent message against the server echo by this id.
+	// Omitting it here (the SSE broadcast has always included it) left polled
+	// and backfilled history unmatchable, so every sent message rendered twice.
+	var clientMessageID interface{}
+	if record.ClientMessageID != nil {
+		clientMessageID = *record.ClientMessageID
+	}
 	return gin.H{
 		"id": record.ID, "type": record.Type, "source": record.Source,
 		"target": record.Target, "payload": payload, "metadata": metadata,
 		"timestamp": record.Timestamp, "visibility": record.Visibility,
+		"client_message_id": clientMessageID,
 	}
 }
 
@@ -183,13 +204,23 @@ func ListEvents(c *gin.Context) {
 		if id := c.Query(cursor.key); id != "" {
 			var boundary models.EventRecord
 			if db.DB.Where("id = ? AND network_id = ?", id, workspace.ID).First(&boundary).Error == nil {
-				query = query.Where("timestamp "+cursor.op+" ?", boundary.Timestamp)
+				if cursor.key == "after" {
+					query = query.Where("(timestamp > ? OR (timestamp = ? AND id > ?))", boundary.Timestamp, boundary.Timestamp, boundary.ID)
+				} else {
+					query = query.Where("(timestamp < ? OR (timestamp = ? AND id < ?))", boundary.Timestamp, boundary.Timestamp, boundary.ID)
+				}
 			}
 		}
 	}
-	order := "timestamp asc"
-	if c.Query("sort") == "desc" || c.Query("before") != "" {
-		order = "timestamp desc"
+	// The id tiebreak is load-bearing, not cosmetic: the after/before cursors above
+	// compare (timestamp, id) as a pair, so rows sharing a millisecond have to come
+	// back in id order too. Ordering by timestamp alone leaves ties in whatever
+	// order the database happens to emit, and the next page's "id > boundary"
+	// then silently drops the ones that sorted first.
+	order := "timestamp asc, id asc"
+	isDesc := c.Query("sort") == "desc" || c.Query("before") != ""
+	if isDesc {
+		order = "timestamp desc, id desc"
 	}
 	targetAgent := strings.TrimSpace(c.Query("target_agents"))
 	var streamHead models.EventRecord
@@ -212,7 +243,7 @@ func ListEvents(c *gin.Context) {
 				headQuery = headQuery.Where("type = ?", eventType)
 			}
 		}
-		hasStreamHead = headQuery.Order("timestamp desc").First(&streamHead).Error == nil
+		hasStreamHead = headQuery.Order("timestamp desc, id desc").First(&streamHead).Error == nil
 	}
 	var records []models.EventRecord
 	if targetAgent == "" {
@@ -242,7 +273,11 @@ func ListEvents(c *gin.Context) {
 	}
 	var oldestID, newestID interface{}
 	if len(records) > 0 {
-		oldestID, newestID = records[0].ID, records[len(records)-1].ID
+		if isDesc {
+			oldestID, newestID = records[len(records)-1].ID, records[0].ID
+		} else {
+			oldestID, newestID = records[0].ID, records[len(records)-1].ID
+		}
 	}
 	response := gin.H{"events": events, "has_more": hasMore, "oldest_id": oldestID, "newest_id": newestID}
 	if targetAgent != "" {
@@ -261,7 +296,7 @@ func LatestEventsPerChannel(c *gin.Context) {
 		return
 	}
 	var records []models.EventRecord
-	db.DB.Where("network_id = ? AND target LIKE ?", workspace.ID, "channel/%").Order("timestamp desc").Limit(1000).Find(&records)
+	db.DB.Where("network_id = ? AND target LIKE ?", workspace.ID, "channel/%").Order("timestamp desc, id desc").Limit(1000).Find(&records)
 	channels := map[string]gin.H{}
 	for _, record := range records {
 		name := strings.TrimPrefix(record.Target, "channel/")
@@ -335,83 +370,45 @@ func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64
 		}
 	}
 
-	if contentStr, ok := req.Payload["content"].(string); ok && contentStr != "" {
-		autoMaterializeMessageFiles(workspaceID, contentStr)
-	}
-
 	return nil
 }
 
-func autoMaterializeMessageFiles(workspaceID string, content string) {
-	if content == "" {
-		return
+// ensureWorkspaceConnectorToken returns the raw token that the connector must
+// send to /v1/token/resolve. A password hash cannot be reversed, so legacy
+// workspaces that predate settings["token"] (or whose setting was overwritten)
+// need a newly issued credential. Keep the JSON copy and password hash in sync
+// so the token is immediately resolvable by every authentication path.
+func ensureWorkspaceConnectorToken(workspace *models.Workspace) (string, error) {
+	settings := decodeJSONMap(workspace.Settings)
+	if token, ok := settings["token"].(string); ok && token != "" && verifyWorkspaceAccess(workspace, token) {
+		return token, nil
 	}
 
-	var filenames []string
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
-		if strings.Contains(line, ".md") || strings.Contains(line, ".py") || strings.Contains(line, ".csv") || strings.Contains(line, ".txt") || strings.Contains(line, ".json") {
-			words := strings.Fields(line)
-			for _, w := range words {
-				wClean := strings.Trim(w, " `\"'()[]:→,")
-				if strings.HasSuffix(wClean, ".md") || strings.HasSuffix(wClean, ".py") || strings.HasSuffix(wClean, ".csv") || strings.HasSuffix(wClean, ".txt") || strings.HasSuffix(wClean, ".json") {
-					if len(wClean) > 3 && !strings.Contains(wClean, "/") && !strings.Contains(wClean, "\\") {
-						filenames = append(filenames, wClean)
-					}
-				}
-			}
-		}
+	token := "ws_" + strings.ReplaceAll(uuid.New().String(), "-", "")
+	hash := hashWorkspaceToken(token)
+	settings["token"] = token
+	settingsBytes, err := json.Marshal(settings)
+	if err != nil {
+		return "", err
+	}
+	if err := db.DB.Model(workspace).Updates(map[string]interface{}{
+		"password_hash": hash,
+		"settings":      settingsBytes,
+	}).Error; err != nil {
+		return "", err
 	}
 
-	if len(filenames) == 0 {
-		return
-	}
-
-	basePath := config.GlobalConfig.FileStoragePath
-	wsDir := filepath.Join(basePath, workspaceID)
-	_ = os.MkdirAll(wsDir, 0755)
-
-	for _, fname := range filenames {
-		var count int64
-		db.DB.Model(&models.FileRecord{}).Where("workspace_id = ? AND filename = ?", workspaceID, fname).Count(&count)
-		if count == 0 {
-			filePath := filepath.Join(wsDir, fname)
-			if _, err := os.Stat(filePath); os.IsNotExist(err) {
-				_ = os.WriteFile(filePath, []byte(content), 0644)
-			}
-
-			info, _ := os.Stat(filePath)
-			sizeVal := len(content)
-			if info != nil {
-				sizeVal = int(info.Size())
-			}
-
-			storageKey := fmt.Sprintf("%s/%s", workspaceID, fname)
-			cType := "application/octet-stream"
-			if strings.HasSuffix(fname, ".md") || strings.HasSuffix(fname, ".txt") {
-				cType = "text/markdown; charset=utf-8"
-			}
-			db.DB.Create(&models.FileRecord{
-				ID:          uuid.New().String(),
-				WorkspaceID: workspaceID,
-				Filename:    fname,
-				ContentType: cType,
-				Size:        sizeVal,
-				StorageKey:  storageKey,
-				UploadedBy:  "openagents:agent",
-				ChannelName: nil,
-				Status:      "active",
-				CreatedAt:   time.Now(),
-			})
-		}
-	}
+	workspace.PasswordHash = &hash
+	workspace.Settings = settingsBytes
+	return token, nil
 }
 
 func LaunchAgent(c *gin.Context) {
 	agentName := c.Param("agent_name")
 	network := c.Query("network")
 	if network == "" {
-		network = c.PostForm("network")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "network is required"})
+		return
 	}
 	workspace, err := resolveWorkspace(network)
 	if err != nil {
@@ -422,52 +419,65 @@ func LaunchAgent(c *gin.Context) {
 	lowerName := strings.ToLower(agentName)
 	var execErr error
 
-	// Determine correct Windows CMD launcher syntax (cmd /k handles || fallback natively without PowerShell syntax errors)
-	var runCmd *exec.Cmd
-	switch {
-	case strings.Contains(lowerName, "claude"):
-		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "claude || npx -y @anthropic-ai/claude-code")
-	case strings.Contains(lowerName, "codex"):
-		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "codex || npx -y codex")
-	case strings.Contains(lowerName, "cline"):
-		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "cline || npx -y cline")
-	case strings.Contains(lowerName, "hermes"):
-		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "hermes || npx -y hermes")
-	case strings.Contains(lowerName, "kilo"):
-		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "kilo || npx -y kilo")
-	case strings.Contains(lowerName, "aider"):
-		runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", "aider || npx -y aider")
-	default:
-		connectorPath := filepath.Join("D:\\code\\wwj-agent-launcher", "bin", "agent-connector.js")
-		if _, err := os.Stat(connectorPath); err == nil {
-			runCmd = exec.Command("node", connectorPath, "up", "--foreground")
-			runCmd.Dir = "D:\\code\\wwj-agent-launcher"
+	// Safe local launcher syntax routing through the workspace connector.
+	// We locate the local wwj CLI script relative to the backend cwd.
+	cliPath := "../../packages/wwj/src/cli.js"
+	if _, err := os.Stat(cliPath); os.IsNotExist(err) {
+		if _, err2 := os.Stat("../packages/wwj/src/cli.js"); err2 == nil {
+			cliPath = "../packages/wwj/src/cli.js"
 		} else {
-			runCmd = exec.Command("cmd", "/c", "start", "cmd", "/k", fmt.Sprintf("node bin/agent-connector.js connect --agent=%s", agentName))
+			// Fallback if not running in the monorepo structure
+			cliPath = "wwj"
 		}
 	}
 
-	if runCmd != nil {
-		execErr = runCmd.Start()
+	// In local development the browser may carry a stale workspace identifier
+	// in the token slot. Always use the database-backed connector credential so
+	// wwj receives a token that /v1/token/resolve can actually authenticate.
+	localDevMode := config.GlobalConfig != nil && config.GlobalConfig.AuthMode == "none"
+	reqToken := workspaceToken(c)
+	if localDevMode {
+		var tokenErr error
+		reqToken, tokenErr = ensureWorkspaceConnectorToken(workspace)
+		if tokenErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare workspace connector token"})
+			return
+		}
+	} else {
+		// Production callers must prove they are allowed to start a local agent
+		// for this workspace.
+		if reqToken == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "X-Workspace-Token required to launch an agent"})
+			return
+		}
+		if !verifyWorkspaceAccess(workspace, reqToken) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
+			return
+		}
 	}
 
+	runArgs := []string{"/c", "start", "cmd", "/k"}
+	if cliPath == "wwj" {
+		runArgs = append(runArgs, "wwj", "connect", agentName, reqToken, "--endpoint", "http://localhost:8000")
+	} else {
+		runArgs = append(runArgs, "node", cliPath, "connect", agentName, reqToken, "--endpoint", "http://localhost:8000")
+	}
+	runCmd := exec.Command("cmd", runArgs...)
+
+	execErr = runCmd.Start()
 	if execErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to launch agent process: %v", execErr)})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to launch agent process: " + execErr.Error()})
 		return
 	}
 
-	// Process launched successfully -> update database state to online
+	nowTime := time.Now()
 	var member models.WorkspaceMember
 	err = db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).First(&member).Error
-	nowTime := time.Now()
-	agentTypeStr := strings.ToUpper(agentName)
-	if strings.Contains(agentName, "-") {
-		parts := strings.Split(agentName, "-")
-		agentTypeStr = strings.ToUpper(parts[0])
-	}
+
+	agentTypeStr := lowerName
 	hostStr := "localhost"
-	dirStr := workspace.ID
-	descStr := fmt.Sprintf("Auto-launched %s agent runtime", agentName)
+	dirStr := "."
+	descStr := fmt.Sprintf("Launched %s agent runtime", agentName)
 
 	if err != nil {
 		member = models.WorkspaceMember{
@@ -478,21 +488,24 @@ func LaunchAgent(c *gin.Context) {
 			ServerHost:    &hostStr,
 			WorkingDir:    &dirStr,
 			Description:   &descStr,
-			EnabledSkills: []byte(`{"installed":["web_search","file_ops","terminal_exec","code_edit"]}`),
-			Status:        "online",
+			EnabledSkills: []byte(`{"installed":[]}`), // Real skills empty until agent reports heartbeat
+			Status:        "launching",                // True status: launching until heartbeat confirms readiness
 			LastHeartbeat: &nowTime,
 			JoinedAt:      nowTime,
 		}
 		db.DB.Create(&member)
 	} else {
 		db.DB.Model(&member).Updates(map[string]interface{}{
-			"status":         "online",
+			"status":         "launching",
 			"last_heartbeat": nowTime,
 			"agent_type":     agentTypeStr,
 		})
 	}
 
-	payloadBytes, _ := json.Marshal(gin.H{"agent_name": agentName, "status": "online", "action": "launched"})
+	// The launcher only proves a process was spawned — never that the agent
+	// connected. Report "launching" on the wire too, so the event log and the
+	// API response agree with the member row instead of claiming readiness.
+	payloadBytes, _ := json.Marshal(gin.H{"agent_name": agentName, "status": "launching", "action": "launched"})
 	metaBytes, _ := json.Marshal(gin.H{})
 	eventID := uuid.New().String()
 	nowMs := time.Now().UnixMilli()
@@ -516,7 +529,7 @@ func LaunchAgent(c *gin.Context) {
 		"type":      "workspace.agent.control",
 		"source":    "system:launcher",
 		"target":    "openagents:" + agentName,
-		"payload":   gin.H{"agent_name": agentName, "status": "online", "action": "launched"},
+		"payload":   gin.H{"agent_name": agentName, "status": "launching", "action": "launched"},
 		"timestamp": nowMs,
 	})
 
@@ -526,5 +539,5 @@ func LaunchAgent(c *gin.Context) {
 		Payload:     string(fullBytes),
 	})
 
-	c.JSON(http.StatusOK, gin.H{"message": "Agent launched successfully", "agent_name": agentName, "status": "online"})
+	c.JSON(http.StatusOK, gin.H{"message": "Launcher started; waiting for the agent to connect", "agent_name": agentName, "status": "launching"})
 }

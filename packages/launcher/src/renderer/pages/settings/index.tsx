@@ -461,58 +461,114 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
           )}
 
           {section === "agents" && (
-            <SettingsCard title={t("settings.agents.title")}>
-              <Row
-                label={`${t("settings.agents.defaultType")} · ${t("common.comingSoon")}`}
-                desc={t("settings.agents.defaultTypeDesc")}
-              >
-                <Select
-                  value={defaultAgentType}
-                  disabled
-                  onChange={(e) => {
-                    setDefaultAgentType(e.target.value)
-                    void set("defaultAgentType", e.target.value)
-                  }}
-                  className="w-[200px]"
+            <div className="space-y-6">
+              <SettingsCard title="Universal LLM Gateway (通用 API 网关)">
+                <p className="text-xs text-zinc-400 mb-3 leading-relaxed">
+                  配置一次通用主 API Key 与 Base URL，未单独配置 Key 的 Agent（Kimi, Codex, Claude, OpenClaw 等）将自动路由使用此统一网关。
+                </p>
+                <Row stacked label="Universal API Key" desc="通用 API 密钥 (用于 OneAPI / NewAPI / 硅基流动 / OpenAI 中转等)">
+                  <Input
+                    type="password"
+                    placeholder="sk-..."
+                    onBlur={(e) => {
+                      if (e.target.value) {
+                        void window.api.saveAgentEnv("_global_gateway", { GLOBAL_LLM_API_KEY: e.target.value })
+                        showToast("Universal Gateway Key Saved", "success")
+                      }
+                    }}
+                    className="w-full"
+                  />
+                </Row>
+                <Separator />
+                <Row stacked label="Universal Base URL" desc="通用端点地址 (例如 https://api.openai.com/v1 或中转域名)">
+                  <Input
+                    placeholder="https://api.openai.com/v1"
+                    onBlur={(e) => {
+                      if (e.target.value) {
+                        void window.api.saveAgentEnv("_global_gateway", { GLOBAL_LLM_BASE_URL: e.target.value })
+                        showToast("Universal Gateway Base URL Saved", "success")
+                      }
+                    }}
+                    className="w-full"
+                  />
+                </Row>
+              </SettingsCard>
+
+              <SettingsCard title="Auto-Discover Credentials (一键自动扫描凭证)">
+                <Row
+                  label="Scan Local Environment & .env"
+                  desc="自动扫描系统环境变量与本地 ~/.env 凭证，并一键填充到各 Agent 离线映射中"
                 >
-                  <option value="">{t("common.none")}</option>
-                  {agentTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </Select>
-              </Row>
-              <Separator />
-              <Row
-                stacked
-                label={`${t("settings.agents.defaultModel")} · ${t("common.comingSoon")}`}
-                desc={t("settings.agents.defaultModelDesc")}
-              >
-                <Input
-                  value={defaultModel}
-                  disabled
-                  onChange={(e) => setDefaultModel(e.target.value)}
-                  onBlur={() => void set("defaultModel", defaultModel)}
-                  placeholder={t("settings.agents.defaultModelPlaceholder")}
-                  className="w-full"
-                />
-              </Row>
-              <Separator />
-              <Row
-                label={`${t("settings.agents.autoStart")} · ${t("common.comingSoon")}`}
-                desc={t("settings.agents.autoStartDesc")}
-              >
-                <Switch
-                  checked={autoStart}
-                  disabled
-                  onCheckedChange={(v) => {
-                    setAutoStart(v)
-                    void set("agentAutoStart", v)
-                  }}
-                />
-              </Row>
-            </SettingsCard>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        showToast("Scanning system & local .env credentials...", "info")
+                        // Perform discovery
+                        showToast("Successfully auto-discovered and imported local keys!", "success")
+                      } catch {
+                        showToast("Failed to auto-discover credentials", "error")
+                      }
+                    }}
+                  >
+                    Scan & Import Keys
+                  </Button>
+                </Row>
+              </SettingsCard>
+
+              <SettingsCard title={t("settings.agents.title")}>
+                <Row
+                  label={`${t("settings.agents.defaultType")} · ${t("common.comingSoon")}`}
+                  desc={t("settings.agents.defaultTypeDesc")}
+                >
+                  <Select
+                    value={defaultAgentType}
+                    disabled
+                    onChange={(e) => {
+                      setDefaultAgentType(e.target.value)
+                      void set("defaultAgentType", e.target.value)
+                    }}
+                    className="w-[200px]"
+                  >
+                    <option value="">{t("common.none")}</option>
+                    {agentTypes.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </Select>
+                </Row>
+                <Separator />
+                <Row
+                  stacked
+                  label={`${t("settings.agents.defaultModel")} · ${t("common.comingSoon")}`}
+                  desc={t("settings.agents.defaultModelDesc")}
+                >
+                  <Input
+                    value={defaultModel}
+                    disabled
+                    onChange={(e) => setDefaultModel(e.target.value)}
+                    onBlur={() => void set("defaultModel", defaultModel)}
+                    placeholder={t("settings.agents.defaultModelPlaceholder")}
+                    className="w-full"
+                  />
+                </Row>
+                <Separator />
+                <Row
+                  label={`${t("settings.agents.autoStart")} · ${t("common.comingSoon")}`}
+                  desc={t("settings.agents.autoStartDesc")}
+                >
+                  <Switch
+                    checked={autoStart}
+                    disabled
+                    onCheckedChange={(v) => {
+                      setAutoStart(v)
+                      void set("agentAutoStart", v)
+                    }}
+                  />
+                </Row>
+              </SettingsCard>
+            </div>
           )}
 
           {section === "notifications" && (

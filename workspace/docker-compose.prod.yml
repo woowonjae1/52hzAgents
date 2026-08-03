@@ -22,7 +22,7 @@ services:
       AUTH_MODE: workspace_token
       IDENTITY_MODE: standalone
       CORS_ORIGINS: ${CORS_ORIGINS:-https://workspace.openagents.org}
-      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-120}
+      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-600}
     depends_on:
       db:
         condition: service_healthy

@@ -99,12 +99,23 @@ class EnvManager {
   }
 
   /**
-   * Get the full effective env for an agent: saved + resolved.
+   * Get the full effective env for an agent: saved + resolved + global fallback gateway.
    */
   getEffective(agentType, registry) {
     const saved = this.load(agentType);
-    const resolved = this.resolve(agentType, saved, registry);
-    return { ...saved, ...resolved };
+    const globalGateway = this.load('_global_gateway');
+    
+    // If agent has no saved specific API key, supply global gateway if present
+    const combinedSaved = { ...saved };
+    if (globalGateway.GLOBAL_LLM_API_KEY && !combinedSaved.LLM_API_KEY && !combinedSaved.OPENAI_API_KEY && !combinedSaved.ANTHROPIC_API_KEY && !combinedSaved.KIMI_API_KEY) {
+      combinedSaved.LLM_API_KEY = globalGateway.GLOBAL_LLM_API_KEY;
+      if (globalGateway.GLOBAL_LLM_BASE_URL && !combinedSaved.LLM_BASE_URL) {
+        combinedSaved.LLM_BASE_URL = globalGateway.GLOBAL_LLM_BASE_URL;
+      }
+    }
+
+    const resolved = this.resolve(agentType, combinedSaved, registry);
+    return { ...combinedSaved, ...resolved };
   }
 }
 

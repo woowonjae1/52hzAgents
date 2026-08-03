@@ -115,52 +115,135 @@ class CodexAdapter extends BaseAdapter {
   // Find codex binary (multi-tier, like Claude adapter)
   // ------------------------------------------------------------------
 
+  /**
+   * Verify a candidate binary can actually be launched.
+   *
+   * Existence is not enough. A Microsoft Store app execution alias (under
+   * C:\Program Files\WindowsApps) passes fs.existsSync and even reports an
+   * executable bit, yet spawning it fails with EACCES because of the package
+   * ACLs. Detection that only stats the path logs "CLI mode: <path>" at startup
+   * and then fails every single task at run time. Probing --version keeps the
+   * advertised capability honest.
+   *
+   * Records the errno per candidate in this._probeFailures so the run-time
+   * error can tell "not installed" (ENOENT) apart from "installed but not
+   * launchable" (EACCES), instead of advising a reinstall that cannot help.
+   */
+  /**
+   * Render a thrown value as something actionable. A failed spawn often carries
+   * an empty .message but a meaningful code/syscall (EACCES, ENOENT), and the
+   * previous `Error: ${e.message}` turned exactly those into a bare "Error:".
+   */
+  _describeThrown(e) {
+    if (!e) return 'unknown error';
+    const parts = [];
+    if (e.code) parts.push(String(e.code));
+    if (e.syscall) parts.push(`syscall=${e.syscall}`);
+    if (e.path) parts.push(`path=${e.path}`);
+    const msg = (e.message || '').trim();
+    if (msg) parts.push(msg);
+    return parts.length > 0 ? parts.join(' ') : String(e);
+  }
+
+  /**
+   * Explain an empty turn using what the CLI actually reported. Every branch
+   * here used to collapse into "No response generated. Please try again." —
+   * advice that cannot help when the real cause is an expired login, a bad
+   * model name, or a non-zero exit, and that makes a retry pointless.
+   */
+  _describeEmptyResult(result) {
+    const bits = [];
+    const turnFailure = (result.turnFailure || '').trim();
+    if (turnFailure) bits.push(turnFailure);
+    const stderr = (result.stderr || '').trim();
+    if (stderr) bits.push(stderr.slice(-800));
+    if (bits.length === 0) {
+      const code = result.exitCode;
+      bits.push(code === 0 || code === null || code === undefined
+        ? 'the CLI exited cleanly but emitted no agent message'
+        : `the CLI exited with code ${code} and wrote nothing to stderr`);
+    }
+    return `codex produced no response — ${bits.join('\n\n')}`;
+  }
+
+  /**
+   * Explain why no CLI is usable, based on what detection actually observed.
+   * Reporting "not found" for a binary that exists but cannot be spawned sends
+   * people off to reinstall it, which never fixes an ACL/alias problem.
+   */
+  _unavailableReason() {
+    const blocked = Object.entries(this._probeFailures || {})
+      .filter(([, code]) => code !== 'ENOENT');
+    if (blocked.length === 0) {
+      return 'codex CLI not found. Install with: npm install -g @openai/codex'
+        + '\n\nOr configure OPENAI_API_KEY + OPENAI_BASE_URL for direct API mode.';
+    }
+    const detail = blocked.map(([p, code]) => `  • ${p} — ${code}`).join('\n');
+    return 'codex CLI was found but could not be launched:\n' + detail
+      + '\n\nEACCES usually means a Microsoft Store install (under WindowsApps),'
+      + ' which cannot be spawned directly. Install a runnable copy instead:'
+      + '\n  npm install -g @openai/codex'
+      + '\n\nOr configure OPENAI_API_KEY + OPENAI_BASE_URL for direct API mode.';
+  }
+
+  _isLaunchable(binPath) {
+    try {
+      execSync(`"${binPath}" --version`, {
+        encoding: 'utf-8', timeout: 15000, windowsHide: true, stdio: 'pipe',
+      });
+      return true;
+    } catch (e) {
+      this._probeFailures[binPath] = e.code || 'EPROBE';
+      return false;
+    }
+  }
+
   _findCodexBinary() {
     const home = os.homedir();
     const ext = IS_WINDOWS ? '.cmd' : '';
+    this._probeFailures = {};
 
-    // Tier 0: Isolated runtime prefix (~/.wwj/runtimes/codex/)
-    const runtimeCandidate = path.join(home, '.wwj', 'runtimes', 'codex', 'node_modules', '.bin', `codex${ext}`);
-    if (fs.existsSync(runtimeCandidate)) return runtimeCandidate;
-
-    // Tier 0b: Legacy portable install
-    const portableCandidate = path.join(home, '.wwj', 'nodejs', 'node_modules', '.bin', `codex${ext}`);
-    if (fs.existsSync(portableCandidate)) return portableCandidate;
-
-    // Tier 1: PATH search via a codepage-safe lookup (whereBinary forces UTF-8
-    // output + verifies existence so a non-ASCII/Chinese username isn't mangled
-    // into an ENOENT; it also no longer returns an empty string on a miss, which
-    // used to short-circuit the Node-derived fallback tiers below).
+    // Tier 1 uses a codepage-safe lookup (whereBinary forces UTF-8 output +
+    // verifies existence so a non-ASCII/Chinese username isn't mangled into an
+    // ENOENT; it also no longer returns an empty string on a miss, which used
+    // to short-circuit the Node-derived fallback tiers below).
     const viaWhere = whereBinary('codex');
-    if (viaWhere) return viaWhere;
 
-    // Tier 2: Next to current Node.js interpreter (npm global)
-    const nodeBinDir = path.dirname(process.execPath);
-    const nearNode = path.join(nodeBinDir, `codex${ext}`);
-    if (fs.existsSync(nearNode)) return nearNode;
+    const candidates = [
+      // Tier 0: Isolated runtime prefix (~/.wwj/runtimes/codex/)
+      path.join(home, '.wwj', 'runtimes', 'codex', 'node_modules', '.bin', `codex${ext}`),
+      // Tier 0b: Legacy portable install
+      path.join(home, '.wwj', 'nodejs', 'node_modules', '.bin', `codex${ext}`),
+      // Tier 1: PATH search
+      viaWhere,
+      // Tier 2: Next to current Node.js interpreter (npm global)
+      path.join(path.dirname(process.execPath), `codex${ext}`),
+    ];
 
     // Tier 3: npm global prefix (handles custom npm prefix like D:\node\node_global)
     try {
       const npmPrefix = execSync('npm config get prefix', {
         encoding: 'utf-8', timeout: 5000, windowsHide: true,
       }).trim();
-      if (npmPrefix) {
-        const prefixCandidate = path.join(npmPrefix, `codex${ext}`);
-        if (fs.existsSync(prefixCandidate)) return prefixCandidate;
-      }
+      if (npmPrefix) candidates.push(path.join(npmPrefix, `codex${ext}`));
     } catch {}
 
     // Tier 4: Common install locations
-    const candidates = IS_WINDOWS ? [
+    candidates.push(...(IS_WINDOWS ? [
       path.join(process.env.APPDATA || '', 'npm', 'codex.cmd'),
     ] : [
       path.join(home, '.local', 'bin', 'codex'),
       path.join(home, '.npm-global', 'bin', 'codex'),
       '/opt/homebrew/bin/codex',
       '/usr/local/bin/codex',
-    ];
+    ]));
+
+    // Existence gates the probe; launchability decides. A candidate that exists
+    // but cannot spawn is skipped so the next tier still gets its chance,
+    // rather than winning detection and then failing every task.
     for (const c of candidates) {
-      if (fs.existsSync(c)) return c;
+      if (!c || !fs.existsSync(c)) continue;
+      if (this._isLaunchable(c)) return c;
     }
 
     return null;
@@ -275,7 +358,7 @@ class CodexAdapter extends BaseAdapter {
     } else if (this._directMode) {
       await this._handleViaDirectApi(content, msgChannel);
     } else {
-      await this.sendError(msgChannel, 'codex CLI not found. Install with: npm install -g @openai/codex\n\nOr configure OPENAI_API_KEY + OPENAI_BASE_URL for direct API mode.');
+      await this.sendError(msgChannel, this._unavailableReason());
     }
   }
 
@@ -341,12 +424,16 @@ class CodexAdapter extends BaseAdapter {
           this._saveSessions();
           continue;
         } else {
-          await this.sendError(msgChannel, 'No response generated. Please try again.');
+          // The CLI produced no answer. It already told us why via turn.failed,
+          // a non-zero exit code, or stderr — report that instead of a generic
+          // "try again", which hides the cause and makes a retry pointless.
+          await this.sendError(msgChannel, this._describeEmptyResult(result));
           return;
         }
       } catch (e) {
-        this._log(`Error in subprocess: ${e.message}`);
-        await this.sendError(msgChannel, `Error: ${e.message}`);
+        const reason = this._describeThrown(e);
+        this._log(`Error in subprocess: ${reason}`);
+        await this.sendError(msgChannel, `codex failed to run: ${reason}`);
         return;
       }
     }
@@ -368,6 +455,10 @@ class CodexAdapter extends BaseAdapter {
       let hasToolUseSinceLastText = false;
       let lineBuffer = '';
       let stderrBuf = '';
+      // Reason reported by the CLI itself via a turn.failed event. Kept so the
+      // caller can tell the user why the turn produced no text, instead of
+      // collapsing every failure into "No response generated".
+      let turnFailure = '';
       let _pendingLines = Promise.resolve();
 
       if (proc.stderr) {
@@ -425,6 +516,7 @@ class CodexAdapter extends BaseAdapter {
         } else if (eventType === 'turn.failed') {
           const error = event.error || {};
           const errMsg = error.message || JSON.stringify(error);
+          turnFailure = errMsg;
           this._log(`Turn failed: ${errMsg}`);
         }
       };
@@ -460,6 +552,7 @@ class CodexAdapter extends BaseAdapter {
           responseText: responseTexts.join('\n').trim(),
           exitCode: code,
           stderr: stderrBuf,
+          turnFailure,
         });
       });
 
@@ -485,11 +578,16 @@ class CodexAdapter extends BaseAdapter {
         }
         await this.sendResponse(msgChannel, responseText);
       } else {
-        await this.sendError(msgChannel, 'No response generated. Please try again.');
+        // Name the endpoint and model that came back empty. "Please try again"
+        // hid the usual causes here — wrong model id, or a proxy that answers
+        // 200 with no choices — neither of which a retry fixes.
+        await this.sendError(msgChannel, 'codex produced no response — the API returned an empty completion'
+          + ` (endpoint: ${this._directBaseUrl || 'default'}, model: ${this._directModel || 'gpt-4o'})`);
       }
     } catch (e) {
-      this._log(`Error in direct API: ${e.message}`);
-      await this.sendError(msgChannel, `Error: ${e.message}`);
+      const reason = this._describeThrown(e);
+      this._log(`Error in direct API: ${reason}`);
+      await this.sendError(msgChannel, `codex API call failed: ${reason}`);
     }
   }
 

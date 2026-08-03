@@ -282,10 +282,19 @@ export function ChatView() {
     // Check if the real user message has arrived
     const optimisticUser = sessionOptimisticMessages.find((m) => m.messageId.startsWith('optimistic-user-'));
     if (optimisticUser) {
+      // Prefer the exact client_message_id match, but always keep the
+      // identity/content fallback: an echo carrying no client_message_id (an
+      // older event, or the same text posted from another client) must still
+      // retire the local copy. Gating solely on the id left the optimistic
+      // message in place indefinitely — and since optimistic messages render
+      // after every real one, the agent's reply appeared sandwiched between
+      // the two copies of what the user sent.
       const realUserFound = sessionMessages.some(
-        (m) => m.senderType !== 'agent' && (optimisticUser.clientMessageId
-          ? m.clientMessageId === optimisticUser.clientMessageId
-          : m.messageId === optimisticUser.messageId || m.content === optimisticUser.content)
+        (m) => m.senderType !== 'agent' && (
+          (!!optimisticUser.clientMessageId && m.clientMessageId === optimisticUser.clientMessageId)
+          || m.messageId === optimisticUser.messageId
+          || m.content === optimisticUser.content
+        )
       );
       if (realUserFound) {
         removeIds.add(optimisticUser.messageId);

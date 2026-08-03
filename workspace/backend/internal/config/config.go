@@ -68,7 +68,14 @@ func LoadConfig() {
 	}
 
 	rateLimitStr := os.Getenv("REQUESTS_PER_MINUTE")
-	rateLimit := 120
+	// Budgeted against real steady-state load, because the limiter keys on client
+	// IP and every agent connector plus every browser tab on a machine shares one.
+	// A browser tab costs ~50 req/min (discovery + the 15s sidebar refresh) and an
+	// idle connector ~45. The old default of 120 could not fit one browser and two
+	// agents, which is why the dev script had to override it with 100000 — a
+	// default nobody can run under is not a safety limit, it is a bug that gets
+	// configured away. 600 still stops a runaway poll loop dead.
+	rateLimit := 600
 	if rateLimitStr != "" {
 		if parsed, err := strconv.Atoi(rateLimitStr); err == nil && parsed > 0 {
 			rateLimit = parsed

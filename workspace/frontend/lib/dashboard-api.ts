@@ -1,13 +1,18 @@
 import { getStoredAuth, refreshAccessToken } from './auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://workspace-endpoint.openagents.org';
+import { getApiBaseUrl } from './config';
 
 export interface WorkspaceSummary {
   workspaceId: string;
   slug: string;
   name: string;
   status: string;
-  token: string;
+  /**
+   * GET /v1/ws deliberately omits this — the backend stores only a hash of the
+   * workspace token and must not leak the plaintext to a list endpoint. Callers
+   * have to resolve the real token from wherever the browser cached it when the
+   * workspace was created or last opened.
+   */
+  token?: string;
   agentCount: number;
   createdAt: string | null;
   lastActivityAt: string | null;
@@ -29,7 +34,7 @@ async function authFetch<T>(path: string, options: RequestInit = {}): Promise<T>
   const { accessToken } = getStoredAuth();
 
   const doFetch = async (token: string) =>
-    fetch(`${API_URL}${path}`, {
+    fetch(`${getApiBaseUrl()}${path}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

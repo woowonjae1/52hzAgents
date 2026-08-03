@@ -11,18 +11,6 @@ import { workspaceApi } from '@/lib/api';
 import { eventToMessage, networkAgentToWorkspaceAgent, type WorkspaceAgent } from '@/lib/types';
 import { toast } from 'sonner';
 
-function estimateTokens(text: string): number {
-  if (!text) return 0;
-  let asciiCount = 0;
-  let cjkCount = 0;
-  for (let i = 0; i < text.length; i++) {
-    const code = text.charCodeAt(i);
-    if (code > 255) cjkCount++;
-    else asciiCount++;
-  }
-  return Math.ceil(asciiCount * 0.28 + cjkCount * 1.6);
-}
-
 /** One classified line in the collaboration activity feed. */
 interface ActivityLine {
   id: string;
@@ -96,16 +84,19 @@ export function MissionControl() {
       try {
         const res = await workspaceApi.pollEvents({ type: 'workspace.message', limit: 100 });
         if (cancelled) return;
+        // Count only usage an agent actually reported. The old character-count
+        // fallback produced a number indistinguishable from a measured one, so
+        // the tile read as real usage while being invented. Agents that report
+        // nothing now contribute nothing.
         const usageMap: Record<string, number> = {};
         for (const ev of res.events) {
           const m = eventToMessage(ev);
           const name = m.senderName;
-          if (name) {
-            const exact = m.metadata?.usage?.total_tokens || m.metadata?.usage?.completion_tokens;
-            const count = (typeof exact === 'number' && exact > 0)
-              ? exact
-              : estimateTokens(m.content);
-            usageMap[name] = (usageMap[name] || 0) + count;
+          if (!name) continue;
+          const usage = m.metadata?.usage;
+          const exact = usage?.total_tokens ?? usage?.completion_tokens;
+          if (typeof exact === 'number' && exact > 0) {
+            usageMap[name] = (usageMap[name] || 0) + exact;
           }
         }
         setAgentTokens(usageMap);
@@ -268,7 +259,8 @@ export function MissionControl() {
             label="working"
             accent={workingCount > 0}
           />
-          <Stat value={fmtTokens(totalTokens)} label="tokens" />
+          {/* Scoped to the polled window, not a lifetime total — say so. */}
+          <Stat value={fmtTokens(totalTokens)} label="recent tokens" />
           <button
             onClick={() => setConnectModalOpen(true)}
             className="ml-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 transition-colors cursor-pointer"

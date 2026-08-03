@@ -331,20 +331,12 @@ func ListWorkspaces(c *gin.Context) {
 		var agentCount int64
 		db.DB.Model(&models.WorkspaceMember{}).Where("workspace_id = ?", ws.ID).Count(&agentCount)
 
-		// 试图从 Settings 恢复明文 token
-		token := ""
-		settings := decodeJSONMap(ws.Settings)
-		if t, ok := settings["token"].(string); ok {
-			token = t
-		}
-
 		items = append(items, gin.H{
 			"id":             ws.ID,
 			"workspaceId":    ws.ID,
 			"name":           ws.Name,
 			"slug":           ws.Slug,
 			"status":         ws.Status,
-			"token":          token,
 			"agentCount":     agentCount,
 			"createdAt":      ws.CreatedAt,
 			"lastActivityAt": ws.LastActivityAt,
@@ -378,6 +370,9 @@ func ResolveToken(c *gin.Context) {
 
 	var ws models.Workspace
 	err := db.DB.Where("password_hash = ? OR password_hash = ?", req.Token, hash).First(&ws).Error
+	if err != nil {
+		err = db.DB.Where("id = ?", req.Token).First(&ws).Error
+	}
 	if err != nil {
 		var list []models.Workspace
 		if err2 := db.DB.Where("status != ?", "deleted").Find(&list).Error; err2 == nil {

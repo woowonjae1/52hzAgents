@@ -59,7 +59,7 @@ interface AgentStationProps {
   data: StationData;
   onOpenAgent: () => void;
   onOpenThread: (sessionId: string) => void;
-  onPairAgent?: (agentName: string) => void;
+  onPairAgent?: () => void;
 }
 
 /**
@@ -144,7 +144,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
               {skillCount} skill{skillCount === 1 ? '' : 's'}
             </span>
             {tokenCount ? (
-              <span className="tabular-nums" title="Tokens used by this agent">{fmtTokens(tokenCount)} tok</span>
+              <span className="tabular-nums" title="Tokens this agent reported in recent messages">{fmtTokens(tokenCount)} tok</span>
             ) : null}
           </div>
         </div>
@@ -190,7 +190,10 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
             <span className="truncate">Open</span>
           </button>
           <button
-            onClick={() => onPairAgent?.(agent.agentName)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPairAgent?.();
+            }}
             disabled={status !== 'offline'}
             className={cn(
               'h-7 rounded-md border text-[10px] font-semibold transition-colors flex items-center justify-center gap-1 truncate px-1',

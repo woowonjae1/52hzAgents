@@ -21,8 +21,9 @@ type rateWindow struct {
 // limit, while this protects a standalone deployment by default.
 func RateLimit(requestsPerMinute int) gin.HandlerFunc {
 	var (
-		mu      sync.Mutex
-		clients = make(map[string]rateWindow)
+		mu        sync.Mutex
+		clients   = make(map[string]rateWindow)
+		lastSweep time.Time
 	)
 	return func(c *gin.Context) {
 		if c.Request.URL.Path == "/v1/health" || c.Request.URL.Path == "/api/health" {
@@ -32,6 +33,18 @@ func RateLimit(requestsPerMinute int) gin.HandlerFunc {
 		now := time.Now()
 		key := c.ClientIP()
 		mu.Lock()
+		// Evict windows too old to affect a decision, so the map does not retain
+		// an entry per client IP for the process lifetime. Throttled to once a
+		// minute: sweeping on every request walks the whole map while holding the
+		// lock, which costs more under load than the leak it prevents.
+		if now.Sub(lastSweep) >= time.Minute {
+			for ip, w := range clients {
+				if now.Sub(w.startedAt) >= 2*time.Minute {
+					delete(clients, ip)
+				}
+			}
+			lastSweep = now
+		}
 		window := clients[key]
 		if window.startedAt.IsZero() || now.Sub(window.startedAt) >= time.Minute {
 			window = rateWindow{startedAt: now}

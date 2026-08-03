@@ -559,7 +559,7 @@ class BaseAdapter {
   }
 
   _controlPollDelayMs() {
-    return this._hasActiveWork() ? 250 : 2000;
+    return this._hasActiveWork() ? 500 : 2000;
   }
 
   _wakeControlPoller() {
@@ -607,14 +607,23 @@ class BaseAdapter {
         messages = result.messages;
         rawCursor = result.cursor;
         composingActive = !!result.composing;
-        if (pollCount <= 3 || pollCount % 20 === 0) {
+        if (pollCount <= 3 || pollCount % 200 === 0) {
           this._log(`Poll #${pollCount}: ${messages.length} messages, cursor=${rawCursor || 'none'}${composingActive ? ' composing' : ''}`);
         }
       } catch (e) {
-        this._log(`Poll #${pollCount} failed: ${e.message} \nStack: ${e.stack}`);
-        await this._sleep(5000);
+        // Back off on sustained failure. A deleted or mistyped workspace now
+        // correctly 404s (the server used to silently fall back to another
+        // workspace and answer 200), so a dead adapter would otherwise hammer
+        // this endpoint at 2 req/s forever without ever giving up or saying so.
+        this._pollFailures = (this._pollFailures || 0) + 1;
+        const backoff = Math.min(500 * 2 ** Math.min(this._pollFailures - 1, 6), 30_000);
+        if (this._pollFailures === 1 || this._pollFailures % 20 === 0) {
+          this._log(`Poll #${pollCount} failed (${this._pollFailures}x consecutively): ${e.message} — backing off ${backoff}ms`);
+        }
+        await this._sleep(backoff);
         continue;
       }
+      this._pollFailures = 0;
 
       if (rawCursor) this._lastEventId = rawCursor;
 
@@ -623,9 +632,6 @@ class BaseAdapter {
       for (const msg of messages) {
         const msgId = msg.id || msg.messageId;
         if (msgId && this._processedIds.has(msgId)) continue;
-        // Approval responses are control data for the requesting adapter, not
-        // a new chat turn. Handle them before the normal chat dispatch so an
-        // agent never mistakes "Approved command execution" for a prompt.
         if (msg.metadata?.tool_approval_response) {
           let handled = false;
           try { handled = await this._handleApprovalResponse(msg); } catch (e) {
@@ -636,10 +642,7 @@ class BaseAdapter {
             continue;
           }
         }
-        // Only real chat handoffs may start a task. Intermediate state and
-        // error events are visible to users but must never wake another agent.
         if (['status', 'thinking', 'loading', 'error'].includes(msg.messageType)) continue;
-        // Handle queue cancellation signals from frontend
         if (msg.messageType === 'queue_cancel') {
           if (msgId) this._processedIds.add(msgId);
           const channel = msg.sessionId || this.channelName || 'general';
@@ -657,7 +660,6 @@ class BaseAdapter {
           if (msgId) this._processedIds.add(msgId);
           await this._dispatchMessage(msg);
         }
-        // Cap dedup set
         if (this._processedIds.size > 2000) {
           const arr = [...this._processedIds];
           this._processedIds.clear();
@@ -667,26 +669,19 @@ class BaseAdapter {
         idleCount++;
       }
 
-      // Adaptive polling with warm plateau:
-      //   Active (messages incoming):  2s
-      //   Warm (≤5 min since last msg): 5s
-      //   Cooldown (5-7 min):          5s → 15s (ramp 1s per idle poll)
-      //   Cold (>7 min):              15s
-      // The warm plateau keeps the agent responsive during typical user
-      // think-time between messages without hammering the backend.
-      const WARM_INTERVAL = 5000;
-      const WARM_POLLS = 60;  // 60 × 5s = 5 minutes warm plateau
+      // Reasonable production polling with adaptive backoff:
+      //   Active (incoming msgs processing): 200ms
+      //   Warm (conversation active within last 15s): 1000ms (1s)
+      //   Idle (long silence): 5000ms (5s)
       let delay;
       if (incoming.length > 0) {
-        delay = 2000;
-      } else if (composingActive) {
-        delay = 2000;
-        idleCount = Math.min(idleCount, WARM_POLLS);
-      } else if (idleCount <= WARM_POLLS) {
-        delay = WARM_INTERVAL;
+        delay = 200;
+      } else if (idleCount <= 15) { // First 15s of idle
+        delay = 1000;
       } else {
-        delay = Math.min(WARM_INTERVAL + (idleCount - WARM_POLLS) * 1000, 15000);
+        delay = 5000;
       }
+
       await this._sleep(delay);
     }
   }

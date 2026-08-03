@@ -18,6 +18,8 @@ import { execSync, execFile, execFileSync, spawnSync } from "child_process"
 import { Store } from "./store"
 import { readPathEnv, writePathEnv, withPathEnv } from "./env"
 import { AgentManager, type ChatStreamEvent } from "./agent-manager"
+import { backendManager } from "./backend-manager"
+import { embeddedViewManager } from "./embedded-view-manager"
 import {
   ConnectionsStore,
   CredentialsStore,
@@ -160,6 +162,8 @@ const connectionsStore = new ConnectionsStore()
 const credentialsStore = new CredentialsStore()
 const githubBindingsStore = new GitHubBindingsStore()
 let mainWindow: BrowserWindow | null = null
+import { getBackendUrl, setBackendUrl } from './backend-config'
+export { getBackendUrl, setBackendUrl }
 let tray: Tray | null = null
 let agentManager: AgentManager | null = null
 let coreVersion: string | null = null
@@ -794,6 +798,7 @@ function createWindow(): void {
       preload: path.join(__dirname, "../preload/index.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
     },
     show: false,
   })
@@ -859,6 +864,9 @@ function createWindow(): void {
   })
 
   mainWindow.on("closed", () => {
+    try {
+      embeddedViewManager.destroy()
+    } catch {}
     mainWindow = null
   })
 }
@@ -1688,6 +1696,39 @@ function setupIPC(): void {
   ipcMain.handle("workspace:list", () =>
     agentManager ? agentManager.getNetworks() : [],
   )
+  ipcMain.handle("app:get-api-url", () => getBackendUrl())
+  ipcMain.handle(
+    "embedded-view:show",
+    (_e, bounds?: { x: number; y: number; width: number; height: number }, url?: string) => {
+      if (!mainWindow) return
+      embeddedViewManager.attach(mainWindow, url)
+      embeddedViewManager.show(bounds)
+    },
+  )
+  ipcMain.handle("embedded-view:hide", () => {
+    embeddedViewManager.hide()
+  })
+  ipcMain.handle("embedded-view:navigate", (_e, url: string) => {
+    embeddedViewManager.navigate(url)
+  })
+  ipcMain.handle("workspace:get-token", (_e, slug?: string) => {
+    if (!agentManager) return null
+    const networks = agentManager.getNetworks() as Array<{ slug?: string; id?: string; token?: string }>
+    if (networks.length === 0) return null
+
+    if (slug) {
+      const target = networks.find((n) => n.slug === slug || n.id === slug)
+      if (target?.token) return target.token
+      console.warn(`[workspace:get-token] Token resolution failed for slug/id "${slug}". Configured networks:`, networks.map((n) => ({ slug: n.slug, id: n.id })))
+      return null
+    }
+
+    // Only allow fallback if no explicit slug requested and exactly 1 network exists
+    if (networks.length === 1) {
+      return networks[0]?.token || null
+    }
+    return null
+  })
   ipcMain.handle("workspace:create", (_e, name) =>
     requireManager().createWorkspace(name),
   )
@@ -2652,6 +2693,7 @@ app.whenReady().then(async () => {
   }
 
   await ensureCoreLibrary()
+  await backendManager.ensureBackend().catch((err) => console.error('[BackendManager] ensureBackend failed:', err))
 
   if (
     fs.existsSync(GLOBAL_MODULES) &&
@@ -2685,6 +2727,11 @@ app.whenReady().then(async () => {
   if (!isHeadless) createWindow()
 
   agentManager = new AgentManager(store)
+  const networks = agentManager.getNetworks() as Array<{ endpoint?: string }>
+  const initEndpoint = (store.get("workspaceEndpoint") as string) || networks[0]?.endpoint
+  if (initEndpoint) {
+    setBackendUrl(initEndpoint)
+  }
   agentManager!._ensureDaemon().catch(() => {})
 
   agentManager.on("chat-event", (ev: ChatStreamEvent) => {
@@ -2738,6 +2785,12 @@ app.on("activate", () => {
 
 app.on("before-quit", () => {
   ;(app as typeof app & { isQuitting: boolean }).isQuitting = true
+  try {
+    embeddedViewManager.destroy()
+  } catch {}
+  try {
+    backendManager.stopBackend()
+  } catch {}
   try {
     if (agentManager) agentManager.stopAllChatPolling()
   } catch {}

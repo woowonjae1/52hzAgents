@@ -108,6 +108,16 @@ interface ChatMessageProps {
   isRejected?: boolean;
 }
 
+function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: string; name: string }): boolean {
+  const currentUserId = currentUser.id.trim();
+  const senderId = (message.senderId || '').replace(/^human:/, '').trim();
+  if (currentUserId && senderId === currentUserId) return true;
+
+  const currentUserName = currentUser.name.trim().toLocaleLowerCase();
+  const senderName = message.senderName.trim().toLocaleLowerCase();
+  return Boolean(currentUserName && senderName === currentUserName);
+}
+
 export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
@@ -217,7 +227,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
   }
 
   if (isHuman) {
-    const isCurrentUser = !!message.senderId && message.senderId === currentUser.id;
+    const isCurrentUser = isCurrentHumanMessage(message, currentUser);
     const displayName = isCurrentUser
       ? 'You'
       : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');

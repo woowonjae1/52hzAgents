@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import type { AgentCatalogEntry, CloudAgentConfig, CloudAgentProvider } from '@/lib/types';
 import { AgentIcon, ProviderIcon } from '@/components/icons/agent-icons';
+import { getApiBaseUrl } from '@/lib/config';
 
 // ---------------------------------------------------------------------------
 // Brand colors for local agents and cloud providers
@@ -159,9 +160,10 @@ export function ConnectAgentView() {
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  const maskedToken = token.length > 16
+  const displayToken = token || '<token>';
+  const maskedToken = (token && token.length > 16)
     ? `${token.slice(0, 8)}${'•'.repeat(8)}${token.slice(-4)}`
-    : token;
+    : displayToken;
 
   const handleAddCloudAgent = async () => {
     if (!selectedProvider || !cfgModel || !cfgName || !cfgKey) {
@@ -405,11 +407,11 @@ function LocalAgentsTab({
                 Run command to connect:
               </div>
               <pre className="text-zinc-100 text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
-                {`wwj connect my-${selectedEntry.name} ${token}`}
+                {`wwj connect my-${selectedEntry.name} ${displayToken}`}
               </pre>
               <button
                 className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-colors"
-                onClick={() => copyToClipboard(`wwj connect my-${selectedEntry.name} ${token}`)}
+                onClick={() => copyToClipboard(`wwj connect my-${selectedEntry.name} ${displayToken}`)}
               >
                 {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
               </button>
@@ -590,7 +592,7 @@ function CloudAgentsTab({
             {selectedProvider === 'google' && (
               <>
                 <a
-                  href={`${process.env.NEXT_PUBLIC_API_URL || 'https://workspace-endpoint.openagents.org'}/v1/cloud-agents/google/auth?network=${encodeURIComponent(workspaceId)}&agent_name=${encodeURIComponent(cfgName || 'gemini')}&model=${encodeURIComponent(cfgModel || 'gemini-3.5-flash')}`}
+                  href={`${getApiBaseUrl()}/v1/cloud-agents/google/auth?network=${encodeURIComponent(workspaceId)}&agent_name=${encodeURIComponent(cfgName || 'gemini')}&model=${encodeURIComponent(cfgModel || 'gemini-3.5-flash')}`}
                   className="flex items-center justify-center gap-2.5 w-full px-3 py-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors text-xs font-semibold"
                 >
                   <svg viewBox="0 0 24 24" className="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg">

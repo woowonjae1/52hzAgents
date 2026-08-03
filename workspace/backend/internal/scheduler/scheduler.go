@@ -36,8 +36,11 @@ func StartScheduler() {
 // fireDueTimers 扫描并触发到期的单次定时消息提醒。
 func expireStaleAgents() {
 	cutoff := time.Now().UTC().Add(-time.Duration(config.GlobalConfig.AgentTimeoutSeconds) * time.Second)
+	// "launching" is reaped alongside "online": the launcher sets it when a
+	// process is spawned, so an agent that never connects must decay to
+	// offline rather than advertising a permanent "starting up" state.
 	db.DB.Model(&models.WorkspaceMember{}).
-		Where("status = ? AND last_heartbeat IS NOT NULL AND last_heartbeat < ?", "online", cutoff).
+		Where("status IN ? AND last_heartbeat IS NOT NULL AND last_heartbeat < ?", []string{"online", "launching"}, cutoff).
 		Updates(map[string]interface{}{"status": "offline", "session_id": nil})
 }
 

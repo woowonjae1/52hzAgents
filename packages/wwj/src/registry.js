@@ -40,6 +40,8 @@ class Registry {
     this.registryUrl = registryUrl || DEFAULT_REGISTRY_URL || null;
     this.cacheFile = path.join(configDir, CACHE_FILE);
     this._catalog = null; // in-memory cache
+    this._memCatalogCache = null;
+    this._memEntryMapCache = new Map();
   }
 
   /**

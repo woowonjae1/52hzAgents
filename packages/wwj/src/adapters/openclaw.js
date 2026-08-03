@@ -191,6 +191,16 @@ class OpenClawAdapter extends BaseAdapter {
 
   stop() {
     this._closeGatewayApprovalRelay();
+
+    // A workspace reconnect replaces this adapter, but an in-flight
+    // `openclaw agent` process is independent of the poll loop. Leave it
+    // alive and it keeps writing the old workspace's session after the new
+    // adapter has started, causing session-takeover errors and duplicate work.
+    for (const [channel, proc] of Object.entries(this._channelProcesses)) {
+      this._stoppingChannels.add(channel);
+      void this._stopProcess(proc);
+    }
+    this._channelProcesses = {};
     super.stop();
   }
 

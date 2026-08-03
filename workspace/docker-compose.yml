@@ -25,7 +25,7 @@ services:
       GIN_MODE: release
       IDENTITY_MODE: standalone
       CORS_ORIGINS: http://localhost:3000
-      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-120}
+      REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-600}
     ports:
       - "8000:8000"
     depends_on:

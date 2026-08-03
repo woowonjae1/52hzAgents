@@ -1,12 +1,94 @@
 'use client';
 
-import React, { createContext, useContext, useCallback, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { workspaceApi } from './api';
 import { capture, group } from './analytics';
 import { useOpenAgentsAuth } from './openagents-auth-context';
 import { generateUserId, getStoredIdentity, storeIdentity } from './identity';
 import { networkAgentToWorkspaceAgent, networkChannelToSession } from './types';
 import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TimerItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
+
+// ---------------------------------------------------------------------------
+// Reference stability for polled collections
+//
+// Discovery re-runs every 5–15s and rebuilds `agents` / `sessions` from the
+// response. Handing React a fresh array of fresh objects every tick invalidates
+// the provider's useMemo and every effect that depends on those arrays, so
+// interval-owning effects are torn down and recreated on each poll even when
+// nothing changed. These comparisons let an unchanged poll return the previous
+// reference, which is what actually stops the churn.
+// ---------------------------------------------------------------------------
+
+function sameStringList(a: readonly string[] | null | undefined, b: readonly string[] | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function sameSkills(a: Record<string, unknown> | null, b: Record<string, unknown> | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
+
+function sameAgent(a: WorkspaceAgent, b: WorkspaceAgent): boolean {
+  return (
+    a.agentName === b.agentName &&
+    a.role === b.role &&
+    a.agentType === b.agentType &&
+    a.serverHost === b.serverHost &&
+    a.workingDir === b.workingDir &&
+    a.description === b.description &&
+    a.status === b.status &&
+    a.lastHeartbeatAt === b.lastHeartbeatAt &&
+    a.joinedAt === b.joinedAt &&
+    sameSkills(a.enabledSkills, b.enabledSkills)
+  );
+}
+
+function sameSession(a: WorkspaceSession, b: WorkspaceSession): boolean {
+  return (
+    a.sessionId === b.sessionId &&
+    a.workspaceId === b.workspaceId &&
+    a.createdBy === b.createdBy &&
+    a.title === b.title &&
+    a.status === b.status &&
+    a.starred === b.starred &&
+    a.master === b.master &&
+    a.orchestrationMode === b.orchestrationMode &&
+    a.orchestrationInstruction === b.orchestrationInstruction &&
+    a.createdAt === b.createdAt &&
+    a.lastEventAt === b.lastEventAt &&
+    sameStringList(a.participants, b.participants)
+  );
+}
+
+/**
+ * Return `prev` when `next` is element-wise equal, otherwise return a list that
+ * reuses the previous object for every element that did not change. Callers get
+ * a stable array identity when nothing moved, and stable item identities when
+ * only some rows did.
+ */
+function reconcileList<T>(prev: T[], next: T[], isSame: (a: T, b: T) => boolean): T[] {
+  if (prev.length !== next.length) {
+    return next.map((item, i) => (i < prev.length && isSame(prev[i], item) ? prev[i] : item));
+  }
+  let changed = false;
+  const merged = next.map((item, i) => {
+    if (isSame(prev[i], item)) return prev[i];
+    changed = true;
+    return item;
+  });
+  return changed ? merged : prev;
+}
 
 function useWorkspaceIdentity() {
   const { user } = useOpenAgentsAuth();
@@ -170,6 +252,15 @@ export function WorkspaceProvider({
   bearerToken?: string;
   children: React.ReactNode;
 }) {
+  const [effectiveToken, setEffectiveToken] = useState<string>(() => {
+    if (token) return token;
+    if (typeof window !== 'undefined' && workspaceId) {
+      try {
+        return localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token') || '';
+      } catch {}
+    }
+    return '';
+  });
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [agents, setAgents] = useState<WorkspaceAgent[]>([]);
   const { currentUser, setUserName } = useWorkspaceIdentity();
@@ -424,8 +515,10 @@ export function WorkspaceProvider({
         })
       : agents;
 
+    const effectiveAgents = targetAgents.length > 0 ? targetAgents : agents;
+
     const sendStop = () => Promise.allSettled(
-      targetAgents.map((a) => {
+      effectiveAgents.map((a) => {
         const channel = targetSessionId || undefined;
         return workspaceApi.sendAgentControl(a.agentName, 'stop', { channel });
       })
@@ -441,15 +534,55 @@ export function WorkspaceProvider({
     }, 3000);
   }, [activeSessionIds, agents, sessions]);
 
-  // Configure API client on mount
+  // Configure API client on mount / token change
   useEffect(() => {
-    workspaceApi.configure(workspaceId, token, bearerToken || undefined);
-    // Tie all subsequent events to this workspace so they line up with the
-    // website + launcher funnel stages for the same workspace ID.
+    let cancelled = false;
+    let initialToken = token;
+
+    if (!initialToken && typeof window !== 'undefined' && workspaceId) {
+      try {
+        initialToken = localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token') || '';
+      } catch {}
+    }
+
+    const bridge = typeof window !== 'undefined'
+      ? (window as unknown as { electronBridge?: { getWorkspaceToken?: (slug: string) => Promise<string | null> } }).electronBridge
+      : undefined;
+
+    const isDesktop = !!bridge?.getWorkspaceToken;
+
+    const applyToken = (t: string) => {
+      if (cancelled) return;
+      setEffectiveToken(t);
+      // Desktop bridge supplies tokens on-demand; avoid persisting tokens into web localStorage on desktop.
+      if (t && workspaceId && !isDesktop) {
+        try {
+          localStorage.setItem(`workspace_token_${workspaceId}`, t);
+          localStorage.setItem('workspace_token', t);
+        } catch {}
+      }
+      workspaceApi.configure(workspaceId, t, bearerToken || undefined);
+    };
+
+    if (!token && bridge?.getWorkspaceToken && workspaceId) {
+      bridge.getWorkspaceToken(workspaceId).then((injectedToken) => {
+        if (cancelled) return;
+        applyToken(injectedToken || initialToken);
+      }).catch(() => {
+        if (!cancelled) applyToken(initialToken);
+      });
+    } else {
+      applyToken(initialToken);
+    }
+
     if (workspaceId) {
       group('workspace', workspaceId);
       capture('workspace_opened', { workspace_id: workspaceId });
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [workspaceId, token, bearerToken]);
 
   const refreshWorkspace = useCallback(async () => {
@@ -476,7 +609,8 @@ export function WorkspaceProvider({
   const refreshDiscovery = useCallback(async () => {
     try {
       const discovery = await workspaceApi.discover();
-      setAgents(discovery.agents.map(networkAgentToWorkspaceAgent));
+      const nextAgents = discovery.agents.map(networkAgentToWorkspaceAgent);
+      setAgents((prev) => reconcileList(prev, nextAgents, sameAgent));
 
       const updated = discovery.channels.map((ch) =>
         networkChannelToSession(ch, workspaceId)
@@ -487,29 +621,40 @@ export function WorkspaceProvider({
         const newChannels = updated.filter((s) => !existingIds.has(s.sessionId));
         // Merge: update metadata but preserve user-renamed titles
         const updatedMap = new Map(updated.map((s) => [s.sessionId, s]));
-        const merged = prev
-          .filter((s) => {
-            // Drop sessions not in remote discovery (deleted/removed on backend)
-            if (!updatedMap.has(s.sessionId)) return false;
-            return true;
-          })
-          .map((s) => {
-            const remote = updatedMap.get(s.sessionId)!;
-            // Keep local title if user manually renamed in this browser session
-            const keepLocalTitle = manuallyRenamedSessions.has(s.sessionId);
-            return {
-              ...s,
-              title: keepLocalTitle ? s.title : remote.title,
-              participants: remote.participants,
-              master: remote.master,
-              orchestrationMode: remote.orchestrationMode,
-              orchestrationInstruction: remote.orchestrationInstruction,
-              lastEventAt: remote.lastEventAt,
-              createdAt: remote.createdAt || s.createdAt,
-              status: remote.status,
-              starred: remote.starred,
-            };
-          });
+        let changed = false;
+        const merged: WorkspaceSession[] = [];
+        for (const s of prev) {
+          const remote = updatedMap.get(s.sessionId);
+          // Drop sessions not in remote discovery (deleted/removed on backend)
+          if (!remote) {
+            changed = true;
+            continue;
+          }
+          // Keep local title if user manually renamed in this browser session
+          const keepLocalTitle = manuallyRenamedSessions.has(s.sessionId);
+          const candidate: WorkspaceSession = {
+            ...s,
+            title: keepLocalTitle ? s.title : remote.title,
+            participants: remote.participants,
+            master: remote.master,
+            orchestrationMode: remote.orchestrationMode,
+            orchestrationInstruction: remote.orchestrationInstruction,
+            lastEventAt: remote.lastEventAt,
+            createdAt: remote.createdAt || s.createdAt,
+            status: remote.status,
+            starred: remote.starred,
+          };
+          // An unchanged channel keeps its previous object. Without this the
+          // spread above minted a new object every poll, so `sessions` changed
+          // identity every 5s and every effect keyed on it was torn down.
+          if (sameSession(s, candidate)) {
+            merged.push(s);
+          } else {
+            merged.push(candidate);
+            changed = true;
+          }
+        }
+        if (!changed && newChannels.length === 0) return prev;
         return [...merged, ...newChannels];
       });
 
@@ -631,19 +776,9 @@ export function WorkspaceProvider({
         }
       }
 
-      // Also refresh files, browser tabs, persistent contexts, and DM conversations so sidebar counts stay current
-      workspaceApi.listFiles().then((r) => setFiles(r.files)).catch(() => {});
-      workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
-      workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
-      workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
-      workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {});
-      workspaceApi.listTimers().then((r) => setTimers(r.timers)).catch(() => {});
-      workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {});
-      workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {});
-      workspaceApi.listNotifications().then((r) => {
-        setNotifications(r.notifications);
-        setUnreadNotificationCount(r.unreadCount);
-      }).catch(() => {});
+      // Sidebar collections are refreshed on their own slower cadence — see the
+      // auxiliary-state effect below. They used to be fanned out from here, which
+      // turned one discovery tick into ten requests.
     } catch {
       // Non-critical — keep existing state
     }
@@ -769,19 +904,34 @@ export function WorkspaceProvider({
     }
   }, [notifications, refreshNotifications]);
 
-  // Collaboration state is persisted server-side. Poll these lightweight
-  // resources so updates from other agents are reflected even if the browser
-  // was not attached to the channel that emitted the state event.
+  // Collaboration and sidebar state is persisted server-side. Poll these
+  // lightweight resources so updates from other agents are reflected even if the
+  // browser was not attached to the channel that emitted the state event.
+  //
+  // This is deliberately one slow tick rather than a fan-out riding on discovery.
+  // Discovery runs every 5s while agents are active; issuing these nine list
+  // calls alongside it meant a single idle browser tab produced ~120 requests a
+  // minute — the whole default rate-limit budget, before any agent traffic. The
+  // initial values are loaded by the workspace bootstrap effect, so starting at
+  // the first 15s tick costs nothing on first paint.
   useEffect(() => {
-    const refreshCollaboration = () => {
-      void refreshTodos();
-      void refreshTimers();
-      void refreshRoutines();
-      void refreshNotifications();
+    const refreshAuxiliaryState = () => {
+      workspaceApi.listFiles().then((r) => setFiles(r.files)).catch(() => {});
+      workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
+      workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
+      workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
+      workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {});
+      workspaceApi.listTimers().then((r) => setTimers(r.timers)).catch(() => {});
+      workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {});
+      workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {});
+      workspaceApi.listNotifications().then((r) => {
+        setNotifications(r.notifications);
+        setUnreadNotificationCount(r.unreadCount);
+      }).catch(() => {});
     };
-    const interval = window.setInterval(refreshCollaboration, 15_000);
+    const interval = window.setInterval(refreshAuxiliaryState, 15_000);
     return () => window.clearInterval(interval);
-  }, [refreshNotifications, refreshRoutines, refreshTimers, refreshTodos]);
+  }, []);
 
   const refreshKnowledge = useCallback(async () => {
     try {
@@ -1019,7 +1169,7 @@ export function WorkspaceProvider({
       }
     })();
     return () => { cancelled = true; };
-  }, [workspaceId, token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [workspaceId, effectiveToken, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist previews to localStorage for instant rendering on reload
   useEffect(() => {
@@ -1251,91 +1401,108 @@ export function WorkspaceProvider({
     }
   }, [completedSessionIds]);
 
+  const providerValue = useMemo(() => ({
+    workspace,
+    token: effectiveToken,
+    agents,
+    currentUser,
+    setUserName,
+    onlineUsers,
+    sessions,
+    files,
+    selectedFileId,
+    currentSessionId,
+    loading,
+    error,
+    lastMessageBySession,
+    activeSessionIds,
+    stoppingSessionIds,
+    completedSessionIds,
+    monitorMode,
+    acknowledgeCompletion,
+    agentModes,
+    updateLastMessage,
+    setSessionActive,
+    updateAgentMode,
+    stopAllAgents,
+    setCurrentSessionId,
+    consumeSkipFocus,
+    setSelectedFileId,
+    currentFilePath,
+    setCurrentFilePath,
+    createSession,
+    renameSession,
+    updateSession,
+    addParticipant,
+    removeParticipant,
+    setSessionMaster,
+    setSessionOrchestration,
+    renameWorkspace,
+    refreshWorkspace,
+    refreshAgents,
+    refreshFiles,
+    uploadFile,
+    deleteFile,
+    browserTabs,
+    selectedBrowserTabId,
+    setSelectedBrowserTabId,
+    refreshBrowserTabs,
+    openBrowserTab,
+    closeBrowserTab,
+    navigateBrowserTab,
+    reconnectBrowserTab,
+    browserContexts,
+    refreshBrowserContexts,
+    persistBrowserTab,
+    unpersistBrowserTab,
+    deleteBrowserContext,
+    openBrowserTabWithContext,
+    dmConversations,
+    refreshDMConversations,
+    todos,
+    refreshTodos,
+    replaceTodos,
+    timers,
+    refreshTimers,
+    createTimer,
+    cancelTimer,
+    routines,
+    refreshRoutines,
+    createRoutine,
+    knowledge,
+    refreshKnowledge,
+    createKnowledge,
+    updateKnowledge,
+    deleteKnowledge,
+    notifications,
+    unreadNotificationCount,
+    refreshNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
+    dismissNotification,
+    notificationSound,
+    setNotificationSound,
+  }), [
+    workspace, effectiveToken, agents, currentUser, setUserName, onlineUsers, sessions, files,
+    selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds,
+    stoppingSessionIds, completedSessionIds, monitorMode, acknowledgeCompletion, agentModes,
+    updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, setCurrentSessionId,
+    consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession,
+    renameSession, updateSession, addParticipant, removeParticipant, setSessionMaster,
+    setSessionOrchestration, renameWorkspace, refreshWorkspace, refreshAgents, refreshFiles,
+    uploadFile, deleteFile, browserTabs, selectedBrowserTabId, setSelectedBrowserTabId,
+    refreshBrowserTabs, openBrowserTab, closeBrowserTab, navigateBrowserTab,
+    reconnectBrowserTab, browserContexts, refreshBrowserContexts, persistBrowserTab,
+    unpersistBrowserTab, deleteBrowserContext, openBrowserTabWithContext, dmConversations,
+    refreshDMConversations, todos, refreshTodos, replaceTodos, timers, refreshTimers,
+    createTimer, cancelTimer, routines, refreshRoutines, createRoutine, knowledge,
+    refreshKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, notifications,
+    unreadNotificationCount, refreshNotifications, markNotificationRead, markAllNotificationsRead,
+    dismissNotification, notificationSound, setNotificationSound
+  ]);
+
   return (
-    <WorkspaceContext.Provider
-      value={{
-        workspace,
-        token,
-        agents,
-        currentUser,
-        setUserName,
-        onlineUsers,
-        sessions,
-        files,
-        selectedFileId,
-        currentSessionId,
-        loading,
-        error,
-        lastMessageBySession,
-        activeSessionIds,
-        stoppingSessionIds,
-        completedSessionIds,
-        monitorMode,
-        acknowledgeCompletion,
-        agentModes,
-        updateLastMessage,
-        setSessionActive,
-        updateAgentMode,
-        stopAllAgents,
-        setCurrentSessionId,
-        consumeSkipFocus,
-        setSelectedFileId,
-        currentFilePath,
-        setCurrentFilePath,
-        createSession,
-        renameSession,
-        updateSession,
-        addParticipant,
-        removeParticipant,
-        setSessionMaster,
-        setSessionOrchestration,
-        renameWorkspace,
-        refreshWorkspace,
-        refreshAgents,
-        refreshFiles,
-        uploadFile,
-        deleteFile,
-        browserTabs,
-        selectedBrowserTabId,
-        setSelectedBrowserTabId,
-        refreshBrowserTabs,
-        openBrowserTab,
-        closeBrowserTab,
-        navigateBrowserTab,
-        reconnectBrowserTab,
-        browserContexts,
-        refreshBrowserContexts,
-        persistBrowserTab,
-        unpersistBrowserTab,
-        deleteBrowserContext,
-        openBrowserTabWithContext,
-        dmConversations,
-        refreshDMConversations,
-        todos,
-        refreshTodos,
-        replaceTodos,
-        timers,
-        refreshTimers,
-        createTimer,
-        cancelTimer,
-        routines,
-        refreshRoutines,
-        createRoutine,
-        knowledge,
-        refreshKnowledge,
-        createKnowledge,
-        updateKnowledge,
-        deleteKnowledge,
-        notifications,
-        unreadNotificationCount,
-        refreshNotifications,
-        markNotificationRead,
-        markAllNotificationsRead,
-        dismissNotification,
-        notificationSound,
-        setNotificationSound,
-      }}
-    >
+    <WorkspaceContext.Provider value={providerValue}>
       {children}
     </WorkspaceContext.Provider>
   );

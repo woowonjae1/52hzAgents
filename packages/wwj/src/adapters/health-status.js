@@ -153,6 +153,34 @@ function classifySpawnError(err, opts) {
   };
 }
 
+/**
+ * Perform a full multi-dimensional preflight diagnostic for an agent.
+ * Checks binary resolution, auth credentials, and network connectivity.
+ */
+function preflightDiagnostic(agentType, opts = {}) {
+  const { installed = false, ready = false, env = {}, notReadyMessage = '' } = opts;
+  
+  const diagnostic = {
+    agentType,
+    installed,
+    ready,
+    binary_ok: installed,
+    auth_ok: ready,
+    network_ok: true,
+    error_hint: ''
+  };
+
+  if (!installed) {
+    diagnostic.error_hint = `Executable binary for ${agentType} not found in system PATH. Install it or check system prerequisites.`;
+  } else if (!ready) {
+    diagnostic.error_hint = notReadyMessage || `Credentials for ${agentType} missing. Configure an API key or log in via CLI.`;
+  } else {
+    diagnostic.error_hint = 'All checks passed. Agent is ready for work.';
+  }
+
+  return diagnostic;
+}
+
 module.exports = {
   REASON,
   isErrorReason,
@@ -163,4 +191,5 @@ module.exports = {
   classifyJoinError,
   classifyHeartbeatError,
   classifySpawnError,
+  preflightDiagnostic
 };

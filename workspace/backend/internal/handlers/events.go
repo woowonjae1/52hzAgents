@@ -18,6 +18,7 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 本地 GORM 数据库连接包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 自研的内存级多路复用广播 Hub。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 表结构模型映射定义。
+	"gorm.io/gorm"
 )
 
 // upgrader 是 gorilla/websocket 的升级器配置，允许跨域请求并设定缓冲区大小。
@@ -43,6 +44,13 @@ type SendEventRequest struct {
 
 // verifyWorkspaceAccess 校验客户端请求是否拥有该工作区的合法访问权限。
 func verifyWorkspaceAccess(workspace *models.Workspace, token string) bool {
+	// 如果系统设置为免密模式 (AUTH_MODE=none)，允许直接无障碍访问。
+	// Unloaded config must never be read as "no auth required": guard the
+	// bypass rather than dereferencing nil (which previously panicked
+	// mid-request). Token verification below still applies normally.
+	if config.GlobalConfig != nil && config.GlobalConfig.AuthMode == "none" {
+		return true
+	}
 	// 如果工作区密码哈希为空，则该工作区属于公有模式，允许任何人直接免密访问。
 	if workspace.PasswordHash == nil || *workspace.PasswordHash == "" {
 		return true
@@ -64,19 +72,15 @@ func hashWorkspaceToken(token string) string {
 
 // resolveWorkspace 通过 Network 的 ID 或 Slug 检索对应工作区实体。
 func resolveWorkspace(network string) (*models.Workspace, error) {
-	var ws models.Workspace // 声明 workspace 结构体。
-	if network != "" {
-		err := db.DB.Where("id = ? OR slug = ?", network, network).First(&ws).Error
-		if err == nil {
-			return &ws, nil
-		}
+	if network == "" {
+		return nil, gorm.ErrRecordNotFound
 	}
-	// 容错回退：检索数据库中创建最早的活跃工作区实体
-	err := db.DB.Where("status = ?", "active").Order("created_at asc").First(&ws).Error
-	if err == nil {
-		return &ws, nil
+	var ws models.Workspace
+	err := db.DB.Where("id = ? OR slug = ?", network, network).First(&ws).Error
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	return &ws, nil
 }
 
 // SendEvent 处理 POST /v1/events 接口，将事件持久化并广播分发。

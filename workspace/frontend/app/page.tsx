@@ -417,10 +417,24 @@ function CreateWorkspaceForm({
 function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
   const router = useRouter();
 
+  const enterWorkspace = () => {
+    // GET /v1/ws never carries the plaintext token (see WorkspaceSummary.token),
+    // so the only place a real one can come from is whatever the browser cached
+    // when this workspace was created or last opened. Interpolating a missing
+    // value into the URL used to literally produce "?token=undefined".
+    let cachedToken = workspace.token;
+    if (!cachedToken) {
+      try {
+        cachedToken = localStorage.getItem(`workspace_token_${workspace.workspaceId}`) || undefined;
+      } catch {}
+    }
+    router.push(cachedToken ? `/${workspace.slug}?token=${cachedToken}` : `/${workspace.slug}`);
+  };
+
   return (
     <Card
       className="cursor-pointer border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
-      onClick={() => router.push(`/${workspace.slug}?token=${workspace.token}`)}
+      onClick={enterWorkspace}
     >
       <CardContent className="p-4 space-y-4">
         <div className="flex items-start justify-between gap-2.5">

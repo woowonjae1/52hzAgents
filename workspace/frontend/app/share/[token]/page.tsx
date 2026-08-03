@@ -6,8 +6,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { Loader2 } from 'lucide-react';
 import type { SharedSnapshotMessage } from '@/lib/types';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://workspace-endpoint.openagents.org';
+import { getApiBaseUrl } from '@/lib/config';
 
 interface SnapshotData {
   id: string;
@@ -63,7 +62,7 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`${API_URL}/v1/shares/public/${token}`);
+        const res = await fetch(`${getApiBaseUrl()}/v1/shares/public/${token}`);
         if (!res.ok) {
           setError('This shared conversation could not be found or has been removed.');
           return;

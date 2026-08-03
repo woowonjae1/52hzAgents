@@ -98,7 +98,12 @@ class Daemon {
     this._cachedAgentNames = new Set(agents.map(a => a.name));
     this._cachedAgentConfigs = {};
     for (const a of agents) this._cachedAgentConfigs[a.name] = this._agentConfigFingerprint(a);
-    this._log(`Daemon started with ${agents.length} agent(s)`);
+
+    // Parallel Async Warm-up Pool: Launch all configured agents concurrently instead of serially
+    this._log(`Launching ${agents.length} agent(s) in parallel warm-up pool...`);
+    await Promise.allSettled(agents.map(agent => Promise.resolve(this._launchAgent(agent))));
+
+    this._log(`Daemon started with ${agents.length} agent(s) fully initialized in parallel`);
 
     // Block until shutdown
     await new Promise((resolve) => {

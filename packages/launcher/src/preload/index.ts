@@ -195,6 +195,9 @@ contextBridge.exposeInMainWorld('api', {
   revealCredential: (id: string) => ipcRenderer.invoke('credentials:reveal', id),
   testCredential: (input: { id?: string; provider: string; secret?: string }) =>
     ipcRenderer.invoke('credentials:test', input),
-  applyCredentialToAgents: (input: { credentialId: string; envKey: string; agentTypes: string[] }) =>
-    ipcRenderer.invoke('credentials:apply-to-agents', input),
+  // ── Embedded View ──
+  showEmbeddedView: (bounds?: { x: number; y: number; width: number; height: number }, url?: string) =>
+    ipcRenderer.invoke('embedded-view:show', bounds, url),
+  hideEmbeddedView: () => ipcRenderer.invoke('embedded-view:hide'),
+  navigateEmbeddedView: (url: string) => ipcRenderer.invoke('embedded-view:navigate', url),
 })

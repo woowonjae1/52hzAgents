@@ -131,6 +131,18 @@ func GetCloudAgentProviders(c *gin.Context) {
 	})
 }
 
+// maskCloudAgentSecret returns a copy safe to serialize. The stored provider key
+// is never echoed back to a client — only enough of it to recognise which key is
+// configured. Takes its argument by value so the caller's record is untouched.
+func maskCloudAgentSecret(cfg models.CloudAgentConfig) models.CloudAgentConfig {
+	if len(cfg.APIKey) > 8 {
+		cfg.APIKey = cfg.APIKey[:3] + "****" + cfg.APIKey[len(cfg.APIKey)-4:]
+	} else if len(cfg.APIKey) > 0 {
+		cfg.APIKey = "****"
+	}
+	return cfg
+}
+
 // ListCloudAgents 列出特定工作区下的云端 Agent 配置
 func ListCloudAgents(c *gin.Context) {
 	network := c.Query("network")
@@ -160,8 +172,13 @@ func ListCloudAgents(c *gin.Context) {
 		return
 	}
 
+	maskedConfigs := make([]models.CloudAgentConfig, len(configs))
+	for i, cfg := range configs {
+		maskedConfigs[i] = maskCloudAgentSecret(cfg)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"cloud_agents": configs,
+		"cloud_agents": maskedConfigs,
 	})
 }
 
@@ -229,7 +246,9 @@ func AddCloudAgent(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, config)
+	// Masked on the way out: the key is persisted in full for the agent to use,
+	// but echoing it back to the caller would re-expose it on every create/update.
+	c.JSON(http.StatusOK, maskCloudAgentSecret(config))
 }
 
 // UpdateCloudAgentRequest 更新云端 Agent 的请求参数
@@ -303,7 +322,9 @@ func UpdateCloudAgent(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, config)
+	// Masked on the way out: the key is persisted in full for the agent to use,
+	// but echoing it back to the caller would re-expose it on every create/update.
+	c.JSON(http.StatusOK, maskCloudAgentSecret(config))
 }
 
 // RemoveCloudAgent 删除指定的云端 Agent 配置

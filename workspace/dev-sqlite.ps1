@@ -32,7 +32,7 @@ function Stop-Managed {
     if (-not (Test-Path $statePath)) { return }
     try {
         $state = Get-Content $statePath -Raw | ConvertFrom-Json
-        foreach ($p in @('backendPid', 'frontendPid')) {
+        foreach ($p in @('backendPid', 'frontendPid', 'connectorPid')) {
             $procId = $state.$p
             if ($procId -and (Get-Process -Id $procId -ErrorAction SilentlyContinue)) {
                 Start-Process taskkill.exe -ArgumentList @('/PID', "$procId", '/T', '/F') -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue
@@ -59,13 +59,16 @@ $backendCmd = @"
 Set-Location -LiteralPath '$backendPath'
 `$env:CGO_ENABLED = '0'
 `$env:DATABASE_URL = 'sqlite://$dbPath'
-`$env:AUTH_MODE = 'workspace_token'
+`$env:AUTH_MODE = 'none'
 `$env:CORS_ORIGINS = '*'
 `$env:FILE_STORAGE_PATH = '$filesPath'
-`$env:REQUESTS_PER_MINUTE = '100000'
+`$env:REQUESTS_PER_MINUTE = '1000'
 `$env:ROUTER_LLM_ENABLED = 'false'
 & '$go' run ./cmd/server *>> '$backendLog'
 "@
+
+$connectorPath = Join-Path $workspaceRoot '..' | Join-Path -ChildPath 'packages\wwj'
+$connectorLog = Join-Path $runtimePath 'connector.log'
 
 $frontendCmd = @"
 Set-Location -LiteralPath '$frontendPath'
@@ -73,9 +76,16 @@ Set-Location -LiteralPath '$frontendPath'
 & '$frontendPath\node_modules\.bin\next.cmd' dev -p 3005 *>> '$frontendLog'
 "@
 
+$connectorCmd = @"
+Set-Location -LiteralPath '$connectorPath'
+`$env:WWJ_WORKSPACE_ENDPOINT = 'http://localhost:8000'
+& node bin/agent-connector.js up --endpoint http://localhost:8000 *>> '$connectorLog'
+"@
+
 $backend = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $backendCmd) -WindowStyle Hidden -PassThru
 $frontend = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $frontendCmd) -WindowStyle Hidden -PassThru
-@{ backendPid = $backend.Id; frontendPid = $frontend.Id } | ConvertTo-Json | Set-Content -Encoding UTF8 $statePath
+$connector = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $connectorCmd) -WindowStyle Hidden -PassThru
+@{ backendPid = $backend.Id; frontendPid = $frontend.Id; connectorPid = $connector.Id } | ConvertTo-Json | Set-Content -Encoding UTF8 $statePath
 
 function Wait-Http([string]$Url, [int]$TimeoutSeconds) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -106,5 +116,5 @@ Write-Host "  Data/logs: $runtimePath"
 Write-Host 'Stop with: .\workspace\dev-sqlite.ps1 -Stop'
 
 # Keep process alive so background task job object does not terminate child processes
-Wait-Process -Id $backend.Id, $frontend.Id
+while ($true) { Start-Sleep -Seconds 5 }
 

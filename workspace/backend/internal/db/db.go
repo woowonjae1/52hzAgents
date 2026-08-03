@@ -18,10 +18,14 @@ func InitDB() {
 	dbURL := config.GlobalConfig.DatabaseURL
 
 	if strings.HasPrefix(dbURL, "sqlite://") || strings.HasSuffix(dbURL, ".db") {
-		// SQLite mode
 		sqlitePath := strings.TrimPrefix(dbURL, "sqlite://")
 		if sqlitePath == "" {
 			sqlitePath = "gorm.db"
+		}
+		if !strings.Contains(sqlitePath, "?") {
+			sqlitePath += "?_journal_mode=WAL&_busy_timeout=5000"
+		} else if !strings.Contains(sqlitePath, "_journal_mode") {
+			sqlitePath += "&_journal_mode=WAL&_busy_timeout=5000"
 		}
 		DB, err = gorm.Open(sqlite.Open(sqlitePath), &gorm.Config{})
 	} else {

@@ -18,6 +18,9 @@ class SessionRevokedError extends Error {
   }
 }
 
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100, keepAliveMsecs: 10000 });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100, keepAliveMsecs: 10000 });
+
 /**
  * HTTP client for workspace API operations.
  *
@@ -27,6 +30,8 @@ class SessionRevokedError extends Error {
 class WorkspaceClient {
   constructor(endpoint) {
     this.endpoint = (endpoint || DEFAULT_ENDPOINT).replace(/\/$/, '');
+    this.httpAgent = httpAgent;
+    this.httpsAgent = httpsAgent;
   }
 
   /**
@@ -872,6 +877,7 @@ class WorkspaceClient {
         method: 'POST',
         headers: { ...headers, 'Content-Length': Buffer.byteLength(jsonBody) },
         timeout,
+        agent: parsedUrl.protocol === 'https:' ? httpsAgent : httpAgent,
         signal: AbortSignal.timeout(timeout), // hard deadline (covers DNS/connect); see _get
       }, (res) => {
         let data = '';

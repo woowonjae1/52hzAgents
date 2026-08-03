@@ -19,8 +19,22 @@ type executeCommandRequest struct {
 
 // ExecuteTerminalCommand handles POST /v1/terminal/execute
 func ExecuteTerminalCommand(c *gin.Context) {
+	// Strict RCE Prevention: Only allow loopback requests (localhost / 127.0.0.1 / ::1)
+	clientIP := c.ClientIP()
+	if clientIP != "127.0.0.1" && clientIP != "::1" && clientIP != "localhost" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Terminal execution is restricted to localhost loopback calls only"})
+		return
+	}
+
 	_, ok := requestWorkspace(c)
 	if !ok {
+		return
+	}
+
+	// Token requirement: Even in dev mode, terminal execution requires a valid X-Workspace-Token
+	token := workspaceToken(c)
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "X-Workspace-Token required for terminal execution"})
 		return
 	}
 
