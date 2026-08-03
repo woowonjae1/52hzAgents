@@ -334,6 +334,7 @@ function LocalAgentsTab({
   isCopied: boolean;
   copyToClipboard: (text: string) => void;
 }) {
+  const displayToken = token || '<token>';
   return (
     <div className="p-4 space-y-4">
       {/* Agent grid */}

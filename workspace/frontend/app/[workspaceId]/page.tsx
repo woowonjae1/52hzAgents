@@ -64,10 +64,20 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     }
   }, [workspaceId, token]);
 
-  // Has workspace token in URL — use it directly
-  if (token) {
+  const hasBridge = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+  let cachedToken: string | null = null;
+  if (!token && typeof window !== 'undefined') {
+    try {
+      cachedToken = localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token');
+    } catch {}
+  }
+
+  const effectiveInitialToken = token || cachedToken || '';
+
+  // Has workspace token in URL, cached in localStorage, or running inside Electron Desktop Bridge — mount WorkspaceProvider
+  if (token || cachedToken || hasBridge) {
     return (
-      <WorkspaceProvider workspaceId={workspaceId} token={token} bearerToken={idToken || undefined}>
+      <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>
           <LayoutProvider>
             <Wrapper />
