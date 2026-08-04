@@ -340,9 +340,10 @@ async function cmdConnect(connector, flags, positional) {
   // Token resolution order: positional arg / --token flag, then env vars.
   // WWJ_WORKSPACE_TOKEN supplies the workspace credential in non-interactive use.
   // for compatibility with the existing mcp-server env var.
-  const token = positional[1]
-    || flags.token
-    || process.env.WWJ_WORKSPACE_TOKEN;
+  let token = positional[1];
+  if (!token || token === '-') {
+    token = flags.token || process.env.WWJ_WORKSPACE_TOKEN || process.env.OPENAGENTS_TOKEN;
+  }
 
   if (!name) {
     print('Usage: wwj connect <agent-name> <token>');

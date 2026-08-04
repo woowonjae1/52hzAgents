@@ -262,6 +262,14 @@ export interface CloudAgentConfig {
   updated_at: string;
 }
 
+export interface SharedSnapshotMessage {
+  id: string;
+  sender_name: string;
+  sender_type: string;
+  content: string;
+  created_at: string | null;
+}
+
 export interface ONMEvent {
   event_id: string;
   type: string;
@@ -271,6 +279,7 @@ export interface ONMEvent {
   metadata: Record<string, unknown>;
   visibility: string;
   timestamp: number;
+  client_message_id?: string;
 }
 
 export function eventToMessage(event: ONMEvent): WorkspaceMessage {
@@ -281,6 +290,7 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
   const senderType = rawType || (source.startsWith('human:') || source.startsWith('user') ? 'human' : 'agent');
   const senderName = (payload.sender_name as string) || (source.includes(':') ? source.split(':')[1] : source) || 'System';
   const sessionId = (event.target || '').replace(/^channel\//, '');
+  const clientMsgId = (metadata.client_message_id as string) || (payload.client_message_id as string) || (event.client_message_id as string) || undefined;
 
   return {
     messageId: event.event_id,
@@ -294,6 +304,7 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
     messageType: (payload.message_type as string) || (event.type === 'workspace.agent.thinking' ? 'thinking' : 'chat'),
     metadata: metadata,
     createdAt: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
+    clientMessageId: clientMsgId,
   };
 }
 

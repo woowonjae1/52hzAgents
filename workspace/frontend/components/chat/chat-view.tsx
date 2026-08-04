@@ -436,7 +436,7 @@ export function ChatView() {
 
       // Add optimistic messages immediately and scroll to bottom
       setOptimisticMessages((prev) => [
-        ...prev.filter((m) => m.sessionId !== currentSessionId),
+        ...prev.filter((m) => !(m.sessionId === currentSessionId && m.messageId.startsWith('optimistic-loading-'))),
         userOptimisticMsg,
         loadingOptimisticMsg,
       ]);

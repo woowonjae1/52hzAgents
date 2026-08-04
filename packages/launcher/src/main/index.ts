@@ -1836,12 +1836,23 @@ function setupIPC(): void {
     return result
   })
 
+  const assertSenderIsMain = (e: Electron.IpcMainInvokeEvent) => {
+    if (mainWindow && e.sender.id !== mainWindow.webContents.id) {
+      throw new Error("Unauthorized IPC sender")
+    }
+  }
+
   // ── Credentials ──
-  ipcMain.handle("credentials:list", () => credentialsStore.list())
-  ipcMain.handle("credentials:upsert", (_e, input) =>
-    credentialsStore.upsert(input),
-  )
-  ipcMain.handle("credentials:remove", (_e, id) => {
+  ipcMain.handle("credentials:list", (e) => {
+    assertSenderIsMain(e)
+    return credentialsStore.list()
+  })
+  ipcMain.handle("credentials:upsert", (e, input) => {
+    assertSenderIsMain(e)
+    return credentialsStore.upsert(input)
+  })
+  ipcMain.handle("credentials:remove", (e, id) => {
+    assertSenderIsMain(e)
     const removed = credentialsStore.remove(id)
     if (removed) {
       connectionsStore.unlinkCredential(id)
@@ -1849,17 +1860,21 @@ function setupIPC(): void {
     }
     return removed
   })
-  ipcMain.handle("credentials:reveal", (_e, id) => credentialsStore.reveal(id))
+  ipcMain.handle("credentials:reveal", (e, id) => {
+    assertSenderIsMain(e)
+    return credentialsStore.reveal(id)
+  })
   ipcMain.handle(
     "credentials:test",
     async (
-      _e,
+      e,
       payload: {
         id?: string
         provider: string
         secret?: string
       },
     ) => {
+      assertSenderIsMain(e)
       let secret = payload.secret
       if (!secret && payload.id)
         secret = credentialsStore.getSecret(payload.id) || undefined

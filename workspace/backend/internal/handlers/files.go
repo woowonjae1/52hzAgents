@@ -5,6 +5,7 @@ package handlers
 import (
 	"encoding/base64" // 用于解密 Agent 提交的 Base64 格式文件内容。
 	"encoding/json"   // 用于序列化上传事件消息负载。
+	"errors"          // 用于构建路径校验错误。
 	"fmt"             // 用于格式化拼接文件存储路径。
 	"io"              // 用于流式读取上传的表单数据。
 	"net/http"        // 包含标准的 HTTP 常量和响应写入方法。
@@ -34,25 +35,30 @@ type Base64UploadRequest struct {
 
 // saveFileLocal 将文件物理保存至本地磁盘中。
 func saveFileLocal(workspaceID, fileID, filename string, data []byte) (string, error) {
-	// 构建文件存储的相对路径，格式为 "workspace_id/file_id/filename"。
-	storageKey := fmt.Sprintf("%s/%s/%s", workspaceID, fileID, filename)
-	// 获取配置中设定的本地存储根路径。
+	cleanFilename := filepath.Base(filepath.ToSlash(filename))
+	if cleanFilename == "." || cleanFilename == "/" || cleanFilename == "\\" || cleanFilename == "" {
+		cleanFilename = "unnamed_file"
+	}
+	storageKey := fmt.Sprintf("%s/%s/%s", workspaceID, fileID, cleanFilename)
 	basePath := config.GlobalConfig.FileStoragePath
-	// 拼接出绝对路径。
-	fullPath := filepath.Join(basePath, storageKey)
+	fullPath := filepath.Join(basePath, workspaceID, fileID, cleanFilename)
 
-	// 获取文件所在目录，并递归创建该级目录（如果不存在的话）。
+	absBasePath, err1 := filepath.Abs(basePath)
+	absFullPath, err2 := filepath.Abs(fullPath)
+	if err1 == nil && err2 == nil && !strings.HasPrefix(absFullPath, absBasePath) {
+		return "", errors.New("invalid file path traversal")
+	}
+
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", err // 返回目录创建失败错误。
+		return "", err
 	}
 
-	// 将二进制字节流写入文件，设置权限为 0644（所有者读写，其余人只读）。
 	if err := os.WriteFile(fullPath, data, 0644); err != nil {
-		return "", err // 返回写入失败错误。
+		return "", err
 	}
 
-	return storageKey, nil // 写入成功，返回用作 DB 查询的 storageKey。
+	return storageKey, nil
 }
 
 // UploadFileMultipart 处理 POST /v1/files 接口，支持标准的 multipart/form-data 格式上传。

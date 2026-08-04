@@ -68,11 +68,16 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
           return;
         }
         const json = await res.json();
-        if (json.code !== 0) {
+        if (json.code !== undefined && json.code !== 0) {
           setError(json.message || 'Share not found');
           return;
         }
-        setSnapshot(json.data);
+        const data = json.data || json;
+        if (!data || !Array.isArray(data.messages)) {
+          setError('Share not found or invalid format');
+          return;
+        }
+        setSnapshot(data);
       } catch {
         setError('Failed to load shared conversation.');
       } finally {

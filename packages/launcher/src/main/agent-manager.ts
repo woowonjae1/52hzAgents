@@ -1307,11 +1307,11 @@ function resolveNpmInvocation(): {
     ].find(exists)
     if (npmCli) return { cmd: nodeBin, preArgs: [npmCli], useShell: false }
   }
-  // Bundled node/npm-cli not found — preserve legacy behaviour exactly.
+  // Bundled node/npm-cli not found — use spawn without shell: true to prevent CVE-2024-27980
   return {
     cmd: process.platform === "win32" ? "npm.cmd" : "npm",
     preArgs: [],
-    useShell: true,
+    useShell: false,
   }
 }
 

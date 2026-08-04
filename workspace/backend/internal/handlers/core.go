@@ -458,11 +458,16 @@ func LaunchAgent(c *gin.Context) {
 
 	runArgs := []string{"/c", "start", "cmd", "/k"}
 	if cliPath == "wwj" {
-		runArgs = append(runArgs, "wwj", "connect", agentName, reqToken, "--endpoint", "http://localhost:8000")
+		runArgs = append(runArgs, "wwj", "connect", agentName, "-", "--endpoint", "http://localhost:8000")
 	} else {
-		runArgs = append(runArgs, "node", cliPath, "connect", agentName, reqToken, "--endpoint", "http://localhost:8000")
+		runArgs = append(runArgs, "node", cliPath, "connect", agentName, "-", "--endpoint", "http://localhost:8000")
 	}
 	runCmd := exec.Command("cmd", runArgs...)
+	runCmd.Env = append(os.Environ(),
+		"WWJ_WORKSPACE_TOKEN="+reqToken,
+		"OPENAGENTS_TOKEN="+reqToken,
+		"WWJ_WORKSPACE_ENDPOINT=http://localhost:8000",
+	)
 
 	execErr = runCmd.Start()
 	if execErr != nil {
