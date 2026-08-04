@@ -51,7 +51,7 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	}
 
 	var memberships []models.ChannelMember
-	db.DB.Where("channel_id = ?", channel.ID).Find(&memberships)
+	db.DB.Where("channel_id = ?", channel.ID).Order("id ASC").Find(&memberships)
 	participants := make([]string, 0, len(memberships))
 	for _, member := range memberships {
 		if member.AgentName != noResponseAgent {
@@ -150,13 +150,10 @@ func onlineParticipants(workspaceID string, participants []string) map[string]bo
 	var members []models.WorkspaceMember
 	db.DB.Where("workspace_id = ? AND agent_name IN ?", workspaceID, participants).Find(&members)
 	now := time.Now()
-	timeout := 15 * time.Second
+	// Connector sends heartbeats every 30s; require 90s (3x margin) for online status
+	timeout := 90 * time.Second
 	if config.GlobalConfig != nil && config.GlobalConfig.AgentTimeoutSeconds > 0 {
-		tSec := config.GlobalConfig.AgentTimeoutSeconds
-		if tSec > 15 {
-			tSec = 15 // Enforce strict 15s window for active routing
-		}
-		timeout = time.Duration(tSec) * time.Second
+		timeout = time.Duration(config.GlobalConfig.AgentTimeoutSeconds) * time.Second
 	}
 	online := map[string]bool{}
 	for _, member := range members {
