@@ -25,7 +25,7 @@ import { Input } from "../../components/ui/Input"
 import { Select } from "../../components/ui/Select"
 import { Button } from "../../components/ui/Button"
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog"
-import { useThemeStore, type ThemeMode } from "../../store/theme"
+import { ALL_THEMES, THEME_SWATCHES, useThemeStore, type ThemeMode } from "../../store/theme"
 import { useAgentsStore } from "../../store/agents"
 import { useNotificationsStore } from "../../store/notifications"
 import type { RuntimeInfo, UpdaterState } from "../../types"
@@ -90,8 +90,12 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
   const [launcherVersion, setLauncherVersion] = useState<string>("--")
   const mounted = useRef(true)
 
-  const { mode: themeMode, setMode: setThemeMode } = useThemeStore(
-    useShallow((s) => ({ mode: s.mode, setMode: s.setMode })),
+  const {
+    mode: themeMode,
+    setMode: setThemeMode,
+    resolved: resolvedTheme,
+  } = useThemeStore(
+    useShallow((s) => ({ mode: s.mode, setMode: s.setMode, resolved: s.resolved })),
   )
   const agents = useAgentsStore((s) => s.agents)
   const { prefs: notifPrefs, setPrefs: setNotifPrefs } = useNotificationsStore(
@@ -357,7 +361,7 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
 
       <div className="flex flex-1 min-h-0 px-8 py-6 max-w-[1200px] mx-auto w-full gap-10">
         <aside className="w-[220px] shrink-0 flex flex-col">
-          <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-xl bg-zinc-950/50 border border-zinc-800/80 text-[12px] shadow-sm">
+          <div className="mb-6 flex items-center gap-2 rounded-(--r-xl) border border-(--border-c) bg-(--surface-0) px-3 py-2 text-[12px]">
             <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
             <input
               placeholder={t("settings.searchPlaceholder")}
@@ -375,14 +379,14 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left text-[13px] border-0 cursor-pointer transition-all relative overflow-hidden group",
                     section === s.id
-                      ? "text-cyan-400 bg-cyan-500/10 font-medium"
+                      ? "text-(--fg) bg-(--surface-2) font-medium"
                       : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40",
                   )}
                 >
                   {section === s.id && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-1/2 bg-cyan-400 rounded-r-full shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                    <div className="absolute left-0 top-1/2 h-1/2 w-0.5 -translate-y-1/2 rounded-r-full bg-(--accent)" />
                   )}
-                  <span className={cn("transition-colors", section === s.id ? "text-cyan-400" : "text-zinc-500 group-hover:text-zinc-400")}>
+                  <span className={cn("transition-colors", section === s.id ? "text-(--fg)" : "text-(--fg-x-muted) group-hover:text-(--fg-muted)")}>
                     {s.icon}
                   </span>
                   {t(`settings.sections.${s.id}`)}
@@ -439,20 +443,29 @@ export default function Settings({ showToast }: SettingsProps): React.JSX.Elemen
           {section === "appearance" && (
             <SettingsCard title={t("settings.appearance.title")}>
               <Row label={t("settings.appearance.theme")} desc={t("settings.appearance.themeDesc")}>
-                <div className="flex gap-1.5">
-                  {(["light", "dark", "system"] as ThemeMode[]).map((m) => (
+                {/* One light theme plus five dark tints — labels come from the
+                    shell namespace so this and the sidebar picker never drift. */}
+                <div className="flex flex-wrap gap-1.5">
+                  {ALL_THEMES.map((m: ThemeMode) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setThemeMode(m)}
                       className={cn(
-                        "px-3 py-1.5 rounded-sm text-[12px] border cursor-pointer",
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[12px] border cursor-pointer",
                         themeMode === m
                           ? "border-(--accent) bg-(--accent-bg) text-(--accent) font-semibold"
                           : "border-(--border) bg-(--bg-card) text-(--text-secondary) hover:border-(--border-hover)",
                       )}
                     >
-                      {t(`settings.appearance.modes.${m}`)}
+                      <span
+                        className="size-2.5 rounded-full border border-(--border)"
+                        style={{
+                          background:
+                            m === "system" ? THEME_SWATCHES[resolvedTheme] : THEME_SWATCHES[m],
+                        }}
+                      />
+                      {t(`shell.theme.names.${m}`)}
                     </button>
                   ))}
                 </div>
@@ -920,7 +933,7 @@ function SettingsCard({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <div className="bg-zinc-950/40 border border-zinc-800/80 rounded-2xl px-6 py-5 mb-5 shadow-sm">
+    <div className="mb-5 rounded-(--r-2xl) border border-(--border-c) bg-(--surface-1) px-6 py-5">
       <h3 className="m-0 mb-4 text-[14px] font-bold tracking-tight text-zinc-100 flex items-center gap-2">
         {title}
       </h3>
@@ -958,7 +971,7 @@ function Row({
     )
   }
   return (
-    <div className="flex items-center justify-between gap-6 py-3.5 group/row hover:bg-zinc-900/30 -mx-3 px-3 rounded-xl transition-colors">
+    <div className="group/row -mx-3 flex items-center justify-between gap-6 rounded-(--r-xl) px-3 py-3.5 transition-colors hover:bg-(--surface-2)">
       <Label plain className="m-0 normal-case tracking-normal min-w-0 flex-1">
         <span className="text-[13px] font-semibold text-zinc-200">
           {label}

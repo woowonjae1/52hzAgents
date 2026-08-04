@@ -39,7 +39,7 @@ export function HealthDashboard(): React.JSX.Element {
   }, [])
 
   return (
-    <div className="mt-4 p-4 rounded-xl bg-zinc-900/60 border border-zinc-800 text-sm space-y-3">
+    <div className="mt-4 space-y-3 rounded-(--r-xl) border border-(--border-c) bg-(--surface-1) p-4 text-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 font-medium text-zinc-200">
           <Activity className="w-4 h-4 text-emerald-400" />
@@ -59,7 +59,7 @@ export function HealthDashboard(): React.JSX.Element {
         {services.map((svc) => (
           <div
             key={svc.name}
-            className="p-3 rounded-lg bg-zinc-950/80 border border-zinc-800/80 flex items-center justify-between"
+            className="flex items-center justify-between rounded-(--r-lg) border border-(--border-c) bg-(--surface-0) p-3"
           >
             <div>
               <div className="text-xs font-medium text-zinc-300">{svc.name}</div>

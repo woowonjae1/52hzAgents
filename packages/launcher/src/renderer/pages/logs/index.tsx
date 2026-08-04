@@ -370,7 +370,7 @@ export default function Logs({ showToast }: LogsProps): React.JSX.Element {
                     <tr
                       key={i}
                       className={cn(
-                        "group/log flex items-start hover:bg-zinc-900/50 transition-colors border-l-2 border-transparent hover:border-zinc-700/50",
+                        "group/log flex items-start border-l-2 border-transparent transition-colors hover:border-(--border-accent) hover:bg-(--surface-1)",
                         p.level === "error" && "bg-red-950/20 hover:bg-red-950/40 hover:border-red-500/50",
                       )}
                     >
@@ -389,7 +389,7 @@ export default function Logs({ showToast }: LogsProps): React.JSX.Element {
                       {/* Message Content */}
                       <td className="flex-1 min-w-0 pt-0.5 pb-0.5 px-2 pr-4 wrap-break-word">
                         {p.source && (
-                          <span className="inline-block shrink-0 text-[10px] uppercase font-bold tracking-wider text-cyan-500 bg-cyan-500/10 px-1.5 py-px rounded-sm mr-2 border border-cyan-500/20">
+                          <span className="mr-2 inline-block shrink-0 rounded-(--r-base) bg-(--surface-2) px-1.5 py-px text-[10px] font-medium uppercase tracking-wider text-(--fg-muted)">
                             {p.source}
                           </span>
                         )}
@@ -401,7 +401,7 @@ export default function Logs({ showToast }: LogsProps): React.JSX.Element {
                             <button
                               type="button"
                               onClick={() => toggleExpanded(i)}
-                              className="inline-flex items-center gap-1 text-[10.5px] font-medium text-cyan-500 hover:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 px-2 py-0.5 rounded-sm cursor-pointer border border-cyan-500/20 transition-colors"
+                              className="inline-flex cursor-pointer items-center gap-1 rounded-(--r-base) border border-(--border-c) px-2 py-0.5 text-[11px] text-(--fg-muted) transition-colors hover:bg-(--surface-2) hover:text-(--fg)"
                             >
                               {isExpanded ? (
                                 <ChevronDown className="w-3 h-3" />
@@ -411,7 +411,7 @@ export default function Logs({ showToast }: LogsProps): React.JSX.Element {
                               {isExpanded ? "Collapse JSON Payload" : "Inspect JSON Payload"}
                             </button>
                             {isExpanded && (
-                              <pre className="bg-zinc-950/80 border border-zinc-800/80 rounded-md px-3 py-2.5 mt-2 overflow-x-auto text-[11.5px] shadow-inner text-zinc-300">
+                              <pre className="mt-2 overflow-x-auto rounded-(--r-md) border border-(--border-c) bg-(--surface-0) px-3 py-2.5 text-[12px] text-(--fg-muted)">
                                 <JsonViewer value={p.json} collapsed={false} />
                               </pre>
                             )}

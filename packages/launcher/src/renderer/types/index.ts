@@ -331,6 +331,73 @@ export interface FileListEntry {
   created_at?: string
 }
 
+// ── Local git (mirrors src/main/git.ts) ──
+
+export type GitFileStatus =
+  | 'modified'
+  | 'added'
+  | 'deleted'
+  | 'renamed'
+  | 'copied'
+  | 'untracked'
+  | 'conflicted'
+  | 'typechange'
+
+export interface GitChangedFile {
+  path: string
+  oldPath?: string
+  status: GitFileStatus
+  staged: boolean
+  unstaged: boolean
+  additions: number
+  deletions: number
+  binary: boolean
+}
+
+export interface GitRepoInfo {
+  isRepo: boolean
+  root: string | null
+  branch: string | null
+  upstream: string | null
+  ahead: number
+  behind: number
+  error?: string
+}
+
+export interface GitStatusResult extends GitRepoInfo {
+  files: GitChangedFile[]
+  additions: number
+  deletions: number
+}
+
+export type GitDiffLineType = 'add' | 'del' | 'context' | 'hunk' | 'meta'
+
+export interface GitDiffLine {
+  type: GitDiffLineType
+  content: string
+  oldNumber: number | null
+  newNumber: number | null
+}
+
+export interface GitDiffHunk {
+  header: string
+  lines: GitDiffLine[]
+}
+
+export interface GitDiffResult {
+  path: string
+  oldPath?: string
+  binary: boolean
+  tooLarge: boolean
+  hunks: GitDiffHunk[]
+  error?: string
+}
+
+export interface GitFileEntry {
+  path: string
+  untracked: boolean
+}
+
 export interface PythonStatus {
   pythonPath: string | null
   pythonFound: boolean
@@ -475,6 +542,24 @@ declare global {
       sessionLoad(workspaceId: string, channelName: string): Promise<ChatSessionMeta | null>
       sessionDelete(workspaceId: string, channelName: string): Promise<boolean>
       sessionClear(workspaceId?: string): Promise<number>
+
+      // ── Embedded workspace web view ──
+      showEmbeddedView(
+        bounds?: { x: number; y: number; width: number; height: number },
+        url?: string,
+      ): Promise<void>
+      hideEmbeddedView(): Promise<void>
+      navigateEmbeddedView(url: string): Promise<void>
+
+      // ── Local git (Changes / Files panel) ──
+      gitStatus(dir: string): Promise<GitStatusResult>
+      gitDiff(dir: string, filePath: string, opts?: { context?: number }): Promise<GitDiffResult>
+      gitFileList(dir: string): Promise<{ root: string | null; entries: GitFileEntry[]; error?: string }>
+      gitReadFile(
+        dir: string,
+        filePath: string,
+      ): Promise<{ content: string | null; binary: boolean; tooLarge: boolean; error?: string }>
+      gitRepoInfo(dir: string): Promise<GitRepoInfo>
 
       // ── Connections ──
       listConnections(): Promise<ConnectionRecord[]>

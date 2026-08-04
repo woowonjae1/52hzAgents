@@ -103,7 +103,9 @@ test.describe("launcher full flow", () => {
     // Unique per cell so parallel matrix agents don't collide in the shared workspace.
     const name = `e2e-${SLUG}-${osTag}-${runId}`.slice(0, 38)
 
-    // 1. Install (skip if a warm profile already has it).
+    // 1. Install (skip if a warm profile already has it). The management screens
+    //    live behind the sidebar's gear menu now, so open that first.
+    await page.getByTestId("open-manage-menu").first().click()
     await page.getByTestId("nav-install").click()
     const card = page.getByTestId(`agent-card-${SLUG}`)
     await expect(card).toBeVisible({ timeout: 30_000 })
@@ -131,6 +133,7 @@ test.describe("launcher full flow", () => {
     // retrying because it opens asynchronously after the install resolves.
     await expect(async () => {
       await page.keyboard.press("Escape")
+      await page.getByTestId("open-manage-menu").first().click({ timeout: 2_000 })
       await page.getByTestId("nav-agents").click({ timeout: 2_000 })
       await expect(page.getByTestId("new-agent-open")).toBeVisible({
         timeout: 2_000,

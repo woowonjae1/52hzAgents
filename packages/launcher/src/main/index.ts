@@ -20,6 +20,7 @@ import { readPathEnv, writePathEnv, withPathEnv } from "./env"
 import { AgentManager, type ChatStreamEvent } from "./agent-manager"
 import { backendManager } from "./backend-manager"
 import { embeddedViewManager } from "./embedded-view-manager"
+import { registerGitHandlers } from "./git"
 import {
   ConnectionsStore,
   CredentialsStore,
@@ -1683,6 +1684,10 @@ function setupIPC(): void {
   ipcMain.handle("session:clear", (_e, workspaceId) =>
     requireManager().clearChatSessions(workspaceId),
   )
+
+  // Local git for the workspace Changes/Files panel. Independent of the daemon:
+  // it reads whatever repository the session is pointed at on this machine.
+  registerGitHandlers(ipcMain)
 
   ipcMain.handle("workspace:connect", (_e, agentName, slug) =>
     requireManager().connectWorkspace(agentName, slug),

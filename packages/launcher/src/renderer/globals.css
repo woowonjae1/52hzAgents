@@ -1,209 +1,72 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
-/* ===========================================================
-   Design tokens — mirror launcher-legacy/styles.css 1:1
-   =========================================================== */
-@layer base {
-  :root {
-    /* Render native form controls (the <select> option popup, date pickers,
-       scrollbars) with light chrome by default; the dark theme flips this to
-       `dark` so the OS-drawn option list isn't white-on-white. */
-    color-scheme: light;
-
-    /* Backgrounds */
-    --bg-primary: #f2f2f7;
-    --bg-secondary: #ffffff;
-    --bg-card: #ffffff;
-    --bg-card-hover: #fafafa;
-    --bg-input: #eeeef0;
-    --bg-sidebar: #ffffff;
-
-    /* Text */
-    --text-primary: #1c1c1e;
-    --text-secondary: #636366;
-    --text-tertiary: #aeaeb2;
-    --text-link: #5856d6;
-
-    /* Accent */
-    --accent: #5856d6;
-    --accent-hover: #4a48c4;
-    --accent-bg: rgba(88, 86, 214, 0.06);
-    --accent-border: rgba(88, 86, 214, 0.15);
-    --accent-text: #ffffff;
-
-    /* Semantic */
-    --success: #30d158;
-    --success-bg: rgba(48, 209, 88, 0.08);
-    --success-text: #248a3d;
-    --warning: #ff9f0a;
-    --warning-bg: rgba(255, 159, 10, 0.08);
-    --warning-text: #c77c0a;
-    --danger: #ff3b30;
-    --danger-bg: rgba(255, 59, 48, 0.06);
-    --danger-text: #d70015;
-
-    /* Borders / shadows */
-    --border: rgba(0, 0, 0, 0.06);
-    --border-hover: rgba(0, 0, 0, 0.12);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
-    --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
-    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
-
-    /* Radii */
-    --radius: 12px;
-    --radius-sm: 8px;
-    --radius-md: 10px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-
-    /* Misc */
-    --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
-    --sidebar-width: 210px;
-
-    /* shadcn HSL aliases (kept for utilities like bg-background etc.) */
-    --background: 240 24% 95.9%;       /* #f2f2f7 */
-    --foreground: 240 10% 10.6%;       /* #1c1c1e */
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 10.6%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 10.6%;
-    --primary: 243 60% 59%;            /* #5856d6 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 39%;  /* #636366 */
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 6% 68%;      /* close to #aeaeb2 */
-    --accent-hsl: 243 60% 59%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 3 90% 59%;            /* close to #ff3b30 */
-    --destructive-foreground: 0 0% 100%;
-    --border-hsl: 240 6% 94%;
-    --input-hsl: 240 6% 94%;             /* #eeeef0 */
-    --ring: 243 60% 59%;
-    --success-hsl: 136 60% 51%;
-    --success-foreground: 136 56% 33%;   /* #248a3d */
-    --warning-hsl: 35 100% 53%;
-    --warning-foreground: 33 90% 41%;    /* #c77c0a */
-  }
-
-  /* ===========================================================
-     Dark theme — activated by [data-theme="dark"] on <html>.
-     ThemeStore writes the attribute; tokens override the :root
-     light defaults via the higher-specificity selector.
-     =========================================================== */
-  [data-theme="dark"] {
-    /* Make the native <select> option popup, date pickers and scrollbars use
-       the OS dark palette so they don't render white-on-white in dark mode. */
-    color-scheme: dark;
-
-    --bg-primary: #09090b;
-    --bg-secondary: #121215;
-    --bg-card: #18181b;
-    --bg-card-hover: #242429;
-    --bg-input: #202025;
-    --bg-sidebar: #0d0d10;
-
-    --text-primary: #f4f4f5;
-    --text-secondary: #a1a1aa;
-    --text-tertiary: #71717a;
-    --text-link: #38bdf8;
-
-    --accent: #06b6d4;
-    --accent-hover: #0284c7;
-    --accent-bg: rgba(6, 182, 212, 0.12);
-    --accent-border: rgba(6, 182, 212, 0.3);
-    --accent-text: #ffffff;
-
-    --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.12);
-    --success-text: #34d399;
-    --warning: #f59e0b;
-    --warning-bg: rgba(245, 158, 11, 0.12);
-    --warning-text: #fbbf24;
-    --danger: #f43f5e;
-    --danger-bg: rgba(244, 63, 94, 0.12);
-    --danger-text: #fb7185;
-
-    --border: rgba(255, 255, 255, 0.08);
-    --border-hover: rgba(255, 255, 255, 0.18);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.8), 0 6px 16px rgba(0, 0, 0, 0.6);
-
-    /* shadcn HSL aliases (dark) */
-    --background: 225 19% 8%;
-    --foreground: 240 10% 96%;
-    --card: 228 16% 13%;
-    --card-foreground: 240 10% 96%;
-    --popover: 228 16% 13%;
-    --popover-foreground: 240 10% 96%;
-    --primary: 243 75% 73%;
-    --primary-foreground: 225 19% 8%;
-    --secondary: 228 13% 18%;
-    --secondary-foreground: 240 5% 78%;
-    --muted: 228 13% 18%;
-    --muted-foreground: 240 5% 53%;
-    --accent-hsl: 243 75% 73%;
-    --accent-foreground: 225 19% 8%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 240 10% 96%;
-    --border-hsl: 228 10% 22%;
-    --input-hsl: 228 13% 18%;
-    --ring: 243 75% 73%;
-    --success-hsl: 158 64% 52%;
-    --success-foreground: 158 64% 72%;
-    --warning-hsl: 43 96% 56%;
-    --warning-foreground: 43 96% 76%;
-  }
-}
-
-/* Register design tokens with Tailwind v4 so `bg-*`, `text-*`, `border-*`,
-   `rounded-*`, `shadow-*` utilities resolve correctly. */
+/* Register the layer tokens with Tailwind v4 so `bg-*`, `text-*`, `border-*`,
+   `rounded-*` and `shadow-*` utilities resolve against them. The shadcn-style
+   names stay (54 files use them) but now point at Paseo's surfaces instead of
+   the old HSL triples. */
 @theme inline {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent-hsl));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-border: hsl(var(--border-hsl));
-  --color-input: hsl(var(--input-hsl));
-  --color-ring: hsl(var(--ring));
-  --color-success: hsl(var(--success-hsl));
-  --color-success-foreground: hsl(var(--success-foreground));
-  --color-warning: hsl(var(--warning-hsl));
-  --color-warning-foreground: hsl(var(--warning-foreground));
+  --color-background: var(--surface-0);
+  --color-foreground: var(--fg);
+  --color-card: var(--surface-1);
+  --color-card-foreground: var(--fg);
+  --color-popover: var(--surface-2);
+  --color-popover-foreground: var(--fg);
+  --color-primary: var(--fg);
+  --color-primary-foreground: var(--surface-0);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--fg);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--fg-muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-fg);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-fg);
+  --color-border: var(--border-c);
+  --color-input: var(--surface-2);
+  --color-ring: var(--accent);
+  --color-success: var(--status-success);
+  --color-success-foreground: var(--accent-fg);
+  --color-warning: var(--status-warning);
+  --color-warning-foreground: var(--accent-fg);
 
-  /* Hardcoded px so rounded-{sm,md,lg,xl} resolve via CSS var. */
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Surfaces, addressable directly: bg-surface-2, border-border-accent, … */
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-sidebar: var(--surface-sidebar);
+  --color-sidebar-hover: var(--surface-sidebar-hover);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-x-muted: var(--fg-x-muted);
+  --color-border-accent: var(--border-accent);
+  --color-diff-add: var(--diff-add);
+  --color-diff-del: var(--diff-del);
+
+  --radius: var(--r-lg);
+  --radius-sm: var(--r-md);
+  --radius-md: var(--r-lg);
+  --radius-lg: var(--r-xl);
+  --radius-xl: var(--r-2xl);
 
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
 }
 
 /* ===========================================================
    Reset / globals
    =========================================================== */
-/* Tailwind v4 removed default border color — restore legacy gray so
+/* Tailwind v4 removed default border color — restore the token so
    naked `border` (without `border-border`) still looks right. */
 @layer base {
   *, ::before, ::after {
-    border-color: var(--border);
+    border-color: var(--border-c);
   }
 }
 
@@ -218,27 +81,25 @@ body,
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
-  letter-spacing: -0.01em;
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 13px;
+  font-family: var(--font-ui);
+  background: var(--surface-0);
+  color: var(--fg);
+  font-size: var(--text-sm);
 }
 
-/* Headings — legacy values */
 h1 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: var(--text-primary);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--fg);
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-bright);
   text-decoration: none;
 }
 a:hover {
@@ -246,7 +107,7 @@ a:hover {
 }
 
 code {
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  font-family: var(--font-mono);
 }
 
 /* ===========================================================
@@ -264,17 +125,21 @@ code {
    Scrollbar
    =========================================================== */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 3px;
+  background: color-mix(in srgb, var(--scrollbar-handle) 45%, transparent);
+  border-radius: var(--r-base);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.18);
+  background: var(--scrollbar-handle);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Hide scrollbar while keeping scroll behavior (modal bodies, etc.) */
@@ -317,46 +182,50 @@ code {
    Skeleton shimmer
    =========================================================== */
 .skeleton-shimmer {
-  background: linear-gradient(90deg, #ececf1 25%, #f6f6f8 50%, #ececf1 75%);
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 50%,
+    var(--surface-2) 75%
+  );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.1s linear infinite;
 }
 
 /* ===========================================================
    Legacy structural classes (port from launcher-legacy)
-   These keep pages 1:1 visually with the legacy renderer.
+   Retained so the management pages keep their layout; colors now
+   resolve through the Paseo tokens.
    =========================================================== */
 
 /* Cards */
 .card-legacy {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--surface-1);
+  border: 1px solid var(--border-c);
+  border-radius: var(--r-xl);
   padding: 18px 20px;
   margin-bottom: 12px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.18s var(--ease), border-color 0.18s var(--ease);
+  transition: border-color 0.18s var(--ease);
 }
 .card-legacy:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-hover);
+  border-color: var(--border-accent);
 }
 .card-legacy h3 {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 600;
   margin: 0 0 12px;
-  color: var(--text-primary);
+  color: var(--fg);
 }
 
 /* Empty state */
 .empty-state {
   text-align: center;
   padding: 48px 24px;
-  color: var(--text-tertiary);
+  color: var(--fg-x-muted);
 }
 .empty-state p {
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 /* Card grid */
@@ -376,17 +245,17 @@ code {
 /* Banners */
 .banner {
   padding: 14px 18px;
-  border-radius: var(--radius);
+  border-radius: var(--r-xl);
   margin-bottom: 18px;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .banner.warning {
-  background: var(--warning-bg);
-  border: 1px solid rgba(255, 159, 10, 0.15);
-  color: var(--warning-text);
+  background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
+  color: var(--status-warning);
 }
 .banner a {
-  color: var(--accent);
+  color: var(--accent-bright);
   cursor: pointer;
   text-decoration: none;
   font-weight: 500;
@@ -400,7 +269,7 @@ code {
   font-size: 10px;
   font-weight: 600;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: var(--r-full);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   display: inline-flex;
@@ -409,24 +278,24 @@ code {
   white-space: nowrap;
 }
 .badge-success {
-  background: var(--success-bg);
-  color: var(--success-text);
+  background: color-mix(in srgb, var(--status-success) 14%, transparent);
+  color: var(--status-success);
 }
 .badge-warning {
-  background: var(--warning-bg);
-  color: var(--warning-text);
+  background: color-mix(in srgb, var(--status-warning) 14%, transparent);
+  color: var(--status-warning);
 }
 .badge-info {
-  background: #e0e7ff;
-  color: #3730a3;
+  background: color-mix(in srgb, var(--status-merged) 14%, transparent);
+  color: var(--status-merged);
 }
 .badge-danger {
-  background: var(--danger-bg);
-  color: var(--danger-text);
+  background: color-mix(in srgb, var(--destructive) 14%, transparent);
+  color: var(--destructive);
 }
 .badge-muted {
-  background: #f0f0f0;
-  color: #888;
+  background: var(--surface-2);
+  color: var(--fg-muted);
 }
 .badge-success-sm,
 .badge-warning-sm,
@@ -434,17 +303,17 @@ code {
 .badge-danger-sm {
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--r-base);
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   line-height: 1.4;
   white-space: nowrap;
 }
-.badge-success-sm { background: var(--success-bg); color: var(--success-text); }
-.badge-warning-sm { background: var(--warning-bg); color: var(--warning-text); }
-.badge-muted-sm { background: #f0f0f0; color: #888; }
-.badge-danger-sm { background: var(--danger-bg); color: var(--danger-text); }
+.badge-success-sm { background: color-mix(in srgb, var(--status-success) 14%, transparent); color: var(--status-success); }
+.badge-warning-sm { background: color-mix(in srgb, var(--status-warning) 14%, transparent); color: var(--status-warning); }
+.badge-muted-sm { background: var(--surface-2); color: var(--fg-muted); }
+.badge-danger-sm { background: color-mix(in srgb, var(--destructive) 14%, transparent); color: var(--destructive); }
 
 /* Forms */
 .form-group {
@@ -454,7 +323,7 @@ code {
   display: block;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--fg-muted);
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -464,12 +333,12 @@ code {
 .form-group input[type='datetime-local'],
 .form-group select {
   width: 100%;
-  padding: 9px 14px;
-  background: var(--bg-input);
+  padding: 8px 12px;
+  background: var(--surface-2);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 13px;
+  border-radius: var(--r-md);
+  color: var(--fg);
+  font-size: var(--text-sm);
   outline: none;
   transition: all 0.18s var(--ease);
   font-family: inherit;
@@ -477,16 +346,15 @@ code {
 .form-group input:focus,
 .form-group select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-bg);
-  background: var(--bg-secondary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+  background: var(--surface-1);
 }
-/* The native <select> option popup is OS-drawn. When the control carries an
-   explicit light text color, the open list can render white-on-white in dark
-   mode on Windows/Linux Chromium, so theme the options explicitly. */
+/* The native <select> option popup is OS-drawn; theme the options explicitly so
+   they don't render white-on-white in the dark themes. */
 select option,
 select optgroup {
-  background: var(--bg-card);
-  color: var(--text-primary);
+  background: var(--surface-2);
+  color: var(--fg);
 }
 .form-actions {
   display: flex;
@@ -494,44 +362,42 @@ select optgroup {
   margin-top: 18px;
 }
 .hint {
-  font-size: 12px;
-  color: var(--text-tertiary);
+  font-size: var(--text-xs);
+  color: var(--fg-x-muted);
   margin-bottom: 12px;
 }
 
 /* Logs */
 .log-viewer {
-  background: #1a1a1e;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--surface-0);
+  border: 1px solid var(--border-c);
+  border-radius: var(--r-xl);
   padding: 16px 18px;
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  font-size: 11.5px;
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
   line-height: 1.65;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #d4d4d4;
-  box-shadow: var(--shadow-md);
+  color: var(--fg-muted);
   margin: 0;
 }
 
-/* Workspaces in Settings */
 /* Loading text */
 .loading-text {
-  color: var(--text-tertiary);
-  font-size: 13px;
+  color: var(--fg-x-muted);
+  font-size: var(--text-sm);
   padding: 24px 0;
 }
 
 /* Test result line */
-.test-loading { color: var(--text-secondary); }
-.test-success { color: var(--success-text); }
-.test-error { color: var(--danger-text); }
+.test-loading { color: var(--fg-muted); }
+.test-success { color: var(--status-success); }
+.test-error { color: var(--destructive); }
 
 /* Required marker */
 .required {
-  color: var(--danger-text);
+  color: var(--destructive);
 }
 
 /* ===========================================================
@@ -539,57 +405,53 @@ select optgroup {
    =========================================================== */
 [data-sonner-toaster] {
   --width: 360px !important;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif !important;
+  font-family: var(--font-ui) !important;
 }
 
 [data-sonner-toast] {
-  background: var(--bg-card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
+  background: var(--surface-2) !important;
+  border: 1px solid var(--border-c) !important;
+  border-radius: var(--r-xl) !important;
   box-shadow: var(--shadow-lg) !important;
-  color: var(--text-primary) !important;
-  font-size: 13px !important;
+  color: var(--fg) !important;
+  font-size: var(--text-sm) !important;
   padding: 12px 16px !important;
 }
 
 [data-sonner-toast][data-type="success"] {
-  background: var(--success-bg) !important;
-  border-color: var(--success) !important;
-  color: var(--success-text) !important;
+  border-color: var(--status-success) !important;
+  color: var(--status-success) !important;
 }
 [data-sonner-toast][data-type="success"] [data-icon] svg {
-  color: var(--success-text) !important;
+  color: var(--status-success) !important;
 }
 
 [data-sonner-toast][data-type="error"] {
-  background: var(--danger-bg) !important;
-  border-color: var(--danger) !important;
-  color: var(--danger-text) !important;
+  border-color: var(--destructive) !important;
+  color: var(--destructive) !important;
 }
 [data-sonner-toast][data-type="error"] [data-icon] svg {
-  color: var(--danger-text) !important;
+  color: var(--destructive) !important;
 }
 
 [data-sonner-toast][data-type="warning"] {
-  background: var(--warning-bg) !important;
-  border-color: var(--warning) !important;
-  color: var(--warning-text) !important;
+  border-color: var(--status-warning) !important;
+  color: var(--status-warning) !important;
 }
 [data-sonner-toast][data-type="warning"] [data-icon] svg {
-  color: var(--warning-text) !important;
+  color: var(--status-warning) !important;
 }
 
 [data-sonner-toast][data-type="info"] {
-  background: var(--accent-bg) !important;
   border-color: var(--accent) !important;
-  color: var(--accent) !important;
+  color: var(--accent-bright) !important;
 }
 [data-sonner-toast][data-type="info"] [data-icon] svg {
-  color: var(--accent) !important;
+  color: var(--accent-bright) !important;
 }
 
 [data-sonner-toast] [data-title] {
-  font-size: 13px !important;
+  font-size: var(--text-sm) !important;
   font-weight: 500 !important;
   color: inherit !important;
 }
@@ -601,9 +463,9 @@ select optgroup {
 
 /* Inline pill (e.g. command in dialog) */
 .inline-code {
-  font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
-  background: var(--bg-input);
-  border-radius: 4px;
+  font-family: var(--font-mono);
+  background: var(--surface-2);
+  border-radius: var(--r-base);
   padding: 1px 5px;
   font-size: 11px;
 }
@@ -618,23 +480,23 @@ select optgroup {
 .phase-step {
   position: relative;
   padding: 10px 8px 8px;
-  background: var(--bg-input);
-  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
   text-align: center;
   border: 1px solid transparent;
   transition: all 0.18s var(--ease);
 }
 .phase-step.active {
-  background: var(--accent-bg);
-  border-color: var(--accent-border);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .phase-step.done {
-  background: var(--success-bg);
-  color: var(--success-text);
+  background: color-mix(in srgb, var(--status-success) 12%, transparent);
+  color: var(--status-success);
 }
 .phase-step.error {
-  background: var(--danger-bg);
-  color: var(--danger-text);
+  background: color-mix(in srgb, var(--destructive) 12%, transparent);
+  color: var(--destructive);
 }
 .phase-step-label {
   font-size: 11px;
@@ -644,7 +506,7 @@ select optgroup {
 }
 .phase-step-detail {
   font-size: 10px;
-  color: var(--text-tertiary);
+  color: var(--fg-x-muted);
   margin-top: 3px;
   height: 14px;
   overflow: hidden;
@@ -652,7 +514,7 @@ select optgroup {
   white-space: nowrap;
 }
 .phase-step.active .phase-step-detail {
-  color: var(--accent);
+  color: var(--accent-bright);
 }
 
 /* Background install banner (mini progress) */
@@ -660,9 +522,9 @@ select optgroup {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border-c);
+  border-radius: var(--r-xl);
   box-shadow: var(--shadow-lg);
   padding: 12px 14px;
   min-width: 280px;
@@ -671,7 +533,7 @@ select optgroup {
   animation: fadeIn 0.2s var(--ease);
 }
 .install-mini-title {
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   margin-bottom: 6px;
   display: flex;
@@ -680,7 +542,7 @@ select optgroup {
 }
 .install-mini-bar {
   height: 4px;
-  background: var(--bg-input);
+  background: var(--surface-3);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -691,7 +553,7 @@ select optgroup {
 }
 .install-mini-detail {
   font-size: 10.5px;
-  color: var(--text-tertiary);
+  color: var(--fg-x-muted);
   margin-top: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -710,13 +572,13 @@ select optgroup {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--text-tertiary);
+  color: var(--fg-x-muted);
 }
 .wizard-step .dot {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: var(--bg-input);
+  background: var(--surface-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -725,19 +587,18 @@ select optgroup {
 }
 .wizard-step.active .dot {
   background: var(--accent);
-  color: white;
+  color: var(--accent-fg);
 }
 .wizard-step.done .dot {
-  background: var(--success);
-  color: white;
+  background: var(--status-success);
+  color: var(--accent-fg);
 }
 .wizard-step.active {
-  color: var(--text-primary);
+  color: var(--fg);
   font-weight: 600;
 }
 .wizard-step-sep {
   width: 24px;
   height: 1px;
-  background: var(--border);
+  background: var(--border-c);
 }
-

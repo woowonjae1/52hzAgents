@@ -171,7 +171,7 @@ export function GuidedTour(): React.JSX.Element | null {
 
       {/* Highlight ring around the target. */}
       <div
-        className="absolute rounded-lg pointer-events-none ring-2 ring-[#6366f1] shadow-[0_0_0_4px_rgba(99,102,241,0.25)] transition-all duration-150"
+        className="pointer-events-none absolute rounded-(--r-lg) ring-2 ring-(--accent) transition-all duration-150"
         style={{
           top: hole.top,
           left: hole.left,

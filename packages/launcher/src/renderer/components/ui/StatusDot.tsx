@@ -24,9 +24,9 @@ export default function StatusDot({ state, className }: StatusDotProps): React.J
     <span
       className={cn(
         "inline-block w-[7px] h-[7px] rounded-full shrink-0",
-        s === "online"   && "bg-(--success) shadow-[0_0_0_3px_rgba(48,209,88,0.15)]",
-        s === "starting" && "bg-(--warning) animate-[pulse-dot_1.5s_infinite]",
-        s === "offline"  && "bg-(--text-tertiary)",
+        s === "online"   && "bg-(--status-success)",
+        s === "starting" && "bg-(--status-warning) animate-[pulse-dot_1.5s_infinite]",
+        s === "offline"  && "bg-(--fg-x-muted)",
         className,
       )}
     />

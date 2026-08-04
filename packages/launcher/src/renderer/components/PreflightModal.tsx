@@ -26,7 +26,7 @@ export function PreflightModal({
   return (
     <Modal open={open} onClose={onClose}>
       <div className="flex items-center gap-2 mb-2">
-        <Shield className="w-5 h-5 text-cyan-400" />
+        <Shield className="w-5 h-5 text-(--fg-muted)" />
         <ModalTitle>Agent Preflight Diagnostic: {agentName}</ModalTitle>
       </div>
       
@@ -36,7 +36,7 @@ export function PreflightModal({
 
       <div className="space-y-3 mb-6">
         {/* Binary Check */}
-        <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+        <div className="flex items-center justify-between rounded-(--r-xl) border border-(--border-c) bg-(--surface-0) p-3">
           <div className="flex items-center gap-2.5">
             <Terminal className="w-4 h-4 text-zinc-400" />
             <div className="flex flex-col">
@@ -56,7 +56,7 @@ export function PreflightModal({
         </div>
 
         {/* Credentials Check */}
-        <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+        <div className="flex items-center justify-between rounded-(--r-xl) border border-(--border-c) bg-(--surface-0) p-3">
           <div className="flex items-center gap-2.5">
             <Shield className="w-4 h-4 text-zinc-400" />
             <div className="flex flex-col">
@@ -76,7 +76,7 @@ export function PreflightModal({
         </div>
 
         {/* Network & Endpoint */}
-        <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/80">
+        <div className="flex items-center justify-between rounded-(--r-xl) border border-(--border-c) bg-(--surface-0) p-3">
           <div className="flex items-center gap-2.5">
             <Globe className="w-4 h-4 text-zinc-400" />
             <div className="flex flex-col">

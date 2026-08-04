@@ -5,25 +5,15 @@ import { useAgentsStore } from "./store/agents"
 import { useInstallStore } from "./store/install"
 import { useThemeStore } from "./store/theme"
 import { useNotificationsStore } from "./store/notifications"
-import Sidebar from "./components/Sidebar"
 import { ToastContainer } from "./components/ui/Toast"
 import { CommandPalette } from "./components/command-palette/CommandPalette"
 import { OnboardingFlow, shouldShowOnboarding } from "./components/onboarding/OnboardingFlow"
 import { GuidedTour, shouldShowGuidedTour } from "./components/onboarding/GuidedTour"
-import Dashboard from "./pages/dashboard"
-import Agents from "./pages/agents"
-import Workspaces from "./pages/workspaces"
-import Connections from "./pages/connections"
-import Credentials from "./pages/credentials"
-import GitHubPage from "./pages/github"
-import Install from "./pages/install"
-import Logs from "./pages/logs"
-import Settings from "./pages/settings"
+import AppShell from "./components/shell/AppShell"
 import { InstallMiniBanner } from "./components/install-progress/StagedProgress"
 import { LauncherUpdateBanner } from "./components/LauncherUpdateBanner"
 import { useToasts } from "./hooks/useToast"
 import { useInstallProgress } from "./hooks/useInstallProgress"
-import { cn } from "./lib/utils"
 import { capture } from "./lib/analytics"
 
 export default function App(): React.JSX.Element {
@@ -100,12 +90,12 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     const tabs = [
       "dashboard",
-      "agents",
       "workspaces",
+      "install",
+      "agents",
       "connections",
       "credentials",
       "github",
-      "install",
       "logs",
       "settings",
     ]
@@ -127,32 +117,8 @@ export default function App(): React.JSX.Element {
     .sort((a, b) => b.startedAt - a.startedAt)[0]
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)]">
-      <Sidebar />
-
-      <main
-        className={cn(
-          "flex-1 min-w-0 bg-(--bg-primary)",
-          "overflow-hidden flex flex-col",
-        )}
-      >
-        {currentTab === "dashboard" && (
-          <Dashboard
-            showToast={showToast}
-            onOpenConfigure={() => {}}
-            onOpenConnectWorkspace={() => {}}
-          />
-        )}
-
-        {currentTab === "agents" && <Agents showToast={showToast} />}
-        {currentTab === "workspaces" && <Workspaces showToast={showToast} />}
-        {currentTab === "connections" && <Connections showToast={showToast} />}
-        {currentTab === "credentials" && <Credentials showToast={showToast} />}
-        {currentTab === "github" && <GitHubPage showToast={showToast} />}
-        {currentTab === "install" && <Install showToast={showToast} />}
-        {currentTab === "logs" && <Logs showToast={showToast} />}
-        {currentTab === "settings" && <Settings showToast={showToast} />}
-      </main>
+    <>
+      <AppShell showToast={showToast} />
 
       {activeJob && currentTab !== "install" && (
         <InstallMiniBanner
@@ -178,6 +144,6 @@ export default function App(): React.JSX.Element {
           mutually exclusive, and this guarantees the spotlight can never render
           on top of the wizard even if a stray startTour() slips through. */}
       {!onboardingOpen && <GuidedTour />}
-    </div>
+    </>
   )
 }

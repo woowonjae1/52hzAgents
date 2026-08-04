@@ -23,7 +23,7 @@ interface DashboardProps {
 
 function SkeletonCard(): React.JSX.Element {
   return (
-    <div className="flex flex-col h-full p-4 bg-zinc-950/60 border border-zinc-800/80 rounded-2xl animate-pulse">
+    <div className="flex h-full flex-col rounded-(--r-xl) border border-(--border-c) bg-(--surface-1) p-4 animate-pulse">
       <div className="flex items-center gap-3">
         <div className="size-10 rounded-xl bg-zinc-900" />
         <div className="flex-1 space-y-2">
@@ -119,56 +119,54 @@ export default function Dashboard({
       <TopBar title="智能体控制塔 (Control Tower)" showSearch />
 
       <div className="p-6 max-w-7xl mx-auto w-full space-y-6">
-        {/* Header Control Metrics Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 border border-zinc-800/80 shadow-md flex items-center justify-between">
+        {/* Status band. Flat surfaces, one muted icon tile each — the numbers are
+            the content, so nothing here competes with them for attention. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="flex items-center justify-between rounded-(--r-xl) border border-(--border-c) bg-(--surface-1) p-4">
             <div>
-              <div className="text-xs font-medium text-zinc-400">活跃智能体节点</div>
-              <div className="text-2xl font-bold font-mono text-zinc-100 mt-1 flex items-baseline gap-2">
+              <div className="text-[12px] text-(--fg-muted)">运行中的智能体</div>
+              <div className="mt-1 flex items-baseline gap-1.5 text-[22px] font-medium tabular-nums text-(--fg)">
                 <span>{activeCount}</span>
-                <span className="text-xs text-zinc-500 font-normal">/ {agents.length} Total</span>
+                <span className="text-[12px] font-normal text-(--fg-x-muted)">/ {agents.length}</span>
               </div>
             </div>
-            <div className="size-11 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              <Cpu className="size-5" />
+            <div className="grid size-9 place-items-center rounded-(--r-lg) bg-(--surface-2) text-(--fg-muted)">
+              <Cpu className="size-4" />
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 border border-zinc-800/80 shadow-md flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-(--r-xl) border border-(--border-c) bg-(--surface-1) p-4">
             <div>
-              <div className="text-xs font-medium text-zinc-400">已桥接 Workspace</div>
-              <div className="text-2xl font-bold font-mono text-zinc-100 mt-1 flex items-baseline gap-2">
-                <span>{connectedCount}</span>
-                <span className="text-xs text-emerald-400 font-normal">Active WS</span>
-              </div>
+              <div className="text-[12px] text-(--fg-muted)">已连接工作区</div>
+              <div className="mt-1 text-[22px] font-medium tabular-nums text-(--fg)">{connectedCount}</div>
             </div>
-            <div className="size-11 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <Layers className="size-5" />
+            <div className="grid size-9 place-items-center rounded-(--r-lg) bg-(--surface-2) text-(--fg-muted)">
+              <Layers className="size-4" />
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900/90 to-zinc-950/90 border border-zinc-800/80 shadow-md flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-(--r-xl) border border-(--border-c) bg-(--surface-1) p-4">
             <div>
-              <div className="text-xs font-medium text-zinc-400">守护进程与后端自愈</div>
-              <div className="text-xs font-bold font-mono text-emerald-400 mt-2 flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] inline-block" />
-                <span>Healthy (PID Active)</span>
+              <div className="text-[12px] text-(--fg-muted)">守护进程</div>
+              <div className="mt-2 flex items-center gap-1.5 text-[13px] text-(--status-success)">
+                <span className="inline-block size-1.5 rounded-full bg-(--status-success)" />
+                <span>运行中</span>
               </div>
             </div>
-            <div className="size-11 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-              <ShieldCheck className="size-5" />
+            <div className="grid size-9 place-items-center rounded-(--r-lg) bg-(--surface-2) text-(--fg-muted)">
+              <ShieldCheck className="size-4" />
             </div>
           </div>
         </div>
 
         {/* Section Title & Toolbar */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-zinc-100 m-0">智能体集群矩阵</h2>
+            <h2 className="m-0 text-[15px] font-medium text-(--fg)">智能体</h2>
             <button
               onClick={() => void refreshAgents()}
-              className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer border border-zinc-800"
-              title="刷新节点状态"
+              className="grid size-6 place-items-center rounded-(--r-md) text-(--fg-muted) hover:bg-(--surface-2) hover:text-(--fg) transition-colors cursor-pointer"
+              title="刷新状态"
             >
               <RefreshCw className="size-3.5" />
             </button>
@@ -176,9 +174,9 @@ export default function Dashboard({
 
           <button
             onClick={() => setCurrentTab("install")}
-            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-[13px] text-(--fg-muted) hover:text-(--fg) transition-colors cursor-pointer"
           >
-            <span>添加新智能体</span>
+            <span>添加智能体</span>
             <ArrowRight className="size-3.5" />
           </button>
         </div>
@@ -191,7 +189,7 @@ export default function Dashboard({
             <SkeletonCard />
           </div>
         ) : agents.length === 0 ? (
-          <div className="p-10 rounded-2xl bg-zinc-950/60 border border-zinc-800/80 text-center space-y-4">
+          <div className="space-y-4 rounded-(--r-xl) border border-(--border-c) bg-(--surface-1) p-10 text-center">
             <div className="size-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 mx-auto">
               <Cpu className="size-6" />
             </div>

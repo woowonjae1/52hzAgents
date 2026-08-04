@@ -2,23 +2,37 @@ import * as React from "react"
 import { cn } from "../../lib/utils"
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "primary" | "destructive" | "ghost" | "link"
+  variant?: "default" | "primary" | "outline" | "destructive" | "ghost" | "link"
   size?: "default" | "sm" | "lg" | "icon"
 }
 
+/**
+ * Flat button set.
+ *
+ * No drop shadows and no colored glow: elevation is carried by the surface
+ * tokens, and on a dark theme a shadow under a 28px control just reads as mud.
+ * Only `primary` gets the accent fill — everything else is a bordered or bare
+ * surface, so a dense row of actions has exactly one focal point.
+ */
 const variantClass: Record<NonNullable<ButtonProps["variant"]>, string> = {
-  default:     "bg-(--bg-card) text-(--text-primary) border-(--border) shadow-(--shadow-sm) hover:enabled:border-(--border-hover) hover:enabled:shadow-(--shadow-md) hover:enabled:bg-(--bg-card-hover)",
-  primary:     "bg-(--accent) text-(--accent-text) font-semibold border-transparent shadow-[0_1px_4px_rgba(88,86,214,0.2)] hover:enabled:bg-(--accent-hover) hover:enabled:shadow-[0_3px_10px_rgba(88,86,214,0.25)]",
-  destructive: "bg-(--bg-card) text-(--danger-text) border-[rgba(255,59,48,0.2)] shadow-(--shadow-sm) hover:enabled:bg-(--danger-bg) hover:enabled:border-[rgba(255,59,48,0.35)]",
-  ghost:       "bg-transparent border-transparent shadow-none hover:enabled:bg-(--bg-input)",
-  link:        "border-transparent shadow-none text-(--accent) underline-offset-4 hover:enabled:underline px-0",
+  default:
+    "bg-transparent text-(--fg) border-(--border-c) hover:enabled:bg-(--surface-2) hover:enabled:border-(--border-accent)",
+  primary:
+    "bg-(--accent) text-(--accent-fg) font-medium border-transparent hover:enabled:brightness-110",
+  // Alias of `default` — several call sites ask for it by name.
+  outline:
+    "bg-transparent text-(--fg) border-(--border-c) hover:enabled:bg-(--surface-2) hover:enabled:border-(--border-accent)",
+  destructive:
+    "bg-transparent text-(--destructive) border-(--border-c) hover:enabled:border-(--destructive) hover:enabled:bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)]",
+  ghost: "bg-transparent border-transparent text-(--fg-muted) hover:enabled:bg-(--surface-2) hover:enabled:text-(--fg)",
+  link: "border-transparent text-(--accent-bright) underline-offset-4 hover:enabled:underline px-0",
 }
 
 const sizeClass: Record<NonNullable<ButtonProps["size"]>, string> = {
-  default: "px-4 py-[7px] text-[12px]",
-  sm:      "px-3 py-[5px] text-[11px]",
-  lg:      "px-5 py-[9px] text-[13px]",
-  icon:    "h-8 w-8 p-0",
+  default: "h-8 px-3 text-[13px]",
+  sm: "h-7 px-2.5 text-[12px]",
+  lg: "h-9 px-4 text-[13px]",
+  icon: "size-8 p-0",
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -26,11 +40,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap",
-        "rounded-sm font-medium leading-[1.4] cursor-pointer select-none",
-        "transition-all duration-150 border outline-none",
-        "disabled:opacity-35 disabled:cursor-not-allowed",
-        "active:enabled:scale-[0.97] active:enabled:shadow-none",
+        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap",
+        "rounded-(--r-lg) leading-none cursor-pointer select-none",
+        "transition-colors duration-150 border outline-none",
+        "focus-visible:ring-2 focus-visible:ring-(--accent) focus-visible:ring-offset-0",
+        "disabled:opacity-40 disabled:cursor-not-allowed",
         variantClass[variant],
         sizeClass[size],
         className,

@@ -138,6 +138,14 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('session:delete', workspaceId, channelName),
   sessionClear: (workspaceId?: string) => ipcRenderer.invoke('session:clear', workspaceId),
 
+  // ── Local git (Changes / Files panel) ──
+  gitStatus: (dir: string) => ipcRenderer.invoke('git:status', dir),
+  gitDiff: (dir: string, filePath: string, opts?: { context?: number }) =>
+    ipcRenderer.invoke('git:diff', dir, filePath, opts),
+  gitFileList: (dir: string) => ipcRenderer.invoke('git:file-list', dir),
+  gitReadFile: (dir: string, filePath: string) => ipcRenderer.invoke('git:read-file', dir, filePath),
+  gitRepoInfo: (dir: string) => ipcRenderer.invoke('git:repo-info', dir),
+
   // ── Connections ──
   listConnections: () => ipcRenderer.invoke('connections:list'),
   upsertConnection: (record: unknown) => ipcRenderer.invoke('connections:upsert', record),

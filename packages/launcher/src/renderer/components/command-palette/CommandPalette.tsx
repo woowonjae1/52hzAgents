@@ -23,7 +23,7 @@ import { useShallow } from "zustand/react/shallow"
 import { useTranslation } from "react-i18next"
 import { useUiStore } from "../../store/ui"
 import { useAgentsStore } from "../../store/agents"
-import { useThemeStore, type ThemeMode } from "../../store/theme"
+import { ALL_THEMES, useThemeStore, type ThemeMode } from "../../store/theme"
 import { cn } from "../../lib/utils"
 
 const HISTORY_KEY = "launcher:command-history"
@@ -203,17 +203,19 @@ export function CommandPalette(): React.JSX.Element | null {
       },
     ]
 
-    const themeCmds: Command[] = (["light", "dark", "system"] as ThemeMode[]).map((m) => ({
+    // Labels come from the shell namespace so the palette, the settings page and
+    // the sidebar picker all name the six themes identically.
+    const themeCmds: Command[] = ALL_THEMES.map((m: ThemeMode) => ({
       id: `theme:${m}`,
-      title: t("commandPalette.commands.theme", { mode: t(`commandPalette.themes.${m}`) }),
+      title: t("commandPalette.commands.theme", { mode: t(`shell.theme.names.${m}`) }),
       group: t("commandPalette.groups.appearance"),
       icon:
-        m === "dark" ? (
-          <Moon className="w-3.5 h-3.5" />
+        m === "system" ? (
+          <Monitor className="w-3.5 h-3.5" />
         ) : m === "light" ? (
           <Sun className="w-3.5 h-3.5" />
         ) : (
-          <Monitor className="w-3.5 h-3.5" />
+          <Moon className="w-3.5 h-3.5" />
         ),
       subtitle: mode === m ? t("commandPalette.current") : undefined,
       run: () => setMode(m),

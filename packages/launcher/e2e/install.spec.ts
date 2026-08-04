@@ -20,7 +20,9 @@ test.describe("launcher install smoke", () => {
     // 1. App booted.
     await expect(page).toHaveTitle(/OpenAgents/i)
 
-    // 2. Go to the Install (marketplace) tab.
+    // 2. Go to the Install (marketplace) tab. The management screens live behind
+    //    the sidebar's gear menu now, so open that first.
+    await page.getByTestId("open-manage-menu").first().click()
     await page.getByTestId("nav-install").click()
 
     // 3. The agent's card renders.

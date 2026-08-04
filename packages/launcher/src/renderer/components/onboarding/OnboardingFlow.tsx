@@ -1074,10 +1074,10 @@ function AgentSelectionStep({
                   "w-full h-full text-left p-3.5 rounded-xl border transition-all duration-150 relative overflow-hidden",
                   installing ? "cursor-not-allowed" : "cursor-pointer hover:-translate-y-0.5",
                   active
-                    ? "border-[#06b6d4] bg-[#06b6d4]/10 shadow-[0_0_20px_rgba(6,182,212,0.25)] ring-1 ring-[#06b6d4]"
+                    ? "border-(--accent) bg-(--surface-2) ring-1 ring-(--accent)"
                     : installing
-                      ? "border-zinc-800 bg-zinc-950/40 opacity-50"
-                      : "border-zinc-800/80 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900/90 shadow-sm",
+                      ? "border-(--border-c) bg-(--surface-0) opacity-50"
+                      : "border-(--border-c) bg-(--surface-1) hover:border-(--border-accent) hover:bg-(--surface-2)",
                 )}
               >
                 <div className="flex items-start gap-2.5">
