@@ -23,9 +23,9 @@ func InitDB() {
 			sqlitePath = "gorm.db"
 		}
 		if !strings.Contains(sqlitePath, "?") {
-			sqlitePath += "?_journal_mode=WAL&_busy_timeout=5000"
-		} else if !strings.Contains(sqlitePath, "_journal_mode") {
-			sqlitePath += "&_journal_mode=WAL&_busy_timeout=5000"
+			sqlitePath += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+		} else if !strings.Contains(sqlitePath, "journal_mode") {
+			sqlitePath += "&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 		}
 		DB, err = gorm.Open(sqlite.Open(sqlitePath), &gorm.Config{})
 	} else {
