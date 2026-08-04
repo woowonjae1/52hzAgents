@@ -285,12 +285,6 @@ func UpdatePresence(c *gin.Context) {
 		return
 	}
 
-	// 如果会话 ID 已经不符（说明被旋转注销），返回错误提醒。
-	if member.SessionID != nil && *member.SessionID != req.SessionID {
-		c.JSON(http.StatusConflict, gin.H{"error": "session_revoked"})
-		return
-	}
-
 	// 刷新成员的最后一次心跳及状态。
 	now := time.Now()
 	member.LastHeartbeat = &now
@@ -298,6 +292,9 @@ func UpdatePresence(c *gin.Context) {
 		member.Status = req.Status
 	} else {
 		member.Status = "online"
+	}
+	if req.SessionID != "" {
+		member.SessionID = &req.SessionID
 	}
 
 	// 保存心跳记录。

@@ -180,13 +180,8 @@ func fallbackTargets(channelID string, source string, master *string, participan
 		return mentions
 	}
 	sender := agentNameFromSource(source)
-	if master != nil && *master != "" {
-		if isAgentSource(source) && sender == *master {
-			return nil
-		}
-		return []string{*master}
-	}
 
+	// Rotate among online candidates first
 	var onlineCandidates []string
 	for _, participant := range participants {
 		if online[participant] && participant != sender {
@@ -202,6 +197,11 @@ func fallbackTargets(channelID string, source string, master *string, participan
 		selected := onlineCandidates[nextIdx]
 		rrMutex.Unlock()
 		return []string{selected}
+	}
+
+	// Fallback to master if configured and not sender
+	if master != nil && *master != "" && sender != *master {
+		return []string{*master}
 	}
 
 	var allCandidates []string
