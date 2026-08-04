@@ -377,6 +377,15 @@ async function cmdConnect(connector, flags, positional) {
       token,
     });
 
+    // Auto-create agent if it doesn't exist yet
+    let agent = connector.config.getAgent(name);
+    if (!agent) {
+      const knownTypes = ['openclaw', 'claude', 'codex', 'aider', 'goose', 'cursor', 'opencode', 'hermes', 'cline', 'amp', 'copilot', 'gemini'];
+      const inferred = knownTypes.find((t) => name.toLowerCase().includes(t)) || flags.type || 'custom';
+      print(`Agent '${name}' not created yet. Auto-creating agent '${name}' of type '${inferred}'...`);
+      connector.config.addAgent({ name, type: inferred });
+    }
+
     // Connect agent
     connector.connectWorkspace(name, slug);
     print(`'${name}' connected to workspace '${wsName}'`);
