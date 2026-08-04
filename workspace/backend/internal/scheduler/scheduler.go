@@ -24,23 +24,34 @@ func StartScheduler() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop() // 方法结束时释放计时器。
 
-		// 无限循环监听计时器 Tick 信号。
+		// 无限循环监听计时器 Tick 信号，并带有 panic 容错恢复保护。
 		for range ticker.C {
-			expireStaleAgents()
-			fireDueTimers()   // 执行到期 Timers 触发扫描。
-			fireDueRoutines() // 执行到期 Routines 触发扫描。
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("Recovered from panic in background scheduler loop: %v", r)
+					}
+				}()
+				expireStaleAgents()
+				fireDueTimers()   // 执行到期 Timers 触发扫描。
+				fireDueRoutines() // 执行到期 Routines 触发扫描。
+			}()
 		}
 	}()
 }
 
-// fireDueTimers 扫描并触发到期的单次定时消息提醒。
+// expireStaleAgents 自动将超过心跳宽限期的离线 Agent 状态更新为 offline。
 func expireStaleAgents() {
-	cutoff := time.Now().UTC().Add(-time.Duration(config.GlobalConfig.AgentTimeoutSeconds) * time.Second)
-	// "launching" is reaped alongside "online": the launcher sets it when a
-	// process is spawned, so an agent that never connects must decay to
-	// offline rather than advertising a permanent "starting up" state.
+	if db.DB == nil {
+		return
+	}
+	timeoutSec := 60
+	if config.GlobalConfig != nil && config.GlobalConfig.AgentTimeoutSeconds > 0 {
+		timeoutSec = config.GlobalConfig.AgentTimeoutSeconds
+	}
+	cutoff := time.Now().Add(-time.Duration(timeoutSec) * time.Second)
 	db.DB.Model(&models.WorkspaceMember{}).
-		Where("status IN ? AND last_heartbeat IS NOT NULL AND last_heartbeat < ?", []string{"online", "launching"}, cutoff).
+		Where("status IN ? AND (last_heartbeat IS NULL OR last_heartbeat < ?)", []string{"online", "launching"}, cutoff).
 		Updates(map[string]interface{}{"status": "offline", "session_id": nil})
 }
 
