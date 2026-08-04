@@ -359,6 +359,13 @@ function CreateWorkspaceForm({
     setLoading(true);
     try {
       const ws = await createWorkspace(agentName.trim(), name.trim() || undefined);
+      if (ws.token && typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`workspace_token_${ws.slug}`, ws.token);
+          localStorage.setItem(`workspace_token_${ws.workspaceId}`, ws.token);
+          localStorage.setItem('workspace_token', ws.token);
+        } catch {}
+      }
       group('workspace', ws.slug);
       capture('workspace_created', {
         source: 'workspace_app',
@@ -418,14 +425,14 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
   const router = useRouter();
 
   const enterWorkspace = () => {
-    // GET /v1/ws never carries the plaintext token (see WorkspaceSummary.token),
-    // so the only place a real one can come from is whatever the browser cached
-    // when this workspace was created or last opened. Interpolating a missing
-    // value into the URL used to literally produce "?token=undefined".
     let cachedToken = workspace.token;
     if (!cachedToken) {
       try {
-        cachedToken = localStorage.getItem(`workspace_token_${workspace.workspaceId}`) || undefined;
+        cachedToken =
+          localStorage.getItem(`workspace_token_${workspace.workspaceId}`) ||
+          localStorage.getItem(`workspace_token_${workspace.slug}`) ||
+          localStorage.getItem('workspace_token') ||
+          undefined;
       } catch {}
     }
     router.push(cachedToken ? `/${workspace.slug}?token=${cachedToken}` : `/${workspace.slug}`);
