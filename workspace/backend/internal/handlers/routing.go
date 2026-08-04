@@ -78,6 +78,17 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	mentions := mentionedAgents(content, req.Payload, participants)
 	online := onlineParticipants(workspaceID, participants)
 
+	// Agent-sourced messages: only route if the agent explicitly @mentions
+	// another agent. Without a mention, the reply is stored but must NOT wake
+	// another agent — otherwise every agent reply triggers the next agent's
+	// turn, creating an infinite echo storm.
+	if isAgentSource(req.Source) {
+		if len(mentions) > 0 {
+			return mentions, true, nil
+		}
+		return nil, false, nil
+	}
+
 	mode := strings.ToLower(strings.TrimSpace(channel.OrchestrationMode))
 	if mode == "master" && channel.MasterAgent != nil && *channel.MasterAgent != "" {
 		targets = masterTargets(req.Source, *channel.MasterAgent, participants, mentions)
