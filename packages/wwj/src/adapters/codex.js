@@ -439,15 +439,42 @@ class CodexAdapter extends BaseAdapter {
     }
   }
 
+  _resolveShimToJs(binPath) {
+    if (IS_WINDOWS && binPath) {
+      try {
+        if (!binPath.toLowerCase().endsWith('.cmd')) return null;
+        const cmdContent = fs.readFileSync(binPath, 'utf-8');
+        const match = cmdContent.match(/%dp0%\\([^\s"*?]+\.js)/i)
+          || cmdContent.match(/%dp0%\\([^\s"*?]+\.mjs)/i);
+        if (match) {
+          const cmdDir = path.dirname(path.resolve(binPath));
+          return path.resolve(cmdDir, match[1]);
+        }
+      } catch {}
+    }
+    return null;
+  }
+
   async _spawnCodex(cmd, env, msgChannel, prompt) {
     return new Promise((resolve, reject) => {
-      const proc = spawn(cmd[0], cmd.slice(1), {
+      let bin = cmd[0];
+      let args = cmd.slice(1);
+      let useShell = IS_WINDOWS;
+
+      const scriptPath = this._resolveShimToJs(bin);
+      if (scriptPath && fs.existsSync(scriptPath)) {
+        bin = process.execPath;
+        args = [scriptPath, ...args];
+        useShell = false;
+      }
+
+      const proc = spawn(bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env,
         cwd: this.workingDir,
         detached: !IS_WINDOWS,
         windowsHide: true,
-        shell: IS_WINDOWS,
+        shell: useShell,
       });
       this._channelProcesses[msgChannel] = proc;
 
