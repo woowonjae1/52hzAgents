@@ -58,6 +58,18 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 			participants = append(participants, member.AgentName)
 		}
 	}
+
+	// 若频道尚未关联任何专属成员，自动回退取工作区中的所有 Agent 成员
+	if len(participants) == 0 {
+		var wsMembers []models.WorkspaceMember
+		db.DB.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
+		for _, m := range wsMembers {
+			if m.AgentName != "" && m.AgentName != noResponseAgent {
+				participants = append(participants, m.AgentName)
+			}
+		}
+	}
+
 	if len(participants) == 0 {
 		return []string{noResponseAgent}, true, nil
 	}
