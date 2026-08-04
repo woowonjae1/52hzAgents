@@ -331,11 +331,22 @@ func ListWorkspaces(c *gin.Context) {
 		var agentCount int64
 		db.DB.Model(&models.WorkspaceMember{}).Where("workspace_id = ?", ws.ID).Count(&agentCount)
 
+		var token string
+		if len(ws.Settings) > 0 {
+			var settings map[string]interface{}
+			if err := json.Unmarshal(ws.Settings, &settings); err == nil && settings != nil {
+				if t, ok := settings["token"].(string); ok {
+					token = t
+				}
+			}
+		}
+
 		items = append(items, gin.H{
 			"id":             ws.ID,
 			"workspaceId":    ws.ID,
 			"name":           ws.Name,
 			"slug":           ws.Slug,
+			"token":          token,
 			"status":         ws.Status,
 			"agentCount":     agentCount,
 			"createdAt":      ws.CreatedAt,

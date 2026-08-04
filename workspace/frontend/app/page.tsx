@@ -435,6 +435,13 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
           undefined;
       } catch {}
     }
+    if (cachedToken && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`workspace_token_${workspace.slug}`, cachedToken);
+        localStorage.setItem(`workspace_token_${workspace.workspaceId}`, cachedToken);
+        localStorage.setItem('workspace_token', cachedToken);
+      } catch {}
+    }
     router.push(cachedToken ? `/${workspace.slug}?token=${cachedToken}` : `/${workspace.slug}`);
   };
 
