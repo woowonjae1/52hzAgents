@@ -530,7 +530,7 @@ class OpenClawAdapter extends BaseAdapter {
 
       this._log(`CLI: ${binary} ${args.slice(0, 5).join(' ')} ...`);
 
-      const spawnEnv = { ...(this.agentEnv || process.env) };
+      const spawnEnv = { ...(this.agentEnv || process.env), OPENCLAW_SKIP_VERSION_CHECK: '1' };
       if (IS_WINDOWS) {
         const nodeBinDir = path.dirname(process.execPath);
         const npmBin = path.join(process.env.APPDATA || '', 'npm');
