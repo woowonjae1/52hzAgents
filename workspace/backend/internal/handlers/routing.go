@@ -5,11 +5,17 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
+)
+
+var (
+	rrMutex    sync.Mutex
+	rrIndexMap = make(map[string]int) // channelID -> last routed index
 )
 
 const noResponseAgent = "__no_response__"
@@ -67,10 +73,10 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		if llmTargets, handled := routeWithLLM(workspaceID, channel, req, participants); handled {
 			targets = llmTargets
 		} else {
-			targets = fallbackTargets(req.Source, channel.MasterAgent, participants, online, mentions)
+			targets = fallbackTargets(channel.ID, req.Source, channel.MasterAgent, participants, online, mentions)
 		}
 	} else {
-		targets = fallbackTargets(req.Source, channel.MasterAgent, participants, online, mentions)
+		targets = fallbackTargets(channel.ID, req.Source, channel.MasterAgent, participants, online, mentions)
 	}
 	if len(targets) == 0 {
 		targets = []string{noResponseAgent}
@@ -144,9 +150,13 @@ func onlineParticipants(workspaceID string, participants []string) map[string]bo
 	var members []models.WorkspaceMember
 	db.DB.Where("workspace_id = ? AND agent_name IN ?", workspaceID, participants).Find(&members)
 	now := time.Now()
-	timeout := 60 * time.Second
+	timeout := 15 * time.Second
 	if config.GlobalConfig != nil && config.GlobalConfig.AgentTimeoutSeconds > 0 {
-		timeout = time.Duration(config.GlobalConfig.AgentTimeoutSeconds) * time.Second
+		tSec := config.GlobalConfig.AgentTimeoutSeconds
+		if tSec > 15 {
+			tSec = 15 // Enforce strict 15s window for active routing
+		}
+		timeout = time.Duration(tSec) * time.Second
 	}
 	online := map[string]bool{}
 	for _, member := range members {
@@ -168,7 +178,7 @@ func valueOrEmpty(value *string) string {
 	return *value
 }
 
-func fallbackTargets(source string, master *string, participants []string, online map[string]bool, mentions []string) []string {
+func fallbackTargets(channelID string, source string, master *string, participants []string, online map[string]bool, mentions []string) []string {
 	if len(mentions) > 0 {
 		return mentions
 	}
@@ -179,16 +189,41 @@ func fallbackTargets(source string, master *string, participants []string, onlin
 		}
 		return []string{*master}
 	}
+
+	var onlineCandidates []string
 	for _, participant := range participants {
 		if online[participant] && participant != sender {
-			return []string{participant}
+			onlineCandidates = append(onlineCandidates, participant)
 		}
 	}
+
+	if len(onlineCandidates) > 0 {
+		rrMutex.Lock()
+		lastIdx := rrIndexMap[channelID]
+		nextIdx := (lastIdx + 1) % len(onlineCandidates)
+		rrIndexMap[channelID] = nextIdx
+		selected := onlineCandidates[nextIdx]
+		rrMutex.Unlock()
+		return []string{selected}
+	}
+
+	var allCandidates []string
 	for _, participant := range participants {
 		if participant != sender {
-			return []string{participant}
+			allCandidates = append(allCandidates, participant)
 		}
 	}
+
+	if len(allCandidates) > 0 {
+		rrMutex.Lock()
+		lastIdx := rrIndexMap[channelID]
+		nextIdx := (lastIdx + 1) % len(allCandidates)
+		rrIndexMap[channelID] = nextIdx
+		selected := allCandidates[nextIdx]
+		rrMutex.Unlock()
+		return []string{selected}
+	}
+
 	return nil
 }
 
