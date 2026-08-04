@@ -294,7 +294,7 @@ func DeleteRoutine(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
 		return
 	}
-	if !authorizeWorkspace(c, workspace) {
+	if !authorizeResourceOwner(c, workspace, record.CreatedBy) {
 		return
 	}
 	if err := db.DB.Model(&record).Update("status", "cancelled").Error; err != nil {

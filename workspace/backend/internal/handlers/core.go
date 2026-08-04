@@ -16,6 +16,7 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
+	"gorm.io/gorm"
 )
 
 func requestWorkspace(c *gin.Context) (*models.Workspace, bool) {
@@ -51,6 +52,31 @@ func authorizeWorkspace(c *gin.Context, workspace *models.Workspace) bool {
 	}
 	c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
 	return false
+}
+
+func currentActor(c *gin.Context) string {
+	if actor := c.GetHeader("X-Actor-Id"); strings.TrimSpace(actor) != "" {
+		return strings.TrimSpace(actor)
+	}
+	if actor := c.Query("actor"); strings.TrimSpace(actor) != "" {
+		return strings.TrimSpace(actor)
+	}
+	if actor := c.GetHeader("X-Created-By"); strings.TrimSpace(actor) != "" {
+		return strings.TrimSpace(actor)
+	}
+	return ""
+}
+
+func authorizeResourceOwner(c *gin.Context, workspace *models.Workspace, createdBy string) bool {
+	if !authorizeWorkspace(c, workspace) {
+		return false
+	}
+	actor := currentActor(c)
+	if actor != "" && createdBy != "" && !strings.EqualFold(actor, createdBy) && !verifyWorkspaceAccess(workspace, workspaceToken(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the creator or workspace administrator can modify this resource"})
+		return false
+	}
+	return true
 }
 
 func UpdateWorkspace(c *gin.Context) {
@@ -308,6 +334,13 @@ func LatestEventsPerChannel(c *gin.Context) {
 }
 
 func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64) error {
+	return materializeEventTx(db.DB, workspaceID, req, timestamp)
+}
+
+func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, timestamp int64) error {
+	if tx == nil {
+		tx = db.DB
+	}
 	if req.Payload == nil {
 		req.Payload = map[string]interface{}{}
 	}
@@ -327,32 +360,32 @@ func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64
 		if master != "" {
 			channel.MasterAgent = &master
 		}
-		if err := db.DB.Create(&channel).Error; err != nil {
+		if err := tx.Create(&channel).Error; err != nil {
 			return err
 		}
 		if participants, ok := req.Payload["participants"].([]interface{}); ok {
 			for _, item := range participants {
 				if name, ok := item.(string); ok && name != "" {
-					db.DB.Create(&models.ChannelMember{ChannelID: channel.ID, AgentName: name})
+					tx.Create(&models.ChannelMember{ChannelID: channel.ID, AgentName: name})
 				}
 			}
 		}
 		req.Metadata["channel_name"] = channelName
 	case "network.channel.join", "network.channel.leave":
 		var channel models.Channel
-		if db.DB.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error == nil {
+		if tx.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error == nil {
 			name, _ := req.Payload["agent_name"].(string)
 			if req.Type == "network.channel.join" {
-				db.DB.FirstOrCreate(&models.ChannelMember{ChannelID: channel.ID, AgentName: name})
+				tx.FirstOrCreate(&models.ChannelMember{ChannelID: channel.ID, AgentName: name})
 			} else {
-				db.DB.Where("channel_id = ? AND agent_name = ?", channel.ID, name).Delete(&models.ChannelMember{})
+				tx.Where("channel_id = ? AND agent_name = ?", channel.ID, name).Delete(&models.ChannelMember{})
 			}
 		}
 	}
 	if strings.HasPrefix(req.Target, "channel/") {
 		var channel models.Channel
-		if db.DB.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error == nil {
-			db.DB.Model(&channel).Update("last_event_at", timestamp)
+		if tx.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error == nil {
+			tx.Model(&channel).Update("last_event_at", timestamp)
 			targets, routed, err := routeMessage(workspaceID, &channel, req)
 			if err != nil {
 				return err
@@ -362,7 +395,7 @@ func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64
 				if isHumanSource(req.Source) && !strings.HasPrefix(channel.Name, "routines:") {
 					for _, target := range targets {
 						if target != noResponseAgent {
-							db.DB.FirstOrCreate(&models.ChannelMember{ChannelID: channel.ID, AgentName: target})
+							tx.FirstOrCreate(&models.ChannelMember{ChannelID: channel.ID, AgentName: target})
 						}
 					}
 				}

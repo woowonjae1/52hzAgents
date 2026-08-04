@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -216,11 +217,16 @@ func bfSnapshot(key, sessionID string) (string, error) {
 	return snapshot, nil
 }
 
-func bfCloseSession(key, sessionID string) {
+func bfCloseSession(key, sessionID string) error {
 	if sessionID == "" {
-		return
+		return nil
 	}
-	_, _ = bfCall(key, "close_session", nil, sessionID)
+	_, err := bfCall(key, "close_session", nil, sessionID)
+	if err != nil {
+		log.Printf("bfCloseSession error for session %s: %v", sessionID, err)
+		return err
+	}
+	return nil
 }
 
 // bfSaveContext captures the session's cookies/localStorage into a persistent

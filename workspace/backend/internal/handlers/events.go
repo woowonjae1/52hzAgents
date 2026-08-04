@@ -152,36 +152,63 @@ func SendEvent(c *gin.Context) {
 	eventID := uuid.New().String()
 	// 获取当前的高精度毫秒级 Unix 时间戳。
 	nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
-	if err := materializeEvent(workspace.ID, &req, nowUnixMs); err != nil {
-		if err == errSessionRevoked {
+
+	var eventRec models.EventRecord
+	txErr := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := materializeEventTx(tx, workspace.ID, &req, nowUnixMs); err != nil {
+			return err
+		}
+		payloadBytes, _ = json.Marshal(req.Payload)
+		metaBytes, _ = json.Marshal(req.Metadata)
+
+		eventRec = models.EventRecord{
+			ID:         eventID,
+			NetworkID:  workspace.ID,
+			Type:       req.Type,
+			Source:     req.Source,
+			Target:     req.Target,
+			Payload:    payloadBytes,
+			Metadata:   metaBytes,
+			Timestamp:  nowUnixMs,
+			Visibility: req.Visibility,
+		}
+		if clientMessageID != "" {
+			eventRec.ClientMessageID = &clientMessageID
+		}
+		return tx.Create(&eventRec).Error
+	})
+
+	if txErr != nil {
+		if txErr == errSessionRevoked {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "session_revoked: another client is now running as this agent"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to apply event"})
-		return
-	}
-	payloadBytes, _ = json.Marshal(req.Payload)
-	metaBytes, _ = json.Marshal(req.Metadata)
-
-	// 创建 GORM 对应的数据表记录对象。
-	eventRec := models.EventRecord{
-		ID:         eventID,
-		NetworkID:  workspace.ID,
-		Type:       req.Type,
-		Source:     req.Source,
-		Target:     req.Target,
-		Payload:    payloadBytes,
-		Metadata:   metaBytes,
-		Timestamp:  nowUnixMs,
-		Visibility: req.Visibility,
-	}
-	if clientMessageID != "" {
-		eventRec.ClientMessageID = &clientMessageID
-	}
-
-	// 将事件持久化写入数据库。如果写入失败，返回 500 服务器错误。
-	if err := db.DB.Create(&eventRec).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save event to database"})
+		if clientMessageID != "" {
+			var existing models.EventRecord
+			if err := db.DB.Where("network_id = ? AND client_message_id = ?", workspace.ID, clientMessageID).First(&existing).Error; err == nil {
+				var payload map[string]interface{}
+				var metadata map[string]interface{}
+				_ = json.Unmarshal(existing.Payload, &payload)
+				_ = json.Unmarshal(existing.Metadata, &metadata)
+				c.JSON(http.StatusOK, gin.H{
+					"id":                existing.ID,
+					"event_id":          existing.ID,
+					"network":           existing.NetworkID,
+					"type":              existing.Type,
+					"source":            existing.Source,
+					"target":            existing.Target,
+					"payload":           payload,
+					"metadata":          metadata,
+					"timestamp":         existing.Timestamp,
+					"visibility":        existing.Visibility,
+					"client_message_id": clientMessageID,
+					"status":            "confirmed",
+					"duplicate":         true,
+				})
+				return
+			}
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save event"})
 		return
 	}
 
@@ -432,41 +459,52 @@ func StreamEventsWS(c *gin.Context) {
 		// 生成并持久化数据。
 		eventID := uuid.New().String()
 		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
-		if err := materializeEvent(workspace.ID, &parsedReq, nowUnixMs); err != nil {
+
+		var eventRec models.EventRecord
+		txErr := db.DB.Transaction(func(tx *gorm.DB) error {
+			if err := materializeEventTx(tx, workspace.ID, &parsedReq, nowUnixMs); err != nil {
+				return err
+			}
+			payloadBytes, _ := json.Marshal(parsedReq.Payload)
+			metaBytes, _ := json.Marshal(parsedReq.Metadata)
+
+			eventRec = models.EventRecord{
+				ID:         eventID,
+				NetworkID:  workspace.ID,
+				Type:       parsedReq.Type,
+				Source:     parsedReq.Source,
+				Target:     parsedReq.Target,
+				Payload:    payloadBytes,
+				Metadata:   metaBytes,
+				Timestamp:  nowUnixMs,
+				Visibility: parsedReq.Visibility,
+			}
+			if clientMessageID != "" {
+				eventRec.ClientMessageID = &clientMessageID
+			}
+			return tx.Create(&eventRec).Error
+		})
+
+		if txErr != nil {
+			if clientMessageID != "" {
+				var existing models.EventRecord
+				if err := db.DB.Where("network_id = ? AND client_message_id = ?", workspace.ID, clientMessageID).First(&existing).Error; err == nil {
+					sendAck(gin.H{
+						"type":              "system.event.ack",
+						"status":            "confirmed",
+						"event_id":          existing.ID,
+						"client_message_id": clientMessageID,
+						"timestamp":         existing.Timestamp,
+						"duplicate":         true,
+					})
+					continue
+				}
+			}
 			sendAck(gin.H{
 				"type":              "system.event.ack",
 				"status":            "rejected",
 				"client_message_id": clientMessageID,
-				"error":             err.Error(),
-			})
-			continue
-		}
-
-		payloadBytes, _ := json.Marshal(parsedReq.Payload)
-		metaBytes, _ := json.Marshal(parsedReq.Metadata)
-
-		eventRec := models.EventRecord{
-			ID:         eventID,
-			NetworkID:  workspace.ID,
-			Type:       parsedReq.Type,
-			Source:     parsedReq.Source,
-			Target:     parsedReq.Target,
-			Payload:    payloadBytes,
-			Metadata:   metaBytes,
-			Timestamp:  nowUnixMs,
-			Visibility: parsedReq.Visibility,
-		}
-		if clientMessageID != "" {
-			eventRec.ClientMessageID = &clientMessageID
-		}
-
-		// 保存入库。
-		if err := db.DB.Create(&eventRec).Error; err != nil {
-			sendAck(gin.H{
-				"type":              "system.event.ack",
-				"status":            "rejected",
-				"client_message_id": clientMessageID,
-				"error":             err.Error(),
+				"error":             txErr.Error(),
 			})
 			continue
 		}

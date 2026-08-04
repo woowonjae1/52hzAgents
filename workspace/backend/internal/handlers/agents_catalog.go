@@ -112,19 +112,112 @@ func GetCloudAgentProviders(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"providers": []gin.H{
 			{
-				"name":  "openai",
-				"label": "OpenAI",
+				"id": "openai", "name": "openai", "label": "OpenAI", "category": "global",
+				"description": "GPT-4o, o1, and OpenAI official models",
+				"doc_url":     "https://platform.openai.com/docs",
 				"models": []gin.H{
 					{"name": "gpt-4o", "label": "GPT-4o", "max_tokens": 4096},
+					{"name": "gpt-4o-mini", "label": "GPT-4o Mini", "max_tokens": 4096},
+					{"name": "o1-preview", "label": "o1 Preview", "max_tokens": 32768},
+					{"name": "o1-mini", "label": "o1 Mini", "max_tokens": 65536},
 					{"name": "gpt-4-turbo", "label": "GPT-4 Turbo", "max_tokens": 4096},
 				},
 			},
 			{
-				"name":  "anthropic",
-				"label": "Anthropic",
+				"id": "anthropic", "name": "anthropic", "label": "Anthropic", "category": "global",
+				"description": "Claude 3.5 Sonnet, Claude 3 Opus, and Claude 3 Haiku",
+				"doc_url":     "https://docs.anthropic.com/",
 				"models": []gin.H{
-					{"name": "claude-3-5-sonnet", "label": "Claude 3.5 Sonnet", "max_tokens": 8192},
-					{"name": "claude-3-opus", "label": "Claude 3 Opus", "max_tokens": 4096},
+					{"name": "claude-3-5-sonnet-20241022", "label": "Claude 3.5 Sonnet", "max_tokens": 8192},
+					{"name": "claude-3-5-haiku-20241022", "label": "Claude 3.5 Haiku", "max_tokens": 8192},
+					{"name": "claude-3-opus-20240229", "label": "Claude 3 Opus", "max_tokens": 4096},
+				},
+			},
+			{
+				"id": "openrouter", "name": "openrouter", "label": "OpenRouter", "category": "global",
+				"description": "Unified API for 100+ LLMs across all major providers",
+				"doc_url":     "https://openrouter.ai/docs",
+				"models": []gin.H{
+					{"name": "auto", "label": "Auto Best Model", "max_tokens": 8192},
+					{"name": "anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet (OpenRouter)", "max_tokens": 8192},
+					{"name": "openai/gpt-4o", "label": "GPT-4o (OpenRouter)", "max_tokens": 4096},
+					{"name": "deepseek/deepseek-chat", "label": "DeepSeek V3 (OpenRouter)", "max_tokens": 8192},
+					{"name": "meta-llama/llama-3.3-70b-instruct", "label": "Llama 3.3 70B (OpenRouter)", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "google", "name": "google", "label": "Google Gemini", "category": "global",
+				"description": "Gemini 1.5 Pro and Gemini 1.5 Flash",
+				"doc_url":     "https://ai.google.dev/docs",
+				"models": []gin.H{
+					{"name": "gemini-1.5-pro", "label": "Gemini 1.5 Pro", "max_tokens": 8192},
+					{"name": "gemini-1.5-flash", "label": "Gemini 1.5 Flash", "max_tokens": 8192},
+					{"name": "gemini-2.0-flash-exp", "label": "Gemini 2.0 Flash Exp", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "deepseek", "name": "deepseek", "label": "DeepSeek", "category": "china",
+				"description": "DeepSeek V3 & DeepSeek R1 reasoning models",
+				"doc_url":     "https://platform.deepseek.com/",
+				"models": []gin.H{
+					{"name": "deepseek-chat", "label": "DeepSeek V3", "max_tokens": 8192},
+					{"name": "deepseek-reasoner", "label": "DeepSeek R1 Reasoning", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "azure_openai", "name": "azure_openai", "label": "Azure OpenAI", "category": "enterprise",
+				"description": "Microsoft Azure OpenAI Service deployments",
+				"doc_url":     "https://learn.microsoft.com/azure/ai-services/openai/",
+				"models": []gin.H{
+					{"name": "gpt-4o", "label": "GPT-4o Deployment", "max_tokens": 4096},
+					{"name": "gpt-4", "label": "GPT-4 Deployment", "max_tokens": 4096},
+				},
+			},
+			{
+				"id": "groq", "name": "groq", "label": "Groq LPU", "category": "global",
+				"description": "Ultra high-speed Llama 3 & Mixtral inference",
+				"doc_url":     "https://console.groq.com/docs",
+				"models": []gin.H{
+					{"name": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B Versatile", "max_tokens": 8192},
+					{"name": "mixtral-8x7b-32768", "label": "Mixtral 8x7B", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "siliconflow", "name": "siliconflow", "label": "SiliconFlow", "category": "china",
+				"description": "SiliconCloud API for DeepSeek, Qwen, Yi & Hunyuan",
+				"doc_url":     "https://siliconflow.cn/docs",
+				"models": []gin.H{
+					{"name": "deepseek-ai/DeepSeek-V3", "label": "DeepSeek V3 (SiliconFlow)", "max_tokens": 8192},
+					{"name": "Qwen/Qwen2.5-72B-Instruct", "label": "Qwen 2.5 72B (SiliconFlow)", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "dashscope", "name": "dashscope", "label": "Qwen / DashScope", "category": "china",
+				"description": "Alibaba Cloud DashScope Qwen Max, Plus & Turbo",
+				"doc_url":     "https://help.aliyun.com/document_detail/2712195.html",
+				"models": []gin.H{
+					{"name": "qwen-max", "label": "Qwen Max", "max_tokens": 8192},
+					{"name": "qwen-plus", "label": "Qwen Plus", "max_tokens": 8192},
+					{"name": "qwen-turbo", "label": "Qwen Turbo", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "zhipu", "name": "zhipu", "label": "Zhipu GLM", "category": "china",
+				"description": "Zhipu AI BigModel GLM-4 Plus & Flash",
+				"doc_url":     "https://open.bigmodel.cn/dev/howuse/introduction",
+				"models": []gin.H{
+					{"name": "glm-4-plus", "label": "GLM-4 Plus", "max_tokens": 8192},
+					{"name": "glm-4-flash", "label": "GLM-4 Flash", "max_tokens": 8192},
+				},
+			},
+			{
+				"id": "moonshot", "name": "moonshot", "label": "Moonshot / Kimi", "category": "china",
+				"description": "Kimi long-context chat models",
+				"doc_url":     "https://platform.moonshot.cn/docs",
+				"models": []gin.H{
+					{"name": "moonshot-v1-8k", "label": "Kimi Moonshot v1 8K", "max_tokens": 8192},
+					{"name": "moonshot-v1-32k", "label": "Kimi Moonshot v1 32K", "max_tokens": 8192},
+					{"name": "moonshot-v1-128k", "label": "Kimi Moonshot v1 128K", "max_tokens": 8192},
 				},
 			},
 		},

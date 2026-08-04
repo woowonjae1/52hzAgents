@@ -140,7 +140,7 @@ func DeleteTimer(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
 		return
 	}
-	if !authorizeWorkspace(c, workspace) {
+	if !authorizeResourceOwner(c, workspace, record.CreatedBy) {
 		return
 	}
 	if record.Status == "cancelled" {

@@ -344,6 +344,9 @@ func DeleteKnowledge(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if !authorizeResourceOwner(c, workspace, entry.CreatedBy) {
+		return
+	}
 	if err := db.DB.Model(&entry).Updates(map[string]interface{}{
 		"status": "deleted", "updated_at": time.Now(),
 	}).Error; err != nil {

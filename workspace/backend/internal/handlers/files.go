@@ -359,8 +359,10 @@ func ListFiles(c *gin.Context) {
 		}
 	}
 
-	// 自动扫描磁盘物理文件，同步 Agent/脚本新增产生的本地文件至数据库
-	syncLocalDiskFiles(workspace.ID)
+	// 仅在显式请求 sync=true 参数时进行本地磁盘同步，保持 GET 读接口为纯只读
+	if c.Query("sync") == "true" {
+		syncLocalDiskFiles(workspace.ID)
+	}
 
 	// 查询活跃中的文件列表。
 	var files []models.FileRecord
@@ -444,6 +446,10 @@ func DeleteFile(c *gin.Context) {
 	var record models.FileRecord
 	if err := db.DB.Where("id = ? AND workspace_id = ?", fileID, workspace.ID).First(&record).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found in this workspace"})
+		return
+	}
+
+	if !authorizeResourceOwner(c, workspace, record.UploadedBy) {
 		return
 	}
 
