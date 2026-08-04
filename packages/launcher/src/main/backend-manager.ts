@@ -217,7 +217,7 @@ export class BackendManager {
       CORS_ORIGINS: process.env.CORS_ORIGINS || 'http://localhost:3005,http://localhost:3001,http://localhost:3000,app://.',
       FILE_STORAGE_PATH: filesPath,
       REQUESTS_PER_MINUTE: process.env.REQUESTS_PER_MINUTE || '1000',
-      ROUTER_LLM_ENABLED: 'false',
+      ROUTER_LLM_ENABLED: process.env.ROUTER_LLM_ENABLED || 'true',
     }
 
     const binaryName = process.platform === 'win32' ? 'server.exe' : 'server'

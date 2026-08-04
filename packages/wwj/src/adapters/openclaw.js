@@ -75,6 +75,15 @@ class OpenClawAdapter extends BaseAdapter {
     const mjs = path.join(portableDir, 'node_modules', 'openclaw', 'openclaw.mjs');
     if (fs.existsSync(mjs)) return mjs;
 
+    // Tier 0c: Windows global npm path (~/AppData/Roaming/npm/node_modules/openclaw/)
+    if (IS_WINDOWS) {
+      const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      for (const entryFile of ['openclaw.mjs', 'openclaw.js', 'index.js', 'bin/openclaw.js', 'dist/index.js']) {
+        const candidate = path.join(appData, 'npm', 'node_modules', 'openclaw', entryFile);
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+
     // Fallback: check if openclaw is on PATH (system install)
     // On Windows, resolve .cmd shim to actual .mjs path to avoid spawn issues
     try {
