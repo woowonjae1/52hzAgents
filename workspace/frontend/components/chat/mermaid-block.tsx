@@ -133,7 +133,7 @@ export function MermaidBlock({
 
 	if (!svg) {
 		return (
-			<div className="my-2 rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 p-3 text-xs text-muted-foreground">
+			<div className="my-2 rounded-md border border-border bg-surface1 p-3 text-xs text-muted-foreground">
 				Rendering Mermaid diagram...
 			</div>
 		);
@@ -142,7 +142,7 @@ export function MermaidBlock({
 	return (
 		<div
 			ref={containerRef}
-			className="my-2 overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 p-3 [&_svg]:mx-auto [&_svg]:max-w-full"
+			className="my-2 overflow-x-auto rounded-md border border-border bg-surface0 p-3 [&_svg]:mx-auto [&_svg]:max-w-full"
 		/>
 	);
 }

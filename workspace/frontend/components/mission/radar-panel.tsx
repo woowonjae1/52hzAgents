@@ -22,7 +22,7 @@ interface PanelAgent {
 const STATUS_COLOR: Record<Status, { dot: string; text: string; label: string }> = {
   working: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Working' },
   ready: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Online' },
-  offline: { dot: 'bg-zinc-400 dark:bg-zinc-600', text: 'text-zinc-400 dark:text-zinc-500', label: 'Offline' },
+  offline: { dot: 'bg-foreground-extra-muted', text: 'text-foreground-extra-muted', label: 'Offline' },
 };
 
 function stripMarkdown(text: string): string {
@@ -73,8 +73,8 @@ export function RadarPanel() {
   if (agents.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-6 bg-card">
-        <Users className="size-8 text-zinc-300 dark:text-zinc-700 mb-3" />
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">No agents to inspect yet.</p>
+        <Users className="size-8 text-foreground-extra-muted mb-3" />
+        <p className="text-sm text-foreground-muted">No agents to inspect yet.</p>
       </div>
     );
   }
@@ -82,14 +82,14 @@ export function RadarPanel() {
   return (
     <div className="h-full flex flex-col bg-card overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 flex items-center gap-2 pl-4 pr-12 h-11 border-b border-zinc-100 dark:border-zinc-800/60">
-        <Users className="size-4 text-zinc-500 dark:text-zinc-400" />
-        <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Agents</span>
-        <span className="text-[11px] text-zinc-400 dark:text-zinc-500 ml-auto tabular-nums">{panelAgents.length}</span>
+      <div className="shrink-0 flex items-center gap-2 pl-4 pr-12 h-11 border-b border-border/60/60">
+        <Users className="size-4 text-foreground-muted" />
+        <span className="text-sm font-semibold text-foreground">Agents</span>
+        <span className="text-[11px] text-foreground-extra-muted ml-auto tabular-nums">{panelAgents.length}</span>
       </div>
 
       {/* Agent selector list */}
-      <div className="shrink-0 max-h-44 overflow-y-auto border-b border-zinc-100 dark:border-zinc-800/60 p-1.5">
+      <div className="shrink-0 max-h-44 overflow-y-auto border-b border-border/60/60 p-1.5">
         {panelAgents.map((r) => {
           const isSel = r.agent.agentName === selected;
           const c = STATUS_COLOR[r.status];
@@ -99,11 +99,11 @@ export function RadarPanel() {
               onClick={() => setSelected(r.agent.agentName)}
               className={cn(
                 'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors',
-                isSel ? 'bg-zinc-100 dark:bg-zinc-800/60' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/30',
+                isSel ? 'bg-surface2/60' : 'hover:bg-surface1 dark:hover:bg-primary/30',
               )}
             >
               <span className={cn('size-1.5 rounded-full shrink-0', c.dot, r.status === 'working' && 'animate-pulse')} />
-              <span className={cn('text-xs truncate flex-1', isSel ? 'font-semibold text-zinc-900 dark:text-zinc-50' : 'font-medium text-zinc-600 dark:text-zinc-300')}>
+              <span className={cn('text-xs truncate flex-1', isSel ? 'font-semibold text-foreground' : 'font-medium text-foreground-muted')}>
                 {r.agent.agentName}
               </span>
               <span className={cn('text-[10px] font-medium shrink-0', c.text)}>{c.label}</span>
@@ -120,10 +120,10 @@ export function RadarPanel() {
             <div className="flex items-center gap-3">
               <AgentAvatar name={current.agent.agentName} size={40} status={current.agent.status} showStatus />
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-50 truncate">{current.agent.agentName}</div>
+                <div className="text-sm font-semibold text-foreground truncate">{current.agent.agentName}</div>
                 <div className="flex items-center gap-2 mt-0.5">
                   {current.agent.agentType && (
-                    <span className="text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">{current.agent.agentType}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-foreground-extra-muted">{current.agent.agentType}</span>
                   )}
                   <span className={cn('flex items-center gap-1 text-[10px] font-semibold', STATUS_COLOR[current.status].text)}>
                     <span className={cn('size-1.5 rounded-full', STATUS_COLOR[current.status].dot, current.status === 'working' && 'animate-pulse')} />
@@ -134,35 +134,35 @@ export function RadarPanel() {
             </div>
 
             {/* Current activity */}
-            <div className={cn('rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs border', current.status === 'working' ? 'bg-amber-500/5 border-amber-500/10' : 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-100 dark:border-zinc-800/50')}>
-              {current.status === 'working' ? <Wrench className="size-3.5 shrink-0 mt-0.5 text-amber-500" /> : current.status === 'ready' ? <Radio className="size-3.5 shrink-0 mt-0.5 text-emerald-500" /> : <Cpu className="size-3.5 shrink-0 mt-0.5 text-zinc-400" />}
+            <div className={cn('rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs border', current.status === 'working' ? 'bg-amber-500/5 border-amber-500/10' : 'bg-surface1/30 border-border/60/50')}>
+              {current.status === 'working' ? <Wrench className="size-3.5 shrink-0 mt-0.5 text-amber-500" /> : current.status === 'ready' ? <Radio className="size-3.5 shrink-0 mt-0.5 text-emerald-500" /> : <Cpu className="size-3.5 shrink-0 mt-0.5 text-foreground-extra-muted" />}
               {current.activity ? (
-                <p className={cn('line-clamp-3 min-w-0', current.status === 'working' ? 'text-amber-700 dark:text-amber-300' : 'text-zinc-600 dark:text-zinc-300')}>
+                <p className={cn('line-clamp-3 min-w-0', current.status === 'working' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground-muted')}>
                   {stripMarkdown(current.activity.content).slice(0, 240) || 'Idle'}
                 </p>
               ) : (
-                <p className="text-zinc-400 dark:text-zinc-500">{current.status === 'offline' ? 'Agent is offline' : 'Standby — awaiting a task'}</p>
+                <p className="text-foreground-extra-muted">{current.status === 'offline' ? 'Agent is offline' : 'Standby — awaiting a task'}</p>
               )}
             </div>
 
             {/* Threads */}
             <div>
-              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500 mb-1.5">
+              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-foreground-extra-muted mb-1.5">
                 <MessageSquare className="size-3" /> Threads · {current.threads.length}
               </div>
               {current.threads.length === 0 ? (
-                <p className="text-[11px] text-zinc-400 dark:text-zinc-600">No threads yet</p>
+                <p className="text-[11px] text-foreground-extra-muted">No threads yet</p>
               ) : (
                 <div className="flex flex-col gap-0.5">
                   {current.threads.map((t) => (
                     <button
                       key={t.sessionId}
                       onClick={() => openThread(t.sessionId)}
-                      className="flex items-center gap-1.5 px-2 py-1.5 -mx-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition-colors text-left"
+                      className="flex items-center gap-1.5 px-2 py-1.5 -mx-1 rounded-md hover:bg-surface2/40 transition-colors text-left"
                     >
-                      <Hash className="size-3 shrink-0 text-zinc-300 dark:text-zinc-600" />
-                      <span className="text-xs text-zinc-600 dark:text-zinc-300 truncate flex-1">{t.title || 'Untitled'}</span>
-                      {t.lastEventAt && <span className="text-[9px] text-zinc-400 dark:text-zinc-600 shrink-0">{timeAgo(new Date(t.lastEventAt).toISOString())}</span>}
+                      <Hash className="size-3 shrink-0 text-foreground-extra-muted" />
+                      <span className="text-xs text-foreground-muted truncate flex-1">{t.title || 'Untitled'}</span>
+                      {t.lastEventAt && <span className="text-[9px] text-foreground-extra-muted shrink-0">{timeAgo(new Date(t.lastEventAt).toISOString())}</span>}
                     </button>
                   ))}
                 </div>

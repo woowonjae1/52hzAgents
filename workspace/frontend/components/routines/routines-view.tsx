@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
+import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -89,7 +90,7 @@ export function RoutinesView() {
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <CalendarClock className="size-4 text-violet-500" />
-          <h2 className="text-sm font-semibold">Routines</h2>
+          <ScreenTitle>Routines</ScreenTitle>
           {activeRoutines.length > 0 && (
             <span className="text-xs text-muted-foreground">
               {activeRoutines.length} active
@@ -99,14 +100,14 @@ export function RoutinesView() {
         <div className="flex items-center gap-0.5">
           <button
             onClick={() => setShowCreateDialog(true)}
-            className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             title="Create routine"
           >
             <Plus className="size-3.5" />
           </button>
           <button
             onClick={refreshRoutines}
-            className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
           >
             <RefreshCw className="size-3.5" />
           </button>

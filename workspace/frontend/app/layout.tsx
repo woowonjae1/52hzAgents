@@ -67,6 +67,21 @@ export default function RootLayout({
         `}</Script>
         </>
         )}
+        {/*
+          Apply the stored Paseo dark tint before first paint, the same way
+          next-themes seeds the `dark` class. Without this, a reload on the Claude
+          or Midnight tint renders one frame in the default teal-green dark and
+          then snaps. Deliberately `beforeInteractive` and dependency-free — it
+          must run ahead of hydration, and it only ever touches `theme-*` classes.
+        */}
+        <Script id="paseo-tint-init" strategy="beforeInteractive">{`
+          try {
+            var stored = localStorage.getItem('paseo-theme');
+            var tints = { zinc: 'theme-zinc', midnight: 'theme-midnight', claude: 'theme-claude', ghostty: 'theme-ghostty' };
+            var cls = tints[stored];
+            if (cls) document.documentElement.classList.add(cls);
+          } catch (e) {}
+        `}</Script>
       </head>
       <body className="bg-background text-foreground font-sans">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>

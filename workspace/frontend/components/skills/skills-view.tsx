@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Sparkles, Search, ExternalLink, Star, ArrowRight, Check, Plus, Loader2, AlertCircle, Upload, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
+import { ScreenTitle } from '@/components/headers/screen-title';
 import { workspaceApi } from '@/lib/api';
 import type { WorkspaceCustomSkill } from '@/lib/types';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -551,7 +552,7 @@ export function SkillsView() {
       <div className="shrink-0 px-5 pt-4 pb-3 border-b border-border space-y-3">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-amber-500" />
-          <h2 className="text-sm font-semibold">Skill Hub</h2>
+          <ScreenTitle>Skill Hub</ScreenTitle>
           <span className="text-xs text-muted-foreground">{allSkills.length} skills</span>
           <button
             onClick={() => setUploadOpen(true)}

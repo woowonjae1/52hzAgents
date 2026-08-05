@@ -205,7 +205,7 @@ export function FilePreview() {
             if (isMobile) openMobileList();
             else setSelectedFileId(null);
           }}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 cursor-pointer"
+          className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 cursor-pointer"
           title="Back to files"
         >
           <ChevronLeft className="size-5" />
@@ -224,7 +224,7 @@ export function FilePreview() {
         {content !== null && (
           <button
             onClick={handleCopy}
-            className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
             title="Copy content"
           >
             {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
@@ -233,7 +233,7 @@ export function FilePreview() {
 
         <button
           onClick={handleDownload}
-          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
           title="Open in new tab / Download"
         >
           <ExternalLink className="size-4" />
@@ -241,7 +241,7 @@ export function FilePreview() {
 
         <button
           onClick={handleDelete}
-          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
           title="Delete"
         >
           <Trash2 className="size-4" />
@@ -280,7 +280,7 @@ export function FilePreview() {
             <audio src={blobUrl} controls className="w-80 max-w-full" />
           </div>
         ) : blobUrl && isImage ? (
-          <div className="flex items-center justify-center p-4 h-full bg-zinc-950/5 dark:bg-zinc-950/40">
+          <div className="flex items-center justify-center p-4 h-full bg-primary/5">
             <img
               src={blobUrl}
               alt={file.filename}
@@ -294,7 +294,7 @@ export function FilePreview() {
         ) : content !== null ? (
           <div className="flex text-xs font-mono min-h-full">
             {/* Line numbers gutter */}
-            <div className="select-none py-4 px-3 text-right text-zinc-400 dark:text-zinc-600 bg-muted/30 border-r border-border shrink-0 min-w-[40px]">
+            <div className="select-none py-4 px-3 text-right text-foreground-extra-muted bg-muted/30 border-r border-border shrink-0 min-w-[40px]">
               {lines.map((_, i) => (
                 <div key={i} className="leading-6">{i + 1}</div>
               ))}

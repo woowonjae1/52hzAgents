@@ -182,7 +182,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
               </button>
               <button
                 onClick={handleCancelTodos}
-                className="ml-1 p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                className="ml-1 p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
                 title="Cancel all tasks"
               >
                 <X className="size-3" />
@@ -199,7 +199,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                 <span className="text-amber-500 font-mono">{firesAt ? timeUntil(firesAt) : ''}</span>
                 <button
                   onClick={() => handleCancelTimer(t.id)}
-                  className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  className="p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
                   title="Cancel timer"
                 >
                   <X className="size-3" />
@@ -219,7 +219,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
           </span>
           <button
             onClick={() => handleCancelQueued(q.queueId)}
-            className="shrink-0 p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+            className="shrink-0 p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
             title="Cancel queued message"
           >
             <X className="size-3" />

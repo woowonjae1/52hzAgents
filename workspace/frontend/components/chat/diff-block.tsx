@@ -64,7 +64,7 @@ function parseDiff(code: string): { rows: DiffRow[]; file: string | null; adds: 
 const ROW_STYLE: Record<DiffKind, { row: string; sign: string; signColor: string; num: string }> = {
   add: { row: 'bg-emerald-500/[0.08]', sign: '+', signColor: 'text-emerald-500', num: 'text-emerald-600/70 dark:text-emerald-500/60' },
   del: { row: 'bg-red-500/[0.08]', sign: '-', signColor: 'text-red-500', num: 'text-red-600/70 dark:text-red-500/60' },
-  context: { row: '', sign: ' ', signColor: 'text-transparent', num: 'text-zinc-500/50' },
+  context: { row: '', sign: ' ', signColor: 'text-transparent', num: 'text-foreground-muted/50' },
   hunk: { row: 'bg-cyan-500/[0.06]', sign: ' ', signColor: 'text-transparent', num: 'text-transparent' },
   meta: { row: '', sign: ' ', signColor: 'text-transparent', num: 'text-transparent' },
 };
@@ -87,21 +87,21 @@ export function DiffBlock({ code }: DiffBlockProps) {
   };
 
   return (
-    <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 font-mono text-[12.5px] shadow-sm">
+    <div className="my-3 overflow-hidden rounded-xl border border-border bg-primary font-mono text-[12.5px] shadow-sm">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 h-9 border-b border-zinc-800 bg-zinc-900/60 select-none">
+      <div className="flex items-center gap-2 px-3 h-9 border-b border-border bg-primary/60 select-none">
         <button
           onClick={() => setCollapsed((v) => !v)}
-          className="flex items-center gap-1.5 min-w-0 text-zinc-400 hover:text-zinc-200 transition-colors"
+          className="flex items-center gap-1.5 min-w-0 text-foreground-extra-muted hover:text-foreground-extra-muted transition-colors"
         >
           <ChevronDown className={cn('size-3.5 shrink-0 transition-transform', collapsed && '-rotate-90')} />
-          <FileDiff className="size-3.5 shrink-0 text-zinc-500" />
-          <span className="text-[11px] truncate text-zinc-300">{file || 'diff'}</span>
+          <FileDiff className="size-3.5 shrink-0 text-foreground-muted" />
+          <span className="text-[11px] truncate text-foreground-extra-muted">{file || 'diff'}</span>
         </button>
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {adds > 0 && <span className="text-[10px] font-semibold text-emerald-500 tabular-nums">+{adds}</span>}
           {dels > 0 && <span className="text-[10px] font-semibold text-red-500 tabular-nums">−{dels}</span>}
-          <button onClick={copy} className="text-zinc-500 hover:text-zinc-200 transition-colors" title="Copy diff">
+          <button onClick={copy} className="text-foreground-muted hover:text-foreground-extra-muted transition-colors" title="Copy diff">
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           </button>
         </div>
@@ -120,7 +120,7 @@ export function DiffBlock({ code }: DiffBlockProps) {
                   <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-[11px] select-none', s.num)}>
                     {r.oldNo ?? ''}
                   </span>
-                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-[11px] select-none border-r border-zinc-800/80', s.num)}>
+                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-[11px] select-none border-r border-border/80', s.num)}>
                     {r.newNo ?? ''}
                   </span>
                   {/* sign */}
@@ -129,7 +129,7 @@ export function DiffBlock({ code }: DiffBlockProps) {
                   <span
                     className={cn(
                       'whitespace-pre pr-4 flex-1',
-                      r.kind === 'hunk' ? 'text-cyan-400/80' : r.kind === 'add' ? 'text-emerald-200' : r.kind === 'del' ? 'text-red-200' : 'text-zinc-300',
+                      r.kind === 'hunk' ? 'text-cyan-400/80' : r.kind === 'add' ? 'text-emerald-200' : r.kind === 'del' ? 'text-red-200' : 'text-foreground-extra-muted',
                     )}
                   >
                     {r.text || ' '}

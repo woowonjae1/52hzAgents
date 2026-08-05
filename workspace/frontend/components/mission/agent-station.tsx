@@ -32,13 +32,13 @@ const STATUS_META: Record<StationStatus, { label: string; dot: string; text: str
     label: 'Online',
     dot: 'bg-emerald-500',
     text: 'text-emerald-600 dark:text-emerald-400',
-    border: 'border-zinc-200 dark:border-zinc-800',
+    border: 'border-border',
   },
   offline: {
     label: 'Offline',
-    dot: 'bg-zinc-400 dark:bg-zinc-600',
-    text: 'text-zinc-400 dark:text-zinc-500',
-    border: 'border-zinc-200 dark:border-zinc-800 opacity-75',
+    dot: 'bg-foreground-extra-muted',
+    text: 'text-foreground-extra-muted',
+    border: 'border-border opacity-75',
   },
 };
 
@@ -77,7 +77,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
     <div
       className={cn(
         'group relative flex flex-col rounded-xl border bg-card overflow-hidden transition-colors',
-        'hover:border-zinc-300 dark:hover:border-zinc-700',
+        'hover:border-border-accent',
         meta.border,
       )}
     >
@@ -88,15 +88,15 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
       <button onClick={onOpenAgent} className="flex items-center gap-3 px-4 pt-4 pb-2 text-left w-full">
         <AgentAvatar name={agent.agentName} size={36} status={agent.status} showStatus />
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50 truncate block">{agent.agentName}</span>
+          <span className="text-sm font-semibold text-foreground truncate block">{agent.agentName}</span>
           {agent.agentType && (
-            <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500 truncate block mt-0.5">
+            <span className="text-[9px] font-semibold uppercase tracking-widest text-foreground-extra-muted truncate block mt-0.5">
               {agent.agentType}
             </span>
           )}
         </div>
         {/* Status pill */}
-        <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-zinc-100 dark:bg-zinc-800/60 shrink-0', meta.text)}>
+        <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-surface2/60 shrink-0', meta.text)}>
           <span className={cn('size-1.5 rounded-full', meta.dot, isWorking && 'animate-pulse')} />
           {meta.label}
         </span>
@@ -109,7 +109,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
             'rounded-lg px-3 py-2.5 min-h-[50px] flex items-start gap-2 text-xs border transition-colors',
             isWorking
               ? 'bg-amber-500/5 border-amber-500/10'
-              : 'bg-zinc-50 dark:bg-zinc-900/30 border-zinc-100 dark:border-zinc-800/50',
+              : 'bg-surface1/30 border-border/60/50',
           )}
         >
           {isWorking ? (
@@ -117,14 +117,14 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
           ) : status === 'ready' ? (
             <Radio className="size-3.5 shrink-0 mt-0.5 text-emerald-500" />
           ) : (
-            <Cpu className="size-3.5 shrink-0 mt-0.5 text-zinc-400" />
+            <Cpu className="size-3.5 shrink-0 mt-0.5 text-foreground-extra-muted" />
           )}
           {activity ? (
-            <p className={cn('line-clamp-2 min-w-0 leading-normal', isWorking ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-zinc-600 dark:text-zinc-300')}>
+            <p className={cn('line-clamp-2 min-w-0 leading-normal', isWorking ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-foreground-muted')}>
               {stripMarkdown(activity.content).slice(0, 160) || (isWorking ? 'Working…' : 'Idle')}
             </p>
           ) : (
-            <p className="text-zinc-400 dark:text-zinc-500">
+            <p className="text-foreground-extra-muted">
               {status === 'offline' ? 'Agent is offline' : status === 'ready' ? 'Standby — awaiting a task' : 'Warming up…'}
             </p>
           )}
@@ -132,13 +132,13 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
       </div>
 
       {/* Footer — threads this agent drives + skill/token summary */}
-      <div className="mt-auto border-t border-zinc-100 dark:border-zinc-800/50 bg-zinc-50/40 dark:bg-zinc-950/20 px-4 py-3 flex flex-col gap-2.5">
+      <div className="mt-auto border-t border-border/60/50 bg-surface1/40 px-4 py-3 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-foreground-extra-muted">
             <MessageSquare className="size-3" />
             Threads · {activeThreadCount}
           </span>
-          <div className="flex items-center gap-2 text-[9px] font-semibold text-zinc-400 dark:text-zinc-500">
+          <div className="flex items-center gap-2 text-[9px] font-semibold text-foreground-extra-muted">
             <span className="flex items-center gap-1">
               <Zap className="size-3" />
               {skillCount} skill{skillCount === 1 ? '' : 's'}
@@ -149,7 +149,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
           </div>
         </div>
         {threads.length === 0 ? (
-          <p className="text-[10px] text-zinc-400 dark:text-zinc-600">No threads yet</p>
+          <p className="text-[10px] text-foreground-extra-muted">No threads yet</p>
         ) : (
           <div className="flex flex-col gap-0.5">
             {threads.slice(0, 2).map((t) => {
@@ -158,14 +158,14 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
                 <button
                   key={t.sessionId}
                   onClick={() => onOpenThread(t.sessionId)}
-                  className="flex items-center gap-1.5 px-1.5 py-1 -mx-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/40 transition-colors text-left group/thread"
+                  className="flex items-center gap-1.5 px-1.5 py-1 -mx-1.5 rounded-md hover:bg-surface2/40 transition-colors text-left group/thread"
                 >
-                  <Hash className={cn('size-3 shrink-0', live ? 'text-amber-500' : 'text-zinc-400 dark:text-zinc-600')} />
-                  <span className="text-[10px] text-zinc-600 dark:text-zinc-300 truncate flex-1 group-hover/thread:text-zinc-900 dark:group-hover/thread:text-zinc-50 font-medium">
+                  <Hash className={cn('size-3 shrink-0', live ? 'text-amber-500' : 'text-foreground-extra-muted')} />
+                  <span className="text-[10px] text-foreground-muted truncate flex-1 group-hover/thread:text-foreground dark:group-hover/thread:text-primary-foreground font-medium">
                     {t.title || 'Untitled'}
                   </span>
                   {t.lastEventAt && (
-                    <span className="text-[9px] text-zinc-400 dark:text-zinc-600 shrink-0">
+                    <span className="text-[9px] text-foreground-extra-muted shrink-0">
                       {timeAgo(new Date(t.lastEventAt).toISOString())}
                     </span>
                   )}
@@ -173,7 +173,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
               );
             })}
             {threads.length > 2 && (
-              <button onClick={onOpenAgent} className="text-[9px] text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 text-left px-1.5 pt-0.5 font-medium transition-colors">
+              <button onClick={onOpenAgent} className="text-[9px] text-foreground-extra-muted hover:text-foreground-muted text-left px-1.5 pt-0.5 font-medium transition-colors">
                 + {threads.length - 2} more thread{threads.length - 2 === 1 ? '' : 's'}
               </button>
             )}
@@ -181,10 +181,10 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
         )}
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-1.5 border-t border-zinc-100 dark:border-zinc-800/40 pt-2.5 mt-0.5">
+        <div className="grid grid-cols-2 gap-1.5 border-t border-border/60/40 pt-2.5 mt-0.5">
           <button
             onClick={onOpenAgent}
-            className="h-7 rounded-md border border-zinc-200 dark:border-zinc-800 bg-white hover:bg-zinc-50 dark:bg-zinc-900/50 dark:hover:bg-zinc-900 text-[10px] font-semibold text-zinc-700 dark:text-zinc-300 transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
+            className="h-7 rounded-md border border-border bg-white hover:bg-surface1/50 dark:hover:bg-primary text-[10px] font-semibold text-foreground-muted transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
           >
             <MessageSquare className="size-3 shrink-0" />
             <span className="truncate">Open</span>
@@ -198,7 +198,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
             className={cn(
               'h-7 rounded-md border text-[10px] font-semibold transition-colors flex items-center justify-center gap-1 truncate px-1',
               status === 'offline'
-                ? 'bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-900 dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 dark:border-zinc-100 cursor-pointer'
+                ? 'bg-primary hover:bg-primary text-white border-primary dark:hover:bg-surface3 cursor-pointer'
                 : 'bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-500/30 cursor-default',
             )}
             title={status === 'offline' ? `Launch or pair ${agent.agentName}` : `${agent.agentName} is connected`}

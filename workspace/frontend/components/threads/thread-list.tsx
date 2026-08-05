@@ -30,12 +30,12 @@ function AvatarStack({ agents, max = 2 }: { agents: WorkspaceAgent[]; max?: numb
   return (
     <div className="flex -space-x-1.5">
       {shown.map((agent) => (
-        <div key={agent.agentName} className="ring-2 ring-white dark:ring-zinc-900 rounded-full">
+        <div key={agent.agentName} className="ring-2 ring-white rounded-full">
           <AgentAvatar name={agent.agentName} size={18} />
         </div>
       ))}
       {extra > 0 && (
-        <div className="size-[18px] rounded-full bg-zinc-200 flex items-center justify-center text-[7px] font-medium text-zinc-600 ring-2 ring-white dark:ring-zinc-900">
+        <div className="size-[18px] rounded-full bg-surface3 flex items-center justify-center text-[7px] font-medium text-foreground-muted ring-2 ring-white">
           +{extra}
         </div>
       )}
@@ -74,7 +74,7 @@ function DMSection({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+    <div className="mt-3 pt-3 border-t border-border">
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
@@ -112,10 +112,10 @@ function DMSection({
                 onClick={() => onSelect(dmId)}
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors cursor-pointer',
-                  isSelected ? 'bg-zinc-100 dark:bg-zinc-800 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                  isSelected ? 'bg-surface2 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-surface1 dark:hover:bg-primary/50'
                 )}
               >
-                <div className="shrink-0 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 rounded-full size-[30px] bg-white dark:bg-zinc-900">
+                <div className="shrink-0 flex items-center justify-center border border-border rounded-full size-[30px] bg-card">
                   <MessageCircle className="size-3.5 text-muted-foreground" />
                 </div>
                 <div className="flex-1 min-w-0 space-y-0.5">
@@ -249,27 +249,27 @@ export function ThreadList() {
         {!isMobile && (
           <button
             onClick={sidebarToggle}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-muted-foreground transition-colors shrink-0"
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
           >
             <PanelLeft className="size-4" />
           </button>
         )}
         <div className="flex items-center w-full gap-1">
-          <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-50/50 dark:bg-zinc-950/20 border border-zinc-200/80 focus-within:border-zinc-400 dark:border-zinc-800/80 dark:focus-within:border-zinc-700 text-muted-foreground transition-all">
+          <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface1/50 border border-border/80 focus-within:border-border-accent dark:border-border/80 dark:focus-within:border-border-accent text-muted-foreground transition-all">
             <Search className="size-3.5 opacity-60" />
             <input
               type="text"
               placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="text-xs bg-transparent outline-none flex-1 placeholder:text-muted-foreground/70 font-medium text-zinc-900 dark:text-zinc-50"
+              className="text-xs bg-transparent outline-none flex-1 placeholder:text-muted-foreground/70 font-medium text-foreground"
             />
             {searching && (
               <div className="size-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
             )}
           </div>
           <button
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-muted-foreground transition-colors shrink-0"
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
             title="Refresh"
           >
             <RefreshCw className="size-3.5" />
@@ -401,7 +401,7 @@ export function ThreadList() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button
-                      className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0"
+                      className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 dark:hover:bg-primary shrink-0"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="size-3.5 text-muted-foreground" />
@@ -510,7 +510,7 @@ export function ThreadList() {
 
           {/* Archived section */}
           {!isSearching && archivedSessions.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+            <div className="mt-3 pt-3 border-t border-border">
               <button
                 onClick={() => setShowArchived(!showArchived)}
                 className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
@@ -549,8 +549,8 @@ export function ThreadList() {
                         }}
                         className={cn(
                           'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative group cursor-pointer',
-                          isSelected ? 'bg-zinc-100 dark:bg-zinc-800 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
-                          'has-data-[state=open]:bg-zinc-50 dark:has-data-[state=open]:bg-zinc-800/50'
+                          isSelected ? 'bg-surface2 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-surface1 dark:hover:bg-primary/50',
+                          'has-data-[state=open]:bg-surface1 dark:has-data-[state=open]:bg-primary/50'
                         )}
                       >
                         <div className="shrink-0">
@@ -574,7 +574,7 @@ export function ThreadList() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 shrink-0"
+                              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 dark:hover:bg-primary shrink-0"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreVertical className="size-3.5 text-muted-foreground" />

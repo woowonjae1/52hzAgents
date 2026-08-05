@@ -28,7 +28,7 @@ function IconWrapper({ name, size = 20, className }: { name: string } & IconProp
     <span
       className={cn(
         'inline-flex items-center justify-center rounded-md shrink-0',
-        needsBg && 'bg-white dark:bg-zinc-200 p-0.5',
+        needsBg && 'bg-white p-0.5',
         className,
       )}
       style={{ width: size, height: size }}

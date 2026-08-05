@@ -275,7 +275,7 @@ function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, onSave }
                   <span
                     className={cn(
                       'ml-auto size-1.5 rounded-full',
-                      a.status === 'online' ? 'bg-green-500' : 'bg-zinc-400',
+                      a.status === 'online' ? 'bg-green-500' : 'bg-foreground-extra-muted',
                     )}
                   />
                 </button>

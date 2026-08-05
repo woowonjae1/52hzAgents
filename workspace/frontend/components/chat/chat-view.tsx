@@ -593,7 +593,7 @@ export function ChatView() {
             return (
               <>
                 {sessionAgents.length > 1 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-medium shrink-0">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface2 text-foreground-muted font-medium shrink-0">
                     group
                   </span>
                 )}
@@ -656,7 +656,7 @@ export function ChatView() {
                           </div>
                         ))}
                         {sessionAgents.length > 3 && (
-                          <div className="size-5 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[7px] font-medium text-zinc-600 dark:text-zinc-400 border-2 border-background" title={sessionAgents.map((agent) => agent.agentName).join(', ')}>
+                          <div className="size-5 rounded-full bg-surface3 flex items-center justify-center text-[7px] font-medium text-foreground-muted border-2 border-background" title={sessionAgents.map((agent) => agent.agentName).join(', ')}>
                             +{sessionAgents.length - 3}
                           </div>
                         )}
@@ -751,8 +751,8 @@ export function ChatView() {
               size="sm"
               onClick={() => setShowAllSteps((prev) => !prev)}
               className={cn(
-                'gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
-                showAllSteps && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200/50 dark:border-zinc-700/50'
+                'gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
+                showAllSteps && 'bg-surface2 text-foreground border border-border/50'
               )}
               title={showAllSteps ? 'Showing all intermediate steps' : 'Showing only latest steps'}
             >
@@ -762,15 +762,15 @@ export function ChatView() {
 
           {/* Right workspace panels toggles (Desktop only) */}
           {!isMobile && (
-            <div className="flex items-center gap-1 border-r border-zinc-200/60 dark:border-zinc-800/60 pr-1.5 mr-0.5">
+            <div className="flex items-center gap-1 border-r border-border/60 pr-1.5 mr-0.5">
               {/* Web Sandbox */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setActiveRightTab(activeRightTab === 'browser' ? null : 'browser')}
                 className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
-                  activeRightTab === 'browser' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
+                  activeRightTab === 'browser' && 'bg-surface2 text-foreground border border-border/50 font-bold'
                 )}
                 title="Web Sandbox Preview"
               >
@@ -784,8 +784,8 @@ export function ChatView() {
                 size="sm"
                 onClick={() => setActiveRightTab(activeRightTab === 'radar' ? null : 'radar')}
                 className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
-                  activeRightTab === 'radar' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
+                  activeRightTab === 'radar' && 'bg-surface2 text-foreground border border-border/50 font-bold'
                 )}
                 title="Inspect agents"
               >
@@ -799,8 +799,8 @@ export function ChatView() {
                 size="sm"
                 onClick={() => setActiveRightTab(activeRightTab === 'file' ? null : 'file')}
                 className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
-                  activeRightTab === 'file' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
+                  activeRightTab === 'file' && 'bg-surface2 text-foreground border border-border/50 font-bold'
                 )}
                 title="File Preview"
               >
@@ -814,8 +814,8 @@ export function ChatView() {
                 size="sm"
                 onClick={() => setActiveRightTab(activeRightTab === 'terminal' ? null : 'terminal')}
                 className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100',
-                  activeRightTab === 'terminal' && 'bg-zinc-100 dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 border border-zinc-200/50 dark:border-zinc-700/50 font-bold'
+                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
+                  activeRightTab === 'terminal' && 'bg-surface2 text-foreground border border-border/50 font-bold'
                 )}
                 title="Terminal Logs Stream"
               >
@@ -844,7 +844,7 @@ export function ChatView() {
             variant="ghost"
             size="sm"
             onClick={() => setShareDialogOpen(true)}
-            className="gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+            className="gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground"
             title="Share conversation"
           >
             <Share2 className="size-3.5" />
@@ -859,19 +859,19 @@ export function ChatView() {
         const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
         if (sessionAgents.length <= 1) return null;
         return (
-          <div className="flex items-center gap-2 px-2 lg:px-4 py-1.5 border-b shrink-0 overflow-x-auto bg-zinc-50/60 dark:bg-zinc-900/40">
+          <div className="flex items-center gap-2 px-2 lg:px-4 py-1.5 border-b shrink-0 overflow-x-auto bg-surface1/60">
             {sessionAgents.map((agent, i) => {
               const desc = shortDescription(agent.description);
               const isMaster = currentSession?.master === agent.agentName;
               return (
                 <div key={agent.agentName} className="flex items-center gap-2 shrink-0">
-                  {i > 0 && <span className="text-zinc-300 dark:text-zinc-700 select-none">|</span>}
+                  {i > 0 && <span className="text-foreground-extra-muted select-none">|</span>}
                   <div
                     className="flex items-center gap-1.5 shrink-0"
                     title={agent.description ? `${agent.agentName} — ${agent.description}` : agent.agentName}
                   >
                     <AgentAvatar name={agent.agentName} size={16} status={agent.status} showStatus />
-                    <span className="text-[11px] font-semibold text-zinc-700 dark:text-zinc-200 shrink-0">
+                    <span className="text-[11px] font-semibold text-foreground shrink-0">
                       {agent.agentName}
                     </span>
                     {isMaster && <Crown className="size-2.5 text-amber-500 shrink-0" />}

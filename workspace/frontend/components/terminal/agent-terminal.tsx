@@ -28,7 +28,7 @@ function highlightCommand(cmd: string) {
       <span
         key={idx}
         className={cn(
-          isKeyword ? 'text-emerald-400 font-semibold' : isOption ? 'text-zinc-500' : 'text-zinc-200',
+          isKeyword ? 'text-emerald-400 font-semibold' : isOption ? 'text-foreground-muted' : 'text-foreground-extra-muted',
         )}
       >
         {part}
@@ -51,11 +51,11 @@ interface TerminalLine {
 // left gutter accent. Kept intentionally restrained — colour marks meaning,
 // it is not decoration.
 const LINE_STYLE: Record<TerminalLine['type'], { glyph: string; sender: string; text: string; gutter: string; bg: string }> = {
-  command: { glyph: '$', sender: 'text-zinc-200', text: 'text-zinc-100', gutter: 'bg-zinc-500/60', bg: 'bg-white/[0.02]' },
-  success: { glyph: '✓', sender: 'text-emerald-400', text: 'text-zinc-200', gutter: 'bg-emerald-500/50', bg: '' },
+  command: { glyph: '$', sender: 'text-foreground-extra-muted', text: 'text-primary-foreground', gutter: 'bg-foreground-muted/60', bg: 'bg-white/[0.02]' },
+  success: { glyph: '✓', sender: 'text-emerald-400', text: 'text-foreground-extra-muted', gutter: 'bg-emerald-500/50', bg: '' },
   error: { glyph: '✕', sender: 'text-red-400', text: 'text-red-300', gutter: 'bg-red-500/70', bg: 'bg-red-500/[0.05]' },
-  thinking: { glyph: '◦', sender: 'text-zinc-400', text: 'text-zinc-400 italic', gutter: 'bg-zinc-500/40', bg: '' },
-  info: { glyph: '›', sender: 'text-zinc-400', text: 'text-zinc-300', gutter: 'bg-transparent', bg: '' },
+  thinking: { glyph: '◦', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted italic', gutter: 'bg-foreground-muted/40', bg: '' },
+  info: { glyph: '›', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted', gutter: 'bg-transparent', bg: '' },
 };
 
 export function AgentTerminal() {
@@ -219,7 +219,7 @@ export function AgentTerminal() {
 
   return (
     <div
-      className="flex flex-col h-full bg-[#0b0d10] text-zinc-300 font-mono text-[12px] leading-5 select-text relative overflow-hidden"
+      className="flex flex-col h-full bg-[#0b0d10] text-foreground-extra-muted font-mono text-[12px] leading-5 select-text relative overflow-hidden"
       onClick={() => inputRef.current?.focus()}
     >
       <style>{`
@@ -228,18 +228,18 @@ export function AgentTerminal() {
       `}</style>
 
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between pl-3.5 pr-12 h-11 shrink-0 border-b border-zinc-800/70 bg-zinc-900/40 backdrop-blur-md select-none">
+      <div className="relative z-10 flex items-center justify-between pl-3.5 pr-12 h-11 shrink-0 border-b border-border/70 bg-primary/40 backdrop-blur-md select-none">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-full bg-[#ff5f57]" />
             <span className="size-2.5 rounded-full bg-[#febc2e]" />
             <span className="size-2.5 rounded-full bg-[#28c840]" />
           </div>
-          <TerminalSquare className="size-3.5 text-zinc-400 ml-1" />
-          <span className="text-[11px] text-zinc-300 font-medium truncate">
+          <TerminalSquare className="size-3.5 text-foreground-extra-muted ml-1" />
+          <span className="text-[11px] text-foreground-extra-muted font-medium truncate">
             {activeSession?.title || currentSessionId || 'openagents-shell'}
           </span>
-          <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-zinc-800 text-[10px]">
+          <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-border text-[10px]">
             <Cpu className={cn('size-2.5', isAgentWorking ? 'text-amber-400 animate-spin' : 'text-emerald-400')} />
             <span className={cn('font-semibold tracking-wide', isAgentWorking ? 'text-amber-400' : 'text-emerald-400')}>
               {activeOperator}
@@ -247,19 +247,19 @@ export function AgentTerminal() {
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-zinc-950/70 border border-zinc-800/70 focus-within:border-zinc-600 transition-colors">
-            <Search className="size-3 text-zinc-500" />
+          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-primary/70 border border-border/70 focus-within:border-border-accent transition-colors">
+            <Search className="size-3 text-foreground-muted" />
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="filter"
-              className="bg-transparent border-0 outline-none text-[10px] w-16 focus:w-24 transition-all text-zinc-200 placeholder:text-zinc-600"
+              className="bg-transparent border-0 outline-none text-[10px] w-16 focus:w-24 transition-all text-foreground-extra-muted placeholder:text-foreground-muted"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); setClearedBefore(localLines.length); }}
-            className="size-6 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800/60 transition-colors"
+            className="size-6 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground-extra-muted hover:bg-primary/60 transition-colors"
             title="Clear console"
           >
             <Eraser className="size-3.5" />
@@ -268,7 +268,7 @@ export function AgentTerminal() {
             onClick={(e) => { e.stopPropagation(); setIsAutoScroll((v) => !v); }}
             className={cn(
               'size-6 flex items-center justify-center rounded-md border transition-colors',
-              isAutoScroll ? 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20' : 'text-zinc-500 border-zinc-800 hover:text-zinc-300',
+              isAutoScroll ? 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20' : 'text-foreground-muted border-border hover:text-foreground-extra-muted',
             )}
             title={isAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
           >
@@ -284,8 +284,8 @@ export function AgentTerminal() {
         className="relative z-10 flex-grow overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-zinc-800/70"
       >
         {filteredLines.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center gap-2 text-zinc-600 select-none">
-            <Terminal className="size-6 text-zinc-700" />
+          <div className="h-full flex flex-col items-center justify-center gap-2 text-foreground-muted select-none">
+            <Terminal className="size-6 text-foreground" />
             <span className="text-[11px]">
               {currentSessionId ? 'Console ready — type a command below' : 'Select a thread to attach the shell'}
             </span>
@@ -296,12 +296,12 @@ export function AgentTerminal() {
             return (
               <div
                 key={line.id || `local-${idx}`}
-                className={cn('group grid grid-cols-[auto_auto_1fr] items-baseline gap-x-2.5 px-3 py-[3px] hover:bg-zinc-800/25', s.bg)}
+                className={cn('group grid grid-cols-[auto_auto_1fr] items-baseline gap-x-2.5 px-3 py-[3px] hover:bg-primary/25', s.bg)}
               >
                 {/* gutter + time */}
                 <span className="flex items-center gap-2 shrink-0">
                   <span className={cn('w-[2px] self-stretch rounded-full', s.gutter)} />
-                  <span className="text-zinc-600 tabular-nums text-[10px]">{line.time}</span>
+                  <span className="text-foreground-muted tabular-nums text-[10px]">{line.time}</span>
                 </span>
                 {/* sender + glyph */}
                 <span className={cn('shrink-0 font-semibold', s.sender)}>
@@ -314,7 +314,7 @@ export function AgentTerminal() {
                     {line.type === 'command' ? highlightCommand(line.content) : line.content}
                   </span>
                   {line.commandArgs && (
-                    <pre className="mt-1 mb-0.5 p-2 rounded-md bg-black/40 border border-zinc-800/70 text-[10px] text-zinc-500 overflow-x-auto max-h-40 whitespace-pre scrollbar-thin">
+                    <pre className="mt-1 mb-0.5 p-2 rounded-md bg-black/40 border border-border/70 text-[10px] text-foreground-muted overflow-x-auto max-h-40 whitespace-pre scrollbar-thin">
                       {line.commandArgs}
                     </pre>
                   )}
@@ -328,19 +328,19 @@ export function AgentTerminal() {
 
       {/* Working banner */}
       {sending && (
-        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-zinc-800/40 border-t border-zinc-700/50 text-amber-400 text-[10px] select-none">
+        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent/50 text-amber-400 text-[10px] select-none">
           <RefreshCw className="size-3 animate-spin" />
           <span>executing on workspace host…</span>
         </div>
       )}
 
       {/* Prompt */}
-      <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-zinc-800/70 bg-zinc-900/40 backdrop-blur-md">
-        <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-zinc-950/80 border border-zinc-800/70 focus-within:border-zinc-600 transition-colors">
+      <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-border/70 bg-primary/40 backdrop-blur-md">
+        <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-primary/80 border border-border/70 focus-within:border-border-accent transition-colors">
           <span className="shrink-0 select-none font-semibold text-[11px] text-emerald-400">
             52hz@openagents
           </span>
-          <span className="shrink-0 text-zinc-600 select-none">~$</span>
+          <span className="shrink-0 text-foreground-muted select-none">~$</span>
           <input
             ref={inputRef}
             type="text"
@@ -348,7 +348,7 @@ export function AgentTerminal() {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleInputKeyDown}
             disabled={sending}
-            className="flex-grow bg-transparent border-0 outline-none text-zinc-100 text-xs p-0 min-w-0 placeholder:text-zinc-600"
+            className="flex-grow bg-transparent border-0 outline-none text-primary-foreground text-xs p-0 min-w-0 placeholder:text-foreground-muted"
             placeholder={sending ? 'transmitting…' : 'type a command…'}
           />
           {!inputValue && !sending && <span className="w-1.5 h-4 bg-emerald-400/90 rounded-[1px] term-cursor shrink-0" />}

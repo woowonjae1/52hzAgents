@@ -205,7 +205,7 @@ export function AgentProfilePanel() {
         <div className="flex items-center justify-end px-3 pt-3">
           <button
             onClick={() => setSelectedAgentName(null)}
-            className="size-7 flex items-center justify-center rounded-md hover:bg-zinc-200/60 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="size-7 flex items-center justify-center rounded-md hover:bg-surface3/60 dark:hover:bg-primary text-muted-foreground transition-colors"
             title="Close"
           >
             <X className="size-4" />
@@ -221,9 +221,9 @@ export function AgentProfilePanel() {
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={cn(
                   'inline-flex items-center gap-1 text-[11px] px-1.5 py-px rounded font-medium',
-                  isOnline ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  isOnline ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
                 )}>
-                  <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-green-500' : 'bg-zinc-400')} />
+                  <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-green-500' : 'bg-foreground-extra-muted')} />
                   {agent.status}
                 </span>
               </div>
@@ -296,7 +296,7 @@ export function AgentProfilePanel() {
                     </span>
                     {item.copyable && (
                       <button
-                        className="size-6 shrink-0 flex items-center justify-center rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors mt-px"
+                        className="size-6 shrink-0 flex items-center justify-center rounded hover:bg-surface2 text-muted-foreground transition-colors mt-px"
                         title={`Copy ${item.label}`}
                         onClick={() => copyToClipboard(item.value)}
                       >
@@ -349,7 +349,7 @@ export function AgentProfilePanel() {
                       </button>
                       <button
                         onClick={() => { setEditingKey(false); setNewApiKey(''); }}
-                        className="px-2 py-1.5 text-[10px] font-medium rounded border hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        className="px-2 py-1.5 text-[10px] font-medium rounded border hover:bg-surface2 transition-colors"
                       >
                         Cancel
                       </button>
@@ -496,7 +496,7 @@ export function AgentProfilePanel() {
           <div className="flex gap-2">
             <button
               onClick={handleStartThread}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border bg-background hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border bg-background hover:bg-surface1 dark:hover:bg-primary transition-colors"
             >
               <Plus className="size-3" />
               Start a Thread

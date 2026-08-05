@@ -80,7 +80,7 @@ export function FileList() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
             title="Upload File"
           >
             <Upload className="size-3.5" />
@@ -133,8 +133,8 @@ export function FileList() {
               className={cn(
                 'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
                 selectedFileId === file.id
-                  ? 'bg-zinc-100 dark:bg-zinc-800'
-                  : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                  ? 'bg-surface2'
+                  : 'hover:bg-surface1 dark:hover:bg-primary/50'
               )}
             >
               {getFileIcon(file.contentType, file.filename)}
@@ -147,7 +147,7 @@ export function FileList() {
               </div>
               <button
                 onClick={(e) => handleDelete(e, file.id, file.filename)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground hover:text-red-500 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-all"
                 title="Delete"
               >
                 <Trash2 className="size-3.5" />

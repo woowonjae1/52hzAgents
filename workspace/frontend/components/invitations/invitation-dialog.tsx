@@ -76,7 +76,7 @@ export function InvitationDialog() {
       case 'rejected':
         return <XCircle className="size-3.5 text-red-500" />;
       case 'expired':
-        return <Clock className="size-3.5 text-zinc-400" />;
+        return <Clock className="size-3.5 text-foreground-extra-muted" />;
       default:
         return null;
     }

@@ -7,6 +7,7 @@ import {
   LogIn, LogOut, Shield, Moon, Sun, KeyRound, X, Crown, Users, Radar,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { ThemeSwitcher } from '@/components/layout/theme-switcher';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -102,9 +103,9 @@ export function SidebarContent() {
   };
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-zinc-50 dark:bg-zinc-950">
+    <div className="flex flex-col h-full min-h-0 bg-surface0">
       {/* Category Switcher Row */}
-      <div className="px-3 py-2.5 border-b border-zinc-200/40 dark:border-zinc-800/40 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none bg-zinc-50/50 dark:bg-zinc-950/50">
+      <div className="px-3 py-2.5 border-b border-border/40 dark:border-border/40 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none bg-surface1/50">
         <CategoryTab active={viewMode === 'threads'} label="Chats" onClick={() => setViewMode('threads')} />
         <CategoryTab active={viewMode === 'files'} label="Files" onClick={() => setViewMode('files')} />
         <CategoryTab active={viewMode === 'tasks'} label="Tasks" onClick={() => setViewMode('tasks')} />
@@ -122,7 +123,7 @@ export function SidebarContent() {
       </div>
 
       {/* Bottom control row */}
-      <div className="shrink-0 border-t border-zinc-200/40 dark:border-zinc-800/40 px-3.5 py-3 space-y-2.5 bg-zinc-50/80 dark:bg-zinc-950/80 backdrop-blur-md">
+      <div className="shrink-0 border-t border-border/40 dark:border-border/40 px-3.5 py-3 space-y-2.5 bg-surface1/80 backdrop-blur-md">
         {isOpenAgentsDomain && user && (
           <div className="flex items-center gap-2">
             <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold shrink-0">
@@ -135,10 +136,15 @@ export function SidebarContent() {
           </div>
         )}
 
+        {/* Paseo theme picker — light plus the five dark tints. Its own row so it
+            doesn't compete with the icon buttons for width; move it into the
+            settings dialog if the footer gets busier. */}
+        <ThemeSwitcher className="mb-2" />
+
         <div className="flex items-center gap-1">
           <button
             onClick={toggleTheme}
-            className="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+            className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
             title={isDark ? 'Light Mode' : 'Dark Mode'}
           >
             {isDark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
@@ -146,7 +152,7 @@ export function SidebarContent() {
           {token && (
             <button
               onClick={handleCopyToken}
-              className="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+              className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
               title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
             >
               {tokenCopied ? <Check className="size-4.5" /> : <KeyRound className="size-4.5" />}
@@ -154,7 +160,7 @@ export function SidebarContent() {
           )}
           <button
             onClick={() => setSettingsOpen(true)}
-            className="size-8 flex items-center justify-center rounded-lg text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900 transition-colors cursor-pointer"
+            className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
             title="Settings"
           >
             <Settings className="size-4.5" />
@@ -194,8 +200,8 @@ function CategoryTab({
       className={cn(
         'px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer whitespace-nowrap outline-none border border-transparent',
         active
-          ? 'bg-zinc-900 text-zinc-50 dark:bg-zinc-100 dark:text-zinc-900 shadow-xs border-zinc-200/20 dark:border-zinc-800/20'
-          : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-150 dark:hover:bg-zinc-900/50'
+          ? 'bg-primary text-primary-foreground shadow-xs border-border/20 dark:border-border/20'
+          : 'text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2/50'
       )}
     >
       {label}

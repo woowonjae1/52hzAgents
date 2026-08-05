@@ -10,6 +10,12 @@ import {
 } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import {
+  DEFAULT_SIDEBAR_WIDTH,
+  clampSidebarWidth,
+  readStoredSidebarWidth,
+  storeSidebarWidth,
+} from '@/lib/panel-store';
 
 export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills';
 
@@ -22,6 +28,16 @@ interface LayoutState {
   isMobile: boolean;
   isSidebarOpen: boolean;
   sidebarToggle: () => void;
+  /** Sidebar width in px — resizable between 200 and 600, as in Paseo. */
+  sidebarWidth: number;
+  setSidebarWidth: (width: number) => void;
+  /**
+   * True while the handle is being dragged. Anything sized off `sidebarWidth`
+   * must drop its width transition during a drag, or it lags behind the cursor —
+   * but keep the transition for the open/close toggle.
+   */
+  isSidebarResizing: boolean;
+  setSidebarResizing: (v: boolean) => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   selectedAgentName: string | null;
@@ -57,6 +73,18 @@ const LayoutContext = createContext<LayoutState | undefined>(undefined);
 export function LayoutProvider({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // Start at the default and hydrate from storage after mount — reading
+  // localStorage in the initializer would desync from the server-rendered markup.
+  const [sidebarWidth, setSidebarWidthState] = useState(DEFAULT_SIDEBAR_WIDTH);
+  useEffect(() => {
+    setSidebarWidthState(readStoredSidebarWidth());
+  }, []);
+  const setSidebarWidth = (width: number) => {
+    const clamped = clampSidebarWidth(width);
+    setSidebarWidthState(clamped);
+    storeSidebarWidth(clamped);
+  };
+  const [isSidebarResizing, setSidebarResizing] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('mission');
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
@@ -88,10 +116,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const toggleDetailExpanded = () => setIsDetailExpanded((v) => !v);
 
   const cssVariables = useMemo(() => ({
-    '--sidebar-width': '240px',
+    // Tracks the real, resizable width instead of a hardcoded 240px that never
+    // matched what the sidebar actually rendered at.
+    '--sidebar-width': `${sidebarWidth}px`,
     '--sidebar-width-collapsed': '52px',
     '--header-height-mobile': '60px',
-  } as React.CSSProperties), []);
+  } as React.CSSProperties), [sidebarWidth]);
 
   const sidebarToggle = () => setIsSidebarOpen((open) => !open);
 
@@ -118,6 +148,10 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       isMobile,
       isSidebarOpen,
       sidebarToggle,
+      sidebarWidth,
+      setSidebarWidth,
+      isSidebarResizing,
+      setSidebarResizing,
       viewMode,
       setViewMode,
       selectedAgentName,

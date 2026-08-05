@@ -7,6 +7,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import type { KnowledgeEntry } from '@/lib/types';
 import { useWorkspace } from '@/lib/workspace-context';
+import { ScreenTitle } from '@/components/headers/screen-title';
 import { KnowledgeEditor } from './knowledge-editor';
 
 function timeAgo(dateStr: string | null): string {
@@ -92,7 +93,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <BookOpen className="size-4 text-amber-500" />
-          <h2 className="text-sm font-semibold">Knowledge</h2>
+          <ScreenTitle>Knowledge</ScreenTitle>
           {knowledge.length > 0 && (
             <span className="text-xs text-muted-foreground">{knowledge.length}</span>
           )}
@@ -101,7 +102,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           <button
             type="button"
             onClick={() => { setEditingEntry(null); setEditorOpen(true); }}
-            className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             title="New entry"
           >
             <Plus className="size-3.5" />
@@ -109,7 +110,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           <button
             type="button"
             onClick={refreshKnowledge}
-            className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             title="Refresh"
           >
             <RefreshCw className="size-3.5" />
@@ -136,8 +137,8 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             {knowledge.map((entry) => (
               <div
                 key={entry.id}
-                className={`flex items-start justify-between gap-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group ${
-                  selectedId === entry.id ? 'bg-zinc-50 dark:bg-zinc-800/50' : ''
+                className={`flex items-start justify-between gap-2 hover:bg-surface1 dark:hover:bg-primary/50 transition-colors group ${
+                  selectedId === entry.id ? 'bg-surface1/50' : ''
                 }`}
               >
                 <button
@@ -159,7 +160,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleEdit(entry); }}
-                    className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground"
+                    className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground"
                     title="Edit"
                   >
                     <Pencil className="size-3" />
@@ -198,18 +199,18 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           {isMobile && (
-            <button type="button" onClick={() => setMobileDetail(false)} className="p-1 -ml-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800">
+            <button type="button" onClick={() => setMobileDetail(false)} className="p-1 -ml-1 rounded hover:bg-surface2">
               <ArrowLeft className="size-4" />
             </button>
           )}
-          <h2 className="text-sm font-semibold truncate">{selectedEntry.title}</h2>
+          <ScreenTitle>{selectedEntry.title}</ScreenTitle>
           <span className="text-[10px] text-muted-foreground font-mono shrink-0">@knowledge:{selectedEntry.slug}</span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={() => handleEdit(selectedEntry)}
-            className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             title="Edit"
           >
             <Pencil className="size-3.5" />

@@ -96,11 +96,11 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       <p className="leading-relaxed mb-2 last:mb-0">{renderMentions(children, agentNames)}</p>
     ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-2 border-zinc-300 dark:border-zinc-600 pl-3 my-2 text-muted-foreground italic">
+      <blockquote className="border-l-2 border-border-accent pl-3 my-2 text-muted-foreground italic">
         {children}
       </blockquote>
     ),
-    hr: () => <hr className="my-3 border-zinc-200 dark:border-zinc-700" />,
+    hr: () => <hr className="my-3 border-border" />,
 
     // Lists
     ul: ({ children }) => (
@@ -115,16 +115,16 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
     // Tables
     table: ({ children }) => (
-      <div className="my-3 overflow-x-auto rounded-md border border-zinc-200 dark:border-zinc-700">
+      <div className="my-3 overflow-x-auto rounded-md border border-border">
         <table className="min-w-full text-sm">{children}</table>
       </div>
     ),
     thead: ({ children }) => (
-      <thead className="bg-zinc-50 dark:bg-zinc-800/50">{children}</thead>
+      <thead className="bg-surface1/50">{children}</thead>
     ),
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => (
-      <tr className="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
+      <tr className="border-b border-border last:border-0">
         {children}
       </tr>
     ),
@@ -143,7 +143,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       const isInline = props.inline ?? (!className && !textContent.includes('\n'));
       if (isInline) {
         return (
-          <code className="text-[13px] px-1.5 py-0.5 rounded bg-zinc-150 dark:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100 font-mono">
+          <code className="text-[13px] px-1.5 py-0.5 rounded bg-surface2/80 text-foreground font-mono">
             {children}
           </code>
         );
@@ -177,8 +177,8 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       }
 
       return (
-        <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 font-mono shadow-sm">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-900 bg-zinc-900/60 text-[10px] font-bold tracking-wider text-zinc-500 uppercase">
+        <div className="my-3 overflow-hidden rounded-xl border border-border bg-primary text-primary-foreground font-mono shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-primary bg-primary/60 text-[10px] font-bold tracking-wider text-foreground-muted uppercase">
             <span>{language}</span>
             <button
               onClick={() => {
@@ -188,12 +188,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="hover:text-zinc-200 transition-colors"
+              className="hover:text-foreground-extra-muted transition-colors"
             >
               Copy
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-zinc-100 font-mono">
+          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-primary-foreground font-mono">
             {children}
           </pre>
         </div>

@@ -4,6 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
+import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import type { NotificationItem } from '@/lib/types';
@@ -27,7 +28,7 @@ function PriorityDot({ priority }: { priority: NotificationItem['priority'] }) {
         'size-2 rounded-full shrink-0 mt-1.5',
         priority === 'high' && 'bg-red-500',
         priority === 'normal' && 'bg-blue-500',
-        priority === 'low' && 'bg-zinc-400',
+        priority === 'low' && 'bg-foreground-extra-muted',
       )}
     />
   );
@@ -52,7 +53,7 @@ function NotificationCard({
         'px-3 py-2.5 flex items-start gap-2.5 cursor-pointer transition-colors',
         !notification.isRead
           ? 'bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30'
-          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
+          : 'hover:bg-surface1 dark:hover:bg-primary/50',
       )}
       onClick={() => onNavigate(notification)}
     >
@@ -100,7 +101,7 @@ function NotificationCard({
           e.stopPropagation();
           onDismiss(notification.id);
         }}
-        className="p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+        className="p-1 rounded-md hover:bg-surface3 dark:hover:bg-primary text-muted-foreground transition-colors shrink-0 opacity-0 group-hover:opacity-100"
         title="Dismiss"
       >
         <X className="size-3" />
@@ -204,7 +205,7 @@ export function InboxView() {
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Inbox className="size-4 text-blue-500" />
-          <h2 className="text-sm font-semibold">Inbox</h2>
+          <ScreenTitle>Inbox</ScreenTitle>
           {unreadNotificationCount > 0 && (
             <span className="text-xs text-muted-foreground">
               {unreadNotificationCount} unread
@@ -215,7 +216,7 @@ export function InboxView() {
           {unreadNotificationCount > 0 && (
             <button
               onClick={markAllNotificationsRead}
-              className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
               title="Mark all as read"
             >
               <CheckCheck className="size-3.5" />
@@ -223,7 +224,7 @@ export function InboxView() {
           )}
           <button
             onClick={refreshNotifications}
-            className="p-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             title="Refresh"
           >
             <RefreshCw className="size-3.5" />

@@ -236,24 +236,24 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       <div className="py-2.5">
         <div className="flex items-start gap-3">
           <div
-            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/50 dark:border-zinc-700/40 text-zinc-600 dark:text-zinc-400"
+            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-surface2/80 border border-border/50 text-foreground-muted"
           >
             <User className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs font-bold text-zinc-900 dark:text-zinc-50">{displayName}</span>
+              <span className="text-xs font-bold text-foreground">{displayName}</span>
               {timestamp && (
-                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono font-medium ml-auto">{timestamp}</span>
+                <span className="text-[10px] text-foreground-extra-muted font-mono font-medium ml-auto">{timestamp}</span>
               )}
             </div>
-            <div className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+            <div className="text-xs leading-relaxed text-foreground-muted">
               <MarkdownContent content={message.content} agentNames={agentNames} />
               <Attachments items={attachments} />
               
               <div className="flex items-center gap-3.5 mt-2 text-[10px] font-medium">
                 {isCurrentUser && message.deliveryStatus === 'sending' && (
-                  <span className="text-zinc-400">Sending...</span>
+                  <span className="text-foreground-extra-muted">Sending...</span>
                 )}
                 {isCurrentUser && message.deliveryStatus === 'confirmed' && (
                   <span className="text-emerald-600 dark:text-emerald-400">✓ Sent</span>
@@ -273,33 +273,33 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     <div className="py-2.5 group/msg">
       <div className="flex items-start gap-3">
         <AgentAvatar name={message.senderName} size={32} square className="mt-1 shrink-0" />
-        <div className="flex-1 min-w-0 bg-white dark:bg-zinc-900/50 border border-zinc-200/70 dark:border-zinc-800/60 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-zinc-100 dark:border-zinc-800/30">
-            <span className="text-xs font-bold text-zinc-900 dark:text-zinc-50 truncate">
+        <div className="flex-1 min-w-0 bg-card/50 border border-border/70 dark:border-border/60 rounded-xl p-4 shadow-xs">
+          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/60/30">
+            <span className="text-xs font-bold text-foreground truncate">
               {message.senderName}
             </span>
             {agent && (
               <span className={cn(
-                'text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 border border-zinc-200/40 dark:border-zinc-800/30',
+                'text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 border border-border/40 dark:border-border/30',
                 agent.role === 'master'
                   ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/20'
-                  : 'bg-zinc-100/80 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  : 'bg-surface2/80 text-foreground-muted dark:text-foreground-extra-muted'
               )}>
                 {agent.role}
               </span>
             )}
             {timestamp && (
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium ml-auto font-mono">{timestamp}</span>
+              <span className="text-[10px] text-foreground-extra-muted font-medium ml-auto font-mono">{timestamp}</span>
             )}
           </div>
-          <div className="text-xs leading-relaxed text-zinc-700 dark:text-zinc-300">
+          <div className="text-xs leading-relaxed text-foreground-muted">
             <MarkdownContent content={message.content} agentNames={agentNames} />
             <Attachments items={attachments} />
 
             {approvalRequest && (
-              <div className="mt-3.5 p-3.5 rounded-lg border bg-zinc-50/50 dark:bg-zinc-950/30 border-zinc-200 dark:border-zinc-800 space-y-2.5 max-w-full">
+              <div className="mt-3.5 p-3.5 rounded-lg border bg-surface1/50 border-border space-y-2.5 max-w-full">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
                     Action Approval Required
                   </span>
@@ -307,13 +307,13 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                     ID: {approvalRequest.approval_id}
                   </span>
                 </div>
-                <div className="text-xs space-y-1.5 font-mono bg-zinc-100 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800/80 p-2.5 rounded overflow-x-auto max-w-full text-zinc-800 dark:text-zinc-200">
+                <div className="text-xs space-y-1.5 font-mono bg-surface2/50 border border-border/80 p-2.5 rounded overflow-x-auto max-w-full text-foreground">
                   <div className="font-semibold">Tool: {approvalRequest.tool}</div>
                   {approvalRequest.args?.command && (
-                    <div className="whitespace-pre-wrap text-zinc-600 dark:text-zinc-400 font-mono">$ {approvalRequest.args.command}</div>
+                    <div className="whitespace-pre-wrap text-foreground-muted font-mono">$ {approvalRequest.args.command}</div>
                   )}
                   {approvalRequest.args?.path && (
-                    <div className="text-zinc-600 dark:text-zinc-400">File: {approvalRequest.args.path}</div>
+                    <div className="text-foreground-muted">File: {approvalRequest.args.path}</div>
                   )}
                 </div>
                 
@@ -322,8 +322,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                     <span className={cn(
                       "text-xs font-semibold px-2 py-1 rounded",
                       currentApproved 
-                        ? "bg-zinc-100 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
-                        : "bg-zinc-100 text-zinc-800 dark:bg-zinc-900 dark:text-zinc-200"
+                        ? "bg-surface2 text-foreground"
+                        : "bg-surface2 text-foreground"
                     )}>
                       {currentApproved ? '✓ Approved' : '✗ Denied'}
                     </span>
@@ -331,7 +331,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                     <>
                       <Button
                         size="sm"
-                        className="h-8 px-3 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-medium"
+                        className="h-8 px-3 bg-primary hover:bg-primary text-white dark:hover:bg-surface3 font-medium"
                         onClick={handleApprove}
                       >
                         Approve
@@ -339,7 +339,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-8 px-3 text-muted-foreground border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-foreground font-medium"
+                        className="h-8 px-3 text-muted-foreground border-border hover:bg-surface2 hover:text-foreground font-medium"
                         onClick={handleReject}
                       >
                         Deny
@@ -351,11 +351,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             )}
 
             {/* Floating Action Toolbar */}
-            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-zinc-100/60 dark:border-zinc-800/40 opacity-80 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border/60 dark:border-border/40 opacity-80 hover:opacity-100 transition-opacity">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 gap-1 rounded-md transition-colors"
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface2 gap-1 rounded-md transition-colors"
                 onClick={handleCopy}
                 title="Copy message text"
               >
@@ -365,7 +365,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 gap-1 rounded-md transition-colors"
+                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface2 gap-1 rounded-md transition-colors"
                 onClick={() => {
                   navigator.clipboard.writeText(`@${message.senderName} ${message.content}`);
                   toast.success(`Branched prompt from @${message.senderName}`);

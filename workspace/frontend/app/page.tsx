@@ -29,11 +29,11 @@ function CodeBlock({ code, className = '' }: { code: string; className?: string 
 
   return (
     <div className={`relative group ${className}`}>
-      <pre className="bg-zinc-900 text-zinc-100 rounded-lg px-4 py-3 text-sm font-mono leading-relaxed overflow-x-auto">
+      <pre className="bg-primary text-primary-foreground rounded-lg px-4 py-3 text-sm font-mono leading-relaxed overflow-x-auto">
         <code>{code}</code>
       </pre>
       <button
-        className="absolute top-2 right-2 size-7 flex items-center justify-center rounded-md bg-zinc-700/80 hover:bg-zinc-600 text-zinc-300 hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 size-7 flex items-center justify-center rounded-md bg-primary/80 hover:bg-primary text-foreground-extra-muted hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
         title="Copy"
         onClick={() => copyToClipboard(code)}
       >
@@ -56,7 +56,7 @@ function LandingPage() {
     { name: 'Codex CLI', status: 'supported', command: 'agn install codex', color: 'bg-emerald-500' },
     { name: 'Aider', status: 'supported', command: 'agn install aider', color: 'bg-blue-500' },
     { name: 'Goose', status: 'supported', command: 'agn install goose', color: 'bg-rose-500' },
-    { name: 'Custom', status: 'supported', command: 'agn create my-agent --type custom', color: 'bg-zinc-500' },
+    { name: 'Custom', status: 'supported', command: 'agn create my-agent --type custom', color: 'bg-foreground-muted' },
   ];
 
   return (
@@ -176,7 +176,7 @@ function LandingPage() {
             {agents.map((agent) => (
               <div
                 key={agent.name}
-                className="rounded-lg border bg-card p-4 hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors"
+                className="rounded-lg border bg-card p-4 hover:border-border-accent transition-colors"
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className={`size-8 rounded-lg ${agent.color} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
@@ -191,7 +191,7 @@ function LandingPage() {
             ))}
           </div>
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Search for more: <code className="bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-xs font-mono">agn search coding</code>
+            Search for more: <code className="bg-surface2 px-1.5 py-0.5 rounded text-xs font-mono">agn search coding</code>
           </p>
         </div>
       </section>
@@ -381,10 +381,10 @@ function CreateWorkspaceForm({
   };
 
   return (
-    <Card className="border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-sm rounded-xl">
+    <Card className="border-dashed border-border-accent bg-card shadow-sm rounded-xl">
       <CardContent className="p-5">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 tracking-tight">Create New Workspace</h3>
+          <h3 className="font-bold text-sm text-foreground tracking-tight">Create New Workspace</h3>
           <div className="space-y-2.5">
             <Input
               placeholder="Agent Name (e.g. coder-agent)"
@@ -392,22 +392,22 @@ function CreateWorkspaceForm({
               onChange={(e) => setAgentName(e.target.value)}
               required
               autoFocus
-              className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
+              className="text-xs h-9 border-border focus:border-border-accent dark:border-border dark:focus:border-border-accent focus:ring-0 focus-visible:ring-0"
             />
             <Input
               placeholder="Workspace Name (optional)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="text-xs h-9 border-zinc-200 focus:border-zinc-400 dark:border-zinc-800 dark:focus:border-zinc-600 focus:ring-0 focus-visible:ring-0"
+              className="text-xs h-9 border-border focus:border-border-accent dark:border-border dark:focus:border-border-accent focus:ring-0 focus-visible:ring-0"
             />
           </div>
           {error && <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>}
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={loading} className="bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-semibold h-8 rounded-lg">
+            <Button type="submit" size="sm" disabled={loading} className="bg-primary hover:bg-primary text-white dark:hover:bg-surface3 font-semibold h-8 rounded-lg">
               {loading ? <Loader2 className="size-3.5 animate-spin mr-1" /> : <Plus className="size-3.5 mr-1" />}
               Create
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="h-8 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground">
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel} className="h-8 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground">
               Cancel
             </Button>
           </div>
@@ -447,31 +447,31 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 
   return (
     <Card
-      className="cursor-pointer border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 hover:border-zinc-300 dark:hover:border-zinc-700 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
+      className="cursor-pointer border border-border/80 dark:border-border/80 bg-card hover:border-border-accent hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
       onClick={enterWorkspace}
     >
       <CardContent className="p-4 space-y-4">
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
-            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-50 tracking-tight truncate">{workspace.name}</h3>
+            <h3 className="font-bold text-sm text-foreground tracking-tight truncate">{workspace.name}</h3>
             <p className="text-[9px] text-muted-foreground font-mono mt-1 truncate" title={workspace.slug}>
               ID: {workspace.slug}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-zinc-200/50 dark:border-zinc-800/40 bg-zinc-50/50 dark:bg-zinc-900/50">
-            <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-emerald-500' : 'bg-zinc-500'}`} />
-            <span className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 capitalize">{workspace.status}</span>
+          <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-border/50 dark:border-border/40 bg-surface1/50">
+            <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-emerald-500' : 'bg-foreground-muted'}`} />
+            <span className="text-[10px] font-semibold text-foreground-muted capitalize">{workspace.status}</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-3.5 text-[10px] font-medium text-zinc-500 dark:text-zinc-400 border-t border-zinc-100 dark:border-zinc-800/40 pt-3">
+        <div className="flex items-center gap-3.5 text-[10px] font-medium text-foreground-muted border-t border-border/60/40 pt-3">
           <span className="flex items-center gap-1">
-            <Users className="size-3.5 text-zinc-400" />
+            <Users className="size-3.5 text-foreground-extra-muted" />
             {workspace.agentCount} agent{workspace.agentCount !== 1 ? 's' : ''}
           </span>
           {workspace.lastActivityAt && (
             <span className="flex items-center gap-1">
-              <Clock className="size-3.5 text-zinc-400" />
+              <Clock className="size-3.5 text-foreground-extra-muted" />
               {timeAgo(workspace.lastActivityAt)}
             </span>
           )}
@@ -510,9 +510,9 @@ function Dashboard() {
   }, [load]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50">
+    <div className="min-h-screen bg-surface0 text-foreground">
       {/* Header */}
-      <header className="border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-10">
+      <header className="border-b border-border/60 bg-card/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Image src="/logo-icon.png" alt="52hzAgents" width={18} height={18} />
@@ -520,7 +520,7 @@ function Dashboard() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
-            <Button variant="ghost" size="sm" onClick={logout} className="size-8 p-0 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-foreground">
+            <Button variant="ghost" size="sm" onClick={logout} className="size-8 p-0 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground">
               <LogOut className="size-4" />
             </Button>
           </div>
@@ -530,7 +530,7 @@ function Dashboard() {
       {/* Content */}
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         {/* Actions bar */}
-        <div className="flex items-center justify-between border-b border-zinc-200/40 dark:border-zinc-800/40 pb-4">
+        <div className="flex items-center justify-between border-b border-border/40 dark:border-border/40 pb-4">
           <div>
             <h2 className="text-lg font-bold tracking-tight">Manage Workspaces</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -538,7 +538,7 @@ function Dashboard() {
             </p>
           </div>
           {!showCreate && (
-            <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 font-semibold shadow-xs">
+            <Button size="sm" onClick={() => setShowCreate(true)} className="rounded-lg bg-primary hover:bg-primary text-white dark:hover:bg-surface3 font-semibold shadow-xs">
               <Plus className="size-3.5 mr-1" />
               New Workspace
             </Button>

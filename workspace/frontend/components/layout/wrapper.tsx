@@ -3,6 +3,7 @@
 import { Sidebar } from './sidebar';
 import { MobileHeader } from './mobile-header';
 import { useLayout } from './layout-context';
+import { cn } from '@/lib/utils';
 import { ChatView } from '@/components/chat/chat-view';
 import { ThreadList } from '@/components/threads/thread-list';
 import { FileList } from '@/components/files/file-list';
@@ -32,12 +33,12 @@ function WorkspaceLoadingScreen() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        <div className="size-16 flex items-center justify-center rounded-xl border border-zinc-200/10 dark:border-zinc-800/10 bg-zinc-50 dark:bg-zinc-900 overflow-hidden p-2.5 shadow-md">
+        <div className="size-16 flex items-center justify-center rounded-xl border border-border/10 dark:border-border/10 bg-surface1 overflow-hidden p-2.5 shadow-md">
           <img src="/logo-icon.png" alt="52hzAgents Logo" className="w-full h-full object-contain" />
         </div>
         <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">52hzAgents Workspace</h1>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1.5">Loading your workspace…</p>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">52hzAgents Workspace</h1>
+          <p className="text-xs text-foreground-extra-muted mt-1.5">Loading your workspace…</p>
         </div>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
@@ -55,7 +56,7 @@ function WorkspaceLoadingScreen() {
 }
 
 export function Wrapper() {
-  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
+  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, sidebarWidth, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading } = useWorkspace();
   const hasAgents = agents.length > 0;
 
@@ -66,45 +67,45 @@ export function Wrapper() {
   // ── Mobile layout: single-pane with list/detail switching ──
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen w-full bg-zinc-50 dark:bg-zinc-950 [&_.container-fluid]:px-5">
+      <div className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
           {/* Full-screen views (no list/detail split) */}
           {viewMode === 'mission' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <MissionControl />
             </div>
           ) : !hasAgents && viewMode === 'threads' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <EmptyState />
             </div>
           ) : viewMode === 'connect' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <ConnectAgentView />
             </div>
           ) : viewMode === 'tasks' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <TasksView />
             </div>
           ) : viewMode === 'timers' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <TimersView />
             </div>
           ) : viewMode === 'inbox' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <InboxView />
             </div>
           ) : viewMode === 'skills' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <SkillsView />
             </div>
           ) : viewMode === 'knowledge' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <KnowledgeView />
             </div>
           ) : mobilePane === 'list' ? (
             /* List pane — full width */
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm flex flex-col">
               {viewMode === 'threads' && <ThreadList />}
               {viewMode === 'files' && <FileList />}
               {viewMode === 'browser' && <BrowserTabList />}
@@ -112,7 +113,7 @@ export function Wrapper() {
             </div>
           ) : (
             /* Detail pane — full width, edge-to-edge on mobile */
-            <div className="relative h-full bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="relative h-full bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               {(viewMode === 'threads' || viewMode === 'routines') && (
                 <main className="h-full" role="content">
                   <ChatView />
@@ -131,23 +132,25 @@ export function Wrapper() {
 
   // ── Desktop layout: sidebar + center chat + collapsible right preview ──
   return (
-    <div className="flex h-screen w-full bg-zinc-50 dark:bg-zinc-950 [&_.container-fluid]:px-5">
+    <div className="flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
       {!isDetailExpanded && <Sidebar />}
 
       <div className="flex flex-col flex-grow min-w-0 w-full">
         <div className="flex grow min-h-0 overflow-hidden mx-2.5 py-2.5 gap-2.5">
-          {/* Invisible spacer for fixed sidebar (260px when open, 0px when closed) */}
+          {/* Invisible spacer standing in for the fixed sidebar. Reads the same
+              resizable width the sidebar itself does, so dragging the handle moves
+              the main pane with it. */}
           {!isDetailExpanded && (
-            <div 
-              className="shrink-0 transition-all duration-300" 
-              style={{ width: isSidebarOpen ? '320px' : '0px' }}
+            <div
+              className={cn('shrink-0', !isSidebarResizing && 'transition-all duration-300')}
+              style={{ width: isSidebarOpen ? `${sidebarWidth}px` : '0px' }}
             />
           )}
 
           {/* Dynamic multi-pane grid based on viewMode and activeRightTab */}
           {!hasAgents && viewMode === 'threads' ? (
             /* No agents + threads view: full-width onboarding */
-            <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm">
+            <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <EmptyState />
             </div>
           ) : viewMode === 'threads' && monitorMode ? (
@@ -159,11 +162,11 @@ export function Wrapper() {
           ) : (
             <>
               {/* Column 2: Center Main Workspace */}
-              <div className="relative flex-grow flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
+              <div className="relative flex-grow flex-1 min-w-0 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm flex flex-col">
                 {!isSidebarOpen && (
                   <button
                     onClick={sidebarToggle}
-                    className="absolute top-3 left-3 z-30 size-8 rounded-lg bg-background/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:text-foreground shadow-sm flex items-center justify-center transition-all hover:scale-105 cursor-pointer"
+                    className="absolute top-3 left-3 z-30 size-8 rounded-lg bg-background/90 backdrop-blur border border-border text-foreground-muted hover:text-foreground shadow-sm flex items-center justify-center transition-all hover:scale-105 cursor-pointer"
                     title="Expand Sidebar"
                   >
                     <PanelLeft className="size-4" />
@@ -198,11 +201,11 @@ export function Wrapper() {
 
               {/* Column 3: Right Collapsible Preview Panel */}
               {!isDetailExpanded && activeRightTab !== null && viewMode !== 'mission' && viewMode !== 'connect' && viewMode !== 'files' && (
-                <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
+                <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
                   {/* Close button for right panel */}
                   <button 
                     onClick={() => setActiveRightTab(null)}
-                    className="absolute top-3 right-3 z-10 size-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+                    className="absolute top-3 right-3 z-10 size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted transition-colors cursor-pointer"
                     title="Close preview panel"
                   >
                     <X className="size-4" />

@@ -23,11 +23,11 @@ interface ActivityLine {
 
 // Restrained per-type dot — a single small status color, no neon/glow.
 const ACTIVITY_DOT: Record<ActivityLine['type'], string> = {
-  command: 'bg-zinc-400 dark:bg-zinc-500',
+  command: 'bg-foreground-extra-muted',
   success: 'bg-emerald-500',
   error: 'bg-red-500',
-  thinking: 'bg-zinc-300 dark:bg-zinc-600',
-  info: 'bg-zinc-300 dark:bg-zinc-600',
+  thinking: 'bg-surface4',
+  info: 'bg-surface4',
 };
 
 function stripMarkdown(text: string): string {
@@ -221,17 +221,17 @@ export function MissionControl() {
   if (agents.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-6">
-        <div className="size-12 rounded-xl bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center mb-4">
-          <Users className="size-6 text-zinc-400" />
+        <div className="size-12 rounded-xl bg-surface2 flex items-center justify-center mb-4">
+          <Users className="size-6 text-foreground-extra-muted" />
         </div>
-        <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">No agents connected yet</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 max-w-sm">
+        <h2 className="text-base font-semibold text-foreground">No agents connected yet</h2>
+        <p className="text-sm text-foreground-muted mt-1 max-w-sm">
           Connect an agent to see it here, alongside the threads it works on and the
           activity it shares with the rest of your team.
         </p>
         <button
           onClick={() => setViewMode('connect')}
-          className="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 text-sm font-semibold transition-colors"
+          className="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary hover:bg-primary text-white dark:hover:bg-surface3 text-sm font-semibold transition-colors"
         >
           <Plus className="size-4" />
           Connect your first agent
@@ -243,13 +243,13 @@ export function MissionControl() {
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
       {/* Header strip */}
-      <div className="shrink-0 flex items-center gap-3 px-5 py-3.5 border-b border-zinc-200/60 dark:border-zinc-800/60">
-        <div className="size-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-          <Users className="size-4 text-zinc-600 dark:text-zinc-300" />
+      <div className="shrink-0 flex items-center gap-3 px-5 py-3.5 border-b border-border/60">
+        <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center">
+          <Users className="size-4 text-foreground-muted" />
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50 leading-tight">Overview</h1>
-          <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Agents and shared activity in this workspace</p>
+          <h1 className="text-sm font-semibold text-foreground leading-tight">Overview</h1>
+          <p className="text-[11px] text-foreground-extra-muted">Agents and shared activity in this workspace</p>
         </div>
         <div className="flex items-center gap-2.5">
           <Stat icon={<Users className="size-3.5" />} value={`${onlineCount}/${agents.length}`} label="online" />
@@ -263,7 +263,7 @@ export function MissionControl() {
           <Stat value={fmtTokens(totalTokens)} label="recent tokens" />
           <button
             onClick={() => setConnectModalOpen(true)}
-            className="ml-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900 transition-colors cursor-pointer"
+            className="ml-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-primary hover:bg-primary text-white dark:hover:bg-surface3 transition-colors cursor-pointer"
             title="Launch a local agent or pair a remote server"
           >
             <Plus className="size-3.5" />
@@ -295,15 +295,15 @@ export function MissionControl() {
         </div>
 
         {/* Shared activity feed */}
-        <aside className="shrink-0 flex flex-col min-h-0 lg:w-[340px] xl:w-[380px] max-h-[42vh] lg:max-h-none border-t lg:border-t-0 lg:border-l border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-zinc-950/20">
-          <div className="shrink-0 flex items-center gap-2 px-4 h-11 border-b border-zinc-200/60 dark:border-zinc-800/60">
-            <span className={cn('size-1.5 rounded-full', activityFeed.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-300 dark:bg-zinc-700')} />
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">Activity</span>
-            <span className="text-[11px] text-zinc-400 dark:text-zinc-500 ml-auto tabular-nums">{activityFeed.length} events</span>
+        <aside className="shrink-0 flex flex-col min-h-0 lg:w-[340px] xl:w-[380px] max-h-[42vh] lg:max-h-none border-t lg:border-t-0 lg:border-l border-border/60 bg-surface1/40">
+          <div className="shrink-0 flex items-center gap-2 px-4 h-11 border-b border-border/60">
+            <span className={cn('size-1.5 rounded-full', activityFeed.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-surface4')} />
+            <span className="text-sm font-semibold text-foreground">Activity</span>
+            <span className="text-[11px] text-foreground-extra-muted ml-auto tabular-nums">{activityFeed.length} events</span>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto py-1.5">
             {activityFeed.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center gap-2 text-zinc-400 dark:text-zinc-600 px-6 text-center">
+              <div className="h-full flex flex-col items-center justify-center gap-2 text-foreground-extra-muted px-6 text-center">
                 <MessageSquare className="size-5" />
                 <span className="text-xs">No activity yet. Messages between agents and teammates will appear here.</span>
               </div>
@@ -312,18 +312,18 @@ export function MissionControl() {
                 <button
                   key={line.id || `act-line-${idx}`}
                   onClick={() => openThread(line.channel)}
-                  className="w-full text-left flex items-start gap-2.5 px-4 py-2 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/30 transition-colors"
+                  className="w-full text-left flex items-start gap-2.5 px-4 py-2 hover:bg-surface2/70 dark:hover:bg-primary/30 transition-colors"
                 >
                   <span className={cn('mt-1.5 size-1.5 rounded-full shrink-0', ACTIVITY_DOT[line.type])} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">{line.sender}</span>
-                      <span className="text-[11px] text-zinc-400 dark:text-zinc-500 truncate">#{line.channel}</span>
-                      <span className="ml-auto shrink-0 text-[10px] text-zinc-400 dark:text-zinc-600 tabular-nums">
+                      <span className="text-xs font-semibold text-foreground truncate">{line.sender}</span>
+                      <span className="text-[11px] text-foreground-extra-muted truncate">#{line.channel}</span>
+                      <span className="ml-auto shrink-0 text-[10px] text-foreground-extra-muted tabular-nums">
                         {line.time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <p className={cn('text-xs truncate mt-0.5', line.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400')}>
+                    <p className={cn('text-xs truncate mt-0.5', line.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted')}>
                       {line.content || '—'}
                     </p>
                   </div>
@@ -339,7 +339,7 @@ export function MissionControl() {
 
 function SectionLabel({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-1.5 mb-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+    <div className="flex items-center gap-1.5 mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground-extra-muted">
       {icon}
       {children}
     </div>
@@ -348,10 +348,10 @@ function SectionLabel({ icon, children }: { icon?: React.ReactNode; children: Re
 
 function Stat({ icon, value, label, accent }: { icon?: React.ReactNode; value: string; label: string; accent?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-100/70 dark:bg-zinc-900/50 border border-zinc-200/50 dark:border-zinc-800/50">
-      {icon && <span className={accent ? 'text-amber-500' : 'text-zinc-400 dark:text-zinc-500'}>{icon}</span>}
-      <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-50 tabular-nums">{value}</span>
-      <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{label}</span>
+    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2/70 border border-border/50">
+      {icon && <span className={accent ? 'text-amber-500' : 'text-foreground-extra-muted'}>{icon}</span>}
+      <span className="text-xs font-semibold text-foreground tabular-nums">{value}</span>
+      <span className="text-[10px] text-foreground-extra-muted">{label}</span>
     </div>
   );
 }

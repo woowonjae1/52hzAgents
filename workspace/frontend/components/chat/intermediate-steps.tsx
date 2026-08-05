@@ -227,7 +227,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
           disabled={!hasDetail}
           className={cn(
             'group/tool flex items-center gap-2 w-full text-left rounded-lg border px-2 py-1.5 transition-colors',
-            'border-zinc-200/70 dark:border-zinc-800/70 bg-zinc-50/60 dark:bg-zinc-900/30',
+            'border-border/70 dark:border-border/70 bg-surface1/60',
             hasDetail && 'cursor-pointer hover:border-blue-300/60 dark:hover:border-blue-800/50 hover:bg-blue-50/40 dark:hover:bg-blue-950/10',
           )}
         >
@@ -246,8 +246,8 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
           )}
         </button>
         {expanded && parsed.args && (
-          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-zinc-800 bg-zinc-950/90 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-3 py-1 border-b border-zinc-800/60 bg-zinc-900/40 text-[10px] text-zinc-400 font-mono">
+          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-primary/90 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1 border-b border-border/60 bg-primary/40 text-[10px] text-foreground-extra-muted font-mono">
               <span className="flex items-center gap-1">
                 <span className="size-2 rounded-full bg-emerald-500/80 inline-block" />
                 <span>{parsed.toolDisplay || 'Terminal Output'}</span>
@@ -262,14 +262,14 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
                     setTimeout(() => setCopied(false), 2000);
                   }
                 }}
-                className="flex items-center gap-1 hover:text-zinc-200 transition-colors cursor-pointer"
+                className="flex items-center gap-1 hover:text-foreground-extra-muted transition-colors cursor-pointer"
                 title="Copy parameters"
               >
                 {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-zinc-300 font-mono whitespace-pre-wrap break-all selection:bg-blue-500/30">
+            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground-extra-muted font-mono whitespace-pre-wrap break-all selection:bg-blue-500/30">
               {parsed.args}
             </pre>
           </div>
@@ -352,7 +352,7 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
     <div className="flex items-start gap-3 py-1">
       {/* Spacer matching avatar width for alignment with chat messages */}
       <div className="size-8 shrink-0" />
-      <div className="border-l-2 border-zinc-200 dark:border-zinc-700 pl-3 py-0.5 min-w-0 flex-1">
+      <div className="border-l-2 border-border pl-3 py-0.5 min-w-0 flex-1">
         {senderGroups.map((group, gi) => (
           <div key={`${group.sender}-${gi}`}>
             {hasMultipleAgents && (

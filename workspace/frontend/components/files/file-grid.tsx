@@ -200,7 +200,7 @@ export function FileGrid() {
         {/* Actions */}
         <button
           onClick={handleCreateFolder}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0"
+          className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
           title="New Folder"
         >
           <FolderPlus className="size-4" />
@@ -208,7 +208,7 @@ export function FileGrid() {
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+          className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
           title={currentPath ? `Upload to ${currentPath}` : 'Upload File'}
         >
           <Upload className="size-4" />
@@ -249,7 +249,7 @@ export function FileGrid() {
                     key={`folder:${entry.name}`}
                     type="button"
                     onClick={() => navigateToFolder(entry.name)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800/60 cursor-pointer group"
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-surface2/60 cursor-pointer group"
                   >
                     <Folder className="size-12 text-amber-500" />
                     <span className="text-xs font-medium truncate w-full">{entry.name}</span>
@@ -271,7 +271,7 @@ export function FileGrid() {
                     'relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors cursor-pointer group',
                     isSelected
                       ? 'bg-primary/10 ring-2 ring-primary/30'
-                      : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/60'
+                      : 'hover:bg-surface2/60'
                   )}
                   onClick={() => {
                     setSelectedFileId(file.id);
@@ -300,7 +300,7 @@ export function FileGrid() {
                   {/* Delete button on hover */}
                   <button
                     onClick={(e) => handleDelete(e, file.id, file.filename)}
-                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-white/80 dark:bg-zinc-900/80 hover:bg-red-50 dark:hover:bg-red-950/50 text-muted-foreground hover:text-red-500 transition-all shadow-sm"
+                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-red-50 dark:hover:bg-red-950/50 text-muted-foreground hover:text-red-500 transition-all shadow-sm"
                     title="Delete"
                   >
                     <Trash2 className="size-3" />

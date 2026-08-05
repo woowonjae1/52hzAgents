@@ -115,7 +115,7 @@ export function BrowserTabList() {
           <button
             onClick={handleOpen}
             disabled={opening}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
             title="Open New Tab"
           >
             <Plus className="size-3.5" />
@@ -149,8 +149,8 @@ export function BrowserTabList() {
                     className={cn(
                       'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
                       selectedBrowserTabId === tab.id
-                        ? 'bg-zinc-100 dark:bg-zinc-800'
-                        : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                        ? 'bg-surface2'
+                        : 'hover:bg-surface1 dark:hover:bg-primary/50'
                     )}
                   >
                     <Lock className="size-4 text-green-500 shrink-0" />
@@ -165,7 +165,7 @@ export function BrowserTabList() {
                     </div>
                     <button
                       onClick={(e) => handleClose(e, tab.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground hover:text-red-500 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-all"
                       title="Close tab"
                     >
                       <X className="size-3.5" />
@@ -179,7 +179,7 @@ export function BrowserTabList() {
                   key={ctx.id}
                   className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group"
                 >
-                  <Lock className="size-4 text-zinc-400 dark:text-zinc-500 shrink-0" />
+                  <Lock className="size-4 text-foreground-extra-muted shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-medium truncate text-muted-foreground">{ctx.name}</p>
                     <p className="text-[11px] text-muted-foreground/60 truncate">
@@ -192,14 +192,14 @@ export function BrowserTabList() {
                     <button
                       onClick={(e) => handleOpenWithContext(e, ctx.id)}
                       disabled={opening}
-                      className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground hover:text-green-500 transition-colors disabled:opacity-50"
+                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-green-500 transition-colors disabled:opacity-50"
                       title="Open tab with this session"
                     >
                       <Play className="size-3.5" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteContext(e, ctx.id, ctx.name)}
-                      className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground hover:text-red-500 transition-colors"
+                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-colors"
                       title="Delete saved session"
                     >
                       <Trash2 className="size-3.5" />
@@ -226,8 +226,8 @@ export function BrowserTabList() {
                   className={cn(
                     'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
                     selectedBrowserTabId === tab.id
-                      ? 'bg-zinc-100 dark:bg-zinc-800'
-                      : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                      ? 'bg-surface2'
+                      : 'hover:bg-surface1 dark:hover:bg-primary/50'
                   )}
                 >
                   <Globe className="size-4 text-blue-500 shrink-0" />
@@ -244,7 +244,7 @@ export function BrowserTabList() {
                   </div>
                   <button
                     onClick={(e) => handleClose(e, tab.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 text-muted-foreground hover:text-red-500 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-all"
                     title="Close tab"
                   >
                     <X className="size-3.5" />

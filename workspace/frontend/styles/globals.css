@@ -6,84 +6,363 @@
 /** Dark Mode Variant **/
 @custom-variant dark (&:is(.dark *));
 
-/** Colors - https://tailwindcss.com/docs/colors **/
+/**
+ * Paseo design tokens — 1:1 with paseo/packages/app/src/styles/theme.ts.
+ *
+ * Light = `lightSemanticColors`. Dark = `paseoDarkColors` (the project's DEFAULT
+ * dark theme: a subtle teal-green tint, NOT neutral zinc). Values are copied
+ * verbatim; regenerate from theme.ts rather than nudging one by hand — the status
+ * tiers in particular are a normalized set (one lightness and one chroma fraction
+ * per tier) and hand-tuning a single hue breaks the family.
+ */
 :root {
-  --background: #ffffff;
+  /* Surfaces (layers) */
+  --surface0: #ffffff; /* App background */
+  --surface1: #fafafa; /* Subtle hover */
+  --surface2: #f4f4f5; /* Elevated: badges, inputs, sheets */
+  --surface3: #e4e4e7; /* Highest elevation */
+  --surface4: #d4d4d8; /* Extra emphasis */
+  --surface-diff-empty: #f6f6f6; /* Empty side of split diff rows */
+  --surface-sidebar: #f4f4f5;
+  --surface-sidebar-hover: #e9e9ec;
+  --surface-workspace: #ffffff;
+
+  /* Text */
   --foreground: #1a1a1e;
+  --foreground-muted: #71717a;
+  --foreground-extra-muted: #a1a1aa;
+
+  /* Controls */
+  --scrollbar-handle: #3f3f46;
+
+  /* Borders */
+  --border: #e4e4e7;
+  --border-accent: #ececf1;
+
+  /* Brand */
+  --accent: #20744a;
+  --accent-bright: #239956;
+  --accent-foreground: #ffffff;
+
+  /* Semantic */
+  --destructive: #b04138;
+  --destructive-foreground: #ffffff;
+  --success: #20744a;
+  --success-foreground: #ffffff;
+
+  /* Diff — the color *is* the signal here, so it stays saturated */
+  --diff-addition: #15803d;
+  --diff-deletion: #b91c1c;
+
+  /* Status, full tier — for a surface whose job is to report the status */
+  --status-success: #1f8040;
+  --status-danger: #c32424;
+  --status-warning: #91601b;
+  --status-merged: #8728e5;
+
+  /* Status, muted tier — same signal repeated on every row of a dense list,
+     where full saturation would make the list the loudest thing on screen */
+  --status-muted-success: #496d50;
+  --status-muted-danger: #904d46;
+  --status-muted-warning: #755f45;
+  --status-muted-merged: #6e519d;
+
+  /* Terminal */
+  --terminal-background: #ffffff;
+  --terminal-foreground: #1a1a1e;
+  --terminal-cursor: #1a1a1e;
+  --terminal-cursor-accent: #ffffff;
+  --terminal-selection-background: rgba(0, 0, 0, 0.15);
+  --terminal-selection-foreground: #1a1a1e;
+  --terminal-black: #1a1a1e;
+  --terminal-red: #dc2626;
+  --terminal-green: #16a34a;
+  --terminal-yellow: #ca8a04;
+  --terminal-blue: #2563eb;
+  --terminal-magenta: #9333ea;
+  --terminal-cyan: #0891b2;
+  --terminal-white: #ffffff;
+  --terminal-bright-black: #3f3f46;
+  --terminal-bright-red: #ef4444;
+  --terminal-bright-green: #22c55e;
+  --terminal-bright-yellow: #f59e0b;
+  --terminal-bright-blue: #3b82f6;
+  --terminal-bright-magenta: #a855f7;
+  --terminal-bright-cyan: #06b6d4;
+  --terminal-bright-white: #fafafa;
+
+  /* Legacy aliases — Paseo keeps these for gradual migration and the existing
+     shadcn-shaped components in this app read them, so they map onto the layers
+     above instead of carrying independent values. */
+  --background: #ffffff;
   --card: #ffffff;
   --card-foreground: #1a1a1e;
   --popover: #ffffff;
   --popover-foreground: #1a1a1e;
   --primary: #18181b;
-  --primary-foreground: #ffffff;
+  --primary-foreground: #fafafa;
   --secondary: #f4f4f5;
   --secondary-foreground: #1a1a1e;
   --muted: #f4f4f5;
   --muted-foreground: #71717a;
-  --accent: #20744a;
-  --accent-foreground: #ffffff;
-  --destructive: #b04138;
-  --destructive-foreground: #ffffff;
-
-  --surface0: #ffffff;
-  --surface1: #fafafa;
-  --surface2: #f4f4f5;
-  --surface3: #e4e4e7;
-  --surface4: #d4d4d8;
-  --surface-sidebar: #f4f4f5;
-  --surface-sidebar-hover: #e9e9ec;
-
-  --status-success: #1f8040;
-  --status-danger: #c32424;
-  --status-warning: #91601b;
-  --status-muted-success: #496d50;
-  --status-muted-danger: #904d46;
-  --status-muted-warning: #755f45;
-
-  --border: #e4e4e7;
-  --border-accent: #ececf1;
   --input: #f4f4f5;
   --ring: #18181b;
   --radius: 0.5rem;
 }
 
+/**
+ * Dark = Paseo's default dark theme (`paseoDarkColors`), a subtle teal-green
+ * tint. The previous values here were pulled from the raw zinc scale
+ * (surface0 #121214 = zinc-950), which is not any of Paseo's six themes and read
+ * as neutral gray — the single most visible way the port looked "not like Paseo".
+ * The other four dark tints (zinc / midnight / claude / ghostty) are separate
+ * selectable themes, not variants of this one.
+ */
 .dark {
-  --background: #121214;
-  --foreground: #f4f4f5;
-  --card: #18181b;
-  --card-foreground: #f4f4f5;
-  --popover: #18181b;
-  --popover-foreground: #f4f4f5;
-  --primary: #f4f4f5;
-  --primary-foreground: #18181b;
-  --secondary: #27272a;
-  --secondary-foreground: #f4f4f5;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #239956;
+  /* Surfaces (layers) */
+  --surface0: #181b1a;
+  --surface1: #1e2120;
+  --surface2: #272a29;
+  --surface3: #434645;
+  --surface4: #595b5b;
+  --surface-diff-empty: #252827;
+  --surface-sidebar: #141716;
+  --surface-sidebar-hover: #1c1f1e;
+  --surface-workspace: #1e2120; /* = surface1 in dark */
+
+  /* Text */
+  --foreground: #fafafa;
+  --foreground-muted: #a1a5a4;
+  --foreground-extra-muted: #717574;
+
+  /* Controls */
+  --scrollbar-handle: #717574;
+
+  /* Borders */
+  --border: #252b2a;
+  --border-accent: #2f3534;
+
+  /* Brand */
+  --accent: #20744a;
+  --accent-bright: #7ccba0;
   --accent-foreground: #ffffff;
-  --destructive: #ef4444;
+
+  /* Semantic — warm red, hue ~7, so it reads as red (not pink) against the green tint */
+  --destructive: #c64f43;
   --destructive-foreground: #ffffff;
+  --success: #20744a;
+  --success-foreground: #ffffff;
 
-  --surface0: #121214;
-  --surface1: #18181b;
-  --surface2: #27272a;
-  --surface3: #3f3f46;
-  --surface4: #52525b;
-  --surface-sidebar: #18181b;
-  --surface-sidebar-hover: #27272a;
+  /* Diff */
+  --diff-addition: #4ade80;
+  --diff-deletion: #ef4444;
 
+  /* Status, full tier */
   --status-success: #2ead58;
   --status-danger: #f65048;
   --status-warning: #c38328;
+  --status-merged: #a670f5;
+
+  /* Status, muted tier */
   --status-muted-success: #7cac85;
   --status-muted-danger: #ca8c85;
   --status-muted-warning: #b79875;
+  --status-muted-merged: #a594c6;
 
+  /* Terminal */
+  --terminal-background: #181b1a;
+  --terminal-foreground: #fafafa;
+  --terminal-cursor: #fafafa;
+  --terminal-cursor-accent: #181b1a;
+  --terminal-selection-background: rgba(255, 255, 255, 0.2);
+  --terminal-selection-foreground: #fafafa;
+  --terminal-black: #141716;
+  --terminal-red: #e07070;
+  --terminal-green: #5dba80;
+  --terminal-yellow: #d4a44a;
+  --terminal-blue: #6a9de0;
+  --terminal-magenta: #b07ad0;
+  --terminal-cyan: #4aabb8;
+  --terminal-white: #d4d4d8;
+  --terminal-bright-black: #434645;
+  --terminal-bright-red: #e89090;
+  --terminal-bright-green: #7ecf9a;
+  --terminal-bright-yellow: #e0be6e;
+  --terminal-bright-blue: #8ab4e8;
+  --terminal-bright-magenta: #c49ae0;
+  --terminal-bright-cyan: #6ec2cc;
+  --terminal-bright-white: #f0f0f2;
+
+  /* Legacy aliases */
+  --background: #181b1a;
+  --card: #1e2120;
+  --card-foreground: #fafafa;
+  --popover: #272a29;
+  --popover-foreground: #fafafa;
+  --primary: #fafafa;
+  --primary-foreground: #181b1a;
+  --secondary: #272a29;
+  --secondary-foreground: #fafafa;
+  --muted: #272a29;
+  --muted-foreground: #a1a5a4;
+  --input: #272a29;
+  --ring: #d4d4d8;
+}
+
+/**
+ * The other four dark tints from Paseo (`darkZincTheme`, `darkMidnightTheme`,
+ * `darkClaudeTheme`, `darkGhosttyTheme`). Apply alongside `.dark`, e.g.
+ * `<html class="dark theme-claude">`.
+ *
+ * Each block carries only the tint-varying tokens — Paseo builds all five dark
+ * themes by passing a `DarkThemeConfig` through one `buildDarkSemanticColors()`,
+ * so everything derived from the tint is written as a var() reference and
+ * everything shared (status scale, diff colours, ANSI palette, #fafafa
+ * foreground) is inherited from `.dark` above. Duplicating the shared half here
+ * is how five themes quietly drift apart.
+ */
+.dark.theme-zinc {
+  --surface0: #18181b;
+  --surface1: #1f1f22;
+  --surface2: #27272a;
+  --surface3: #3f3f46;
+  --surface4: #52525b;
+  --surface-diff-empty: #242427;
+  --surface-sidebar: #131316;
+  --surface-sidebar-hover: #1b1b1e;
+  --foreground-muted: #a1a1aa;
+  --foreground-extra-muted: #71717a;
+  --scrollbar-handle: #71717a;
   --border: #27272a;
-  --border-accent: #3f3f46;
-  --input: #27272a;
-  --ring: #a1a1aa;
+  --border-accent: #303036;
+  --accent: #e4e4e7;
+  --accent-bright: #fafafa;
+  /* monochrome zinc accent is near-white — needs dark text */
+  --accent-foreground: #18181b;
+  --destructive: #c44a4a;
+
+  --surface-workspace: var(--surface1);
+  --success: var(--accent);
+  --background: var(--surface0);
+  --card: var(--surface1);
+  --popover: var(--surface2);
+  --primary-foreground: var(--surface0);
+  --secondary: var(--surface2);
+  --muted: var(--surface2);
+  --muted-foreground: var(--foreground-muted);
+  --input: var(--surface2);
+  --terminal-background: var(--surface0);
+  --terminal-cursor-accent: var(--surface0);
+  --terminal-black: var(--surface-sidebar);
+  --terminal-bright-black: var(--surface3);
+}
+
+.dark.theme-midnight {
+  --surface0: #161820;
+  --surface1: #1c1e27;
+  --surface2: #252731;
+  --surface3: #3c3e4c;
+  --surface4: #535564;
+  --surface-diff-empty: #222430;
+  --surface-sidebar: #121420;
+  --surface-sidebar-hover: #1a1c28;
+  --foreground-muted: #9a9db0;
+  --foreground-extra-muted: #6b6e82;
+  --scrollbar-handle: #6b6e82;
+  --border: #242636;
+  --border-accent: #2e3040;
+  --accent: #3b6fcf;
+  --accent-bright: #7eaaeb;
+  --accent-foreground: #ffffff;
+  /* red with a hint of cool lean against the blue tint */
+  --destructive: #c44a52;
+
+  --surface-workspace: var(--surface1);
+  --success: var(--accent);
+  --background: var(--surface0);
+  --card: var(--surface1);
+  --popover: var(--surface2);
+  --primary-foreground: var(--surface0);
+  --secondary: var(--surface2);
+  --muted: var(--surface2);
+  --muted-foreground: var(--foreground-muted);
+  --input: var(--surface2);
+  --terminal-background: var(--surface0);
+  --terminal-cursor-accent: var(--surface0);
+  --terminal-black: var(--surface-sidebar);
+  --terminal-bright-black: var(--surface3);
+}
+
+.dark.theme-claude {
+  --surface0: #1f1f1e;
+  --surface1: #262523;
+  --surface2: #2f2d2b;
+  --surface3: #4a4745;
+  --surface4: #605d5b;
+  --surface-diff-empty: #2a2826;
+  --surface-sidebar: #1a1918;
+  --surface-sidebar-hover: #222120;
+  --foreground-muted: #ada9a5;
+  --foreground-extra-muted: #78746f;
+  --scrollbar-handle: #78746f;
+  --border: #2c2a27;
+  --border-accent: #36332f;
+  --accent: #d97757;
+  --accent-bright: #e89a7f;
+  --accent-foreground: #ffffff;
+  /* warm orange-red, hue ~10 — sits with the Claude orange accent */
+  --destructive: #cf513e;
+
+  --surface-workspace: var(--surface1);
+  --success: var(--accent);
+  --background: var(--surface0);
+  --card: var(--surface1);
+  --popover: var(--surface2);
+  --primary-foreground: var(--surface0);
+  --secondary: var(--surface2);
+  --muted: var(--surface2);
+  --muted-foreground: var(--foreground-muted);
+  --input: var(--surface2);
+  --terminal-background: var(--surface0);
+  --terminal-cursor-accent: var(--surface0);
+  --terminal-black: var(--surface-sidebar);
+  --terminal-bright-black: var(--surface3);
+}
+
+.dark.theme-ghostty {
+  --surface0: #282c34;
+  --surface1: #2f333d;
+  --surface2: #383c48;
+  --surface3: #4a4f5e;
+  --surface4: #5b6175;
+  --surface-diff-empty: #323643;
+  --surface-sidebar: #21252d;
+  --surface-sidebar-hover: #292d36;
+  --foreground-muted: #c8ccd8;
+  --foreground-extra-muted: #a0a4b2;
+  --scrollbar-handle: #a0a4b2;
+  --border: #353a47;
+  --border-accent: #3f4454;
+  --accent: #89b4fa;
+  --accent-bright: #b4d0fc;
+  --accent-foreground: #ffffff;
+  /* red with slight cool lean against the slate-blue surfaces */
+  --destructive: #c44a55;
+
+  --surface-workspace: var(--surface1);
+  --success: var(--accent);
+  --background: var(--surface0);
+  --card: var(--surface1);
+  --popover: var(--surface2);
+  --primary-foreground: var(--surface0);
+  --secondary: var(--surface2);
+  --muted: var(--surface2);
+  --muted-foreground: var(--foreground-muted);
+  --input: var(--surface2);
+  --terminal-background: var(--surface0);
+  --terminal-cursor-accent: var(--surface0);
+  --terminal-black: var(--surface-sidebar);
+  --terminal-bright-black: var(--surface3);
 }
 
 /** Theme Setup **/
@@ -106,30 +385,104 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
 
-  /** Paseo Layer Surfaces & Status Colors **/
+  /** Paseo — layer surfaces **/
   --color-surface0: var(--surface0);
   --color-surface1: var(--surface1);
   --color-surface2: var(--surface2);
   --color-surface3: var(--surface3);
   --color-surface4: var(--surface4);
+  --color-surface-diff-empty: var(--surface-diff-empty);
   --color-surface-sidebar: var(--surface-sidebar);
   --color-surface-sidebar-hover: var(--surface-sidebar-hover);
+  --color-surface-workspace: var(--surface-workspace);
+
+  /** Paseo — text tiers **/
+  --color-foreground-muted: var(--foreground-muted);
+  --color-foreground-extra-muted: var(--foreground-extra-muted);
+
+  /** Paseo — borders, brand, controls **/
   --color-border-accent: var(--border-accent);
+  --color-accent-bright: var(--accent-bright);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-scrollbar-handle: var(--scrollbar-handle);
+
+  /** Paseo — diff **/
+  --color-diff-addition: var(--diff-addition);
+  --color-diff-deletion: var(--diff-deletion);
+
+  /** Paseo — status, full tier **/
   --color-status-success: var(--status-success);
   --color-status-danger: var(--status-danger);
   --color-status-warning: var(--status-warning);
+  --color-status-merged: var(--status-merged);
+
+  /** Paseo — status, muted tier (dense lists) **/
   --color-status-muted-success: var(--status-muted-success);
   --color-status-muted-danger: var(--status-muted-danger);
   --color-status-muted-warning: var(--status-muted-warning);
+  --color-status-muted-merged: var(--status-muted-merged);
+
+  /** Paseo — terminal palette **/
+  --color-terminal-background: var(--terminal-background);
+  --color-terminal-foreground: var(--terminal-foreground);
+  --color-terminal-cursor: var(--terminal-cursor);
+  --color-terminal-cursor-accent: var(--terminal-cursor-accent);
+  --color-terminal-selection-background: var(--terminal-selection-background);
+  --color-terminal-selection-foreground: var(--terminal-selection-foreground);
+  --color-terminal-black: var(--terminal-black);
+  --color-terminal-red: var(--terminal-red);
+  --color-terminal-green: var(--terminal-green);
+  --color-terminal-yellow: var(--terminal-yellow);
+  --color-terminal-blue: var(--terminal-blue);
+  --color-terminal-magenta: var(--terminal-magenta);
+  --color-terminal-cyan: var(--terminal-cyan);
+  --color-terminal-white: var(--terminal-white);
+  --color-terminal-bright-black: var(--terminal-bright-black);
+  --color-terminal-bright-red: var(--terminal-bright-red);
+  --color-terminal-bright-green: var(--terminal-bright-green);
+  --color-terminal-bright-yellow: var(--terminal-bright-yellow);
+  --color-terminal-bright-blue: var(--terminal-bright-blue);
+  --color-terminal-bright-magenta: var(--terminal-bright-magenta);
+  --color-terminal-bright-cyan: var(--terminal-bright-cyan);
+  --color-terminal-bright-white: var(--terminal-bright-white);
 
   /** Base Styles **/
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-lg: var(--radius);
+
+  /**
+   * Paseo breakpoints (styles/unistyles.ts). These replace Tailwind's defaults
+   * (640/768/1024/1280) so a `md:` in a ported component fires at the same width
+   * it does in Paseo. Note the blast radius: every existing responsive class in
+   * this app now switches 32-48px earlier than before.
+   */
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 720px;
+  --breakpoint-lg: 992px;
+  --breakpoint-xl: 1200px;
+
+  /**
+   * Paseo type scale (theme.ts `FONT_SIZE`). xs/sm/base/lg/xl already match
+   * Tailwind's defaults; these three do not — Tailwind ships 24/30/36px, Paseo
+   * uses 22/26/34, so every large heading would sit 2-4px off without this.
+   */
+  --text-2xl: 22px;
+  --text-3xl: 26px;
+  --text-4xl: 34px;
+
+  /**
+   * Paseo radius scale (theme.ts `BORDER_RADIUS`). md/lg/xl/2xl already line up
+   * with Tailwind; `sm` is 2px in Paseo (Tailwind ships 4px), and `base` (4px) is
+   * its own step.
+   */
+  --radius-sm: 2px;
+  --radius-base: 4px;
   --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: 16px;
 
   /** Animations **/
   --animate-marquee: marquee var(--duration) infinite linear;

@@ -137,7 +137,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
               placeholder="e.g. Check the deployment status and report any issues"
               rows={3}
               disabled={submitting}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors resize-none"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-border-accent transition-colors resize-none"
             />
           </div>
 
@@ -149,7 +149,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
               onChange={(e) => { setName(e.target.value); setNameManual(true); }}
               placeholder="Short label for this routine"
               disabled={submitting}
-              className="w-full px-3 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
+              className="w-full px-3 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-border-accent transition-colors"
             />
           </div>
 
@@ -161,7 +161,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 value={source}
                 onChange={(e) => setSource(e.target.value)}
                 disabled={submitting}
-                className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
+                className="w-full text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:border-border-accent transition-colors"
               >
                 {onlineAgents.map((a) => (
                   <option key={a.agentName} value={a.agentName}>{a.agentName}</option>
@@ -173,14 +173,14 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
           {/* Schedule type toggle */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Schedule</label>
-            <div className="flex gap-1 p-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+            <div className="flex gap-1 p-0.5 rounded-lg bg-surface2">
               <button
                 onClick={() => setScheduleType('daily')}
                 disabled={submitting}
                 className={cn(
                   'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
                   scheduleType === 'daily'
-                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-foreground'
+                    ? 'bg-white shadow-sm text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -192,7 +192,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 className={cn(
                   'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
                   scheduleType === 'interval'
-                    ? 'bg-white dark:bg-zinc-700 shadow-sm text-foreground'
+                    ? 'bg-white shadow-sm text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -212,7 +212,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                     value={hour}
                     onChange={(e) => setHour(Number(e.target.value))}
                     disabled={submitting}
-                    className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
+                    className="w-full text-sm rounded-lg border border-border bg-card px-2 py-1.5 focus:outline-none focus:border-border-accent transition-colors"
                   >
                     {Array.from({ length: 24 }, (_, i) => (
                       <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
@@ -225,7 +225,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                     value={minute}
                     onChange={(e) => setMinute(Number(e.target.value))}
                     disabled={submitting}
-                    className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
+                    className="w-full text-sm rounded-lg border border-border bg-card px-2 py-1.5 focus:outline-none focus:border-border-accent transition-colors"
                   >
                     {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
                       <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
@@ -244,8 +244,8 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                       className={cn(
                         'flex-1 text-[10px] font-medium py-1.5 rounded-md transition-colors border',
                         days.has(i)
-                          ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-950 font-semibold'
-                          : 'border-zinc-200 dark:border-zinc-700 text-muted-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                          ? 'bg-primary border-primary text-white font-semibold'
+                          : 'border-border text-muted-foreground hover:bg-surface1 dark:hover:bg-primary'
                       )}
                     >
                       {label}
@@ -268,8 +268,8 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                     className={cn(
                       'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors border',
                       intervalMinutes === preset.value
-                        ? 'bg-zinc-900 border-zinc-900 text-white dark:bg-zinc-100 dark:border-zinc-100 dark:text-zinc-950 font-semibold'
-                        : 'border-zinc-200 dark:border-zinc-700 text-muted-foreground hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                        ? 'bg-primary border-primary text-white font-semibold'
+                        : 'border-border text-muted-foreground hover:bg-surface1 dark:hover:bg-primary'
                     )}
                   >
                     {preset.label}
@@ -285,7 +285,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                   value={intervalMinutes}
                   onChange={(e) => setIntervalMinutes(Math.max(1, Math.min(1440, Number(e.target.value) || 1)))}
                   disabled={submitting}
-                  className="w-20 px-2 py-1.5 text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none focus:border-zinc-400 dark:focus:border-zinc-650 transition-colors"
+                  className="w-20 px-2 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:border-border-accent transition-colors"
                 />
                 <span className="text-xs text-muted-foreground">minutes</span>
               </div>

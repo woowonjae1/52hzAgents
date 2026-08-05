@@ -209,7 +209,7 @@ export function BrowserView() {
         {isMobile && (
           <button
             onClick={openMobileList}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0"
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -227,7 +227,7 @@ export function BrowserView() {
                 if (e.key === 'Enter') handleNavigate();
                 if (e.key === 'Escape') setEditingUrl(false);
               }}
-              className="w-full text-xs bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded px-1.5 py-0.5 outline-none focus:border-blue-500 font-mono"
+              className="w-full text-xs bg-surface2 border border-border-accent rounded px-1.5 py-0.5 outline-none focus:border-blue-500 font-mono"
               autoFocus
             />
           ) : (
@@ -263,7 +263,7 @@ export function BrowserView() {
         {tab.contextId ? (
           <button
             onClick={handleUnpersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-green-600 dark:text-green-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-orange-500 dark:hover:text-orange-400 transition-colors shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-green-600 dark:text-green-400 hover:bg-surface2 hover:text-orange-500 dark:hover:text-orange-400 transition-colors shrink-0"
             title="Remove persistent state — revert to temporal tab"
           >
             <Lock className="size-3" />
@@ -272,7 +272,7 @@ export function BrowserView() {
         ) : (
           <button
             onClick={handlePersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-green-600 transition-colors shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-surface2 hover:text-green-600 transition-colors shrink-0"
             title="Make persistent — preserve login state for agents to reuse"
           >
             <Lock className="size-3" />
@@ -283,7 +283,7 @@ export function BrowserView() {
         <button
           onClick={handleReconnect}
           disabled={reconnecting}
-          className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+          className="p-1 rounded hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
           title="Reconnect — create a new browser session"
         >
           <RefreshCw className={cn("size-4", reconnecting && "animate-spin")} />
@@ -292,7 +292,7 @@ export function BrowserView() {
         {!isMobile && (
           <button
             onClick={toggleDetailExpanded}
-            className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0"
+            className="p-1 rounded hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
             title={isDetailExpanded ? 'Restore size' : 'Expand to full page'}
           >
             {isDetailExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
@@ -301,7 +301,7 @@ export function BrowserView() {
 
         <button
           onClick={handleClose}
-          className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+          className="p-1 rounded hover:bg-surface2 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
           title="Close tab"
         >
           <X className="size-4" />
@@ -309,7 +309,7 @@ export function BrowserView() {
       </div>
 
       {/* Browser view area */}
-      <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-900 flex items-start justify-center">
+      <div className="flex-1 overflow-auto bg-surface1 flex items-start justify-center">
         {tab.liveUrl && !reconnecting ? (
           <iframe
             src={tab.liveUrl}
@@ -342,7 +342,7 @@ export function BrowserView() {
             <img
               src={screenshotUrl}
               alt={`Screenshot of ${tab.url}`}
-              className="max-w-full border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-sm"
+              className="max-w-full border border-border rounded-lg shadow-sm"
             />
           </div>
         ) : (

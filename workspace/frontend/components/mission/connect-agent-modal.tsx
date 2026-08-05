@@ -48,7 +48,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <div className="flex items-center gap-2.5">
-            <div className="size-9 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300">
+            <div className="size-9 rounded-xl bg-surface2 flex items-center justify-center text-foreground-muted">
               <Zap className="size-5" />
             </div>
             <div>
@@ -64,11 +64,11 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
           {/* Section 1: One-Click Local Agent Launcher */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
                 <Play className="size-3.5" />
                 Local agent runtimes
               </h3>
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500">One-click launch</span>
+              <span className="text-[10px] text-foreground-extra-muted">One-click launch</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -83,14 +83,14 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                       'p-3 rounded-xl border flex items-center justify-between transition-colors',
                       isOnline
                         ? 'bg-emerald-500/5 border-emerald-500/30'
-                        : 'bg-card border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700',
+                        : 'bg-card border-border hover:border-border-accent',
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <AgentAvatar name={agent.agentName} size={32} status={agent.status} showStatus />
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 truncate">{agent.agentName}</p>
-                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                        <p className="text-xs font-semibold text-foreground truncate">{agent.agentName}</p>
+                        <p className="text-[10px] text-foreground-extra-muted uppercase tracking-wider">
                           {agent.agentType || 'Worker'}
                         </p>
                       </div>
@@ -127,22 +127,22 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
           </div>
 
           {/* Section 2: Remote Pairing Command */}
-          <div className="space-y-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-800/80">
+          <div className="space-y-2.5 pt-2 border-t border-border/80">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
                 <Globe className="size-3.5" />
                 Pair a remote server
               </h3>
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500">Any machine</span>
+              <span className="text-[10px] text-foreground-extra-muted">Any machine</span>
             </div>
 
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
+            <p className="text-[11px] text-foreground-muted leading-relaxed">
               Run this command on any remote server, dev container, or laptop to pair its agents into this workspace:
             </p>
 
-            <div className="relative group rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/60 p-3 font-mono text-xs text-zinc-700 dark:text-zinc-300 flex items-center justify-between gap-3">
+            <div className="relative group rounded-xl border border-border bg-surface1/60 p-3 font-mono text-xs text-foreground-muted flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0 overflow-x-auto">
-                <Terminal className="size-4 text-zinc-400 shrink-0" />
+                <Terminal className="size-4 text-foreground-extra-muted shrink-0" />
                 <code className="truncate">{pairingCommand}</code>
               </div>
               <Button

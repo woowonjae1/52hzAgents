@@ -50,7 +50,7 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
                 'text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
                 agent.role === 'master'
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                  : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
+                  : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
               )}>
                 {agent.role}
               </span>

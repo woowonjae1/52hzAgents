@@ -18,7 +18,7 @@ export function getFileIcon(contentType: string | undefined, filename: string) {
     ct.includes('json')
   )
     return <FileCode className="size-4 text-emerald-500" />;
-  return <FileIcon className="size-4 text-zinc-400" />;
+  return <FileIcon className="size-4 text-foreground-extra-muted" />;
 }
 
 /** Larger icons for the grid view */
@@ -33,7 +33,7 @@ export function getFileIconLarge(contentType: string | undefined, filename: stri
     ct.includes('json')
   )
     return <FileCode className="size-10 text-emerald-500" />;
-  return <FileIcon className="size-10 text-zinc-400" />;
+  return <FileIcon className="size-10 text-foreground-extra-muted" />;
 }
 
 export function timeAgo(dateStr: string): string {

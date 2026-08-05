@@ -106,14 +106,14 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
         {onlineAgents.length > 0 && (
           <button
             type="button"
-            className="mt-3 flex w-full items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-left transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+            className="mt-3 flex w-full items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-left transition-colors hover:bg-surface1"
             onClick={toggleAll}
           >
             <div className={cn(
               'size-4 rounded shrink-0 flex items-center justify-center border transition-colors',
               isAllSelected || isPartiallySelected
                 ? 'bg-blue-500 border-blue-500 text-white'
-                : 'border-zinc-300 dark:border-zinc-600'
+                : 'border-border-accent'
             )}>
               {isAllSelected && <Check className="size-3" strokeWidth={3} />}
               {isPartiallySelected && <Minus className="size-3" strokeWidth={3} />}
@@ -153,8 +153,8 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
                 className={cn(
                   'flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all border',
                   isSelected
-                    ? 'bg-zinc-50 dark:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700'
-                    : 'border-transparent opacity-50 hover:opacity-75 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
+                    ? 'bg-surface1/80 border-border'
+                    : 'border-transparent opacity-50 hover:opacity-75 hover:bg-surface1'
                 )}
                 onClick={() => toggleAgent(agent.agentName)}
               >
@@ -163,7 +163,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
                   'size-4 rounded shrink-0 flex items-center justify-center border transition-colors',
                   isSelected
                     ? 'bg-blue-500 border-blue-500 text-white'
-                    : 'border-zinc-300 dark:border-zinc-600'
+                    : 'border-border-accent'
                 )}>
                   {isSelected && <Check className="size-3" strokeWidth={3} />}
                 </div>
@@ -190,7 +190,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             <select
               value={resumeFrom}
               onChange={(e) => setResumeFrom(e.target.value)}
-              className="w-full text-sm rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">New conversation (no context)</option>
               {resumableSessions.map((s) => (
