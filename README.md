@@ -79,8 +79,8 @@
                                                ▲
                                                │ (WS connection / Agent stdin/stdout)
 ┌──────────────────────────────────────────────┴──────────────────────────────────────────────┐
-│                                   Agent 连接器与守护进程                                    │
-│     packages/agn_go (Go 版守护进程 `agn`)     ·     packages/wwj (Node.js 版守护进程 `wwj`)     │
+│                                Agent 连接器与守护进程 `wwj`                                  │
+│                                    (packages/wwj)                                          │
 │                                                                                             │
 │       [Claude Code]    [Codex Agent]    [OpenClaw]    [Cursor]    [Copilot]    [Aider]      │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -121,10 +121,9 @@
 │       ├── styles/                 # globals.css（Paseo surface0..4 + 6 套主题变量定义）
 │       └── lib/                    # identity-colors.ts、paseo-theme.ts、api.ts、auth-context.tsx
 ├── packages/
-│   ├── launcher/                    # Electron 42 + Vite 桌面端 Native App Shell (Windows/macOS/Linux)
+│   ├── launcher/                    # Electron 42 + Vite 桌面端 Native App Shell (Windows/macOS/Linux)，内置捆绑 wwj
 │   ├── go/                          # OpenAgents Go — 原生 SwiftUI macOS + iOS 客户端
-│   ├── agn_go/                      # Go 版本地 Agent 守护进程 (`agn` CLI，零依赖单文件)
-│   └── wwj/                         # Node.js 版本地 Agent 守护进程与库 (`wwj` CLI，@woowonjae/wwj)
+│   └── wwj/                         # 本地 Agent 守护进程与库 (`wwj` CLI，@woowonjae/wwj)
 ├── sdk/                              # Studio / 社区知识库示例等外部集成脚手架
 ├── docs/
 │   ├── assets/                      # 品牌 Logo、视觉 Banner 与 Demo 演示动图
@@ -189,22 +188,28 @@ npm run dev
 
 ## 🤖 接入您的 AI 智能体
 
-提供两种等价实现的本地守护进程 CLI，二选一即可：Go 版 `agn`（零依赖单文件，详见 [`packages/agn_go`](packages/agn_go/README.md)）与 Node.js 版 `wwj`（详见 [`packages/wwj`](packages/wwj/README.md)）。
+通过本地守护进程 `wwj`（详见 [`packages/wwj`](packages/wwj/README.md)，也是 Electron 桌面客户端内置捆绑的同一份实现）连接本地 Agent：
 
 ```bash
+# 0) 安装 CLI（或直接使用 packages/launcher 内捆绑的版本）
+npm install -g ./packages/wwj
+
 # 1) 启动后台守护进程
-agn up                            # 或：wwj up
+wwj up
 
 # 2) 创建本地 Agent（--type 支持 claude / codex / openclaw / cursor / aider / gemini 等）
-agn create my-agent --type claude # 或：wwj create my-agent --type claude
+wwj create my-agent --type claude
 
-# 3) 连接到自托管 Workspace，实时双向桥接其 stdin/stdout
-agn connect my-agent <workspace-token-or-id> --endpoint http://localhost:8000
-                                   # 或：wwj connect my-agent <token>
+# 3) 配置密钥（按 Agent 类型设置对应环境变量）
+wwj env openclaw --set LLM_API_KEY=sk-...
 
-# 查看状态 / 断开连接
-agn ls                             # 或：wwj status
-agn disconnect my-agent            # 或：wwj down
+# 4) 连接到自托管 Workspace，实时双向桥接其 stdin/stdout
+wwj connect my-agent <workspace-token-or-id>
+
+# 查看状态 / 日志 / 断开连接
+wwj status
+wwj logs
+wwj down
 ```
 
 > macOS / iOS 用户也可以使用原生 SwiftUI 客户端 **OpenAgents Go**（[`packages/go`](packages/go/README.md)），以 iMessage 式双栏布局连接同一个自托管 Workspace。

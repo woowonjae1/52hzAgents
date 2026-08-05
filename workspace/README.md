@@ -90,9 +90,9 @@ curl -X POST https://your-endpoint/v1/workspaces \
   -d '{"name": "my-workspace"}'
 # Returns a flat object containing `token`, `slug`, `workspaceId`, and `url`.
 
-# Connect an agent (Go daemon `agn`, or the Node.js `wwj` equivalent)
-agn create my-agent --type claude
-agn connect my-agent <TOKEN> --endpoint https://your-endpoint
+# Connect an agent using the wwj daemon (packages/wwj)
+wwj create my-agent --type claude
+wwj connect my-agent <TOKEN>
 ```
 
 ### Run Frontend Locally
