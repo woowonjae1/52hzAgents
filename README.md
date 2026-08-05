@@ -28,6 +28,7 @@
 
 ### 1. 🎨 Paseo 1:1 桌面级设计系统 (Design System)
 - **5 层分层图层 (Surfaces 0~4)**：抛弃传统盲目的色块与高饱和色彩，采用 `surface0`（主背景）到 `surface4`（最高拾起层）的极致分层色系，搭配 `surfaceSidebar` 专属高对比侧边栏。
+- **6 套主题一键切换 (`ThemeSwitcher`)**：`light` 亮色 + 5 种深色调（`dark` Paseo 墨绿、`zinc` 石墨灰、`midnight` 深蓝、`claude` 珊瑚橙、`ghostty` 蓝紫）。`next-themes` 负责亮/暗大类切换，`lib/paseo-theme.ts` 在其上叠加一层 tint class，选中即持久化到 `localStorage`，与 Paseo 桌面端色板逐一对齐。
 - **320px 标准侧边栏与 3 栏 Split 架构**：320px 左侧边栏 + 自适应中央主工作区 + 400px 右侧可折叠辅助面板（文件预览、Diff 对比、终端）。
 - **微观字阶与超细桌面标题 (Micro-Typography)**：顶栏大标题在桌面端采用 `300` 级别超细字重（Light Weight），结构化标签与内容文本区分明确，视觉安静且富有高级感。
 - **10 色身份对比度填充表 (`Identity Colors`)**：内建 10 色算法（violet, sky, emerald, orange, pink, indigo, teal, red, amber, blue），将项目与 Agent 图标强行锁定在 4.2~4.8:1 对比度带中，防止单一项目夺走视觉焦点。
@@ -54,14 +55,14 @@
 ## 🛠 系统架构全景图
 
 ```
-                             ┌───────────────────────────────────┐
-                             │       Electron 桌面客户端 Shell    │
-                             │        (packages/launcher)        │
-                             └─────────────────┬─────────────────┘
-                                               │ (内嵌 WebView / Local HTTP)
-                                               ▼
-                             ┌───────────────────────────────────┐
-                             │        Next.js 前端 UI 界面       │
+                    ┌───────────────────────────┐   ┌───────────────────────────────────┐
+                    │  Electron 桌面客户端 Shell  │   │   OpenAgents Go — 原生 macOS/iOS   │
+                    │     (packages/launcher)    │   │   SwiftUI 客户端 (packages/go)     │
+                    └─────────────┬───────────────┘   └─────────────────┬─────────────────┘
+                                  │ (内嵌 WebView / Local HTTP)                       │ (REST / SSE)
+                                  ▼                                                  │
+                             ┌───────────────────────────────────┐                   │
+                             │        Next.js 前端 UI 界面       │◄──────────────────┘
                              │       (workspace/frontend)        │
                              └─────────────────┬─────────────────┘
                                                │ (HTTP / SSE / WebSocket)
@@ -79,7 +80,7 @@
                                                │ (WS connection / Agent stdin/stdout)
 ┌──────────────────────────────────────────────┴──────────────────────────────────────────────┐
 │                                   Agent 连接器与守护进程                                    │
-│         packages/agn_go (Go 版守护进程)     ·     packages/agent-connector (Node.js 适配器)       │
+│     packages/agn_go (Go 版守护进程 `agn`)     ·     packages/wwj (Node.js 版守护进程 `wwj`)     │
 │                                                                                             │
 │       [Claude Code]    [Codex Agent]    [OpenClaw]    [Cursor]    [Copilot]    [Aider]      │
 └─────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -95,25 +96,40 @@
 │   ├── backend/                     # Go 核心后端服务 (Gin + GORM)
 │   │   ├── cmd/server/              # 服务主入口
 │   │   └── internal/
-│   │       ├── handlers/            # 消息路由(routing.go)、文件(files.go)、Todos(todos.go)
+│   │       ├── handlers/            # 路由(routing.go/routing_llm.go)、文件(files.go)、
+│   │       │                        # 终端(terminal.go)、共享浏览器(browser_fabric.go)、
+│   │       │                        # Agent 目录与运行时(agents_catalog.go/agent_runtime.go)、
+│   │       │                        # Todos/Routines/Timers/Knowledge/Shares/Notifications
 │   │       ├── hub/                 # WebSocket / SSE 事件广播 Hub
+│   │       ├── scheduler/           # Routine / Timer 后台调度循环
+│   │       ├── middleware/          # 鉴权与请求中间件
 │   │       ├── models/              # GORM 数据库 Schema 架构
-│   │       └── db/                  # SQLite / PostgreSQL 数据库驱动层
-│   └── frontend/                    # Next.js 14 Web / 桌面工作区前端
-│       ├── app/                     # Next.js App Router
+│   │       └── db/                  # SQLite (纯 Go, CGO_ENABLED=0) / PostgreSQL 驱动层
+│   └── frontend/                    # Next.js 16 + React 19 Web / 桌面工作区前端
+│       ├── app/                     # Next.js App Router ([workspaceId]、share 只读分享页)
 │       ├── components/
-│       │   ├── layout/              # 320px 侧边栏(sidebar.tsx)、3 栏 Wrapper(wrapper.tsx)
-│       │   ├── chat/                # 对话面板(chat-view.tsx)、Composer(chat-input.tsx)
-│       │   ├── files/               # 文件全格式预览(file-preview.tsx)
-│       │   ├── ui/                  # Paseo 基础 Primitives (status-badge, segmented-control)
-│       │   └── headers/             # 桌面 300 字重标题 (screen-title.tsx)
-│       ├── styles/                  # globals.css (Paseo surface0..4 变量定义)
-│       └── lib/                     # identity-colors.ts 身份颜色算法与 API Client
+│       │   ├── layout/              # 320px 侧边栏、主题切换(theme-switcher.tsx)
+│       │   ├── chat/threads/inbox/  # 对话面板、线程列表、收件箱
+│       │   ├── files/knowledge/     # 文件全格式预览、知识库
+│       │   ├── terminal/browser/    # 交互式终端、共享浏览器沙箱
+│       │   ├── mission/monitor/     # Mission Control 雷达大厅、Agent 监控
+│       │   ├── routines/timers/tasks/skills/  # 例行任务、定时器、待办、技能装配
+│       │   ├── connect/invitations/sessions/  # Agent 接入、邀请、会话管理
+│       │   ├── settings/           # 工作区与账号设置
+│       │   ├── ui/                 # Paseo 基础 Primitives (status-badge, segmented-control)
+│       │   └── headers/            # 桌面 300 字重标题 (screen-title.tsx)
+│       ├── styles/                 # globals.css（Paseo surface0..4 + 6 套主题变量定义）
+│       └── lib/                    # identity-colors.ts、paseo-theme.ts、api.ts、auth-context.tsx
 ├── packages/
-│   ├── launcher/                    # Electron 42 + Vite 桌面端 Native App Shell
-│   ├── agn_go/                      # Go 版本地 Agent 守护进程 (`agn` CLI)
-│   └── agent-connector/             # Node.js 版多 Agent 适配器与 MCP Server
-└── docs/assets/                     # 品牌 Logo、视觉 Banner 与 Demo 演示动图
+│   ├── launcher/                    # Electron 42 + Vite 桌面端 Native App Shell (Windows/macOS/Linux)
+│   ├── go/                          # OpenAgents Go — 原生 SwiftUI macOS + iOS 客户端
+│   ├── agn_go/                      # Go 版本地 Agent 守护进程 (`agn` CLI，零依赖单文件)
+│   └── wwj/                         # Node.js 版本地 Agent 守护进程与库 (`wwj` CLI，@woowonjae/wwj)
+├── sdk/                              # Studio / 社区知识库示例等外部集成脚手架
+├── docs/
+│   ├── assets/                      # 品牌 Logo、视觉 Banner 与 Demo 演示动图
+│   └── projects/                    # 架构与迁移相关的设计笔记
+└── 启动桌面端.bat                    # Windows 一键启动脚本
 ```
 
 ---
@@ -173,22 +189,25 @@ npm run dev
 
 ## 🤖 接入您的 AI 智能体
 
-通过 Go 守护进程 `agn`（详见 [`packages/agn_go`](packages/agn_go/README.md)）连接本地 Agent：
+提供两种等价实现的本地守护进程 CLI，二选一即可：Go 版 `agn`（零依赖单文件，详见 [`packages/agn_go`](packages/agn_go/README.md)）与 Node.js 版 `wwj`（详见 [`packages/wwj`](packages/wwj/README.md)）。
 
 ```bash
 # 1) 启动后台守护进程
-agn up
+agn up                            # 或：wwj up
 
-# 2) 创建本地 Agent（--type 支持 claude / codex / openclaw / aider 等）
-agn create my-agent --type claude
+# 2) 创建本地 Agent（--type 支持 claude / codex / openclaw / cursor / aider / gemini 等）
+agn create my-agent --type claude # 或：wwj create my-agent --type claude
 
 # 3) 连接到自托管 Workspace，实时双向桥接其 stdin/stdout
 agn connect my-agent <workspace-token-or-id> --endpoint http://localhost:8000
+                                   # 或：wwj connect my-agent <token>
 
 # 查看状态 / 断开连接
-agn ls
-agn disconnect my-agent
+agn ls                             # 或：wwj status
+agn disconnect my-agent            # 或：wwj down
 ```
+
+> macOS / iOS 用户也可以使用原生 SwiftUI 客户端 **OpenAgents Go**（[`packages/go`](packages/go/README.md)），以 iMessage 式双栏布局连接同一个自托管 Workspace。
 
 ---
 

@@ -1,9 +1,12 @@
-# OpenAgents Workspace
+# 52hzAgents Workspace — Backend & Frontend
 
-The current backend is Go 1.21 with Gin and GORM. Use
-[QUICKSTART-WINDOWS.md](QUICKSTART-WINDOWS.md) for the Windows startup path.
+The backend is Go 1.21 with Gin and GORM (SQLite via `glebarez/sqlite`, no CGO
+required, or PostgreSQL). The frontend is Next.js + React. Use
+[QUICKSTART-WINDOWS.md](QUICKSTART-WINDOWS.md) for the Windows startup path,
+or `.\dev-sqlite.ps1` from the repository root for the fastest local loop.
 
-A managed agent collaboration environment built on the [OpenAgents Network Model](../docs/openagents_network_model.md).
+See the [repository root README](../README.md) for the full product overview,
+design system, and desktop client details.
 
 ## Quick Start
 
@@ -87,11 +90,9 @@ curl -X POST https://your-endpoint/v1/workspaces \
   -d '{"name": "my-workspace"}'
 # Returns a flat object containing `token`, `slug`, `workspaceId`, and `url`.
 
-# Connect an agent
-openagents create claude --name my-agent \
-  --join-workspace <TOKEN> \
-  --endpoint https://your-endpoint \
-  --no-browser
+# Connect an agent (Go daemon `agn`, or the Node.js `wwj` equivalent)
+agn create my-agent --type claude
+agn connect my-agent <TOKEN> --endpoint https://your-endpoint
 ```
 
 ### Run Frontend Locally
