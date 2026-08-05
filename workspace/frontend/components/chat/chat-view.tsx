@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, Terminal } from 'lucide-react';
+import { ListTree, MessageSquare, MessageSquarePlus, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, Terminal } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -127,7 +127,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
   const [showCreateRoutine, setShowCreateRoutine] = useState(false);
   const {
     isMobile,
@@ -347,7 +347,7 @@ export function ChatView() {
     if (!currentSessionId) return;
     const lastMsg = displayMessages[displayMessages.length - 1];
     if (lastMsg) {
-      const isTerminalStatus = /stopped|stopping failed/i.test(lastMsg.content);
+      const isTerminalStatus = /stopped|stopping failed|execution stopped/i.test(lastMsg.content);
       const isWorking = !isTerminalStatus && (
         lastMsg.messageType === 'status' ||
         lastMsg.messageType === 'thinking' ||
@@ -377,7 +377,7 @@ export function ChatView() {
     // local CLI has emitted its first status update. Keep the session active in
     // that gap so the Stop button stays available for the whole request.
     if (lastMsg.senderType !== 'agent') return;
-    const isTerminalStatus = /stopped|stopping failed/i.test(lastMsg.content);
+    const isTerminalStatus = /stopped|stopping failed|execution stopped/i.test(lastMsg.content);
     const isAgentWorking = lastMsg.senderType === 'agent' && !isTerminalStatus && (
       lastMsg.messageType === 'status' ||
       lastMsg.messageType === 'thinking' ||
@@ -531,18 +531,18 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-zinc-900">
+    <div className="flex flex-col h-full bg-surface0">
       {/* Thread header */}
-      <div className="flex items-center gap-2 px-3 lg:px-5 py-2.5 lg:py-3.5 border-b border-zinc-200/60 dark:border-zinc-800/60 shrink-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex items-center gap-2 px-4 lg:px-6 py-3 border-b border-border/80 shrink-0 bg-surface0 sticky top-0 z-10">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
             <button
               onClick={sidebarToggle}
-              className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors shrink-0 -ml-1 cursor-pointer"
+              className="size-7 flex items-center justify-center rounded-lg hover:bg-surface-sidebar-hover text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1 cursor-pointer"
               title="Expand Sidebar"
             >
-              <PanelLeft className="size-4.5" />
+              <PanelLeft className="size-4" />
             </button>
           )}
           {/* Return to workspace Overview */}
@@ -551,17 +551,17 @@ export function ChatView() {
               setCurrentSessionId(null);
               setViewMode('mission');
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-zinc-950 dark:hover:text-zinc-50 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors shrink-0 -ml-1 cursor-pointer border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xs"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-normal text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors shrink-0 -ml-1 cursor-pointer border border-border/60"
             title="Back to workspace overview"
           >
-            <ChevronLeft className="size-3.5 text-zinc-400 shrink-0" />
-            <span className="text-[11px] font-bold">Overview</span>
+            <ChevronLeft className="size-3.5 text-muted-foreground shrink-0" />
+            <span className="text-[11px]">Overview</span>
           </button>
           {isDM ? (
-            <h2 className="text-xs font-bold tracking-tight truncate flex items-center gap-1.5 text-zinc-900 dark:text-zinc-50">
-              <MessageSquare className="size-3.5 text-zinc-400" />
+            <h2 className="text-sm font-normal lg:font-light tracking-tight truncate flex items-center gap-1.5 text-foreground">
+              <MessageSquare className="size-3.5 text-muted-foreground" />
               {currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 font-semibold border border-zinc-200/30 dark:border-zinc-800/30">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-normal">
                 read-only
               </span>
             </h2>
@@ -575,12 +575,12 @@ export function ChatView() {
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}
-              className="text-xs font-bold tracking-tight bg-transparent border-b border-zinc-400 dark:border-zinc-600 outline-none min-w-0 max-w-[300px] text-zinc-900 dark:text-zinc-50 h-6"
+              className="text-sm font-normal tracking-tight bg-transparent border-b border-border outline-none min-w-0 max-w-[300px] text-foreground h-6"
               autoFocus
             />
           ) : (
             <h2
-              className="text-xs font-bold tracking-tight truncate cursor-pointer hover:text-zinc-500 dark:hover:text-zinc-300 transition-colors text-zinc-900 dark:text-zinc-50"
+              className="text-sm font-normal lg:font-light tracking-tight truncate cursor-pointer hover:text-muted-foreground transition-colors text-foreground"
               onClick={startEditingTitle}
               title="Click to rename"
             >
@@ -602,13 +602,30 @@ export function ChatView() {
           })()}
         </div>
         <div className="flex items-center gap-1 lg:gap-1.5 shrink-0">
+          {/* New topic — same agents, empty context. One click, no dialog. The
+              participants are inherited from this thread on purpose: a channel
+              with no members falls back to every agent in the workspace on the
+              backend, which would make the first message fan out to everyone. */}
+          {!isDM && (currentSession?.participants?.length ?? 0) > 0 && (
+            <Button
+              variant="ghost"
+              mode="icon"
+              size="sm"
+              onClick={() => void createSession({ participants: currentSession!.participants })}
+              title="New topic — same agents, fresh context"
+            >
+              <MessageSquarePlus className="size-4" />
+            </Button>
+          )}
           {/* Compact avatar stack — click to manage thread agents (add / remove /
               set leader). Replaces the old standalone manage-agents button. Not
               shown for DMs. */}
           {!isDM && (() => {
             const participants = currentSession?.participants || [];
             const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
-            if (sessionAgents.length === 0) return null;
+            // Deliberately no early return when the thread has no agents: this
+            // dropdown is the only way to add one, so bailing out left an empty
+            // thread permanently unusable. The trigger becomes "Add agent".
             // In-thread list must include OFFLINE participants too — otherwise an
             // agent whose daemon is down can never be removed from the thread.
             const agentByName = new Map(agents.map((a) => [a.agentName, a]));
@@ -626,15 +643,24 @@ export function ChatView() {
                     className="flex -space-x-1.5 shrink-0 mr-1 items-center rounded-full outline-none hover:opacity-80 transition-opacity cursor-pointer"
                     title="Manage thread agents"
                   >
-                    {sessionAgents.slice(0, 3).map((agent) => (
-                      <div key={agent.agentName} className="border-2 border-background rounded-full" title={agent.agentName}>
-                        <AgentAvatar name={agent.agentName} size={18} />
-                      </div>
-                    ))}
-                    {sessionAgents.length > 3 && (
-                      <div className="size-5 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[7px] font-medium text-zinc-600 dark:text-zinc-400 border-2 border-background" title={sessionAgents.map((agent) => agent.agentName).join(', ')}>
-                        +{sessionAgents.length - 3}
-                      </div>
+                    {sessionAgents.length === 0 ? (
+                      <span className="flex items-center gap-1 rounded-full border border-dashed border-amber-400/80 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:text-amber-300">
+                        <Plus className="size-3" />
+                        Add agent
+                      </span>
+                    ) : (
+                      <>
+                        {sessionAgents.slice(0, 3).map((agent) => (
+                          <div key={agent.agentName} className="border-2 border-background rounded-full" title={agent.agentName}>
+                            <AgentAvatar name={agent.agentName} size={18} />
+                          </div>
+                        ))}
+                        {sessionAgents.length > 3 && (
+                          <div className="size-5 rounded-full bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center text-[7px] font-medium text-zinc-600 dark:text-zinc-400 border-2 border-background" title={sessionAgents.map((agent) => agent.agentName).join(', ')}>
+                            +{sessionAgents.length - 3}
+                          </div>
+                        )}
+                      </>
                     )}
                   </button>
                 </DropdownMenuTrigger>
@@ -918,6 +944,18 @@ export function ChatView() {
         {!isDM && (
           <div className="px-3 lg:px-4 py-2 lg:py-3">
             <div className="max-w-3xl mx-auto w-full">
+              {/* A thread with no agents gets no reply: the backend only borrows a
+                  workspace agent when the choice is unambiguous. Say so instead of
+                  letting the message vanish into silence. */}
+              {currentSession && (currentSession.participants?.length ?? 0) === 0 && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
+                  <AlertTriangle className="size-3.5 shrink-0" />
+                  <span className="flex-1">
+                    No agents in this thread — messages won&apos;t be answered. Use
+                    {' '}<span className="font-medium">Add agent</span> in the header.
+                  </span>
+                </div>
+              )}
               {currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}
               <ChatInput
                 onSend={handleSend}

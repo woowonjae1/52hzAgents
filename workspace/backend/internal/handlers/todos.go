@@ -3,18 +3,51 @@ package handlers
 
 // 导入所需的包，用于 JSON 转换、事件分发以及数据库操作。
 import (
+	"bytes"
 	"encoding/json" // 用于解析请求体及序列化通知负载。
 	"fmt"           // 用于格式化字符串拼接（新增）。
-	"net/http"      // 包含标准的 HTTP 常量和响应写入方法。
-	"strings"       // 提供辅助字符串处理函数。
-	"time"          // 记录更新时刻。
+	"io"
+	"net/http" // 包含标准的 HTTP 常量和响应写入方法。
+	"strings"  // 提供辅助字符串处理函数。
+	"time"     // 记录更新时刻。
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"                                           // Gin 框架路由控制。
 	"github.com/google/uuid"                                             // 为新增实体分配随机 UUID。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 事件广播总线。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 数据结构体模型。
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 )
+
+func toUTF8String(s string) string {
+	if utf8.ValidString(s) && !strings.Contains(s, "\ufffd") {
+		hasMojibake := false
+		for _, r := range s {
+			if r >= 0x80 && r <= 0xff {
+				hasMojibake = true
+				break
+			}
+		}
+		if !hasMojibake {
+			return strings.TrimSpace(s)
+		}
+		latinBytes := []byte(s)
+		r := transform.NewReader(bytes.NewReader(latinBytes), simplifiedchinese.GBK.NewDecoder())
+		decoded, err := io.ReadAll(r)
+		if err == nil && utf8.Valid(decoded) && len(decoded) > 0 {
+			return strings.TrimSpace(string(decoded))
+		}
+		return strings.TrimSpace(s)
+	}
+	r := transform.NewReader(bytes.NewReader([]byte(s)), simplifiedchinese.GBK.NewDecoder())
+	decoded, err := io.ReadAll(r)
+	if err == nil && utf8.Valid(decoded) && len(decoded) > 0 {
+		return strings.TrimSpace(string(decoded))
+	}
+	return strings.TrimSpace(strings.ReplaceAll(s, "\ufffd", ""))
+}
 
 // PutTodoItem 代表单个代办事项项的参数。
 type PutTodoItem struct {
@@ -61,11 +94,13 @@ func PutTodos(c *gin.Context) {
 	if !authorizeWorkspace(c, workspace) {
 		return
 	}
-	for _, item := range req.Todos {
+	for i, item := range req.Todos {
 		if item.Status != "pending" && item.Status != "in_progress" && item.Status != "completed" && item.Status != "cancelled" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "todo status must be pending, in_progress, completed, or cancelled"})
 			return
 		}
+		req.Todos[i].Content = toUTF8String(item.Content)
+		req.Todos[i].Assignee = toUTF8String(item.Assignee)
 	}
 
 	// 初始化通道默认值。

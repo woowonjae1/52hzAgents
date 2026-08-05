@@ -18,10 +18,12 @@ interface NewThreadDialogProps {
   onOpenChange: (open: boolean) => void;
   agents: WorkspaceAgent[];
   sessions?: WorkspaceSession[];
+  /** Pre-checked agents when the dialog opens — normally the current thread's members. */
+  defaultParticipants?: string[];
   onCreateThread: (opts: { participants: string[]; resumeFrom?: string }) => void;
 }
 
-export function NewThreadDialog({ open, onOpenChange, agents, sessions, onCreateThread }: NewThreadDialogProps) {
+export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultParticipants, onCreateThread }: NewThreadDialogProps) {
   // Only show online agents in the picker
   const onlineAgents = agents.filter((a) => a.status === 'online');
   const offlineAgentCount = agents.length - onlineAgents.length;
@@ -37,11 +39,17 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, onCreate
     setSelected(isAllSelected ? new Set() : new Set(agentNames));
   };
 
-  // Reset state when dialog opens. When there's exactly one online agent,
-  // pre-select it so the common single-agent case is a one-click "Start Thread".
+  // Reset state when dialog opens. Prefer the caller's default (the current
+  // thread's members), then fall back to pre-selecting the only online agent, so
+  // both the single-agent and "same team again" cases are a one-click start.
   useEffect(() => {
     if (open) {
-      setSelected(onlineAgents.length === 1 ? new Set([onlineAgents[0].agentName]) : new Set());
+      const preset = (defaultParticipants || []).filter((name) => agentNames.includes(name));
+      if (preset.length > 0) {
+        setSelected(new Set(preset));
+      } else {
+        setSelected(onlineAgents.length === 1 ? new Set([onlineAgents[0].agentName]) : new Set());
+      }
       setResumeFrom('');
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -72,10 +80,15 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, onCreate
     (s) => s.status === 'active' && s.lastEventAt != null
   );
 
-  // Check if any selected agent is a Claude Code agent (heuristic: agent type or name contains 'claude')
-  const hasClaudeAgent = onlineAgents.some(
-    (a) => selected.has(a.agentName) && /claude/i.test(a.agentName)
-  );
+  // Session resume is a Claude Code feature. Match on the reported agent type
+  // ("claude" is the catalog name) so renaming an agent no longer silently hides
+  // the resume picker. The name is only a fallback for agents that joined
+  // without reporting a type.
+  const hasClaudeAgent = onlineAgents.some((agent) => {
+    if (!selected.has(agent.agentName)) return false;
+    const type = (agent.agentType || '').toLowerCase();
+    return type ? type.startsWith('claude') : /claude/i.test(agent.agentName);
+  });
 
   const multipleAgents = onlineAgents.length > 1;
 

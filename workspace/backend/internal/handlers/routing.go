@@ -50,8 +50,21 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		return nil, false, nil
 	}
 
+	// channel_members has a composite (channel_id, agent_name) primary key and no
+	// id column — in the AutoMigrate schema and in 0001_initial_schema.sql alike.
+	// The previous Order("id ASC") therefore failed on every single query ("no
+	// such column: id"); the error was discarded, memberships stayed empty, and
+	// EVERY channel silently behaved as if it had no members of its own. That is
+	// what let agents outside a thread be picked to answer in it. Order by
+	// agent_name instead: the column exists and the order stays deterministic,
+	// which the round-robin index in fallbackTargets depends on.
 	var memberships []models.ChannelMember
-	db.DB.Where("channel_id = ?", channel.ID).Order("id ASC").Find(&memberships)
+	if err := db.DB.Where("channel_id = ?", channel.ID).Order("agent_name ASC").Find(&memberships).Error; err != nil {
+		// Membership is unreadable, so no routing decision can be correct. Store
+		// the message and wake nobody rather than falling through to the
+		// workspace-wide fallback and borrowing an unrelated agent.
+		return []string{noResponseAgent}, true, nil
+	}
 	participants := make([]string, 0, len(memberships))
 	for _, member := range memberships {
 		if member.AgentName != noResponseAgent {
@@ -59,14 +72,25 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		}
 	}
 
-	// 若频道尚未关联任何专属成员，自动回退取工作区中的所有 Agent 成员
+	// 频道没有自己的成员时，只在选择唯一时才回退到工作区成员。
+	//
+	// This fallback used to take *every* agent in the workspace, which let an
+	// agent that was never added to the channel be picked as the recipient — a
+	// message in an empty channel would be answered by an unrelated agent chosen
+	// by round-robin. Restricting it to a single-agent workspace keeps legacy
+	// single-agent channels working while removing that surprise. With two or
+	// more agents nobody answers, and the UI tells the user to add one.
 	if len(participants) == 0 {
 		var wsMembers []models.WorkspaceMember
 		db.DB.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
+		named := make([]string, 0, len(wsMembers))
 		for _, m := range wsMembers {
 			if m.AgentName != "" && m.AgentName != noResponseAgent {
-				participants = append(participants, m.AgentName)
+				named = append(named, m.AgentName)
 			}
+		}
+		if len(named) == 1 {
+			participants = named
 		}
 	}
 
@@ -76,6 +100,15 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 
 	content, _ := req.Payload["content"].(string)
 	mentions := mentionedAgents(content, req.Payload, participants)
+	if isHumanSource(req.Source) && len(mentions) > 1 {
+		// Solution 1: Single-Target Dispatcher (Primary Addressee Lock)
+		// If a human prompt directly addresses a primary agent at the start (e.g. "@claude-agent ..."),
+		// route exclusively to that primary addressee to prevent parallel execution race conditions.
+		trimmed := strings.TrimSpace(content)
+		if strings.HasPrefix(trimmed, "@"+mentions[0]) {
+			mentions = []string{mentions[0]}
+		}
+	}
 	online := onlineParticipants(workspaceID, participants)
 
 	// Agent-sourced messages: only route if the agent explicitly @mentions

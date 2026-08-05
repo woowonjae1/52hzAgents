@@ -1,7 +1,5 @@
-'use client';
-
 import { useEffect, useState } from 'react';
-import { FileText, Download, Trash2, Loader2, ChevronLeft } from 'lucide-react';
+import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, ExternalLink, Music, Film, FileCode } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
@@ -19,8 +17,20 @@ function isHtmlFile(contentType: string, filename: string): boolean {
   return contentType === 'text/html' || /\.html?$/i.test(filename);
 }
 
-function isImageFile(contentType: string): boolean {
-  return contentType.startsWith('image/');
+function isImageFile(contentType: string, filename: string): boolean {
+  return contentType.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(filename);
+}
+
+function isPdfFile(contentType: string, filename: string): boolean {
+  return contentType === 'application/pdf' || /\.pdf$/i.test(filename);
+}
+
+function isVideoFile(contentType: string, filename: string): boolean {
+  return contentType.startsWith('video/') || /\.(mp4|webm|ogv|mov|mkv)$/i.test(filename);
+}
+
+function isAudioFile(contentType: string, filename: string): boolean {
+  return contentType.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(filename);
 }
 
 function isMarkdownFile(contentType: string, filename: string): boolean {
@@ -28,15 +38,31 @@ function isMarkdownFile(contentType: string, filename: string): boolean {
 }
 
 function isTextFile(contentType: string, filename: string): boolean {
-  if (isHtmlFile(contentType, filename)) return false; // HTML is handled separately
+  if (isHtmlFile(contentType, filename)) return false;
   return (
     contentType.startsWith('text/') ||
     contentType === 'application/json' ||
     contentType === 'application/javascript' ||
     contentType === 'application/xml' ||
     contentType === 'application/yaml' ||
-    /\.(md|txt|csv|json|js|ts|tsx|jsx|py|rs|go|java|rb|c|cpp|h|sh|yaml|yml|toml|cfg|ini|log)$/i.test(filename)
+    contentType === 'application/x-sh' ||
+    /\.(md|txt|csv|json|js|ts|tsx|jsx|py|rs|go|java|rb|c|cpp|h|hpp|cs|php|swift|kt|sh|bat|cmd|ps1|yaml|yml|toml|cfg|ini|log|sql|vue|svelte|graphql|prisma|env|dockerfile|lock|xml|svg|css|scss|less)$/i.test(filename)
   );
+}
+
+function fixMojibake(text: string): string {
+  // Detect classic Windows GBK / UTF-8 double-encoding Mojibake (e.g. 鎴愰兘, 鍩, 鎴, 浜)
+  if (/^[\s\S]{0,150}(?:鎴愰兘|鍩|鎴|浜|澶|绠|闈|娲|琛|矾|绾|缁)/.test(text)) {
+    try {
+      const bytes = new Uint8Array(Array.from(text).map((c) => c.charCodeAt(0) & 0xff));
+      const decoder = new TextDecoder('utf-8');
+      const decoded = decoder.decode(bytes);
+      if (decoded && !decoded.includes('\ufffd') && decoded.length > 0) {
+        return decoded;
+      }
+    } catch {}
+  }
+  return text;
 }
 
 export function FilePreview() {
@@ -45,6 +71,7 @@ export function FilePreview() {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const file = files.find((f) => f.id === selectedFileId);
 
@@ -66,11 +93,14 @@ export function FilePreview() {
     const ct = file.contentType || '';
     const fn = file.filename || '';
     const isHtml = isHtmlFile(ct, fn);
-    const isImage = isImageFile(ct);
+    const isImage = isImageFile(ct, fn);
+    const isPdf = isPdfFile(ct, fn);
+    const isVideo = isVideoFile(ct, fn);
+    const isAudio = isAudioFile(ct, fn);
     const isText = isTextFile(ct, fn);
 
-    // HTML and images use the direct URL — no fetch needed
-    if (isHtml) {
+    // Direct blob/URL types
+    if (isHtml || isPdf || isVideo || isAudio) {
       setContent(null);
       const url = workspaceApi.getFileUrl(file.id);
       if (blobUrl) URL.revokeObjectURL(blobUrl);
@@ -79,9 +109,12 @@ export function FilePreview() {
       return;
     }
 
-    if (!isText && !isImage) {
+    // Only skip fetch for known compiled binary archive/executable files
+    const isKnownBinary = /\.(zip|gz|tar|tgz|7z|rar|exe|dll|so|dylib|bin|iso|dmg|apk|ipa|woff2?|ttf|eot|otf)$/i.test(fn);
+    if (isKnownBinary) {
       setContent(null);
       setBlobUrl(null);
+      setLoading(false);
       return;
     }
 
@@ -108,7 +141,7 @@ export function FilePreview() {
         } else {
           const text = await res.text();
           if (!cancelled) {
-            setContent(text);
+            setContent(fixMojibake(text));
             setBlobUrl(null);
           }
         }
@@ -132,11 +165,15 @@ export function FilePreview() {
 
   const handleDownload = () => {
     const url = workspaceApi.getFileUrl(file.id);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.filename;
-    // We can't easily add headers to an <a> download, so open in new tab
     window.open(url, '_blank');
+  };
+
+  const handleCopy = () => {
+    if (!content) return;
+    navigator.clipboard.writeText(content);
+    setCopied(true);
+    toast.success('Copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDelete = async () => {
@@ -148,82 +185,132 @@ export function FilePreview() {
     }
   };
 
+  const ct = file.contentType || '';
+  const fn = file.filename || '';
+  const isHtml = isHtmlFile(ct, fn);
+  const isImage = isImageFile(ct, fn);
+  const isPdf = isPdfFile(ct, fn);
+  const isVideo = isVideoFile(ct, fn);
+  const isAudio = isAudioFile(ct, fn);
+  const isMarkdown = isMarkdownFile(ct, fn);
+
+  const lines = content ? content.split('\n') : [];
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-card">
       {/* Header */}
-      <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-3 border-b shrink-0">
+      <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-3 border-b shrink-0 bg-background/50">
         <button
           onClick={() => {
             if (isMobile) openMobileList();
             else setSelectedFileId(null);
           }}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0"
+          className="size-8 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors shrink-0 cursor-pointer"
           title="Back to files"
         >
           <ChevronLeft className="size-5" />
         </button>
         <FileText className="size-4 text-muted-foreground shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{file.filename.split('/').pop() || file.filename}</p>
+          <p className="text-sm font-semibold truncate text-foreground">{file.filename.split('/').pop() || file.filename}</p>
           <p className="text-xs text-muted-foreground truncate">
             {file.filename.includes('/') && (
               <span className="text-muted-foreground/60">{file.filename.split('/').slice(0, -1).join('/')}/ · </span>
             )}
-            {formatSize(file.size)} · {file.contentType || 'unknown'} · {(file.uploadedBy || 'unknown').replace(/^(openagents:|human:)/, '')}
+            {formatSize(file.size)} · {file.contentType || 'file'} · {(file.uploadedBy || 'unknown').replace(/^(openagents:|human:)/, '')}
           </p>
         </div>
+
+        {content !== null && (
+          <button
+            onClick={handleCopy}
+            className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors cursor-pointer"
+            title="Copy content"
+          >
+            {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
+          </button>
+        )}
+
         <button
           onClick={handleDownload}
-          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors"
-          title="Download"
+          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground transition-colors cursor-pointer"
+          title="Open in new tab / Download"
         >
-          <Download className="size-4" />
+          <ExternalLink className="size-4" />
         </button>
+
         <button
           onClick={handleDelete}
-          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-red-500 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-muted-foreground hover:text-red-500 transition-colors cursor-pointer"
           title="Delete"
         >
           <Trash2 className="size-4" />
         </button>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
+      {/* Content Body */}
+      <div className="flex-1 overflow-auto bg-background">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
-        ) : isHtmlFile(file.contentType || '', file.filename) && blobUrl ? (
+        ) : isHtml && blobUrl ? (
+          <iframe
+            src={blobUrl}
+            title={file.filename}
+            className="w-full h-full border-0 bg-white"
+            sandbox="allow-scripts allow-same-origin"
+          />
+        ) : isPdf && blobUrl ? (
           <iframe
             src={blobUrl}
             title={file.filename}
             className="w-full h-full border-0"
-            sandbox="allow-scripts allow-same-origin"
           />
-        ) : blobUrl && isImageFile(file.contentType || '') ? (
-          <div className="flex items-center justify-center p-4 h-full">
+        ) : isVideo && blobUrl ? (
+          <div className="flex items-center justify-center p-4 h-full bg-black/90">
+            <video src={blobUrl} controls autoPlay className="max-w-full max-h-full rounded-lg shadow-lg" />
+          </div>
+        ) : isAudio && blobUrl ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
+            <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <Music className="size-8 animate-pulse" />
+            </div>
+            <p className="font-medium text-sm text-foreground">{file.filename}</p>
+            <audio src={blobUrl} controls className="w-80 max-w-full" />
+          </div>
+        ) : blobUrl && isImage ? (
+          <div className="flex items-center justify-center p-4 h-full bg-zinc-950/5 dark:bg-zinc-950/40">
             <img
               src={blobUrl}
               alt={file.filename}
-              className="max-w-full max-h-full object-contain rounded"
+              className="max-w-full max-h-full object-contain rounded-lg shadow-md"
             />
           </div>
-        ) : content !== null && isMarkdownFile(file.contentType || '', file.filename) ? (
-          <div className="p-5 max-w-3xl mx-auto text-sm">
+        ) : content !== null && isMarkdown ? (
+          <div className="p-6 max-w-4xl mx-auto text-sm leading-relaxed">
             <MarkdownContent content={content} agentNames={[]} />
           </div>
         ) : content !== null ? (
-          <pre className="p-4 text-xs font-mono whitespace-pre-wrap break-words text-foreground">
-            {content}
-          </pre>
+          <div className="flex text-xs font-mono min-h-full">
+            {/* Line numbers gutter */}
+            <div className="select-none py-4 px-3 text-right text-zinc-400 dark:text-zinc-600 bg-muted/30 border-r border-border shrink-0 min-w-[40px]">
+              {lines.map((_, i) => (
+                <div key={i} className="leading-6">{i + 1}</div>
+              ))}
+            </div>
+            {/* Code content */}
+            <pre className="p-4 leading-6 whitespace-pre-wrap break-words flex-1 text-foreground overflow-x-auto">
+              {content}
+            </pre>
+          </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-            <FileText className="size-8 opacity-30" />
-            <p className="text-sm">Preview not available for this file type</p>
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+            <FileText className="size-10 opacity-30" />
+            <p className="text-sm font-medium">Preview not available for this file type</p>
             <button
               onClick={handleDownload}
-              className="text-xs text-primary hover:underline"
+              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
             >
               Download file
             </button>

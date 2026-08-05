@@ -57,16 +57,16 @@ function NavButton({
     <button
       onClick={onClick}
       className={cn(
-        'w-full flex items-center gap-2.5 px-2.5 h-8 rounded-lg text-xs transition-all duration-150',
+        'w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-xs transition-all duration-150 cursor-pointer select-none',
         active
-          ? 'bg-zinc-100/80 dark:bg-zinc-900/80 text-zinc-900 dark:text-zinc-50 font-bold border border-zinc-200/20 dark:border-zinc-800/20 shadow-xs'
-          : 'hover:bg-zinc-100/40 dark:hover:bg-zinc-900/20 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 font-medium'
+          ? 'bg-surface2 text-foreground font-medium border border-border/50 shadow-xs'
+          : 'hover:bg-surface-sidebar-hover text-muted-foreground hover:text-foreground font-normal'
       )}
     >
-      <span className={cn('size-4 flex items-center justify-center shrink-0 transition-opacity', active ? 'opacity-100' : 'opacity-50')}>{icon}</span>
+      <span className={cn('size-4 flex items-center justify-center shrink-0 transition-opacity', active ? 'opacity-100 text-foreground' : 'opacity-60')}>{icon}</span>
       <span className="flex-1 text-left truncate">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 border border-zinc-200/30 dark:border-zinc-800/30 shrink-0">
+        <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 shrink-0">
           {count}
         </span>
       )}

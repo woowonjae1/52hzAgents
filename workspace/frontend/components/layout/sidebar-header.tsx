@@ -17,44 +17,37 @@ export function SidebarHeader() {
   const { workspace } = useWorkspace();
 
   return (
-    <div className="flex items-center justify-between shrink-0 px-4 py-3.5 border-b border-zinc-200/40 dark:border-zinc-800/40">
-      {/* Left: Workspace Selector dropdown */}
+    <div className="flex items-center justify-between shrink-0 px-4 py-3 border-b border-border/80 bg-surface-sidebar">
+      {/* Left: Workspace / Host Selector with status dot */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors text-left max-w-[150px] cursor-pointer outline-none">
-            <img 
-              src="/logo-icon.png" 
-              className="size-4.5 object-contain shrink-0 rounded-sm" 
-              alt="Workspace logo" 
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
-            />
-            <span className="text-xs font-bold truncate text-zinc-800 dark:text-zinc-200">
+          <button className="flex items-center gap-2 hover:opacity-80 transition-opacity text-left max-w-[200px] cursor-pointer outline-none group">
+            <span className="size-2 rounded-full bg-status-success shrink-0 animate-pulse" title="Host Connected" />
+            <span className="text-sm font-semibold tracking-tight truncate text-foreground">
               {workspace?.name || '52hzAgents'}
             </span>
-            <ChevronDown className="size-3.5 text-zinc-400 shrink-0" />
+            <ChevronDown className="size-3.5 text-muted-foreground group-hover:text-foreground shrink-0 transition-colors" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-52">
-          <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+        <DropdownMenuContent align="start" className="w-56 bg-surface0 border-border">
+          <DropdownMenuLabel className="text-xs text-muted-foreground font-medium">Workspaces</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem disabled className="font-semibold text-zinc-700 dark:text-zinc-300">
+          <DropdownMenuItem disabled className="font-semibold text-foreground text-xs">
             {workspace?.name || 'Demo Workspace'}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="text-zinc-400 text-xs" disabled>
+          <DropdownMenuItem className="text-muted-foreground text-[11px]" disabled>
             ID: {workspace?.slug || 'slug'}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       {/* Right: Actions */}
-      <div className="flex items-center gap-0.5 shrink-0">
+      <div className="flex items-center gap-1 shrink-0">
         {/* New Thread */}
         <button
           onClick={openNewThread}
-          className="size-7 rounded-lg hover:bg-zinc-150 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 flex items-center justify-center transition-colors cursor-pointer"
+          className="size-7 rounded-lg hover:bg-surface-sidebar-hover text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="New Thread"
         >
           <Plus className="size-4" />
@@ -63,7 +56,7 @@ export function SidebarHeader() {
         {/* Collapse Sidebar toggle */}
         <button
           onClick={sidebarToggle}
-          className="size-7 rounded-lg hover:bg-zinc-150 dark:hover:bg-zinc-900 text-zinc-500 hover:text-zinc-950 dark:text-zinc-400 dark:hover:text-zinc-100 flex items-center justify-center transition-colors cursor-pointer"
+          className="size-7 rounded-lg hover:bg-surface-sidebar-hover text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Collapse Sidebar"
         >
           <PanelLeft className="size-4" />

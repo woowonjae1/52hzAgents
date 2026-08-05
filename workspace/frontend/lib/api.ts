@@ -7,6 +7,7 @@ import type {
   BrowserPersistentContext,
   BrowserTab,
   CloudAgentConfig,
+  CloudAgentModelInfo,
   CloudAgentProvider,
   DMConversation,
   EventConfirmation,
@@ -17,6 +18,7 @@ import type {
   NetworkProfile,
   NotificationItem,
   ONMEvent,
+  RoutineItem,
   ShareSummary,
   TimerItem,
   TodoItem,
@@ -28,7 +30,7 @@ import type {
   WorkspaceInvitation,
   WorkspaceSession,
 } from './types';
-import { eventToMessage } from './types';
+import { eventToMessage, networkAgentToWorkspaceAgent } from './types';
 import { getApiBaseUrl } from './config';
 
 /** Map a snake_case custom-skill entry from the backend to camelCase. */
@@ -338,7 +340,7 @@ class WorkspaceApi {
       master: opts.master || null,
       orchestrationMode: 'dynamic',
       orchestrationInstruction: null,
-      createdAt: new Date(event.timestamp).toISOString(),
+      createdAt: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
       lastEventAt: null,
     };
   }
@@ -436,7 +438,7 @@ class WorkspaceApi {
     agentName: string,
     action: string,
     params: Record<string, unknown> = {},
-  ): Promise<ONMEvent> {
+  ): Promise<EventConfirmation> {
     return this.sendEvent({
       type: 'workspace.agent.control',
       source: 'human:user',
@@ -492,6 +494,7 @@ class WorkspaceApi {
   /** Get the download URL for a file. */
   getFileUrl(fileId: string): string {
     const params = new URLSearchParams();
+    if (this.workspaceId) params.set('network', this.workspaceId);
     if (this.token) params.set('token', this.token);
     const qs = params.toString();
     return `${getApiBaseUrl()}/v1/files/${fileId}${qs ? `?${qs}` : ''}`;
@@ -609,13 +612,14 @@ class WorkspaceApi {
       url: t.url as string,
       title: (t.title as string) || null,
       status: t.status as string,
+      targetAgentName: (t.target_agent_name || t.targetAgentName || null) as string | null,
       createdBy: (t.created_by as string) || 'unknown',
       sharedWith: (t.shared_with as string[]) || [],
       liveUrl: (t.live_url as string) || null,
       sessionId: (t.session_id as string) || null,
       contextId: (t.context_id as string) || null,
       createdAt: (t.created_at as string) || null,
-      lastActiveAt: (t.last_active_at as string) || null,
+      lastActivityAt: (t.last_active_at || t.lastActivityAt || null) as string | null,
     };
   }
 
@@ -731,18 +735,7 @@ class WorkspaceApi {
 
   async listAgents(): Promise<WorkspaceAgent[]> {
     const discovery = await this.discover();
-    return discovery.agents.map((a) => ({
-      agentName: a.address.replace(/^openagents:/, ''),
-      role: a.role,
-      agentType: a.agent_type || null,
-      serverHost: a.server_host || null,
-      workingDir: a.working_dir || null,
-      description: a.description || null,
-      enabledSkills: a.enabled_skills || null,
-      status: a.status,
-      lastHeartbeatAt: null,
-      joinedAt: null,
-    }));
+    return discovery.agents.map(networkAgentToWorkspaceAgent);
   }
 
   /** Fetch the catalog of supported agent client types. */
@@ -765,24 +758,52 @@ class WorkspaceApi {
   // Cloud agents
   // ---------------------------------------------------------------------------
 
+  private mapCloudAgentConfig(raw: Record<string, unknown>): CloudAgentConfig {
+    return {
+      id: String(raw.id || raw.ID || ''),
+      workspaceId: String(raw.workspace_id || raw.workspaceId || raw.network || ''),
+      providerId: String(raw.provider_id || raw.providerId || raw.provider || ''),
+      agentName: String(raw.agent_name || raw.agentName || ''),
+      model: String(raw.model || ''),
+      category: String(raw.category || 'text'),
+      apiKeyMasked: String(raw.api_key_masked || raw.apiKeyMasked || raw.api_key || ''),
+      systemPrompt: (raw.system_prompt || raw.systemPrompt || undefined) as string | undefined,
+      createdAt: (raw.created_at || raw.createdAt || undefined) as string | undefined,
+      updatedAt: (raw.updated_at || raw.updatedAt || undefined) as string | undefined,
+    };
+  }
+
   async getCloudProviders(): Promise<CloudAgentProvider[]> {
-    const res = await this.request<{ providers: any[] }>('/v1/cloud-agents/providers');
+    const res = await this.request<{ providers: Record<string, unknown>[] }>('/v1/cloud-agents/providers');
     return (res.providers || []).map((p) => ({
-      name: p.name,
-      label: p.label,
-      models: (p.models || []).map((m: any) => ({
-        id: m.id || m.name || '',
-        category: m.category || 'chat',
-        label: m.label || m.name || '',
-      })),
+      id: String(p.id || p.provider_id || p.name || ''),
+      name: String(p.name || p.id || ''),
+      label: String(p.label || p.name || p.id || ''),
+      description: String(p.description || ''),
+      doc_url: String(p.doc_url || ''),
+      category: String(p.category || 'global'),
+      models: Array.isArray(p.models)
+        ? (p.models as unknown[]).map((m: unknown): CloudAgentModelInfo => {
+            if (typeof m === 'object' && m !== null) {
+              const obj = m as Record<string, unknown>;
+              return {
+                id: String(obj.id || obj.model || obj.name || ''),
+                label: String(obj.label || obj.name || obj.id || ''),
+                category: (obj.category || 'text') as CloudAgentModelInfo['category'],
+              };
+            }
+            const str = String(m);
+            return { id: str, label: str, category: 'text' };
+          })
+        : [],
     }));
   }
 
   async listCloudAgents(): Promise<CloudAgentConfig[]> {
-    const res = await this.request<{ cloud_agents: CloudAgentConfig[] }>(
+    const res = await this.request<{ cloud_agents: Record<string, unknown>[] }>(
       `/v1/cloud-agents?network=${this.workspaceId}`
     );
-    return res.cloud_agents;
+    return (res.cloud_agents || []).map((c) => this.mapCloudAgentConfig(c));
   }
 
   async addCloudAgent(params: {
@@ -794,7 +815,7 @@ class WorkspaceApi {
     systemPrompt?: string;
     maxTokens?: number;
   }): Promise<CloudAgentConfig> {
-    return this.request<CloudAgentConfig>('/v1/cloud-agents', {
+    const raw = await this.request<Record<string, unknown>>('/v1/cloud-agents', {
       method: 'POST',
       body: JSON.stringify({
         network: this.workspaceId,
@@ -807,6 +828,7 @@ class WorkspaceApi {
         max_tokens: params.maxTokens || null,
       }),
     });
+    return this.mapCloudAgentConfig(raw);
   }
 
   async executeTerminalCommand(command: string): Promise<{ output: string }> {
@@ -823,7 +845,7 @@ class WorkspaceApi {
     maxTokens?: number;
     status?: string;
   }): Promise<CloudAgentConfig> {
-    return this.request<CloudAgentConfig>(`/v1/cloud-agents/${agentName}`, {
+    const raw = await this.request<Record<string, unknown>>(`/v1/cloud-agents/${agentName}`, {
       method: 'PATCH',
       body: JSON.stringify({
         network: this.workspaceId,
@@ -834,6 +856,7 @@ class WorkspaceApi {
         ...updates.status !== undefined && { status: updates.status },
       }),
     });
+    return this.mapCloudAgentConfig(raw);
   }
 
   async removeCloudAgent(agentName: string): Promise<void> {
@@ -951,7 +974,7 @@ class WorkspaceApi {
     return result.events.map((e) => ({
       channelName: e.target.replace(/^channel\//, ''),
       snippet: (e.payload as Record<string, string>)?.content || '',
-      messageId: e.id,
+      messageId: e.event_id,
     }));
   }
 
@@ -1197,10 +1220,12 @@ class WorkspaceApi {
     return {
       notifications: (raw.notifications || []).map((n): NotificationItem => ({
         id: (n.id || n.ID) as string,
+        type: (n.type || n.Type || 'info') as string,
         title: (n.title || n.Title) as string,
+        body: (n.body || n.Body || n.message || n.Message || '') as string,
         message: (n.message || n.Message) as string,
         priority: (n.priority || n.Priority || 'normal') as NotificationItem['priority'],
-        isRead: !!(n.is_read || n.IsRead || n.isRead),
+        isRead: !!(n.is_read || n.IsRead || n.isRead || n.read),
         createdBy: (n.created_by || n.createdBy || n.CreatedBy || '') as string,
         channelName: (n.channel_name ?? n.channelName ?? n.ChannelName ?? null) as string | null,
         threadId: (n.thread_id ?? n.threadId ?? n.ThreadID ?? null) as string | null,
@@ -1307,15 +1332,15 @@ class WorkspaceApi {
         created_by: createdBy || 'human:user',
       }),
     });
+    const token = String(raw.share_token || raw.token || raw.id || '');
     return {
-      id: raw.id as string,
-      workspaceId: (raw.workspace_id || '') as string,
-      channelName: (raw.channel_name || '') as string,
-      title: (raw.title || null) as string | null,
-      shareToken: raw.share_token as string,
-      messageCount: (raw.message_count || 0) as number,
-      status: (raw.status || 'active') as string,
+      token,
+      shareToken: token,
+      title: String(raw.title || channelName),
+      channelName: String(raw.channel_name || channelName),
+      createdBy: String(raw.created_by || createdBy || 'human:user'),
       createdAt: (raw.created_at || null) as string | null,
+      messageCount: Number(raw.message_count || 0),
     };
   }
 

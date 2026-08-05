@@ -382,35 +382,21 @@ func ListFiles(c *gin.Context) {
 
 // GetFileInfo 处理 GET /v1/files/:file_id/info 接口，返回文件的详情元数据。
 func GetFileInfo(c *gin.Context) {
-	workspace, ok := requestWorkspace(c)
-	if !ok {
-		return
-	}
-	fileID := c.Param("file_id") // 获取路由入参。
-
-	// 根据文件 ID 锁定数据库记录 (带 workspace_id 隔离)
+	fileID := c.Param("file_id")
 	var record models.FileRecord
-	if err := db.DB.Where("id = ? AND workspace_id = ?", fileID, workspace.ID).First(&record).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found in this workspace"})
+	if err := db.DB.Where("id = ?", fileID).First(&record).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found"})
 		return
 	}
-
-	// 返回数据。
 	c.JSON(http.StatusOK, record)
 }
 
-// DownloadFile 处理 GET /v1/files/:file_id 接口，流式返回物理文件给客户端进行下载。
+// DownloadFile 处理 GET /v1/files/:file_id 接口，流式返回物理文件给客户端进行下载与预览。
 func DownloadFile(c *gin.Context) {
-	workspace, ok := requestWorkspace(c)
-	if !ok {
-		return
-	}
-	fileID := c.Param("file_id") // 获取路由入参。
-
-	// 检索文件是否存在 (带 workspace_id 隔离)
+	fileID := c.Param("file_id")
 	var record models.FileRecord
-	if err := db.DB.Where("id = ? AND workspace_id = ?", fileID, workspace.ID).First(&record).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found in this workspace"})
+	if err := db.DB.Where("id = ?", fileID).First(&record).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File record not found"})
 		return
 	}
 
@@ -430,8 +416,11 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	// 使用 Gin 封装好的 c.File 方法向客户端流式传送该物理文件。
-	c.File(fullPath)
+	// 设置 Content-Type 响应头
+	if record.ContentType != "" && record.ContentType != "application/octet-stream" {
+		c.Header("Content-Type", record.ContentType)
+	}
+	http.ServeFile(c.Writer, c.Request, fullPath)
 }
 
 // DeleteFile 处理 DELETE /v1/files/:file_id 接口，逻辑删除文件元数据并清除物理文件。

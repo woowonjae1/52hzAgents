@@ -27,7 +27,7 @@ function formatSchedule(r: RoutineItem): string {
   if (r.scheduleDays.length === 2 && [5, 6].every((d) => r.scheduleDays!.includes(d))) {
     return `Weekends at ${time}`;
   }
-  const dayLabels = r.scheduleDays.map((d) => DAY_NAMES[d] || `${d}`).join(', ');
+  const dayLabels = r.scheduleDays.map((d: number) => DAY_NAMES[d] || `${d}`).join(', ');
   return `${dayLabels} at ${time}`;
 }
 
@@ -124,7 +124,7 @@ export function RoutinesView() {
         ) : (
           <div className="p-4 space-y-3">
             {activeRoutines.map((routine) => {
-              const agentName = routine.createdBy.replace('openagents:', '');
+              const agentName = routine.createdBy.replace('openagents:', '') || 'agent';
               const session = sessions.find((s) => s.sessionId === routine.channelName);
               const channelTitle = session?.title || routine.channelName;
 
@@ -157,7 +157,7 @@ export function RoutinesView() {
                         <span>·</span>
                         <span className="truncate">{channelTitle}</span>
                         <span>·</span>
-                        <span>next: {timeUntil(routine.nextFiresAt)}</span>
+                        <span>next: {routine.nextFiresAt ? timeUntil(routine.nextFiresAt) : 'N/A'}</span>
                         {routine.lastFiredAt && (
                           <>
                             <span>·</span>

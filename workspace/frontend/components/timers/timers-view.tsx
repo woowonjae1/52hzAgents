@@ -49,9 +49,11 @@ export function TimersView() {
       .map((session) => ({ id: session.sessionId, title: session.title || session.sessionId }));
     return values.length ? values : [{ id: 'general', title: 'General' }];
   }, [sessions]);
-  const activeTimers = useMemo(() => timers.filter((timer) => timer.status === 'active').sort((a, b) => (
-    new Date(a.firesAt).getTime() - new Date(b.firesAt).getTime()
-  )), [timers]);
+  const activeTimers = useMemo(() => timers.filter((timer) => timer.status === 'active').sort((a, b) => {
+    const aT = a.firesAt ? new Date(a.firesAt).getTime() : 0;
+    const bT = b.firesAt ? new Date(b.firesAt).getTime() : 0;
+    return aT - bT;
+  }), [timers]);
 
   useEffect(() => {
     void refreshTimers();

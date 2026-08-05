@@ -67,7 +67,7 @@ function DMSection({
   currentSessionId,
   onSelect,
 }: {
-  conversations: { agents: [string, string]; lastMessage: { content: string; sender: string; timestamp: number }; messageCount: number }[];
+  conversations: import('@/lib/types').DMConversation[];
   currentSessionId: string | null;
   onSelect: (sessionId: string) => void;
 }) {
@@ -94,13 +94,15 @@ function DMSection({
       {expanded && (
         <div className="mt-1 space-y-1">
           {conversations.map((convo) => {
-            const dmId = `dm:${convo.agents[0]},${convo.agents[1]}`;
+            const agent0 = convo.agents?.[0] || 'agent';
+            const agent1 = convo.agents?.[1] || 'agent';
+            const dmId = `dm:${agent0},${agent1}`;
             const isSelected = currentSessionId === dmId;
-            const agentA = convo.agents[0].replace(/^openagents:/, '');
-            const agentB = convo.agents[1].replace(/^openagents:/, '');
-            const sender = convo.lastMessage.sender.replace(/^openagents:/, '');
-            const preview = `${sender}: ${convo.lastMessage.content}`;
-            const displayTime = convo.lastMessage.timestamp
+            const agentA = agent0.replace(/^openagents:/, '');
+            const agentB = agent1.replace(/^openagents:/, '');
+            const sender = (convo.lastMessage?.sender || '').replace(/^openagents:/, '');
+            const preview = `${sender}: ${convo.lastMessage?.content || ''}`;
+            const displayTime = convo.lastMessage?.timestamp
               ? timeAgo(new Date(convo.lastMessage.timestamp).toISOString())
               : '';
 
@@ -349,11 +351,11 @@ export function ThreadList() {
                   if (isMobile) openMobileDetail();
                 }}
                 className={cn(
-                  'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-all relative group cursor-pointer',
-                  isSelected ? 'bg-zinc-100 dark:bg-zinc-800 border border-zinc-900 dark:border-zinc-100 shadow-xs scale-[0.99]' : 'border border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
-                  'has-data-[state=open]:bg-zinc-50 dark:has-data-[state=open]:bg-zinc-800/50',
+                  'w-full flex items-center gap-2.5 p-2 rounded-md text-left transition-all relative group cursor-pointer select-none',
+                  isSelected ? 'bg-surface2 text-foreground border border-border/70 shadow-xs' : 'border border-transparent hover:bg-surface-sidebar-hover',
+                  'has-data-[state=open]:bg-surface-sidebar-hover',
                   isActive && 'thread-wip',
-                  isCompleted && !isSelected && 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200/60 dark:border-amber-700/40 animate-[glow_2s_ease-in-out_infinite]'
+                  isCompleted && !isSelected && 'bg-amber-500/10 border border-amber-500/30'
                 )}
               >
                 {/* Avatar stack — show only channel participants */}
@@ -487,7 +489,7 @@ export function ThreadList() {
             );
             const visibleDMs = dmConversations.filter((c) => {
               // For each side, if it's an agent it must be online; humans pass through.
-              return c.agents.every((addr) => {
+              return (c.agents || []).every((addr: string) => {
                 if (addr.startsWith('human:')) return true;
                 const name = addr.replace(/^openagents:/, '');
                 return onlineAgentNames.has(name);

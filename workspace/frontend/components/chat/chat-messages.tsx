@@ -67,10 +67,10 @@ function groupKey(group: MessageGroup, index: number): string {
 }
 
 function isTerminalStatus(msg: WorkspaceMessage) {
-  return (
-    msg.messageType === 'status' &&
-    /stopped|stopping failed/i.test(msg.content)
-  );
+  // Match terminal signals regardless of messageType — some connectors send
+  // the stop notice as a 'chat' message rather than 'status', which previously
+  // caused the WorkingIndicator to persist after the agent had already stopped.
+  return /stopped|stopping failed|execution stopped/i.test(msg.content);
 }
 
 // Scroll diagnostics. Always on in dev; in production it's opt-in via

@@ -61,7 +61,11 @@ export function AgentProfilePanel() {
     if (!isCloud || !agent) { setCloudConfig(null); return; }
     workspaceApi.listCloudAgents().then((configs) => {
       setCloudConfig(configs.find((c) => c.agentName === agent.agentName) || null);
-    }).catch(() => {});
+    }).catch((error) => {
+      // An empty cloud panel used to be indistinguishable from a failed request.
+      // eslint-disable-next-line no-console
+      console.error('[agent-profile] could not load cloud agent config:', error);
+    });
   }, [isCloud, agent?.agentName]);
 
   const handleRemoveCloudAgent = useCallback(async () => {
@@ -91,7 +95,10 @@ export function AgentProfilePanel() {
       setNewApiKey('');
       workspaceApi.listCloudAgents().then((configs) => {
         setCloudConfig(configs.find((c) => c.agentName === agent.agentName) || null);
-      }).catch(() => {});
+      }).catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('[agent-profile] could not refresh cloud agent config:', error);
+      });
     } catch {
       toast.error('Failed to update API key');
     } finally {

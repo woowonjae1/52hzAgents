@@ -12,7 +12,8 @@ import { useWorkspace } from '@/lib/workspace-context';
  */
 export function NewThreadDialogHost() {
   const { newThreadOpen, setNewThreadOpen, setViewMode, isMobile, openMobileDetail } = useLayout();
-  const { agents, sessions, createSession } = useWorkspace();
+  const { agents, sessions, currentSessionId, createSession } = useWorkspace();
+  const currentParticipants = sessions.find((s) => s.sessionId === currentSessionId)?.participants;
 
   return (
     <NewThreadDialog
@@ -20,6 +21,7 @@ export function NewThreadDialogHost() {
       onOpenChange={setNewThreadOpen}
       agents={agents}
       sessions={sessions}
+      defaultParticipants={currentParticipants}
       onCreateThread={({ participants, resumeFrom }) => {
         createSession({ participants, resumeFrom });
         setViewMode('threads');

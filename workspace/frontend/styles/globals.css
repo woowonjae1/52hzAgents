@@ -8,60 +8,82 @@
 
 /** Colors - https://tailwindcss.com/docs/colors **/
 :root {
-  --background: var(--color-zinc-50);
-  --foreground: var(--color-zinc-950);
-  --card: var(--color-white);
-  --card-foreground: var(--color-zinc-950);
-  --popover: var(--color-white);
-  --popover-foreground: var(--color-zinc-950);
-  --primary: var(--color-zinc-900);
-  --primary-foreground: var(--color-white);
-  --secondary: var(--color-zinc-100);
-  --secondary-foreground: var(--color-zinc-900);
-  --muted: var(--color-zinc-100);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-100);
-  --accent-foreground: var(--color-zinc-900);
-  --destructive: var(--color-red-600);
-  --destructive-foreground: var(--color-white);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-green-500);
-  --chart-3: var(--color-yellow-500);
-  --chart-4: var(--color-red-500);
-  --chart-5: var(--color-purple-500);
-  --border: oklch(
-    94% 0.004 286.32
-  ); /* between --color-zinc-100 and --color-zinc-200 */
-  --input: var(--color-zinc-200);
-  --ring: var(--color-zinc-400);
+  --background: #ffffff;
+  --foreground: #1a1a1e;
+  --card: #ffffff;
+  --card-foreground: #1a1a1e;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1e;
+  --primary: #18181b;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #1a1a1e;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #20744a;
+  --accent-foreground: #ffffff;
+  --destructive: #b04138;
+  --destructive-foreground: #ffffff;
+
+  --surface0: #ffffff;
+  --surface1: #fafafa;
+  --surface2: #f4f4f5;
+  --surface3: #e4e4e7;
+  --surface4: #d4d4d8;
+  --surface-sidebar: #f4f4f5;
+  --surface-sidebar-hover: #e9e9ec;
+
+  --status-success: #1f8040;
+  --status-danger: #c32424;
+  --status-warning: #91601b;
+  --status-muted-success: #496d50;
+  --status-muted-danger: #904d46;
+  --status-muted-warning: #755f45;
+
+  --border: #e4e4e7;
+  --border-accent: #ececf1;
+  --input: #f4f4f5;
+  --ring: #18181b;
   --radius: 0.5rem;
 }
 
 .dark {
-  --background: var(--color-zinc-950);
-  --foreground: var(--color-zinc-50);
-  --card: var(--color-zinc-900);
-  --card-foreground: var(--color-zinc-50);
-  --popover: var(--color-zinc-900);
-  --popover-foreground: var(--color-zinc-50);
-  --primary: var(--color-zinc-50);
-  --primary-foreground: var(--color-zinc-900);
-  --secondary: var(--color-zinc-800);
-  --secondary-foreground: var(--color-zinc-50);
-  --muted: var(--color-zinc-900);
-  --muted-foreground: var(--color-zinc-500);
-  --accent: var(--color-zinc-900);
-  --accent-foreground: var(--color-zinc-50);
-  --destructive: var(--color-red-600);
-  --destructive-foreground: var(--color-white);
-  --chart-1: var(--color-blue-500);
-  --chart-2: var(--color-green-500);
-  --chart-3: var(--color-yellow-500);
-  --chart-4: var(--color-red-500);
-  --chart-5: var(--color-purple-500);
-  --border: var(--color-zinc-800);
-  --input: var(--color-zinc-800);
-  --ring: var(--color-zinc-600);
+  --background: #121214;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --popover: #18181b;
+  --popover-foreground: #f4f4f5;
+  --primary: #f4f4f5;
+  --primary-foreground: #18181b;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #239956;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --surface0: #121214;
+  --surface1: #18181b;
+  --surface2: #27272a;
+  --surface3: #3f3f46;
+  --surface4: #52525b;
+  --surface-sidebar: #18181b;
+  --surface-sidebar-hover: #27272a;
+
+  --status-success: #2ead58;
+  --status-danger: #f65048;
+  --status-warning: #c38328;
+  --status-muted-success: #7cac85;
+  --status-muted-danger: #ca8c85;
+  --status-muted-warning: #b79875;
+
+  --border: #27272a;
+  --border-accent: #3f3f46;
+  --input: #27272a;
+  --ring: #a1a1aa;
 }
 
 /** Theme Setup **/
@@ -83,6 +105,22 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+
+  /** Paseo Layer Surfaces & Status Colors **/
+  --color-surface0: var(--surface0);
+  --color-surface1: var(--surface1);
+  --color-surface2: var(--surface2);
+  --color-surface3: var(--surface3);
+  --color-surface4: var(--surface4);
+  --color-surface-sidebar: var(--surface-sidebar);
+  --color-surface-sidebar-hover: var(--surface-sidebar-hover);
+  --color-border-accent: var(--border-accent);
+  --color-status-success: var(--status-success);
+  --color-status-danger: var(--status-danger);
+  --color-status-warning: var(--status-warning);
+  --color-status-muted-success: var(--status-muted-success);
+  --color-status-muted-danger: var(--status-muted-danger);
+  --color-status-muted-warning: var(--status-muted-warning);
 
   /** Base Styles **/
   --color-border: var(--border);

@@ -131,8 +131,10 @@ interface LastMessageInfo {
 
 interface WorkspaceContextValue {
   workspace: Workspace | null;
+  workspaceId: string;
   token: string;
   agents: WorkspaceAgent[];
+  setAgents: React.Dispatch<React.SetStateAction<WorkspaceAgent[]>>;
   currentUser: WorkspaceIdentity;
   setUserName: (name: string) => void;
   onlineUsers: OnlineUser[];
@@ -624,7 +626,7 @@ export function WorkspaceProvider({
         let changed = false;
         const merged: WorkspaceSession[] = [];
         for (const s of prev) {
-          const remote = updatedMap.get(s.sessionId);
+          const remote = updatedMap.get(s.sessionId) as WorkspaceSession | undefined;
           // Drop sessions not in remote discovery (deleted/removed on backend)
           if (!remote) {
             changed = true;
@@ -1403,8 +1405,10 @@ export function WorkspaceProvider({
 
   const providerValue = useMemo(() => ({
     workspace,
+    workspaceId,
     token: effectiveToken,
     agents,
+    setAgents,
     currentUser,
     setUserName,
     onlineUsers,
@@ -1483,7 +1487,7 @@ export function WorkspaceProvider({
     notificationSound,
     setNotificationSound,
   }), [
-    workspace, effectiveToken, agents, currentUser, setUserName, onlineUsers, sessions, files,
+    workspace, workspaceId, effectiveToken, agents, setAgents, currentUser, setUserName, onlineUsers, sessions, files,
     selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds,
     stoppingSessionIds, completedSessionIds, monitorMode, acknowledgeCompletion, agentModes,
     updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, setCurrentSessionId,

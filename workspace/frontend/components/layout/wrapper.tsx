@@ -26,7 +26,7 @@ import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 
-import { Network, X } from 'lucide-react';
+import { Network, X, PanelLeft } from 'lucide-react';
 
 function WorkspaceLoadingScreen() {
   return (
@@ -55,7 +55,7 @@ function WorkspaceLoadingScreen() {
 }
 
 export function Wrapper() {
-  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
+  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading } = useWorkspace();
   const hasAgents = agents.length > 0;
 
@@ -139,8 +139,8 @@ export function Wrapper() {
           {/* Invisible spacer for fixed sidebar (260px when open, 0px when closed) */}
           {!isDetailExpanded && (
             <div 
-              className="shrink-0 transition-all duration-350" 
-              style={{ width: isSidebarOpen ? '260px' : '0px' }}
+              className="shrink-0 transition-all duration-300" 
+              style={{ width: isSidebarOpen ? '320px' : '0px' }}
             />
           )}
 
@@ -160,6 +160,15 @@ export function Wrapper() {
             <>
               {/* Column 2: Center Main Workspace */}
               <div className="relative flex-grow flex-1 min-w-0 bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col">
+                {!isSidebarOpen && (
+                  <button
+                    onClick={sidebarToggle}
+                    className="absolute top-3 left-3 z-30 size-8 rounded-lg bg-background/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-300 hover:text-foreground shadow-sm flex items-center justify-center transition-all hover:scale-105 cursor-pointer"
+                    title="Expand Sidebar"
+                  >
+                    <PanelLeft className="size-4" />
+                  </button>
+                )}
                 {viewMode === 'mission' ? (
                   <MissionControl />
                 ) : viewMode === 'connect' ? (
@@ -188,7 +197,7 @@ export function Wrapper() {
               </div>
 
               {/* Column 3: Right Collapsible Preview Panel */}
-              {!isDetailExpanded && activeRightTab !== null && viewMode !== 'mission' && viewMode !== 'connect' && (
+              {!isDetailExpanded && activeRightTab !== null && viewMode !== 'mission' && viewMode !== 'connect' && viewMode !== 'files' && (
                 <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-zinc-200/80 dark:border-zinc-800/80 rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
                   {/* Close button for right panel */}
                   <button 

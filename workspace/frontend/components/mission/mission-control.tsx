@@ -8,7 +8,7 @@ import { ConnectAgentModal } from './connect-agent-modal';
 import { Users, Activity, Loader2, Plus, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
-import { eventToMessage, networkAgentToWorkspaceAgent, type WorkspaceAgent } from '@/lib/types';
+import { eventToMessage, networkAgentToWorkspaceAgent, type WorkspaceAgent, type ONMEvent } from '@/lib/types';
 import { toast } from 'sonner';
 
 /** One classified line in the collaboration activity feed. */
@@ -191,7 +191,7 @@ export function MissionControl() {
       try {
         const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 40 });
         if (cancelled) return;
-        const lines: ActivityLine[] = res.events.map((ev) => {
+        const lines: ActivityLine[] = res.events.map((ev: ONMEvent, idx: number) => {
           const m = eventToMessage(ev);
           const channel = (ev.target || '').replace(/^channel\//, '');
           let type: ActivityLine['type'] = 'info';
@@ -199,7 +199,7 @@ export function MissionControl() {
           else if (m.messageType === 'status') type = /failed|error|stopped|denied/i.test(m.content) ? 'error' : 'success';
           else if (m.senderType === 'agent') type = 'info';
           return {
-            id: m.messageId || ev.id,
+            id: m.messageId || ev.event_id || `activity-${idx}-${ev.timestamp || Date.now()}`,
             time: m.createdAt ? new Date(m.createdAt) : new Date(ev.timestamp),
             sender: m.senderName || (ev.source || '').replace(/^(human:|openagents:)/, ''),
             channel: titleFor(channel),
@@ -308,9 +308,9 @@ export function MissionControl() {
                 <span className="text-xs">No activity yet. Messages between agents and teammates will appear here.</span>
               </div>
             ) : (
-              activityFeed.map((line) => (
+              activityFeed.map((line, idx) => (
                 <button
-                  key={line.id}
+                  key={line.id || `act-line-${idx}`}
                   onClick={() => openThread(line.channel)}
                   className="w-full text-left flex items-start gap-2.5 px-4 py-2 hover:bg-zinc-100/70 dark:hover:bg-zinc-800/30 transition-colors"
                 >

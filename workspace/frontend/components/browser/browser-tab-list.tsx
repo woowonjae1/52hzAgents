@@ -160,7 +160,7 @@ export function BrowserTabList() {
                       </p>
                       <p className="text-[11px] text-muted-foreground truncate">
                         {truncateUrl(tab.url)}
-                        {tab.lastActiveAt && ` · ${timeAgo(tab.lastActiveAt)}`}
+                        {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                       </p>
                     </div>
                     <button
@@ -239,7 +239,7 @@ export function BrowserTabList() {
                       {truncateUrl(tab.url)}
                       {' · '}
                       {(tab.createdBy || 'unknown').replace(/^(openagents:|human:)/, '')}
-                      {tab.lastActiveAt && ` · ${timeAgo(tab.lastActiveAt)}`}
+                      {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                     </p>
                   </div>
                   <button

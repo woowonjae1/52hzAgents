@@ -44,7 +44,7 @@ function NotificationCard({
   onDismiss: (id: string) => void;
   onNavigate: (notification: NotificationItem) => void;
 }) {
-  const agentName = notification.createdBy.replace(/^(openagents:|system:)/, '');
+  const agentName = notification.createdBy.replace(/^(openagents:|system:)/, '') || 'system';
 
   return (
     <div
@@ -166,8 +166,10 @@ export function InboxView() {
     const u = notifications
       .filter((n) => !n.isRead)
       .sort((a, b) => {
-        const priorityOrder = { high: 0, normal: 1, low: 2 };
-        const pDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        const priorityOrder: Record<string, number> = { high: 0, normal: 1, low: 2 };
+        const aP = (a.priority && priorityOrder[a.priority as string]) ?? 1;
+        const bP = (b.priority && priorityOrder[b.priority as string]) ?? 1;
+        const pDiff = aP - bP;
         if (pDiff !== 0) return pDiff;
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;

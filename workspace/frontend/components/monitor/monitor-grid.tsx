@@ -58,23 +58,23 @@ export function MonitorGrid() {
           const msgs = result.events.map(eventToMessage);
 
           // Find indices of key messages (msgs sorted newest-first)
-          const lastUserIdx = msgs.findIndex((m) => m.senderType !== 'agent');
+          const lastUserIdx = msgs.findIndex((m: WorkspaceMessage) => m.senderType !== 'agent');
           const lastUser = lastUserIdx >= 0 ? msgs[lastUserIdx] : null;
 
           // Find last agent chat message (not status/thinking)
           const lastAgentChatIdx = msgs.findIndex(
-            (m) => m.senderType === 'agent' && m.messageType !== 'status' && m.messageType !== 'thinking'
+            (m: WorkspaceMessage) => m.senderType === 'agent' && m.messageType !== 'status' && m.messageType !== 'thinking'
           );
           const lastAgentChat = lastAgentChatIdx >= 0 ? msgs[lastAgentChatIdx] : null;
 
           // Find last agent status/thinking
           const lastAgentStatus = msgs.find(
-            (m) => m.senderType === 'agent' && (m.messageType === 'status' || m.messageType === 'thinking')
+            (m: WorkspaceMessage) => m.senderType === 'agent' && (m.messageType === 'status' || m.messageType === 'thinking')
           ) || null;
 
           // If the latest agent message is status/thinking, agent is working — show that
           // Otherwise show the final chat response
-          const latestAgentAny = msgs.find((m) => m.senderType === 'agent');
+          const latestAgentAny = msgs.find((m: WorkspaceMessage) => m.senderType === 'agent');
           const agentIsWorking = latestAgentAny && (latestAgentAny.messageType === 'status' || latestAgentAny.messageType === 'thinking');
 
           // Only show agent chat response if it's newer than the last user message

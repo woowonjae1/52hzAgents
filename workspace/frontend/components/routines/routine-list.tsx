@@ -21,7 +21,7 @@ function formatSchedule(r: RoutineItem): string {
   const time = `${String(r.scheduleHour).padStart(2, '0')}:${String(r.scheduleMinute).padStart(2, '0')} UTC`;
   if (!r.scheduleDays || r.scheduleDays.length === 7) return `Daily at ${time}`;
   if (r.scheduleDays.length === 5 && [0, 1, 2, 3, 4].every((d) => r.scheduleDays!.includes(d))) return `Weekdays at ${time}`;
-  const dayLabels = r.scheduleDays.map((d) => DAY_NAMES[d] || `${d}`).join(', ');
+  const dayLabels = r.scheduleDays.map((d: number) => DAY_NAMES[d] || `${d}`).join(', ');
   return `${dayLabels} at ${time}`;
 }
 
@@ -53,7 +53,7 @@ export function RoutineList() {
 
   // Auto-select the first routine when entering the routines view
   useEffect(() => {
-    if (activeRoutines.length > 0 && (!currentSessionId || !currentSessionId.startsWith('routine'))) {
+    if (activeRoutines.length > 0 && (!currentSessionId || !currentSessionId.startsWith('routine')) && typeof activeRoutines[0].channelName === 'string') {
       setCurrentSessionId(activeRoutines[0].channelName);
     }
   }, [activeRoutines, currentSessionId, setCurrentSessionId]);
@@ -112,7 +112,7 @@ export function RoutineList() {
         ) : (
           <div className="py-1">
             {activeRoutines.map((routine) => {
-              const agentName = routine.createdBy.replace('openagents:', '');
+              const agentName = routine.createdBy.replace('openagents:', '') || 'agent';
               const isSelected = currentSessionId === routine.channelName;
 
               return (
@@ -132,7 +132,7 @@ export function RoutineList() {
                     <div className="text-[11px] text-muted-foreground mt-0.5">{formatSchedule(routine)}</div>
                     <div className="text-[11px] text-muted-foreground truncate mt-0.5">{routine.message}</div>
                     <div className="text-[10px] text-muted-foreground/60 mt-1">
-                      next: {timeUntil(routine.nextFiresAt)}
+                      next: {routine.nextFiresAt ? timeUntil(routine.nextFiresAt) : 'N/A'}
                     </div>
                   </div>
                   <button

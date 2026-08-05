@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Circle, Loader2, Timer, MessageSquareMore, X } from 'lucide-react';
+import { Circle, Loader2, Timer, MessageSquareMore, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import type { TimerItem, WorkspaceMessage } from '@/lib/types';
@@ -97,7 +97,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
   }, [pollTimers]);
 
   const handleCancelTodos = useCallback(async () => {
-    const agents = Array.from(new Set(channelTodos.map((t) => t.createdBy)));
+    const agents = Array.from(new Set(channelTodos.map((t) => (t.createdBy || '')))).filter(Boolean);
     for (const source of agents) {
       try {
         await workspaceApi.cancelChannelTodos(channelName, source);
@@ -113,52 +113,100 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     } catch {}
   }, [channelName]);
 
+  const [tasksExpanded, setTasksExpanded] = useState(false);
+
   const hasContent = pendingCount > 0 || inProgressCount > 0 || activeTimers.length > 0 || queuedMessages.length > 0;
   if (!hasContent) return null;
 
   return (
-    <div className="flex flex-col gap-0.5 px-1 py-1 text-[11px] text-muted-foreground">
+    <div className="flex flex-col gap-1 px-1 py-1 text-[11px] text-muted-foreground">
+      {/* Expanded tasks card overlay */}
+      {tasksExpanded && channelTodos.length > 0 && (
+        <div className="mb-1 rounded-lg border border-border bg-card p-2 shadow-lg space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="flex items-center justify-between px-1 pb-1 border-b border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span>Current Tasks ({channelTodos.length})</span>
+            <button
+              type="button"
+              onClick={() => setTasksExpanded(false)}
+              className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto divide-y divide-border/50">
+            {channelTodos.map((todo) => (
+              <div key={todo.id || todo.content} className="flex items-start gap-2 py-1.5 px-1">
+                {todo.status === 'in_progress' ? (
+                  <Loader2 className="mt-0.5 size-3.5 text-blue-500 animate-spin shrink-0" />
+                ) : (
+                  <Circle className="mt-0.5 size-3.5 text-muted-foreground shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground leading-snug break-words">{todo.content}</p>
+                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+                    {todo.createdBy && <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>}
+                    {todo.assignee && <span>assigned to {todo.assignee}</span>}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Todos and timers row */}
       {(inProgressCount > 0 || pendingCount > 0 || activeTimers.length > 0) && (
         <div className="flex items-center gap-2.5">
           {(inProgressCount > 0 || pendingCount > 0) && (
             <span className="flex items-center gap-1">
-              {inProgressCount > 0 && (
-                <>
-                  <Loader2 className="size-3 text-blue-500 animate-spin" />
-                  <span>{inProgressCount} in progress</span>
-                </>
-              )}
-              {inProgressCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
-              {pendingCount > 0 && (
-                <>
-                  <Circle className="size-3" />
-                  <span>{pendingCount} pending</span>
-                </>
-              )}
+              <button
+                type="button"
+                onClick={() => setTasksExpanded((prev) => !prev)}
+                className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer group"
+                title="Click to view all task details"
+              >
+                {inProgressCount > 0 && (
+                  <>
+                    <Loader2 className="size-3 text-blue-500 animate-spin" />
+                    <span className="group-hover:underline">{inProgressCount} in progress</span>
+                  </>
+                )}
+                {inProgressCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
+                {pendingCount > 0 && (
+                  <>
+                    <Circle className="size-3" />
+                    <span className="group-hover:underline">{pendingCount} pending</span>
+                  </>
+                )}
+                {tasksExpanded ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+              </button>
               <button
                 onClick={handleCancelTodos}
-                className="ml-0.5 p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                className="ml-1 p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                 title="Cancel all tasks"
               >
                 <X className="size-3" />
               </button>
             </span>
           )}
-          {activeTimers.map((t) => (
-            <span key={t.id} className="flex items-center gap-1">
-              <Timer className="size-3 text-amber-500" />
-              <span>{t.message.length > 30 ? t.message.slice(0, 30) + '…' : t.message}</span>
-              <span className="text-amber-500 font-mono">{timeUntil(t.firesAt)}</span>
-              <button
-                onClick={() => handleCancelTimer(t.id)}
-                className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                title="Cancel timer"
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
+          {activeTimers.map((t) => {
+            const msg = t.message || '';
+            const firesAt = t.firesAt || '';
+            return (
+              <span key={t.id} className="flex items-center gap-1">
+                <Timer className="size-3 text-amber-500" />
+                <span>{msg.length > 30 ? msg.slice(0, 30) + '…' : msg}</span>
+                <span className="text-amber-500 font-mono">{firesAt ? timeUntil(firesAt) : ''}</span>
+                <button
+                  onClick={() => handleCancelTimer(t.id)}
+                  className="p-0.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  title="Cancel timer"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
 

@@ -177,10 +177,38 @@ export interface BrowserTab {
   liveUrl: string | null;
   status: string;
   contextId: string | null;
-  targetAgentName: string | null;
+  targetAgentName?: string | null;
   createdBy: string | null;
   lastActivityAt: string | null;
+  lastActiveAt?: string | null;
   createdAt: string | null;
+  sessionId?: string | null;
+  sharedWith?: string[];
+}
+
+export interface BrowserPersistentContext {
+  id: string;
+  workspaceId?: string | null;
+  workspace_id?: string | null;
+  name: string;
+  domain?: string | null;
+  status?: string;
+  sharedWith?: string[];
+  storagePath?: string | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+  created_at?: string | null;
+  lastUsedAt?: string | null;
+}
+
+export interface AgentCatalogEntry {
+  name: string;
+  label: string;
+  description: string;
+  install_command: string;
+  homepage: string;
+  tags: string[];
+  builtin: boolean;
 }
 
 export interface BrowserContext {
@@ -230,36 +258,172 @@ export interface InboxItem {
   isRead: boolean;
 }
 
-export interface AgentCatalogEntry {
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  body: string;
+  isRead: boolean;
+  priority: 'low' | 'normal' | 'high';
+  createdBy: string;
+  channelName: string | null;
+  threadId: string | null;
+  linkUrl: string | null;
+  status: string;
+  createdAt: string | null;
+  readAt: string | null;
+}
+
+export interface RoutineItem {
+  id: string;
   name: string;
+  message: string;
+  scheduleHour: number;
+  scheduleMinute: number;
+  scheduleDays: number[] | null;
+  scheduleIntervalMinutes?: number | null;
+  timezone: string;
+  nextFiresAt: string;
+  lastFiredAt: string | null;
+  status: string;
+  createdBy: string;
+  channelName: string;
+  createdAt: string | null;
+  context?: string | null;
+}
+
+export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+export interface TodoItem {
+  id: string;
+  content: string;
+  status: TodoStatus;
+  assignee: string;
+  createdBy: string;
+  channelName: string;
+  threadId: string | null;
+  position: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface TimerItem {
+  id: string;
+  message: string;
+  delaySeconds: number;
+  firesAt: string;
+  status: string;
+  createdBy: string;
+  channelName: string;
+  createdAt: string | null;
+}
+
+export interface AgentApproval {
+  id: string;
+  agentName: string;
+  requestedBy: string;
+  action: string;
+  details: Record<string, unknown> | null;
+  status: 'pending' | 'approved' | 'rejected';
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  createdAt: string | null;
+}
+
+export interface AgentLogEntry {
+  id: string;
+  agentName: string;
+  level: 'info' | 'warn' | 'error' | 'debug';
+  message: string;
+  createdAt: string | null;
+}
+
+export interface AgentRuntime {
+  workspaceId: string;
+  agentName: string;
+  processStatus: 'stopped' | 'running' | 'failed' | 'starting';
+  healthStatus: 'healthy' | 'unhealthy' | 'unknown';
+  pid: number | null;
+  restartCount: number;
+  lastError: string | null;
+  updatedAt: string | null;
+}
+
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+export interface DMConversation {
+  agents: [string, string];
+  lastMessage: { content: string; sender: string; timestamp: number };
+  messageCount: number;
+}
+
+export interface EventConfirmation {
+  event_id: string;
+  timestamp: number;
+  status: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface EventPollResponse {
+  events: ONMEvent[];
+  has_more: boolean;
+}
+
+export interface MessagePollResponse {
+  messages: WorkspaceMessage[];
+  hasMore: boolean;
+}
+
+export interface NetworkDiscovery {
+  agents: WorkspaceAgent[];
+  channels: WorkspaceSession[];
+}
+
+export interface ShareSummary {
+  token: string;
+  shareToken: string;
+  title: string;
+  channelName: string;
+  createdBy: string;
+  createdAt: string | null;
+  messageCount: number;
+}
+
+export interface CloudAgentModelInfo {
+  id: string;
   label: string;
-  description: string;
-  install_command: string;
-  homepage: string;
-  tags: string[];
-  builtin: boolean;
+  category: 'text' | 'image' | 'audio';
 }
 
 export interface CloudAgentProvider {
   id: string;
   name: string;
+  label?: string;
   description: string;
   doc_url: string;
-  category: 'text' | 'image' | 'audio';
-  models: string[];
-  default_model: string;
-  supported_envs: string[];
+  category: string;
+  models: CloudAgentModelInfo[];
+  // No default_model / supported_envs here: the backend's provider catalog never
+  // sends them and nothing reads them. The model picker defaults to models[0].
 }
 
 export interface CloudAgentConfig {
   id: string;
-  workspace_id: string;
-  provider_id: string;
-  agent_name: string;
+  workspaceId: string;
+  providerId: string;
+  agentName: string;
   model: string;
-  system_prompt?: string;
-  created_at: string;
-  updated_at: string;
+  category: string;
+  apiKeyMasked: string;
+  systemPrompt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface SharedSnapshotMessage {
@@ -379,7 +543,7 @@ export interface NetworkChannel {
   last_event_at?: number;
 }
 
-export function networkChannelToSession(ch: Record<string, unknown> | NetworkChannel, defaultWorkspaceId?: string): WorkspaceSession {
+export function networkChannelToSession(ch: Record<string, unknown> | NetworkChannel | WorkspaceSession, defaultWorkspaceId?: string): WorkspaceSession {
   const raw = (ch || {}) as Record<string, unknown>;
   const rawAddr = (raw.address as string) || '';
   const addrId = rawAddr.replace(/^channel\//, '');

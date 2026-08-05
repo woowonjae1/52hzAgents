@@ -242,10 +242,10 @@ export function BrowserView() {
         </div>
 
         {/* Shared with badges */}
-        {tab.sharedWith.length > 0 && (
+        {(tab.sharedWith || []).length > 0 && (
           <div className="flex items-center gap-1 shrink-0">
             <Users className="size-3.5 text-muted-foreground" />
-            {tab.sharedWith.map((agent) => (
+            {(tab.sharedWith || []).map((agent) => (
               <span
                 key={agent}
                 className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
