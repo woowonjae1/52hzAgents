@@ -162,8 +162,7 @@ export function EmptyState() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
         <div className="flex items-center justify-center p-3 rounded-full bg-primary/10">
-          <img src="/logo-black.png" alt="52Hz Agent" className="size-10 object-contain dark:hidden" />
-          <img src="/logo-white.png" alt="52Hz Agent" className="size-10 object-contain hidden dark:block" />
+          <img src="/logo-icon.png" alt="52Hz Agent" className="size-10 object-contain" />
         </div>
         <div className="space-y-2">
           <h3 className="text-lg font-semibold">You&apos;re all set!</h3>

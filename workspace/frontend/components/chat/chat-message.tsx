@@ -237,10 +237,9 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       <div className="py-2.5 flex justify-end">
         <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[75%]">
           <div
-            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-surface3 text-foreground dark:bg-zinc-700 dark:text-white shadow-xs border border-border/80 overflow-hidden"
+            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 shadow-xs border border-border/80 overflow-hidden bg-white dark:bg-zinc-700"
           >
-            <img src="/logo-black.png" alt="You" className="size-5 object-contain dark:hidden" />
-            <img src="/logo-white.png" alt="You" className="size-5 object-contain hidden dark:block" />
+            <img src="/logo-icon.png" alt="You" className="size-6 object-contain" />
           </div>
           <div className="flex-1 min-w-0 text-right">
             <div className="flex items-center gap-2 mb-1.5 justify-end">
