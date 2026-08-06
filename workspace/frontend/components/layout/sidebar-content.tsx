@@ -106,6 +106,7 @@ export function SidebarContent() {
     <div className="flex flex-col h-full min-h-0 bg-surface0">
       {/* Category Switcher Row */}
       <div className="px-3 py-2.5 border-b border-border/40 dark:border-border/40 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none bg-surface1/50">
+        <CategoryTab active={viewMode === 'mission' || viewMode === 'connect'} label="Agents" onClick={() => setViewMode('mission')} />
         <CategoryTab active={viewMode === 'threads'} label="Chats" onClick={() => setViewMode('threads')} />
         <CategoryTab active={viewMode === 'files'} label="Files" onClick={() => setViewMode('files')} />
         <CategoryTab active={viewMode === 'tasks'} label="Tasks" onClick={() => setViewMode('tasks')} />

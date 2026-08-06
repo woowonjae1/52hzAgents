@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -280,30 +280,36 @@ export function ThreadList() {
       </div>
 
       {/* Agent Status Indicator Strip */}
-      {agents.length > 0 && (
-        <div className="px-3 py-1.5 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-surface1/30">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
-          {agents.map((a) => {
-            const isWorking = activeSessionIds.has(a.agentName);
-            const statusLabel = a.status === 'online' ? (isWorking ? 'Executing tool' : 'Idle') : 'Offline';
-            return (
-              <button
-                key={a.agentName}
-                onClick={() => {
-                  const s = activeSessions.find((session) => session.participants.includes(a.agentName));
-                  if (s) setCurrentSessionId(s.sessionId);
-                }}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface2/80 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer border border-border/50"
-                title={`${a.agentName} — Status: ${statusLabel}${a.description ? ` (${a.description})` : ''}`}
-              >
-                <span className={cn('size-1.5 rounded-full', a.status === 'online' ? (isWorking ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-zinc-400')} />
-                <span>{a.agentName}</span>
-                <span className="text-[9px] text-muted-foreground font-mono">({statusLabel})</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <div className="px-3 py-1.5 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-surface1/30">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
+        {agents.map((a) => {
+          const isWorking = activeSessionIds.has(a.agentName);
+          const statusLabel = a.status === 'online' ? (isWorking ? 'Executing tool' : 'Idle') : 'Offline';
+          return (
+            <button
+              key={a.agentName}
+              onClick={() => {
+                const s = activeSessions.find((session) => session.participants.includes(a.agentName));
+                if (s) setCurrentSessionId(s.sessionId);
+              }}
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface2/80 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer border border-border/50"
+              title={`${a.agentName} — Status: ${statusLabel}${a.description ? ` (${a.description})` : ''}`}
+            >
+              <span className={cn('size-1.5 rounded-full', a.status === 'online' ? (isWorking ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-zinc-400')} />
+              <span>{a.agentName}</span>
+              <span className="text-[9px] text-muted-foreground font-mono">({statusLabel})</span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setViewMode('mission')}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0 cursor-pointer border border-primary/20 ml-auto"
+          title="Open Agent Station & Connect Agents"
+        >
+          <Plus className="size-3" />
+          <span>Connect Agent</span>
+        </button>
+      </div>
 
       {/* Thread rows */}
       <div className="flex-1 overflow-y-auto px-4 py-1">
