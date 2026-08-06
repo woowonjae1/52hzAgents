@@ -650,6 +650,19 @@ class BaseAdapter {
           if (queueId) this._cancelQueuedMessage(channel, queueId);
           continue;
         }
+
+        // 方案 2 落地：禁止 Agent 自动对系统连线或非目标消息打招呼。
+        // 只有当消息来自用户 (human)，或者显式 @ 当前 Agent / 指定 targetAgents 时才激活回应。
+        const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || (msg.senderId || '').startsWith('human:') || (msg.senderId || '').startsWith('user:');
+        const mentionsMe = Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName);
+        const targetedMe = Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName);
+        const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
+
+        if (isSelf || (!isHuman && !mentionsMe && !targetedMe)) {
+          this._log(`Ignoring non-targeted message from ${msg.senderName || msg.senderId}`);
+          continue;
+        }
+
         incoming.push(msg);
       }
 

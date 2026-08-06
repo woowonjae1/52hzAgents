@@ -34,18 +34,15 @@ interface ParsedStep {
 }
 
 function parseStepContent(content: string): ParsedStep {
-  // Thinking placeholder
   if (content === 'thinking...' || content.toLowerCase() === 'thinking') {
     return { type: 'thinking', text: content };
   }
 
-  // Claude adapter: **Thinking:**\n{content}
   const thinkingMatch = content.match(/^\*\*Thinking:\*\*\n([\s\S]+)$/);
   if (thinkingMatch) {
     return { type: 'thinking', text: thinkingMatch[1].trim() };
   }
 
-  // Claude adapter: **Using tool:** `ToolName`\n```\n{args}\n```
   const toolMatch = content.match(
     /\*\*Using tool:\*\*\s*`([^`]+)`\s*```([\s\S]*?)```/
   );
@@ -57,7 +54,6 @@ function parseStepContent(content: string): ParsedStep {
     return { type: 'tool_call', tool: rawTool, toolDisplay, args, summary };
   }
 
-  // Codex adapter: **Running:** `command`
   const runMatch = content.match(/\*\*Running:\*\*\s*`([^`]+)`/);
   if (runMatch) {
     return {
@@ -68,7 +64,6 @@ function parseStepContent(content: string): ParsedStep {
     };
   }
 
-  // Codex adapter: **Editing:** `filename`
   const editMatch = content.match(/\*\*Editing:\*\*\s*`([^`]+)`/);
   if (editMatch) {
     return {
@@ -79,20 +74,16 @@ function parseStepContent(content: string): ParsedStep {
     };
   }
 
-  // Compaction / context management
   if (/compact/i.test(content)) {
     return { type: 'compacting', text: content };
   }
 
-  // General status
   return { type: 'status', text: content };
 }
 
 function cleanToolName(name: string): string {
-  // mcp__openagents-workspace__workspace_status → workspace_status
   const mcpMatch = name.match(/^mcp__[^_]+__(.+)$/);
   if (mcpMatch) return mcpMatch[1];
-  // mcp_openagents-workspace__workspace_status
   const mcpMatch2 = name.match(/^mcp_[^_]+--.+?__(.+)$/);
   if (mcpMatch2) return mcpMatch2[1];
   return name;
@@ -144,9 +135,6 @@ function getStepIcon(parsed: ParsedStep) {
   return TOOL_ICONS[parsed.toolDisplay || ''] || Wrench;
 }
 
-// A bare "thinking..." placeholder carries no reasoning text — the working
-// indicator already shows the agent is active, so it should not render as its
-// own sub-step. Real thinking (with content) still renders.
 function isPlaceholderThinking(message: WorkspaceMessage): boolean {
   if (message.messageType === 'todos') return false;
   const parsed = message.messageType === 'thinking'
@@ -163,7 +151,6 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Todos render as a compact checklist
   if (message.messageType === 'todos') {
     const todos = (message.metadata?.todos as Array<{ content: string; status: string; assignee?: string }>) || [];
     if (!todos.length) return null;
@@ -190,10 +177,8 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
     );
   }
 
-  // Skip bare "thinking..." placeholders — the working indicator conveys this.
   if (isPlaceholderThinking(message)) return null;
 
-  // Messages with messageType 'thinking' are already typed — parse as thinking directly
   const parsed = message.messageType === 'thinking'
     ? { type: 'thinking' as const, text: message.content }
     : parseStepContent(message.content);
@@ -201,7 +186,6 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
   const hasDetail = parsed.type === 'tool_call' && !!parsed.args;
   const isThinkingWithContent = parsed.type === 'thinking' && !!parsed.text && parsed.text !== 'thinking...' && parsed.text.toLowerCase() !== 'thinking';
 
-  // Thinking with content renders directly inline (not behind a click)
   if (isThinkingWithContent) {
     return (
       <div className="py-0.5">
@@ -216,8 +200,6 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
     );
   }
 
-  // Tool calls render as a proper card (Codex / Claude Code style): a tinted
-  // icon chip, the monospace tool name, a target summary, and collapsible args.
   if (parsed.type === 'tool_call') {
     return (
       <div className="my-1">
@@ -226,30 +208,30 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
           onClick={() => hasDetail && setExpanded(!expanded)}
           disabled={!hasDetail}
           className={cn(
-            'group/tool flex items-center gap-2 w-full text-left rounded-lg border px-2 py-1.5 transition-colors',
+            'group/tool flex items-center gap-2 w-full text-left rounded-lg border px-2.5 py-1.5 transition-colors',
             'border-border/70 dark:border-border/70 bg-surface1/60',
-            hasDetail && 'cursor-pointer hover:border-blue-300/60 dark:hover:border-blue-800/50 hover:bg-blue-50/40 dark:hover:bg-blue-950/10',
+            hasDetail && 'cursor-pointer hover:border-blue-500/50 hover:bg-blue-50/40 dark:hover:bg-blue-950/20',
           )}
         >
           <span className="size-5 shrink-0 rounded-md bg-blue-500/10 flex items-center justify-center">
             <Icon className="size-3 text-blue-500" />
           </span>
-          <span className="font-mono text-[11px] font-semibold text-foreground/80 shrink-0">{parsed.toolDisplay}</span>
+          <span className="font-mono text-[11px] font-semibold text-foreground shrink-0">{parsed.toolDisplay}</span>
           {parsed.summary && (
             <>
-              <span className="text-muted-foreground/30 shrink-0">›</span>
-              <span className="truncate font-mono text-[11px] text-muted-foreground/70 min-w-0 flex-1">{parsed.summary}</span>
+              <span className="text-muted-foreground/40 shrink-0">›</span>
+              <span className="truncate font-mono text-[11px] text-foreground-muted min-w-0 flex-1">{parsed.summary}</span>
             </>
           )}
           {hasDetail && (
-            <ChevronRight className={cn('size-3.5 shrink-0 ml-auto text-muted-foreground/40 transition-transform', expanded && 'rotate-90')} />
+            <ChevronRight className={cn('size-3.5 shrink-0 ml-auto text-muted-foreground/60 transition-transform', expanded && 'rotate-90')} />
           )}
         </button>
         {expanded && parsed.args && (
-          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-primary/90 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-3 py-1 border-b border-border/60 bg-primary/40 text-[10px] text-foreground-extra-muted font-mono">
-              <span className="flex items-center gap-1">
-                <span className="size-2 rounded-full bg-emerald-500/80 inline-block" />
+          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-surface0 dark:bg-zinc-900 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 dark:bg-zinc-800 text-[11px] text-foreground font-mono">
+              <span className="flex items-center gap-1.5 font-medium">
+                <span className="size-2 rounded-full bg-emerald-500 inline-block" />
                 <span>{parsed.toolDisplay || 'Terminal Output'}</span>
               </span>
               <button
@@ -262,14 +244,14 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
                     setTimeout(() => setCopied(false), 2000);
                   }
                 }}
-                className="flex items-center gap-1 hover:text-foreground-extra-muted transition-colors cursor-pointer"
+                className="flex items-center gap-1 text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
                 title="Copy parameters"
               >
                 {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground-extra-muted font-mono whitespace-pre-wrap break-all selection:bg-blue-500/30">
+            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground font-mono whitespace-pre-wrap break-all selection:bg-blue-500/30">
               {parsed.args}
             </pre>
           </div>
@@ -278,7 +260,6 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
     );
   }
 
-  // Thinking (bare), status, and compaction render as compact inline rows.
   return (
     <div>
       <div className="flex items-center gap-2 text-xs py-0.5 text-muted-foreground">
@@ -293,16 +274,12 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         {parsed.type === 'compacting' && (
           <span className="italic text-violet-500/80 animate-pulse">Vibing ...</span>
         )}
-        {parsed.type === 'status' && <span>{parsed.text}</span>}
+        {parsed.type === 'status' && <span className="text-foreground-muted font-mono text-[11px]">{parsed.text}</span>}
         {parsed.type === 'thinking' && <span className="italic text-[11px]">thinking</span>}
       </div>
     </div>
   );
 });
-
-// ── Intermediate Steps Group ──
-
-// ── Activity Indicator: Breathing Dots ──
 
 function ActivityIndicator() {
   return (
@@ -328,15 +305,11 @@ interface IntermediateStepsProps {
 }
 
 export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents, isActive = false }: IntermediateStepsProps) {
-  if (steps.length === 0) return null;
-  // A group whose only content is "thinking..." placeholders shows nothing on
-  // its own; render it only while the agent is active (the working indicator
-  // then appears). This also hides stale placeholder-only groups in history.
+  if (!steps || steps.length === 0) return null;
   const renderableSteps = steps.filter((s) => !isPlaceholderThinking(s));
-  if (renderableSteps.length === 0 && !isActive) return null;
+  if (renderableSteps.length === 0) return null;
   const hasTerminalStatus = steps.some(isTerminalStatus);
 
-  // Group consecutive steps by sender
   const hasMultipleAgents = (agents?.length ?? 0) > 1;
   const senderGroups: { sender: string; steps: WorkspaceMessage[] }[] = [];
   for (const step of steps) {
@@ -350,7 +323,6 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
 
   return (
     <div className="flex items-start gap-3 py-1">
-      {/* Spacer matching avatar width for alignment with chat messages */}
       <div className="size-8 shrink-0" />
       <div className="border-l-2 border-border pl-3 py-0.5 min-w-0 flex-1">
         {senderGroups.map((group, gi) => (

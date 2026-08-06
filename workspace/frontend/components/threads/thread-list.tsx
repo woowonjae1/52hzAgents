@@ -191,6 +191,8 @@ export function ThreadList() {
 
   const activeSessions = sortedSessions.filter((s) => s.status === 'active');
   const archivedSessions = sortedSessions.filter((s) => s.status === 'archived');
+  const pinnedSessions = activeSessions.filter((s) => s.starred);
+  const unpinnedSessions = activeSessions.filter((s) => !s.starred);
 
   const filteredSessions = isSearching
     ? sortedSessions.filter((s) =>
@@ -277,6 +279,27 @@ export function ThreadList() {
         </div>
       </div>
 
+      {/* Agent Status Indicator Strip */}
+      {agents.length > 0 && (
+        <div className="px-3 py-1.5 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-surface1/30">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
+          {agents.map((a) => (
+            <button
+              key={a.agentName}
+              onClick={() => {
+                const s = activeSessions.find((session) => session.participants.includes(a.agentName));
+                if (s) setCurrentSessionId(s.sessionId);
+              }}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-surface2/60 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer"
+              title={`${a.agentName} (${a.status})`}
+            >
+              <span className={cn('size-1.5 rounded-full', a.status === 'online' ? 'bg-emerald-500' : 'bg-zinc-400')} />
+              <span>{a.agentName}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Thread rows */}
       <div className="flex-1 overflow-y-auto px-4 py-1">
         <div className="space-y-1">
@@ -352,8 +375,10 @@ export function ThreadList() {
                 }}
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-md text-left transition-all relative group cursor-pointer select-none',
-                  isSelected ? 'bg-surface2 text-foreground border border-border/70 shadow-xs' : 'border border-transparent hover:bg-surface-sidebar-hover',
-                  'has-data-[state=open]:bg-surface-sidebar-hover',
+                  isSelected
+                    ? 'bg-surface2 dark:bg-zinc-800 text-foreground border-l-[3px] border-l-emerald-500 dark:border-l-emerald-400 border-t border-r border-b border-border/70 shadow-xs font-semibold'
+                    : 'border border-transparent hover:bg-surface1/60 dark:hover:bg-zinc-800/60 text-foreground-muted hover:text-foreground',
+                  'has-data-[state=open]:bg-surface1/60',
                   isActive && 'thread-wip',
                   isCompleted && !isSelected && 'bg-amber-500/10 border border-amber-500/30'
                 )}

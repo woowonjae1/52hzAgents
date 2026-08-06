@@ -93,10 +93,18 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       .filter((name) => agentNames.includes(name));
   };
 
-  // Only suggest online agents — mentioning offline ones never resolves and
-  // just clutters the picker on long-lived workspaces.
-  const filteredAgents = agents.filter(
-    (a) => a.status === 'online' && a.agentName.toLowerCase().includes(mentionFilter.toLowerCase())
+  // Allow typing @ to mention ANY agent (online or offline) + catalog fallbacks
+  const catalogAgents: WorkspaceAgent[] = [
+    { agentName: 'claude-agent', role: 'worker', agentType: 'claude', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
+    { agentName: 'openclaw', role: 'worker', agentType: 'openclaw', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
+    { agentName: 'pi', role: 'worker', agentType: 'pi', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
+    { agentName: 'codex-agent', role: 'worker', agentType: 'codex', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
+  ];
+
+  const availableAgents = agents.length > 0 ? agents : catalogAgents;
+
+  const filteredAgents = availableAgents.filter(
+    (a) => a.agentName.toLowerCase().includes(mentionFilter.toLowerCase())
   );
 
   const filteredKnowledge = knowledge.filter(
@@ -231,12 +239,13 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
     const textarea = e.target;
     // Height is kept in sync by the layout effect keyed on `message`.
 
-    // Detect @mention trigger
+    // Detect @mention trigger or / slash command trigger
     const cursorPos = textarea.selectionStart;
     const textBefore = value.slice(0, cursorPos);
     const atMatch = textBefore.match(/@([\w:-]*)$/);
-    if (atMatch && (agents.length > 1 || knowledge.length > 0)) {
-      setMentionFilter(atMatch[1]);
+    const slashMatch = textBefore.match(/\/([\w:-]*)$/);
+    if (atMatch || slashMatch) {
+      setMentionFilter(atMatch ? atMatch[1] : slashMatch ? slashMatch[1] : '');
       setMentionIndex(0);
       setShowMentions(true);
     } else {
@@ -514,18 +523,20 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <Button
-            variant={hasContent ? 'primary' : 'secondary'}
-            size="icon"
-            className={cn(
-              'size-9 rounded-xl transition-all',
-              hasContent ? 'opacity-100' : 'opacity-50'
-            )}
+          <button
+            type="button"
             onClick={handleSend}
             disabled={!hasContent || disabled}
+            className={cn(
+              'size-9 rounded-xl flex items-center justify-center transition-all cursor-pointer',
+              hasContent
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white shadow-xs'
+                : 'bg-surface3 text-foreground-extra-muted opacity-50 cursor-not-allowed'
+            )}
+            title="Send message"
           >
             <SendHorizontal className="size-4" />
-          </Button>
+          </button>
         </div>
       </div>
     </div>

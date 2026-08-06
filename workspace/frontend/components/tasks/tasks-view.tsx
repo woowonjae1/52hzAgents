@@ -233,7 +233,13 @@ export function TasksView() {
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" mode="icon" size="sm" onClick={() => void refreshTodos()} title="Refresh tasks"><RefreshCw className="size-4" /></Button>
-          <Button size="sm" onClick={openCreate}><Plus className="mr-1 size-3.5" />New task</Button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border border-zinc-700 dark:border-zinc-300 hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer shadow-xs"
+          >
+            <Plus className="size-3.5 shrink-0" />
+            <span className="whitespace-nowrap">New task</span>
+          </button>
         </div>
       </header>
 

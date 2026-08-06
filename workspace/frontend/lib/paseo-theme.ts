@@ -9,7 +9,7 @@
  * Paseo's own teal-green one, which needs no extra class.
  */
 
-export type PaseoThemeName = 'light' | 'dark' | 'zinc' | 'midnight' | 'claude' | 'ghostty';
+export type PaseoThemeName = 'light' | 'dark';
 
 export interface PaseoThemeInfo {
   name: PaseoThemeName;
@@ -17,20 +17,16 @@ export interface PaseoThemeInfo {
   /** Swatch shown in the picker — verbatim from Paseo's THEME_SWATCHES. */
   swatch: string;
   isDark: boolean;
-  /** Class appended next to `dark`. Empty for light and the default dark tint. */
+  /** Class appended next to `dark`. Empty for light and default dark tint. */
   tintClass: string;
 }
 
 export const PASEO_THEMES: PaseoThemeInfo[] = [
   { name: 'light', label: 'Light', swatch: '#ffffff', isDark: false, tintClass: '' },
-  { name: 'dark', label: 'Paseo', swatch: '#2D8B62', isDark: true, tintClass: '' },
-  { name: 'zinc', label: 'Zinc', swatch: '#808080', isDark: true, tintClass: 'theme-zinc' },
-  { name: 'midnight', label: 'Midnight', swatch: '#4A6BA8', isDark: true, tintClass: 'theme-midnight' },
-  { name: 'claude', label: 'Claude', swatch: '#D97757', isDark: true, tintClass: 'theme-claude' },
-  { name: 'ghostty', label: 'Ghostty', swatch: '#8caaee', isDark: true, tintClass: 'theme-ghostty' },
+  { name: 'dark', label: 'Dark', swatch: '#18181b', isDark: true, tintClass: 'theme-zinc' },
 ];
 
-const ALL_TINT_CLASSES = PASEO_THEMES.map((t) => t.tintClass).filter(Boolean);
+const ALL_TINT_CLASSES = ['theme-zinc', 'theme-midnight', 'theme-claude', 'theme-ghostty'];
 
 const STORAGE_KEY = 'paseo-theme';
 

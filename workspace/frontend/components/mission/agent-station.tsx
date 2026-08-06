@@ -184,9 +184,9 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
         <div className="grid grid-cols-2 gap-1.5 border-t border-border/60/40 pt-2.5 mt-0.5">
           <button
             onClick={onOpenAgent}
-            className="h-7 rounded-md border border-border bg-white hover:bg-surface1/50 dark:hover:bg-primary text-[10px] font-semibold text-foreground-muted transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
+            className="h-7 rounded-md border border-border bg-surface2 hover:bg-surface3 text-[10px] font-semibold text-foreground transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
           >
-            <MessageSquare className="size-3 shrink-0" />
+            <MessageSquare className="size-3 shrink-0 text-foreground-muted" />
             <span className="truncate">Open</span>
           </button>
           <button
@@ -198,7 +198,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
             className={cn(
               'h-7 rounded-md border text-[10px] font-semibold transition-colors flex items-center justify-center gap-1 truncate px-1',
               status === 'offline'
-                ? 'bg-primary hover:bg-primary text-white border-primary dark:hover:bg-surface3 cursor-pointer'
+                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-700 dark:border-zinc-300 hover:bg-zinc-800 dark:hover:bg-white cursor-pointer'
                 : 'bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-500/30 cursor-default',
             )}
             title={status === 'offline' ? `Launch or pair ${agent.agentName}` : `${agent.agentName} is connected`}

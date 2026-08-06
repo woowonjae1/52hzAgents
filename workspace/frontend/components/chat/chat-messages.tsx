@@ -29,7 +29,9 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
     }
   };
 
-  messages.forEach((msg) => {
+  const visibleMessages = messages.filter((msg) => !msg.content.startsWith('__queue_cancel:'));
+
+  visibleMessages.forEach((msg) => {
     if (msg.messageType === 'thinking') {
       // Thinking is a first-level block (shown with its author), so flush any
       // pending sub-level steps first to keep ordering. Consecutive thinking

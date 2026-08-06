@@ -226,6 +226,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
+  // ── User Messages (Right Aligned) ──
   if (isHuman) {
     const isCurrentUser = isCurrentHumanMessage(message, currentUser);
     const displayName = isCurrentUser
@@ -233,25 +234,25 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');
 
     return (
-      <div className="py-2.5">
-        <div className="flex items-start gap-3">
+      <div className="py-2.5 flex justify-end">
+        <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[75%]">
           <div
-            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-surface2/80 border border-border/50 text-foreground-muted"
+            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 bg-surface3 text-foreground dark:bg-zinc-700 dark:text-white shadow-xs border border-border/80"
           >
             <User className="size-4" />
           </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-xs font-bold text-foreground">{displayName}</span>
+          <div className="flex-1 min-w-0 text-right">
+            <div className="flex items-center gap-2 mb-1.5 justify-end">
               {timestamp && (
-                <span className="text-[10px] text-foreground-extra-muted font-mono font-medium ml-auto">{timestamp}</span>
+                <span className="text-[10px] text-foreground-extra-muted font-mono font-medium">{timestamp}</span>
               )}
+              <span className="text-xs font-bold text-foreground">{displayName}</span>
             </div>
-            <div className="text-xs leading-relaxed text-foreground-muted">
+            <div className="text-xs leading-relaxed text-foreground dark:text-zinc-100 bg-surface2 dark:bg-zinc-800/90 border border-border/80 dark:border-zinc-700/80 p-3.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block">
               <MarkdownContent content={message.content} agentNames={agentNames} />
               <Attachments items={attachments} />
               
-              <div className="flex items-center gap-3.5 mt-2 text-[10px] font-medium">
+              <div className="flex items-center justify-end gap-3.5 mt-1.5 text-[10px] font-medium">
                 {isCurrentUser && message.deliveryStatus === 'sending' && (
                   <span className="text-foreground-extra-muted">Sending...</span>
                 )}
@@ -269,6 +270,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
+  // ── AI Agent Messages (Left Aligned) ──
   return (
     <div className="py-2.5 group/msg">
       <div className="flex items-start gap-3">

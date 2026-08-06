@@ -132,8 +132,8 @@
 
   /* Text */
   --foreground: #fafafa;
-  --foreground-muted: #a1a5a4;
-  --foreground-extra-muted: #717574;
+  --foreground-muted: #d4d4d8;
+  --foreground-extra-muted: #a1a1aa;
 
   /* Controls */
   --scrollbar-handle: #717574;
@@ -230,8 +230,8 @@
   --surface-diff-empty: #242427;
   --surface-sidebar: #131316;
   --surface-sidebar-hover: #1b1b1e;
-  --foreground-muted: #a1a1aa;
-  --foreground-extra-muted: #71717a;
+  --foreground-muted: #e4e4e7;
+  --foreground-extra-muted: #a1a1aa;
   --scrollbar-handle: #71717a;
   --border: #27272a;
   --border-accent: #303036;

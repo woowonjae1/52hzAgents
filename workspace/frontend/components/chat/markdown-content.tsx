@@ -143,13 +143,13 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       const isInline = props.inline ?? (!className && !textContent.includes('\n'));
       if (isInline) {
         return (
-          <code className="text-[13px] px-1.5 py-0.5 rounded bg-surface2/80 text-foreground font-mono">
+          <code className="text-[13px] px-1.5 py-0.5 rounded bg-surface2 text-foreground font-mono font-medium border border-border/50">
             {children}
           </code>
         );
       }
       return (
-        <code className={cn('text-[13px] bg-transparent text-inherit p-0', className)}>
+        <code className={cn('text-[13px] bg-transparent text-inherit p-0 font-mono', className)}>
           {children}
         </code>
       );
@@ -177,9 +177,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       }
 
       return (
-        <div className="my-3 overflow-hidden rounded-xl border border-border bg-primary text-primary-foreground font-mono shadow-sm">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-primary bg-primary/60 text-[10px] font-bold tracking-wider text-foreground-muted uppercase">
-            <span>{language}</span>
+        <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 font-mono shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/80 bg-zinc-900/90 text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-zinc-600 inline-block" />
+              <span>{language}</span>
+            </span>
             <button
               onClick={() => {
                 const text = nodeToText(codeElement?.props?.children).trim();
@@ -188,12 +191,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="hover:text-foreground-extra-muted transition-colors"
+              className="hover:text-zinc-100 text-zinc-400 transition-colors cursor-pointer text-xs uppercase"
             >
               Copy
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-primary-foreground font-mono">
+          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-zinc-100 font-mono bg-zinc-950">
             {children}
           </pre>
         </div>

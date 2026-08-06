@@ -77,9 +77,7 @@ export default function RootLayout({
         <Script id="paseo-tint-init" strategy="beforeInteractive">{`
           try {
             var stored = localStorage.getItem('paseo-theme');
-            var tints = { zinc: 'theme-zinc', midnight: 'theme-midnight', claude: 'theme-claude', ghostty: 'theme-ghostty' };
-            var cls = tints[stored];
-            if (cls) document.documentElement.classList.add(cls);
+            if (stored === 'dark' || stored === 'zinc') document.documentElement.classList.add('theme-zinc');
           } catch (e) {}
         `}</Script>
       </head>

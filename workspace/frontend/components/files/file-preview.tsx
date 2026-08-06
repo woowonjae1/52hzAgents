@@ -310,7 +310,7 @@ export function FilePreview() {
             <p className="text-sm font-medium">Preview not available for this file type</p>
             <button
               onClick={handleDownload}
-              className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-md hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer"
             >
               Download file
             </button>

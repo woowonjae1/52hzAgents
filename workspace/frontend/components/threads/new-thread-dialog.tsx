@@ -203,10 +203,20 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
         )}
 
         <div className="flex justify-end gap-2 mt-4">
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="border border-border/80 text-foreground hover:bg-surface2 hover:text-foreground font-medium"
+          >
             Cancel
           </Button>
-          <Button size="sm" onClick={handleCreate} disabled={selected.size === 0}>
+          <Button
+            size="sm"
+            onClick={handleCreate}
+            disabled={selected.size === 0}
+            className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 font-medium"
+          >
             {resumeFrom ? 'Resume Thread' : 'Start Thread'}
           </Button>
         </div>

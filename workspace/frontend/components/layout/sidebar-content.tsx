@@ -243,17 +243,16 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
     }
   }, [open, workspace]);
 
-  if (!workspace) return null;
-
+  const workspaceSlug = workspace?.slug || 'workspace';
   const workspaceUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/${workspace.slug}${window.location.search}`
+    ? `${window.location.origin}/${workspaceSlug}${window.location.search}`
     : '';
 
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      const wsUpdates: Record<string, unknown> = { name: name.trim(), settings: { ...workspace.settings, monitorMode } };
+      const wsUpdates: Record<string, unknown> = { name: name.trim(), settings: { ...(workspace?.settings || {}), monitorMode } };
       if (bfApiKey.trim()) wsUpdates.browserfabric_api_key = bfApiKey.trim();
       await workspaceApi.updateWorkspace(wsUpdates);
       await refreshWorkspace();
@@ -287,8 +286,8 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
           <div className="space-y-2">
             <Label variant="secondary">Workspace ID</Label>
             <div className="flex items-center gap-2">
-              <Input value={workspace.slug} readOnly className="text-xs font-mono" />
-              <Button variant="outline" size="icon" onClick={() => copyToken(workspace.slug)}>
+              <Input value={workspaceSlug} readOnly className="text-xs font-mono" />
+              <Button variant="outline" size="icon" onClick={() => copyToken(workspaceSlug)}>
                 {tokenCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
               </Button>
             </div>

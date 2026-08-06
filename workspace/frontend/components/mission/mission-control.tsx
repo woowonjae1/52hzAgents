@@ -263,11 +263,11 @@ export function MissionControl() {
           <Stat value={fmtTokens(totalTokens)} label="recent tokens" />
           <button
             onClick={() => setConnectModalOpen(true)}
-            className="ml-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold bg-primary hover:bg-primary text-white dark:hover:bg-surface3 transition-colors cursor-pointer"
+            className="ml-1 inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer shadow-xs"
             title="Launch a local agent or pair a remote server"
           >
-            <Plus className="size-3.5" />
-            <span>Connect agent</span>
+            <Plus className="size-3.5 shrink-0" />
+            <span className="whitespace-nowrap">Connect agent</span>
           </button>
         </div>
       </div>
