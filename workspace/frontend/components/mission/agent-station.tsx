@@ -86,7 +86,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
 
       {/* Header — click opens the agent's focused stream */}
       <button onClick={onOpenAgent} className="flex items-center gap-3 px-4 pt-4 pb-2 text-left w-full">
-        <AgentAvatar name={agent.agentName} size={36} status={agent.status} showStatus />
+        <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={36} status={agent.status} showStatus />
         <div className="flex-1 min-w-0">
           <span className="text-sm font-semibold text-foreground truncate block">{agent.agentName}</span>
           {agent.agentType && (

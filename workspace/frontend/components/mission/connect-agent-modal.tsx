@@ -87,7 +87,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                     )}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <AgentAvatar name={agent.agentName} size={32} status={agent.status} showStatus />
+                      <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={32} status={agent.status} showStatus />
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-foreground truncate">{agent.agentName}</p>
                         <p className="text-[10px] text-foreground-extra-muted uppercase tracking-wider">

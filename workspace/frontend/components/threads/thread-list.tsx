@@ -24,14 +24,14 @@ function AvatarStack({ agents, max = 2 }: { agents: WorkspaceAgent[]; max?: numb
   if (shown.length <= 1) {
     const agent = shown[0];
     if (!agent) return null;
-    return <AgentAvatar name={agent.agentName} size={30} />;
+    return <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={30} />;
   }
 
   return (
     <div className="flex -space-x-1.5">
       {shown.map((agent) => (
         <div key={agent.agentName} className="ring-2 ring-white rounded-full">
-          <AgentAvatar name={agent.agentName} size={18} />
+          <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={18} />
         </div>
       ))}
       {extra > 0 && (
@@ -295,7 +295,7 @@ export function ThreadList() {
               className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface2/80 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer border border-border/50"
               title={`${a.agentName} — Status: ${statusLabel}${a.description ? ` (${a.description})` : ''}`}
             >
-              <span className={cn('size-1.5 rounded-full', a.status === 'online' ? (isWorking ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-zinc-400')} />
+              <AgentAvatar name={a.agentName} agentType={a.agentType} size={14} />
               <span>{a.agentName}</span>
               <span className="text-[9px] text-muted-foreground font-mono">({statusLabel})</span>
             </button>

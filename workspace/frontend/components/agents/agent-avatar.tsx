@@ -9,7 +9,7 @@ const KNOWN_AGENTS = [
   'perplexity', 'pi', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
 ];
 
-const PNG_AGENTS = ['cline', 'hermes', 'kilo', 'openclaw', 'pi'];
+const PNG_AGENTS = ['cline', 'hermes', 'kilo', 'pi'];
 
 interface AgentAvatarProps {
   name: string;
