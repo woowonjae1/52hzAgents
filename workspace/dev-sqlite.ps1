@@ -84,8 +84,7 @@ Set-Location -LiteralPath '$connectorPath'
 
 $backend = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $backendCmd) -WindowStyle Hidden -PassThru
 $frontend = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $frontendCmd) -WindowStyle Hidden -PassThru
-$connector = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', $connectorCmd) -WindowStyle Hidden -PassThru
-@{ backendPid = $backend.Id; frontendPid = $frontend.Id; connectorPid = $connector.Id } | ConvertTo-Json | Set-Content -Encoding UTF8 $statePath
+@{ backendPid = $backend.Id; frontendPid = $frontend.Id; connectorPid = 0 } | ConvertTo-Json | Set-Content -Encoding UTF8 $statePath
 
 function Wait-Http([string]$Url, [int]$TimeoutSeconds) {
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -103,6 +102,16 @@ if (-not (Wait-Http 'http://localhost:8000/v1/health' 150)) {
     Stop-Managed; throw "Backend did not become ready. See $backendLog"
 }
 Write-Host 'Backend ready on http://localhost:8000' -ForegroundColor Green
+
+# Start agent connector AFTER backend is ready
+Write-Host 'Starting agent connector daemon...' -ForegroundColor Cyan
+Push-Location $connectorPath
+try {
+    $env:WWJ_WORKSPACE_ENDPOINT = 'http://localhost:8000'
+    & node bin/agent-connector.js up --endpoint http://localhost:8000 *>> $connectorLog
+} finally { Pop-Location }
+Write-Host 'Agent connector daemon started' -ForegroundColor Green
+
 if (-not (Wait-Http 'http://localhost:3005/' 90)) {
     Write-Host "Frontend still starting — check $frontendLog" -ForegroundColor Yellow
 } else {
@@ -115,6 +124,20 @@ Write-Host '  Backend:  http://localhost:8000/v1/health'
 Write-Host "  Data/logs: $runtimePath"
 Write-Host 'Stop with: .\workspace\dev-sqlite.ps1 -Stop'
 
-# Keep process alive so background task job object does not terminate child processes
-while ($true) { Start-Sleep -Seconds 5 }
+# Keep process alive & watchdog: restart connector daemon if it dies
+while ($true) {
+    Start-Sleep -Seconds 15
+    # Check if connector daemon is still alive
+    Push-Location $connectorPath
+    try {
+        $statusOutput = & node bin/agent-connector.js status 2>&1 | Out-String
+        if ($statusOutput -match 'not running') {
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Connector daemon died, restarting..." -ForegroundColor Yellow
+            $env:WWJ_WORKSPACE_ENDPOINT = 'http://localhost:8000'
+            & node bin/agent-connector.js up --endpoint http://localhost:8000 *>> $connectorLog
+            Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Connector daemon restarted" -ForegroundColor Green
+        }
+    } catch { }
+    finally { Pop-Location }
+}
 
