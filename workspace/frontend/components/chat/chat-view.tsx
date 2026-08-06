@@ -308,10 +308,30 @@ export function ChatView() {
       const userMsgIdx = sessionMessages.findIndex(
         (m) => m.senderType !== 'agent' && m.content === optimisticLoading.metadata?._userContent
       );
-      // If user msg is confirmed AND there's an agent message after it, clear loading
-      const hasAgentAfterUser = userMsgIdx >= 0 && sessionMessages.slice(userMsgIdx + 1).some(
-        (m) => m.senderType === 'agent'
-      );
+      // Clear only once a real ANSWER arrives. Step events (thinking/status/
+      // todos) are hidden from the transcript unless "show all steps" is on, so
+      // treating them as "the agent replied" tore the pending row down and left
+      // the thread visibly empty for the entire time the agent was working —
+      // while the sidebar, which reads the raw last message, correctly showed
+      // "thinking...". That mismatch is exactly what made sends look ignored.
+      const isStepMessage = (m: WorkspaceMessage) =>
+        m.messageType === 'status'
+        || m.messageType === 'thinking'
+        || m.messageType === 'todos'
+        || m.messageType === 'loading';
+      const isAgentAnswer = (m: WorkspaceMessage) => m.senderType === 'agent' && !isStepMessage(m);
+
+      const hasAgentAfterUser = userMsgIdx >= 0
+        ? sessionMessages.slice(userMsgIdx + 1).some(isAgentAnswer)
+        // The user message is matched by exact content, which fails if the
+        // backend normalises it at all. Fall back to wall-clock so a pending row
+        // can never get stuck forever when that match misses.
+        : sessionMessages.some(
+            (m) => isAgentAnswer(m)
+              && !!m.createdAt
+              && !!optimisticLoading.createdAt
+              && m.createdAt > optimisticLoading.createdAt,
+          );
       if (hasAgentAfterUser) {
         removeIds.add(optimisticLoading.messageId);
       }
