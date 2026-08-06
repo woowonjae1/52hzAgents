@@ -193,9 +193,18 @@ export function TasksView() {
                   <p className={cn('text-sm leading-snug', (todo.status === 'completed' || todo.status === 'cancelled') && 'line-through text-muted-foreground')}>
                     {todo.content}
                   </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+                    <span className={cn(
+                      'px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
+                      todo.status === 'in_progress' && 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/40',
+                      todo.status === 'completed' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/40',
+                      todo.status === 'pending' && 'bg-surface2 text-muted-foreground border border-border/50',
+                      todo.status === 'cancelled' && 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/40'
+                    )}>
+                      {todo.status.replace('_', ' ')}
+                    </span>
                     <span>{todo.channelName}</span>
-                    <span>by {todo.createdBy.replace(/^openagents:/, '')}</span>
+                    <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>
                     {todo.assignee && <span>assigned to {todo.assignee}</span>}
                     <span>{timeAgo(todo.updatedAt || todo.createdAt)}</span>
                   </div>

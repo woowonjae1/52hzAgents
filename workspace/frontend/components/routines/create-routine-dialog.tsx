@@ -180,7 +180,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 className={cn(
                   'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
                   scheduleType === 'daily'
-                    ? 'bg-white shadow-sm text-foreground'
+                    ? 'bg-card dark:bg-zinc-800 shadow-xs text-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -192,7 +192,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 className={cn(
                   'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
                   scheduleType === 'interval'
-                    ? 'bg-white shadow-sm text-foreground'
+                    ? 'bg-card dark:bg-zinc-800 shadow-xs text-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >

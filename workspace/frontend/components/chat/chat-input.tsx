@@ -406,34 +406,50 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
 
         {/* Pending file previews */}
         {pendingFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {pendingFiles.map((pf, i) => (
-              <div
-                key={i}
-                className="relative group rounded-lg border bg-muted overflow-hidden"
+          <div className="space-y-1.5 pb-1">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-medium text-foreground-muted">
+                Attachments ({pendingFiles.length})
+              </span>
+              <button
+                type="button"
+                onClick={() => setPendingFiles([])}
+                className="text-[11px] font-medium text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors flex items-center gap-1 cursor-pointer"
               >
-                {pf.preview ? (
-                  <img
-                    src={pf.preview}
-                    alt={pf.file.name}
-                    className="h-20 w-auto max-w-[160px] object-cover"
-                  />
-                ) : (
-                  <div className="h-20 w-24 flex flex-col items-center justify-center gap-1 px-2">
-                    <FileIcon className="size-5 text-muted-foreground" />
-                    <span className="text-[10px] text-muted-foreground truncate w-full text-center">
-                      {pf.file.name}
-                    </span>
-                  </div>
-                )}
-                <button
-                  onClick={() => removeFile(i)}
-                  className="absolute top-0.5 right-0.5 size-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                <X className="size-3" />
+                <span>Clear all</span>
+              </button>
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 scrollbar-thin">
+              {pendingFiles.map((pf, i) => (
+                <div
+                  key={i}
+                  className="relative group shrink-0 rounded-lg border bg-muted overflow-hidden"
                 >
-                  <X className="size-3" />
-                </button>
-              </div>
-            ))}
+                  {pf.preview ? (
+                    <img
+                      src={pf.preview}
+                      alt={pf.file.name}
+                      className="h-16 w-auto max-w-[140px] object-cover"
+                    />
+                  ) : (
+                    <div className="h-16 w-28 flex flex-col items-center justify-center gap-1 px-2">
+                      <FileIcon className="size-4 text-muted-foreground" />
+                      <span className="text-[10px] text-muted-foreground truncate w-full text-center">
+                        {pf.file.name}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="absolute top-0.5 right-0.5 size-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

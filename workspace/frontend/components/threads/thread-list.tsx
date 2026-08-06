@@ -283,20 +283,25 @@ export function ThreadList() {
       {agents.length > 0 && (
         <div className="px-3 py-1.5 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-surface1/30">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
-          {agents.map((a) => (
-            <button
-              key={a.agentName}
-              onClick={() => {
-                const s = activeSessions.find((session) => session.participants.includes(a.agentName));
-                if (s) setCurrentSessionId(s.sessionId);
-              }}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-surface2/60 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer"
-              title={`${a.agentName} (${a.status})`}
-            >
-              <span className={cn('size-1.5 rounded-full', a.status === 'online' ? 'bg-emerald-500' : 'bg-zinc-400')} />
-              <span>{a.agentName}</span>
-            </button>
-          ))}
+          {agents.map((a) => {
+            const isWorking = activeSessionIds.has(a.agentName);
+            const statusLabel = a.status === 'online' ? (isWorking ? 'Executing tool' : 'Idle') : 'Offline';
+            return (
+              <button
+                key={a.agentName}
+                onClick={() => {
+                  const s = activeSessions.find((session) => session.participants.includes(a.agentName));
+                  if (s) setCurrentSessionId(s.sessionId);
+                }}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface2/80 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer border border-border/50"
+                title={`${a.agentName} — Status: ${statusLabel}${a.description ? ` (${a.description})` : ''}`}
+              >
+                <span className={cn('size-1.5 rounded-full', a.status === 'online' ? (isWorking ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500') : 'bg-zinc-400')} />
+                <span>{a.agentName}</span>
+                <span className="text-[9px] text-muted-foreground font-mono">({statusLabel})</span>
+              </button>
+            );
+          })}
         </div>
       )}
 

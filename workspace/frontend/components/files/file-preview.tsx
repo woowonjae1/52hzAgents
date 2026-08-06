@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, ExternalLink, Music, Film, FileCode } from 'lucide-react';
+import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, ExternalLink, Music, Film, FileCode, Maximize2, Minimize2 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { FileGrid } from './file-grid';
+import { cn } from '@/lib/utils';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -72,6 +73,7 @@ export function FilePreview() {
   const [loading, setLoading] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const file = files.find((f) => f.id === selectedFileId);
 
@@ -197,7 +199,7 @@ export function FilePreview() {
   const lines = content ? content.split('\n') : [];
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className={cn("flex flex-col h-full bg-card", isFullscreen && "fixed inset-0 z-50 bg-background animate-in fade-in duration-150")}>
       {/* Header */}
       <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-3 border-b shrink-0 bg-background/50">
         <button
@@ -230,6 +232,14 @@ export function FilePreview() {
             {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
           </button>
         )}
+
+        <button
+          onClick={() => setIsFullscreen((prev) => !prev)}
+          className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}
+        >
+          {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+        </button>
 
         <button
           onClick={handleDownload}

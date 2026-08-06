@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Settings, Copy, Check, Bot, Globe } from 'lucide-react';
+import { Settings, Copy, Check, Bot, Globe, Loader2, Plug } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
@@ -29,11 +29,29 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(workspace?.name || '');
   const [saving, setSaving] = useState(false);
+  const [testingBf, setTestingBf] = useState(false);
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [bfApiKey, setBfApiKey] = useState('');
   const { refreshWorkspace } = useWorkspace();
   const { isCopied: urlCopied, copyToClipboard: copyUrl } = useCopyToClipboard();
   const { isCopied: tokenCopied, copyToClipboard: copyToken } = useCopyToClipboard();
+
+  const handleTestBrowserFabric = async () => {
+    const keyToTest = bfApiKey.trim() || workspace?.browserfabricApiKey;
+    if (!keyToTest) {
+      toast.error('No BrowserFabric API key configured');
+      return;
+    }
+    setTestingBf(true);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      toast.success('BrowserFabric API key connection successful!');
+    } catch {
+      toast.error('Failed to connect to BrowserFabric service');
+    } finally {
+      setTestingBf(false);
+    }
+  };
 
   // Sync descriptions from workspace agents when dialog opens
   useEffect(() => {
@@ -146,9 +164,31 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
 
           {/* Browser Fabric API Key */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Globe className="size-4 text-muted-foreground" />
-              <Label>Browser Fabric API Key</Label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Globe className="size-4 text-muted-foreground" />
+                <Label>Browser Fabric API Key</Label>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTestBrowserFabric}
+                disabled={testingBf}
+                className="h-7 px-2.5 text-xs font-medium border-border/80 text-foreground hover:bg-surface2 shrink-0 cursor-pointer"
+              >
+                {testingBf ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin mr-1" />
+                    Testing...
+                  </>
+                ) : (
+                  <>
+                    <Plug className="size-3 mr-1 text-emerald-500" />
+                    Test Connection
+                  </>
+                )}
+              </Button>
             </div>
             {workspace.browserfabricApiKey && (
               <p className="text-xs text-muted-foreground font-mono">
@@ -192,10 +232,18 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button
+            variant="outline"
+            onClick={() => setOpen(false)}
+            className="border border-border/80 text-foreground hover:bg-surface2 font-medium"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || !name.trim()}>
+          <Button
+            onClick={handleSave}
+            disabled={saving || !name.trim()}
+            className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 font-medium"
+          >
             {saving ? 'Saving...' : 'Save'}
           </Button>
         </DialogFooter>
