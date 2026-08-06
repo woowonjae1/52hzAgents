@@ -424,7 +424,9 @@ export function ChatView() {
       const loadingOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-loading-${timestamp}`,
         sessionId: currentSessionId,
-        senderName: agents.find((a) => a.role === 'master')?.agentName || agents[0]?.agentName || 'Agent',
+        // Whoever the message is actually addressed to owns the pending row, so
+        // "@openclaw ..." acknowledges as openclaw rather than as the master.
+        senderName: mentions[0] || agents.find((a) => a.role === 'master')?.agentName || agents[0]?.agentName || 'Agent',
         senderType: 'agent',
         content: '',
         messageType: 'loading',

@@ -13,6 +13,15 @@ const PNG_AGENTS = ['cline', 'hermes', 'kilo', 'openclaw', 'pi'];
 
 interface AgentAvatarProps {
   name: string;
+  /**
+   * The agent's reported type ("claude", "openclaw", "cloud:openai"…). Prefer
+   * passing this whenever the agent record is at hand: it is the canonical
+   * identity, whereas the display name is whatever the user called the agent.
+   * Matching on the name alone means an agent named "worker-1" or "小助手" never
+   * gets its brand icon, which is why chat messages showed a letter tile while
+   * the sidebar — which looks agents up properly — showed the real icon.
+   */
+  agentType?: string | null;
   size?: number;
   status?: string;
   showStatus?: boolean;
@@ -20,13 +29,16 @@ interface AgentAvatarProps {
   square?: boolean;
 }
 
-export function AgentAvatar({ name = '', size = 28, status, showStatus = false, className, square = false }: AgentAvatarProps) {
+export function AgentAvatar({ name = '', agentType, size = 28, status, showStatus = false, className, square = false }: AgentAvatarProps) {
   const [imgError, setImgError] = useState(false);
   const cleanName = (name || '').replace(/^(openagents:|agent:|human:)/, '').trim();
   const lowercaseName = cleanName.toLowerCase();
 
-  // Find matching agent keyword
-  const matchedAgent = KNOWN_AGENTS.find(k => lowercaseName.includes(k));
+  // Cloud agents report "cloud:<provider>"; the provider is what has an icon.
+  const typeKey = (agentType || '').toLowerCase().replace(/^cloud:/, '').trim();
+  const matchedAgent =
+    (typeKey ? KNOWN_AGENTS.find(k => typeKey.includes(k)) : undefined) ||
+    KNOWN_AGENTS.find(k => lowercaseName.includes(k));
   const isPng = matchedAgent ? PNG_AGENTS.includes(matchedAgent) : false;
   const isOffline = status === 'offline';
   const identityFill = deriveIdentityColor(cleanName || 'agent');

@@ -5,6 +5,7 @@ import { ChatMessage } from './chat-message';
 import { IntermediateSteps } from './intermediate-steps';
 import { ThinkingMessage } from './thinking-message';
 import { WorkingIndicator } from './working-indicator';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -431,12 +432,35 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  <div className="flex items-start gap-3 py-1">
-                    <div className="size-8 shrink-0" />
-                    <div className="py-1.5">
-                      <WorkingIndicator />
-                    </div>
-                  </div>
+                  {/*
+                    Acknowledge the send immediately and say who is handling it.
+                    This row used to be a 32px empty spacer next to seven 2px
+                    animated bars: it was technically present the whole time an
+                    agent was working, but with no avatar and no words it read as
+                    blank space, so sending a message looked like nothing had
+                    happened until the finished answer appeared.
+                  */}
+                  {(() => {
+                    const pending = loadingMessages[0];
+                    const pendingName = pending?.senderName || 'Agent';
+                    const pendingAgent = agents?.find((a) => a.agentName === pendingName);
+                    return (
+                      <div className="flex items-start gap-3 py-1">
+                        <AgentAvatar
+                          name={pendingName}
+                          agentType={pendingAgent?.agentType}
+                          size={32}
+                          square
+                          className="mt-1 shrink-0"
+                        />
+                        <div className="flex items-center gap-2 py-1.5 min-w-0">
+                          <span className="text-xs font-bold text-foreground truncate">{pendingName}</span>
+                          <span className="text-xs text-foreground-muted shrink-0">is working</span>
+                          <WorkingIndicator />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             }

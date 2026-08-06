@@ -274,7 +274,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
   return (
     <div className="py-2.5 group/msg">
       <div className="flex items-start gap-3">
-        <AgentAvatar name={message.senderName} size={32} square className="mt-1 shrink-0" />
+        <AgentAvatar name={message.senderName} agentType={agent?.agentType} size={32} square className="mt-1 shrink-0" />
         <div className="flex-1 min-w-0 bg-card/50 border border-border/70 dark:border-border/60 rounded-xl p-4 shadow-xs">
           <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/60/30">
             <span className="text-xs font-bold text-foreground truncate">

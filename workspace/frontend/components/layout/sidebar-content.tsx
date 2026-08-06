@@ -417,7 +417,7 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
               <Globe className="size-4 text-muted-foreground" />
               <Label>Browser Fabric API Key</Label>
             </div>
-            {workspace.browserfabricApiKey && (
+            {workspace?.browserfabricApiKey && (
               <p className="text-xs text-muted-foreground font-mono">
                 Current: {workspace.browserfabricApiKey}
               </p>
@@ -425,7 +425,7 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
             <Input
               value={bfApiKey}
               onChange={(e) => setBfApiKey(e.target.value)}
-              placeholder={workspace.browserfabricApiKey ? 'Enter new key to replace' : 'bf_... (optional — auto-provisioned if empty)'}
+              placeholder={workspace?.browserfabricApiKey ? 'Enter new key to replace' : 'bf_... (optional — auto-provisioned if empty)'}
               className="text-xs font-mono"
             />
             <p className="text-xs text-muted-foreground">

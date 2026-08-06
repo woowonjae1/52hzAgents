@@ -37,7 +37,7 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
   return (
     <div className="py-1.5">
       <div className="flex items-start gap-2">
-        <AgentAvatar name={sender} size={36} square className="mt-0.5 opacity-70" />
+        <AgentAvatar name={sender} agentType={agent?.agentType} size={36} square className="mt-0.5 opacity-70" />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="text-[15px] font-bold text-foreground truncate">{sender}</span>
