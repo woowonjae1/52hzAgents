@@ -138,7 +138,7 @@ function DMSection({
 
 export function ThreadList() {
   const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations } = useWorkspace();
-  const { sidebarToggle, isMobile, openMobileDetail, openNewThread } = useLayout();
+  const { sidebarToggle, isMobile, openMobileDetail, openNewThread, setViewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
