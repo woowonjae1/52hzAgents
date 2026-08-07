@@ -113,8 +113,8 @@ func PutTodos(c *gin.Context) {
 	// 开启事务处理，确保原有记录删除与新纪录插入的数据原子性。
 	tx := db.DB.Begin()
 
-	// 构造删除语句。
-	deleteQuery := tx.Where("workspace_id = ? AND channel_name = ? AND created_by = ?", workspace.ID, channelName, req.Source)
+	// Delete old todos for this channel to allow multi-agent shared todo updates.
+	deleteQuery := tx.Where("workspace_id = ? AND channel_name = ?", workspace.ID, channelName)
 	if req.ThreadID != nil && *req.ThreadID != "" {
 		deleteQuery = deleteQuery.Where("thread_id = ?", *req.ThreadID)
 	}
