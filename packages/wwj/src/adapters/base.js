@@ -35,6 +35,14 @@ const DEFAULT_ENDPOINT = process.env.WWJ_WORKSPACE_ENDPOINT || process.env.WWJ_E
 // heartbeat_failed up to the daemon. A success resets the streak immediately.
 const HEARTBEAT_ERROR_THRESHOLD = 2;
 
+// Hard cutoff for agent-to-agent ping-pong: the completion-phrase and
+// direct-action regexes below are wording-dependent and can be bypassed by
+// two agents that keep issuing directives at each other without ever using a
+// phrase either regex recognizes. This counter is the backstop — it counts
+// consecutive agent-to-agent turns processed per channel and refuses once the
+// limit is hit, regardless of message wording. Any human message resets it.
+const MAX_AGENT_HOPS_WITHOUT_HUMAN = 20;
+
 class BaseAdapter {
   /**
    * @param {object} opts
@@ -664,6 +672,13 @@ class BaseAdapter {
 
         if (isSelf) continue;
 
+        const hopChannel = msg.sessionId || this.channelName || 'general';
+        this._agentHopCounts = this._agentHopCounts || {};
+
+        if (isHuman) {
+          this._agentHopCounts[hopChannel] = 0;
+        }
+
         if (!isHuman) {
           if (!mentionsMe && !targetedMe) {
             this._log(`Ignoring non-targeted message from ${msg.senderName || msg.senderId}`);
@@ -687,6 +702,15 @@ class BaseAdapter {
             this._log(`Ignoring agent message from ${msg.senderName}: no direct action requested for ${this.agentName}`);
             continue;
           }
+
+          // 3. Hop-limit guard: hard backstop independent of wording (see
+          // MAX_AGENT_HOPS_WITHOUT_HUMAN comment above).
+          const hopCount = (this._agentHopCounts[hopChannel] || 0) + 1;
+          if (hopCount > MAX_AGENT_HOPS_WITHOUT_HUMAN) {
+            this._log(`Ignoring agent message from ${msg.senderName}: hop limit (${MAX_AGENT_HOPS_WITHOUT_HUMAN}) reached in channel ${hopChannel} without a human message — likely ping-pong loop`);
+            continue;
+          }
+          this._agentHopCounts[hopChannel] = hopCount;
         }
 
         incoming.push(msg);

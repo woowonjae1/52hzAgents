@@ -75,7 +75,7 @@ class PiAdapter extends BaseAdapter {
     }
 
     // Tier 2: npm-global node_modules entrypoint
-    const globalAppdata = process.env.APPDATA || (HOME ? path.join(HOME, 'AppData', 'Roaming') : '');
+    const globalAppdata = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
     if (globalAppdata) {
       const globalJs = path.join(globalAppdata, 'npm', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
       if (fs.existsSync(globalJs)) {
