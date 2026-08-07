@@ -934,18 +934,19 @@
   {
     "name": "pi",
     "label": "Pi Agent",
-    "description": "Mathematical and reasoning agent tailored for algorithmic tasks.",
+    "description": "Multi-provider coding agent CLI with read/bash/edit/write tools (@earendil-works/pi-coding-agent).",
     "homepage": "https://openagents.org",
-    "tags": ["coding", "reasoning", "cli"],
+    "tags": ["coding", "cli"],
     "builtin": true,
     "support": { "install": true, "workspace": true, "collaboration": true },
     "install": {
       "binary": "pi",
+      "npm_package": "@earendil-works/pi-coding-agent",
       "api_only": true
     },
     "adapter": {
-      "module": "openagents.adapters.openclaw",
-      "class": "OpenClawAdapter"
+      "module": "openagents.adapters.pi",
+      "class": "PiAdapter"
     },
     "launch": {
       "args": []

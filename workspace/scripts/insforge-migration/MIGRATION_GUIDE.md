@@ -1,6 +1,6 @@
-# OpenAgents Workspace → InsForge + S3 + ECS Migration Guide
+# 52hzAgents Workspace → InsForge + S3 + ECS Migration Guide
 
-Step-by-step playbook for moving an OpenAgents Workspace from its hosted backend
+Step-by-step playbook for moving a 52hzAgents Workspace from its hosted backend
 (`workspace-endpoint.openagents.org`) to your own stack:
 
 - **Database**: InsForge Postgres (PostgREST exposed)

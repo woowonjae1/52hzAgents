@@ -1,4 +1,4 @@
-# OpenAgents Go — Web Port
+# 52hzAgents Go — Web Port
 
 Plan for cloning the React workspace frontend into `packages/go/web/`,
 rebranding it to match the Swift Go app, and bringing it to feature parity
@@ -11,7 +11,7 @@ The Swift Go app has drifted from the React workspace frontend at
 `workspace/frontend/` — different terminology ("Chat" vs "Thread"),
 different icon, different right-panel model (tabbed Content/Browser),
 different workspace-level browser toggle. We want **one product** called
-"OpenAgents Go" that owns macOS, iOS, **and** web, sharing brand,
+"52hzAgents Go" that owns macOS, iOS, **and** web, sharing brand,
 terminology, and feature pace.
 
 Decision matrix from the planning conversation:
@@ -71,7 +71,7 @@ No UX change; this is a relocation only.
 - `theme_color` / `background_color` in `manifest.json`
 - Color tokens: align `tailwind.config.js` (or CSS vars) to Swift's accent
   palette
-- Page `<title>` → "OpenAgents Go" / "{Workspace} — OpenAgents Go"
+- Page `<title>` → "52hzAgents Go" / "{Workspace} — 52hzAgents Go"
 - Header brand text + sidebar logo
 
 ### Phase 2 — Thread→Chat terminology (½ day)

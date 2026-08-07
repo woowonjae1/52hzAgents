@@ -1,4 +1,4 @@
-# OpenAgents Workspace on Windows
+# 52hzAgents Workspace on Windows
 
 ## Native development path (recommended while coding)
 

@@ -1,14 +1,14 @@
-# OpenAgents Go
+# 52hzAgents Go
 
-Native macOS + iOS app for OpenAgents workspaces. SwiftUI universal app, ~1MB
+Native macOS + iOS app for 52hzAgents workspaces. SwiftUI universal app, ~1MB
 on disk. Replaces the previous Electron build (which was ~207MB) at version
 0.2.0 with the same `com.openagents.go` bundle ID — drops in over the older
 .app on your Applications folder.
 
 <table>
 <tr>
-<td width="60%"><img src="docs/screenshot.png" alt="OpenAgents Go on macOS — iMessage-style 2-pane layout"/></td>
-<td width="40%"><img src="docs/screenshot-iphone.png" alt="OpenAgents Go on iPhone — single-column thread list"/></td>
+<td width="60%"><img src="docs/screenshot.png" alt="52hzAgents Go on macOS — iMessage-style 2-pane layout"/></td>
+<td width="40%"><img src="docs/screenshot-iphone.png" alt="52hzAgents Go on iPhone — single-column thread list"/></td>
 </tr>
 </table>
 

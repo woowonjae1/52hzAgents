@@ -1,221 +1,141 @@
 <div align="center">
 
-![52hzAgents Workspace — One workspace. All your agents collaborate.](docs/assets/images/52hzagents_banner.png)
+![52hzAgents Workspace](docs/assets/images/52hzagents_banner.png)
 
 # 52hzAgents Workspace
 
-**52hzAgents Workspace** 是一款高并发、本地优先（Local-First）且支持自托管的多智能体（Multi-Agent）实时协作平台与桌面端环境。
+**52hzAgents Workspace** 是一个本地优先(Local-First)、可自托管的多智能体协作平台:人类与多个 AI 编码 Agent(Claude Code、Codex、OpenClaw、Cursor、Copilot、Pi 等)在同一个工作区里共享会话、文件与浏览器控制权,类似 Slack / Cursor 的桌面协作体验。
 
-它提供了一个类似于 Slack / Cursor / ChatGPT 极简桌面风格的协作空间，人类与 AI 智能体（如 Claude Code、OpenClaw、Codex、Cursor、Copilot 等）可以在其中共享同一个上下文、会话通道、存储文件以及协同控制浏览器。
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/woowonjae1/52hzAgents/actions/workflows/test-e2e.yml/badge.svg)](https://github.com/woowonjae1/52hzAgents/actions/workflows/test-e2e.yml)
 
----
-
-[⭐ 访问远程仓库](https://github.com/woowonjae1/52hzAgents.git) · [🚀 快速开始](#-快速开始与部署指南) · [🛠 系统架构说明](#-系统架构全景图) · [🎨 设计系统规范](#-11-桌面级设计系统规范) · [📂 代码库全景地图](#-代码库全景地图)
+[快速开始](#快速开始) · [架构](#架构) · [代码库地图](#代码库地图) · [接入 Agent](#接入-agent) · [贡献](#贡献)
 
 </div>
 
 ---
 
-## 🎬 界面演示
+## 演示
 
-![52hzAgents Mission Control 演示](docs/assets/demo.gif)
+![52hzAgents 界面演示](docs/assets/demo.gif)
 
-> **Mission Control 指挥中心**（52Hz 雷达 + 实时 Agent 站点卡） → **320px Paseo 高对比侧边栏** → 线程内代码 **Diff 增删** 渲染 → 并排 **交互式终端与共享浏览器**。
+Mission Control 概览面板 → 侧边栏 → 线程内代码 diff 渲染 → 交互式终端。
 
----
+## 这是什么
 
-## 🌟 核心特性与评估
+一个工作区里可以同时挂多个 AI 编码 Agent,它们和人类共享:
 
-### 1. 🎨 Paseo 1:1 桌面级设计系统 (Design System)
-- **5 层分层图层 (Surfaces 0~4)**：抛弃传统盲目的色块与高饱和色彩，采用 `surface0`（主背景）到 `surface4`（最高拾起层）的极致分层色系，搭配 `surfaceSidebar` 专属高对比侧边栏。
-- **6 套主题一键切换 (`ThemeSwitcher`)**：`light` 亮色 + 5 种深色调（`dark` Paseo 墨绿、`zinc` 石墨灰、`midnight` 深蓝、`claude` 珊瑚橙、`ghostty` 蓝紫）。`next-themes` 负责亮/暗大类切换，`lib/paseo-theme.ts` 在其上叠加一层 tint class，选中即持久化到 `localStorage`，与 Paseo 桌面端色板逐一对齐。
-- **320px 标准侧边栏与 3 栏 Split 架构**：320px 左侧边栏 + 自适应中央主工作区 + 400px 右侧可折叠辅助面板（文件预览、Diff 对比、终端）。
-- **微观字阶与超细桌面标题 (Micro-Typography)**：顶栏大标题在桌面端采用 `300` 级别超细字重（Light Weight），结构化标签与内容文本区分明确，视觉安静且富有高级感。
-- **10 色身份对比度填充表 (`Identity Colors`)**：内建 10 色算法（violet, sky, emerald, orange, pink, indigo, teal, red, amber, blue），将项目与 Agent 图标强行锁定在 4.2~4.8:1 对比度带中，防止单一项目夺走视觉焦点。
-- **归一化状态 Badge (`StatusBadge`)**：10% alpha 极简透明背景 + 状态圆点，避免传统粗暴强红强绿警示色对开发者的打扰。
+- **同一个会话上下文** —— 消息、线程、@ 提及路由到具体 Agent 或按线程粘性/轮询分发
+- **同一套文件** —— 内置代码高亮、Markdown、PDF、音视频预览的文件沙箱
+- **同一套运行时** —— Go 后端(Gin + GORM,支持无 CGO 的纯 Go SQLite 或 PostgreSQL)+ WebSocket/SSE 实时事件管道
 
-### 2. ⚡️ 高并发、本地优先 Go 核心 (Go Backend Hub)
-- **纯 Go 免 GCC 依赖**：后端采用 Go（Gin + GORM）重构，支持纯 Go SQLite（CGO_ENABLED=0）与 PostgreSQL 无缝切换，极其轻量且内存占用低。
-- **实时事件推送管道**：基于 WebSocket + SSE 建立的高并发广播 Hub，支持全工作区 Presence 状态、Terminal 终端数据流、Event 实时推送。
+前端是桌面风格的 Next.js 界面(可作为 Web 应用或通过 Electron/SwiftUI 打包为桌面客户端),内置一套分层的深/浅色主题系统(`surface0`~`surface4` + 6 套配色)。
 
-### 3. 🎯 精准定向派发与单目标锁 (Targeted Mention Dispatcher)
-- **单目标优先路由管道**：当消息以 `@AgentName` 开头时，路由引擎自动激活首重精准锁，锁定该 Agent 独占回答，防止多 Agent 竞态并发抢答与陷入逻辑死锁。
-- **平滑回退机制**：按照 `显式 @ 锁` ➡️ `线程粘性 (Last Responder)` ➡️ `Master Agent` ➡️ `RouterLLM` ➡️ `轮询` 阶梯顺序精准分发。
-
-### 4. 📂 全格式文件沙箱与乱码自愈 (File Sandbox & Auto-Healing)
-- **全格式在线预览**：内置代码高亮、Markdown 渲染、PDF 文档嵌入、视频播放器与音频播放器。
-- **Mojibake 乱码秒级自愈 (`fixMojibake`)**：针对 Windows 环境下多字节中文字符写盘可能产生的双重 GBK/UTF-8 编码错位（Mojibake），前端在加载时自动进行反向解包与恢复，确保呈现 100% 干净通顺的中文。
-
-### 5. 🤖 共享控制与 Mission Control 指挥中心
-- **Mission Control 雷达大厅**：以 Agent 为第一主对象的指挥中心——展示 52Hz 动态雷达、实时 Agent 状态卡片、已装技能与全局事件流。
-- **共享浏览器沙箱**：基于 BrowserFabric / Playwright 的协同控制浏览器，支持全员观察截图、执行点击、导航与输入。
-
----
-
-## 🛠 系统架构全景图
+## 架构
 
 ```
-                    ┌───────────────────────────┐   ┌───────────────────────────────────┐
-                    │  Electron 桌面客户端 Shell  │   │   OpenAgents Go — 原生 macOS/iOS   │
-                    │     (packages/launcher)    │   │   SwiftUI 客户端 (packages/go)     │
-                    └─────────────┬───────────────┘   └─────────────────┬─────────────────┘
-                                  │ (内嵌 WebView / Local HTTP)                       │ (REST / SSE)
-                                  ▼                                                  │
-                             ┌───────────────────────────────────┐                   │
-                             │        Next.js 前端 UI 界面       │◄──────────────────┘
-                             │       (workspace/frontend)        │
-                             └─────────────────┬─────────────────┘
-                                               │ (HTTP / SSE / WebSocket)
-                                               ▼
-                             ┌───────────────────────────────────┐
-                             │        Go 核心后端服务 Engine       │
-                             │        (workspace/backend)        │
-                             └─────────────────┬─────────────────┘
-                                               │ (SQLite / PostgreSQL)
-                                               ▼
-                             ┌───────────────────────────────────┐
-                             │        持久化数据库 / 文件沙箱      │
-                             └───────────────────────────────────┘
-                                               ▲
-                                               │ (WS connection / Agent stdin/stdout)
-┌──────────────────────────────────────────────┴──────────────────────────────────────────────┐
-│                                Agent 连接器与守护进程 `wwj`                                  │
-│                                    (packages/wwj)                                          │
-│                                                                                             │
-│       [Claude Code]    [Codex Agent]    [OpenClaw]    [Cursor]    [Copilot]    [Aider]      │
-└─────────────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────┐   ┌────────────────────────────────┐
+│ Electron 桌面客户端 Shell   │   │  原生 macOS/iOS SwiftUI 客户端  │
+│   (packages/launcher)      │   │  SwiftUI 客户端 (packages/go)   │
+└─────────────┬───────────────┘   └────────────────┬────────────────┘
+              │ (内嵌 WebView / 本地 HTTP)                    │ (REST / SSE)
+              ▼                                              │
+        ┌───────────────────────────────┐                    │
+        │      Next.js 前端 UI          │◄───────────────────┘
+        │   (workspace/frontend)        │
+        └─────────────┬─────────────────┘
+                       │ (HTTP / SSE / WebSocket)
+                       ▼
+        ┌───────────────────────────────┐
+        │      Go 后端服务               │
+        │   (workspace/backend)         │
+        └─────────────┬─────────────────┘
+                       │ (SQLite / PostgreSQL)
+                       ▼
+        ┌───────────────────────────────┐
+        │      持久化数据库 / 文件沙箱     │
+        └───────────────────────────────┘
+                       ▲
+                       │ (WebSocket / Agent stdin↔stdout)
+┌──────────────────────┴──────────────────────────────────────────┐
+│                  Agent 连接器守护进程 `wwj`                       │
+│                     (packages/wwj)                              │
+│                                                                   │
+│  Claude Code · Codex · OpenClaw · Cursor · Copilot · Aider · Pi  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 📂 代码库全景地图
+## 代码库地图
 
 ```
 52hzAgents/
 ├── workspace/
-│   ├── backend/                     # Go 核心后端服务 (Gin + GORM)
-│   │   ├── cmd/server/              # 服务主入口
+│   ├── backend/              # Go 后端 (Gin + GORM)
+│   │   ├── cmd/server/       # 服务入口
 │   │   └── internal/
-│   │       ├── handlers/            # 路由(routing.go/routing_llm.go)、文件(files.go)、
-│   │       │                        # 终端(terminal.go)、共享浏览器(browser_fabric.go)、
-│   │       │                        # Agent 目录与运行时(agents_catalog.go/agent_runtime.go)、
-│   │       │                        # Todos/Routines/Timers/Knowledge/Shares/Notifications
-│   │       ├── hub/                 # WebSocket / SSE 事件广播 Hub
-│   │       ├── scheduler/           # Routine / Timer 后台调度循环
-│   │       ├── middleware/          # 鉴权与请求中间件
-│   │       ├── models/              # GORM 数据库 Schema 架构
-│   │       └── db/                  # SQLite (纯 Go, CGO_ENABLED=0) / PostgreSQL 驱动层
-│   └── frontend/                    # Next.js 16 + React 19 Web / 桌面工作区前端
-│       ├── app/                     # Next.js App Router ([workspaceId]、share 只读分享页)
-│       ├── components/
-│       │   ├── layout/              # 320px 侧边栏、主题切换(theme-switcher.tsx)
-│       │   ├── chat/threads/inbox/  # 对话面板、线程列表、收件箱
-│       │   ├── files/knowledge/     # 文件全格式预览、知识库
-│       │   ├── terminal/browser/    # 交互式终端、共享浏览器沙箱
-│       │   ├── mission/monitor/     # Mission Control 雷达大厅、Agent 监控
-│       │   ├── routines/timers/tasks/skills/  # 例行任务、定时器、待办、技能装配
-│       │   ├── connect/invitations/sessions/  # Agent 接入、邀请、会话管理
-│       │   ├── settings/           # 工作区与账号设置
-│       │   ├── ui/                 # Paseo 基础 Primitives (status-badge, segmented-control)
-│       │   └── headers/            # 桌面 300 字重标题 (screen-title.tsx)
-│       ├── styles/                 # globals.css（Paseo surface0..4 + 6 套主题变量定义）
-│       └── lib/                    # identity-colors.ts、paseo-theme.ts、api.ts、auth-context.tsx
+│   │       ├── handlers/     # 路由、文件、终端、Agent 目录与运行时
+│   │       ├── hub/          # WebSocket / SSE 事件广播
+│   │       ├── scheduler/    # Routine / Timer 后台调度
+│   │       ├── middleware/   # 鉴权与请求中间件
+│   │       ├── models/       # GORM 数据模型
+│   │       └── db/           # SQLite (纯 Go) / PostgreSQL 驱动
+│   └── frontend/             # Next.js + React 前端
+│       ├── app/              # App Router
+│       ├── components/       # 聊天、文件、终端、浏览器、Mission Control 等模块
+│       ├── styles/           # 主题变量 (globals.css)
+│       └── lib/              # API 客户端、主题、身份色等工具
 ├── packages/
-│   ├── launcher/                    # Electron 42 + Vite 桌面端 Native App Shell (Windows/macOS/Linux)，内置捆绑 wwj
-│   ├── go/                          # OpenAgents Go — 原生 SwiftUI macOS + iOS 客户端
-│   └── wwj/                         # 本地 Agent 守护进程与库 (`wwj` CLI，@woowonjae/wwj)
-├── sdk/                              # Studio / 社区知识库示例等外部集成脚手架
-├── docs/
-│   ├── assets/                      # 品牌 Logo、视觉 Banner 与 Demo 演示动图
-│   └── projects/                    # 架构与迁移相关的设计笔记
-└── 启动桌面端.bat                    # Windows 一键启动脚本
+│   ├── wwj/                  # Agent 连接器守护进程与 CLI (`wwj`)
+│   ├── launcher/             # Electron 桌面端 App Shell (内置捆绑 wwj)
+│   └── go/                   # 原生 SwiftUI macOS/iOS 客户端
+├── sdk/                       # Studio / 集成脚手架
+└── docs/                      # 品牌素材与架构设计笔记
 ```
 
----
-
-## 🚀 快速开始与部署指南
-
-### 方式 A — 一键启动 Windows 桌面/Web 环境 (推荐)
-
-项目内置免 GCC 的纯 Go SQLite 驱动，运行下方 PowerShell 脚本即可秒开环境：
+## 快速开始
 
 ```powershell
-# 1) 一键启动 Go 后端 (http://localhost:8000) 与 Web 前端 (http://localhost:3005)
+# Windows:一条命令启动 Go 后端 (localhost:8000) 与前端 (localhost:3005)
 .\workspace\dev-sqlite.ps1
 
-# 停止服务：
+# 停止:
 .\workspace\dev-sqlite.ps1 -Stop
 ```
 
-### 方式 B — 启动 Electron 桌面客户端
+完整的手动启动步骤、Docker/PostgreSQL 集成方式、环境变量与自托管部署说明见 [`workspace/README.md`](workspace/README.md)。
 
-开发模式下编译并启动 Electron 桌面端窗口：
+## 接入 Agent
 
-```bash
-cd packages/launcher
-npm run build
-npx electron .
-```
-
-### 方式 C — 分步手动启动
-
-**1. 启动 Go 后端服务 (SQLite 模式，免 CGO)**
+通过本地守护进程 `wwj`(详见 [`packages/wwj`](packages/wwj/README.md),Electron 客户端内已捆绑同一份实现)接入本地 Agent:
 
 ```bash
-cd workspace/backend
-
-# 设置 Go 代理与 SQLite 环境变量
-$env:GOPROXY = "https://goproxy.cn,direct"
-$env:CGO_ENABLED = "0"
-$env:DATABASE_URL = "sqlite://./workspace.db"
-
-# 启动后端
-go run ./cmd/server
-```
-
-**2. 启动前端 UI 界面**
-
-```bash
-cd workspace/frontend
-npm install
-$env:NEXT_PUBLIC_API_URL = "http://localhost:8000"
-npm run dev
-```
-
-打开浏览器访问 `http://localhost:3005` 即可进入工作区。
-
----
-
-## 🤖 接入您的 AI 智能体
-
-通过本地守护进程 `wwj`（详见 [`packages/wwj`](packages/wwj/README.md)，也是 Electron 桌面客户端内置捆绑的同一份实现）连接本地 Agent：
-
-```bash
-# 0) 安装 CLI（或直接使用 packages/launcher 内捆绑的版本）
+# 安装 CLI
 npm install -g ./packages/wwj
 
-# 1) 启动后台守护进程
+# 启动守护进程
 wwj up
 
-# 2) 创建本地 Agent（--type 支持 claude / codex / openclaw / cursor / aider / gemini 等）
+# 创建 Agent(--type 支持 claude / codex / openclaw / cursor / aider / gemini / pi 等)
 wwj create my-agent --type claude
 
-# 3) 配置密钥（按 Agent 类型设置对应环境变量）
-wwj env openclaw --set LLM_API_KEY=sk-...
+# 配置密钥(按 Agent 类型设置对应环境变量)
+wwj env claude --set LLM_API_KEY=sk-...
 
-# 4) 连接到自托管 Workspace，实时双向桥接其 stdin/stdout
+# 连接到自托管的 Workspace,双向桥接其 stdin/stdout
 wwj connect my-agent <workspace-token-or-id>
 
-# 查看状态 / 日志 / 断开连接
+# 状态 / 日志 / 断开
 wwj status
 wwj logs
 wwj down
 ```
 
-> macOS / iOS 用户也可以使用原生 SwiftUI 客户端 **OpenAgents Go**（[`packages/go`](packages/go/README.md)），以 iMessage 式双栏布局连接同一个自托管 Workspace。
+macOS / iOS 用户也可以使用原生 SwiftUI 客户端 [`packages/go`](packages/go/README.md) 连接同一个自托管 Workspace。
 
----
+## 贡献
 
-## 📄 开源许可证
+欢迎 Issue 与 PR,提交前请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-本项目采用 [MIT License](LICENSE) 许可证开源。
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 开源。

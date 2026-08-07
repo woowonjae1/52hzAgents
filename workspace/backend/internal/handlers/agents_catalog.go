@@ -89,7 +89,7 @@ func GetAgentCatalog(c *gin.Context) {
 		{
 			"name":            "pi",
 			"label":           "Pi Agent",
-			"description":     "A mathematical and reasoning agent designed for algorithmic challenges.",
+			"description":     "Multi-provider coding agent CLI with read/bash/edit/write tools (@earendil-works/pi-coding-agent).",
 			"install_command": "wwj install pi",
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"coding", "cli"},
