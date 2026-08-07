@@ -22,31 +22,19 @@ import (
 )
 
 func toUTF8String(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
 	if utf8.ValidString(s) && !strings.Contains(s, "\ufffd") {
-		hasMojibake := false
-		for _, r := range s {
-			if r >= 0x80 && r <= 0xff {
-				hasMojibake = true
-				break
-			}
-		}
-		if !hasMojibake {
-			return strings.TrimSpace(s)
-		}
-		latinBytes := []byte(s)
-		r := transform.NewReader(bytes.NewReader(latinBytes), simplifiedchinese.GBK.NewDecoder())
-		decoded, err := io.ReadAll(r)
-		if err == nil && utf8.Valid(decoded) && len(decoded) > 0 {
-			return strings.TrimSpace(string(decoded))
-		}
-		return strings.TrimSpace(s)
+		return s
 	}
 	r := transform.NewReader(bytes.NewReader([]byte(s)), simplifiedchinese.GBK.NewDecoder())
 	decoded, err := io.ReadAll(r)
 	if err == nil && utf8.Valid(decoded) && len(decoded) > 0 {
 		return strings.TrimSpace(string(decoded))
 	}
-	return strings.TrimSpace(strings.ReplaceAll(s, "\ufffd", ""))
+	return strings.ReplaceAll(s, "\ufffd", "")
 }
 
 // PutTodoItem 代表单个代办事项项的参数。

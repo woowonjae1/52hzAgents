@@ -654,7 +654,11 @@ class BaseAdapter {
         // 方案 2 落地：禁止 Agent 自动对系统连线或非目标消息打招呼。
         // 只有当消息来自用户 (human)，或者显式 @ 当前 Agent / 指定 targetAgents 时才激活回应。
         const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || (msg.senderId || '').startsWith('human:') || (msg.senderId || '').startsWith('user:');
-        const mentionsMe = Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName);
+        const mentionsMe = (Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName)) ||
+          (typeof msg.content === 'string' && (
+            msg.content.includes(`@${this.agentName}`) ||
+            msg.content.toLowerCase().includes(`@${this.agentName.toLowerCase()}`)
+          ));
         const targetedMe = Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName);
         const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 

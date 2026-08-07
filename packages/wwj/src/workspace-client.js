@@ -771,7 +771,17 @@ class WorkspaceClient {
       senderType: isHuman ? 'human' : 'agent',
       senderName,
       content: (payload.content || event.content || ''),
-      mentions: payload.mentions || [],
+      mentions: (() => {
+        const m = Array.isArray(payload.mentions) ? [...payload.mentions] : [];
+        const text = payload.content || event.content || '';
+        if (text) {
+          const matches = Array.from(text.matchAll(/@([a-zA-Z0-9._-]+)/g), (mat) => mat[1]);
+          for (const item of matches) {
+            if (!m.includes(item)) m.push(item);
+          }
+        }
+        return m;
+      })(),
       messageType: payload.message_type || 'chat',
       metadata: event.metadata || {},
     };
