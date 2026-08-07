@@ -58,17 +58,46 @@ class PiAdapter extends BaseAdapter {
   // ------------------------------------------------------------------
 
   _findPiBinary() {
-    // Tier 0: isolated per-agent runtime prefix (~/.wwj/runtimes/pi/)
-    const runtimeBin = path.join(
-      getRuntimePrefix('pi'), 'node_modules', '.bin', IS_WINDOWS ? 'pi.cmd' : 'pi'
-    );
-    if (fs.existsSync(runtimeBin)) return runtimeBin;
+    // Tier 0: Check if workingDir points to pi source repository
+    if (this.workingDir) {
+      const sourceCli = path.join(this.workingDir, 'packages', 'coding-agent', 'dist', 'cli.js');
+      if (fs.existsSync(sourceCli)) {
+        this._piJsPath = sourceCli;
+        return process.execPath;
+      }
+    }
 
-    // Tier 1: PATH + npm-global (codepage-safe lookup shared by every adapter)
+    // Tier 1: isolated per-agent runtime prefix (~/.wwj/runtimes/pi/)
+    const runtimeJs = path.join(getRuntimePrefix('pi'), 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
+    if (fs.existsSync(runtimeJs)) {
+      this._piJsPath = runtimeJs;
+      return process.execPath;
+    }
+
+    // Tier 2: npm-global node_modules entrypoint
+    const globalAppdata = process.env.APPDATA || (HOME ? path.join(HOME, 'AppData', 'Roaming') : '');
+    if (globalAppdata) {
+      const globalJs = path.join(globalAppdata, 'npm', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
+      if (fs.existsSync(globalJs)) {
+        this._piJsPath = globalJs;
+        return process.execPath;
+      }
+    }
+
+    // Tier 3: PATH + npm-global lookup
     const viaWhere = whereBinary('pi');
-    if (viaWhere) return viaWhere;
+    if (viaWhere) {
+      if (viaWhere.endsWith('.cmd')) {
+        const cmdJs = path.join(path.dirname(viaWhere), 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
+        if (fs.existsSync(cmdJs)) {
+          this._piJsPath = cmdJs;
+          return process.execPath;
+        }
+      }
+      return viaWhere;
+    }
 
-    // Tier 2 (Windows only): fall back to a WSL install if one exists.
+    // Tier 4 (Windows only): fall back to WSL
     if (IS_WINDOWS) {
       const wslPath = this._resolveWslPi();
       if (wslPath) {
@@ -182,7 +211,11 @@ class PiAdapter extends BaseAdapter {
     if (!this._piBin) {
       throw new Error('pi CLI not found. Install with: npm install -g @earendil-works/pi-coding-agent');
     }
-    const args = ['--session-id', sessionKey, '--no-context-files'];
+    const args = [];
+    if (this._piJsPath) {
+      args.push(this._piJsPath);
+    }
+    args.push('--session-id', sessionKey, '--no-context-files');
     if (this.piProvider) args.push('--provider', this.piProvider);
     if (this.piModel) args.push('--model', this.piModel);
     // -p consumes the very next token as the message, so it must come last.
@@ -205,13 +238,14 @@ class PiAdapter extends BaseAdapter {
       spawnArgs = ['-e', this._piBin, ...args];
     }
 
+    const isDirectJs = Boolean(this._piJsPath);
     const proc = spawn(spawnBin, spawnArgs, {
       env,
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: !IS_WINDOWS && !this._piViaWsl,
       windowsHide: true,
-      shell: IS_WINDOWS && Boolean(spawnBin && (spawnBin.endsWith('.cmd') || spawnBin.endsWith('.bat'))),
+      shell: !isDirectJs && IS_WINDOWS && Boolean(spawnBin && (spawnBin.endsWith('.cmd') || spawnBin.endsWith('.bat'))),
     });
     this._channelProcesses[channelName] = proc;
 
