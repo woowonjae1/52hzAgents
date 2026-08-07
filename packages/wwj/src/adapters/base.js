@@ -17,6 +17,7 @@
 
 'use strict';
 
+const fs = require('fs');
 const { WorkspaceClient, SessionRevokedError } = require('../workspace-client');
 const { generateSessionTitle, SESSION_DEFAULT_RE } = require('./utils');
 const { defaultAgentWorkdir } = require('../paths');
@@ -42,6 +43,12 @@ const HEARTBEAT_ERROR_THRESHOLD = 2;
 // consecutive agent-to-agent turns processed per channel and refuses once the
 // limit is hit, regardless of message wording. Any human message resets it.
 const MAX_AGENT_HOPS_WITHOUT_HUMAN = 20;
+
+// How long _resolveWorkingDir() trusts its per-channel cache before re-checking
+// the channel's bound directory. Short enough that toggling/re-pointing Open
+// Folder on a thread takes effect quickly; long enough to avoid a network
+// round trip on every single message.
+const WORKING_DIR_CACHE_TTL_MS = 15000;
 
 class BaseAdapter {
   /**
@@ -687,19 +694,14 @@ class BaseAdapter {
 
           const contentStr = typeof msg.content === 'string' ? msg.content : '';
 
-          // 1. Completion / wrap-up guard: stop ping-pong if message indicates tasks/reports are finished
-          const isFinished = /(任务|流程|工作|审查)(已|全|全部)?(完成|结束|完毕)|确认——报告已完成|所有三步协作|任务已全部完成|还有什么要做的吗|不需要再次|不存在/i.test(contentStr);
-          if (isFinished) {
-            this._log(`Ignoring agent message from ${msg.senderName}: completion / wrap-up message detected`);
-            continue;
-          }
-
-          // 2. Action directive guard: agent-to-agent message must contain an explicit action directive for this.agentName
-          const actionRegex = new RegExp(`(?:请|步骤|step|让|由|交给)\\s*@?${this.agentName}`, 'i');
+          // 1. Action directive guard: check if message explicitly requests action from this.agentName
+          const actionRegex = new RegExp(`(?:请|步骤|step|让|由|交给|分派)\\s*@?${this.agentName}|@?${this.agentName}\\s*(?:请|处理|负责|编写|实现)`, 'i');
           const hasDirectAction = actionRegex.test(contentStr) || (Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName));
 
-          if (!hasDirectAction) {
-            this._log(`Ignoring agent message from ${msg.senderName}: no direct action requested for ${this.agentName}`);
+          // 2. Completion / wrap-up guard: if no direct action requested or if general wrap-up without explicit delegation, ignore
+          const isFinished = /(任务|流程|工作|审查)(已|全|全部)?(完成|结束|完毕)|确认——报告已完成|所有三步协作|任务已全部完成|还有什么要做的吗|不需要再次|不存在/i.test(contentStr);
+          if (!hasDirectAction || (isFinished && !actionRegex.test(contentStr))) {
+            this._log(`Ignoring agent message from ${msg.senderName}: no direct action for ${this.agentName} or completion wrap-up message`);
             continue;
           }
 
@@ -843,6 +845,45 @@ class BaseAdapter {
     } catch (e) {
       this._log(`Failed to auto-title channel: ${e.message}`);
     }
+  }
+
+  /**
+   * Resolve the working directory a CLI-driving adapter should spawn into for
+   * this channel/thread ("Open Folder" mode). Falls back to the agent-level
+   * default (this.workingDir, or the per-agent sandbox) when the channel has
+   * no bound directory, or when the bound directory doesn't exist on this
+   * machine (e.g. typo, or the agent runs on a different host than the one
+   * that set it).
+   *
+   * Cached per channel for WORKING_DIR_CACHE_TTL_MS so every message doesn't
+   * pay a network round trip — call after computing `channel` for a message,
+   * not once at adapter startup, since the binding is per-thread not per-agent.
+   */
+  async _resolveWorkingDir(channel) {
+    this._workingDirCache = this._workingDirCache || new Map();
+    const cached = this._workingDirCache.get(channel);
+    const now = Date.now();
+    if (cached && now - cached.at < WORKING_DIR_CACHE_TTL_MS) {
+      return cached.value;
+    }
+
+    const fallback = this.workingDir || defaultAgentWorkdir(this.agentName);
+    let resolved = fallback;
+    try {
+      const info = await this.client.getSession(this.workspaceId, channel, this.token);
+      if (info.workingDir) {
+        if (fs.existsSync(info.workingDir)) {
+          resolved = info.workingDir;
+        } else {
+          this._log(`Channel ${channel} is bound to '${info.workingDir}' but it doesn't exist on this machine — falling back to default sandbox`);
+        }
+      }
+    } catch (e) {
+      this._log(`Failed to resolve channel working dir for ${channel}: ${e.message}`);
+    }
+
+    this._workingDirCache.set(channel, { value: resolved, at: now });
+    return resolved;
   }
 
   // ------------------------------------------------------------------
