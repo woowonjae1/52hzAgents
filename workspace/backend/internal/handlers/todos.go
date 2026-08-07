@@ -65,8 +65,21 @@ func getAgentNameFromSource(source string) string {
 // PutTodos 处理 PUT /v1/todos 接口，替换调用端在特定通道下的全部 Todos 并广播协同消息。
 func PutTodos(c *gin.Context) {
 	var req PutTodosRequest // 声明接收载荷。
-	// 绑定 JSON。
-	if err := c.ShouldBindJSON(&req); err != nil {
+	bodyBytes, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// If raw bytes sent by Windows curl.exe are GBK encoded, decode to UTF-8 first
+	if !utf8.Valid(bodyBytes) {
+		r := transform.NewReader(bytes.NewReader(bodyBytes), simplifiedchinese.GBK.NewDecoder())
+		if decoded, err := io.ReadAll(r); err == nil && utf8.Valid(decoded) {
+			bodyBytes = decoded
+		}
+	}
+
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

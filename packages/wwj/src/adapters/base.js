@@ -662,9 +662,31 @@ class BaseAdapter {
         const targetedMe = Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName);
         const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 
-        if (isSelf || (!isHuman && !mentionsMe && !targetedMe)) {
-          this._log(`Ignoring non-targeted message from ${msg.senderName || msg.senderId}`);
-          continue;
+        if (isSelf) continue;
+
+        if (!isHuman) {
+          if (!mentionsMe && !targetedMe) {
+            this._log(`Ignoring non-targeted message from ${msg.senderName || msg.senderId}`);
+            continue;
+          }
+
+          const contentStr = typeof msg.content === 'string' ? msg.content : '';
+
+          // 1. Completion / wrap-up guard: stop ping-pong if message indicates tasks/reports are finished
+          const isFinished = /(任务|流程|工作|审查)(已|全|全部)?(完成|结束|完毕)|确认——报告已完成|所有三步协作|任务已全部完成|还有什么要做的吗|不需要再次|不存在/i.test(contentStr);
+          if (isFinished) {
+            this._log(`Ignoring agent message from ${msg.senderName}: completion / wrap-up message detected`);
+            continue;
+          }
+
+          // 2. Action directive guard: agent-to-agent message must contain an explicit action directive for this.agentName
+          const actionRegex = new RegExp(`(?:请|步骤|step|让|由|交给)\\s*@?${this.agentName}`, 'i');
+          const hasDirectAction = actionRegex.test(contentStr) || (Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName));
+
+          if (!hasDirectAction) {
+            this._log(`Ignoring agent message from ${msg.senderName}: no direct action requested for ${this.agentName}`);
+            continue;
+          }
         }
 
         incoming.push(msg);
