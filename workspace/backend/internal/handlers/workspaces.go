@@ -233,6 +233,7 @@ type EditChannelRequest struct {
 	Starred                  *bool   `json:"starred"`                   // 是否星标
 	OrchestrationMode        *string `json:"orchestration_mode"`        // 编排模式: dynamic | master | workflow
 	OrchestrationInstruction *string `json:"orchestration_instruction"` // 编排指令内容
+	WorkingDir               *string `json:"working_dir"`               // 该线程绑定的本地项目目录（Open Folder 模式），空字符串表示解绑
 }
 
 // PatchChannel 处理 PATCH /v1/workspaces/:workspace_id/channels/:channel_name 路由，更新通道配置。
@@ -283,6 +284,13 @@ func PatchChannel(c *gin.Context) {
 	}
 	if req.OrchestrationInstruction != nil {
 		ch.OrchestrationInstruction = req.OrchestrationInstruction
+	}
+	if req.WorkingDir != nil {
+		if *req.WorkingDir == "" {
+			ch.WorkingDir = nil
+		} else {
+			ch.WorkingDir = req.WorkingDir
+		}
 	}
 
 	// 保存数据库修改。

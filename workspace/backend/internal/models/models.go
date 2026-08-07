@@ -80,6 +80,7 @@ type Channel struct {
 	Status                   string    `gorm:"type:text;default:active;index:idx_channels_workspace_status;index:idx_channels_status_last_event" json:"status"`
 	Starred                  bool      `gorm:"type:boolean;default:false" json:"starred"`
 	LastEventAt              *int64    `gorm:"type:bigint;index:idx_channels_status_last_event" json:"last_event_at"`
+	WorkingDir               *string   `gorm:"type:text" json:"working_dir"`
 	CreatedAt                time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 

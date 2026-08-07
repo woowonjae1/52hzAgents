@@ -398,7 +398,7 @@ class ClaudeAdapter extends BaseAdapter {
     return null;
   }
 
-  _buildClaudeCmd(prompt, channelName, { skipResume = false, browserEnabled = false } = {}) {
+  _buildClaudeCmd(prompt, channelName, { skipResume = false, browserEnabled = false, workingDir } = {}) {
     const claudeBin = this._findClaudeBinary();
     if (!claudeBin) {
       throw new Error('claude CLI not found. Install with: curl -fsSL https://claude.ai/install.sh | bash');
@@ -429,7 +429,7 @@ class ClaudeAdapter extends BaseAdapter {
 
     // ── Skills mode: write SKILL.md, no MCP server ──
     if (this.toolMode === 'skills') {
-      return this._buildSkillsCmd(cmd, channelName);
+      return this._buildSkillsCmd(cmd, channelName, workingDir);
     }
 
     // ── MCP mode (default): spawn MCP server ──
@@ -439,7 +439,7 @@ class ClaudeAdapter extends BaseAdapter {
   /**
    * Skills mode: write a SKILL.md file and allow Bash + curl for workspace ops.
    */
-  _buildSkillsCmd(cmd, channelName) {
+  _buildSkillsCmd(cmd, channelName, workingDir) {
     if (this._mode === 'plan') {
       cmd.push('--permission-mode', 'plan');
       cmd.push('--allowedTools', 'Read', 'Glob', 'Grep', 'Bash');
@@ -451,7 +451,7 @@ class ClaudeAdapter extends BaseAdapter {
     // Write SKILL.md to .claude/skills/ in the working directory. Never use
     // process.cwd() as the fallback — on a packaged Windows daemon that is
     // C:\WINDOWS\system32 and mkdir there throws EPERM.
-    const workDir = this.workingDir || defaultAgentWorkdir(this.agentName);
+    const workDir = workingDir || this.workingDir || defaultAgentWorkdir(this.agentName);
     const skillDir = path.join(workDir, '.claude', 'skills');
     fs.mkdirSync(skillDir, { recursive: true });
     const skillFile = path.join(skillDir, 'wwj-workspace.md');
@@ -664,7 +664,7 @@ class ClaudeAdapter extends BaseAdapter {
    * Spawn a persistent Claude process for a channel that accepts messages
    * via stdin (--input-format stream-json). Returns the persistent proc entry.
    */
-  _spawnPersistentProc(channel, cmd, cleanEnv) {
+  _spawnPersistentProc(channel, cmd, cleanEnv, workingDir) {
     // Remove -p and its argument from cmd — prompts go via stdin
     const filteredCmd = [];
     for (let i = 0; i < cmd.length; i++) {
@@ -696,7 +696,7 @@ class ClaudeAdapter extends BaseAdapter {
     const proc = spawn(finalCmd[0], finalCmd.slice(1), {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: cleanEnv,
-      cwd: this.workingDir,
+      cwd: workingDir || this.workingDir,
       detached: !IS_WINDOWS,
       windowsHide: true,
     });
@@ -925,6 +925,10 @@ class ClaudeAdapter extends BaseAdapter {
     if (!content) return;
 
     const msgChannel = msg.sessionId || this.channelName;
+    // Resolved once per message (not stashed on `this`) — multiple channels can
+    // be in flight concurrently on the same adapter instance, each potentially
+    // bound to a different "Open Folder" directory.
+    const resolvedWorkingDir = await this._resolveWorkingDir(msgChannel);
     this._stoppingChannels.delete(msgChannel);
     this._stopNoticeSent.delete(msgChannel);
     const sender = msg.senderName || msg.senderType || 'user';
@@ -1081,6 +1085,7 @@ class ClaudeAdapter extends BaseAdapter {
         const built = this._buildClaudeCmd(effectiveContent, msgChannel, {
           skipResume: attempt > 0,
           browserEnabled,
+          workingDir: resolvedWorkingDir,
         });
         cmd = built.cmd;
         mcpConfigFile = built.mcpConfigFile;
@@ -1090,7 +1095,7 @@ class ClaudeAdapter extends BaseAdapter {
       }
 
       try {
-        const pp = this._spawnPersistentProc(msgChannel, cmd, cleanEnv);
+        const pp = this._spawnPersistentProc(msgChannel, cmd, cleanEnv, resolvedWorkingDir);
         this._log(`Spawned persistent process for ${msgChannel} (attempt ${attempt + 1})`);
 
         const result = await this._sendToPersistentProc(pp, effectiveContent);
@@ -1124,7 +1129,7 @@ class ClaudeAdapter extends BaseAdapter {
 
         if (this._mode === 'plan') {
           try {
-            const planDir = path.join(this.workingDir || defaultAgentWorkdir(this.agentName), '.claude', 'plans');
+            const planDir = path.join(resolvedWorkingDir || defaultAgentWorkdir(this.agentName), '.claude', 'plans');
             if (fs.existsSync(planDir)) {
               const planFiles = fs.readdirSync(planDir)
                 .filter((f) => f.endsWith('.md'))

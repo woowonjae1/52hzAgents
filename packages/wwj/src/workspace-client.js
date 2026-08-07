@@ -397,6 +397,7 @@ class WorkspaceClient {
         titleManuallySet: result.titleManuallySet || false,
         resumeFrom: result.resumeFrom || null,
         status: result.status || 'active',
+        workingDir: result.working_dir || null,
       };
     } catch {
       return { sessionId: channelName, title: channelName, status: 'active' };
@@ -406,11 +407,12 @@ class WorkspaceClient {
   /**
    * Update session/channel info via PATCH /v1/workspaces/{id}/channels/{name}.
    */
-  async updateSession(workspaceId, channelName, token, { title, status, autoTitle } = {}) {
+  async updateSession(workspaceId, channelName, token, { title, status, autoTitle, workingDir } = {}) {
     const body = {};
     if (title !== undefined) body.title = title;
     if (status !== undefined) body.status = status;
     if (autoTitle !== undefined) body.auto_title = autoTitle;
+    if (workingDir !== undefined) body.working_dir = workingDir;
     try {
       await this._patch(
         `/v1/workspaces/${workspaceId}/channels/${channelName}`,

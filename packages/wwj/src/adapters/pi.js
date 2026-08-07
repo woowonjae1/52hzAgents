@@ -23,7 +23,7 @@ const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
 const { buildOpenclawSystemPrompt } = require('./workspace-prompt');
-const { whereBinary, getRuntimePrefix, defaultAgentWorkdir } = require('../paths');
+const { whereBinary, getRuntimePrefix } = require('../paths');
 
 const IS_WINDOWS = process.platform === 'win32';
 const MAX_HISTORY_ENTRIES = 12;
@@ -187,7 +187,7 @@ class PiAdapter extends BaseAdapter {
         mode: this._mode,
         disabledModules: this.disabledModules,
       }),
-      '\n## OpenAgents-specific Rules',
+      '\n## 52hzAgents-specific Rules',
       '- Your final text response is posted back to the workspace automatically.',
       '- If you need to ask the user something, ask in normal text. Do not try to open an interactive prompt.',
       '- Do not reveal secrets, tokens, raw auth headers, or internal command lines.',
@@ -229,7 +229,7 @@ class PiAdapter extends BaseAdapter {
     this._log(`Running pi (channel=${channelName}, session=${sessionKey})`);
 
     const env = { ...(this.agentEnv || process.env) };
-    const cwd = this.workingDir || defaultAgentWorkdir(this.agentName);
+    const cwd = await this._resolveWorkingDir(channelName);
 
     let spawnBin = this._piBin;
     let spawnArgs = args;

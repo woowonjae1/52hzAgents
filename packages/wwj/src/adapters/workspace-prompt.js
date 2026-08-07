@@ -79,7 +79,7 @@ function buildWorkspaceIdentity(agentName, workspaceId, channelName, mode = 'exe
       'be different from where you are.\n'
     );
   return (
-    `You are agent '${agentName}' connected to an OpenAgents workspace.\n` +
+    `You are agent '${agentName}' connected to a 52hzAgents workspace.\n` +
     'Your text responses are automatically posted to the workspace chat ' +
     '— just write your answer naturally.\n\n' +
     '## Workspace Context\n' +
@@ -620,7 +620,7 @@ function buildOpenclawSkillMd({ endpoint, workspaceId, token, agentName, channel
     '---\n' +
     'name: wwj-workspace\n' +
     'description: "Share files, browse websites, and collaborate ' +
-    'with other agents in an OpenAgents workspace. Use when: ' +
+    'with other agents in an 52hzAgents workspace. Use when: ' +
     '(1) sharing results or reports with the user or other agents, ' +
     '(2) browsing a website to gather information, ' +
     '(3) reading files shared by users or other agents, ' +
@@ -659,11 +659,11 @@ function buildOpenCodeSkillMd({ endpoint, workspaceId, token, agentName, channel
   const frontmatter =
     '---\n' +
     'name: wwj-workspace\n' +
-    'description: OpenAgents Workspace API — shared files, browser, and agent collaboration\n' +
+    'description: 52hzAgents Workspace API — shared files, browser, and agent collaboration\n' +
     '---\n\n';
 
   const identity =
-    `You are agent '${agentName}' connected to OpenAgents workspace ${workspaceId}.\n` +
+    `You are agent '${agentName}' connected to 52hzAgents workspace ${workspaceId}.\n` +
     'Use these APIs via bash + curl to interact with the workspace.\n\n';
 
   return frontmatter + identity + api + '\n' + buildGuardrails();
@@ -692,7 +692,7 @@ function buildClaudeSkillMd({ endpoint, workspaceId, token, agentName, channelNa
     '---\n' +
     'name: wwj-workspace\n' +
     'description: |\n' +
-    '  OpenAgents Workspace collaboration tools — shared files, browser,\n' +
+    '  52hzAgents Workspace collaboration tools — shared files, browser,\n' +
     '  and multi-agent coordination. Use when: sharing files or reports,\n' +
     '  browsing websites, reading shared files, checking workspace agents,\n' +
     '  or collaborating with other agents via @mentions.\n' +
@@ -723,7 +723,7 @@ function buildCursorSkillMd({ endpoint, workspaceId, token, agentName, channelNa
     '---\n' +
     'name: wwj-workspace\n' +
     'description: |\n' +
-    '  OpenAgents Workspace collaboration tools — shared files, browser,\n' +
+    '  52hzAgents Workspace collaboration tools — shared files, browser,\n' +
     '  and multi-agent coordination. Use when: sharing files or reports,\n' +
     '  browsing websites, reading shared files, checking workspace agents,\n' +
     '  or collaborating with other agents via @mentions.\n' +

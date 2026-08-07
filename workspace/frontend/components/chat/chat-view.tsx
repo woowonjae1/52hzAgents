@@ -19,7 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, MessageSquarePlus, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, Terminal } from 'lucide-react';
+import { ListTree, MessageSquare, MessageSquarePlus, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, Terminal, FolderOpen } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -608,6 +608,15 @@ export function ChatView() {
             >
               {currentSession?.title || 'Thread'}
             </h2>
+          )}
+          {currentSession?.workingDir && (
+            <span
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium shrink-0"
+              title={`Open Folder: ${currentSession.workingDir}`}
+            >
+              <FolderOpen className="size-2.5" />
+              {currentSession.workingDir.split(/[\\/]/).filter(Boolean).pop()}
+            </span>
           )}
           {(() => {
             const participants = currentSession?.participants || [];

@@ -240,7 +240,7 @@ class HermesAdapter extends BaseAdapter {
         mode: this._mode,
         disabledModules: this.disabledModules,
       }),
-      '\n## OpenAgents-specific Rules',
+      '\n## 52hzAgents-specific Rules',
       '- Your final text response is posted back to the workspace automatically.',
       '- If you need to ask the user something, ask in normal text. Do not try to open an interactive prompt.',
       '- Do not reveal secrets, tokens, raw auth headers, or internal command lines.',

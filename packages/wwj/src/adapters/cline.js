@@ -434,7 +434,7 @@ class ClineAdapter extends BaseAdapter {
    *  Cline keeps its own coding system prompt, and `-s` would replace it. */
   _contextHeader(channel) {
     const lines = [
-      `[OpenAgents workspace] You are "${this.agentName}", a coding agent in workspace channel "${channel}".`,
+      `[52hzAgents workspace] You are "${this.agentName}", a coding agent in workspace channel "${channel}".`,
     ];
     if (this._mode === 'plan') {
       lines.push('You are in PLAN mode: investigate and propose a plan; do not modify files.');

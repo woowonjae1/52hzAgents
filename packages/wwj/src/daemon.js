@@ -2,10 +2,19 @@
 
 const fs = require('fs');
 const path = require('path');
-const { spawn, execSync, execFileSync } = require('child_process');
+const http = require('http');
+const { spawn, execSync, execFileSync, execFile } = require('child_process');
 const os = require('os');
 const { WorkspaceClient } = require('./workspace-client');
 const { getEnhancedEnv, whichBinary, IS_WINDOWS, defaultAgentWorkdir } = require('./paths');
+
+// Local-only HTTP server so the (browser-based) frontend can offer a real
+// folder picker for "Open Folder" threads. A browser can never learn a real
+// absolute filesystem path on its own — the File System Access API only
+// yields an opaque, non-transferable directory handle — but wwj runs on the
+// actual machine and can list real paths. Bound to 127.0.0.1 only: this must
+// never be reachable from another host on the network.
+const BROWSE_SERVER_PORT = Number(process.env.WWJ_BROWSE_PORT) || 47893;
 
 /**
  * Agent process lifecycle manager.
@@ -94,6 +103,8 @@ class Daemon {
     // Watch config file for hot-reload
     this._watchConfig();
 
+    this._startBrowseServer();
+
     this._writeStatus();
     this._cachedAgentNames = new Set(agents.map(a => a.name));
     this._cachedAgentConfigs = {};
@@ -122,6 +133,7 @@ class Daemon {
     if (this._statusInterval) clearInterval(this._statusInterval);
     if (this._cmdInterval) clearInterval(this._cmdInterval);
     if (this._configWatcher) { try { this._configWatcher.close(); } catch {} }
+    if (this._browseServer) { try { this._browseServer.close(); } catch {} }
 
     // Kill all child processes
     const kills = Object.keys(this._processes).map((name) =>
@@ -953,6 +965,116 @@ class Daemon {
   _cleanupPid() {
     try { fs.unlinkSync(this.config.pidFile); } catch {}
     try { fs.unlinkSync(this.config.statusFile); } catch {}
+  }
+
+  // ---------------------------------------------------------------------------
+  // Local folder-browse server (real "Open Folder" picker for the frontend)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Trigger a REAL native OS folder-picker dialog and resolve to the chosen
+   * absolute path (or null if the user cancelled). wwj runs on the actual
+   * desktop with real GUI access, so — unlike the browser — it can pop a
+   * genuine native dialog instead of us building an in-page directory
+   * browser. Requires an interactive desktop session; there is no headless
+   * fallback (that's inherent to "show a native dialog", not a bug).
+   */
+  _pickFolderNative() {
+    const execFileAsync = (cmd, args) => new Promise((resolve, reject) => {
+      // windowsHide only hides the spawned console host window (PowerShell's own
+      // black terminal) — it has no effect on GUI windows the process creates,
+      // so the FolderBrowserDialog itself still shows normally.
+      execFile(cmd, args, { timeout: 300000, windowsHide: true }, (err, stdout) => {
+        if (err) { reject(err); return; }
+        resolve(stdout.trim());
+      });
+    });
+
+    if (IS_WINDOWS) {
+      const script = [
+        'Add-Type -AssemblyName System.Windows.Forms',
+        '$f = New-Object System.Windows.Forms.FolderBrowserDialog',
+        "if ($f.ShowDialog() -eq 'OK') { Write-Output $f.SelectedPath }",
+      ].join('; ');
+      // Deliberately NOT combined with -WindowStyle Hidden: stacking that on top
+      // of windowsHide (CREATE_NO_WINDOW) left the process without a usable
+      // interactive window station, so the FolderBrowserDialog would open but
+      // never receive input or report Cancel/close — it just hung forever.
+      // windowsHide alone still flashes a console briefly; that's the accepted
+      // tradeoff for a dialog that actually responds to clicks.
+      return execFileAsync('powershell.exe', ['-NoProfile', '-STA', '-Command', script])
+        .then((out) => out || null);
+    }
+
+    if (os.platform() === 'darwin') {
+      return execFileAsync('osascript', ['-e', 'POSIX path of (choose folder)'])
+        .then((out) => out || null)
+        .catch(() => null); // AppleScript exits non-zero when the user cancels — not a real error.
+    }
+
+    // Linux: no universal native dialog API: best-effort via zenity if installed.
+    return execFileAsync('zenity', ['--file-selection', '--directory'])
+      .then((out) => out || null)
+      .catch((e) => {
+        if (e.code === 'ENOENT') {
+          throw new Error('No native folder dialog available on this Linux setup (zenity not found). Type the path manually.');
+        }
+        return null; // zenity exits non-zero on Cancel.
+      });
+  }
+
+  /**
+   * Bound to 127.0.0.1 only — must never be reachable off this machine.
+   * Origin is checked (not just CORS-reflected) so an arbitrary webpage open
+   * in another tab can't probe the local filesystem via this port; only the
+   * workspace frontend's own localhost origin is allowed to read responses.
+   */
+  _startBrowseServer() {
+    if (this._browseServer) return;
+
+    const isAllowedOrigin = (origin) => !!origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+    this._browseServer = http.createServer((req, res) => {
+      const origin = req.headers.origin;
+      if (isAllowedOrigin(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Vary', 'Origin');
+      }
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, { 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Content-Type' });
+        res.end();
+        return;
+      }
+
+      let url;
+      try { url = new URL(req.url, 'http://localhost'); } catch { url = null; }
+
+      if (!url || url.pathname !== '/browse-folder' || req.method !== 'GET') {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Not found' }));
+        return;
+      }
+
+      this._pickFolderNative()
+        .then((selected) => {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ path: selected }));
+        })
+        .catch((e) => {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: e.message }));
+        });
+    });
+
+    this._browseServer.on('error', (e) => {
+      this._log(`Browse server failed to start on port ${BROWSE_SERVER_PORT}: ${e.message}`);
+      this._browseServer = null;
+    });
+
+    this._browseServer.listen(BROWSE_SERVER_PORT, '127.0.0.1', () => {
+      this._log(`Browse server listening on 127.0.0.1:${BROWSE_SERVER_PORT}`);
+    });
   }
 
   _log(msg) {

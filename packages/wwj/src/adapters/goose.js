@@ -75,7 +75,7 @@ function gooseVersionMeetsMinimum(parsed, minimum = MIN_GOOSE_VERSION) {
 function tooOldMessage(parsed) {
   const cur = parsed ? parsed.join('.') : 'unknown';
   const minv = MIN_GOOSE_VERSION.join('.');
-  return `Goose CLI ${cur} is too old — OpenAgents requires Goose >= ${minv} `
+  return `Goose CLI ${cur} is too old — 52hzAgents requires Goose >= ${minv} `
     + '(headless stream-json support). Upgrade it: curl -fsSL '
     + 'https://github.com/block/goose/releases/download/stable/download_cli.sh '
     + '| CONFIGURE=false bash';
@@ -373,7 +373,7 @@ class GooseAdapter extends BaseAdapter {
           msgChannel,
           'Goose ran but produced no response. This usually means no provider/model is '
           + 'configured — set GOOSE_PROVIDER and GOOSE_MODEL (and a key) for this agent, '
-          + 'or run `goose configure` once outside OpenAgents.',
+          + 'or run `goose configure` once outside 52hzAgents.',
         );
       }
     } catch (e) {

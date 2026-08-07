@@ -71,6 +71,8 @@ export interface WorkspaceSession {
   orchestrationInstruction: string | null;
   createdAt: string | null;
   lastEventAt: number | null;
+  /** Local project directory this thread is bound to ("Open Folder" mode). Null = plain chat, no filesystem access. */
+  workingDir: string | null;
 }
 
 export interface ToolApprovalRequest {
@@ -559,6 +561,7 @@ export function networkChannelToSession(ch: Record<string, unknown> | NetworkCha
   const instruction = (raw.orchestrationInstruction || raw.orchestration_instruction || null) as string | null;
   const created = (raw.createdAt || raw.created_at || null) as string | null;
   const lastEvent = (raw.lastEventAt ?? raw.last_event_at ?? null) as number | null;
+  const workingDir = (raw.workingDir || raw.working_dir || null) as string | null;
 
   return {
     sessionId: id,
@@ -573,5 +576,6 @@ export function networkChannelToSession(ch: Record<string, unknown> | NetworkCha
     orchestrationInstruction: instruction,
     createdAt: created,
     lastEventAt: lastEvent,
+    workingDir: workingDir,
   };
 }

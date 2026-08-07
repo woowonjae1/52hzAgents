@@ -269,13 +269,15 @@ class WorkspaceApi {
     });
   }
 
-  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; masterAgent?: string; orchestrationMode?: string; orchestrationInstruction?: string | null }): Promise<unknown> {
+  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; masterAgent?: string; orchestrationMode?: string; orchestrationInstruction?: string | null; workingDir?: string | null }): Promise<unknown> {
     // Map camelCase fields → snake_case for the backend.
-    const { masterAgent, orchestrationMode, orchestrationInstruction, ...rest } = updates;
+    const { masterAgent, orchestrationMode, orchestrationInstruction, workingDir, ...rest } = updates;
     const body: Record<string, unknown> = { ...rest };
     if (masterAgent !== undefined) body.master_agent = masterAgent;
     if (orchestrationMode !== undefined) body.orchestration_mode = orchestrationMode;
     if (orchestrationInstruction !== undefined) body.orchestration_instruction = orchestrationInstruction;
+    // Backend treats an empty string as "clear the binding" (see PatchChannel).
+    if (workingDir !== undefined) body.working_dir = workingDir ?? '';
     return this.request(`/v1/workspaces/${this.workspaceId}/channels/${channelName}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
@@ -342,6 +344,7 @@ class WorkspaceApi {
       orchestrationInstruction: null,
       createdAt: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
       lastEventAt: null,
+      workingDir: null,
     };
   }
 

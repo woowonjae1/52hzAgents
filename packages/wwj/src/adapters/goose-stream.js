@@ -82,7 +82,7 @@ function classifyGooseError(text) {
   }
   if (has('provider', 'unknown provider', 'no provider', 'provider not', 'configure')) {
     return 'Goose has no usable provider configured. Set GOOSE_PROVIDER (and a key/host), '
-      + 'or run `goose configure` once outside OpenAgents.';
+      + 'or run `goose configure` once outside 52hzAgents.';
   }
   if (has('permission denied', 'not permitted', 'tool execution denied', 'denied by')) {
     return 'A Goose tool call was denied. The workspace runs Goose headless with '

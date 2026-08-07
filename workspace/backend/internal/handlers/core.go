@@ -157,6 +157,7 @@ func DiscoverNetwork(c *gin.Context) {
 			"orchestration_instruction": channel.OrchestrationInstruction,
 			"participants":              participants, "created_at": channel.CreatedAt.UnixMilli(),
 			"last_event_at": channel.LastEventAt, "status": channel.Status, "starred": channel.Starred,
+			"working_dir": channel.WorkingDir,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"agents": agents, "channels": channelItems, "mods": []string{}, "resources": []string{"files", "todos", "timers", "routines", "notifications"}})

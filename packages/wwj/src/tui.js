@@ -117,7 +117,7 @@ function createTUI() {
   const screen = blessed.screen({
     smartCSR: true,
     mouse: true,
-    title: 'OpenAgents',
+    title: '52hzAgents',
     fullUnicode: true,
     tags: true,
   });
@@ -146,7 +146,7 @@ function createTUI() {
   const titleBox = blessed.box({
     top: 1, left: 0, width: '100%', height: 1,
     tags: true,
-    content: `  {bold}OpenAgents{/bold} {gray-fg}v${pkg.version}{/gray-fg}`,
+    content: `  {bold}52hzAgents{/bold} {gray-fg}v${pkg.version}{/gray-fg}`,
     style: { fg: 'white', bg: 'black' },
   });
 
@@ -1452,7 +1452,7 @@ function createTUI() {
   // ── Init ──
   agentList.focus();
   refreshAgentTable();
-  log('Welcome to {bold}OpenAgents{/bold}. Press {cyan-fg}i{/cyan-fg} to install agents, {cyan-fg}n{/cyan-fg} to create one.');
+  log('Welcome to {bold}52hzAgents{/bold}. Press {cyan-fg}i{/cyan-fg} to install agents, {cyan-fg}n{/cyan-fg} to create one.');
 
   // Show installed runtimes that don't have any agent instances yet
   try {
