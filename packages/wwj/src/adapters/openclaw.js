@@ -499,7 +499,8 @@ class OpenClawAdapter extends BaseAdapter {
   // CLI mode (openclaw agent --local)
   // ------------------------------------------------------------------
 
-  _runCliAgent(userMessage, channel) {
+  async _runCliAgent(userMessage, channel) {
+    const spawnCwd = await this._resolveWorkingDir(channel, userMessage);
     return new Promise((resolve, reject) => {
       // Re-check binary if not found at construction time (installed after daemon started)
       if (!this._openclawBinary) {
@@ -621,7 +622,7 @@ class OpenClawAdapter extends BaseAdapter {
       const proc = spawn(spawnBin, spawnArgs, {
         stdio: ['ignore', 'pipe', stderrFd],
         env: spawnEnv,
-        cwd: this.workingDir || process.env.HOME || '/',
+        cwd: spawnCwd,
         timeout: 600000,
         windowsHide: true,
       });

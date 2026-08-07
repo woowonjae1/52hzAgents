@@ -859,7 +859,7 @@ class BaseAdapter {
    * pay a network round trip — call after computing `channel` for a message,
    * not once at adapter startup, since the binding is per-thread not per-agent.
    */
-  async _resolveWorkingDir(channel) {
+  async _resolveWorkingDir(channel, messageText = '') {
     this._workingDirCache = this._workingDirCache || new Map();
     const cached = this._workingDirCache.get(channel);
     const now = Date.now();
@@ -871,11 +871,15 @@ class BaseAdapter {
     let resolved = fallback;
     try {
       const info = await this.client.getSession(this.workspaceId, channel, this.token);
-      if (info.workingDir) {
-        if (fs.existsSync(info.workingDir)) {
-          resolved = info.workingDir;
-        } else {
-          this._log(`Channel ${channel} is bound to '${info.workingDir}' but it doesn't exist on this machine — falling back to default sandbox`);
+      if (info.workingDir && fs.existsSync(info.workingDir)) {
+        resolved = info.workingDir;
+      } else if (messageText && typeof messageText === 'string') {
+        // Try parsing explicit working dir pattern from message text (e.g. "工作目录 D:\code\X I LIKE" or "D:\code\...")
+        const match = messageText.match(/(?:工作目录|working\s*dir|directory|folder)[:：=\s]*([a-zA-Z]:\\[^\s"',;\n\r]+|\/[^\s"',;\n\r]+)/i)
+          || messageText.match(/([a-zA-Z]:\\(?:[^\s"',;\n\r\\]+\\)*[^\s"',;\n\r\\]+)/);
+        if (match && match[1] && fs.existsSync(match[1])) {
+          resolved = match[1];
+          this._log(`Auto-resolved working dir '${resolved}' from message text for channel ${channel}`);
         }
       }
     } catch (e) {
