@@ -149,6 +149,11 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 
 export function ChatView() {
   const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
+  
+  useEffect(() => {
+    console.log('[52hzAgents Monitor] 💬 [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
+  }, [currentSessionId]);
+
   const [showCreateRoutine, setShowCreateRoutine] = useState(false);
   const {
     isMobile,

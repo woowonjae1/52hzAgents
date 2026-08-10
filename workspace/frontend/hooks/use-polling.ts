@@ -98,6 +98,8 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       ? scopeMessagesToSession(initialMessages, sessionId, nextDMPair)
       : [];
 
+    console.log('[52hzAgents Monitor] 📩 [useMessagePolling] Session initialized:', sessionId, 'initialMsgs:', scopedInitialMessages.length, 'at', new Date().toISOString());
+
     if (scopedInitialMessages.length > 0) {
       // Seed with cached messages for instant display
       setMessages(scopedInitialMessages);

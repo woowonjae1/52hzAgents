@@ -635,6 +635,13 @@ export default function HomePage() {
   const { user, loading } = useAuth();
   const openAgentsAuth = useOpenAgentsAuth();
 
+  useEffect(() => {
+    console.log('[52hzAgents Monitor] 🚀 [HomePage] Mounted at', new Date().toISOString(), {
+      pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+      isOpenAgentsDomain: openAgentsAuth.isOpenAgentsDomain,
+    });
+  }, [openAgentsAuth.isOpenAgentsDomain]);
+
   if (loading || openAgentsAuth.loading) {
     return <WorkspaceLoadingSplash />;
   }

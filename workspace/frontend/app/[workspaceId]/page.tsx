@@ -92,6 +92,11 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
       } catch {}
     }
     setMounted(true);
+    console.log('[52hzAgents Monitor] 🏢 [WorkspaceContent] Mounted for workspaceId:', workspaceId, {
+      token: token ? '[present]' : '[none]',
+      cachedToken: cachedToken ? '[present]' : '[none]',
+      timestamp: new Date().toISOString(),
+    });
   }, [token, workspaceId]);
 
   const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
