@@ -7,7 +7,7 @@ let mainWindow = null;
 let tray = null;
 let devServerProcess = null;
 
-const TARGET_URL = process.env.FRONTEND_URL || 'http://localhost:3005';
+const TARGET_URL = process.env.FRONTEND_URL || 'http://localhost:3005/workspace';
 
 function checkServerReady(url, callback) {
   const req = http.get(url, (res) => {

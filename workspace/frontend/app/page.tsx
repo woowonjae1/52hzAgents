@@ -594,25 +594,16 @@ function Dashboard() {
 // ---------------------------------------------------------------------------
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
-  const openAgentsAuth = useOpenAgentsAuth();
+  const router = useRouter();
 
-  if (loading || openAgentsAuth.loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    router.replace('/workspace');
+  }, [router]);
 
-  // Bypass landing page and show dashboard directly on local/custom domains
-  if (!openAgentsAuth.isOpenAgentsDomain) {
-    return <Dashboard />;
-  }
-
-  // Logged in via either auth system → show dashboard
-  if (user || openAgentsAuth.user) return <Dashboard />;
-
-  // Not logged in → show landing page
-  return <LandingPage />;
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#0e0e10] text-[#f4f4f5]">
+      <Loader2 className="size-6 animate-spin text-foreground-extra-muted" />
+      <p className="text-xs text-foreground-extra-muted mt-3 font-mono">Entering 52hzAgents Workspace...</p>
+    </div>
+  );
 }
