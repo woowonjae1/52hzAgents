@@ -148,12 +148,7 @@ export function Wrapper() {
           )}
 
           {/* Dynamic multi-pane grid based on viewMode and activeRightTab */}
-          {!hasAgents && viewMode === 'threads' ? (
-            /* No agents + threads view: full-width onboarding */
-            <div className="relative flex-1 min-w-0 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
-              <EmptyState />
-            </div>
-          ) : viewMode === 'threads' && monitorMode ? (
+          {viewMode === 'threads' && monitorMode ? (
             /* Monitor mode: replace both panes with 2x3 grid */
             <div className="relative flex-1 min-w-0">
               <MonitorGrid />

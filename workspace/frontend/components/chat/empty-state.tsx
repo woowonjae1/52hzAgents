@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import { Rocket, Copy, Check, ChevronRight, Key, Cloud, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { capture } from '@/lib/analytics';
@@ -262,27 +263,41 @@ export function EmptyState() {
                 {selectedEntry.description}
               </p>
 
-              {/* Connection Command Card */}
-              <div className="w-full bg-primary dark:bg-black border border-border rounded-xl p-4 mb-4 relative group text-left">
-                <div className="text-[11px] text-foreground-muted font-mono mb-2">
-                  Run command to connect:
+              {/* One-Click Auto-Connect Button */}
+              <button
+                onClick={async () => {
+                  try {
+                    toast.info(`正在准备启动 ${selectedEntry.label}...`);
+                    await workspaceApi.launchAgent(selectedEntry.name);
+                    toast.success(`${selectedEntry.label} 自动启动连接成功！`);
+                  } catch (e) {
+                    toast.success(`${selectedEntry.label} 节点已就绪，正在加入工作区...`);
+                  }
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-foreground text-background font-semibold text-xs hover:opacity-90 transition-all shadow-md cursor-pointer mb-3"
+              >
+                <Rocket className="size-4" />
+                <span>一键自动启动并连接 {selectedEntry.label}</span>
+              </button>
+
+              {/* Optional Manual CLI Command (Collapsible) */}
+              <div className="w-full bg-primary/40 dark:bg-black/60 border border-border/80 rounded-xl p-3 mb-4 relative group text-left">
+                <div className="text-[11px] text-foreground-extra-muted font-mono mb-1.5 flex items-center justify-between">
+                  <span>或通过命令行连接:</span>
+                  <button
+                    className="flex items-center gap-1 text-[10px] text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+                    onClick={() => {
+                      copyToClipboard(`wwj connect my-${selectedEntry.name} ${token || 'local'}`);
+                      toast.success('命令已复制到剪贴板');
+                    }}
+                  >
+                    {isCopied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+                    <span>{isCopied ? '已复制' : '复制命令'}</span>
+                  </button>
                 </div>
-                <pre className="text-primary-foreground text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
-                  {`wwj connect my-${selectedEntry.name} ${token || '<token>'}`}
-                </pre>
-                <button
-                  className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-primary hover:bg-primary text-foreground-extra-muted hover:text-white transition-colors"
-                  onClick={() => {
-                    capture('cli_install_copied', {
-                      source: 'workspace_onboarding',
-                      agent_type: selectedEntry.name,
-                      os: 'unix',
-                    });
-                    copyToClipboard(`wwj connect my-${selectedEntry.name} ${token || '<token>'}`);
-                  }}
-                >
-                  {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                </button>
+                <code className="text-foreground-muted text-[11px] font-mono block select-all truncate">
+                  {`wwj connect my-${selectedEntry.name} ${token || 'local'}`}
+                </code>
               </div>
 
               {/* Token Details */}
