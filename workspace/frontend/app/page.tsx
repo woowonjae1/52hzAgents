@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { WorkspaceLoadingSplash } from './[workspaceId]/page';
+import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/page';
 import Image from 'next/image';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,
@@ -639,10 +639,15 @@ export default function HomePage() {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Bypass the marketing landing page and go straight to the workspace
-  // picker/auto-redirect on local/custom domains (desktop app, self-host).
+  // Bypass landing page and dashboard redirect on local/custom domains (desktop app, self-host).
+  // Immediately render WorkspaceContent for instant 0-redirect load.
   if (!openAgentsAuth.isOpenAgentsDomain) {
-    return <Dashboard />;
+    const slug = (typeof window !== 'undefined' && localStorage.getItem('last_workspace_slug')) || 'openagents-develop';
+    return (
+      <Suspense fallback={<WorkspaceLoadingSplash />}>
+        <WorkspaceContent workspaceId={slug} />
+      </Suspense>
+    );
   }
 
   if (user || openAgentsAuth.user) return <Dashboard />;

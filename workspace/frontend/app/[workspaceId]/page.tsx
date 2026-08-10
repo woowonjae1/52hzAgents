@@ -71,9 +71,18 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   // (the one React hydrates against) diverge from the server-rendered HTML
   // whenever a token happens to be cached, and that mismatch is what backs
   // React into discarding the server tree and re-rendering from scratch.
-  const [mounted, setMounted] = useState(false);
-  const [cachedToken, setCachedToken] = useState<string | null>(null);
-  const [hasBridge, setHasBridge] = useState(false);
+  const [mounted, setMounted] = useState(() => typeof window !== 'undefined');
+  const [cachedToken, setCachedToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && !token) {
+      try {
+        return localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token') || '';
+      } catch {}
+    }
+    return null;
+  });
+  const [hasBridge, setHasBridge] = useState(() => {
+    return typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+  });
 
   useEffect(() => {
     setHasBridge(!!(window as unknown as { electronBridge?: unknown }).electronBridge);
@@ -85,14 +94,15 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     setMounted(true);
   }, [token, workspaceId]);
 
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const effectiveInitialToken = token || cachedToken || '';
 
   if (!mounted) {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Has workspace token in URL, cached in localStorage, or running inside Electron Desktop Bridge — mount WorkspaceProvider
-  if (token || cachedToken || hasBridge) {
+  // Has workspace token in URL, cached in localStorage, local dev, or running inside Electron Desktop Bridge — mount WorkspaceProvider
+  if (token || cachedToken || hasBridge || isLocal) {
     return (
       <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>
