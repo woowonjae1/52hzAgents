@@ -50,6 +50,7 @@ function createMainWindow() {
     darkTheme: true,
     show: false,
     webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
