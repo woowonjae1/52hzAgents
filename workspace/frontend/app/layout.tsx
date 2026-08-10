@@ -82,7 +82,11 @@ export default function RootLayout({
         `}</Script>
       </head>
       <body className="bg-background text-foreground font-sans">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        {/* Dark is the signature theme — the neutral ramp and the inverted
+            (light-fill/dark-text) buttons are designed on a dark ground, and
+            `enableSystem` is dropped so a first visit lands there rather than
+            inheriting the OS preference. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
           <AuthProvider>
             <OpenAgentsAuthProvider>
               {children}

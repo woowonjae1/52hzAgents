@@ -171,7 +171,7 @@ export function TimersView() {
                 <span className="text-muted-foreground">seconds</span>
               </div>
             </div>
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-status-danger">{error}</p>}
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={submitting}>Cancel</Button>

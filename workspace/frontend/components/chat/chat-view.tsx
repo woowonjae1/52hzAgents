@@ -15,11 +15,12 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, MessageSquarePlus, CalendarClock, Square, ChevronLeft, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, Terminal, FolderOpen } from 'lucide-react';
+import { ListTree, MessageSquare, MessageSquarePlus, CalendarClock, Square, ChevronLeft, ChevronDown, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, FolderOpen, Check } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -28,6 +29,19 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { eventToMessage } from '@/lib/types'; 
 import type { WorkspaceMessage } from '@/lib/types';
+
+/**
+ * The side panels, previously four always-visible toolbar buttons. They are
+ * collapsed into a single dropdown to keep the thread header quiet — but they
+ * stay in the header rather than moving into Settings, because these are view
+ * switchers people toggle constantly, not configuration.
+ */
+const SIDE_PANELS = [
+  { id: 'browser' as const, label: 'Sandbox', icon: Globe },
+  { id: 'radar' as const, label: 'Agents', icon: Users },
+  { id: 'file' as const, label: 'File', icon: FileText },
+  { id: 'terminal' as const, label: 'Terminal', icon: Terminal },
+];
 
 // Module-level message cache — survives component re-renders/unmounts.
 // Keyed by sessionId, stores the last known messages for instant thread switching.
@@ -312,6 +326,7 @@ export function ChatView() {
       // todos) are hidden from the transcript unless "show all steps" is on, so
       // treating them as "the agent replied" tore the pending row down and left
       // the thread visibly empty for the entire time the agent was working —
+
       // while the sidebar, which reads the raw last message, correctly showed
       // "thinking...". That mismatch is exactly what made sends look ignored.
       const isStepMessage = (m: WorkspaceMessage) =>
@@ -580,7 +595,7 @@ export function ChatView() {
             <span className="text-[11px]">Overview</span>
           </button>
           {isDM ? (
-            <h2 className="text-sm font-normal lg:font-light tracking-tight truncate flex items-center gap-1.5 text-foreground">
+            <h2 className="text-sm font-semibold tracking-tight truncate flex items-center gap-1.5 text-foreground">
               <MessageSquare className="size-3.5 text-muted-foreground" />
               {currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-normal">
@@ -602,7 +617,7 @@ export function ChatView() {
             />
           ) : (
             <h2
-              className="text-sm font-normal lg:font-light tracking-tight truncate cursor-pointer hover:text-muted-foreground transition-colors text-foreground"
+              className="text-sm font-semibold tracking-tight truncate cursor-pointer hover:text-muted-foreground transition-colors text-foreground"
               onClick={startEditingTitle}
               title="Click to rename"
             >
@@ -611,7 +626,7 @@ export function ChatView() {
           )}
           {currentSession?.workingDir && (
             <span
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-medium shrink-0"
+              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground-muted font-medium shrink-0"
               title={`Open Folder: ${currentSession.workingDir}`}
             >
               <FolderOpen className="size-2.5" />
@@ -675,7 +690,7 @@ export function ChatView() {
                     title="Manage thread agents"
                   >
                     {sessionAgents.length === 0 ? (
-                      <span className="flex items-center gap-1 rounded-full border border-dashed border-amber-400/80 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-700 dark:text-amber-300">
+                      <span className="flex items-center gap-1 rounded-full border border-dashed border-border-accent px-2 py-0.5 text-[10px] font-medium text-status-warning dark:border-border-accent dark:text-status-warning">
                         <Plus className="size-3" />
                         Add agent
                       </span>
@@ -711,7 +726,7 @@ export function ChatView() {
                           )}
                           {currentSession?.master === agent.agentName ? (
                             <span
-                              className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 shrink-0"
+                              className="flex items-center gap-1 text-[10px] text-status-warning shrink-0"
                               title="Thread leader — receives messages that don't @mention anyone"
                             >
                               <Crown className="size-3" /> leader
@@ -719,7 +734,7 @@ export function ChatView() {
                           ) : (
                             <button
                               onClick={() => currentSessionId && setSessionMaster(currentSessionId, agent.agentName)}
-                              className="size-5 flex items-center justify-center rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                              className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-warning opacity-0 group-hover:opacity-100 transition-all shrink-0"
                               title="Set as thread leader"
                             >
                               <Crown className="size-3" />
@@ -728,7 +743,7 @@ export function ChatView() {
                           {inThread.length > 1 && (
                             <button
                               onClick={() => currentSessionId && removeParticipant(currentSessionId, agent.agentName)}
-                              className="size-5 flex items-center justify-center rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                              className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger opacity-0 group-hover:opacity-100 transition-all shrink-0"
                               title="Remove from thread"
                             >
                               <X className="size-3" />
@@ -768,7 +783,7 @@ export function ChatView() {
             <button
               onClick={() => stopAllAgents(currentSessionId!)}
               disabled={stoppingSessionIds.has(currentSessionId)}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-surface2 text-status-danger hover:bg-surface3 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
             >
               <Square className="size-3 fill-current" />
               {stoppingSessionIds.has(currentSessionId) ? 'Stopping...' : 'Stop'}
@@ -791,70 +806,49 @@ export function ChatView() {
             </Button>
           )}
 
-          {/* Right workspace panels toggles (Desktop only) */}
-          {!isMobile && (
-            <div className="flex items-center gap-1 border-r border-border/60 pr-1.5 mr-0.5">
-              {/* Web Sandbox */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveRightTab(activeRightTab === 'browser' ? null : 'browser')}
-                className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
-                  activeRightTab === 'browser' && 'bg-surface2 text-foreground border border-border/50 font-bold'
-                )}
-                title="Web Sandbox Preview"
-              >
-                <Globe className="size-3.5" />
-                <span className="text-[10px] hidden xl:inline">Sandbox</span>
-              </Button>
-
-              {/* Agents inspector */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveRightTab(activeRightTab === 'radar' ? null : 'radar')}
-                className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
-                  activeRightTab === 'radar' && 'bg-surface2 text-foreground border border-border/50 font-bold'
-                )}
-                title="Inspect agents"
-              >
-                <Users className="size-3.5" />
-                <span className="text-[10px] hidden xl:inline">Agents</span>
-              </Button>
-
-              {/* File Preview */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveRightTab(activeRightTab === 'file' ? null : 'file')}
-                className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
-                  activeRightTab === 'file' && 'bg-surface2 text-foreground border border-border/50 font-bold'
-                )}
-                title="File Preview"
-              >
-                <FileText className="size-3.5" />
-                <span className="text-[10px] hidden xl:inline">File</span>
-              </Button>
-
-              {/* Terminal Logs */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setActiveRightTab(activeRightTab === 'terminal' ? null : 'terminal')}
-                className={cn(
-                  'gap-1 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
-                  activeRightTab === 'terminal' && 'bg-surface2 text-foreground border border-border/50 font-bold'
-                )}
-                title="Terminal Logs Stream"
-              >
-                <Terminal className="size-3.5" />
-                <span className="text-[10px] hidden xl:inline">Terminal</span>
-              </Button>
-            </div>
-          )}
+          {/* Side panels — one control instead of four (see SIDE_PANELS) */}
+          {!isMobile && (() => {
+            const active = SIDE_PANELS.find((p) => p.id === activeRightTab);
+            const TriggerIcon = active?.icon ?? PanelRight;
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'gap-1.5 h-7 text-xs font-medium rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
+                      active && 'bg-surface2 text-foreground'
+                    )}
+                    title={active ? `${active.label} panel open` : 'Open a side panel'}
+                  >
+                    <TriggerIcon className="size-3.5" />
+                    <span className="text-[10px] hidden xl:inline">{active?.label ?? 'Panels'}</span>
+                    <ChevronDown className="size-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuLabel className="text-xs">Side panel</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {SIDE_PANELS.map((panel) => {
+                    const Icon = panel.icon;
+                    const isOpen = activeRightTab === panel.id;
+                    return (
+                      <DropdownMenuItem
+                        key={panel.id}
+                        onClick={() => setActiveRightTab(isOpen ? null : panel.id)}
+                        className="gap-2 text-xs"
+                      >
+                        <Icon className="size-3.5 text-foreground-muted" />
+                        <span className="flex-1">{panel.label}</span>
+                        {isOpen && <Check className="size-3.5" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          })()}
 
           {/* Orchestration mode picker — only for multi-agent threads */}
           {!isDM && currentSession && (() => {
@@ -905,7 +899,7 @@ export function ChatView() {
                     <span className="text-[11px] font-semibold text-foreground shrink-0">
                       {agent.agentName}
                     </span>
-                    {isMaster && <Crown className="size-2.5 text-amber-500 shrink-0" />}
+                    {isMaster && <Crown className="size-2.5 text-status-warning shrink-0" />}
                     {desc && (
                       <span className="text-[11px] text-muted-foreground truncate max-w-[220px]">
                         {desc}
@@ -930,7 +924,7 @@ export function ChatView() {
         const missing = sessionAgents.filter((a) => !a.description || !a.description.trim());
         if (missing.length === 0) return null;
         return (
-          <div className="flex items-center gap-2 px-2 lg:px-4 py-1.5 border-b shrink-0 overflow-x-auto bg-amber-50 dark:bg-amber-900/15 text-amber-800 dark:text-amber-300">
+          <div className="flex items-center gap-2 px-2 lg:px-4 py-1.5 border-b shrink-0 overflow-x-auto bg-surface2 text-status-warning">
             <AlertTriangle className="size-3.5 shrink-0" />
             <span className="text-[11px] leading-snug shrink-0">
               Routing may be less accurate — no description for:
@@ -939,7 +933,7 @@ export function ChatView() {
               <button
                 key={a.agentName}
                 onClick={() => setSelectedAgentName(a.agentName)}
-                className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors shrink-0"
+                className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-surface3 hover:bg-surface4 transition-colors shrink-0"
                 title={`Add a description for ${a.agentName}`}
               >
                 <Sparkles className="size-2.5" />
@@ -974,12 +968,13 @@ export function ChatView() {
         {/* Input — hidden for read-only DM views */}
         {!isDM && (
           <div className="px-3 lg:px-4 py-2 lg:py-3">
-            <div className="max-w-3xl mx-auto w-full">
+            {/* Shares `--chat-column` with the message list above it. */}
+            <div className="mx-auto w-full max-w-(--chat-column)">
               {/* A thread with no agents gets no reply: the backend only borrows a
                   workspace agent when the choice is unambiguous. Say so instead of
                   letting the message vanish into silence. */}
               {currentSession && (currentSession.participants?.length ?? 0) === 0 && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200">
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-border-accent bg-surface2 px-3 py-2 text-xs text-status-warning dark:border-border-accent dark:bg-surface2 dark:text-status-warning">
                   <AlertTriangle className="size-3.5 shrink-0" />
                   <span className="flex-1">
                     No agents in this thread — messages won&apos;t be answered. Use

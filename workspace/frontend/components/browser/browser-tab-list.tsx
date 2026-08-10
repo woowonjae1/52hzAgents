@@ -136,7 +136,7 @@ export function BrowserTabList() {
           {/* Persistent tabs — always on top */}
           {(persistentTabs.length > 0 || idleContexts.length > 0) && (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
                 Persistent
               </div>
               {/* Active persistent tabs */}
@@ -153,7 +153,7 @@ export function BrowserTabList() {
                         : 'hover:bg-surface1 dark:hover:bg-primary/50'
                     )}
                   >
-                    <Lock className="size-4 text-green-500 shrink-0" />
+                    <Lock className="size-4 text-status-success shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-medium truncate">
                         {ctx?.name || tab.title || truncateUrl(tab.url)}
@@ -165,7 +165,7 @@ export function BrowserTabList() {
                     </div>
                     <button
                       onClick={(e) => handleClose(e, tab.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
                       title="Close tab"
                     >
                       <X className="size-3.5" />
@@ -192,14 +192,14 @@ export function BrowserTabList() {
                     <button
                       onClick={(e) => handleOpenWithContext(e, ctx.id)}
                       disabled={opening}
-                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-green-500 transition-colors disabled:opacity-50"
+                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-success transition-colors disabled:opacity-50"
                       title="Open tab with this session"
                     >
                       <Play className="size-3.5" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteContext(e, ctx.id, ctx.name)}
-                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-colors"
+                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-colors"
                       title="Delete saved session"
                     >
                       <Trash2 className="size-3.5" />
@@ -214,7 +214,7 @@ export function BrowserTabList() {
           {regularTabs.length > 0 && (
             <>
               <div className={cn(
-                "px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground",
+                "px-2.5 py-1 text-[11px] font-semibold text-muted-foreground",
                 (persistentTabs.length > 0 || idleContexts.length > 0) && "mt-2"
               )}>
                 Active Tabs
@@ -230,7 +230,7 @@ export function BrowserTabList() {
                       : 'hover:bg-surface1 dark:hover:bg-primary/50'
                   )}
                 >
-                  <Globe className="size-4 text-blue-500 shrink-0" />
+                  <Globe className="size-4 text-foreground-muted shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-medium truncate">
                       {tab.title || truncateUrl(tab.url)}
@@ -244,7 +244,7 @@ export function BrowserTabList() {
                   </div>
                   <button
                     onClick={(e) => handleClose(e, tab.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
                     title="Close tab"
                   >
                     <X className="size-3.5" />

@@ -28,7 +28,7 @@ function highlightCommand(cmd: string) {
       <span
         key={idx}
         className={cn(
-          isKeyword ? 'text-emerald-400 font-semibold' : isOption ? 'text-foreground-muted' : 'text-foreground-extra-muted',
+          isKeyword ? 'text-status-success font-semibold' : isOption ? 'text-foreground-muted' : 'text-foreground-extra-muted',
         )}
       >
         {part}
@@ -52,8 +52,8 @@ interface TerminalLine {
 // it is not decoration.
 const LINE_STYLE: Record<TerminalLine['type'], { glyph: string; sender: string; text: string; gutter: string; bg: string }> = {
   command: { glyph: '$', sender: 'text-foreground-extra-muted', text: 'text-primary-foreground', gutter: 'bg-foreground-muted/60', bg: 'bg-white/[0.02]' },
-  success: { glyph: '✓', sender: 'text-emerald-400', text: 'text-foreground-extra-muted', gutter: 'bg-emerald-500/50', bg: '' },
-  error: { glyph: '✕', sender: 'text-red-400', text: 'text-red-300', gutter: 'bg-red-500/70', bg: 'bg-red-500/[0.05]' },
+  success: { glyph: '✓', sender: 'text-status-success', text: 'text-foreground-extra-muted', gutter: 'bg-status-success/50', bg: '' },
+  error: { glyph: '✕', sender: 'text-red-400', text: 'text-red-300', gutter: 'bg-status-danger/70', bg: 'bg-status-danger/[0.05]' },
   thinking: { glyph: '◦', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted italic', gutter: 'bg-foreground-muted/40', bg: '' },
   info: { glyph: '›', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted', gutter: 'bg-transparent', bg: '' },
 };
@@ -240,8 +240,8 @@ export function AgentTerminal() {
             {activeSession?.title || currentSessionId || 'openagents-shell'}
           </span>
           <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-border text-[10px]">
-            <Cpu className={cn('size-2.5', isAgentWorking ? 'text-amber-400 animate-spin' : 'text-emerald-400')} />
-            <span className={cn('font-semibold tracking-wide', isAgentWorking ? 'text-amber-400' : 'text-emerald-400')}>
+            <Cpu className={cn('size-2.5', isAgentWorking ? 'text-status-warning animate-spin' : 'text-status-success')} />
+            <span className={cn('font-semibold tracking-wide', isAgentWorking ? 'text-status-warning' : 'text-status-success')}>
               {activeOperator}
             </span>
           </span>
@@ -268,7 +268,7 @@ export function AgentTerminal() {
             onClick={(e) => { e.stopPropagation(); setIsAutoScroll((v) => !v); }}
             className={cn(
               'size-6 flex items-center justify-center rounded-md border transition-colors',
-              isAutoScroll ? 'text-emerald-400 border-emerald-500/30 bg-emerald-950/20' : 'text-foreground-muted border-border hover:text-foreground-extra-muted',
+              isAutoScroll ? 'text-status-success border-status-success/30 bg-surface2' : 'text-foreground-muted border-border hover:text-foreground-extra-muted',
             )}
             title={isAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
           >
@@ -281,7 +281,7 @@ export function AgentTerminal() {
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="relative z-10 flex-grow overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-zinc-800/70"
+        className="relative z-10 flex-grow overflow-y-auto py-2 scrollbar-thin scrollbar-thumb-surface3"
       >
         {filteredLines.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-2 text-foreground-muted select-none">
@@ -328,7 +328,7 @@ export function AgentTerminal() {
 
       {/* Working banner */}
       {sending && (
-        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent/50 text-amber-400 text-[10px] select-none">
+        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent/50 text-status-warning text-[10px] select-none">
           <RefreshCw className="size-3 animate-spin" />
           <span>executing on workspace host…</span>
         </div>
@@ -337,7 +337,7 @@ export function AgentTerminal() {
       {/* Prompt */}
       <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-border/70 bg-primary/40 backdrop-blur-md">
         <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-primary/80 border border-border/70 focus-within:border-border-accent transition-colors">
-          <span className="shrink-0 select-none font-semibold text-[11px] text-emerald-400">
+          <span className="shrink-0 select-none font-semibold text-[11px] text-status-success">
             52hz@openagents
           </span>
           <span className="shrink-0 text-foreground-muted select-none">~$</span>
@@ -351,7 +351,7 @@ export function AgentTerminal() {
             className="flex-grow bg-transparent border-0 outline-none text-primary-foreground text-xs p-0 min-w-0 placeholder:text-foreground-muted"
             placeholder={sending ? 'transmitting…' : 'type a command…'}
           />
-          {!inputValue && !sending && <span className="w-1.5 h-4 bg-emerald-400/90 rounded-[1px] term-cursor shrink-0" />}
+          {!inputValue && !sending && <span className="w-1.5 h-4 bg-status-success rounded-[1px] term-cursor shrink-0" />}
         </div>
       </div>
     </div>

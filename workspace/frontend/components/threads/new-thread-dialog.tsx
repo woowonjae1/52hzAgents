@@ -193,7 +193,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
               Local absolute path on the machine running the agent. Agents in this thread read/edit files there.
             </p>
             {browseError && (
-              <p className="mt-1 px-0.5 text-[11px] text-red-500">{browseError}</p>
+              <p className="mt-1 px-0.5 text-[11px] text-status-danger">{browseError}</p>
             )}
           </div>
         )}
@@ -208,7 +208,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             <div className={cn(
               'size-4 rounded shrink-0 flex items-center justify-center border transition-colors',
               isAllSelected || isPartiallySelected
-                ? 'bg-blue-500 border-blue-500 text-white'
+                ? 'bg-foreground-extra-muted border-blue-500 text-white'
                 : 'border-border-accent'
             )}>
               {isAllSelected && <Check className="size-3" strokeWidth={3} />}
@@ -258,7 +258,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
                 <div className={cn(
                   'size-4 rounded shrink-0 flex items-center justify-center border transition-colors',
                   isSelected
-                    ? 'bg-blue-500 border-blue-500 text-white'
+                    ? 'bg-foreground-extra-muted border-blue-500 text-white'
                     : 'border-border-accent'
                 )}>
                   {isSelected && <Check className="size-3" strokeWidth={3} />}
@@ -311,7 +311,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             size="sm"
             onClick={handleCreate}
             disabled={!canCreate}
-            className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 font-medium"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
           >
             {resumeFrom ? 'Resume Thread' : 'Start Thread'}
           </Button>

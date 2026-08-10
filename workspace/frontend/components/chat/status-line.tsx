@@ -27,7 +27,7 @@ export function StatusLine() {
   return (
     <div className="shrink-0 flex items-center gap-3 h-6 px-3 border-t border-border/70 dark:border-border/70 bg-surface1/80 font-mono text-[10px] text-foreground-muted select-none overflow-x-auto">
       {/* Connection / activity */}
-      <span className={cn('flex items-center gap-1.5 shrink-0', working ? 'text-amber-500' : 'text-emerald-500')}>
+      <span className={cn('flex items-center gap-1.5 shrink-0', working ? 'text-status-warning' : 'text-status-success')}>
         <Circle className={cn('size-2 fill-current', working && 'animate-pulse')} />
         {working ? 'working' : 'live'}
       </span>
@@ -50,7 +50,7 @@ export function StatusLine() {
             <>
               <Sep />
               <span className="flex items-center gap-1 shrink-0 text-foreground-muted">
-                <Crown className="size-3 text-amber-500/80" />
+                <Crown className="size-3 text-status-warning" />
                 {master}
               </span>
             </>

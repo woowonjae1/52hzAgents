@@ -221,9 +221,9 @@ export function AgentProfilePanel() {
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={cn(
                   'inline-flex items-center gap-1 text-[11px] px-1.5 py-px rounded font-medium',
-                  isOnline ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
+                  isOnline ? 'bg-status-success/10 text-status-success' : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
                 )}>
-                  <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-green-500' : 'bg-foreground-extra-muted')} />
+                  <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-status-success' : 'bg-foreground-extra-muted')} />
                   {agent.status}
                 </span>
               </div>
@@ -245,7 +245,7 @@ export function AgentProfilePanel() {
               >
                 {generatingDesc
                   ? <RefreshCw className="size-3 animate-spin" />
-                  : <Sparkles className="size-3 text-amber-500" />}
+                  : <Sparkles className="size-3 text-status-warning" />}
                 {generatingDesc ? 'Generating…' : 'Auto-generate'}
               </button>
             </div>
@@ -373,7 +373,7 @@ export function AgentProfilePanel() {
           {/* Runtime, approvals, and bridge diagnostics */}
           <div className="rounded-lg border overflow-hidden">
             <div className="px-3.5 py-2.5 border-b flex items-center gap-1.5">
-              <Activity className="size-3 text-indigo-500" />
+              <Activity className="size-3 text-foreground-muted" />
               <span className="text-xs font-medium">Runtime & approvals</span>
               <button onClick={() => void refreshDiagnostics()} className="ml-auto text-muted-foreground hover:text-foreground" title="Refresh diagnostics">
                 <RefreshCw className={cn('size-3', loadingDiagnostics && 'animate-spin')} />
@@ -383,24 +383,24 @@ export function AgentProfilePanel() {
               <div className="px-3.5 py-2.5 text-xs flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Bridge health</span>
                 {runtime ? (
-                  <span className={cn('font-medium capitalize', runtime.healthStatus === 'healthy' ? 'text-emerald-600' : runtime.healthStatus === 'unhealthy' ? 'text-red-600' : 'text-amber-600')}>
+                  <span className={cn('font-medium capitalize', runtime.healthStatus === 'healthy' ? 'text-status-success' : runtime.healthStatus === 'unhealthy' ? 'text-status-danger' : 'text-status-warning')}>
                     {runtime.processStatus} · {runtime.healthStatus}
                   </span>
                 ) : <span className="text-muted-foreground">No runtime report</span>}
               </div>
-              {runtime?.lastError && <p className="px-3.5 py-2 text-[11px] text-red-600 bg-red-50/50 dark:bg-red-950/20 break-words">{runtime.lastError}</p>}
+              {runtime?.lastError && <p className="px-3.5 py-2 text-[11px] text-status-danger bg-surface2 break-words">{runtime.lastError}</p>}
               {approvals.map((approval) => (
                 <div key={approval.id} className="px-3.5 py-2.5">
                   <div className="text-xs font-medium break-words">Approval: {approval.action}</div>
                   <div className="mt-2 flex gap-1.5">
-                    <button onClick={() => void resolveApproval(approval, 'approved')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-emerald-600 text-white hover:bg-emerald-700"><ShieldCheck className="size-3" />Approve</button>
-                    <button onClick={() => void resolveApproval(approval, 'rejected')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded border text-red-600 hover:bg-red-50"><ShieldX className="size-3" />Reject</button>
+                    <button onClick={() => void resolveApproval(approval, 'approved')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-status-success text-white hover:bg-status-success/85"><ShieldCheck className="size-3" />Approve</button>
+                    <button onClick={() => void resolveApproval(approval, 'rejected')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded border text-status-danger hover:bg-surface3"><ShieldX className="size-3" />Reject</button>
                   </div>
                 </div>
               ))}
               {logs.slice(0, 5).map((entry) => (
                 <div key={entry.id} className="px-3.5 py-2 text-[11px] font-mono flex gap-1.5">
-                  <Terminal className={cn('size-3 shrink-0 mt-0.5', entry.level === 'error' ? 'text-red-500' : 'text-muted-foreground')} />
+                  <Terminal className={cn('size-3 shrink-0 mt-0.5', entry.level === 'error' ? 'text-status-danger' : 'text-muted-foreground')} />
                   <span className="break-all">{entry.message}</span>
                 </div>
               ))}
@@ -459,7 +459,7 @@ export function AgentProfilePanel() {
             return (
               <div className="rounded-lg border overflow-hidden">
                 <div className="px-3.5 py-2.5 border-b flex items-center gap-1.5">
-                  <Sparkles className="size-3 text-amber-500" />
+                  <Sparkles className="size-3 text-status-warning" />
                   <span className="text-xs font-medium">Installed Skills</span>
                   <span className="text-[10px] text-muted-foreground ml-auto">{installed.length}</span>
                 </div>
@@ -504,7 +504,7 @@ export function AgentProfilePanel() {
             {isCloud && (
               <button
                 onClick={handleRemoveCloudAgent}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border-accent text-status-danger hover:bg-surface3 transition-colors"
                 title="Remove cloud agent"
               >
                 <Trash2 className="size-3" />

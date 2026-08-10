@@ -51,10 +51,10 @@ function LandingPage() {
   const { isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
 
   const agents = [
-    { name: 'Claude Code', status: 'supported', command: 'agn install claude', color: 'bg-amber-500' },
+    { name: 'Claude Code', status: 'supported', command: 'agn install claude', color: 'bg-status-warning' },
     { name: 'OpenClaw', status: 'supported', command: 'agn install openclaw', color: 'bg-violet-500' },
-    { name: 'Codex CLI', status: 'supported', command: 'agn install codex', color: 'bg-emerald-500' },
-    { name: 'Aider', status: 'supported', command: 'agn install aider', color: 'bg-blue-500' },
+    { name: 'Codex CLI', status: 'supported', command: 'agn install codex', color: 'bg-status-success' },
+    { name: 'Aider', status: 'supported', command: 'agn install aider', color: 'bg-foreground-extra-muted' },
     { name: 'Goose', status: 'supported', command: 'agn install goose', color: 'bg-rose-500' },
     { name: 'Custom', status: 'supported', command: 'agn create my-agent --type custom', color: 'bg-foreground-muted' },
   ];
@@ -100,7 +100,7 @@ function LandingPage() {
       {/* ── Hero ── */}
       <section className="py-16 sm:py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+          <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight mb-4">
             Your agents, working together
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
@@ -120,14 +120,14 @@ function LandingPage() {
       {/* ── How It Works ── */}
       <section className="py-16 border-t">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-12">
             Get started in three steps
           </h2>
           <div className="grid gap-8 md:grid-cols-3">
             {/* Step 1 */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="size-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">1</div>
+                <div className="size-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-sm font-semibold shrink-0">1</div>
                 <h3 className="font-semibold text-lg">Create a workspace</h3>
               </div>
               <CodeBlock code="agn workspace create" />
@@ -138,7 +138,7 @@ function LandingPage() {
             {/* Step 2 */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="size-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">2</div>
+                <div className="size-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-sm font-semibold shrink-0">2</div>
                 <h3 className="font-semibold text-lg">Connect your agents</h3>
               </div>
               <CodeBlock code={`agn create my-agent --type claude --install\nagn up\nagn connect my-agent <token>`} />
@@ -149,7 +149,7 @@ function LandingPage() {
             {/* Step 3 */}
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="size-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold shrink-0">3</div>
+                <div className="size-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-sm font-semibold shrink-0">3</div>
                 <h3 className="font-semibold text-lg">Collaborate</h3>
               </div>
               <div className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
@@ -166,7 +166,7 @@ function LandingPage() {
       {/* ── Supported Agents ── */}
       <section className="py-16 border-t">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-3">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-3">
             Supported agents
           </h2>
           <p className="text-center text-muted-foreground mb-10 max-w-xl mx-auto">
@@ -179,7 +179,7 @@ function LandingPage() {
                 className="rounded-lg border bg-card p-4 hover:border-border-accent transition-colors"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className={`size-8 rounded-lg ${agent.color} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                  <div className={`size-8 rounded-lg ${agent.color} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
                     {agent.name[0]}
                   </div>
                   <div>
@@ -199,7 +199,7 @@ function LandingPage() {
       {/* ── Features ── */}
       <section className="py-16 border-t">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-12">
             Why 52hzAgents
           </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -230,7 +230,7 @@ function LandingPage() {
       {/* ── CLI Quick Reference ── */}
       <section className="py-16 border-t">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-10">
+          <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-10">
             CLI quick reference
           </h2>
           <div className="space-y-6">
@@ -263,7 +263,7 @@ function LandingPage() {
       {/* ── CTA ── */}
       <section className="py-20 border-t">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 text-center space-y-6">
-          <h2 className="text-2xl sm:text-3xl font-bold">Ready to get started?</h2>
+          <h2 className="text-2xl sm:text-3xl font-semibold">Ready to get started?</h2>
           <p className="text-muted-foreground">
             Install 52hzAgents and have your first agent running in under a minute.
           </p>
@@ -322,7 +322,7 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode; titl
 function CLIGroup({ title, commands }: { title: string; commands: { cmd: string; desc: string }[] }) {
   return (
     <div>
-      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3">{title}</h3>
+      <h3 className="font-semibold text-[11px] font-semibold text-muted-foreground mb-3">{title}</h3>
       <div className="rounded-lg border bg-card overflow-hidden divide-y">
         {commands.map((c) => (
           <div key={c.cmd} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 px-4 py-2.5">
@@ -384,7 +384,7 @@ function CreateWorkspaceForm({
     <Card className="border-dashed border-border-accent bg-card shadow-sm rounded-xl">
       <CardContent className="p-5">
         <form onSubmit={handleSubmit} className="space-y-4">
-          <h3 className="font-bold text-sm text-foreground tracking-tight">Create New Workspace</h3>
+          <h3 className="font-semibold text-sm text-foreground tracking-tight">Create New Workspace</h3>
           <div className="space-y-2.5">
             <Input
               placeholder="Agent Name (e.g. coder-agent)"
@@ -401,7 +401,7 @@ function CreateWorkspaceForm({
               className="text-xs h-9 border-border focus:border-border-accent dark:border-border dark:focus:border-border-accent focus:ring-0 focus-visible:ring-0"
             />
           </div>
-          {error && <p className="text-xs text-red-600 dark:text-red-400 font-medium">{error}</p>}
+          {error && <p className="text-xs text-status-danger font-medium">{error}</p>}
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={loading} className="bg-primary hover:bg-primary text-white dark:hover:bg-surface3 font-semibold h-8 rounded-lg">
               {loading ? <Loader2 className="size-3.5 animate-spin mr-1" /> : <Plus className="size-3.5 mr-1" />}
@@ -453,13 +453,13 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
       <CardContent className="p-4 space-y-4">
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
-            <h3 className="font-bold text-sm text-foreground tracking-tight truncate">{workspace.name}</h3>
+            <h3 className="font-semibold text-sm text-foreground tracking-tight truncate">{workspace.name}</h3>
             <p className="text-[9px] text-muted-foreground font-mono mt-1 truncate" title={workspace.slug}>
               ID: {workspace.slug}
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-border/50 dark:border-border/40 bg-surface1/50">
-            <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-emerald-500' : 'bg-foreground-muted'}`} />
+            <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-status-success' : 'bg-foreground-muted'}`} />
             <span className="text-[10px] font-semibold text-foreground-muted capitalize">{workspace.status}</span>
           </div>
         </div>
@@ -516,7 +516,7 @@ function Dashboard() {
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Image src="/logo-icon.png" alt="52hzAgents" width={18} height={18} />
-            <h1 className="font-bold text-sm tracking-tight">52hzAgents Workspaces</h1>
+            <h1 className="font-semibold text-sm tracking-tight">52hzAgents Workspaces</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[11px] font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
@@ -532,7 +532,7 @@ function Dashboard() {
         {/* Actions bar */}
         <div className="flex items-center justify-between border-b border-border/40 dark:border-border/40 pb-4">
           <div>
-            <h2 className="text-lg font-bold tracking-tight">Manage Workspaces</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Manage Workspaces</h2>
             <p className="text-xs text-muted-foreground mt-0.5">
               {loading ? 'Loading...' : `${workspaces.length} active developer workspace${workspaces.length !== 1 ? 's' : ''}`}
             </p>
@@ -546,7 +546,7 @@ function Dashboard() {
         </div>
 
         {error && (
-          <div className="p-3.5 rounded-xl border border-red-200/30 bg-red-500/5 text-red-600 dark:text-red-400 text-xs font-medium">
+          <div className="p-3.5 rounded-xl border border-border-accent bg-surface2 text-status-danger text-xs font-medium">
             {error}
           </div>
         )}

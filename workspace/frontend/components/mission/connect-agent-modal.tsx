@@ -64,7 +64,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
           {/* Section 1: One-Click Local Agent Launcher */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
                 <Play className="size-3.5" />
                 Local agent runtimes
               </h3>
@@ -82,7 +82,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                     className={cn(
                       'p-3 rounded-xl border flex items-center justify-between transition-colors',
                       isOnline
-                        ? 'bg-emerald-500/5 border-emerald-500/30'
+                        ? 'bg-status-success/5 border-status-success/30'
                         : 'bg-card border-border hover:border-border-accent',
                     )}
                   >
@@ -90,7 +90,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                       <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={32} status={agent.status} showStatus />
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-foreground truncate">{agent.agentName}</p>
-                        <p className="text-[10px] text-foreground-extra-muted uppercase tracking-wider">
+                        <p className="text-[10px] text-foreground-extra-muted ">
                           {agent.agentType || 'Worker'}
                         </p>
                       </div>
@@ -103,7 +103,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                       onClick={() => handleLaunchAgent(agent.agentName)}
                       className={cn(
                         'h-8 px-3 text-[11px] font-semibold gap-1.5 shrink-0',
-                        isOnline && 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10',
+                        isOnline && 'border-status-success/40 text-status-success hover:bg-status-success/10',
                       )}
                     >
                       {isStarting ? (
@@ -129,7 +129,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
           {/* Section 2: Remote Pairing Command */}
           <div className="space-y-2.5 pt-2 border-t border-border/80">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
+              <h3 className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
                 <Globe className="size-3.5" />
                 Pair a remote server
               </h3>
@@ -151,7 +151,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                 onClick={copyCommand}
                 className="h-7 px-2.5 text-xs shrink-0 gap-1.5"
               >
-                {copiedCmd ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                {copiedCmd ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                 <span>{copiedCmd ? 'Copied' : 'Copy'}</span>
               </Button>
             </div>

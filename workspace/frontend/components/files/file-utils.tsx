@@ -9,30 +9,30 @@ export function formatSize(bytes: number): string {
 
 export function getFileIcon(contentType: string | undefined, filename: string) {
   const ct = contentType || '';
-  if (ct.startsWith('image/')) return <Image className="size-4 text-purple-500" />;
+  if (ct.startsWith('image/')) return <Image className="size-4 text-foreground-muted" />;
   if (ct.startsWith('text/') || filename.match(/\.(md|txt|csv)$/i))
-    return <FileText className="size-4 text-blue-500" />;
+    return <FileText className="size-4 text-foreground-muted" />;
   if (
     filename.match(/\.(js|ts|tsx|jsx|py|rs|go|java|rb|c|cpp|h|sh|yaml|yml|json|toml)$/i) ||
     ct.includes('javascript') ||
     ct.includes('json')
   )
-    return <FileCode className="size-4 text-emerald-500" />;
+    return <FileCode className="size-4 text-foreground-muted" />;
   return <FileIcon className="size-4 text-foreground-extra-muted" />;
 }
 
 /** Larger icons for the grid view */
 export function getFileIconLarge(contentType: string | undefined, filename: string) {
   const ct = contentType || '';
-  if (ct.startsWith('image/')) return <Image className="size-10 text-purple-500" />;
+  if (ct.startsWith('image/')) return <Image className="size-10 text-foreground-muted" />;
   if (ct.startsWith('text/') || filename.match(/\.(md|txt|csv)$/i))
-    return <FileText className="size-10 text-blue-500" />;
+    return <FileText className="size-10 text-foreground-muted" />;
   if (
     filename.match(/\.(js|ts|tsx|jsx|py|rs|go|java|rb|c|cpp|h|sh|yaml|yml|json|toml)$/i) ||
     ct.includes('javascript') ||
     ct.includes('json')
   )
-    return <FileCode className="size-10 text-emerald-500" />;
+    return <FileCode className="size-10 text-foreground-muted" />;
   return <FileIcon className="size-10 text-foreground-extra-muted" />;
 }
 

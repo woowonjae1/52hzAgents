@@ -214,7 +214,7 @@ export function BrowserView() {
             <ChevronLeft className="size-5" />
           </button>
         )}
-        <Globe className={cn("size-4 shrink-0", navigating ? "text-amber-500 animate-pulse" : "text-blue-500")} />
+        <Globe className={cn("size-4 shrink-0", navigating ? "text-status-warning animate-pulse" : "text-foreground-muted")} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{tab.title || 'Untitled'}</p>
           {editingUrl ? (
@@ -227,7 +227,7 @@ export function BrowserView() {
                 if (e.key === 'Enter') handleNavigate();
                 if (e.key === 'Escape') setEditingUrl(false);
               }}
-              className="w-full text-xs bg-surface2 border border-border-accent rounded px-1.5 py-0.5 outline-none focus:border-blue-500 font-mono"
+              className="w-full text-xs bg-surface2 border border-border-accent rounded px-1.5 py-0.5 outline-none focus:border-accent font-mono"
               autoFocus
             />
           ) : (
@@ -248,7 +248,7 @@ export function BrowserView() {
             {(tab.sharedWith || []).map((agent) => (
               <span
                 key={agent}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
+                className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground-muted"
               >
                 {agent}
               </span>
@@ -263,7 +263,7 @@ export function BrowserView() {
         {tab.contextId ? (
           <button
             onClick={handleUnpersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-green-600 dark:text-green-400 hover:bg-surface2 hover:text-orange-500 dark:hover:text-orange-400 transition-colors shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-status-success hover:bg-surface2 hover:text-status-warning transition-colors shrink-0"
             title="Remove persistent state — revert to temporal tab"
           >
             <Lock className="size-3" />
@@ -272,7 +272,7 @@ export function BrowserView() {
         ) : (
           <button
             onClick={handlePersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-surface2 hover:text-green-600 transition-colors shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-surface2 hover:text-status-success transition-colors shrink-0"
             title="Make persistent — preserve login state for agents to reuse"
           >
             <Lock className="size-3" />
@@ -301,7 +301,7 @@ export function BrowserView() {
 
         <button
           onClick={handleClose}
-          className="p-1 rounded hover:bg-surface2 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+          className="p-1 rounded hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
           title="Close tab"
         >
           <X className="size-4" />
@@ -326,7 +326,7 @@ export function BrowserView() {
               <button
                 onClick={handleReconnect}
                 disabled={reconnecting}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-accent-foreground text-xs font-medium hover:bg-accent-bright disabled:opacity-50 transition-colors"
               >
                 <RefreshCw className={cn("size-3.5", reconnecting && "animate-spin")} />
                 {reconnecting ? 'Reconnecting…' : 'Reconnect'}

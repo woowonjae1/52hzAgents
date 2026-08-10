@@ -92,7 +92,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     <div className="h-full flex flex-col">
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BookOpen className="size-4 text-amber-500" />
+          <BookOpen className="size-4 text-status-warning" />
           <ScreenTitle>Knowledge</ScreenTitle>
           {knowledge.length > 0 && (
             <span className="text-xs text-muted-foreground">{knowledge.length}</span>
@@ -168,7 +168,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(entry); }}
-                    className="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-500"
+                    className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger"
                     title="Delete"
                   >
                     <Trash2 className="size-3" />

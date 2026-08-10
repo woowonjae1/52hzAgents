@@ -70,18 +70,9 @@ export function isRecentAgent(agent: { status: string; agentType?: string | null
 }
 
 // ── Multi-agent visual differentiation ──
-
-const AGENT_COLORS = [
-  { bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-300', initials: 'bg-blue-500', border: 'border-blue-200 dark:border-blue-800' },
-  { bg: 'bg-purple-50 dark:bg-purple-950/30', text: 'text-purple-700 dark:text-purple-300', initials: 'bg-purple-500', border: 'border-purple-200 dark:border-purple-800' },
-  { bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-700 dark:text-emerald-300', initials: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800' },
-  { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-700 dark:text-amber-300', initials: 'bg-amber-500', border: 'border-amber-200 dark:border-amber-800' },
-  { bg: 'bg-rose-50 dark:bg-rose-950/30', text: 'text-rose-700 dark:text-rose-300', initials: 'bg-rose-500', border: 'border-rose-200 dark:border-rose-800' },
-];
-
-export type AgentColor = typeof AGENT_COLORS[0];
-
-export function getAgentColor(agentName: string, allAgentNames: string[]): AgentColor {
-  const index = allAgentNames.indexOf(agentName);
-  return AGENT_COLORS[(index >= 0 ? index : 0) % AGENT_COLORS.length];
-}
+//
+// There is no per-agent palette here any more. `lib/identity-colors.ts` is the
+// single source: it derives a stable colour from the agent's NAME, where this
+// file derived one from the agent's INDEX in the roster — so every agent's
+// colour shifted whenever somebody joined or left. Import `deriveIdentityColor`
+// instead of reintroducing a parallel set of Tailwind classes here.

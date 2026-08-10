@@ -283,3 +283,6 @@ workspace/backend/secrets/
 workspace/.dev-sqlite/
 workspace/backend/server.exe
 *.exe
+
+# Cygwin/MSYS crash dumps
+*.stackdump

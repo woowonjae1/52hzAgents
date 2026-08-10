@@ -180,7 +180,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 className={cn(
                   'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
                   scheduleType === 'daily'
-                    ? 'bg-card dark:bg-zinc-800 shadow-xs text-foreground font-semibold'
+                    ? 'bg-card shadow-xs text-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -192,7 +192,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 className={cn(
                   'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors',
                   scheduleType === 'interval'
-                    ? 'bg-card dark:bg-zinc-800 shadow-xs text-foreground font-semibold'
+                    ? 'bg-card shadow-xs text-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -294,7 +294,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
 
           {/* Error display */}
           {error && (
-            <p className="text-xs text-red-500">{error}</p>
+            <p className="text-xs text-status-danger">{error}</p>
           )}
         </div>
 

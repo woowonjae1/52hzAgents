@@ -56,8 +56,8 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
       <div
         className={cn(
           square ? 'rounded-lg' : 'rounded-full',
-          'overflow-hidden border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-200 flex items-center justify-center shrink-0 shadow-xs',
-          status === 'online' && 'border-emerald-500 shadow-xs shadow-emerald-500/20'
+          'overflow-hidden border border-border dark:border-surface4 bg-white dark:bg-foreground flex items-center justify-center shrink-0 shadow-xs',
+          status === 'online' && 'border-status-success shadow-xs shadow-status-success/20'
         )}
         style={{ width: size, height: size }}
       >
@@ -70,7 +70,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
           />
         ) : (
           <span
-            className="flex h-full w-full items-center justify-center font-bold text-white uppercase"
+            className="flex h-full w-full items-center justify-center font-semibold text-white uppercase"
             style={{ backgroundColor: identityFill, fontSize: Math.max(9, Math.round(size * 0.42)) }}
             aria-label={cleanName}
           >
@@ -82,7 +82,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
         <span className={cn(
           'absolute -bottom-0.5 -right-0.5 rounded-full border-[1.5px] border-background',
           size >= 28 ? 'size-2.5' : 'size-2',
-          status === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400 dark:bg-zinc-600'
+          status === 'online' ? 'bg-status-success animate-pulse' : 'bg-foreground-extra-muted dark:bg-surface4'
         )} />
       )}
     </div>

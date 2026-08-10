@@ -271,11 +271,11 @@ function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, onSave }
                   )}
                 >
                   <span className="font-medium">@{a.agentName}</span>
-                  {a.role === 'master' && <Crown className="size-3 text-amber-500" />}
+                  {a.role === 'master' && <Crown className="size-3 text-status-warning" />}
                   <span
                     className={cn(
                       'ml-auto size-1.5 rounded-full',
-                      a.status === 'online' ? 'bg-green-500' : 'bg-foreground-extra-muted',
+                      a.status === 'online' ? 'bg-status-success' : 'bg-foreground-extra-muted',
                     )}
                   />
                 </button>

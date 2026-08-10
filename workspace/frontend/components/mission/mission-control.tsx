@@ -24,8 +24,8 @@ interface ActivityLine {
 // Restrained per-type dot — a single small status color, no neon/glow.
 const ACTIVITY_DOT: Record<ActivityLine['type'], string> = {
   command: 'bg-foreground-extra-muted',
-  success: 'bg-emerald-500',
-  error: 'bg-red-500',
+  success: 'bg-status-success',
+  error: 'bg-status-danger',
   thinking: 'bg-surface4',
   info: 'bg-surface4',
 };
@@ -263,7 +263,7 @@ export function MissionControl() {
           <Stat value={fmtTokens(totalTokens)} label="recent tokens" />
           <button
             onClick={() => setConnectModalOpen(true)}
-            className="ml-1 inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer shadow-xs"
+            className="ml-1 inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
             title="Launch a local agent or pair a remote server"
           >
             <Plus className="size-3.5 shrink-0" />
@@ -297,7 +297,7 @@ export function MissionControl() {
         {/* Shared activity feed */}
         <aside className="shrink-0 flex flex-col min-h-0 lg:w-[340px] xl:w-[380px] max-h-[42vh] lg:max-h-none border-t lg:border-t-0 lg:border-l border-border/60 bg-surface1/40">
           <div className="shrink-0 flex items-center gap-2 px-4 h-11 border-b border-border/60">
-            <span className={cn('size-1.5 rounded-full', activityFeed.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-surface4')} />
+            <span className={cn('size-1.5 rounded-full', activityFeed.length > 0 ? 'bg-status-success animate-pulse' : 'bg-surface4')} />
             <span className="text-sm font-semibold text-foreground">Activity</span>
             <span className="text-[11px] text-foreground-extra-muted ml-auto tabular-nums">{activityFeed.length} events</span>
           </div>
@@ -323,7 +323,7 @@ export function MissionControl() {
                         {line.time.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <p className={cn('text-xs truncate mt-0.5', line.type === 'error' ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted')}>
+                    <p className={cn('text-xs truncate mt-0.5', line.type === 'error' ? 'text-status-danger' : 'text-foreground-muted')}>
                       {line.content || '—'}
                     </p>
                   </div>
@@ -339,7 +339,7 @@ export function MissionControl() {
 
 function SectionLabel({ icon, children }: { icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-1.5 mb-3 text-[11px] font-semibold uppercase tracking-wider text-foreground-extra-muted">
+    <div className="flex items-center gap-1.5 mb-3 text-[11px] font-semibold text-foreground-extra-muted">
       {icon}
       {children}
     </div>
@@ -349,7 +349,7 @@ function SectionLabel({ icon, children }: { icon?: React.ReactNode; children: Re
 function Stat({ icon, value, label, accent }: { icon?: React.ReactNode; value: string; label: string; accent?: boolean }) {
   return (
     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2/70 border border-border/50">
-      {icon && <span className={accent ? 'text-amber-500' : 'text-foreground-extra-muted'}>{icon}</span>}
+      {icon && <span className={accent ? 'text-status-warning' : 'text-foreground-extra-muted'}>{icon}</span>}
       <span className="text-xs font-semibold text-foreground tabular-nums">{value}</span>
       <span className="text-[10px] text-foreground-extra-muted">{label}</span>
     </div>

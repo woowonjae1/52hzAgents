@@ -157,7 +157,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
     return (
       <div className="py-0.5">
         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
-          <ListTodo className="size-3.5 shrink-0 text-indigo-500" />
+          <ListTodo className="size-3.5 shrink-0 text-foreground-muted" />
           <span className="font-medium">To-do list</span>
         </div>
         <div className="ml-[22px] space-y-0.5">
@@ -190,7 +190,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
     return (
       <div className="py-0.5">
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
-          <Icon className="size-3.5 shrink-0 mt-0.5 text-amber-500" />
+          <Icon className="size-3.5 shrink-0 mt-0.5 text-status-warning" />
           <span className="italic text-[11px]">thinking</span>
         </div>
         <div className="text-xs leading-relaxed text-foreground/60 ml-[22px] mt-0.5 mb-1 whitespace-pre-wrap">
@@ -210,11 +210,11 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
           className={cn(
             'group/tool flex items-center gap-2 w-full text-left rounded-lg border px-2.5 py-1.5 transition-colors',
             'border-border/70 dark:border-border/70 bg-surface1/60',
-            hasDetail && 'cursor-pointer hover:border-blue-500/50 hover:bg-blue-50/40 dark:hover:bg-blue-950/20',
+            hasDetail && 'cursor-pointer hover:border-border-accent hover:bg-surface2',
           )}
         >
-          <span className="size-5 shrink-0 rounded-md bg-blue-500/10 flex items-center justify-center">
-            <Icon className="size-3 text-blue-500" />
+          <span className="size-5 shrink-0 rounded-md bg-surface3 flex items-center justify-center">
+            <Icon className="size-3 text-foreground-muted" />
           </span>
           <span className="font-mono text-[11px] font-semibold text-foreground shrink-0">{parsed.toolDisplay}</span>
           {parsed.summary && (
@@ -228,10 +228,10 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
           )}
         </button>
         {expanded && parsed.args && (
-          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-surface0 dark:bg-zinc-900 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 dark:bg-zinc-800 text-[11px] text-foreground font-mono">
+          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-surface0 overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 text-[11px] text-foreground font-mono">
               <span className="flex items-center gap-1.5 font-medium">
-                <span className="size-2 rounded-full bg-emerald-500 inline-block" />
+                <span className="size-2 rounded-full bg-status-success inline-block" />
                 <span>{parsed.toolDisplay || 'Terminal Output'}</span>
               </span>
               <button
@@ -247,11 +247,11 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
                 className="flex items-center gap-1 text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
                 title="Copy parameters"
               >
-                {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground font-mono whitespace-pre-wrap break-all selection:bg-blue-500/30">
+            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground font-mono whitespace-pre-wrap break-all selection:bg-surface4">
               {parsed.args}
             </pre>
           </div>
@@ -266,9 +266,9 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         <Icon
           className={cn(
             'size-3.5 shrink-0',
-            parsed.type === 'thinking' && 'text-amber-500 animate-pulse',
+            parsed.type === 'thinking' && 'text-status-warning animate-pulse',
             parsed.type === 'compacting' && 'text-violet-500 animate-spin',
-            parsed.type === 'status' && 'text-emerald-500'
+            parsed.type === 'status' && 'text-status-success'
           )}
         />
         {parsed.type === 'compacting' && (

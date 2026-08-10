@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { deriveIdentityColor } from '@/lib/identity-colors';
 import { MarkdownContent } from './markdown-content';
 import { workspaceApi } from '@/lib/api';
 import { useLayout } from '@/components/layout/layout-context';
@@ -217,7 +218,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
         <span className={cn(
           'text-xs italic',
           isQueued
-            ? 'text-blue-500 dark:text-blue-400'
+            ? 'text-foreground-muted'
             : 'text-muted-foreground'
         )}>
           {message.senderName}: {message.content}
@@ -237,30 +238,33 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       <div className="py-2.5 flex justify-end">
         <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[75%]">
           <div
-            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 shadow-xs border border-border/80 overflow-hidden bg-white dark:bg-zinc-700"
+            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 shadow-xs border border-border/80 overflow-hidden bg-white dark:bg-surface3"
           >
             <img src="/logo-icon.png" alt="You" className="size-6 object-contain" />
           </div>
           <div className="flex-1 min-w-0 text-right">
             <div className="flex items-center gap-2 mb-1.5 justify-end">
               {timestamp && (
-                <span className="text-[10px] text-foreground-extra-muted font-mono font-medium">{timestamp}</span>
+                <span className="text-[11px] text-foreground-extra-muted font-mono">{timestamp}</span>
               )}
-              <span className="text-xs font-bold text-foreground">{displayName}</span>
+              <span className="text-sm font-semibold text-foreground">{displayName}</span>
             </div>
-            <div className="text-xs leading-relaxed text-foreground dark:text-zinc-100 bg-surface2 dark:bg-zinc-800/90 border border-border/80 dark:border-zinc-700/80 p-3.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block">
+            {/* Body sits at 14px/1.78 — the reading rhythm the ChatGPT direction
+                is built on. The bubble is the human side of the conversation, so
+                it keeps full-strength foreground rather than the muted tier. */}
+            <div className="text-sm leading-[1.78] text-foreground bg-surface2 border border-border/80 p-3.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block">
               <MarkdownContent content={message.content} agentNames={agentNames} />
               <Attachments items={attachments} />
-              
-              <div className="flex items-center justify-end gap-3.5 mt-1.5 text-[10px] font-medium">
+
+              <div className="flex items-center justify-end gap-3.5 mt-1.5 text-[11px]">
                 {isCurrentUser && message.deliveryStatus === 'sending' && (
                   <span className="text-foreground-extra-muted">Sending...</span>
                 )}
                 {isCurrentUser && message.deliveryStatus === 'confirmed' && (
-                  <span className="text-emerald-600 dark:text-emerald-400">✓ Sent</span>
+                  <span className="text-success">✓ Sent</span>
                 )}
                 {isCurrentUser && message.deliveryStatus === 'failed' && (
-                  <span className="text-red-600 dark:text-red-400">✗ Failed to send</span>
+                  <span className="text-destructive">✗ Failed to send</span>
                 )}
               </div>
             </div>
@@ -271,30 +275,47 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
   }
 
   // ── AI Agent Messages (Left Aligned) ──
+  // Derived from the name (not the roster) so it stays stable even for a sender
+  // who has since left the workspace.
+  const identityColour = deriveIdentityColor(message.senderName);
+
   return (
     <div className="py-2.5 group/msg">
       <div className="flex items-start gap-3">
         <AgentAvatar name={message.senderName} agentType={agent?.agentType} size={32} square className="mt-1 shrink-0" />
-        <div className="flex-1 min-w-0 bg-card/50 border border-border/70 dark:border-border/60 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/60/30">
-            <span className="text-xs font-bold text-foreground truncate">
+        {/* No card around agent replies: a bubble per reply stacks into a wall of
+            boxes once several agents are in one thread. What replaces it is a
+            2px rail in the agent's identity colour — unlike the avatar, a rail
+            shows where a block STARTS and ENDS, which is the thing that's hard
+            to follow when three agents interleave. Only the human's message
+            keeps a filled bubble, so the two sides stay easy to tell apart. */}
+        <div
+          className="flex-1 min-w-0 pt-0.5 border-l-2 pl-3"
+          style={{ borderColor: identityColour }}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-xs font-semibold truncate" style={{ color: identityColour }}>
               {message.senderName}
             </span>
             {agent && (
+              // Role reads as normal-case text, not a shouted chip: the uppercase
+              // + letter-spaced treatment is the "instrument panel" signal this
+              // direction drops. `master` is distinguished by surface weight
+              // rather than a colour, since the palette has no brand accent.
               <span className={cn(
-                'text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider shrink-0 border border-border/40 dark:border-border/30',
+                'text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 border',
                 agent.role === 'master'
-                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200/20'
-                  : 'bg-surface2/80 text-foreground-muted dark:text-foreground-extra-muted'
+                  ? 'bg-surface3 text-foreground border-border-accent'
+                  : 'bg-surface2/80 text-foreground-muted border-border/40'
               )}>
                 {agent.role}
               </span>
             )}
             {timestamp && (
-              <span className="text-[10px] text-foreground-extra-muted font-medium ml-auto font-mono">{timestamp}</span>
+              <span className="text-[11px] text-foreground-extra-muted ml-auto font-mono">{timestamp}</span>
             )}
           </div>
-          <div className="text-xs leading-relaxed text-foreground-muted">
+          <div className="text-sm leading-[1.78] text-foreground">
             <MarkdownContent content={message.content} agentNames={agentNames} />
             <Attachments items={attachments} />
 
@@ -302,10 +323,10 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               <div className="mt-3.5 p-3.5 rounded-lg border bg-surface1/50 border-border space-y-2.5 max-w-full">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="size-1.5 rounded-full bg-status-warning animate-pulse" />
                     Action Approval Required
                   </span>
-                  <span className="text-[10px] text-muted-foreground uppercase font-mono">
+                  <span className="text-[11px] text-muted-foreground font-mono">
                     ID: {approvalRequest.approval_id}
                   </span>
                 </div>
@@ -361,7 +382,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                 onClick={handleCopy}
                 title="Copy message text"
               >
-                {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+                {copied ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </Button>
               <Button
@@ -374,7 +395,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                 }}
                 title="Fork thread from this message"
               >
-                <GitBranch className="size-3 text-indigo-500" />
+                <GitBranch className="size-3 text-foreground-muted" />
                 <span>Fork</span>
               </Button>
             </div>

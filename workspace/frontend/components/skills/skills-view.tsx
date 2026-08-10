@@ -208,7 +208,7 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
           <div className="flex items-center gap-1.5">
             <h3 className="text-[13px] font-semibold leading-tight truncate">{skill.name}</h3>
             {skill.author === 'Anthropic' && (
-              <span className="shrink-0 text-[8px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase">
+              <span className="shrink-0 text-[8px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
                 Official
               </span>
             )}
@@ -328,9 +328,9 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold">{skill.name}</h2>
+                <h2 className="text-base font-semibold">{skill.name}</h2>
                 {skill.author === 'Anthropic' && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold uppercase">Official</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">Official</span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{skill.description}</p>
@@ -346,7 +346,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {/* Add to Agent */}
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-            <div className="text-[10px] font-semibold text-primary uppercase tracking-wider mb-2">Add to Agent</div>
+            <div className="text-[10px] font-semibold text-primary mb-2">Add to Agent</div>
             {onlineAgents.length === 0 ? (
               <p className="text-xs text-muted-foreground">No online agents. Connect an agent to install skills.</p>
             ) : (
@@ -365,7 +365,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
                           onClick={() => handleUninstall(agent.agentName)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-red-500/10 hover:text-red-600 transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-status-success/10 text-status-success hover:bg-surface3 hover:text-status-danger transition-colors"
                         >
                           <Check className="size-3" />
                           Installed
@@ -395,7 +395,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
                           onClick={() => handleInstall(agent.agentName)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-status-danger/10 text-status-danger hover:bg-surface30/20 transition-colors"
                           title="Installation failed — click to retry"
                         >
                           <AlertCircle className="size-3" />
@@ -424,11 +424,11 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg border border-border p-2.5">
-              <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Category</div>
+              <div className="text-[9px] font-medium text-muted-foreground mb-0.5">Category</div>
               <div className="text-xs font-medium">{CATEGORIES.find(c => c.id === skill.category)?.label}</div>
             </div>
             <div className="rounded-lg border border-border p-2.5">
-              <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Author</div>
+              <div className="text-[9px] font-medium text-muted-foreground mb-0.5">Author</div>
               <div className="text-xs font-medium">{skill.author || 'Workspace user'}</div>
             </div>
           </div>
@@ -437,11 +437,11 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
               GitHub source / CLI install command. */}
           {isCustom ? (
             <div className="rounded-lg border border-border p-2.5">
-              <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Uploaded package</div>
+              <div className="text-[9px] font-medium text-muted-foreground mb-1">Uploaded package</div>
               <div className="flex items-center gap-2">
                 <Package className="size-3.5 text-muted-foreground shrink-0" />
                 <span className="text-xs font-medium truncate">{skill.filename || `${skill.id}.${skill.packageType || 'md'}`}</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium uppercase shrink-0">
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold shrink-0">
                   {skill.packageType || 'md'}
                 </span>
               </div>
@@ -450,7 +450,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
             <>
               {skill.sourceRepo && (
                 <div className="rounded-lg border border-border p-2.5">
-                  <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Source</div>
+                  <div className="text-[9px] font-medium text-muted-foreground mb-0.5">Source</div>
                   <a href={ghUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                     {skill.sourceRepo}/{skill.sourcePath} <ExternalLink className="size-2.5" />
                   </a>
@@ -459,7 +459,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
               {skill.sourceRepo && (
                 <div className="rounded-lg border border-border p-3 bg-muted/30">
-                  <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">CLI Install</div>
+                  <div className="text-[9px] font-medium text-muted-foreground mb-1.5">CLI Install</div>
                   <code className="text-[11px] font-mono block bg-background rounded-md p-2.5 border border-border select-all break-all">
                     npx @anthropic-ai/skills install {skill.sourceRepo}/{skill.sourcePath}
                   </code>
@@ -469,7 +469,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
           )}
 
           <div className="rounded-lg border border-border p-2.5">
-            <div className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider mb-1">Compatible With</div>
+            <div className="text-[9px] font-medium text-muted-foreground mb-1">Compatible With</div>
             <div className="flex flex-wrap gap-1.5">
               {['Claude Code', 'Codex', 'Cursor', 'Gemini CLI', 'OpenCode', 'VS Code', 'Roo Code'].map(a => (
                 <span key={a} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">{a}</span>
@@ -551,7 +551,7 @@ export function SkillsView() {
       {/* Header */}
       <div className="shrink-0 px-5 pt-4 pb-3 border-b border-border space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="size-4 text-amber-500" />
+          <Sparkles className="size-4 text-status-warning" />
           <ScreenTitle>Skill Hub</ScreenTitle>
           <span className="text-xs text-muted-foreground">{allSkills.length} skills</span>
           <button
@@ -608,8 +608,8 @@ export function SkillsView() {
             {activeCategory === 'all' && !search && (
               <div>
                 <div className="flex items-center gap-2 mb-2.5">
-                  <Star className="size-3.5 text-amber-500 fill-amber-500" />
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Featured</h3>
+                  <Star className="size-3.5 text-status-warning fill-status-warning" />
+                  <h3 className="text-xs font-semibold text-muted-foreground">Featured</h3>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
                   {featured.map(skill => (
@@ -623,7 +623,7 @@ export function SkillsView() {
             <div>
               {activeCategory === 'all' && !search && (
                 <div className="flex items-center gap-2 mb-2.5">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">All Skills</h3>
+                  <h3 className="text-xs font-semibold text-muted-foreground">All Skills</h3>
                   <span className="text-[10px] text-muted-foreground">({categoryCounts.all})</span>
                 </div>
               )}
@@ -715,7 +715,7 @@ function UploadSkillDialog({
         <div className="space-y-3">
           {/* File picker */}
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            <label className="text-[11px] font-semibold text-muted-foreground">
               Skill package (.md or .zip)
             </label>
             <label className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-input px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors">
@@ -736,7 +736,7 @@ function UploadSkillDialog({
               />
             </label>
             {file && !extOk && (
-              <p className="mt-1 text-[11px] text-red-500">Only .md and .zip files are supported.</p>
+              <p className="mt-1 text-[11px] text-status-danger">Only .md and .zip files are supported.</p>
             )}
             <p className="mt-1 text-[10px] text-muted-foreground">
               A .zip must contain a SKILL.md (at the root or in a single top-level folder).
@@ -745,7 +745,7 @@ function UploadSkillDialog({
 
           {/* Skill id */}
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Skill ID</label>
+            <label className="text-[11px] font-semibold text-muted-foreground">Skill ID</label>
             <input
               type="text"
               value={id}
@@ -754,7 +754,7 @@ function UploadSkillDialog({
               className="mt-1 w-full px-3 py-2 text-sm rounded-lg bg-muted/50 border border-input focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {id !== '' && !idValid && (
-              <p className="mt-1 text-[11px] text-red-500">
+              <p className="mt-1 text-[11px] text-status-danger">
                 Use letters, digits, &quot;.&quot;, &quot;_&quot; or &quot;-&quot;, not starting with a dash.
               </p>
             )}
@@ -762,7 +762,7 @@ function UploadSkillDialog({
 
           {/* Name */}
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Name</label>
+            <label className="text-[11px] font-semibold text-muted-foreground">Name</label>
             <input
               type="text"
               value={name}
@@ -774,7 +774,7 @@ function UploadSkillDialog({
 
           {/* Description */}
           <div>
-            <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Description (optional)</label>
+            <label className="text-[11px] font-semibold text-muted-foreground">Description (optional)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -785,9 +785,9 @@ function UploadSkillDialog({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2">
-              <AlertCircle className="size-3.5 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-red-600 dark:text-red-400">{error}</p>
+            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-status-danger/5 px-3 py-2">
+              <AlertCircle className="size-3.5 text-status-danger shrink-0 mt-0.5" />
+              <p className="text-[11px] text-status-danger">{error}</p>
             </div>
           )}
         </div>

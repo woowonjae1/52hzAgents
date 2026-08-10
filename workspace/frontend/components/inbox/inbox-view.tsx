@@ -26,8 +26,8 @@ function PriorityDot({ priority }: { priority: NotificationItem['priority'] }) {
     <span
       className={cn(
         'size-2 rounded-full shrink-0 mt-1.5',
-        priority === 'high' && 'bg-red-500',
-        priority === 'normal' && 'bg-blue-500',
+        priority === 'high' && 'bg-status-danger',
+        priority === 'normal' && 'bg-foreground-extra-muted',
         priority === 'low' && 'bg-foreground-extra-muted',
       )}
     />
@@ -52,7 +52,7 @@ function NotificationCard({
       className={cn(
         'px-3 py-2.5 flex items-start gap-2.5 cursor-pointer transition-colors',
         !notification.isRead
-          ? 'bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30'
+          ? 'bg-surface2 hover:bg-surface3'
           : 'hover:bg-surface1 dark:hover:bg-primary/50',
       )}
       onClick={() => onNavigate(notification)}
@@ -65,7 +65,7 @@ function NotificationCard({
             {notification.title}
           </span>
           {notification.priority === 'high' && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium shrink-0">
+            <span className="text-[10px] px-1 py-0.5 rounded bg-surface2 text-status-danger font-medium shrink-0">
               High
             </span>
           )}
@@ -77,7 +77,7 @@ function NotificationCard({
           <span className="text-[10px] text-muted-foreground">{agentName}</span>
           <span className="text-[10px] text-muted-foreground">{timeAgo(notification.createdAt)}</span>
           {notification.channelName && (
-            <span className="text-[10px] text-blue-500 flex items-center gap-0.5">
+            <span className="text-[10px] text-foreground-muted flex items-center gap-0.5">
               <ArrowRight className="size-2.5" />
               Go to thread
             </span>
@@ -87,7 +87,7 @@ function NotificationCard({
               href={notification.linkUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] text-blue-500 flex items-center gap-0.5"
+              className="text-[10px] text-foreground-muted flex items-center gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink className="size-2.5" />
@@ -127,7 +127,7 @@ function NotificationSection({
 
   return (
     <div>
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">
+      <h3 className="text-xs font-medium text-muted-foreground mb-2 px-1">
         {title} ({items.length})
       </h3>
       <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
@@ -204,7 +204,7 @@ export function InboxView() {
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Inbox className="size-4 text-blue-500" />
+          <Inbox className="size-4 text-foreground-muted" />
           <ScreenTitle>Inbox</ScreenTitle>
           {unreadNotificationCount > 0 && (
             <span className="text-xs text-muted-foreground">

@@ -251,7 +251,7 @@ export function FileGrid() {
                     onClick={() => navigateToFolder(entry.name)}
                     className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-surface2/60 cursor-pointer group"
                   >
-                    <Folder className="size-12 text-amber-500" />
+                    <Folder className="size-12 text-status-warning" />
                     <span className="text-xs font-medium truncate w-full">{entry.name}</span>
                     <span className="text-[10px] text-muted-foreground">
                       {entry.fileCount} {entry.fileCount === 1 ? 'item' : 'items'}
@@ -300,7 +300,7 @@ export function FileGrid() {
                   {/* Delete button on hover */}
                   <button
                     onClick={(e) => handleDelete(e, file.id, file.filename)}
-                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-red-50 dark:hover:bg-red-950/50 text-muted-foreground hover:text-red-500 transition-all shadow-sm"
+                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-all shadow-sm"
                     title="Delete"
                   >
                     <Trash2 className="size-3" />

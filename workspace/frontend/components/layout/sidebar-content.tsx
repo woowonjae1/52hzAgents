@@ -127,7 +127,7 @@ export function SidebarContent() {
       <div className="shrink-0 border-t border-border/40 dark:border-border/40 px-3.5 py-3 space-y-2.5 bg-surface1/80 backdrop-blur-md">
         {isOpenAgentsDomain && user && (
           <div className="flex items-center gap-2">
-            <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold shrink-0">
+            <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-semibold shrink-0">
               {user.email[0].toUpperCase()}
             </div>
             <span className="text-[12px] text-muted-foreground truncate flex-1">{user.email}</span>
@@ -299,7 +299,7 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <Label>Monitor Mode</Label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground font-medium">
                   Experimental
                 </span>
               </div>
@@ -324,7 +324,7 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <Label>Split Browser View</Label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground font-medium">
                   Experimental
                 </span>
               </div>
@@ -388,7 +388,7 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {collabOwner && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/30 text-sm">
-                  <Crown className="size-3.5 text-amber-500 shrink-0" />
+                  <Crown className="size-3.5 text-status-warning shrink-0" />
                   <span className="truncate flex-1">{collabOwner}</span>
                   <span className="text-xs text-muted-foreground">Owner</span>
                 </div>
@@ -402,7 +402,7 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
                         .then(() => setCollaborators((prev) => prev.filter((x) => x.email !== c.email)))
                         .catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'));
                     }}
-                    className="size-5 flex items-center justify-center rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                    className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
                   >
                     <X className="size-3" />
                   </button>

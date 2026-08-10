@@ -327,7 +327,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       {showMentions && mentionItems.length > 0 && (
         <div className="absolute bottom-full mb-2 left-0 right-0 bg-popover border rounded-lg shadow-lg z-50 overflow-hidden max-h-[280px] overflow-y-auto">
           {filteredAgents.length > 0 && filteredKnowledge.length > 0 && (
-            <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-b border-border">Agents</div>
+            <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-b border-border">Agents</div>
           )}
           {filteredAgents.map((agent) => {
             const idx = mentionItems.findIndex((m) => m.type === 'agent' && m.agent.agentName === agent.agentName);
@@ -348,14 +348,14 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                 <span className={cn(
                   'text-[10px] px-1.5 py-0.5 rounded-full ml-auto',
                   agent.role === 'master'
-                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                    ? 'bg-surface3 text-foreground'
                     : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
                 )}>
                   {agent.role}
                 </span>
                 <span className={cn(
                   'size-2 rounded-full',
-                  agent.status === 'online' ? 'bg-green-500' : 'bg-foreground-extra-muted'
+                  agent.status === 'online' ? 'bg-status-success' : 'bg-foreground-extra-muted'
                 )} />
               </button>
             );
@@ -363,7 +363,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
           {filteredKnowledge.length > 0 && (
             <>
               {filteredAgents.length > 0 && (
-                <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider border-t border-border">Knowledge</div>
+                <div className="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground border-t border-border">Knowledge</div>
               )}
               {filteredKnowledge.map((entry) => {
                 const idx = mentionItems.findIndex((m) => m.type === 'knowledge' && m.entry.id === entry.id);
@@ -379,8 +379,8 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                       insertMention(`knowledge:${entry.slug}`);
                     }}
                   >
-                    <div className="size-6 rounded-md bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-                      <BookOpen className="size-3.5 text-amber-600 dark:text-amber-400" />
+                    <div className="size-6 rounded-md bg-surface3 flex items-center justify-center shrink-0">
+                      <BookOpen className="size-3.5 text-status-warning" />
                     </div>
                     <span className="font-medium truncate">{entry.title}</span>
                     <span className="text-[10px] text-muted-foreground ml-auto font-mono shrink-0">@knowledge:{entry.slug}</span>
@@ -392,14 +392,18 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
         </div>
       )}
 
+      {/* rounded-3xl (24px) rather than a small radius: the composer is the one
+          control the eye returns to constantly, and the large radius is what
+          reads as "product" instead of "instrument panel". Padding grows with
+          the radius so the text doesn't crowd the rounded corners. */}
       <div className={cn(
-        'relative flex flex-col gap-2 bg-surface2 transition-all duration-150 rounded-xl border border-border/80 p-3 shadow-xs',
+        'relative flex flex-col gap-2 bg-surface2 transition-all duration-150 rounded-3xl border border-border/80 px-4 py-3 shadow-xs',
         isDragging && 'border-accent border-dashed bg-surface1',
         isFocused && !isDragging && 'border-border-accent shadow-sm ring-1 ring-border/50'
       )}>
         {/* Drag overlay */}
         {isDragging && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10 pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center rounded-3xl z-10 pointer-events-none">
             <span className="text-sm font-medium text-primary">Drop files here</span>
           </div>
         )}
@@ -414,7 +418,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
               <button
                 type="button"
                 onClick={() => setPendingFiles([])}
-                className="text-[11px] font-medium text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-[11px] font-medium text-status-danger hover:text-destructive transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <X className="size-3" />
                 <span>Clear all</span>
@@ -544,9 +548,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             onClick={handleSend}
             disabled={!hasContent || disabled}
             className={cn(
-              'size-9 rounded-xl flex items-center justify-center transition-all cursor-pointer',
+              'size-9 rounded-full flex items-center justify-center transition-all cursor-pointer',
               hasContent
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white shadow-xs'
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs'
                 : 'bg-surface3 text-foreground-extra-muted opacity-50 cursor-not-allowed'
             )}
             title="Send message"

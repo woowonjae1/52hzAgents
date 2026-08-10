@@ -139,7 +139,7 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
       className={cn(
         'flex flex-col text-left border border-input rounded-xl bg-background shadow-xs cursor-pointer p-3 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md',
         isActive && 'thread-wip',
-        isCompleted && 'bg-amber-50 dark:bg-amber-900/20 ring-1 ring-amber-200/60 dark:ring-amber-700/40 animate-[glow_2s_ease-in-out_infinite]',
+        isCompleted && 'bg-surface2 ring-1 ring-border-accent animate-[glow_2s_ease-in-out_infinite]',
       )}
     >
       {/* Header: avatars + title + time */}
@@ -151,12 +151,12 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
             </div>
           ))}
         </div>
-        {session.starred && <Star className="size-3 text-amber-400 fill-amber-400 shrink-0" />}
+        {session.starred && <Star className="size-3 text-status-warning fill-status-warning shrink-0" />}
         <span className="text-xs font-medium text-foreground truncate flex-1 min-w-0">
           {session.title || 'Untitled'}
         </span>
         {isCompleted ? (
-          <CheckCircle2 className="size-3.5 shrink-0 text-amber-500" />
+          <CheckCircle2 className="size-3.5 shrink-0 text-status-warning" />
         ) : (
           <span className="text-[10px] text-muted-foreground shrink-0">{displayTime}</span>
         )}
@@ -195,9 +195,9 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
                   <div key={step.messageId} className="flex items-center gap-1.5 min-w-0">
                     <Icon className={cn(
                       'size-3 shrink-0',
-                      parsed.type === 'thinking' && 'text-amber-500',
-                      parsed.type === 'tool_call' && 'text-blue-500',
-                      parsed.type === 'status' && 'text-emerald-500',
+                      parsed.type === 'thinking' && 'text-status-warning',
+                      parsed.type === 'tool_call' && 'text-foreground-muted',
+                      parsed.type === 'status' && 'text-status-success',
                       parsed.type === 'compacting' && 'text-violet-500 animate-spin',
                     )} />
                     <span className={cn(

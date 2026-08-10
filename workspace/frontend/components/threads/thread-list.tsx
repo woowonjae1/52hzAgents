@@ -112,7 +112,7 @@ function DMSection({
                 onClick={() => onSelect(dmId)}
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors cursor-pointer',
-                  isSelected ? 'bg-surface2 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-surface1 dark:hover:bg-primary/50'
+                  isSelected ? 'bg-surface2 ring-2 ring-border-accent' : 'hover:bg-surface1 dark:hover:bg-primary/50'
                 )}
               >
                 <div className="shrink-0 flex items-center justify-center border border-border rounded-full size-[30px] bg-card">
@@ -281,7 +281,7 @@ export function ThreadList() {
 
       {/* Agent Status Indicator Strip */}
       <div className="px-3 py-1.5 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-surface1/30">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
+        <span className="text-[11px] font-semibold text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
         {agents.map((a) => {
           const isWorking = activeSessionIds.has(a.agentName);
           const statusLabel = a.status === 'online' ? (isWorking ? 'Executing tool' : 'Idle') : 'Offline';
@@ -387,11 +387,15 @@ export function ThreadList() {
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-md text-left transition-all relative group cursor-pointer select-none',
                   isSelected
-                    ? 'bg-surface2 dark:bg-zinc-800 text-foreground border-l-[3px] border-l-emerald-500 dark:border-l-emerald-400 border-t border-r border-b border-border/70 shadow-xs font-semibold'
-                    : 'border border-transparent hover:bg-surface1/60 dark:hover:bg-zinc-800/60 text-foreground-muted hover:text-foreground',
+                    // Selection is carried by the surface step alone. A coloured
+                    // left rail would be a second, competing selection signal —
+                    // and in a palette with no brand accent it reads as status
+                    // ("this thread is healthy") rather than "this one is open".
+                    ? 'bg-surface3 text-foreground border border-border/70 shadow-xs font-semibold'
+                    : 'border border-transparent hover:bg-surface1/60 text-foreground-muted hover:text-foreground',
                   'has-data-[state=open]:bg-surface1/60',
                   isActive && 'thread-wip',
-                  isCompleted && !isSelected && 'bg-amber-500/10 border border-amber-500/30'
+                  isCompleted && !isSelected && 'bg-surface2 border border-border-accent'
                 )}
               >
                 {/* Avatar stack — show only channel participants */}
@@ -405,7 +409,7 @@ export function ThreadList() {
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex items-center gap-1.5">
                     {session.starred && (
-                      <Star className="size-3 shrink-0 fill-amber-400 text-amber-400" />
+                      <Star className="size-3 shrink-0 fill-status-warning text-status-warning" />
                     )}
                     <span className="text-sm flex-1 min-w-0 truncate font-normal text-foreground">
                       {isSearching
@@ -413,7 +417,7 @@ export function ThreadList() {
                         : (session.title || 'Untitled')}
                     </span>
                     {isCompleted && !isSelected ? (
-                      <CheckCircle2 className="size-3.5 shrink-0 text-amber-500" />
+                      <CheckCircle2 className="size-3.5 shrink-0 text-status-warning" />
                     ) : (
                       <span className="text-xs text-muted-foreground shrink-0">
                         {displayTime}
@@ -463,7 +467,7 @@ export function ThreadList() {
                         updateSession(session.sessionId, { starred: !session.starred });
                       }}
                     >
-                      <Star className={cn('size-4', session.starred && 'fill-amber-400 text-amber-400')} />
+                      <Star className={cn('size-4', session.starred && 'fill-status-warning text-status-warning')} />
                       <span>{session.starred ? 'Unstar' : 'Star'}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem
@@ -585,7 +589,7 @@ export function ThreadList() {
                         }}
                         className={cn(
                           'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative group cursor-pointer',
-                          isSelected ? 'bg-surface2 ring-2 ring-indigo-500 dark:ring-indigo-400' : 'hover:bg-surface1 dark:hover:bg-primary/50',
+                          isSelected ? 'bg-surface2 ring-2 ring-border-accent' : 'hover:bg-surface1 dark:hover:bg-primary/50',
                           'has-data-[state=open]:bg-surface1 dark:has-data-[state=open]:bg-primary/50'
                         )}
                       >

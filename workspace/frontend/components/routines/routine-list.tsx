@@ -138,7 +138,7 @@ export function RoutineList() {
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleCancel(routine.id); }}
-                    className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
+                    className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                     title="Cancel routine"
                   >
                     <Trash2 className="size-3" />

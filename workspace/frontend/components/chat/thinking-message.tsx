@@ -40,8 +40,10 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
         <AgentAvatar name={sender} agentType={agent?.agentType} size={36} square className="mt-0.5 opacity-70" />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-[15px] font-bold text-foreground truncate">{sender}</span>
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-500/90 italic shrink-0">
+            <span className="text-sm font-semibold text-foreground truncate">{sender}</span>
+            {/* "thinking" is a transient state label, not a warning — it reads in
+                the muted text tier rather than borrowing a semantic colour. */}
+            <span className="inline-flex items-center gap-1 text-[11px] text-foreground-extra-muted italic shrink-0">
               <Brain className="size-3.5" />
               thinking
             </span>
@@ -49,17 +51,17 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
               <span className={cn(
                 'text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
                 agent.role === 'master'
-                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                  ? 'bg-surface3 text-foreground'
                   : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
               )}>
                 {agent.role}
               </span>
             )}
             {timestamp && (
-              <span className="text-xs text-muted-foreground">{timestamp}</span>
+              <span className="text-[11px] font-mono text-muted-foreground">{timestamp}</span>
             )}
           </div>
-          <div className="mt-0.5 text-sm leading-relaxed text-foreground/60">
+          <div className="mt-0.5 text-sm leading-[1.78] text-foreground/60">
             {texts.length === 1 ? (
               <div className="whitespace-pre-wrap">{texts[0]}</div>
             ) : (
@@ -73,7 +75,7 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
                     {i > 0 && (
                       <span
                         aria-hidden
-                        className="absolute -left-3 top-[11px] size-1.5 -translate-y-1/2 rounded-full bg-amber-500/50"
+                        className="absolute -left-3 top-[11px] size-1.5 -translate-y-1/2 rounded-full bg-foreground-extra-muted/50"
                       />
                     )}
                     {t}

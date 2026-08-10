@@ -123,7 +123,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
       {/* Expanded tasks card overlay */}
       {tasksExpanded && channelTodos.length > 0 && (
         <div className="mb-1 rounded-lg border border-border bg-card p-2 shadow-lg space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="flex items-center justify-between px-1 pb-1 border-b border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center justify-between px-1 pb-1 border-b border-border text-[11px] font-semibold text-muted-foreground">
             <span>Current Tasks ({channelTodos.length})</span>
             <button
               type="button"
@@ -137,7 +137,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
             {channelTodos.map((todo) => (
               <div key={todo.id || todo.content} className="flex items-start gap-2 py-1.5 px-1">
                 {todo.status === 'in_progress' ? (
-                  <Loader2 className="mt-0.5 size-3.5 text-blue-500 animate-spin shrink-0" />
+                  <Loader2 className="mt-0.5 size-3.5 text-foreground-muted animate-spin shrink-0" />
                 ) : (
                   <Circle className="mt-0.5 size-3.5 text-muted-foreground shrink-0" />
                 )}
@@ -167,7 +167,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
               >
                 {inProgressCount > 0 && (
                   <>
-                    <Loader2 className="size-3 text-blue-500 animate-spin" />
+                    <Loader2 className="size-3 text-foreground-muted animate-spin" />
                     <span className="group-hover:underline">{inProgressCount} in progress</span>
                   </>
                 )}
@@ -194,9 +194,9 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
             const firesAt = t.firesAt || '';
             return (
               <span key={t.id} className="flex items-center gap-1">
-                <Timer className="size-3 text-amber-500" />
+                <Timer className="size-3 text-status-warning" />
                 <span>{msg.length > 30 ? msg.slice(0, 30) + '…' : msg}</span>
-                <span className="text-amber-500 font-mono">{firesAt ? timeUntil(firesAt) : ''}</span>
+                <span className="text-status-warning font-mono">{firesAt ? timeUntil(firesAt) : ''}</span>
                 <button
                   onClick={() => handleCancelTimer(t.id)}
                   className="p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
@@ -212,7 +212,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
 
       {/* Queued messages */}
       {queuedMessages.map((q) => (
-        <div key={q.queueId} className="flex items-center gap-1.5 text-blue-500 dark:text-blue-400">
+        <div key={q.queueId} className="flex items-center gap-1.5 text-foreground-muted">
           <MessageSquareMore className="size-3 shrink-0" />
           <span className="truncate">
             Queued: {q.content.length > 60 ? q.content.slice(0, 60) + '…' : q.content}

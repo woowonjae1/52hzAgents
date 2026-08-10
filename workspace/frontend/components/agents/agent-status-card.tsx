@@ -80,9 +80,9 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
                 </p>
               </div>
               <span className={cn(
-                'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-medium',
+                'text-[10px]  px-1.5 py-0.5 rounded-full font-medium',
                 isMaster
-                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                  ? 'bg-surface3 text-foreground'
                   : 'text-muted-foreground'
               )}>
                 {agent.role}
@@ -104,7 +104,7 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
                   <DropdownMenuContent align="end">
                     {!isMaster && (
                       <DropdownMenuItem onClick={() => handlePromote(agent.agentName)}>
-                        <Crown className="size-4 text-amber-500" />
+                        <Crown className="size-4 text-status-warning" />
                         Set as Master
                       </DropdownMenuItem>
                     )}

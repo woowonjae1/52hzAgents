@@ -74,11 +74,11 @@ export function DropzoneOverlay() {
   if (!isDragging) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-primary/80 backdrop-blur-md border-4 border-dashed border-indigo-500/80 animate-[fadeIn_0.15s_ease-out] text-white p-6">
-      <div className="size-20 rounded-full bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mb-4 animate-bounce">
-        <UploadCloud className="size-10 text-indigo-400" />
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-primary/80 backdrop-blur-md border-4 border-dashed border-border-accent animate-[fadeIn_0.15s_ease-out] text-white p-6">
+      <div className="size-20 rounded-full bg-surface3 border border-border-accent flex items-center justify-center mb-4 animate-bounce">
+        <UploadCloud className="size-10 text-foreground-muted" />
       </div>
-      <h3 className="text-xl font-bold tracking-tight">Drop files to upload</h3>
+      <h3 className="text-xl font-semibold tracking-tight">Drop files to upload</h3>
       <p className="text-sm text-foreground-extra-muted mt-1 max-w-sm text-center">
         Files will be added directly to the Workspace Shared Storage
       </p>

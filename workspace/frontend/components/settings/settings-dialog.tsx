@@ -184,7 +184,7 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
                   </>
                 ) : (
                   <>
-                    <Plug className="size-3 mr-1 text-emerald-500" />
+                    <Plug className="size-3 mr-1 text-status-success" />
                     Test Connection
                   </>
                 )}
@@ -242,7 +242,7 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
           <Button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 font-medium"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
           >
             {saving ? 'Saving...' : 'Save'}
           </Button>

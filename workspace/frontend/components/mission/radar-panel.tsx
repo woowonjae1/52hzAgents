@@ -20,8 +20,8 @@ interface PanelAgent {
 }
 
 const STATUS_COLOR: Record<Status, { dot: string; text: string; label: string }> = {
-  working: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Working' },
-  ready: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Online' },
+  working: { dot: 'bg-status-warning', text: 'text-status-warning', label: 'Working' },
+  ready: { dot: 'bg-status-success', text: 'text-status-success', label: 'Online' },
   offline: { dot: 'bg-foreground-extra-muted', text: 'text-foreground-extra-muted', label: 'Offline' },
 };
 
@@ -123,7 +123,7 @@ export function RadarPanel() {
                 <div className="text-sm font-semibold text-foreground truncate">{current.agent.agentName}</div>
                 <div className="flex items-center gap-2 mt-0.5">
                   {current.agent.agentType && (
-                    <span className="text-[10px] uppercase tracking-wide text-foreground-extra-muted">{current.agent.agentType}</span>
+                    <span className="text-[11px] text-foreground-extra-muted">{current.agent.agentType}</span>
                   )}
                   <span className={cn('flex items-center gap-1 text-[10px] font-semibold', STATUS_COLOR[current.status].text)}>
                     <span className={cn('size-1.5 rounded-full', STATUS_COLOR[current.status].dot, current.status === 'working' && 'animate-pulse')} />
@@ -134,10 +134,10 @@ export function RadarPanel() {
             </div>
 
             {/* Current activity */}
-            <div className={cn('rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs border', current.status === 'working' ? 'bg-amber-500/5 border-amber-500/10' : 'bg-surface1/30 border-border/60/50')}>
-              {current.status === 'working' ? <Wrench className="size-3.5 shrink-0 mt-0.5 text-amber-500" /> : current.status === 'ready' ? <Radio className="size-3.5 shrink-0 mt-0.5 text-emerald-500" /> : <Cpu className="size-3.5 shrink-0 mt-0.5 text-foreground-extra-muted" />}
+            <div className={cn('rounded-lg px-3 py-2.5 flex items-start gap-2 text-xs border', current.status === 'working' ? 'bg-status-warning/5 border-status-warning/15' : 'bg-surface1/30 border-border/50')}>
+              {current.status === 'working' ? <Wrench className="size-3.5 shrink-0 mt-0.5 text-status-warning" /> : current.status === 'ready' ? <Radio className="size-3.5 shrink-0 mt-0.5 text-status-success" /> : <Cpu className="size-3.5 shrink-0 mt-0.5 text-foreground-extra-muted" />}
               {current.activity ? (
-                <p className={cn('line-clamp-3 min-w-0', current.status === 'working' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground-muted')}>
+                <p className={cn('line-clamp-3 min-w-0', current.status === 'working' ? 'text-status-warning' : 'text-foreground-muted')}>
                   {stripMarkdown(current.activity.content).slice(0, 240) || 'Idle'}
                 </p>
               ) : (
@@ -147,7 +147,7 @@ export function RadarPanel() {
 
             {/* Threads */}
             <div>
-              <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-foreground-extra-muted mb-1.5">
+              <div className="flex items-center gap-1 text-[11px] font-semibold text-foreground-extra-muted mb-1.5">
                 <MessageSquare className="size-3" /> Threads · {current.threads.length}
               </div>
               {current.threads.length === 0 ? (

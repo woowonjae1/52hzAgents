@@ -183,10 +183,10 @@ export function EmptyState() {
         <div className="md:col-span-5 flex flex-col justify-between p-5 bg-card min-h-0 overflow-y-auto">
           <div className="space-y-4">
             <div>
-              <span className="text-[9px] font-bold uppercase tracking-wider text-foreground-extra-muted">
+              <span className="text-[11px] font-semibold text-foreground-extra-muted">
                 Agent Catalog
               </span>
-              <h2 className="text-base font-bold tracking-tight text-foreground mt-1">
+              <h2 className="text-base font-semibold tracking-tight text-foreground mt-1">
                 Select Runtime
               </h2>
             </div>
@@ -216,7 +216,7 @@ export function EmptyState() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold text-foreground truncate">{entry.label}</div>
-                        <div className="text-[9px] text-muted-foreground mt-0.5 font-mono uppercase tracking-wider">
+                        <div className="text-[9px] text-muted-foreground mt-0.5 font-mono ">
                           {entry.tags?.[0] || 'Local'}
                         </div>
                       </div>
@@ -254,7 +254,7 @@ export function EmptyState() {
                 <AgentIcon name={selectedEntry.name} size={52} />
               </div>
 
-              <h3 className="text-base font-bold tracking-tight text-foreground mb-1">
+              <h3 className="text-base font-semibold tracking-tight text-foreground mb-1">
                 {selectedEntry.label}
               </h3>
               
@@ -264,7 +264,7 @@ export function EmptyState() {
 
               {/* Connection Command Card */}
               <div className="w-full bg-primary dark:bg-black border border-border rounded-xl p-4 mb-4 relative group text-left">
-                <div className="text-[10px] text-foreground-muted font-mono mb-2 uppercase tracking-wider">
+                <div className="text-[11px] text-foreground-muted font-mono mb-2">
                   Run command to connect:
                 </div>
                 <pre className="text-primary-foreground text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
@@ -299,7 +299,7 @@ export function EmptyState() {
                     <span className="mr-1.5 font-mono">
                       {token.length > 12 ? `${token.slice(0, 6)}...${token.slice(-4)}` : token}
                     </span>
-                    {tokenCopied ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                    {tokenCopied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
                   </button>
                 </div>
               )}
@@ -336,7 +336,7 @@ function CliStep({
       <div className="relative group mt-1">
         <pre className="bg-primary text-primary-foreground rounded-lg px-3.5 py-2.5 text-xs font-mono leading-relaxed overflow-x-auto">
           <span className="text-foreground-muted">$ </span>
-          <span className="text-emerald-400">{command}</span>
+          <span className="text-status-success">{command}</span>
         </pre>
         <button
           className="absolute top-1.5 right-1.5 size-6 flex items-center justify-center rounded bg-primary/80 hover:bg-primary text-foreground-extra-muted hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"

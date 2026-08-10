@@ -172,7 +172,7 @@ export function TasksView() {
     if (!items.length) return null;
     return (
       <section key={sectionStatus}>
-        <h3 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <h3 className="mb-2 text-[11px] font-semibold text-muted-foreground">
           {STATUS_LABEL[sectionStatus]} <span className="text-muted-foreground/60">{items.length}</span>
         </h3>
         <div className="overflow-hidden rounded-lg border border-border bg-card divide-y divide-border">
@@ -195,11 +195,11 @@ export function TasksView() {
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
                     <span className={cn(
-                      'px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider',
-                      todo.status === 'in_progress' && 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/40',
-                      todo.status === 'completed' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-800/40',
+                      'px-1.5 py-0.5 rounded text-[11px] font-semibold',
+                      todo.status === 'in_progress' && 'bg-surface3 text-foreground-muted border border-border-accent',
+                      todo.status === 'completed' && 'bg-status-success/10 text-status-success border border-border-accent',
                       todo.status === 'pending' && 'bg-surface2 text-muted-foreground border border-border/50',
-                      todo.status === 'cancelled' && 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200/50 dark:border-red-800/40'
+                      todo.status === 'cancelled' && 'bg-status-danger/10 text-status-danger border border-border-accent'
                     )}>
                       {todo.status.replace('_', ' ')}
                     </span>
@@ -220,7 +220,7 @@ export function TasksView() {
                     <button type="button" onClick={() => void reorderTask(todo, 1)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" title="Move task down">
                       <ArrowDown className="size-3.5" />
                     </button>
-                    <button type="button" onClick={() => void deleteTask(todo)} className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30" title="Delete task">
+                    <button type="button" onClick={() => void deleteTask(todo)} className="rounded p-1 text-muted-foreground hover:bg-surface3 hover:text-status-danger dark:hover:bg-red-950/30" title="Delete task">
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
@@ -244,7 +244,7 @@ export function TasksView() {
           <Button variant="ghost" mode="icon" size="sm" onClick={() => void refreshTodos()} title="Refresh tasks"><RefreshCw className="size-4" /></Button>
           <button
             onClick={openCreate}
-            className="inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border border-zinc-700 dark:border-zinc-300 hover:bg-zinc-800 dark:hover:bg-white transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground border border-primary hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
           >
             <Plus className="size-3.5 shrink-0" />
             <span className="whitespace-nowrap">New task</span>
@@ -296,7 +296,7 @@ export function TasksView() {
                 {editing && !channels.some((item) => item.id === channel) && <option value={channel}>{channel}</option>}
               </select>
             </div>
-            {error && <p className="text-xs text-red-600">{error}</p>}
+            {error && <p className="text-xs text-status-danger">{error}</p>}
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>

@@ -62,10 +62,10 @@ function parseDiff(code: string): { rows: DiffRow[]; file: string | null; adds: 
 }
 
 const ROW_STYLE: Record<DiffKind, { row: string; sign: string; signColor: string; num: string }> = {
-  add: { row: 'bg-emerald-500/[0.08]', sign: '+', signColor: 'text-emerald-500', num: 'text-emerald-600/70 dark:text-emerald-500/60' },
-  del: { row: 'bg-red-500/[0.08]', sign: '-', signColor: 'text-red-500', num: 'text-red-600/70 dark:text-red-500/60' },
+  add: { row: 'bg-status-success/[0.08]', sign: '+', signColor: 'text-status-success', num: 'text-status-success/70 dark:text-status-success/60' },
+  del: { row: 'bg-status-danger/[0.08]', sign: '-', signColor: 'text-status-danger', num: 'text-status-danger/70 dark:text-status-danger/60' },
   context: { row: '', sign: ' ', signColor: 'text-transparent', num: 'text-foreground-muted/50' },
-  hunk: { row: 'bg-cyan-500/[0.06]', sign: ' ', signColor: 'text-transparent', num: 'text-transparent' },
+  hunk: { row: 'bg-surface2', sign: ' ', signColor: 'text-transparent', num: 'text-transparent' },
   meta: { row: '', sign: ' ', signColor: 'text-transparent', num: 'text-transparent' },
 };
 
@@ -99,8 +99,8 @@ export function DiffBlock({ code }: DiffBlockProps) {
           <span className="text-[11px] truncate text-foreground-extra-muted">{file || 'diff'}</span>
         </button>
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          {adds > 0 && <span className="text-[10px] font-semibold text-emerald-500 tabular-nums">+{adds}</span>}
-          {dels > 0 && <span className="text-[10px] font-semibold text-red-500 tabular-nums">−{dels}</span>}
+          {adds > 0 && <span className="text-[10px] font-semibold text-status-success tabular-nums">+{adds}</span>}
+          {dels > 0 && <span className="text-[10px] font-semibold text-status-danger tabular-nums">−{dels}</span>}
           <button onClick={copy} className="text-foreground-muted hover:text-foreground-extra-muted transition-colors" title="Copy diff">
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           </button>
@@ -124,12 +124,12 @@ export function DiffBlock({ code }: DiffBlockProps) {
                     {r.newNo ?? ''}
                   </span>
                   {/* sign */}
-                  <span className={cn('shrink-0 w-5 text-center select-none font-bold', s.signColor)}>{s.sign}</span>
+                  <span className={cn('shrink-0 w-5 text-center select-none font-semibold', s.signColor)}>{s.sign}</span>
                   {/* content */}
                   <span
                     className={cn(
                       'whitespace-pre pr-4 flex-1',
-                      r.kind === 'hunk' ? 'text-cyan-400/80' : r.kind === 'add' ? 'text-emerald-200' : r.kind === 'del' ? 'text-red-200' : 'text-foreground-extra-muted',
+                      r.kind === 'hunk' ? 'text-foreground-muted' : r.kind === 'add' ? 'text-foreground' : r.kind === 'del' ? 'text-foreground' : 'text-foreground-extra-muted',
                     )}
                   >
                     {r.text || ' '}

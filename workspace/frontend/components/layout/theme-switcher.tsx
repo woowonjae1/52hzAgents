@@ -74,7 +74,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
                   // Fixed colours, not tokens: the check sits on the swatch, whose
                   // colour is the same in every theme. `text-foreground` here would
                   // flip to near-white in dark mode and vanish on the white swatch.
-                  themeInfo.name === 'light' ? 'text-zinc-700' : 'text-white',
+                  themeInfo.name === 'light' ? 'text-foreground' : 'text-white',
                 )}
                 strokeWidth={3}
               />

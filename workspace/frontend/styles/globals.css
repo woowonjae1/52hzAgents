@@ -16,38 +16,38 @@
  * per tier) and hand-tuning a single hue breaks the family.
  */
 :root {
-  /* Surfaces (layers) */
+  /* Surfaces (layers) — true neutral (no blue bias), matching the dark ramp */
   --surface0: #ffffff; /* App background */
-  --surface1: #fafafa; /* Subtle hover */
-  --surface2: #f4f4f5; /* Elevated: badges, inputs, sheets */
-  --surface3: #e4e4e7; /* Highest elevation */
-  --surface4: #d4d4d8; /* Extra emphasis */
+  --surface1: #f9f9f9; /* Subtle hover */
+  --surface2: #f4f4f4; /* Elevated: badges, inputs, sheets */
+  --surface3: #e3e3e3; /* Highest elevation */
+  --surface4: #d1d1d1; /* Extra emphasis */
   --surface-diff-empty: #f6f6f6; /* Empty side of split diff rows */
-  --surface-sidebar: #f4f4f5;
-  --surface-sidebar-hover: #e9e9ec;
+  --surface-sidebar: #f9f9f9;
+  --surface-sidebar-hover: #ececec;
   --surface-workspace: #ffffff;
 
   /* Text */
-  --foreground: #1a1a1e;
-  --foreground-muted: #71717a;
-  --foreground-extra-muted: #a1a1aa;
+  --foreground: #0d0d0d;
+  --foreground-muted: #5d5d5d;
+  --foreground-extra-muted: #8f8f8f;
 
   /* Controls */
-  --scrollbar-handle: #3f3f46;
+  --scrollbar-handle: #c1c1c1;
 
   /* Borders */
-  --border: #e4e4e7;
-  --border-accent: #ececf1;
+  --border: #e5e5e5;
+  --border-accent: #ececec;
 
-  /* Brand */
-  --accent: #20744a;
-  --accent-bright: #239956;
+  /* Brand — achromatic, mirroring the dark theme. Dark fill + light text. */
+  --accent: #0d0d0d;
+  --accent-bright: #000000;
   --accent-foreground: #ffffff;
 
-  /* Semantic */
-  --destructive: #b04138;
+  /* Semantic — toned down a step from the original saturated set */
+  --destructive: #b5544c;
   --destructive-foreground: #ffffff;
-  --success: #20744a;
+  --success: #3e7d54;
   --success-foreground: #ffffff;
 
   /* Diff — the color *is* the signal here, so it stays saturated */
@@ -106,107 +106,135 @@
   --muted: #f4f4f5;
   --muted-foreground: #71717a;
   --input: #f4f4f5;
-  --ring: #18181b;
-  --radius: 0.5rem;
+  --ring: #0d0d0d;
+  /* 12px, up from 8px. Larger radii read as "consumer product" rather than
+     "instrument panel" — the genre signal the ChatGPT direction asks for. */
+  --radius: 0.75rem;
+
+  /*
+   * Shared width of the conversation column. The message list and the composer
+   * BOTH read this, so they sit on one axis by construction — they used to
+   * carry the number separately (a `48rem` style and a `max-w-3xl` class) and
+   * keeping the two in step was manual.
+   *
+   * `100%` fills the panel. The ChatGPT reference caps this near 48rem to hold
+   * prose at ~65 characters, but this workspace's centre column is already
+   * narrowed by the sidebar and the right preview panel, so a second cap left
+   * the messages stranded in a thin band. Set a length here (e.g. `48rem`) to
+   * go back to a fixed reading measure.
+   */
+  --chat-column: 100%;
 }
 
 /**
- * Dark = Paseo's default dark theme (`paseoDarkColors`), a subtle teal-green
- * tint. The previous values here were pulled from the raw zinc scale
- * (surface0 #121214 = zinc-950), which is not any of Paseo's six themes and read
- * as neutral gray — the single most visible way the port looked "not like Paseo".
- * The other four dark tints (zinc / midnight / claude / ghostty) are separate
+ * Dark = the signature theme: a ZERO-HUE-BIAS neutral ramp, in the vein of
+ * ChatGPT's dark mode.
+ *
+ * Two deliberate departures from the previous Paseo teal-green tint:
+ *
+ *   1. The ground is achromatic. A tinted ground forces every accent to either
+ *      harmonize with it or fight it — the old coral-on-teal pairing sat near
+ *      complementary and pulled the eye off the content. Removing the ground's
+ *      hue removes the conflict at the source.
+ *   2. There is no brand accent. `--accent` is a near-white fill paired with a
+ *      dark `--accent-foreground` (the inverted-button pattern), so color is
+ *      spent only where it carries meaning: agent identity, diff, and status.
+ *
+ * Values sit noticeably LIGHTER than the old near-black; ChatGPT's dark mode is
+ * a mid-dark neutral, not a black. The four other dark tints below are separate
  * selectable themes, not variants of this one.
  */
 .dark {
   /* Surfaces (layers) */
-  --surface0: #181b1a;
-  --surface1: #1e2120;
-  --surface2: #272a29;
-  --surface3: #434645;
-  --surface4: #595b5b;
-  --surface-diff-empty: #252827;
-  --surface-sidebar: #141716;
-  --surface-sidebar-hover: #1c1f1e;
-  --surface-workspace: #1e2120; /* = surface1 in dark */
+  --surface0: #212121;
+  --surface1: #2a2a2a;
+  --surface2: #333333;
+  --surface3: #414141;
+  --surface4: #4d4d4d;
+  --surface-diff-empty: #262626;
+  --surface-sidebar: #181818;
+  --surface-sidebar-hover: #212121;
+  --surface-workspace: #2a2a2a; /* = surface1 in dark */
 
   /* Text */
-  --foreground: #fafafa;
-  --foreground-muted: #d4d4d8;
-  --foreground-extra-muted: #a1a1aa;
+  --foreground: #ececec;
+  --foreground-muted: #b4b4b4;
+  --foreground-extra-muted: #8a8a8a;
 
   /* Controls */
-  --scrollbar-handle: #717574;
+  --scrollbar-handle: #4d4d4d;
 
   /* Borders */
-  --border: #252b2a;
-  --border-accent: #2f3534;
+  --border: #2e2e2e;
+  --border-accent: #3d3d3d;
 
-  /* Brand */
-  --accent: #20744a;
-  --accent-bright: #7ccba0;
-  --accent-foreground: #ffffff;
+  /* Brand — achromatic. Light fill + dark text (inverted-button pattern). */
+  --accent: #ececec;
+  --accent-bright: #ffffff;
+  --accent-foreground: #1a1a1a;
 
-  /* Semantic — warm red, hue ~7, so it reads as red (not pink) against the green tint */
-  --destructive: #c64f43;
+  /* Semantic — desaturated so they stay legible without jumping off a pure
+     neutral ground (a saturated red/green reads as a siren here). */
+  --destructive: #c77b74;
   --destructive-foreground: #ffffff;
-  --success: #20744a;
+  --success: #6fa97f;
   --success-foreground: #ffffff;
 
   /* Diff */
-  --diff-addition: #4ade80;
-  --diff-deletion: #ef4444;
+  --diff-addition: #6fa97f;
+  --diff-deletion: #c77b74;
 
   /* Status, full tier */
-  --status-success: #2ead58;
-  --status-danger: #f65048;
-  --status-warning: #c38328;
-  --status-merged: #a670f5;
+  --status-success: #6fa97f;
+  --status-danger: #c77b74;
+  --status-warning: #b99a5c;
+  --status-merged: #9b8bc4;
 
   /* Status, muted tier */
-  --status-muted-success: #7cac85;
-  --status-muted-danger: #ca8c85;
-  --status-muted-warning: #b79875;
-  --status-muted-merged: #a594c6;
+  --status-muted-success: #62806a;
+  --status-muted-danger: #9c6a66;
+  --status-muted-warning: #8d7a54;
+  --status-muted-merged: #7a7194;
 
-  /* Terminal */
-  --terminal-background: #181b1a;
-  --terminal-foreground: #fafafa;
-  --terminal-cursor: #fafafa;
-  --terminal-cursor-accent: #181b1a;
+  /* Terminal — ground follows the neutral ramp; the ANSI hues stay
+     distinguishable because a terminal needs red to read as red. */
+  --terminal-background: #212121;
+  --terminal-foreground: #ececec;
+  --terminal-cursor: #ececec;
+  --terminal-cursor-accent: #212121;
   --terminal-selection-background: rgba(255, 255, 255, 0.2);
-  --terminal-selection-foreground: #fafafa;
-  --terminal-black: #141716;
-  --terminal-red: #e07070;
-  --terminal-green: #5dba80;
-  --terminal-yellow: #d4a44a;
-  --terminal-blue: #6a9de0;
-  --terminal-magenta: #b07ad0;
-  --terminal-cyan: #4aabb8;
-  --terminal-white: #d4d4d8;
-  --terminal-bright-black: #434645;
-  --terminal-bright-red: #e89090;
-  --terminal-bright-green: #7ecf9a;
-  --terminal-bright-yellow: #e0be6e;
-  --terminal-bright-blue: #8ab4e8;
-  --terminal-bright-magenta: #c49ae0;
-  --terminal-bright-cyan: #6ec2cc;
-  --terminal-bright-white: #f0f0f2;
+  --terminal-selection-foreground: #ececec;
+  --terminal-black: #181818;
+  --terminal-red: #d98078;
+  --terminal-green: #6fa97f;
+  --terminal-yellow: #c2a464;
+  --terminal-blue: #6d9bbf;
+  --terminal-magenta: #9b8bc4;
+  --terminal-cyan: #5fa3ab;
+  --terminal-white: #b4b4b4;
+  --terminal-bright-black: #4d4d4d;
+  --terminal-bright-red: #e5948c;
+  --terminal-bright-green: #86bd94;
+  --terminal-bright-yellow: #d4b878;
+  --terminal-bright-blue: #86b0d1;
+  --terminal-bright-magenta: #b0a2d4;
+  --terminal-bright-cyan: #75b8bf;
+  --terminal-bright-white: #ececec;
 
   /* Legacy aliases */
-  --background: #181b1a;
-  --card: #1e2120;
-  --card-foreground: #fafafa;
-  --popover: #272a29;
-  --popover-foreground: #fafafa;
-  --primary: #fafafa;
-  --primary-foreground: #181b1a;
-  --secondary: #272a29;
-  --secondary-foreground: #fafafa;
-  --muted: #272a29;
-  --muted-foreground: #a1a5a4;
-  --input: #272a29;
-  --ring: #d4d4d8;
+  --background: #212121;
+  --card: #2a2a2a;
+  --card-foreground: #ececec;
+  --popover: #2a2a2a;
+  --popover-foreground: #ececec;
+  --primary: #ececec;
+  --primary-foreground: #1a1a1a;
+  --secondary: #333333;
+  --secondary-foreground: #ececec;
+  --muted: #333333;
+  --muted-foreground: #8a8a8a;
+  --input: #2a2a2a;
+  --ring: #8a8a8a;
 }
 
 /**
@@ -506,13 +534,21 @@
   }
 }
 
-/** Thread completion glow **/
+/**
+ * Thread completion glow. Achromatic: "this thread just finished" is a
+ * transient attention cue, not a status, so it gets brightness rather than a
+ * hue — the amber it used to use read as a warning on a neutral ground.
+ */
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 4px 0 rgba(251, 191, 36, 0.3); }
-  50% { box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.4); }
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(236, 236, 236, 0.14); }
+  50% { box-shadow: 0 0 8px 2px rgba(236, 236, 236, 0.22); }
 }
 
-/** Thread work-in-progress shimmer **/
+/**
+ * Thread work-in-progress shimmer. Also achromatic, for the same reason: a
+ * blue/indigo sweep was the single most saturated thing on screen and read as
+ * a brand accent in a palette that deliberately has none.
+ */
 @keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -520,11 +556,11 @@
 .thread-wip {
   background: linear-gradient(
     90deg,
-    rgba(59, 130, 246, 0.04) 0%,
-    rgba(59, 130, 246, 0.15) 30%,
-    rgba(99, 102, 241, 0.20) 50%,
-    rgba(59, 130, 246, 0.15) 70%,
-    rgba(59, 130, 246, 0.04) 100%
+    rgba(13, 13, 13, 0.02) 0%,
+    rgba(13, 13, 13, 0.06) 30%,
+    rgba(13, 13, 13, 0.09) 50%,
+    rgba(13, 13, 13, 0.06) 70%,
+    rgba(13, 13, 13, 0.02) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 2.5s ease-in-out infinite;
@@ -532,14 +568,18 @@
 .dark .thread-wip {
   background: linear-gradient(
     90deg,
-    rgba(96, 165, 250, 0.05) 0%,
-    rgba(96, 165, 250, 0.18) 30%,
-    rgba(129, 140, 248, 0.25) 50%,
-    rgba(96, 165, 250, 0.18) 70%,
-    rgba(96, 165, 250, 0.05) 100%
+    rgba(236, 236, 236, 0.03) 0%,
+    rgba(236, 236, 236, 0.08) 30%,
+    rgba(236, 236, 236, 0.13) 50%,
+    rgba(236, 236, 236, 0.08) 70%,
+    rgba(236, 236, 236, 0.03) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 2.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-wip { animation: none; }
 }
 
 /** Global Styles **/
@@ -571,21 +611,15 @@
   }
 }
 
-/** Custom Scrollbar **/
+/**
+ * Firefox scrollbars. The `::-webkit-*` half that used to sit here was dead —
+ * the block further down overrode all of it — so only the standards property
+ * remains, and it now reads the same token the WebKit rules do.
+ */
 @layer base {
-  ::-webkit-scrollbar {
-    width: 5px;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: var(--input);
-    border-radius: 5px;
-  }
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--input) transparent;
+    scrollbar-color: var(--scrollbar-handle) transparent;
   }
 }
 
@@ -673,7 +707,15 @@ html {
   color: #7ee787 !important;
 }
 
-/* ── Sleek Custom Scrollbars ── */
+/*
+ * Scrollbars. This block is the one that wins — the `@layer base` rules above
+ * lose to it on specificity-free ties by source order, so the two were never
+ * both in effect and only this one is worth reading.
+ *
+ * The handle rides `--scrollbar-handle`, which every theme already defines, so
+ * a new dark tint gets a matching scrollbar for free. The zinc rgba() literals
+ * this replaced carried a blue bias the neutral ramp does not have.
+ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -684,42 +726,18 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(161, 161, 170, 0.25);
+  background: color-mix(in srgb, var(--scrollbar-handle) 55%, transparent);
   border-radius: 9999px;
   transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(161, 161, 170, 0.45);
+  background: var(--scrollbar-handle);
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(82, 82, 91, 0.4);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(113, 113, 122, 0.6);
-}
-
-/* ── Modern Glassmorphism & Glow Utilities ── */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(228, 228, 231, 0.6);
-}
-
-.dark .glass-panel {
-  background: rgba(24, 24, 27, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(39, 39, 42, 0.6);
-}
-
-.glow-emerald {
-  box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.25);
-}
-
-.glow-indigo {
-  box-shadow: 0 0 20px -3px rgba(99, 102, 241, 0.25);
-}
+/*
+ * `.glass-panel`, `.glow-emerald` and `.glow-indigo` used to live here. All
+ * three were unreferenced, and all three belonged to the glassmorphism/neon
+ * vocabulary this direction drops — keeping them around is an invitation to
+ * reach for a coloured glow the palette has no room for.
+ */

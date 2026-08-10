@@ -36,8 +36,8 @@ const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
   gemini:    { bg: 'bg-blue-500',    text: 'text-white' },
   openclaw:  { bg: 'bg-violet-600',  text: 'text-white' },
   amp:       { bg: 'bg-rose-500',    text: 'text-white' },
-  aider:     { bg: 'bg-emerald-500', text: 'text-white' },
-  goose:     { bg: 'bg-amber-600',   text: 'text-white' },
+  aider:     { bg: 'bg-status-success', text: 'text-white' },
+  goose:     { bg: 'bg-status-warning',   text: 'text-white' },
   cline:     { bg: 'bg-cyan-500',    text: 'text-white' },
   copilot:   { bg: 'bg-indigo-500',  text: 'text-white' },
   opencode:  { bg: 'bg-teal-500',    text: 'text-white' },
@@ -66,8 +66,8 @@ function getProviderBrand(name: string) {
 
 function CategoryIcon({ category, className }: { category: string; className?: string }) {
   if (category === 'image') return <ImageIcon className={cn('text-violet-500', className)} />;
-  if (category === 'audio') return <Volume2 className={cn('text-amber-500', className)} />;
-  return <MessageSquare className={cn('text-blue-500', className)} />;
+  if (category === 'audio') return <Volume2 className={cn('text-status-warning', className)} />;
+  return <MessageSquare className={cn('text-foreground-muted', className)} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ export function ConnectAgentView() {
     <div className="flex flex-col h-full bg-card text-foreground">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 shrink-0">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-foreground-muted">Connect Agents</h2>
+        <h2 className="text-[11px] font-semibold text-foreground-muted">Connect Agents</h2>
         <button
           onClick={() => setViewMode('threads')}
           className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
@@ -401,7 +401,7 @@ function LocalAgentsTab({
             </div>
 
             <div className="w-full bg-primary dark:bg-black border border-border rounded-xl p-4 relative group text-left">
-              <div className="text-[10px] text-foreground-muted font-mono mb-2 uppercase tracking-wider">
+              <div className="text-[11px] text-foreground-muted font-mono mb-2">
                 Run command to connect:
               </div>
               <pre className="text-primary-foreground text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
@@ -428,7 +428,7 @@ function LocalAgentsTab({
                 <span className="mr-1.5">
                   {maskedToken}
                 </span>
-                {tokenCopied ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                {tokenCopied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
               </button>
             </div>
           </div>
@@ -511,7 +511,7 @@ function CloudAgentsTab({
         {/* Back button */}
         <button
           onClick={() => onSelectProvider(null)}
-          className="flex items-center gap-1 text-[11px] font-bold text-foreground-muted hover:text-foreground transition-colors mb-2"
+          className="flex items-center gap-1 text-[11px] font-semibold text-foreground-muted hover:text-foreground transition-colors mb-2"
         >
           <ChevronRight className="size-3.5 rotate-180" />
           All providers
@@ -524,7 +524,7 @@ function CloudAgentsTab({
                 <ProviderIcon name={selectedProviderInfo.name} size={32} />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-foreground tracking-tight">{selectedProviderInfo.label}</h3>
+                <h3 className="text-sm font-semibold text-foreground tracking-tight">{selectedProviderInfo.label}</h3>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
                   {isCustomProvider ? 'Connect any OpenAI-compatible endpoint' : 'Configure and add a cloud agent'}
                 </p>
@@ -536,7 +536,7 @@ function CloudAgentsTab({
             {/* Custom endpoint: Base URL */}
             {isCustomProvider && (
               <div className="space-y-1.5">
-                <Label htmlFor="cloud-base-url" className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted">Endpoint URL</Label>
+                <Label htmlFor="cloud-base-url" className="text-[11px] font-semibold text-foreground-extra-muted">Endpoint URL</Label>
                 <Input
                   id="cloud-base-url"
                   value={cfgBaseUrl}
@@ -551,7 +551,7 @@ function CloudAgentsTab({
             {/* Model selector — list for known providers, text input for custom */}
             {isCustomProvider ? (
               <div className="space-y-1.5">
-                <Label htmlFor="cloud-model" className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted">Model Name</Label>
+                <Label htmlFor="cloud-model" className="text-[11px] font-semibold text-foreground-extra-muted">Model Name</Label>
                 <Input
                   id="cloud-model"
                   value={cfgModel}
@@ -562,7 +562,7 @@ function CloudAgentsTab({
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted">Model</Label>
+                <Label className="text-[11px] font-semibold text-foreground-extra-muted">Model</Label>
                 <div className="grid grid-cols-1 gap-1">
                   {selectedProviderInfo.models.map((m) => {
                     const modelId = m.id;
@@ -575,13 +575,13 @@ function CloudAgentsTab({
                         className={cn(
                           'flex items-center gap-2.5 px-3 py-2 rounded-lg border text-xs text-left transition-colors shadow-xs',
                           cfgModel === modelId
-                            ? 'border-primary bg-surface1/50 font-bold'
+                            ? 'border-primary bg-surface1/50 font-semibold'
                             : 'border-transparent hover:bg-surface2/40 dark:hover:bg-primary/20 text-foreground-muted hover:text-foreground',
                         )}
                       >
                         <CategoryIcon category={modelCat} className="size-3.5 shrink-0 opacity-70" />
                         <span className="flex-1 truncate">{modelLabel}</span>
-                        <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">
+                        <span className="text-[11px] font-mono text-muted-foreground">
                           {modelCat}
                         </span>
                       </button>
@@ -610,7 +610,7 @@ function CloudAgentsTab({
                 </button>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 border-t border-border/50" />
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-muted-foreground">or use API key</span>
+                  <span className="text-[11px] font-mono font-semibold text-muted-foreground">or use API key</span>
                   <div className="flex-1 border-t border-border/50" />
                 </div>
               </>
@@ -618,7 +618,7 @@ function CloudAgentsTab({
 
             {/* Agent name */}
             <div className="space-y-1.5">
-              <Label htmlFor="cloud-name" className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted">Agent Name</Label>
+              <Label htmlFor="cloud-name" className="text-[11px] font-semibold text-foreground-extra-muted">Agent Name</Label>
               <Input
                 id="cloud-name"
                 value={cfgName}
@@ -631,7 +631,7 @@ function CloudAgentsTab({
 
             {/* API Key */}
             <div className="space-y-1.5">
-              <Label htmlFor="cloud-key" className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted">API Key</Label>
+              <Label htmlFor="cloud-key" className="text-[11px] font-semibold text-foreground-extra-muted">API Key</Label>
               <Input
                 id="cloud-key"
                 type="password"
@@ -646,13 +646,13 @@ function CloudAgentsTab({
             <div>
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted hover:text-foreground transition-colors"
+                className="text-[11px] font-semibold text-foreground-extra-muted hover:text-foreground transition-colors"
               >
                 {showAdvanced ? 'Hide' : 'Show'} advanced options
               </button>
               {showAdvanced && (
                 <div className="mt-2.5">
-                  <Label htmlFor="cloud-prompt" className="text-[10px] font-bold uppercase tracking-wider text-foreground-extra-muted">System Prompt</Label>
+                  <Label htmlFor="cloud-prompt" className="text-[11px] font-semibold text-foreground-extra-muted">System Prompt</Label>
                   <Textarea
                     id="cloud-prompt"
                     value={cfgPrompt}
@@ -691,7 +691,7 @@ function CloudAgentsTab({
         return (
           <div key={group.label}>
             <div className="flex items-center gap-2 mb-1.5 px-0.5">
-              <span className="text-[9px] font-bold text-foreground-extra-muted uppercase tracking-wider">{group.label}</span>
+              <span className="text-[9px] font-semibold text-foreground-extra-muted ">{group.label}</span>
               <div className="flex-1 border-t border-border/50" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -721,7 +721,7 @@ function CloudAgentsTab({
       {cloudAgents.length > 0 && (
         <div className="space-y-2 mt-5">
           <div className="flex items-center gap-2 px-1">
-            <span className="text-[9px] font-bold text-foreground-extra-muted uppercase tracking-wider">Connected</span>
+            <span className="text-[9px] font-semibold text-foreground-extra-muted ">Connected</span>
             <div className="flex-1 border-t border-border/50" />
           </div>
           {cloudAgents.map((agent) => {
@@ -739,7 +739,7 @@ function CloudAgentsTab({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-foreground">@{name}</span>
+                    <span className="text-xs font-semibold text-foreground">@{name}</span>
                     <CategoryIcon category={category} className="size-3 opacity-60" />
                   </div>
                   <div className="text-[9px] font-mono text-foreground-extra-muted mt-0.5">{agent.model}</div>
@@ -747,7 +747,7 @@ function CloudAgentsTab({
                 <span className="text-[10px] text-foreground-extra-muted font-mono pr-2">{apiKey}</span>
                 <button
                   onClick={() => onRemove(name)}
-                  className="size-6 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-foreground-extra-muted hover:text-red-600 transition-colors"
+                  className="size-6 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-foreground-extra-muted hover:text-status-danger transition-colors"
                   title="Remove"
                 >
                   <Trash2 className="size-3.5" />

@@ -24,14 +24,14 @@ export interface StationData {
 const STATUS_META: Record<StationStatus, { label: string; dot: string; text: string; border: string }> = {
   working: {
     label: 'Working',
-    dot: 'bg-amber-500',
-    text: 'text-amber-600 dark:text-amber-400',
-    border: 'border-amber-500/30 dark:border-amber-500/25',
+    dot: 'bg-status-warning',
+    text: 'text-status-warning',
+    border: 'border-status-warning/30',
   },
   ready: {
     label: 'Online',
-    dot: 'bg-emerald-500',
-    text: 'text-emerald-600 dark:text-emerald-400',
+    dot: 'bg-status-success',
+    text: 'text-status-success',
     border: 'border-border',
   },
   offline: {
@@ -90,13 +90,13 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
         <div className="flex-1 min-w-0">
           <span className="text-sm font-semibold text-foreground truncate block">{agent.agentName}</span>
           {agent.agentType && (
-            <span className="text-[9px] font-semibold uppercase tracking-widest text-foreground-extra-muted truncate block mt-0.5">
+            <span className="text-[11px] font-semibold text-foreground-extra-muted truncate block mt-0.5">
               {agent.agentType}
             </span>
           )}
         </div>
         {/* Status pill */}
-        <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-surface2/60 shrink-0', meta.text)}>
+        <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface2/60 shrink-0', meta.text)}>
           <span className={cn('size-1.5 rounded-full', meta.dot, isWorking && 'animate-pulse')} />
           {meta.label}
         </span>
@@ -108,19 +108,19 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
           className={cn(
             'rounded-lg px-3 py-2.5 min-h-[50px] flex items-start gap-2 text-xs border transition-colors',
             isWorking
-              ? 'bg-amber-500/5 border-amber-500/10'
-              : 'bg-surface1/30 border-border/60/50',
+              ? 'bg-status-warning/5 border-status-warning/15'
+              : 'bg-surface1/30 border-border/50',
           )}
         >
           {isWorking ? (
-            <Wrench className="size-3.5 shrink-0 mt-0.5 text-amber-500" />
+            <Wrench className="size-3.5 shrink-0 mt-0.5 text-status-warning" />
           ) : status === 'ready' ? (
-            <Radio className="size-3.5 shrink-0 mt-0.5 text-emerald-500" />
+            <Radio className="size-3.5 shrink-0 mt-0.5 text-status-success" />
           ) : (
             <Cpu className="size-3.5 shrink-0 mt-0.5 text-foreground-extra-muted" />
           )}
           {activity ? (
-            <p className={cn('line-clamp-2 min-w-0 leading-normal', isWorking ? 'text-amber-700 dark:text-amber-300 font-medium' : 'text-foreground-muted')}>
+            <p className={cn('line-clamp-2 min-w-0 leading-normal', isWorking ? 'text-status-warning font-medium' : 'text-foreground-muted')}>
               {stripMarkdown(activity.content).slice(0, 160) || (isWorking ? 'Working…' : 'Idle')}
             </p>
           ) : (
@@ -132,9 +132,9 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
       </div>
 
       {/* Footer — threads this agent drives + skill/token summary */}
-      <div className="mt-auto border-t border-border/60/50 bg-surface1/40 px-4 py-3 flex flex-col gap-2.5">
+      <div className="mt-auto border-t border-border/50 bg-surface1/40 px-4 py-3 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-foreground-extra-muted">
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-foreground-extra-muted">
             <MessageSquare className="size-3" />
             Threads · {activeThreadCount}
           </span>
@@ -160,7 +160,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
                   onClick={() => onOpenThread(t.sessionId)}
                   className="flex items-center gap-1.5 px-1.5 py-1 -mx-1.5 rounded-md hover:bg-surface2/40 transition-colors text-left group/thread"
                 >
-                  <Hash className={cn('size-3 shrink-0', live ? 'text-amber-500' : 'text-foreground-extra-muted')} />
+                  <Hash className={cn('size-3 shrink-0', live ? 'text-status-warning' : 'text-foreground-extra-muted')} />
                   <span className="text-[10px] text-foreground-muted truncate flex-1 group-hover/thread:text-foreground dark:group-hover/thread:text-primary-foreground font-medium">
                     {t.title || 'Untitled'}
                   </span>
@@ -198,8 +198,8 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
             className={cn(
               'h-7 rounded-md border text-[10px] font-semibold transition-colors flex items-center justify-center gap-1 truncate px-1',
               status === 'offline'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-700 dark:border-zinc-300 hover:bg-zinc-800 dark:hover:bg-white cursor-pointer'
-                : 'bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-500/30 cursor-default',
+                ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90 cursor-pointer'
+                : 'bg-transparent text-status-success border-status-success/30 cursor-default',
             )}
             title={status === 'offline' ? `Launch or pair ${agent.agentName}` : `${agent.agentName} is connected`}
           >

@@ -19,7 +19,7 @@ export function ScreenTitle({ children, className, ...props }: ScreenTitleProps)
   return (
     <h1
       className={cn(
-        'text-base font-normal md:font-light text-foreground truncate min-w-0 shrink',
+        'text-base font-semibold text-foreground truncate min-w-0 shrink',
         className
       )}
       {...props}

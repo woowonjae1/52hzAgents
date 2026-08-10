@@ -37,7 +37,7 @@ function WorkspaceLoadingScreen() {
           <img src="/logo-icon.png" alt="52hzAgents Logo" className="w-full h-full object-contain" />
         </div>
         <div className="text-center">
-          <h1 className="text-xl font-bold tracking-tight text-foreground">52hzAgents Workspace</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgents Workspace</h1>
           <p className="text-xs text-foreground-extra-muted mt-1.5">Loading your workspace…</p>
         </div>
       </div>

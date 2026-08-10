@@ -97,7 +97,7 @@ export function FileList() {
 
       {/* Section label */}
       <div className="px-3 pb-1.5 shrink-0">
-        <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-[11px] font-semibold text-muted-foreground">
           Recent Files
         </span>
       </div>
@@ -147,7 +147,7 @@ export function FileList() {
               </div>
               <button
                 onClick={(e) => handleDelete(e, file.id, file.filename)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-red-500 transition-all"
+                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
                 title="Delete"
               >
                 <Trash2 className="size-3.5" />

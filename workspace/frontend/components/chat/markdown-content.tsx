@@ -5,7 +5,7 @@ import { memo, type ReactNode, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
-import { getAgentColor } from '@/lib/helpers';
+import { deriveIdentityColor } from '@/lib/identity-colors';
 import { cn } from '@/lib/utils';
 import { MermaidBlock } from './mermaid-block';
 import { DiffBlock } from './diff-block';
@@ -50,9 +50,16 @@ function renderMentions(children: ReactNode, agentNames: string[]): ReactNode {
       return parts.map((part) => {
         keyCounter++;
         if (part.startsWith('@') && agentNames.includes(part.slice(1))) {
-          const color = getAgentColor(part.slice(1), agentNames);
+          // Same source as the message rail and the roster dot, so one agent is
+          // one colour everywhere. It used to come from a second, parallel
+          // Tailwind palette keyed on the agent's index in the roster, which
+          // meant a mention changed colour whenever someone joined or left.
           return (
-            <span key={`mention-${keyCounter}`} className={cn('font-medium rounded px-0.5', color.text)}>
+            <span
+              key={`mention-${keyCounter}`}
+              className="font-medium rounded px-0.5"
+              style={{ color: deriveIdentityColor(part.slice(1)) }}
+            >
               {part}
             </span>
           );
@@ -83,17 +90,21 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
   const components: Components = useMemo(() => ({
     // Block elements
+    //
+    // `p`/`li` carry no leading of their own so they inherit the 1.78 the
+    // message body sets — that reading rhythm is the point of the direction,
+    // and a local `leading-relaxed` here would quietly override it.
     h1: ({ children }) => (
-      <h1 className="text-lg font-bold mt-4 mb-2 first:mt-0">{children}</h1>
+      <h1 className="text-lg font-semibold mt-4 mb-2 first:mt-0">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="text-base font-bold mt-3 mb-1.5 first:mt-0">{children}</h2>
+      <h2 className="text-base font-semibold mt-3 mb-1.5 first:mt-0">{children}</h2>
     ),
     h3: ({ children }) => (
       <h3 className="font-semibold text-[15px] mt-3 mb-1 first:mt-0">{children}</h3>
     ),
     p: ({ children }) => (
-      <p className="leading-relaxed mb-2 last:mb-0">{renderMentions(children, agentNames)}</p>
+      <p className="mb-2 last:mb-0">{renderMentions(children, agentNames)}</p>
     ),
     blockquote: ({ children }) => (
       <blockquote className="border-l-2 border-border-accent pl-3 my-2 text-muted-foreground italic">
@@ -110,7 +121,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       <ol className="my-2 ml-4 space-y-0.5 list-decimal">{children}</ol>
     ),
     li: ({ children }) => (
-      <li className="leading-relaxed">{renderMentions(children, agentNames)}</li>
+      <li>{renderMentions(children, agentNames)}</li>
     ),
 
     // Tables
@@ -176,11 +187,16 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         return <DiffBlock code={nodeToText(codeElement?.props?.children).replace(/\n$/, '')} />;
       }
 
+      // Code blocks stay dark in BOTH themes so the syntax-highlight palette
+      // (tuned for a dark ground) keeps its contrast. The values are pinned
+      // rather than tokenized for that reason, but they are true neutrals
+      // matching the app's ramp — the old zinc scale carried a blue bias that
+      // read as a foreign tint next to the neutral surfaces.
       return (
-        <div className="my-3 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-100 font-mono shadow-sm">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800/80 bg-zinc-900/90 text-[10px] font-bold tracking-wider text-zinc-400 uppercase">
+        <div className="my-3 overflow-hidden rounded-xl border border-[#2e2e2e] bg-[#1a1a1a] text-[#ececec] font-mono shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-[#2e2e2e]/80 bg-[#212121]/90 text-[11px] font-semibold text-[#8a8a8a]">
             <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-zinc-600 inline-block" />
+              <span className="size-2 rounded-full bg-[#4d4d4d] inline-block" />
               <span>{language}</span>
             </span>
             <button
@@ -191,12 +207,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="hover:text-zinc-100 text-zinc-400 transition-colors cursor-pointer text-xs uppercase"
+              className="hover:text-[#ececec] text-[#8a8a8a] transition-colors cursor-pointer text-[11px]"
             >
               Copy
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-zinc-100 font-mono bg-zinc-950">
+          <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed text-[#ececec] font-mono bg-[#1a1a1a]">
             {children}
           </pre>
         </div>

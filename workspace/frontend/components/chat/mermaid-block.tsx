@@ -120,11 +120,11 @@ export function MermaidBlock({
 
 	if (error) {
 		return (
-			<div className="my-2 rounded-md border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 p-3">
-				<p className="mb-2 text-xs font-medium text-red-700 dark:text-red-300">
+			<div className="my-2 rounded-md border border-border-accent bg-surface2 p-3">
+				<p className="mb-2 text-xs font-medium text-status-danger">
 					Unable to render Mermaid diagram: {error}
 				</p>
-				<pre className="overflow-x-auto text-[13px] leading-relaxed font-mono text-red-950 dark:text-red-100">
+				<pre className="overflow-x-auto text-[13px] leading-relaxed font-mono text-foreground">
 					<code>{chart}</code>
 				</pre>
 			</div>

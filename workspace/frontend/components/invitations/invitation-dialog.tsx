@@ -70,11 +70,11 @@ export function InvitationDialog() {
   const statusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Clock className="size-3.5 text-amber-500" />;
+        return <Clock className="size-3.5 text-status-warning" />;
       case 'accepted':
-        return <CheckCircle className="size-3.5 text-green-500" />;
+        return <CheckCircle className="size-3.5 text-status-success" />;
       case 'rejected':
-        return <XCircle className="size-3.5 text-red-500" />;
+        return <XCircle className="size-3.5 text-status-danger" />;
       case 'expired':
         return <Clock className="size-3.5 text-foreground-extra-muted" />;
       default:

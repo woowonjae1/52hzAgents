@@ -408,9 +408,13 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
           </button>
         )}
         <div
+          // Width comes from `--chat-column`, the same token the composer uses,
+          // so the two cannot drift apart.
           style={{
             height: virtualizer.getTotalSize(),
             width: '100%',
+            maxWidth: 'var(--chat-column)',
+            margin: '0 auto',
             position: 'relative',
           }}
         >
@@ -454,7 +458,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                           className="mt-1 shrink-0"
                         />
                         <div className="flex items-center gap-2 py-1.5 min-w-0">
-                          <span className="text-xs font-bold text-foreground truncate">{pendingName}</span>
+                          <span className="text-xs font-semibold text-foreground truncate">{pendingName}</span>
                           <span className="text-xs text-foreground-muted shrink-0">is working</span>
                           <WorkingIndicator />
                         </div>
