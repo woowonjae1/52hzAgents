@@ -80,12 +80,8 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     }
     return null;
   });
-  const [hasBridge, setHasBridge] = useState(() => {
-    return typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
-  });
 
   useEffect(() => {
-    setHasBridge(!!(window as unknown as { electronBridge?: unknown }).electronBridge);
     if (!token) {
       try {
         setCachedToken(localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token'));
@@ -106,8 +102,8 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Has workspace token in URL, cached in localStorage, local dev, or running inside Electron Desktop Bridge — mount WorkspaceProvider
-  if (token || cachedToken || hasBridge || isLocal) {
+  // Has workspace token in URL, cached in localStorage, or local dev mode — mount WorkspaceProvider
+  if (token || cachedToken || isLocal) {
     return (
       <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>
