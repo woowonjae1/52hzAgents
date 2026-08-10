@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         {POSTHOG_KEY && (
         <Script id="posthog-init" strategy="afterInteractive">{`
@@ -86,7 +86,7 @@ export default function RootLayout({
             (light-fill/dark-text) buttons are designed on a dark ground, and
             `enableSystem` is dropped so a first visit lands there rather than
             inheriting the OS preference. */}
-        <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" disableTransitionOnChange>
           <AuthProvider>
             <OpenAgentsAuthProvider>
               {children}

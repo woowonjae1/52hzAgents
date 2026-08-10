@@ -108,9 +108,10 @@ export function SidebarContent() {
       <div className="px-3 py-2.5 border-b border-border/40 dark:border-border/40 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none bg-surface1/50">
         <CategoryTab active={viewMode === 'mission' || viewMode === 'connect'} label="Agents" onClick={() => setViewMode('mission')} />
         <CategoryTab active={viewMode === 'threads'} label="Chats" onClick={() => setViewMode('threads')} />
-        <CategoryTab active={viewMode === 'files'} label="Files" onClick={() => setViewMode('files')} />
-        <CategoryTab active={viewMode === 'tasks'} label="Tasks" onClick={() => setViewMode('tasks')} />
-        <CategoryTab active={viewMode === 'knowledge'} label="Docs" onClick={() => setViewMode('knowledge')} />
+        {/* Files and Tasks are byproducts of a conversation — they live in the
+            thread header's Panels menu now, scoped to whichever thread you're
+            in, not as a workspace-wide browse-everything tab up here. */}
+        <CategoryTab active={viewMode === 'knowledge'} label="Knowledge Base" onClick={() => setViewMode('knowledge')} />
       </div>
 
       {/* Explorer List Area */}

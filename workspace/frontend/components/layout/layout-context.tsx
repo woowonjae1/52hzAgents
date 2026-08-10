@@ -19,7 +19,7 @@ import {
 
 export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills';
 
-export type RightPanelTab = 'browser' | 'file' | 'radar' | 'terminal' | 'routines' | null;
+export type RightPanelTab = 'browser' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | null;
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -85,7 +85,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     storeSidebarWidth(clamped);
   };
   const [isSidebarResizing, setSidebarResizing] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('mission');
+  const [viewMode, setViewMode] = useState<ViewMode>('threads');
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);

@@ -34,13 +34,21 @@ function ImageThumbnail({ fileId, filename }: { fileId: string; filename: string
 
 export function FileGrid() {
   const {
-    files, selectedFileId, setSelectedFileId, uploadFile, deleteFile,
-    currentFilePath, setCurrentFilePath,
+    files: allFiles, selectedFileId, setSelectedFileId, uploadFile, deleteFile,
+    currentFilePath, setCurrentFilePath, currentSessionId,
   } = useWorkspace();
   const { isMobile, openMobileDetail } = useLayout();
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // This panel opens from a thread's header, so it shows what THAT thread
+  // produced, not every file in the workspace — shadow `files` so the rest of
+  // the component (folder tree, search, entries) doesn't need to know.
+  const files = useMemo(
+    () => (currentSessionId ? allFiles.filter((f) => f.channelName === currentSessionId) : allFiles),
+    [allFiles, currentSessionId]
+  );
 
   const currentPath = currentFilePath;
   const setCurrentPath = setCurrentFilePath;

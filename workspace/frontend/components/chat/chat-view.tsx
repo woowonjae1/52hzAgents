@@ -16,17 +16,23 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, MessageSquare, MessageSquarePlus, CalendarClock, Square, ChevronLeft, ChevronDown, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, FolderOpen, Check } from 'lucide-react';
+import { ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
+import { GitChip } from '@/components/git/git-chip';
+import { useGitStatus } from '@/lib/use-git-status';
 import { eventToMessage } from '@/lib/types'; 
 import type { WorkspaceMessage } from '@/lib/types';
 
@@ -39,7 +45,8 @@ import type { WorkspaceMessage } from '@/lib/types';
 const SIDE_PANELS = [
   { id: 'browser' as const, label: 'Sandbox', icon: Globe },
   { id: 'radar' as const, label: 'Agents', icon: Users },
-  { id: 'file' as const, label: 'File', icon: FileText },
+  { id: 'file' as const, label: 'Files', icon: FileText },
+  { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
   { id: 'terminal' as const, label: 'Terminal', icon: Terminal },
 ];
 
@@ -147,7 +154,6 @@ export function ChatView() {
     isMobile,
     openMobileList,
     viewMode,
-    setViewMode,
     splitBrowser,
     setSplitBrowser,
     showBrowserPreview,
@@ -215,6 +221,8 @@ export function ChatView() {
     sessionId: currentSessionId,
     initialMessages: initialMessagesRef.current,
   });
+
+  const [dismissedRoutingWarning, setDismissedRoutingWarning] = useState(false);
   const { notifyFocus, notifyBlur, notifyTyping } = useComposingSignal(currentSessionId);
   const [showAllSteps, setShowAllSteps] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -281,6 +289,16 @@ export function ChatView() {
 
   const isDM = currentSessionId?.startsWith('dm:') ?? false;
   const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
+
+  // Which repository the git chip and the context line report on. The master is
+  // tried first because it owns the thread, but not every agent's working
+  // directory is a checkout, so the rest of the participants are the fallback.
+  const gitCandidates = useMemo(() => {
+    const master = currentSession?.master;
+    const participants = currentSession?.participants ?? [];
+    return [...(master ? [master] : []), ...participants.filter((p) => p !== master)];
+  }, [currentSession?.master, currentSession?.participants]);
+  const { status: gitStatus, refresh: refreshGit, agentName: gitAgentName } = useGitStatus(gitCandidates);
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
     [currentSessionId, optimisticMessages]
@@ -582,18 +600,6 @@ export function ChatView() {
               <PanelLeft className="size-4" />
             </button>
           )}
-          {/* Return to workspace Overview */}
-          <button
-            onClick={() => {
-              setCurrentSessionId(null);
-              setViewMode('mission');
-            }}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-normal text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors shrink-0 -ml-1 cursor-pointer border border-border/60"
-            title="Back to workspace overview"
-          >
-            <ChevronLeft className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="text-[11px]">Overview</span>
-          </button>
           {isDM ? (
             <h2 className="text-sm font-semibold tracking-tight truncate flex items-center gap-1.5 text-foreground">
               <MessageSquare className="size-3.5 text-muted-foreground" />
@@ -624,161 +630,11 @@ export function ChatView() {
               {currentSession?.title || 'Thread'}
             </h2>
           )}
-          {currentSession?.workingDir && (
-            <span
-              className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground-muted font-medium shrink-0"
-              title={`Open Folder: ${currentSession.workingDir}`}
-            >
-              <FolderOpen className="size-2.5" />
-              {currentSession.workingDir.split(/[\\/]/).filter(Boolean).pop()}
-            </span>
-          )}
-          {(() => {
-            const participants = currentSession?.participants || [];
-            const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
-            return (
-              <>
-                {sessionAgents.length > 1 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface2 text-foreground-muted font-medium shrink-0">
-                    group
-                  </span>
-                )}
-              </>
-            );
-          })()}
         </div>
-        <div className="flex items-center gap-1 lg:gap-1.5 shrink-0">
-          {/* New topic — same agents, empty context. One click, no dialog. The
-              participants are inherited from this thread on purpose: a channel
-              with no members falls back to every agent in the workspace on the
-              backend, which would make the first message fan out to everyone. */}
-          {!isDM && (currentSession?.participants?.length ?? 0) > 0 && (
-            <Button
-              variant="ghost"
-              mode="icon"
-              size="sm"
-              onClick={() => void createSession({ participants: currentSession!.participants })}
-              title="New topic — same agents, fresh context"
-            >
-              <MessageSquarePlus className="size-4" />
-            </Button>
-          )}
-          {/* Compact avatar stack — click to manage thread agents (add / remove /
-              set leader). Replaces the old standalone manage-agents button. Not
-              shown for DMs. */}
-          {!isDM && (() => {
-            const participants = currentSession?.participants || [];
-            const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
-            // Deliberately no early return when the thread has no agents: this
-            // dropdown is the only way to add one, so bailing out left an empty
-            // thread permanently unusable. The trigger becomes "Add agent".
-            // In-thread list must include OFFLINE participants too — otherwise an
-            // agent whose daemon is down can never be removed from the thread.
-            const agentByName = new Map(agents.map((a) => [a.agentName, a]));
-            const inThread = participants.map(
-              (name) => agentByName.get(name) || { agentName: name, status: 'offline' }
-            );
-            // The "Add to thread" picker still only offers online agents.
-            const notInThread = agents.filter(
-              (a) => a.status === 'online' && !participants.includes(a.agentName)
-            );
-            return (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="flex -space-x-1.5 shrink-0 mr-1 items-center rounded-full outline-none hover:opacity-80 transition-opacity cursor-pointer"
-                    title="Manage thread agents"
-                  >
-                    {sessionAgents.length === 0 ? (
-                      <span className="flex items-center gap-1 rounded-full border border-dashed border-border-accent px-2 py-0.5 text-[10px] font-medium text-status-warning dark:border-border-accent dark:text-status-warning">
-                        <Plus className="size-3" />
-                        Add agent
-                      </span>
-                    ) : (
-                      <>
-                        {sessionAgents.slice(0, 3).map((agent) => (
-                          <div key={agent.agentName} className="border-2 border-background rounded-full" title={agent.agentName}>
-                            <AgentAvatar name={agent.agentName} size={18} />
-                          </div>
-                        ))}
-                        {sessionAgents.length > 3 && (
-                          <div className="size-5 rounded-full bg-surface3 flex items-center justify-center text-[7px] font-medium text-foreground-muted border-2 border-background" title={sessionAgents.map((agent) => agent.agentName).join(', ')}>
-                            +{sessionAgents.length - 3}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  {inThread.length > 0 && (
-                    <>
-                      <DropdownMenuLabel>In this thread</DropdownMenuLabel>
-                      {inThread.map((agent) => (
-                        <div
-                          key={agent.agentName}
-                          className="flex items-center gap-2 px-2 py-1.5 rounded-md group"
-                        >
-                          <AgentAvatar name={agent.agentName} size={20} />
-                          <span className="text-sm flex-1 truncate">{agent.agentName}</span>
-                          {agent.status !== 'online' && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">offline</span>
-                          )}
-                          {currentSession?.master === agent.agentName ? (
-                            <span
-                              className="flex items-center gap-1 text-[10px] text-status-warning shrink-0"
-                              title="Thread leader — receives messages that don't @mention anyone"
-                            >
-                              <Crown className="size-3" /> leader
-                            </span>
-                          ) : (
-                            <button
-                              onClick={() => currentSessionId && setSessionMaster(currentSessionId, agent.agentName)}
-                              className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-warning opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                              title="Set as thread leader"
-                            >
-                              <Crown className="size-3" />
-                            </button>
-                          )}
-                          {inThread.length > 1 && (
-                            <button
-                              onClick={() => currentSessionId && removeParticipant(currentSessionId, agent.agentName)}
-                              className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                              title="Remove from thread"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </>
-                  )}
-                  {notInThread.length > 0 && (
-                    <>
-                      {inThread.length > 0 && <DropdownMenuSeparator />}
-                      <DropdownMenuLabel>Add to thread</DropdownMenuLabel>
-                      {notInThread.map((agent) => (
-                        <button
-                          key={agent.agentName}
-                          onClick={() => currentSessionId && addParticipant(currentSessionId, agent.agentName)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent transition-colors"
-                        >
-                          <AgentAvatar name={agent.agentName} size={20} />
-                          <span className="text-sm flex-1 truncate text-left">{agent.agentName}</span>
-                          <Plus className="size-3 text-muted-foreground shrink-0" />
-                        </button>
-                      ))}
-                    </>
-                  )}
-                  {inThread.length === 0 && notInThread.length === 0 && (
-                    <p className="text-sm text-muted-foreground px-2 py-3 text-center">No agents online</p>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            );
-          })()}
-
-          {/* Stop button — visible when agents are working */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Stop button — visible when agents are working. Ephemeral and
+              safety-critical, so it stays outside the overflow menu rather
+              than being one more click away while something is running. */}
           {currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId)) && (
             <button
               onClick={() => stopAllAgents(currentSessionId!)}
@@ -790,90 +646,186 @@ export function ChatView() {
             </button>
           )}
 
-          {/* All steps toggle */}
-          {hasStatusMessages && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAllSteps((prev) => !prev)}
-              className={cn(
-                'gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
-                showAllSteps && 'bg-surface2 text-foreground border border-border/50'
+          {/* Git — a compose surface (stage/commit/sync), not a settings
+              toggle, so it keeps its own always-visible trigger rather than
+              nesting a commit textarea inside the overflow menu below. */}
+          <GitChip agentName={gitAgentName} status={gitStatus} refresh={refreshGit} />
+
+          {/* Everything else — new topic, agent membership, step detail,
+              side panels, collaboration mode, share — lives behind one
+              overflow menu so the header reads as title-plus-one-button. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" mode="icon" size="sm" title="More">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {/* New topic — same agents, empty context. The participants are
+                  inherited from this thread on purpose: a channel with no
+                  members falls back to every agent in the workspace on the
+                  backend, which would make the first message fan out to everyone. */}
+              {!isDM && (currentSession?.participants?.length ?? 0) > 0 && (
+                <DropdownMenuItem
+                  onClick={() => void createSession({ participants: currentSession!.participants })}
+                  className="gap-2 text-xs"
+                >
+                  <MessageSquarePlus className="size-3.5 text-foreground-muted" />
+                  New topic
+                </DropdownMenuItem>
               )}
-              title={showAllSteps ? 'Showing all intermediate steps' : 'Showing only latest steps'}
-            >
-              <ListTree className="size-3.5" />
-            </Button>
-          )}
 
-          {/* Side panels — one control instead of four (see SIDE_PANELS) */}
-          {!isMobile && (() => {
-            const active = SIDE_PANELS.find((p) => p.id === activeRightTab);
-            const TriggerIcon = active?.icon ?? PanelRight;
-            return (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      'gap-1.5 h-7 text-xs font-medium rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground',
-                      active && 'bg-surface2 text-foreground'
-                    )}
-                    title={active ? `${active.label} panel open` : 'Open a side panel'}
-                  >
-                    <TriggerIcon className="size-3.5" />
-                    <span className="text-[10px] hidden xl:inline">{active?.label ?? 'Panels'}</span>
-                    <ChevronDown className="size-3 opacity-60" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuLabel className="text-xs">Side panel</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {SIDE_PANELS.map((panel) => {
-                    const Icon = panel.icon;
-                    const isOpen = activeRightTab === panel.id;
-                    return (
-                      <DropdownMenuItem
-                        key={panel.id}
-                        onClick={() => setActiveRightTab(isOpen ? null : panel.id)}
-                        className="gap-2 text-xs"
-                      >
-                        <Icon className="size-3.5 text-foreground-muted" />
-                        <span className="flex-1">{panel.label}</span>
-                        {isOpen && <Check className="size-3.5" />}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            );
-          })()}
+              {/* Manage thread agents (add / remove / set leader). Deliberately
+                  shown even with zero agents: this is the only way to add one. */}
+              {!isDM && (() => {
+                const participants = currentSession?.participants || [];
+                // In-thread list must include OFFLINE participants too — otherwise an
+                // agent whose daemon is down can never be removed from the thread.
+                const agentByName = new Map(agents.map((a) => [a.agentName, a]));
+                const inThread = participants.map(
+                  (name) => agentByName.get(name) || { agentName: name, status: 'offline' }
+                );
+                // The "Add to thread" picker still only offers online agents.
+                const notInThread = agents.filter(
+                  (a) => a.status === 'online' && !participants.includes(a.agentName)
+                );
+                return (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="gap-2 text-xs">
+                      <Users className="size-3.5 text-foreground-muted" />
+                      Manage agents
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-56">
+                      {inThread.length > 0 && (
+                        <>
+                          <DropdownMenuLabel>In this thread</DropdownMenuLabel>
+                          {inThread.map((agent) => (
+                            <div
+                              key={agent.agentName}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-md group"
+                            >
+                              <AgentAvatar name={agent.agentName} size={20} />
+                              <span className="text-sm flex-1 truncate">{agent.agentName}</span>
+                              {agent.status !== 'online' && (
+                                <span className="text-[10px] text-muted-foreground shrink-0">offline</span>
+                              )}
+                              {currentSession?.master === agent.agentName ? (
+                                <span
+                                  className="flex items-center gap-1 text-[10px] text-status-warning shrink-0"
+                                  title="Thread leader — receives messages that don't @mention anyone"
+                                >
+                                  <Crown className="size-3" /> leader
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => currentSessionId && setSessionMaster(currentSessionId, agent.agentName)}
+                                  className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-warning opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                  title="Set as thread leader"
+                                >
+                                  <Crown className="size-3" />
+                                </button>
+                              )}
+                              {inThread.length > 1 && (
+                                <button
+                                  onClick={() => currentSessionId && removeParticipant(currentSessionId, agent.agentName)}
+                                  className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                  title="Remove from thread"
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </>
+                      )}
+                      {notInThread.length > 0 && (
+                        <>
+                          {inThread.length > 0 && <DropdownMenuSeparator />}
+                          <DropdownMenuLabel>Add to thread</DropdownMenuLabel>
+                          {notInThread.map((agent) => (
+                            <button
+                              key={agent.agentName}
+                              onClick={() => currentSessionId && addParticipant(currentSessionId, agent.agentName)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent transition-colors"
+                            >
+                              <AgentAvatar name={agent.agentName} size={20} />
+                              <span className="text-sm flex-1 truncate text-left">{agent.agentName}</span>
+                              <Plus className="size-3 text-muted-foreground shrink-0" />
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      {inThread.length === 0 && notInThread.length === 0 && (
+                        <p className="text-sm text-muted-foreground px-2 py-3 text-center">No agents online</p>
+                      )}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                );
+              })()}
 
-          {/* Orchestration mode picker — only for multi-agent threads */}
-          {!isDM && currentSession && (() => {
-            const participants = currentSession.participants || [];
-            const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
-            if (sessionAgents.length < 2) return null;
-            return (
-              <OrchestrationControl
-                session={currentSession}
-                agents={sessionAgents}
-                onChange={(updates) => setSessionOrchestration(currentSessionId!, updates)}
-              />
-            );
-          })()}
+              {/* All steps toggle */}
+              {hasStatusMessages && (
+                <DropdownMenuCheckboxItem
+                  checked={showAllSteps}
+                  onCheckedChange={(v) => setShowAllSteps(v)}
+                  className="gap-2 text-xs"
+                >
+                  <ListTree className="size-3.5 text-foreground-muted" />
+                  Show all steps
+                </DropdownMenuCheckboxItem>
+              )}
 
-          {/* Share conversation */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShareDialogOpen(true)}
-            className="gap-1.5 h-7 text-xs font-semibold rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground"
-            title="Share conversation"
-          >
-            <Share2 className="size-3.5" />
-          </Button>
+              {/* Side panels (see SIDE_PANELS) */}
+              {!isMobile && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="gap-2 text-xs">
+                    <PanelRight className="size-3.5 text-foreground-muted" />
+                    Panels
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-44">
+                    {SIDE_PANELS.map((panel) => {
+                      const Icon = panel.icon;
+                      const isOpen = activeRightTab === panel.id;
+                      return (
+                        <DropdownMenuItem
+                          key={panel.id}
+                          onClick={() => setActiveRightTab(isOpen ? null : panel.id)}
+                          className="gap-2 text-xs"
+                        >
+                          <Icon className="size-3.5 text-foreground-muted" />
+                          <span className="flex-1">{panel.label}</span>
+                          {isOpen && <Check className="size-3.5" />}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
+
+              {/* Collaboration mode — only for multi-agent threads */}
+              {!isDM && currentSession && (() => {
+                const participants = currentSession.participants || [];
+                const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
+                if (sessionAgents.length < 2) return null;
+                return (
+                  <OrchestrationControl
+                    variant="submenu"
+                    session={currentSession}
+                    agents={sessionAgents}
+                    onChange={(updates) => setSessionOrchestration(currentSessionId!, updates)}
+                  />
+                );
+              })()}
+
+              <DropdownMenuSeparator />
+
+              {/* Share conversation */}
+              <DropdownMenuItem onClick={() => setShareDialogOpen(true)} className="gap-2 text-xs">
+                <Share2 className="size-3.5 text-foreground-muted" />
+                Share conversation
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -917,29 +869,38 @@ export function ChatView() {
           and the master's own delegation) depends on agent descriptions. Nudge
           the user to fill any that are blank; each chip opens that agent's
           profile, where a one-click auto-generate button drafts one. */}
-      {!isDM && (() => {
+      {!isDM && !dismissedRoutingWarning && (() => {
         const participants = currentSession?.participants || [];
         const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
         if (sessionAgents.length <= 1) return null;
         const missing = sessionAgents.filter((a) => !a.description || !a.description.trim());
         if (missing.length === 0) return null;
         return (
-          <div className="flex items-center gap-2 px-2 lg:px-4 py-1.5 border-b shrink-0 overflow-x-auto bg-surface2 text-status-warning">
-            <AlertTriangle className="size-3.5 shrink-0" />
-            <span className="text-[11px] leading-snug shrink-0">
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b shrink-0 overflow-x-auto bg-surface2 text-status-warning">
+            <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
+            <span className="text-[11px] leading-snug shrink-0 font-medium">
               Routing may be less accurate — no description for:
             </span>
-            {missing.map((a) => (
-              <button
-                key={a.agentName}
-                onClick={() => setSelectedAgentName(a.agentName)}
-                className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-surface3 hover:bg-surface4 transition-colors shrink-0"
-                title={`Add a description for ${a.agentName}`}
-              >
-                <Sparkles className="size-2.5" />
-                {a.agentName}
-              </button>
-            ))}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {missing.map((a) => (
+                <button
+                  key={a.agentName}
+                  onClick={() => setSelectedAgentName(a.agentName)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors cursor-pointer text-foreground"
+                  title={`Add a description for ${a.agentName}`}
+                >
+                  <Sparkles className="size-2.5 text-status-warning" />
+                  {a.agentName}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setDismissedRoutingWarning(true)}
+              className="ml-auto p-1 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+              title="Dismiss warning"
+            >
+              <X className="size-3.5" />
+            </button>
           </div>
         );
       })()}
@@ -970,6 +931,24 @@ export function ChatView() {
           <div className="px-3 lg:px-4 py-2 lg:py-3">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
+              {/* What the agent is about to act on: which checkout, and how far
+                  it has already drifted from HEAD. Sits directly above the
+                  composer because that is the moment the answer matters. */}
+              {gitStatus?.available && gitStatus.files.length > 0 && (
+                <div className="flex items-center gap-2 px-1 pb-1.5 text-[11.5px] text-foreground-muted font-mono">
+                  <span className="truncate">{gitStatus.dir_name || 'my-project'}</span>
+                  <span aria-hidden>·</span>
+                  <span className="shrink-0">
+                    {gitStatus.files.length} 个文件有改动
+                  </span>
+                  {gitStatus.additions > 0 && (
+                    <span className="shrink-0 tabular-nums text-status-success">+{gitStatus.additions}</span>
+                  )}
+                  {gitStatus.deletions > 0 && (
+                    <span className="shrink-0 tabular-nums text-status-danger">−{gitStatus.deletions}</span>
+                  )}
+                </div>
+              )}
               {/* A thread with no agents gets no reply: the backend only borrows a
                   workspace agent when the choice is unambiguous. Say so instead of
                   letting the message vanish into silence. */}

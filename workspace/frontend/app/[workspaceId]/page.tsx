@@ -1,6 +1,6 @@
 'use client';
 
-import { use, Suspense, useEffect } from 'react';
+import { use, Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { WorkspaceProvider, useWorkspace } from '@/lib/workspace-context';
 import { LayoutProvider } from '@/components/layout/layout-context';
@@ -64,15 +64,32 @@ function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     }
   }, [workspaceId, token]);
 
-  const hasBridge = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
-  let cachedToken: string | null = null;
-  if (!token && typeof window !== 'undefined') {
-    try {
-      cachedToken = localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token');
-    } catch {}
-  }
+  // `hasBridge`/`cachedToken` can only be known once this runs in the browser,
+  // so they start at the SAME value the server rendered (false / null) and are
+  // filled in by an effect after mount. Reading `window`/`localStorage` inline
+  // during render — as this did before — makes the very first client render
+  // (the one React hydrates against) diverge from the server-rendered HTML
+  // whenever a token happens to be cached, and that mismatch is what backs
+  // React into discarding the server tree and re-rendering from scratch.
+  const [mounted, setMounted] = useState(false);
+  const [cachedToken, setCachedToken] = useState<string | null>(null);
+  const [hasBridge, setHasBridge] = useState(false);
+
+  useEffect(() => {
+    setHasBridge(!!(window as unknown as { electronBridge?: unknown }).electronBridge);
+    if (!token) {
+      try {
+        setCachedToken(localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token'));
+      } catch {}
+    }
+    setMounted(true);
+  }, [token, workspaceId]);
 
   const effectiveInitialToken = token || cachedToken || '';
+
+  if (!mounted) {
+    return <WorkspaceLoadingSplash />;
+  }
 
   // Has workspace token in URL, cached in localStorage, or running inside Electron Desktop Bridge — mount WorkspaceProvider
   if (token || cachedToken || hasBridge) {

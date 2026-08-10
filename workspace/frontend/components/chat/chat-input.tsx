@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SendHorizontal, Paperclip, X, FileIcon, ImageIcon, Plus, CalendarClock } from 'lucide-react';
+import { ArrowUp, Paperclip, X, FileIcon, ImageIcon, Plus, CalendarClock, FolderOpen } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -466,11 +466,11 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             onPaste={handlePaste}
             onFocus={() => { setIsFocused(true); onFocusChange?.(true); }}
             onBlur={() => { setIsFocused(false); onFocusChange?.(false); }}
-            placeholder={agents.length > 1 || knowledge.length > 0 ? 'Message... (use @ to mention agents or knowledge)' : 'Message...'}
+            placeholder={agents.length > 1 || knowledge.length > 0 ? '@ 提及 agent / 引用文件 · # 引用知识 · ! 运行命令' : '发送消息... (使用 @ 提及 Agent)'}
             rows={1}
             disabled={disabled}
             data-chat-input
-            className="w-full border-0 bg-transparent shadow-none focus:outline-none placeholder:text-muted-foreground h-auto px-0 text-sm py-2 resize-none"
+            className="w-full border-0 bg-transparent shadow-none focus:outline-none placeholder:text-muted-foreground/70 h-auto px-0 text-sm py-2 resize-none font-sans"
           />
           {/* Shortcut hint: always show 'esc' when focused, show 'i' when not focused and empty */}
           {isFocused ? (
@@ -491,7 +491,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <input
               ref={fileInputRef}
               type="file"
@@ -502,60 +502,70 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             />
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title="Attach file"
             >
-              <Paperclip className="size-4" />
+              <Paperclip className="size-3.5" />
             </button>
             <button
               onClick={() => {
-                // Open file input in image-only mode
                 if (fileInputRef.current) {
                   fileInputRef.current.accept = 'image/*';
                   fileInputRef.current.click();
-                  // Reset to full accept list
                   setTimeout(() => {
                     if (fileInputRef.current) {
                       fileInputRef.current.accept = "image/*,.pdf,.txt,.md,.json,.csv,.xml,.html,.css,.js,.ts,.py,.rb,.go,.rs,.java,.c,.cpp,.h,.hpp,.sh,.yaml,.yml,.toml";
                     }
-                  }, 100);
+                  }, 1000);
                 }
               }}
-              className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title="Attach image"
             >
-              <ImageIcon className="size-4" />
+              <ImageIcon className="size-3.5" />
             </button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                   title="More actions"
                 >
-                  <Plus className="size-4" />
+                  <Plus className="size-3.5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" className="min-w-[180px]">
                 <DropdownMenuItem onSelect={() => onCreateRoutine?.()}>
                   <CalendarClock className="size-4 mr-2" />
-                  Create Routine
+                  创建定时任务 (Routine)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Embedded Pills inside input box matching mockup */}
+            <div className="flex items-center gap-1.5 ml-1.5 border-l border-border/60 pl-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground-muted">
+                <FolderOpen className="size-3 text-foreground-extra-muted" />
+                my-project
+              </span>
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground-muted">
+                Build
+              </span>
+            </div>
           </div>
+          {/* Circular 28px up-arrow send button */}
           <button
             type="button"
             onClick={handleSend}
             disabled={!hasContent || disabled}
             className={cn(
-              'size-9 rounded-full flex items-center justify-center transition-all cursor-pointer',
+              'size-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0',
               hasContent
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs'
-                : 'bg-surface3 text-foreground-extra-muted opacity-50 cursor-not-allowed'
+                ? 'bg-foreground text-background hover:opacity-90 shadow-xs'
+                : 'bg-surface3 text-foreground-extra-muted opacity-40 cursor-not-allowed'
             )}
             title="Send message"
           >
-            <SendHorizontal className="size-4" />
+            <ArrowUp className="size-3.5" strokeWidth={2.5} />
           </button>
         </div>
       </div>

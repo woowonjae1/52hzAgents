@@ -212,6 +212,7 @@ export function Wrapper() {
                   </button>
                   {activeRightTab === 'browser' && <BrowserView />}
                   {activeRightTab === 'file' && <FilePreview />}
+                  {activeRightTab === 'tasks' && <TasksView />}
                   {activeRightTab === 'radar' && <RadarPanel />}
                   {activeRightTab === 'terminal' && <AgentTerminal />}
                 </div>

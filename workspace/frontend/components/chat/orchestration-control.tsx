@@ -10,6 +10,9 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -49,14 +52,17 @@ interface Props {
   session: WorkspaceSession;
   agents: WorkspaceAgent[];
   onChange: (updates: { mode?: Mode; instruction?: string | null }) => void;
+  /** 'submenu' nests this under a parent DropdownMenu (the thread header's
+   * overflow menu) instead of rendering its own standalone trigger button. */
+  variant?: 'standalone' | 'submenu';
 }
 
 /**
- * Header control that lets the user pick how a multi-agent thread coordinates:
- * dynamic router (default), master/sub-agent, or a custom natural-language
- * workflow. The custom workflow opens an editor with @agent autocomplete.
+ * Lets the user pick how a multi-agent thread coordinates: dynamic router
+ * (default), master/sub-agent, or a custom natural-language workflow. The
+ * custom workflow opens an editor with @agent autocomplete.
  */
-export function OrchestrationControl({ session, agents, onChange }: Props) {
+export function OrchestrationControl({ session, agents, onChange, variant = 'standalone' }: Props) {
   const mode = (session.orchestrationMode || 'dynamic') as Mode;
   const active = MODES.find((m) => m.value === mode) || MODES[0];
   const [planOpen, setPlanOpen] = React.useState(false);
@@ -74,63 +80,79 @@ export function OrchestrationControl({ session, agents, onChange }: Props) {
 
   const ActiveIcon = active.icon;
 
+  const items = (
+    <>
+      {MODES.map((m) => {
+        const Icon = m.icon;
+        const isActive = m.value === mode;
+        return (
+          <DropdownMenuItem
+            key={m.value}
+            onSelect={(e) => {
+              // Keep the menu semantics simple; workflow opens a dialog.
+              e.preventDefault();
+              selectMode(m.value);
+            }}
+            className="flex items-start gap-2 py-2 cursor-pointer"
+          >
+            <Icon className="size-3.5 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-medium">{m.label}</span>
+                {isActive && <Check className="size-3 text-primary" />}
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">{m.description}</p>
+            </div>
+          </DropdownMenuItem>
+        );
+      })}
+      {mode === 'workflow' && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setPlanOpen(true);
+            }}
+            className="text-xs cursor-pointer"
+          >
+            Edit workflow plan…
+          </DropdownMenuItem>
+        </>
+      )}
+    </>
+  );
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 h-7 text-xs font-medium"
-            title="Collaboration mode"
-          >
-            <ActiveIcon className="size-3.5" />
-            <span className="hidden lg:inline">{active.label}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72">
-          <DropdownMenuLabel>Collaboration mode</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          {MODES.map((m) => {
-            const Icon = m.icon;
-            const isActive = m.value === mode;
-            return (
-              <DropdownMenuItem
-                key={m.value}
-                onSelect={(e) => {
-                  // Keep the menu semantics simple; workflow opens a dialog.
-                  e.preventDefault();
-                  selectMode(m.value);
-                }}
-                className="flex items-start gap-2 py-2 cursor-pointer"
-              >
-                <Icon className="size-3.5 mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium">{m.label}</span>
-                    {isActive && <Check className="size-3 text-primary" />}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-snug">{m.description}</p>
-                </div>
-              </DropdownMenuItem>
-            );
-          })}
-          {mode === 'workflow' && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={(e) => {
-                  e.preventDefault();
-                  setPlanOpen(true);
-                }}
-                className="text-xs cursor-pointer"
-              >
-                Edit workflow plan…
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {variant === 'submenu' ? (
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="gap-2 text-xs">
+            <ActiveIcon className="size-3.5 text-foreground-muted" />
+            Collaboration mode
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-72">{items}</DropdownMenuSubContent>
+        </DropdownMenuSub>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 h-7 text-xs font-medium"
+              title="Collaboration mode"
+            >
+              <ActiveIcon className="size-3.5" />
+              <span className="hidden lg:inline">{active.label}</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-72">
+            <DropdownMenuLabel>Collaboration mode</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {items}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
 
       <WorkflowPlanDialog
         open={planOpen}

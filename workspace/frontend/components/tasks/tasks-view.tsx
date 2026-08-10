@@ -44,7 +44,13 @@ function nextStatus(status: TodoStatus): TodoStatus {
 }
 
 export function TasksView() {
-  const { todos, refreshTodos, replaceTodos, sessions, currentSessionId, currentUser } = useWorkspace();
+  const { todos: allTodos, refreshTodos, replaceTodos, sessions, currentSessionId, currentUser } = useWorkspace();
+  // This panel opens from a thread's header, so it shows what THIS thread's
+  // agents are working on, not every task across the workspace.
+  const todos = useMemo(
+    () => (currentSessionId ? allTodos.filter((t) => t.channelName === currentSessionId) : allTodos),
+    [allTodos, currentSessionId]
+  );
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<TodoItem | null>(null);
   const [content, setContent] = useState('');

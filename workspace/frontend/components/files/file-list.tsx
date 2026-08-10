@@ -9,12 +9,18 @@ import { toast } from 'sonner';
 import { formatSize, getFileIcon, timeAgo, basename } from './file-utils';
 
 export function FileList() {
-  const { files, selectedFileId, setSelectedFileId, uploadFile, deleteFile, currentFilePath } = useWorkspace();
+  const { files: allFiles, selectedFileId, setSelectedFileId, uploadFile, deleteFile, currentFilePath, currentSessionId } = useWorkspace();
   const { isMobile, openMobileDetail, setActiveRightTab } = useLayout();
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
+  // What this thread produced, not the whole workspace's files.
+  const files = useMemo(
+    () => (currentSessionId ? allFiles.filter((f) => f.channelName === currentSessionId) : allFiles),
+    [allFiles, currentSessionId]
+  );
+
   // Flat list of all files, sorted by most recently modified
   const recentFiles = useMemo(() => {
     // Hide .keep placeholder files

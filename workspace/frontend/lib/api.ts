@@ -1374,6 +1374,44 @@ class WorkspaceApi {
       }),
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // Git (read-only surface used by the workspace chrome)
+  //
+  // `agentName` is how the server picks WHICH repository to report on: it maps
+  // the agent to its registered working directory. Passing it is not optional
+  // in practice — without it the server falls back to its own checkout, which
+  // is never the repo the user is looking at.
+  // ---------------------------------------------------------------------------
+
+  async getGitStatus(agentName: string): Promise<import('./use-git-status').GitStatus> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+    return this.request<import('./use-git-status').GitStatus>(`/v1/git/status?${params}`);
+  }
+
+  async stageGitFiles(agentName: string, files: string[]): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+    await this.request<unknown>(`/v1/git/stage?${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ files }),
+    });
+  }
+
+  async unstageGitFiles(agentName: string, files: string[]): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+    await this.request<unknown>(`/v1/git/unstage?${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ files }),
+    });
+  }
+
+  async createGitCommit(agentName: string, message: string): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+    await this.request<unknown>(`/v1/git/commit?${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  }
 }
 
 export const workspaceApi = new WorkspaceApi();

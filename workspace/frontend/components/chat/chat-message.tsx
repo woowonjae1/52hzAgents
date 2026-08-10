@@ -6,7 +6,6 @@ import { Copy, Check, User, FileIcon, Download, Eye, GitBranch } from 'lucide-re
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
-import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { MarkdownContent } from './markdown-content';
 import { workspaceApi } from '@/lib/api';
@@ -279,21 +278,21 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
   // who has since left the workspace.
   const identityColour = deriveIdentityColor(message.senderName);
 
+  // No avatar and no card: a bubble or a portrait per reply stacks into a wall
+  // of boxes once several agents are in one thread. What identifies the
+  // speaker is a 2px rail in the agent's identity colour plus a matching 6px
+  // dot beside the name — unlike a portrait, a rail shows where a block
+  // STARTS and ENDS, which is the thing that's hard to follow when three
+  // agents interleave. Only the human's message keeps a filled bubble, so the
+  // two sides stay easy to tell apart.
   return (
     <div className="py-2.5 group/msg">
-      <div className="flex items-start gap-3">
-        <AgentAvatar name={message.senderName} agentType={agent?.agentType} size={32} square className="mt-1 shrink-0" />
-        {/* No card around agent replies: a bubble per reply stacks into a wall of
-            boxes once several agents are in one thread. What replaces it is a
-            2px rail in the agent's identity colour — unlike the avatar, a rail
-            shows where a block STARTS and ENDS, which is the thing that's hard
-            to follow when three agents interleave. Only the human's message
-            keeps a filled bubble, so the two sides stay easy to tell apart. */}
-        <div
-          className="flex-1 min-w-0 pt-0.5 border-l-2 pl-3"
-          style={{ borderColor: identityColour }}
-        >
+      <div
+        className="pl-3 border-l-2"
+        style={{ borderColor: identityColour }}
+      >
           <div className="flex items-center gap-2 mb-1.5">
+            <span className="size-1.5 rounded-full shrink-0" style={{ background: identityColour }} />
             <span className="text-xs font-semibold truncate" style={{ color: identityColour }}>
               {message.senderName}
             </span>
@@ -373,35 +372,49 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               </div>
             )}
 
-            {/* Floating Action Toolbar */}
-            <div className="flex items-center gap-1.5 mt-3 pt-2 border-t border-border/60 dark:border-border/40 opacity-80 hover:opacity-100 transition-opacity">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface2 gap-1 rounded-md transition-colors"
-                onClick={handleCopy}
-                title="Copy message text"
-              >
-                {copied ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface2 gap-1 rounded-md transition-colors"
-                onClick={() => {
-                  navigator.clipboard.writeText(`@${message.senderName} ${message.content}`);
-                  toast.success(`Branched prompt from @${message.senderName}`);
-                }}
-                title="Fork thread from this message"
-              >
-                <GitBranch className="size-3 text-foreground-muted" />
-                <span>Fork</span>
-              </Button>
+            {/* Model Metadata Footer matching mockup */}
+            <div className="flex items-center justify-between gap-2 mt-2.5 pt-1.5 border-t border-border/40 text-[11px] font-mono text-foreground-extra-muted">
+              <div className="flex items-center gap-2">
+                <span>
+                  {typeof message.metadata?.model === 'string'
+                    ? message.metadata.model
+                    : agent?.agentType
+                    ? `${agent.agentType}-agent`
+                    : message.senderName}
+                </span>
+                <span>·</span>
+                <span>{typeof message.metadata?.mode === 'string' ? message.metadata.mode : (agent?.role || 'exec')}</span>
+                {typeof message.metadata?.elapsed === 'string' && (
+                  <>
+                    <span>·</span>
+                    <span>{message.metadata.elapsed}</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
+                <button
+                  onClick={handleCopy}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                  title="Copy text"
+                >
+                  {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`@${message.senderName} ${message.content}`);
+                    toast.success(`Forked from @${message.senderName}`);
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                  title="Fork thread"
+                >
+                  <GitBranch className="size-3" />
+                  <span>Fork</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 });

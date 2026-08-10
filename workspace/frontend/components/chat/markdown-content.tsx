@@ -154,7 +154,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       const isInline = props.inline ?? (!className && !textContent.includes('\n'));
       if (isInline) {
         return (
-          <code className="text-[13px] px-1.5 py-0.5 rounded bg-surface2 text-foreground font-mono font-medium border border-border/50">
+          <code className="text-[12px] px-2 py-0.5 rounded-md bg-surface3 text-foreground font-mono font-medium border border-border-accent/60 shadow-xs inline-block my-0.5">
             {children}
           </code>
         );

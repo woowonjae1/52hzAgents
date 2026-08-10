@@ -7,6 +7,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { deriveIdentityColor } from '@/lib/identity-colors';
 import { workspaceApi } from '@/lib/api';
 import type { WorkspaceAgent } from '@/lib/types';
 import {
@@ -193,6 +194,7 @@ export function ThreadList() {
   const archivedSessions = sortedSessions.filter((s) => s.status === 'archived');
   const pinnedSessions = activeSessions.filter((s) => s.starred);
   const unpinnedSessions = activeSessions.filter((s) => !s.starred);
+  const onlineAgentCount = agents.filter((a) => a.status === 'online').length;
 
   const filteredSessions = isSearching
     ? sortedSessions.filter((s) =>
@@ -270,21 +272,40 @@ export function ThreadList() {
               <div className="size-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
             )}
           </div>
-          <button
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
-            title="Refresh"
-          >
-            <RefreshCw className="size-3.5" />
-          </button>
         </div>
       </div>
 
-      {/* Agent Status Indicator Strip */}
-      <div className="px-3 py-1.5 border-b border-border/40 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0 bg-surface1/30">
-        <span className="text-[11px] font-semibold text-foreground-extra-muted shrink-0 mr-1">Agents:</span>
+      {/* New Thread Button matching mockup */}
+      <div className="px-2.5 pt-2 pb-1 shrink-0">
+        <button
+          onClick={openNewThread}
+          className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg bg-surface2 border border-border/80 text-[12.5px] font-medium text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+        >
+          <Plus className="size-3.5 text-foreground-extra-muted" />
+          <span>新建线程</span>
+        </button>
+      </div>
+
+      {/*
+        Agents roster. This was a horizontally-scrolling strip of pills, which
+        put the roster behind a sideways scroll the moment a third agent joined
+        — the one thing you most want at a glance was the one thing you had to
+        scroll for. A vertical list costs the rows it shows and nothing else.
+
+        Each row carries the agent's identity colour as a dot, so the roster,
+        the message rail and an @mention all agree on who is who.
+      */}
+      <div className="px-2 pt-2 pb-1 border-b border-border/40 shrink-0">
+        <div className="flex items-baseline justify-between px-2 mb-1">
+          <span className="text-[11px] font-semibold text-foreground-muted">Agents</span>
+          <span className="text-[11px] font-mono tabular-nums text-foreground-extra-muted">
+            {onlineAgentCount} / {agents.length}
+          </span>
+        </div>
         {agents.map((a) => {
           const isWorking = activeSessionIds.has(a.agentName);
-          const statusLabel = a.status === 'online' ? (isWorking ? 'Executing tool' : 'Idle') : 'Offline';
+          const isOffline = a.status !== 'online';
+          const statusLabel = isOffline ? 'offline' : isWorking ? 'working' : 'idle';
           return (
             <button
               key={a.agentName}
@@ -292,27 +313,41 @@ export function ThreadList() {
                 const s = activeSessions.find((session) => session.participants.includes(a.agentName));
                 if (s) setCurrentSessionId(s.sessionId);
               }}
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface2/80 hover:bg-surface2 transition-colors shrink-0 text-foreground cursor-pointer border border-border/50"
-              title={`${a.agentName} — Status: ${statusLabel}${a.description ? ` (${a.description})` : ''}`}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
+              title={a.description || a.agentName}
             >
-              <AgentAvatar name={a.agentName} agentType={a.agentType} size={14} />
-              <span>{a.agentName}</span>
-              <span className="text-[9px] text-muted-foreground font-mono">({statusLabel})</span>
+              <span
+                className="size-1.5 rounded-full shrink-0"
+                // An offline agent keeps its slot but drops its colour: the
+                // dot is reporting reachability, and a lit dot for something
+                // unreachable is the kind of detail that reads as a bug.
+                style={{ background: isOffline ? 'var(--surface4)' : deriveIdentityColor(a.agentName) }}
+              />
+              <span className={cn(
+                'text-[13px] flex-1 min-w-0 truncate',
+                isOffline ? 'text-foreground-extra-muted' : 'text-foreground'
+              )}>
+                {a.agentName}
+              </span>
+              <span className="text-[11px] text-foreground-extra-muted shrink-0">{statusLabel}</span>
             </button>
           );
         })}
         <button
           onClick={() => setViewMode('mission')}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-primary/10 hover:bg-primary/20 text-primary transition-colors shrink-0 cursor-pointer border border-primary/20 ml-auto"
+          className="w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded-lg text-[13px] text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
           title="Open Agent Station & Connect Agents"
         >
-          <Plus className="size-3" />
-          <span>Connect Agent</span>
+          <Plus className="size-3.5 shrink-0 text-foreground-extra-muted" />
+          <span>Connect agent</span>
         </button>
       </div>
 
       {/* Thread rows */}
-      <div className="flex-1 overflow-y-auto px-4 py-1">
+      <div className="flex-1 overflow-y-auto px-2 py-1">
+        <div className="px-2 mt-1 mb-1">
+          <span className="text-[11px] font-semibold text-foreground-muted">Threads</span>
+        </div>
         <div className="space-y-1">
           {filteredSessions.map((session, idx) => {
             const isSelected = session.sessionId === currentSessionId;
@@ -398,39 +433,23 @@ export function ThreadList() {
                   isCompleted && !isSelected && 'bg-surface2 border border-border-accent'
                 )}
               >
-                {/* Avatar stack — show only channel participants */}
-                <div className="shrink-0">
-                  <AvatarStack agents={
-                    agents.filter((a) => session.participants.includes(a.agentName))
-                  } />
-                </div>
-
                 {/* Content */}
                 <div className="flex-1 min-w-0 space-y-0.5">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-1.5">
                     {session.starred && (
                       <Star className="size-3 shrink-0 fill-status-warning text-status-warning" />
                     )}
-                    <span className="text-sm flex-1 min-w-0 truncate font-normal text-foreground">
+                    <span className="text-[13px] font-medium flex-1 min-w-0 truncate text-foreground">
                       {isSearching
                         ? highlightMatch(session.title || 'Untitled', searchQuery)
                         : (session.title || 'Untitled')}
                     </span>
-                    {isCompleted && !isSelected ? (
-                      <CheckCircle2 className="size-3.5 shrink-0 text-status-warning" />
-                    ) : (
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {displayTime}
-                      </span>
-                    )}
-                    {shortcutKey && (
-                      <kbd className="size-4 flex items-center justify-center rounded text-[9px] font-mono font-medium bg-muted text-muted-foreground border border-input shrink-0">
-                        {shortcutKey}
-                      </kbd>
-                    )}
+                    <span className="text-[11px] text-foreground-extra-muted shrink-0 font-mono">
+                      {displayTime}
+                    </span>
                   </div>
                   <p className={cn(
-                    'text-xs text-muted-foreground truncate',
+                    'text-[11px] text-foreground-muted truncate leading-tight font-sans',
                     previewIsStatus && 'italic'
                   )}>
                     {preview}

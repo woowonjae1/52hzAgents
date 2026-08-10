@@ -16,72 +16,71 @@
  * per tier) and hand-tuning a single hue breaks the family.
  */
 :root {
-  /* Surfaces (layers) — true neutral (no blue bias), matching the dark ramp */
-  --surface0: #ffffff; /* App background */
-  --surface1: #f9f9f9; /* Subtle hover */
-  --surface2: #f4f4f4; /* Elevated: badges, inputs, sheets */
-  --surface3: #e3e3e3; /* Highest elevation */
-  --surface4: #d1d1d1; /* Extra emphasis */
-  --surface-diff-empty: #f6f6f6; /* Empty side of split diff rows */
-  --surface-sidebar: #f9f9f9;
-  --surface-sidebar-hover: #ececec;
-  --surface-workspace: #ffffff;
+  /* Surfaces (layers) — Dark mode by default */
+  --surface0: #0e0e10;
+  --surface1: #161618;
+  --surface2: #1e1e22;
+  --surface3: #28282d;
+  --surface4: #34343a;
+  --surface-diff-empty: #161618;
+  --surface-sidebar: #161618;
+  --surface-sidebar-hover: #202024;
+  --surface-workspace: #161618;
 
   /* Text */
-  --foreground: #0d0d0d;
-  --foreground-muted: #5d5d5d;
-  --foreground-extra-muted: #8f8f8f;
+  --foreground: #f4f4f5;
+  --foreground-muted: #a1a1aa;
+  --foreground-extra-muted: #71717a;
 
   /* Controls */
-  --scrollbar-handle: #c1c1c1;
+  --scrollbar-handle: #34343a;
 
   /* Borders */
-  --border: #e5e5e5;
-  --border-accent: #ececec;
+  --border: #27272a;
+  --border-accent: #3f3f46;
 
-  /* Brand — achromatic, mirroring the dark theme. Dark fill + light text. */
-  --accent: #0d0d0d;
-  --accent-bright: #000000;
-  --accent-foreground: #ffffff;
+  /* Brand — achromatic. Light fill + dark text */
+  --accent: #f4f4f5;
+  --accent-bright: #ffffff;
+  --accent-foreground: #0e0e10;
 
-  /* Semantic — toned down a step from the original saturated set */
-  --destructive: #b5544c;
+  /* Semantic */
+  --destructive: #c77b74;
   --destructive-foreground: #ffffff;
-  --success: #3e7d54;
+  --success: #6fa97f;
   --success-foreground: #ffffff;
 
-  /* Diff — the color *is* the signal here, so it stays saturated */
-  --diff-addition: #15803d;
-  --diff-deletion: #b91c1c;
+  /* Diff */
+  --diff-addition: #4ade80;
+  --diff-deletion: #f87171;
 
-  /* Status, full tier — for a surface whose job is to report the status */
-  --status-success: #1f8040;
-  --status-danger: #c32424;
-  --status-warning: #91601b;
-  --status-merged: #8728e5;
+  /* Status */
+  --status-success: #4ade80;
+  --status-danger: #f87171;
+  --status-warning: #facc15;
+  --status-merged: #a855f7;
 
-  /* Status, muted tier — same signal repeated on every row of a dense list,
-     where full saturation would make the list the loudest thing on screen */
-  --status-muted-success: #496d50;
-  --status-muted-danger: #904d46;
-  --status-muted-warning: #755f45;
-  --status-muted-merged: #6e519d;
+  /* Status muted */
+  --status-muted-success: #166534;
+  --status-muted-danger: #991b1b;
+  --status-muted-warning: #854d0e;
+  --status-muted-merged: #6b21a8;
 
   /* Terminal */
-  --terminal-background: #ffffff;
-  --terminal-foreground: #1a1a1e;
-  --terminal-cursor: #1a1a1e;
-  --terminal-cursor-accent: #ffffff;
-  --terminal-selection-background: rgba(0, 0, 0, 0.15);
-  --terminal-selection-foreground: #1a1a1e;
+  --terminal-background: #0e0e10;
+  --terminal-foreground: #f4f4f5;
+  --terminal-cursor: #f4f4f5;
+  --terminal-cursor-accent: #0e0e10;
+  --terminal-selection-background: rgba(255, 255, 255, 0.15);
+  --terminal-selection-foreground: #f4f4f5;
   --terminal-black: #1a1a1e;
-  --terminal-red: #dc2626;
-  --terminal-green: #16a34a;
-  --terminal-yellow: #ca8a04;
-  --terminal-blue: #2563eb;
-  --terminal-magenta: #9333ea;
-  --terminal-cyan: #0891b2;
-  --terminal-white: #ffffff;
+  --terminal-red: #ef4444;
+  --terminal-green: #22c55e;
+  --terminal-yellow: #f59e0b;
+  --terminal-blue: #3b82f6;
+  --terminal-magenta: #a855f7;
+  --terminal-cyan: #06b6d4;
+  --terminal-white: #f4f4f5;
   --terminal-bright-black: #3f3f46;
   --terminal-bright-red: #ef4444;
   --terminal-bright-green: #22c55e;
@@ -91,39 +90,38 @@
   --terminal-bright-cyan: #06b6d4;
   --terminal-bright-white: #fafafa;
 
-  /* Legacy aliases — Paseo keeps these for gradual migration and the existing
-     shadcn-shaped components in this app read them, so they map onto the layers
-     above instead of carrying independent values. */
-  --background: #ffffff;
-  --card: #ffffff;
-  --card-foreground: #1a1a1e;
-  --popover: #ffffff;
-  --popover-foreground: #1a1a1e;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #1a1a1e;
-  --muted: #f4f4f5;
-  --muted-foreground: #71717a;
-  --input: #f4f4f5;
-  --ring: #0d0d0d;
+  /* Legacy aliases */
+  --background: #0e0e10;
+  --card: #161618;
+  --card-foreground: #f4f4f5;
+  --popover: #1c1c1f;
+  --popover-foreground: #f4f4f5;
+  --primary: #f4f4f5;
+  --primary-foreground: #0e0e10;
+  --secondary: #1e1e22;
+  --secondary-foreground: #f4f4f5;
+  --muted: #1e1e22;
+  --muted-foreground: #a1a1aa;
+  --input: #1e1e22;
+  --ring: #f4f4f5;
   /* 12px, up from 8px. Larger radii read as "consumer product" rather than
      "instrument panel" — the genre signal the ChatGPT direction asks for. */
   --radius: 0.75rem;
 
   /*
    * Shared width of the conversation column. The message list and the composer
-   * BOTH read this, so they sit on one axis by construction — they used to
-   * carry the number separately (a `48rem` style and a `max-w-3xl` class) and
-   * keeping the two in step was manual.
+   * BOTH read this, so they sit on one axis by construction — carrying the
+   * number separately (a `48rem` style and a `max-w-3xl` class) made it easy
+   * for the two to drift.
    *
-   * `100%` fills the panel. The ChatGPT reference caps this near 48rem to hold
-   * prose at ~65 characters, but this workspace's centre column is already
-   * narrowed by the sidebar and the right preview panel, so a second cap left
-   * the messages stranded in a thin band. Set a length here (e.g. `48rem`) to
-   * go back to a fixed reading measure.
+   * Was 900px with wide margins either side, on the theory that a capped read
+   * length is the point of the ChatGPT direction. On an actual wide pane that
+   * read as the conversation being squeezed into the middle of dead space
+   * rather than "generous margins" — widened so the column fills most of the
+   * pane. `min()` still keeps it from overflowing a panel narrower than 1100px
+   * — sidebar open, preview panel open, or just a small window.
    */
-  --chat-column: 100%;
+  --chat-column: min(1100px, 100%);
 }
 
 /**

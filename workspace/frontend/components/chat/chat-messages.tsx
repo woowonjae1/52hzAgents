@@ -408,14 +408,18 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
           </button>
         )}
         <div
-          // Width comes from `--chat-column`, the same token the composer uses,
-          // so the two cannot drift apart.
+          // Deliberately NOT capped to `--chat-column` (the composer still is):
+          // agent replies are left-aligned with no bubble and user replies are
+          // right-aligned with `justify-end` — both alignments are relative to
+          // THIS box, so capping and centering it just re-creates a narrow,
+          // centered column and both sides end up pulled toward the middle of
+          // the pane instead of actually sitting on opposite edges of it.
           style={{
             height: virtualizer.getTotalSize(),
             width: '100%',
-            maxWidth: 'var(--chat-column)',
-            margin: '0 auto',
             position: 'relative',
+            paddingLeft: '1.5rem',
+            paddingRight: '1.5rem',
           }}
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {

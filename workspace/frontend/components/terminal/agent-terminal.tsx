@@ -241,7 +241,7 @@ export function AgentTerminal() {
           </span>
           <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-border text-[10px]">
             <Cpu className={cn('size-2.5', isAgentWorking ? 'text-status-warning animate-spin' : 'text-status-success')} />
-            <span className={cn('font-semibold tracking-wide', isAgentWorking ? 'text-status-warning' : 'text-status-success')}>
+            <span className={cn('font-semibold', isAgentWorking ? 'text-status-warning' : 'text-status-success')}>
               {activeOperator}
             </span>
           </span>

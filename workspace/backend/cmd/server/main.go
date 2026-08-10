@@ -192,6 +192,17 @@ func main() { // 服务程序运行主入口函数。
 		// Real Terminal Shell Command Execution:
 		v1.POST("/terminal/execute", handlers.ExecuteTerminalCommand)
 
+		// Git 版本控制接口：
+		v1.GET("/git/status", handlers.GetGitStatus)
+		v1.GET("/git/branches", handlers.ListGitBranches)
+		v1.GET("/git/log", handlers.GetGitLog)
+		v1.GET("/git/diff", handlers.GetGitDiff)
+		v1.POST("/git/stage", handlers.StageGitFiles)
+		v1.POST("/git/unstage", handlers.UnstageGitFiles)
+		v1.POST("/git/commit", handlers.CreateGitCommit)
+		v1.POST("/git/checkout", handlers.CheckoutGitBranch)
+		v1.POST("/git/discard", handlers.DiscardGitChanges)
+
 		// 补充：输入指示、DM 会话、心跳、成员移除、认领与令牌轮换：
 		v1.POST("/composing", handlers.ComposingSignal)
 		v1.GET("/events/conversations", handlers.ListConversations)
