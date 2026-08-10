@@ -8,7 +8,7 @@ import { Wrapper } from '@/components/layout/wrapper';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { Network } from 'lucide-react';
 
-function WorkspaceLoadingSplash() {
+export function WorkspaceLoadingSplash() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
@@ -53,7 +53,7 @@ function IdentityGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
+export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   const { user, idToken, loading: authLoading, isOpenAgentsDomain, signIn } = useOpenAgentsAuth();

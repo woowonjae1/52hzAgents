@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/page';
 import Image from 'next/image';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,
@@ -594,16 +595,9 @@ function Dashboard() {
 // ---------------------------------------------------------------------------
 
 export default function HomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/workspace');
-  }, [router]);
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#0e0e10] text-[#f4f4f5]">
-      <Loader2 className="size-6 animate-spin text-foreground-extra-muted" />
-      <p className="text-xs text-foreground-extra-muted mt-3 font-mono">Entering 52hzAgents Workspace...</p>
-    </div>
+    <Suspense fallback={<WorkspaceLoadingSplash />}>
+      <WorkspaceContent workspaceId="workspace" />
+    </Suspense>
   );
 }
