@@ -85,15 +85,14 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     setMounted(true);
   }, [token, workspaceId]);
 
-  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  const effectiveInitialToken = token || cachedToken || (isLocal ? 'local' : '');
+  const effectiveInitialToken = token || cachedToken || '';
 
   if (!mounted) {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Has workspace token in URL, cached in localStorage, local dev, or running inside Electron Desktop Bridge — mount WorkspaceProvider
-  if (token || cachedToken || hasBridge || isLocal) {
+  // Has workspace token in URL, cached in localStorage, or running inside Electron Desktop Bridge — mount WorkspaceProvider
+  if (token || cachedToken || hasBridge) {
     return (
       <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>

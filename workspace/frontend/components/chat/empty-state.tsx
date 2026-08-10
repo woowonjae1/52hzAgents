@@ -106,6 +106,7 @@ export function EmptyState() {
   const [loading, setLoading] = useState(true);
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -263,20 +264,30 @@ export function EmptyState() {
                 {selectedEntry.description}
               </p>
 
-              {/* One-Click Auto-Connect Button */}
+              {/* One-Click Auto-Connect Button — spawns the connector process via
+                  the backend (POST /v1/agents/:name/launch). Reports the real
+                  outcome; a failed launch must surface as a failure, not a
+                  fabricated success toast. */}
               <button
+                disabled={launching}
                 onClick={async () => {
+                  setLaunching(true);
+                  toast.loading(`正在启动 ${selectedEntry.label}...`, { id: `launch-${selectedEntry.name}` });
                   try {
-                    toast.info(`正在准备启动 ${selectedEntry.label}...`);
                     await workspaceApi.launchAgent(selectedEntry.name);
-                    toast.success(`${selectedEntry.label} 自动启动连接成功！`);
+                    toast.success(`${selectedEntry.label} 已启动，等待连接...`, { id: `launch-${selectedEntry.name}` });
                   } catch (e) {
-                    toast.success(`${selectedEntry.label} 节点已就绪，正在加入工作区...`);
+                    toast.error(
+                      `启动 ${selectedEntry.label} 失败：${e instanceof Error ? e.message : '未知错误'}`,
+                      { id: `launch-${selectedEntry.name}` },
+                    );
+                  } finally {
+                    setLaunching(false);
                   }
                 }}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-foreground text-background font-semibold text-xs hover:opacity-90 transition-all shadow-md cursor-pointer mb-3"
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-foreground text-background font-semibold text-xs hover:opacity-90 transition-all shadow-md cursor-pointer mb-3 disabled:opacity-60 disabled:pointer-events-none"
               >
-                <Rocket className="size-4" />
+                {launching ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
                 <span>一键自动启动并连接 {selectedEntry.label}</span>
               </button>
 

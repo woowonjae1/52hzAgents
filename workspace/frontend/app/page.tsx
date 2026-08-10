@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/page';
+import { WorkspaceLoadingSplash } from './[workspaceId]/page';
 import Image from 'next/image';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,
@@ -419,37 +419,51 @@ function CreateWorkspaceForm({
 }
 
 // ---------------------------------------------------------------------------
+// Workspace entry — shared by the card's click handler and Dashboard's
+// auto-redirect, so both resolve/cache a token and remember the choice the
+// same way.
+// ---------------------------------------------------------------------------
+
+function resolveWorkspaceToken(workspace: WorkspaceSummary): string | undefined {
+  if (workspace.token) return workspace.token;
+  try {
+    return (
+      localStorage.getItem(`workspace_token_${workspace.workspaceId}`) ||
+      localStorage.getItem(`workspace_token_${workspace.slug}`) ||
+      localStorage.getItem('workspace_token') ||
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function enterWorkspace(workspace: WorkspaceSummary, router: ReturnType<typeof useRouter>) {
+  const cachedToken = resolveWorkspaceToken(workspace);
+  if (typeof window !== 'undefined') {
+    try {
+      if (cachedToken) {
+        localStorage.setItem(`workspace_token_${workspace.slug}`, cachedToken);
+        localStorage.setItem(`workspace_token_${workspace.workspaceId}`, cachedToken);
+        localStorage.setItem('workspace_token', cachedToken);
+      }
+      localStorage.setItem('last_workspace_slug', workspace.slug);
+    } catch {}
+  }
+  router.push(cachedToken ? `/${workspace.slug}?token=${cachedToken}` : `/${workspace.slug}`);
+}
+
+// ---------------------------------------------------------------------------
 // Workspace Card
 // ---------------------------------------------------------------------------
 
 function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
   const router = useRouter();
 
-  const enterWorkspace = () => {
-    let cachedToken = workspace.token;
-    if (!cachedToken) {
-      try {
-        cachedToken =
-          localStorage.getItem(`workspace_token_${workspace.workspaceId}`) ||
-          localStorage.getItem(`workspace_token_${workspace.slug}`) ||
-          localStorage.getItem('workspace_token') ||
-          undefined;
-      } catch {}
-    }
-    if (cachedToken && typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`workspace_token_${workspace.slug}`, cachedToken);
-        localStorage.setItem(`workspace_token_${workspace.workspaceId}`, cachedToken);
-        localStorage.setItem('workspace_token', cachedToken);
-      } catch {}
-    }
-    router.push(cachedToken ? `/${workspace.slug}?token=${cachedToken}` : `/${workspace.slug}`);
-  };
-
   return (
     <Card
       className="cursor-pointer border border-border/80 dark:border-border/80 bg-card hover:border-border-accent hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
-      onClick={enterWorkspace}
+      onClick={() => enterWorkspace(workspace, router)}
     >
       <CardContent className="p-4 space-y-4">
         <div className="flex items-start justify-between gap-2.5">
@@ -488,10 +502,12 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 
 function Dashboard() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -509,6 +525,27 @@ function Dashboard() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Skip the "choose a workspace" screen when there's nothing to choose: a
+  // single workspace, or one already remembered from a previous visit. Only
+  // an actually ambiguous case (zero, or several with no remembered pick)
+  // falls through to the grid below.
+  useEffect(() => {
+    if (loading || redirecting || workspaces.length === 0) return;
+    let target: WorkspaceSummary | undefined;
+    try {
+      const lastSlug = localStorage.getItem('last_workspace_slug');
+      if (lastSlug) target = workspaces.find((w) => w.slug === lastSlug);
+    } catch {}
+    if (!target && workspaces.length === 1) target = workspaces[0];
+    if (!target) return;
+    setRedirecting(true);
+    enterWorkspace(target, router);
+  }, [loading, redirecting, workspaces, router]);
+
+  if (redirecting) {
+    return <WorkspaceLoadingSplash />;
+  }
 
   return (
     <div className="min-h-screen bg-surface0 text-foreground">
@@ -595,9 +632,20 @@ function Dashboard() {
 // ---------------------------------------------------------------------------
 
 export default function HomePage() {
-  return (
-    <Suspense fallback={<WorkspaceLoadingSplash />}>
-      <WorkspaceContent workspaceId="workspace" />
-    </Suspense>
-  );
+  const { user, loading } = useAuth();
+  const openAgentsAuth = useOpenAgentsAuth();
+
+  if (loading || openAgentsAuth.loading) {
+    return <WorkspaceLoadingSplash />;
+  }
+
+  // Bypass the marketing landing page and go straight to the workspace
+  // picker/auto-redirect on local/custom domains (desktop app, self-host).
+  if (!openAgentsAuth.isOpenAgentsDomain) {
+    return <Dashboard />;
+  }
+
+  if (user || openAgentsAuth.user) return <Dashboard />;
+
+  return <LandingPage />;
 }
