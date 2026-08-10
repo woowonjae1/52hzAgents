@@ -3,22 +3,31 @@ const path = require('path');
 const http = require('http');
 const { spawn } = require('child_process');
 
+// Set dedicated userData folder & disable shader cache to avoid Windows permission lock (0x5)
+try {
+  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+  app.commandLine.appendSwitch('disable-gpu-program-cache');
+  const customUserData = path.join(app.getPath('appData'), '52hzAgents-Desktop');
+  app.setPath('userData', customUserData);
+} catch (e) {}
+
 let mainWindow = null;
 let tray = null;
 let devServerProcess = null;
 
-const TARGET_URL = process.env.FRONTEND_URL || 'http://localhost:3005/';
+const TARGET_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:3005/';
 
 function checkServerReady(url, callback) {
-  const req = http.get(url, (res) => {
-    if (res.statusCode === 200 || res.statusCode === 304) {
+  const testUrl = url.replace('localhost', '127.0.0.1');
+  const req = http.get(testUrl, (res) => {
+    if (res.statusCode && res.statusCode < 400) {
       callback(true);
     } else {
       callback(false);
     }
   });
   req.on('error', () => callback(false));
-  req.setTimeout(2000, () => {
+  req.setTimeout(3000, () => {
     req.destroy();
     callback(false);
   });
@@ -35,6 +44,8 @@ function ensureDevStackRunning() {
         stdio: 'ignore',
       });
       devServerProcess.unref();
+    } else {
+      console.log('[52hzAgents Desktop] Dev stack detected online at 127.0.0.1:3005.');
     }
   });
 }
