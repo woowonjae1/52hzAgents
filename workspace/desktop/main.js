@@ -231,7 +231,27 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => mainWindow?.hide());
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false);
 
+// One app, one instance. Nothing in this file reloads the window — loadAppUrl()
+// runs once — so the same URL getting loaded over and over can only come from
+// another instance. And closing the window merely hides it (tray + the 'close'
+// handler below), so every extra `start-desktop.ps1` run left a live instance
+// behind, each loading http://127.0.0.1:3005/ on its own schedule and each
+// bouncing through the workspace picker. Hand the launch to the instance that is
+// already running instead of starting a rival.
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
 app.whenReady().then(() => {
+  if (!gotTheLock) return;
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.52hzagents.app');
   }
