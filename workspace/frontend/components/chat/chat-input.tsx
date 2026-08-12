@@ -558,11 +558,14 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                 status resolves, or when no participant works in a checkout. */}
             {workingDir && (
               <div className="flex items-center gap-1.5 ml-1.5 border-l border-border/60 pl-2">
+                {/* Which directory this channel can touch is the one thing you
+                    want to be sure of before hitting send, so it is not set in
+                    caption type. */}
                 <span
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground-muted"
+                  className="inline-flex items-center gap-1.5 text-[12.5px] font-medium px-2 py-1 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground"
                   title={workingDir}
                 >
-                  <FolderOpen className="size-3 text-foreground-extra-muted" />
+                  <FolderOpen className="size-3.5 text-foreground-extra-muted" />
                   {basename(workingDir)}
                 </span>
               </div>

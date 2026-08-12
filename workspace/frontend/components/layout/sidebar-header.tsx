@@ -9,9 +9,9 @@ export function SidebarHeader() {
   const { workspace } = useWorkspace();
 
   return (
-    <div className="flex items-center justify-between shrink-0 px-3.5 py-3 border-b border-border/60 bg-surface-sidebar">
+    <div className="flex items-center justify-between shrink-0 px-3.5 py-3 border-b border-border/60 bg-surface-sidebar [app-region:drag] select-none">
       {/* Left: Brand logo with status dot */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 [app-region:no-drag]">
         <span className="size-2 rounded-full bg-status-success shrink-0" title="Workspace Connected" />
         <span className="text-sm font-semibold tracking-tight text-foreground font-sans">
           {workspace?.name || '52hzAgents'}
@@ -19,7 +19,7 @@ export function SidebarHeader() {
       </div>
 
       {/* Right: Layout Action Icons matching mockup */}
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-1 shrink-0 [app-region:no-drag]">
         <button
           onClick={sidebarToggle}
           className="size-7 rounded-lg hover:bg-surface3/80 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"

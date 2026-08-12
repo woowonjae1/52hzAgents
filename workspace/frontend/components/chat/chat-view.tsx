@@ -138,7 +138,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
   
   useEffect(() => {
     console.log('[52hzAgents Monitor] 💬 [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
@@ -311,6 +311,11 @@ export function ChatView() {
   // created with no folder therefore still displayed the previous folder, which
   // looked like the binding had been inherited when no binding existed at all.
   const currentSessionWorkingDir = currentSession?.workingDir ?? undefined;
+  // Who is answering in THIS channel. The sidebar roster reports reachability
+  // (online / offline); "working" belongs next to the conversation it is
+  // happening in, which is also the only place the distinction is actionable.
+  const channelAgentNames = currentSession?.participants ?? [];
+  const workingHere = channelAgentNames.filter((name) => workingAgentNames.has(name));
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
     [currentSessionId, optimisticMessages]
@@ -645,6 +650,36 @@ export function ChatView() {
             >
               {currentSession?.title || 'Channel'}
             </h2>
+          )}
+
+          {/* Agent status for this channel — moved here from the sidebar roster.
+              Working is a property of a conversation, not of the workspace
+              list. */}
+          {!isDM && channelAgentNames.length > 0 && (
+            <div className="hidden sm:flex items-center gap-2 shrink min-w-0 max-w-[45%]">
+              <span className="h-3.5 w-px bg-border/70 shrink-0" />
+              {workingHere.length > 0 ? (
+                <span className="flex items-center gap-1.5 min-w-0 text-[12.5px]">
+                  <span className="flex items-end gap-[2px] h-3 shrink-0">
+                    {[0, 1, 2].map((i) => (
+                      <span
+                        key={i}
+                        className="working-bar w-[2px] h-3 rounded-full bg-status-warning"
+                        style={{ animationDelay: `${i * 0.2}s` }}
+                      />
+                    ))}
+                  </span>
+                  <span className="font-medium text-foreground truncate">{workingHere.join('、')}</span>
+                  <span className="text-foreground-muted shrink-0">工作中</span>
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 min-w-0 text-[12.5px] text-foreground-muted">
+                  <span className="size-1.5 rounded-full bg-surface4 shrink-0" />
+                  <span className="truncate">{channelAgentNames.join('、')}</span>
+                  <span className="shrink-0">空闲</span>
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">

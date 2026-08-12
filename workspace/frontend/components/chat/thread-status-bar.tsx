@@ -22,7 +22,7 @@ interface QueuedMessage {
 }
 
 export function ThreadStatusBar({ channelName, messages = [] }: { channelName: string; messages?: WorkspaceMessage[] }) {
-  const { todos, refreshTodos } = useWorkspace();
+  const { todos, refreshTodos, workingAgentNames } = useWorkspace();
   const [timers, setTimers] = useState<TimerItem[]>([]);
   const [cancelledQueueIds, setCancelledQueueIds] = useState<Set<string>>(new Set());
 
@@ -146,6 +146,22 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                   <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
                     {todo.createdBy && <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>}
                     {todo.assignee && <span>assigned to {todo.assignee}</span>}
+                    {/* A handoff used to go silent here: the agent that wrote the
+                        todo finishes its turn, and nothing said whether the
+                        assignee had picked the work up or the baton was dropped.
+                        This reports the assignee's own live state. */}
+                    {todo.assignee && (
+                      workingAgentNames.has(todo.assignee) ? (
+                        <span className="flex items-center gap-1 text-status-warning font-medium">
+                          <Loader2 className="size-2.5 animate-spin" />
+                          {todo.assignee} 工作中
+                        </span>
+                      ) : todo.status === 'in_progress' ? (
+                        <span className="text-foreground-muted font-medium">进行中</span>
+                      ) : (
+                        <span className="text-foreground-extra-muted">等待 {todo.assignee}</span>
+                      )
+                    )}
                   </div>
                 </div>
               </div>

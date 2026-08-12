@@ -998,6 +998,13 @@ class ClaudeAdapter extends BaseAdapter {
               });
             }
           } catch {}
+        } else {
+          // The nudge has already run once for this plan. Anything still open is
+          // not going to be picked up by this turn, and leaving it as "pending"
+          // means the next, unrelated task opens with the previous task's list
+          // still on the panel. Cancel it — the cursor adapter has always done
+          // this; claude had no else branch, so its todos never got closed out.
+          try { await this.cleanupTodos(msgChannel); } catch {}
         }
         return;
       }
@@ -1005,6 +1012,9 @@ class ClaudeAdapter extends BaseAdapter {
         if (!existingPP.everPostedAnything) {
           await this._postStopNotice(msgChannel);
         }
+        // A stopped run leaves its plan half-done. Those items are not coming
+        // back, so close them out instead of parking them on the panel.
+        try { await this.cleanupTodos(msgChannel); } catch {}
         return;
       }
       // Process died mid-message — fall through to spawn a fresh one
@@ -1183,6 +1193,13 @@ class ClaudeAdapter extends BaseAdapter {
               });
             }
           } catch {}
+        } else {
+          // The nudge has already run once for this plan. Anything still open is
+          // not going to be picked up by this turn, and leaving it as "pending"
+          // means the next, unrelated task opens with the previous task's list
+          // still on the panel. Cancel it — the cursor adapter has always done
+          // this; claude had no else branch, so its todos never got closed out.
+          try { await this.cleanupTodos(msgChannel); } catch {}
         }
         break;
       } catch (e) {

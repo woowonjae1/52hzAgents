@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus, FolderPlus, MessageSquarePlus } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus, FolderPlus, FolderOpen, MessageSquarePlus } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -140,7 +140,7 @@ function DMSection({
 }
 
 export function ThreadList() {
-  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, workingAgentNames, completedSessionIds, updateSession, renameSession, dmConversations, createSession } = useWorkspace();
+  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
@@ -382,9 +382,11 @@ export function ThreadList() {
           // workspace and only one of them answers, so membership lit the whole
           // roster for a single reply. workingAgentNames is attributed from the
           // status stream — see setSessionActive in workspace-context.
-          const isWorking = workingAgentNames.has(a.agentName);
+          // The working/idle word used to live at the end of this row. It now
+          // sits in the thread header next to the channel title, where the
+          // conversation it belongs to is: the roster answers "who is here and
+          // reachable", the header answers "who is answering right now".
           const isOffline = a.status !== 'online';
-          const statusLabel = isOffline ? 'offline' : isWorking ? 'working' : 'idle';
           return (
             <button
               key={a.agentName}
@@ -408,7 +410,9 @@ export function ThreadList() {
               )}>
                 {a.agentName}
               </span>
-              <span className="text-[11px] text-foreground-extra-muted shrink-0">{statusLabel}</span>
+              {isOffline && (
+                <span className="text-[11px] text-foreground-extra-muted shrink-0">offline</span>
+              )}
             </button>
           );
         })}
@@ -427,14 +431,18 @@ export function ThreadList() {
         <div className="space-y-1">
           {groupedSessions.map((group) => (
           <div key={group.dir ?? '__no_folder__'} className="mb-2">
-            <div className="flex items-center gap-1.5 px-2 mt-1 mb-0.5">
+            {/* The directory is the heading these channels live under, so it is
+                sized like a heading — it was smaller than the channel titles
+                beneath it, which read as a caption on the wrong element. */}
+            <div className="flex items-center gap-1.5 px-2 mt-1.5 mb-1">
+              <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
               <span
-                className="text-[11px] font-semibold text-foreground-muted truncate"
+                className="text-[13.5px] font-semibold text-foreground truncate"
                 title={group.dir ?? '不绑定任何目录 — agent 不会读写本地文件'}
               >
                 {group.dir ? basename(group.dir) : '直接对话'}
               </span>
-              <span className="text-[10px] font-mono tabular-nums text-foreground-extra-muted shrink-0">
+              <span className="text-[11px] font-mono tabular-nums text-foreground-extra-muted shrink-0">
                 {group.sessions.length}
               </span>
               <button
@@ -536,7 +544,7 @@ export function ThreadList() {
                     {session.starred && (
                       <Star className="size-3 shrink-0 fill-status-warning text-status-warning" />
                     )}
-                    <span className="text-[13px] font-medium flex-1 min-w-0 truncate text-foreground">
+                    <span className="text-[13.5px] font-medium flex-1 min-w-0 truncate text-foreground">
                       {isSearching
                         ? highlightMatch(session.title || 'Untitled', searchQuery)
                         : (session.title || 'Untitled')}
@@ -646,6 +654,12 @@ export function ThreadList() {
               agents.filter((a) => a.status === 'online').map((a) => a.agentName)
             );
             const visibleDMs = dmConversations.filter((c) => {
+              // Empty shells are hidden. A handoff between agents leaves a
+              // point-to-point record whose last event carries no content, and
+              // those rendered as rows reading "human:user:" with nothing after
+              // the colon — three entries that look like conversations you never
+              // had. Only DMs with something actually said in them are listed.
+              if (!(c.lastMessage?.content || '').trim()) return false;
               // For each side, if it's an agent it must be online; humans pass through.
               return (c.agents || []).every((addr: string) => {
                 if (addr.startsWith('human:')) return true;
