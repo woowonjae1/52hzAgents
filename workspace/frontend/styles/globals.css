@@ -596,3 +596,11 @@ html {
  * vocabulary this direction drops — keeping them around is an invitation to
  * reach for a coloured glow the palette has no room for.
  */
+
+/* Hide Next.js Dev Indicator badge (the 'N' circle icon at bottom-right corner) */
+[data-nextjs-toast],
+[data-nextjs-dialog-overlay],
+nextjs-portal,
+#nextjs-toast-errors-parent {
+  display: none !important;
+}
