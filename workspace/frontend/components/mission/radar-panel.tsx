@@ -37,7 +37,7 @@ function stripMarkdown(text: string): string {
  * `RadarPanel` for backwards-compatible imports.)
  */
 export function RadarPanel() {
-  const { agents, sessions, lastMessageBySession, activeSessionIds, setCurrentSessionId } = useWorkspace();
+  const { agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, setCurrentSessionId } = useWorkspace();
   const { setViewMode } = useLayout();
 
   const panelAgents = useMemo<PanelAgent[]>(() => {
@@ -46,13 +46,16 @@ export function RadarPanel() {
       const threads = activeThreads
         .filter((s) => s.participants.includes(agent.agentName) || s.master === agent.agentName)
         .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-      const workingThread = threads.find((t) => activeSessionIds.has(t.sessionId)) || null;
+      // Busy channel ≠ busy agent: every member of an active channel used to
+      // read "working" even though only the routed agent answers.
+      const isWorking = workingAgentNames.has(agent.agentName);
+      const workingThread = isWorking ? threads.find((t) => activeSessionIds.has(t.sessionId)) || null : null;
       const focusThread = workingThread || threads[0] || null;
-      const status: Status = agent.status !== 'online' ? 'offline' : workingThread ? 'working' : 'ready';
+      const status: Status = agent.status !== 'online' ? 'offline' : isWorking ? 'working' : 'ready';
       const activity = focusThread ? lastMessageBySession[focusThread.sessionId] || null : null;
       return { agent, status, threads, focusThread, activity };
     });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds]);
+  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames]);
 
   const [selected, setSelected] = useState<string | null>(null);
   // Default to the first agent; keep selection valid as agents change.
@@ -148,7 +151,7 @@ export function RadarPanel() {
             {/* Threads */}
             <div>
               <div className="flex items-center gap-1 text-[11px] font-semibold text-foreground-extra-muted mb-1.5">
-                <MessageSquare className="size-3" /> Threads · {current.threads.length}
+                <MessageSquare className="size-3" /> Channels · {current.threads.length}
               </div>
               {current.threads.length === 0 ? (
                 <p className="text-[11px] text-foreground-extra-muted">No threads yet</p>

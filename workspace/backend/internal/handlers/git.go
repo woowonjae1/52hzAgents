@@ -67,6 +67,27 @@ func getGitDirForRequest(c *gin.Context) (string, bool) {
 		return "", false
 	}
 
+	// A channel's own binding wins when the caller names one. Git state belongs
+	// to the project you are working in, not to whichever agent happens to be in
+	// the room — an agent's WorkingDir is fixed at launch and is identical
+	// across every channel it joins, which made every channel report the same
+	// repository. Resolved server-side from the channel row so a client can
+	// never point git at an arbitrary path.
+	if channelRef := strings.TrimSpace(c.Query("channel")); channelRef != "" {
+		var channel models.Channel
+		if err := db.DB.Where("workspace_id = ? AND (id = ? OR name = ?)", workspace.ID, channelRef, channelRef).
+			First(&channel).Error; err == nil && channel.WorkingDir != nil {
+			dir := strings.TrimSpace(*channel.WorkingDir)
+			if dir != "" {
+				if stat, err := os.Stat(dir); err == nil && stat.IsDir() {
+					return dir, true
+				}
+			}
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Channel is not bound to a valid working directory"})
+		return "", false
+	}
+
 	agentName := strings.TrimSpace(c.Query("agent_name"))
 	if agentName != "" {
 		var member models.WorkspaceMember
@@ -525,6 +546,113 @@ func CreateGitCommit(c *gin.Context) {
 		"status": "ok",
 		"output": output,
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Remote operations
+//
+// These are the only git commands here that leave the machine, which changes
+// two things: they need a much longer deadline than local plumbing, and they
+// must never block on an interactive credential prompt — this runs inside a
+// server process with no terminal attached, so a prompt would hang the request
+// until the timeout instead of returning something the user can act on.
+// ---------------------------------------------------------------------------
+
+const gitNetworkTimeout = 60 * time.Second
+
+func runGitNet(dir string, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), gitNetworkTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = dir
+	// GIT_TERMINAL_PROMPT=0 makes git fail with "could not read Username" rather
+	// than waiting forever; the empty ASKPASS vars stop any GUI helper from
+	// popping a dialog on the server's desktop.
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=", "SSH_ASKPASS=")
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	err := cmd.Run()
+	stdout := strings.TrimRight(stdoutBuf.String(), "\r\n")
+	stderr := strings.TrimRight(stderrBuf.String(), "\r\n")
+
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return stdout, errors.New("operation timed out after " + gitNetworkTimeout.String() + " (the remote may be unreachable, or it asked for credentials)")
+		}
+		if stderr != "" {
+			return stdout, errors.New(stderr)
+		}
+		return stdout, err
+	}
+	return stdout, nil
+}
+
+// FetchGitRemote handles POST /v1/git/fetch. Read-only against the working
+// tree: it refreshes the remote-tracking refs so ahead/behind become truthful.
+func FetchGitRemote(c *gin.Context) {
+	dir, ok := getGitDirForRequest(c)
+	if !ok {
+		return
+	}
+
+	output, err := runGitNet(dir, "fetch", "--prune")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to fetch: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "output": output})
+}
+
+// PullGitRemote handles POST /v1/git/pull.
+func PullGitRemote(c *gin.Context) {
+	dir, ok := getGitDirForRequest(c)
+	if !ok {
+		return
+	}
+
+	// --ff-only on purpose: a UI button must not silently create a merge commit
+	// or start a rebase in someone's checkout. Diverged history is a decision a
+	// human makes in a terminal, so surface the refusal instead of guessing.
+	output, err := runGitNet(dir, "pull", "--ff-only")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to pull: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "output": output})
+}
+
+// PushGitRemote handles POST /v1/git/push.
+func PushGitRemote(c *gin.Context) {
+	dir, ok := getGitDirForRequest(c)
+	if !ok {
+		return
+	}
+
+	head, err := runGit(dir, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to resolve current branch: " + err.Error()})
+		return
+	}
+	branch := strings.TrimSpace(head)
+	if branch == "" || branch == "HEAD" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot push from a detached HEAD — check out a branch first"})
+		return
+	}
+
+	// -u so the first push of a new local branch sets its upstream instead of
+	// failing with "no upstream configured". Never --force from a button.
+	output, err := runGitNet(dir, "push", "-u", "origin", branch)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to push: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "output": output, "branch": branch})
 }
 
 type checkoutRequest struct {

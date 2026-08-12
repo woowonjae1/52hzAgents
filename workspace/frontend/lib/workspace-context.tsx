@@ -147,13 +147,15 @@ interface WorkspaceContextValue {
   error: string | null;
   lastMessageBySession: Record<string, LastMessageInfo>;
   activeSessionIds: Set<string>;
+  /** Agents that are themselves producing output right now — see setSessionActive. */
+  workingAgentNames: Set<string>;
   stoppingSessionIds: Set<string>;
   completedSessionIds: Set<string>;
   monitorMode: boolean;
   acknowledgeCompletion: (sessionId: string) => void;
   agentModes: Record<string, string>;
   updateLastMessage: (sessionId: string, senderName: string, content: string, isStatus?: boolean) => void;
-  setSessionActive: (sessionId: string, active: boolean) => void;
+  setSessionActive: (sessionId: string, active: boolean, agentName?: string | null) => void;
   updateAgentMode: (agentName: string, mode: string) => void;
   stopAllAgents: (sessionId?: string) => Promise<void>;
   setCurrentSessionId: (id: string | null, options?: { skipFocus?: boolean }) => void;
@@ -296,6 +298,11 @@ export function WorkspaceProvider({
   const [error, setError] = useState<string | null>(null);
   const [lastMessageBySession, setLastMessageBySession] = useState<Record<string, LastMessageInfo>>({});
   const [activeSessionIds, setActiveSessionIds] = useState<Set<string>>(new Set());
+  // sessionId -> the agent whose status stream made that session active. A
+  // channel's membership is not evidence: threads default to every agent in the
+  // workspace, and the server picks ONE of them to answer, so attributing a
+  // busy channel to all of its members lit up the whole roster for one reply.
+  const [workingAgentBySession, setWorkingAgentBySession] = useState<Record<string, string>>({});
   const [stoppingSessionIds, setStoppingSessionIds] = useState<Set<string>>(new Set());
   const stoppingSessionIdsRef = useRef(stoppingSessionIds);
   stoppingSessionIdsRef.current = stoppingSessionIds;
@@ -468,14 +475,42 @@ export function WorkspaceProvider({
     });
   }, []);
 
-  const setSessionActive = useCallback((sessionId: string, active: boolean) => {
+  /**
+   * @param agentName the agent actually emitting the status stream, when it is
+   *   known. Callers pass null while the recipient is still a guess (the
+   *   optimistic "working" row before the first real agent event), so the roster
+   *   names nobody rather than naming the wrong agent.
+   */
+  const setSessionActive = useCallback((sessionId: string, active: boolean, agentName?: string | null) => {
+    const isActive = active && !stoppingSessionIdsRef.current.has(sessionId);
     setActiveSessionIds((prev) => {
       const next = new Set(prev);
-      if (active && !stoppingSessionIdsRef.current.has(sessionId)) next.add(sessionId);
+      if (isActive) next.add(sessionId);
       else next.delete(sessionId);
       return next;
     });
+    setWorkingAgentBySession((prev) => {
+      if (isActive) {
+        // No name this tick: keep the one already attributed instead of
+        // dropping it, or the roster would flicker mid-turn.
+        if (!agentName || prev[sessionId] === agentName) return prev;
+        return { ...prev, [sessionId]: agentName };
+      }
+      if (!(sessionId in prev)) return prev;
+      const next = { ...prev };
+      delete next[sessionId];
+      return next;
+    });
   }, []);
+
+  const workingAgentNames = useMemo(() => {
+    const known = new Set(agents.map((a) => a.agentName));
+    const names = new Set<string>();
+    for (const [sessionId, agentName] of Object.entries(workingAgentBySession)) {
+      if (activeSessionIds.has(sessionId) && known.has(agentName)) names.add(agentName);
+    }
+    return names;
+  }, [workingAgentBySession, activeSessionIds, agents]);
 
   const updateAgentMode = useCallback((agentName: string, mode: string) => {
     setAgentModes((prev) => {
@@ -535,6 +570,17 @@ export function WorkspaceProvider({
       });
     }, 3000);
   }, [activeSessionIds, agents, sessions]);
+
+  // Claim the workspace id synchronously, during render. The effect below is
+  // the only place that used to configure the API client, and it is too late:
+  // React runs child effects before the parent's, and on desktop this one also
+  // awaits a bridge call before it gets a token. So a child that hit the API on
+  // mount — creating a channel, loading the agent catalog — found workspaceId
+  // still empty and threw "WorkspaceApi not configured yet". The id comes from
+  // the route and needs no await, so there is no reason to make callers wait for
+  // the token handshake to learn it. Idempotent: safe under StrictMode's double
+  // render, and the effect still owns the tokens.
+  workspaceApi.setWorkspaceId(workspaceId);
 
   // Configure API client on mount / token change
   useEffect(() => {
@@ -1436,6 +1482,7 @@ export function WorkspaceProvider({
     error,
     lastMessageBySession,
     activeSessionIds,
+    workingAgentNames,
     stoppingSessionIds,
     completedSessionIds,
     monitorMode,
@@ -1504,7 +1551,7 @@ export function WorkspaceProvider({
     setNotificationSound,
   }), [
     workspace, workspaceId, effectiveToken, agents, setAgents, currentUser, setUserName, onlineUsers, sessions, files,
-    selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds,
+    selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds, workingAgentNames,
     stoppingSessionIds, completedSessionIds, monitorMode, acknowledgeCompletion, agentModes,
     updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, setCurrentSessionId,
     consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession,

@@ -53,6 +53,7 @@ export function MissionControl() {
     sessions,
     lastMessageBySession,
     activeSessionIds,
+    workingAgentNames,
     setCurrentSessionId,
   } = useWorkspace();
   const { setViewMode, setSelectedAgentName } = useLayout();
@@ -132,12 +133,15 @@ export function MissionControl() {
           .filter((s) => s.participants.includes(agent.agentName) || s.master === agent.agentName)
           .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
 
-        const workingThread = threads.find((t) => activeSessionIds.has(t.sessionId)) || null;
+        // Busy channel ≠ busy agent: only the routed agent answers, so channel
+        // membership must not put the rest of the roster into "working".
+        const isWorking = workingAgentNames.has(agent.agentName);
+        const workingThread = isWorking ? threads.find((t) => activeSessionIds.has(t.sessionId)) || null : null;
         const focusThread = workingThread || threads[0] || null;
 
         let stationStatus: StationStatus;
         if (agent.status !== 'online') stationStatus = 'offline';
-        else if (workingThread) stationStatus = 'working';
+        else if (isWorking) stationStatus = 'working';
         else stationStatus = 'ready';
 
         const activity = focusThread ? lastMessageBySession[focusThread.sessionId] || null : null;
@@ -160,7 +164,7 @@ export function MissionControl() {
         if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
         return a.agent.agentName.localeCompare(b.agent.agentName);
       });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds, agentTokens]);
+  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens]);
 
   const onlineCount = agents.filter((a) => a.status === 'online').length;
   const workingCount = stations.filter((s) => s.status === 'working').length;

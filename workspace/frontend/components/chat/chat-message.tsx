@@ -394,7 +394,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               <div className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
                 <button
                   onClick={handleCopy}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
                   title="Copy text"
                 >
                   {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
@@ -405,7 +405,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                     navigator.clipboard.writeText(`@${message.senderName} ${message.content}`);
                     toast.success(`Forked from @${message.senderName}`);
                   }}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
                   title="Fork thread"
                 >
                   <GitBranch className="size-3" />

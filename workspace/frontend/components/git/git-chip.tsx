@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { GitBranch, ChevronDown, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { GitBranch, ChevronDown, Loader2, RefreshCw, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
 import { type GitStatus } from '@/lib/use-git-status';
@@ -36,20 +36,20 @@ function FileRow({ file }: { file: GitStatus['files'][number] }) {
 }
 
 export function GitChip({
-  agentName,
+  channelId,
   status,
   refresh,
 }: {
-  agentName: string | null;
+  channelId: string | null;
   status: GitStatus | null;
   refresh: () => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState('');
-  const [aiNotes, setAiNotes] = useState<string[]>([]);
   const [committing, setCommitting] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pulling, setPulling] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,14 +71,13 @@ export function GitChip({
   const staged = status.files.filter((f) => f.staged);
   const unstaged = status.files.filter((f) => !f.staged);
 
-  const commitAndSync = async () => {
-    if (!agentName || !message.trim() || staged.length === 0) return;
+  const commit = async () => {
+    if (!channelId || !message.trim() || staged.length === 0) return;
     setCommitting(true);
     try {
-      await workspaceApi.createGitCommit(agentName, message.trim());
+      await workspaceApi.createGitCommit(channelId, message.trim());
       toast.success('已提交更改');
       setMessage('');
-      setAiNotes([]);
       setOpen(false);
       await refresh();
     } catch (e) {
@@ -88,50 +87,71 @@ export function GitChip({
     }
   };
 
+  // Fetch first, then re-read status: without the fetch, ahead/behind are stale
+  // numbers from whenever something else last talked to the remote.
   const handleSync = async () => {
+    if (!channelId) return;
     setSyncing(true);
     try {
+      await workspaceApi.fetchGitRemote(channelId);
       await refresh();
-      toast.success('Git 状态已同步');
-    } catch {
-      toast.error('同步失败');
+      toast.success('已与远端同步');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '同步失败');
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleGenerateCommitMessage = async () => {
-    if (staged.length === 0) {
-      toast.error('请先暂存文件再生成 Commit Message');
-      return;
-    }
-    setGenerating(true);
+  const handlePull = async () => {
+    if (!channelId) return;
+    setPulling(true);
     try {
-      // Generate summary title and bullet notes based on staged file paths
-      const fileNames = staged.map((f) => f.path.split('/').pop()).filter(Boolean);
-      const generatedTitle = `refactor: 优化 ${fileNames.slice(0, 3).join('、')}${fileNames.length > 3 ? ' 等' : ''} 逻辑`;
-      const generatedNotes = [
-        `• 调整了 ${staged.length} 个受影响文件的代码实现`,
-        `• 补全并验证了最新的变动和逻辑分支`,
-      ];
-      setMessage(generatedTitle);
-      setAiNotes(generatedNotes);
-      toast.success('AI 已生成 Commit 说明');
-    } catch {
-      toast.error('生成失败');
+      await workspaceApi.pullGitRemote(channelId);
+      await refresh();
+      toast.success('已拉取远端更改');
+    } catch (e) {
+      // --ff-only refusals land here; the git message names the real problem
+      // (diverged branches), so show it rather than a generic failure.
+      toast.error(e instanceof Error ? e.message : '拉取失败');
     } finally {
-      setGenerating(false);
+      setPulling(false);
+    }
+  };
+
+  const handlePush = async () => {
+    if (!channelId) return;
+    setPushing(true);
+    try {
+      const res = await workspaceApi.pushGitRemote(channelId);
+      await refresh();
+      toast.success(`已推送到 origin/${res.branch}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '推送失败');
+    } finally {
+      setPushing(false);
     }
   };
 
   const stageAll = async () => {
-    if (!agentName || unstaged.length === 0) return;
+    if (!channelId || unstaged.length === 0) return;
     try {
-      await workspaceApi.stageGitFiles(agentName, unstaged.map((f) => f.path));
+      await workspaceApi.stageGitFiles(channelId, unstaged.map((f) => f.path));
       await refresh();
       toast.success('所有文件已暂存');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '暂存失败');
+    }
+  };
+
+  const unstageAll = async () => {
+    if (!channelId || staged.length === 0) return;
+    try {
+      await workspaceApi.unstageGitFiles(channelId, staged.map((f) => f.path));
+      await refresh();
+      toast.success('已取消暂存');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '取消暂存失败');
     }
   };
 
@@ -142,7 +162,7 @@ export function GitChip({
         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors cursor-pointer"
         title={`${status.dir}${status.commit ? ` @ ${status.commit}` : ''}`}
       >
-        <GitBranch className="size-3 text-foreground-extra-muted shrink-0" />
+        <GitBranch className="size-3 text-foreground-muted shrink-0" />
         <span className="font-medium max-w-[120px] truncate">{status.branch || 'detached'}</span>
         {status.additions > 0 && (
           <span className="font-mono tabular-nums text-[11px] text-status-success">+{status.additions}</span>
@@ -150,7 +170,7 @@ export function GitChip({
         {status.deletions > 0 && (
           <span className="font-mono tabular-nums text-[11px] text-status-danger">−{status.deletions}</span>
         )}
-        <ChevronDown className={cn('size-2.5 text-foreground-extra-muted transition-transform', open && 'rotate-180')} />
+        <ChevronDown className={cn('size-2.5 text-foreground-muted transition-transform', open && 'rotate-180')} />
       </button>
 
       {open && (
@@ -170,10 +190,10 @@ export function GitChip({
               onClick={handleSync}
               disabled={syncing}
               className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/50"
-              title="Sync with remote"
+              title="git fetch --prune,然后重读状态"
             >
               <RefreshCw className={cn("size-2.5 text-muted-foreground", syncing && "animate-spin")} />
-              sync
+              同步
             </button>
           </div>
 
@@ -187,6 +207,12 @@ export function GitChip({
               <>
                 <div className="flex items-baseline justify-between px-3 pt-1.5 pb-1">
                   <span className="text-[11px] font-semibold text-foreground-muted">已暂存 ({staged.length})</span>
+                  <button
+                    onClick={unstageAll}
+                    className="text-[11px] text-primary hover:underline transition-colors cursor-pointer"
+                  >
+                    取消暂存
+                  </button>
                 </div>
                 {staged.map((f) => <FileRow key={`s-${f.path}`} file={f} />)}
               </>
@@ -219,30 +245,36 @@ export function GitChip({
               className="w-full resize-none rounded-lg bg-surface0 border border-border-accent px-2.5 py-2 text-[12px] text-foreground placeholder:text-foreground-extra-muted outline-none focus:border-accent disabled:opacity-50 transition-colors"
             />
 
-            {aiNotes.length > 0 && (
-              <div className="p-2 rounded-lg bg-surface0/80 border border-border/60 text-[11px] text-foreground-muted space-y-1">
-                {aiNotes.map((note, i) => (
-                  <p key={i}>{note}</p>
-                ))}
-              </div>
-            )}
+            <button
+              onClick={commit}
+              disabled={committing || staged.length === 0 || !message.trim()}
+              className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+            >
+              {committing && <Loader2 className="size-3 animate-spin" />}
+              提交
+            </button>
 
+            {/* Remote actions. Always available — ahead/behind can be stale until
+                the sync above runs, so hiding them on those counts would hide
+                the push you just made a commit for. */}
             <div className="flex items-center gap-2">
               <button
-                onClick={handleGenerateCommitMessage}
-                disabled={generating || staged.length === 0}
-                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-[12px] font-medium hover:bg-surface4 disabled:opacity-40 transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                onClick={handlePull}
+                disabled={pulling || !channelId}
+                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-[12px] font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                title="git pull --ff-only"
               >
-                {generating ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3 text-status-warning" />}
-                生成
+                {pulling ? <Loader2 className="size-3 animate-spin" /> : <ArrowDownToLine className="size-3 text-foreground-muted" />}
+                拉取{status.behind > 0 ? ` (${status.behind})` : ''}
               </button>
               <button
-                onClick={commitAndSync}
-                disabled={committing || staged.length === 0 || !message.trim()}
-                className="flex-[1.4] h-8 rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                onClick={handlePush}
+                disabled={pushing || !channelId}
+                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-[12px] font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                title="git push -u origin <当前分支>"
               >
-                {committing && <Loader2 className="size-3 animate-spin" />}
-                提交并同步
+                {pushing ? <Loader2 className="size-3 animate-spin" /> : <ArrowUpFromLine className="size-3 text-foreground-muted" />}
+                推送{status.ahead > 0 ? ` (${status.ahead})` : ''}
               </button>
             </div>
           </div>

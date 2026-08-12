@@ -9,101 +9,106 @@
 /**
  * Paseo design tokens — 1:1 with paseo/packages/app/src/styles/theme.ts.
  *
- * Light = `lightSemanticColors`. Dark = `paseoDarkColors` (the project's DEFAULT
- * dark theme: a subtle teal-green tint, NOT neutral zinc). Values are copied
- * verbatim; regenerate from theme.ts rather than nudging one by hand — the status
- * tiers in particular are a normalized set (one lightness and one chroma fraction
- * per tier) and hand-tuning a single hue breaks the family.
+ * `:root` is the light theme (no class needed — it's the default). `.dark`
+ * below is the project's signature dark theme. The two share one structure —
+ * same token names, same grouping — with `:root`'s values being `.dark`'s
+ * with lightness inverted: white/near-white surfaces, near-black text, and
+ * the accent flipped from light-fill/dark-text to dark-fill/light-text. This
+ * is the ChatGPT light-mode pairing, not a separate palette design — if
+ * `.dark` changes, mirror the change here rather than drifting the two apart.
  */
 :root {
-  /* Surfaces (layers) — Dark mode by default */
-  --surface0: #0e0e10;
-  --surface1: #161618;
-  --surface2: #1e1e22;
-  --surface3: #28282d;
-  --surface4: #34343a;
-  --surface-diff-empty: #161618;
-  --surface-sidebar: #161618;
-  --surface-sidebar-hover: #202024;
-  --surface-workspace: #161618;
+  /* Surfaces (layers) */
+  --surface0: #ffffff;
+  --surface1: #f7f7f8;
+  --surface2: #ececec;
+  --surface3: #e3e3e3;
+  --surface4: #d9d9d9;
+  --surface-diff-empty: #f2f2f2;
+  --surface-sidebar: #f9f9f9;
+  --surface-sidebar-hover: #ececec;
+  --surface-workspace: #f7f7f8; /* = surface1 in light */
 
   /* Text */
-  --foreground: #f4f4f5;
-  --foreground-muted: #a1a1aa;
-  --foreground-extra-muted: #71717a;
+  --foreground: #0d0d0d;
+  --foreground-muted: #5d5d5d;
+  --foreground-extra-muted: #8e8e93;
 
   /* Controls */
-  --scrollbar-handle: #34343a;
+  --scrollbar-handle: #d4d4d4;
 
   /* Borders */
-  --border: #27272a;
-  --border-accent: #3f3f46;
+  --border: #e5e5e5;
+  --border-accent: #d4d4d4;
 
-  /* Brand — achromatic. Light fill + dark text */
-  --accent: #f4f4f5;
-  --accent-bright: #ffffff;
-  --accent-foreground: #0e0e10;
+  /* Brand — achromatic. Dark fill + light text (inverted-button pattern,
+     flipped from dark mode's light-fill/dark-text). */
+  --accent: #0d0d0d;
+  --accent-bright: #000000;
+  --accent-foreground: #ffffff;
 
-  /* Semantic */
+  /* Semantic — unchanged from dark; these already read fine on a light
+     ground so the two themes share one set. */
   --destructive: #c77b74;
   --destructive-foreground: #ffffff;
   --success: #6fa97f;
   --success-foreground: #ffffff;
 
   /* Diff */
-  --diff-addition: #4ade80;
-  --diff-deletion: #f87171;
+  --diff-addition: #2f9e44;
+  --diff-deletion: #c0392b;
 
-  /* Status */
-  --status-success: #4ade80;
-  --status-danger: #f87171;
-  --status-warning: #facc15;
-  --status-merged: #a855f7;
+  /* Status, full tier */
+  --status-success: #2f9e44;
+  --status-danger: #c0392b;
+  --status-warning: #a3790f;
+  --status-merged: #7c3aed;
 
-  /* Status muted */
-  --status-muted-success: #166534;
-  --status-muted-danger: #991b1b;
-  --status-muted-warning: #854d0e;
-  --status-muted-merged: #6b21a8;
+  /* Status, muted tier */
+  --status-muted-success: #bfe6c8;
+  --status-muted-danger: #f3c6c0;
+  --status-muted-warning: #f2ddac;
+  --status-muted-merged: #ded0f9;
 
-  /* Terminal */
-  --terminal-background: #0e0e10;
-  --terminal-foreground: #f4f4f5;
-  --terminal-cursor: #f4f4f5;
-  --terminal-cursor-accent: #0e0e10;
-  --terminal-selection-background: rgba(255, 255, 255, 0.15);
-  --terminal-selection-foreground: #f4f4f5;
-  --terminal-black: #1a1a1e;
-  --terminal-red: #ef4444;
-  --terminal-green: #22c55e;
-  --terminal-yellow: #f59e0b;
-  --terminal-blue: #3b82f6;
-  --terminal-magenta: #a855f7;
-  --terminal-cyan: #06b6d4;
-  --terminal-white: #f4f4f5;
-  --terminal-bright-black: #3f3f46;
-  --terminal-bright-red: #ef4444;
-  --terminal-bright-green: #22c55e;
-  --terminal-bright-yellow: #f59e0b;
-  --terminal-bright-blue: #3b82f6;
-  --terminal-bright-magenta: #a855f7;
-  --terminal-bright-cyan: #06b6d4;
-  --terminal-bright-white: #fafafa;
+  /* Terminal — background/foreground follow the neutral ramp; the ANSI
+     hues are darkened relative to dark mode so they stay legible on white. */
+  --terminal-background: #ffffff;
+  --terminal-foreground: #0d0d0d;
+  --terminal-cursor: #0d0d0d;
+  --terminal-cursor-accent: #ffffff;
+  --terminal-selection-background: rgba(0, 0, 0, 0.1);
+  --terminal-selection-foreground: #0d0d0d;
+  --terminal-black: #1a1a1a;
+  --terminal-red: #c0392b;
+  --terminal-green: #15803d;
+  --terminal-yellow: #a3790f;
+  --terminal-blue: #1d4ed8;
+  --terminal-magenta: #7c3aed;
+  --terminal-cyan: #0e7490;
+  --terminal-white: #5d5d5d;
+  --terminal-bright-black: #8e8e93;
+  --terminal-bright-red: #d64545;
+  --terminal-bright-green: #16a34a;
+  --terminal-bright-yellow: #ca8a04;
+  --terminal-bright-blue: #2563eb;
+  --terminal-bright-magenta: #9333ea;
+  --terminal-bright-cyan: #0891b2;
+  --terminal-bright-white: #0d0d0d;
 
   /* Legacy aliases */
-  --background: #0e0e10;
-  --card: #161618;
-  --card-foreground: #f4f4f5;
-  --popover: #1c1c1f;
-  --popover-foreground: #f4f4f5;
-  --primary: #f4f4f5;
-  --primary-foreground: #0e0e10;
-  --secondary: #1e1e22;
-  --secondary-foreground: #f4f4f5;
-  --muted: #1e1e22;
-  --muted-foreground: #a1a1aa;
-  --input: #1e1e22;
-  --ring: #f4f4f5;
+  --background: #ffffff;
+  --card: #f7f7f8;
+  --card-foreground: #0d0d0d;
+  --popover: #ffffff;
+  --popover-foreground: #0d0d0d;
+  --primary: #0d0d0d;
+  --primary-foreground: #ffffff;
+  --secondary: #ececec;
+  --secondary-foreground: #0d0d0d;
+  --muted: #ececec;
+  --muted-foreground: #5d5d5d;
+  --input: #ececec;
+  --ring: #0d0d0d;
   /* 12px, up from 8px. Larger radii read as "consumer product" rather than
      "instrument panel" — the genre signal the ChatGPT direction asks for. */
   --radius: 0.75rem;
@@ -230,165 +235,17 @@
   --secondary: #333333;
   --secondary-foreground: #ececec;
   --muted: #333333;
-  --muted-foreground: #8a8a8a;
+  /* = --foreground-muted, NOT --foreground-extra-muted. These two names are
+     used interchangeably across the app (`text-muted-foreground` vs
+     `text-foreground-muted`), so letting them hold different values meant
+     identical-looking code produced two different contrast levels — the
+     dimmer one failed AA on every surface in the ramp. Light mode already
+     pairs them; dark now matches. */
+  --muted-foreground: #b4b4b4;
   --input: #2a2a2a;
-  --ring: #8a8a8a;
-}
-
-/**
- * The other four dark tints from Paseo (`darkZincTheme`, `darkMidnightTheme`,
- * `darkClaudeTheme`, `darkGhosttyTheme`). Apply alongside `.dark`, e.g.
- * `<html class="dark theme-claude">`.
- *
- * Each block carries only the tint-varying tokens — Paseo builds all five dark
- * themes by passing a `DarkThemeConfig` through one `buildDarkSemanticColors()`,
- * so everything derived from the tint is written as a var() reference and
- * everything shared (status scale, diff colours, ANSI palette, #fafafa
- * foreground) is inherited from `.dark` above. Duplicating the shared half here
- * is how five themes quietly drift apart.
- */
-.dark.theme-zinc {
-  --surface0: #18181b;
-  --surface1: #1f1f22;
-  --surface2: #27272a;
-  --surface3: #3f3f46;
-  --surface4: #52525b;
-  --surface-diff-empty: #242427;
-  --surface-sidebar: #131316;
-  --surface-sidebar-hover: #1b1b1e;
-  --foreground-muted: #e4e4e7;
-  --foreground-extra-muted: #a1a1aa;
-  --scrollbar-handle: #71717a;
-  --border: #27272a;
-  --border-accent: #303036;
-  --accent: #e4e4e7;
-  --accent-bright: #fafafa;
-  /* monochrome zinc accent is near-white — needs dark text */
-  --accent-foreground: #18181b;
-  --destructive: #c44a4a;
-
-  --surface-workspace: var(--surface1);
-  --success: var(--accent);
-  --background: var(--surface0);
-  --card: var(--surface1);
-  --popover: var(--surface2);
-  --primary-foreground: var(--surface0);
-  --secondary: var(--surface2);
-  --muted: var(--surface2);
-  --muted-foreground: var(--foreground-muted);
-  --input: var(--surface2);
-  --terminal-background: var(--surface0);
-  --terminal-cursor-accent: var(--surface0);
-  --terminal-black: var(--surface-sidebar);
-  --terminal-bright-black: var(--surface3);
-}
-
-.dark.theme-midnight {
-  --surface0: #161820;
-  --surface1: #1c1e27;
-  --surface2: #252731;
-  --surface3: #3c3e4c;
-  --surface4: #535564;
-  --surface-diff-empty: #222430;
-  --surface-sidebar: #121420;
-  --surface-sidebar-hover: #1a1c28;
-  --foreground-muted: #9a9db0;
-  --foreground-extra-muted: #6b6e82;
-  --scrollbar-handle: #6b6e82;
-  --border: #242636;
-  --border-accent: #2e3040;
-  --accent: #3b6fcf;
-  --accent-bright: #7eaaeb;
-  --accent-foreground: #ffffff;
-  /* red with a hint of cool lean against the blue tint */
-  --destructive: #c44a52;
-
-  --surface-workspace: var(--surface1);
-  --success: var(--accent);
-  --background: var(--surface0);
-  --card: var(--surface1);
-  --popover: var(--surface2);
-  --primary-foreground: var(--surface0);
-  --secondary: var(--surface2);
-  --muted: var(--surface2);
-  --muted-foreground: var(--foreground-muted);
-  --input: var(--surface2);
-  --terminal-background: var(--surface0);
-  --terminal-cursor-accent: var(--surface0);
-  --terminal-black: var(--surface-sidebar);
-  --terminal-bright-black: var(--surface3);
-}
-
-.dark.theme-claude {
-  --surface0: #1f1f1e;
-  --surface1: #262523;
-  --surface2: #2f2d2b;
-  --surface3: #4a4745;
-  --surface4: #605d5b;
-  --surface-diff-empty: #2a2826;
-  --surface-sidebar: #1a1918;
-  --surface-sidebar-hover: #222120;
-  --foreground-muted: #ada9a5;
-  --foreground-extra-muted: #78746f;
-  --scrollbar-handle: #78746f;
-  --border: #2c2a27;
-  --border-accent: #36332f;
-  --accent: #d97757;
-  --accent-bright: #e89a7f;
-  --accent-foreground: #ffffff;
-  /* warm orange-red, hue ~10 — sits with the Claude orange accent */
-  --destructive: #cf513e;
-
-  --surface-workspace: var(--surface1);
-  --success: var(--accent);
-  --background: var(--surface0);
-  --card: var(--surface1);
-  --popover: var(--surface2);
-  --primary-foreground: var(--surface0);
-  --secondary: var(--surface2);
-  --muted: var(--surface2);
-  --muted-foreground: var(--foreground-muted);
-  --input: var(--surface2);
-  --terminal-background: var(--surface0);
-  --terminal-cursor-accent: var(--surface0);
-  --terminal-black: var(--surface-sidebar);
-  --terminal-bright-black: var(--surface3);
-}
-
-.dark.theme-ghostty {
-  --surface0: #282c34;
-  --surface1: #2f333d;
-  --surface2: #383c48;
-  --surface3: #4a4f5e;
-  --surface4: #5b6175;
-  --surface-diff-empty: #323643;
-  --surface-sidebar: #21252d;
-  --surface-sidebar-hover: #292d36;
-  --foreground-muted: #c8ccd8;
-  --foreground-extra-muted: #a0a4b2;
-  --scrollbar-handle: #a0a4b2;
-  --border: #353a47;
-  --border-accent: #3f4454;
-  --accent: #89b4fa;
-  --accent-bright: #b4d0fc;
-  --accent-foreground: #ffffff;
-  /* red with slight cool lean against the slate-blue surfaces */
-  --destructive: #c44a55;
-
-  --surface-workspace: var(--surface1);
-  --success: var(--accent);
-  --background: var(--surface0);
-  --card: var(--surface1);
-  --popover: var(--surface2);
-  --primary-foreground: var(--surface0);
-  --secondary: var(--surface2);
-  --muted: var(--surface2);
-  --muted-foreground: var(--foreground-muted);
-  --input: var(--surface2);
-  --terminal-background: var(--surface0);
-  --terminal-cursor-accent: var(--surface0);
-  --terminal-black: var(--surface-sidebar);
-  --terminal-bright-black: var(--surface3);
+  /* Focus ring: needs to clear AA against surface0-surface2, so it rides the
+     foreground rather than a muted tier. */
+  --ring: #ececec;
 }
 
 /** Theme Setup **/

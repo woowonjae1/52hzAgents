@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/page';
+import { WorkspaceLoadingSplash } from './[workspaceId]/page';
 import Image from 'next/image';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,
@@ -52,12 +52,12 @@ function LandingPage() {
   const { isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
 
   const agents = [
-    { name: 'Claude Code', status: 'supported', command: 'agn install claude', color: 'bg-status-warning' },
-    { name: 'OpenClaw', status: 'supported', command: 'agn install openclaw', color: 'bg-violet-500' },
-    { name: 'Codex CLI', status: 'supported', command: 'agn install codex', color: 'bg-status-success' },
-    { name: 'Aider', status: 'supported', command: 'agn install aider', color: 'bg-foreground-extra-muted' },
-    { name: 'Goose', status: 'supported', command: 'agn install goose', color: 'bg-rose-500' },
-    { name: 'Custom', status: 'supported', command: 'agn create my-agent --type custom', color: 'bg-foreground-muted' },
+    { name: 'Claude Code', status: 'supported', command: 'wwj install claude', color: 'bg-status-warning' },
+    { name: 'OpenClaw', status: 'supported', command: 'wwj install openclaw', color: 'bg-violet-500' },
+    { name: 'Codex CLI', status: 'supported', command: 'wwj install codex', color: 'bg-status-success' },
+    { name: 'Aider', status: 'supported', command: 'wwj install aider', color: 'bg-foreground-extra-muted' },
+    { name: 'Goose', status: 'supported', command: 'wwj install goose', color: 'bg-rose-500' },
+    { name: 'Custom', status: 'supported', command: 'wwj create my-agent --type custom', color: 'bg-foreground-muted' },
   ];
 
   return (
@@ -109,8 +109,8 @@ function LandingPage() {
             shared workspaces where they collaborate with each other and with you, in real time.
           </p>
           <div className="max-w-lg mx-auto space-y-3">
-            <CodeBlock code="curl -fsSL https://openagents.org/install.sh | bash" />
-            <CodeBlock code={`agn create my-agent --type claude --install\nagn up`} />
+            <CodeBlock code="npm install -g ./packages/wwj" />
+            <CodeBlock code={`wwj create my-agent --type claude --install\nwwj up`} />
           </div>
           <p className="mt-4 text-sm text-muted-foreground">
             Install in seconds. Works on macOS, Linux, and Windows.
@@ -131,7 +131,7 @@ function LandingPage() {
                 <div className="size-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-sm font-semibold shrink-0">1</div>
                 <h3 className="font-semibold text-lg">Create a workspace</h3>
               </div>
-              <CodeBlock code="agn workspace create" />
+              <CodeBlock code="wwj workspace create" />
               <p className="text-sm text-muted-foreground">
                 Creates a workspace and gives you a shareable token. Share it with teammates or other agents.
               </p>
@@ -142,7 +142,7 @@ function LandingPage() {
                 <div className="size-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-sm font-semibold shrink-0">2</div>
                 <h3 className="font-semibold text-lg">Connect your agents</h3>
               </div>
-              <CodeBlock code={`agn create my-agent --type claude --install\nagn up\nagn connect my-agent <token>`} />
+              <CodeBlock code={`wwj create my-agent --type claude --install\nwwj up\nwwj connect my-agent <token>`} />
               <p className="text-sm text-muted-foreground">
                 Create an agent, start the daemon, and connect it with the token from step 1. Add as many agents as you need.
               </p>
@@ -192,7 +192,7 @@ function LandingPage() {
             ))}
           </div>
           <p className="text-center text-sm text-muted-foreground mt-6">
-            Search for more: <code className="bg-surface2 px-1.5 py-0.5 rounded text-xs font-mono">agn search coding</code>
+            Search for more: <code className="bg-surface2 px-1.5 py-0.5 rounded text-xs font-mono">wwj search coding</code>
           </p>
         </div>
       </section>
@@ -212,7 +212,7 @@ function LandingPage() {
             <FeatureCard
               icon={<Zap className="size-5" />}
               title="One-Command Setup"
-              description="agn create installs, configures, and runs your agent in one step. Background daemon auto-restarts on crash."
+              description="wwj create installs, configures, and runs your agent in one step. Background daemon auto-restarts on crash."
             />
             <FeatureCard
               icon={<Shield className="size-5" />}
@@ -236,26 +236,27 @@ function LandingPage() {
           </h2>
           <div className="space-y-6">
             <CLIGroup title="Agent Management" commands={[
-              { cmd: 'agn', desc: 'Scan machine, show agent status' },
-              { cmd: 'agn install <type>', desc: 'Install an agent runtime' },
-              { cmd: 'agn create <name> --type <type>', desc: 'Create an agent instance' },
-              { cmd: 'agn connect <name> <token>', desc: 'Connect an agent to a workspace' },
-              { cmd: 'agn start <name>', desc: 'Start a configured agent via the daemon' },
-              { cmd: 'agn stop <name>', desc: 'Stop a specific agent' },
-              { cmd: 'agn search <query>', desc: 'Search available agents' },
+              { cmd: 'wwj', desc: 'Scan machine, show agent status' },
+              { cmd: 'wwj install <type>', desc: 'Install an agent runtime' },
+              { cmd: 'wwj create <name> --type <type>', desc: 'Create an agent instance' },
+              { cmd: 'wwj connect <name> <token>', desc: 'Connect an agent to a workspace' },
+              { cmd: 'wwj env <type> --set KEY=value', desc: 'Set an agent runtime’s credentials' },
+              { cmd: 'wwj start <name>', desc: 'Start a configured agent via the daemon' },
+              { cmd: 'wwj stop <name>', desc: 'Stop a specific agent' },
+              { cmd: 'wwj search <query>', desc: 'Search available agents' },
             ]} />
             <CLIGroup title="Daemon" commands={[
-              { cmd: 'agn up', desc: 'Start daemon (all configured agents)' },
-              { cmd: 'agn down', desc: 'Stop daemon' },
-              { cmd: 'agn status', desc: 'Show running agents and daemon health' },
-              { cmd: 'agn autostart', desc: 'Auto-start on login' },
-              { cmd: 'agn logs', desc: 'Show recent daemon logs' },
+              { cmd: 'wwj up', desc: 'Start daemon (all configured agents)' },
+              { cmd: 'wwj down', desc: 'Stop daemon' },
+              { cmd: 'wwj status', desc: 'Show running agents and daemon health' },
+              { cmd: 'wwj autostart', desc: 'Auto-start on login' },
+              { cmd: 'wwj logs', desc: 'Show recent daemon logs' },
             ]} />
             <CLIGroup title="Workspace" commands={[
-              { cmd: 'agn workspace create', desc: 'Create a workspace, get shareable token' },
-              { cmd: 'agn workspace join <token>', desc: 'Join with a token' },
-              { cmd: 'agn workspace list', desc: 'List configured workspaces' },
-              { cmd: 'agn disconnect <name>', desc: 'Disconnect an agent from its workspace' },
+              { cmd: 'wwj workspace create', desc: 'Create a workspace, get shareable token' },
+              { cmd: 'wwj workspace join <token>', desc: 'Join with a token' },
+              { cmd: 'wwj workspace list', desc: 'List configured workspaces' },
+              { cmd: 'wwj disconnect <name>', desc: 'Disconnect an agent from its workspace' },
             ]} />
           </div>
         </div>
@@ -268,7 +269,7 @@ function LandingPage() {
           <p className="text-muted-foreground">
             Install 52hzAgents and have your first agent running in under a minute.
           </p>
-          <CodeBlock code={`curl -fsSL https://raw.githubusercontent.com/woowonjae1/52hzAgents/main/install.sh | bash\nagn create my-agent --type claude --install && agn up`} className="max-w-xl mx-auto" />
+          <CodeBlock code={`npm install -g ./packages/wwj\nwwj create my-agent --type claude --install && wwj up`} className="max-w-xl mx-auto" />
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <a href="https://github.com/woowonjae1/52hzAgents">
               <Button>
@@ -500,7 +501,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 // Dashboard
 // ---------------------------------------------------------------------------
 
-function Dashboard() {
+function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean }) {
   const { user, logout } = useAuth();
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
@@ -528,8 +529,8 @@ function Dashboard() {
 
   // Skip the "choose a workspace" screen when there's nothing to choose: a
   // single workspace, or one already remembered from a previous visit. Only
-  // an actually ambiguous case (zero, or several with no remembered pick)
-  // falls through to the grid below.
+  // an actually ambiguous case (2+ with no remembered pick) falls through to
+  // the grid below. Zero workspaces is handled by the effect after this one.
   useEffect(() => {
     if (loading || redirecting || workspaces.length === 0) return;
     let target: WorkspaceSummary | undefined;
@@ -542,6 +543,25 @@ function Dashboard() {
     setRedirecting(true);
     enterWorkspace(target, router);
   }, [loading, redirecting, workspaces, router]);
+
+  // Local/desktop use has no reason to make a first-time user fill out a
+  // "create workspace" form before they can do anything — silently provision
+  // one, the same way `wwj workspace create` would, and land straight in it.
+  useEffect(() => {
+    if (!autoCreateIfEmpty || loading || redirecting || error || workspaces.length > 0) return;
+    setRedirecting(true);
+    createWorkspace('local', 'My Workspace')
+      .then((ws) => {
+        enterWorkspace(
+          { workspaceId: ws.workspaceId, slug: ws.slug, name: ws.name, status: 'active', token: ws.token, agentCount: 0, createdAt: null, lastActivityAt: null },
+          router,
+        );
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to create a default workspace');
+        setRedirecting(false);
+      });
+  }, [autoCreateIfEmpty, loading, redirecting, error, workspaces, router]);
 
   if (redirecting) {
     return <WorkspaceLoadingSplash />;
@@ -646,15 +666,12 @@ export default function HomePage() {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Bypass landing page and dashboard redirect on local/custom domains (desktop app, self-host).
-  // Immediately render WorkspaceContent for instant 0-redirect load.
+  // Bypass the landing page on local/custom domains (desktop app, self-host) —
+  // Dashboard resolves the real workspace (cached, or the only one, or
+  // silently creates one) and only falls back to a picker grid when that's
+  // genuinely ambiguous. No hardcoded slug: that was the earlier bug.
   if (!openAgentsAuth.isOpenAgentsDomain) {
-    const slug = (typeof window !== 'undefined' && localStorage.getItem('last_workspace_slug')) || 'openagents-develop';
-    return (
-      <Suspense fallback={<WorkspaceLoadingSplash />}>
-        <WorkspaceContent workspaceId={slug} />
-      </Suspense>
-    );
+    return <Dashboard autoCreateIfEmpty />;
   }
 
   if (user || openAgentsAuth.user) return <Dashboard />;

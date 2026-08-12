@@ -4,7 +4,6 @@ import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile } from './chat-input';
 import { ThreadStatusBar } from './thread-status-bar';
-import { StatusLine } from './status-line';
 import { EmptyState } from './empty-state';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
@@ -66,15 +65,6 @@ function parseDMSession(sessionId: string | null): [string, string] | null {
 
 function normalizeAgentAddress(address: string): string {
   return address.replace(/^openagents:/, '');
-}
-
-/** Condense an agent description down to a few words for the roster bar. */
-function shortDescription(desc: string | null, maxWords = 8): string {
-  if (!desc) return '';
-  const clean = desc.trim().replace(/\s+/g, ' ');
-  const words = clean.split(' ');
-  if (words.length <= maxWords) return clean;
-  return words.slice(0, maxWords).join(' ') + '…';
 }
 
 function messagesForSession(sessionId: string, msgs: WorkspaceMessage[]): WorkspaceMessage[] {
@@ -227,7 +217,23 @@ export function ChatView() {
     initialMessages: initialMessagesRef.current,
   });
 
-  const [dismissedRoutingWarning, setDismissedRoutingWarning] = useState(false);
+  // Persisted (not just component state): dismissing this once shouldn't mean
+  // seeing it again on every reload — that's what made it feel like a
+  // permanent nag bar instead of a one-time nudge.
+  const [dismissedRoutingWarning, setDismissedRoutingWarningState] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return localStorage.getItem('dismissed_routing_warning') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setDismissedRoutingWarning = (v: boolean) => {
+    setDismissedRoutingWarningState(v);
+    try {
+      localStorage.setItem('dismissed_routing_warning', v ? '1' : '0');
+    } catch {}
+  };
   const { notifyFocus, notifyBlur, notifyTyping } = useComposingSignal(currentSessionId);
   const [showAllSteps, setShowAllSteps] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -295,15 +301,16 @@ export function ChatView() {
   const isDM = currentSessionId?.startsWith('dm:') ?? false;
   const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
 
-  // Which repository the git chip and the context line report on. The master is
-  // tried first because it owns the thread, but not every agent's working
-  // directory is a checkout, so the rest of the participants are the fallback.
-  const gitCandidates = useMemo(() => {
-    const master = currentSession?.master;
-    const participants = currentSession?.participants ?? [];
-    return [...(master ? [master] : []), ...participants.filter((p) => p !== master)];
-  }, [currentSession?.master, currentSession?.participants]);
-  const { status: gitStatus, refresh: refreshGit, agentName: gitAgentName } = useGitStatus(gitCandidates);
+  // Which repository the git chip and the context line report on: the folder
+  // this channel is bound to, resolved server-side from the channel id.
+  const { status: gitStatus, refresh: refreshGit, channelId: gitChannelId } = useGitStatus(currentSession?.sessionId);
+  // The composer's folder pill answers "what directory is THIS channel bound
+  // to", so it reads the channel's own binding. It used to read gitStatus.dir —
+  // the agent *member's* working directory, which is fixed when that agent
+  // launches and is identical across every channel the agent sits in. A channel
+  // created with no folder therefore still displayed the previous folder, which
+  // looked like the binding had been inherited when no binding existed at all.
+  const currentSessionWorkingDir = currentSession?.workingDir ?? undefined;
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
     [currentSessionId, optimisticMessages]
@@ -441,7 +448,11 @@ export function ChatView() {
       lastMsg.messageType === 'thinking' ||
       lastMsg.messageType === 'loading'
     );
-    setSessionActive(currentSessionId, isAgentWorking);
+    // Name the agent behind the status only when it is a real event. The
+    // optimistic loading row guesses the recipient (the server decides the
+    // actual target), so it must not put a name on the roster.
+    const isOptimistic = Boolean(lastMsg.messageId?.startsWith('optimistic-'));
+    setSessionActive(currentSessionId, isAgentWorking, isOptimistic ? null : lastMsg.senderName);
   }, [currentSessionId, displayMessages, setSessionActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Extract agent mode from status message metadata
@@ -574,14 +585,14 @@ export function ChatView() {
             <div className="flex items-center p-4 rounded-full bg-primary/10 mb-4">
               <MessageSquare className="size-8 text-primary" />
             </div>
-            <p className="text-lg font-semibold text-foreground">Start a new session</p>
+            <p className="text-lg font-semibold text-foreground">开一个新频道</p>
             <p className="text-sm mt-1 max-w-xs">
-              Create a session and pick which agents join to start collaborating.
+              建一个频道,选好参与的 agent,就可以开始协作了。
             </p>
             {agents.length > 0 && (
               <Button className="mt-5 gap-1.5" onClick={openNewThread}>
                 <Plus className="size-4" />
-                New Thread
+                New Channel
               </Button>
             )}
           </>
@@ -632,29 +643,15 @@ export function ChatView() {
               onClick={startEditingTitle}
               title="Click to rename"
             >
-              {currentSession?.title || 'Thread'}
+              {currentSession?.title || 'Channel'}
             </h2>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {/* Stop button — visible when agents are working. Ephemeral and
-              safety-critical, so it stays outside the overflow menu rather
-              than being one more click away while something is running. */}
-          {currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId)) && (
-            <button
-              onClick={() => stopAllAgents(currentSessionId!)}
-              disabled={stoppingSessionIds.has(currentSessionId)}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-surface2 text-status-danger hover:bg-surface3 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
-            >
-              <Square className="size-3 fill-current" />
-              {stoppingSessionIds.has(currentSessionId) ? 'Stopping...' : 'Stop'}
-            </button>
-          )}
-
           {/* Git — a compose surface (stage/commit/sync), not a settings
               toggle, so it keeps its own always-visible trigger rather than
               nesting a commit textarea inside the overflow menu below. */}
-          <GitChip agentName={gitAgentName} status={gitStatus} refresh={refreshGit} />
+          <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
           {/* Everything else — new topic, agent membership, step detail,
               side panels, collaboration mode, share — lives behind one
@@ -717,7 +714,7 @@ export function ChatView() {
                               {currentSession?.master === agent.agentName ? (
                                 <span
                                   className="flex items-center gap-1 text-[10px] text-status-warning shrink-0"
-                                  title="Thread leader — receives messages that don't @mention anyone"
+                                  title="Channel leader — receives messages that don't @mention anyone"
                                 >
                                   <Crown className="size-3" /> leader
                                 </span>
@@ -751,7 +748,7 @@ export function ChatView() {
                             <button
                               key={agent.agentName}
                               onClick={() => currentSessionId && addParticipant(currentSessionId, agent.agentName)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent transition-colors"
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface2 transition-colors"
                             >
                               <AgentAvatar name={agent.agentName} size={20} />
                               <span className="text-sm flex-1 truncate text-left">{agent.agentName}</span>
@@ -834,42 +831,6 @@ export function ChatView() {
         </div>
       </div>
 
-      {/* Agent roster bar — thin strip listing who's in the thread + a hint of
-          their responsibility. Only shown for group threads (>1 agent), never DMs. */}
-      {!isDM && (() => {
-        const participants = currentSession?.participants || [];
-        const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
-        if (sessionAgents.length <= 1) return null;
-        return (
-          <div className="flex items-center gap-2 px-2 lg:px-4 py-1.5 border-b shrink-0 overflow-x-auto bg-surface1/60">
-            {sessionAgents.map((agent, i) => {
-              const desc = shortDescription(agent.description);
-              const isMaster = currentSession?.master === agent.agentName;
-              return (
-                <div key={agent.agentName} className="flex items-center gap-2 shrink-0">
-                  {i > 0 && <span className="text-foreground-extra-muted select-none">|</span>}
-                  <div
-                    className="flex items-center gap-1.5 shrink-0"
-                    title={agent.description ? `${agent.agentName} — ${agent.description}` : agent.agentName}
-                  >
-                    <AgentAvatar name={agent.agentName} size={16} status={agent.status} showStatus />
-                    <span className="text-[11px] font-semibold text-foreground shrink-0">
-                      {agent.agentName}
-                    </span>
-                    {isMaster && <Crown className="size-2.5 text-status-warning shrink-0" />}
-                    {desc && (
-                      <span className="text-[11px] text-muted-foreground truncate max-w-[220px]">
-                        {desc}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
-
       {/* Missing-description warning — routing accuracy (dynamic/workflow router
           and the master's own delegation) depends on agent descriptions. Nudge
           the user to fill any that are blank; each chip opens that agent's
@@ -936,24 +897,6 @@ export function ChatView() {
           <div className="px-3 lg:px-4 py-2 lg:py-3">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
-              {/* What the agent is about to act on: which checkout, and how far
-                  it has already drifted from HEAD. Sits directly above the
-                  composer because that is the moment the answer matters. */}
-              {gitStatus?.available && gitStatus.files.length > 0 && (
-                <div className="flex items-center gap-2 px-1 pb-1.5 text-[11.5px] text-foreground-muted font-mono">
-                  <span className="truncate">{gitStatus.dir_name || 'my-project'}</span>
-                  <span aria-hidden>·</span>
-                  <span className="shrink-0">
-                    {gitStatus.files.length} 个文件有改动
-                  </span>
-                  {gitStatus.additions > 0 && (
-                    <span className="shrink-0 tabular-nums text-status-success">+{gitStatus.additions}</span>
-                  )}
-                  {gitStatus.deletions > 0 && (
-                    <span className="shrink-0 tabular-nums text-status-danger">−{gitStatus.deletions}</span>
-                  )}
-                </div>
-              )}
               {/* A thread with no agents gets no reply: the backend only borrows a
                   workspace agent when the choice is unambiguous. Say so instead of
                   letting the message vanish into silence. */}
@@ -976,6 +919,10 @@ export function ChatView() {
                 onFocusChange={(focused) => focused ? notifyFocus() : notifyBlur()}
                 focusKey={focusKey}
                 onCreateRoutine={() => setShowCreateRoutine(true)}
+                workingDir={currentSessionWorkingDir}
+                isWorking={!!currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId))}
+                stopping={!!currentSessionId && stoppingSessionIds.has(currentSessionId)}
+                onStop={() => currentSessionId && stopAllAgents(currentSessionId)}
                 disabled={!currentUser.name.trim()}
               />
             </div>
@@ -1004,8 +951,6 @@ export function ChatView() {
         )}
       </div>
 
-      {/* Persistent status line — always-on thread context */}
-      {!isDM && currentSessionId && <StatusLine />}
     </div>
   );
 }

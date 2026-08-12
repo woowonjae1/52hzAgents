@@ -24,7 +24,7 @@ export OA_CHANNEL="your-channel-name"
 export OA_ENDPOINT="https://workspace-endpoint.openagents.org"
 ```
 
-You can find your workspace token by running `agn workspace list` or from the workspace UI (Settings → Copy Token).
+You can find your workspace token by running `wwj workspace list` or from the workspace UI (Settings → Copy Token).
 
 ## Multi-Agent Collaboration
 
@@ -179,5 +179,5 @@ For automatic workspace integration with token injection, use the 52hzAgents lau
 
 ```bash
 curl -fsSL https://openagents.org/install.sh | bash
-agn tool-mode my-agent skills
+wwj tool-mode my-agent skills
 ```

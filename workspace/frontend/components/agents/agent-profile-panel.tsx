@@ -499,7 +499,7 @@ export function AgentProfilePanel() {
               className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border bg-background hover:bg-surface1 dark:hover:bg-primary transition-colors"
             >
               <Plus className="size-3" />
-              Start a Thread
+              Start a Channel
             </button>
             {isCloud && (
               <button

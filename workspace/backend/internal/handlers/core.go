@@ -354,7 +354,7 @@ func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, 
 		channelName = "thread-" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12]
 		title, _ := req.Payload["title"].(string)
 		if title == "" {
-			title = "New Thread"
+			title = "新频道"
 		}
 		master, _ := req.Payload["master"].(string)
 		channel := models.Channel{ID: uuid.New().String(), WorkspaceID: workspaceID, Name: channelName, Title: &title, Status: "active", OrchestrationMode: "dynamic", CreatedAt: time.Now()}
@@ -440,6 +440,7 @@ func ensureWorkspaceConnectorToken(workspace *models.Workspace) (string, error) 
 func LaunchAgent(c *gin.Context) {
 	agentName := c.Param("agent_name")
 	network := c.Query("network")
+	workingDir := c.Query("working_dir")
 	if network == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "network is required"})
 		return
@@ -502,6 +503,12 @@ func LaunchAgent(c *gin.Context) {
 		"OPENAGENTS_TOKEN="+reqToken,
 		"WWJ_WORKSPACE_ENDPOINT=http://localhost:8000",
 	)
+	// The chosen project directory becomes the connector process's cwd, so the
+	// agent it spawns reads/edits files there instead of the backend's own
+	// working directory.
+	if workingDir != "" {
+		runCmd.Dir = workingDir
+	}
 
 	execErr = runCmd.Start()
 	if execErr != nil {
@@ -516,6 +523,9 @@ func LaunchAgent(c *gin.Context) {
 	agentTypeStr := lowerName
 	hostStr := "localhost"
 	dirStr := "."
+	if workingDir != "" {
+		dirStr = workingDir
+	}
 	descStr := fmt.Sprintf("Launched %s agent runtime", agentName)
 
 	if err != nil {
@@ -534,11 +544,15 @@ func LaunchAgent(c *gin.Context) {
 		}
 		db.DB.Create(&member)
 	} else {
-		db.DB.Model(&member).Updates(map[string]interface{}{
+		updates := map[string]interface{}{
 			"status":         "launching",
 			"last_heartbeat": nowTime,
 			"agent_type":     agentTypeStr,
-		})
+		}
+		if workingDir != "" {
+			updates["working_dir"] = workingDir
+		}
+		db.DB.Model(&member).Updates(updates)
 	}
 
 	// The launcher only proves a process was spawned — never that the agent

@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         {POSTHOG_KEY && (
         <Script id="posthog-init" strategy="afterInteractive">{`
@@ -67,26 +67,17 @@ export default function RootLayout({
         `}</Script>
         </>
         )}
-        {/*
-          Apply the stored Paseo dark tint before first paint, the same way
-          next-themes seeds the `dark` class. Without this, a reload on the Claude
-          or Midnight tint renders one frame in the default teal-green dark and
-          then snaps. Deliberately `beforeInteractive` and dependency-free — it
-          must run ahead of hydration, and it only ever touches `theme-*` classes.
-        */}
-        <Script id="paseo-tint-init" strategy="beforeInteractive">{`
-          try {
-            var stored = localStorage.getItem('paseo-theme');
-            if (stored === 'dark' || stored === 'zinc') document.documentElement.classList.add('theme-zinc');
-          } catch (e) {}
-        `}</Script>
       </head>
       <body className="bg-background text-foreground font-sans">
         {/* Dark is the signature theme — the neutral ramp and the inverted
-            (light-fill/dark-text) buttons are designed on a dark ground, and
-            `enableSystem` is dropped so a first visit lands there rather than
-            inheriting the OS preference. */}
-        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" disableTransitionOnChange>
+            (light-fill/dark-text) buttons are designed on a dark ground, so
+            `defaultTheme` lands a first visit there and `enableSystem` is
+            dropped rather than inheriting the OS preference. There is no
+            `forcedTheme`: it pins the class and silently turns every
+            `setTheme()` into a no-op, which is what broke the light/dark
+            toggle — pass `defaultTheme` alone to pick a default the user can
+            still override. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
           <AuthProvider>
             <OpenAgentsAuthProvider>
               {children}

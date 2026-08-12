@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { toast } from 'sonner';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus, FolderPlus, MessageSquarePlus } from 'lucide-react';
+import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -9,7 +11,7 @@ import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { workspaceApi } from '@/lib/api';
-import type { WorkspaceAgent } from '@/lib/types';
+import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -138,8 +140,8 @@ function DMSection({
 }
 
 export function ThreadList() {
-  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations } = useWorkspace();
-  const { sidebarToggle, isMobile, openMobileDetail, openNewThread, setViewMode } = useLayout();
+  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, workingAgentNames, completedSessionIds, updateSession, renameSession, dmConversations, createSession } = useWorkspace();
+  const { sidebarToggle, isMobile, openMobileDetail, setViewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
@@ -203,6 +205,64 @@ export function ThreadList() {
       )
     : activeSessions;
 
+  // Channels grouped by the directory they are bound to: the directory *is* the
+  // project, and a channel is one conversation inside it. Channels with no
+  // directory are plain chats and get their own group, so "no folder" stays a
+  // visible choice instead of an unlabelled remainder. `filteredSessions` is
+  // already sorted by recency and Map preserves insertion order, so both the
+  // groups and the rows inside them come out most-recent-first.
+  const groupedSessions = useMemo(() => {
+    const groups = new Map<string, { dir: string | null; sessions: WorkspaceSession[] }>();
+    for (const s of filteredSessions) {
+      const key = s.workingDir || '';
+      let group = groups.get(key);
+      if (!group) {
+        group = { dir: s.workingDir || null, sessions: [] };
+        groups.set(key, group);
+      }
+      group.sessions.push(s);
+    }
+    return [...groups.values()];
+  }, [filteredSessions]);
+
+  // Flattened render order, so the 1-9 shortcuts and the numbers shown on the
+  // rows agree with what the grouped list actually looks like.
+  const visualOrder = useMemo(() => groupedSessions.flatMap((g) => g.sessions), [groupedSessions]);
+  const orderIndex = useMemo(
+    () => new Map(visualOrder.map((s, i) => [s.sessionId, i])),
+    [visualOrder],
+  );
+
+  const startChannel = async (dir: string | null) => {
+    try {
+      await createSession({ workingDir: dir ?? undefined });
+      if (isMobile) openMobileDetail();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '创建频道失败');
+    }
+  };
+
+  // The OS folder dialog is opened by wwj on the desktop and can take a moment
+  // to appear. Without this the button looked dead and people clicked it twice.
+  const [browsingFolder, setBrowsingFolder] = useState(false);
+
+  const addProjectFolder = async () => {
+    if (browsingFolder) return;
+    setBrowsingFolder(true);
+    try {
+      const dir = await browseForFolder();
+      if (dir) await startChannel(dir);
+    } catch (e) {
+      toast.error(
+        e instanceof Error
+          ? `无法连接本机的 wwj(${e.message})。请确认 \`wwj up\` 正在运行。`
+          : '打开文件夹选择框失败。',
+      );
+    } finally {
+      setBrowsingFolder(false);
+    }
+  };
+
   // Keyboard shortcuts:
   //   1-9  → open the Nth visible thread (mirrors monitor mode's 1-6)
   //   i    → focus the chat input of the current thread
@@ -222,7 +282,7 @@ export function ThreadList() {
       // navigating with the keyboard and presses 'i' explicitly to type.
       const num = parseInt(e.key, 10);
       if (num >= 1 && num <= 9) {
-        const session = activeSessions[num - 1];
+        const session = visualOrder[num - 1];
         if (session) {
           e.preventDefault();
           setCurrentSessionId(session.sessionId, { skipFocus: true });
@@ -244,7 +304,7 @@ export function ThreadList() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeSessions, currentSessionId, isMobile, setCurrentSessionId, openMobileDetail]);
+  }, [visualOrder, currentSessionId, isMobile, setCurrentSessionId, openMobileDetail]);
 
   return (
     <div className="flex flex-col h-full">
@@ -275,14 +335,28 @@ export function ThreadList() {
         </div>
       </div>
 
-      {/* New Thread Button matching mockup */}
-      <div className="px-2.5 pt-2 pb-1 shrink-0">
+      {/* The two ways to start, side by side and with no dialog in between.
+          Which directory a channel belongs to is decided by *where* you start
+          it — here, or from a project group's + below — so there is never a
+          separate "pick a folder" step to get wrong. */}
+      <div className="px-2.5 pt-2 pb-1 shrink-0 flex gap-1.5">
         <button
-          onClick={openNewThread}
-          className="w-full flex items-center justify-center gap-1.5 h-8 rounded-lg bg-surface2 border border-border/80 text-[12.5px] font-medium text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+          onClick={() => startChannel(null)}
+          className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-surface2 border border-border/80 text-[12.5px] font-medium text-foreground hover:bg-surface3 transition-colors cursor-pointer"
         >
-          <Plus className="size-3.5 text-foreground-extra-muted" />
-          <span>新建线程</span>
+          <MessageSquarePlus className="size-3.5 text-foreground-extra-muted" />
+          <span>直接对话</span>
+        </button>
+        <button
+          onClick={addProjectFolder}
+          disabled={browsingFolder}
+          title="选择一个项目目录,并在其中开始一个频道"
+          className="flex items-center justify-center gap-1.5 h-8 px-2.5 rounded-lg bg-surface2 border border-border/80 text-[12.5px] font-medium text-foreground hover:bg-surface3 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-default"
+        >
+          {browsingFolder
+            ? <Loader2 className="size-3.5 animate-spin text-foreground-extra-muted" />
+            : <FolderPlus className="size-3.5 text-foreground-extra-muted" />}
+          <span>{browsingFolder ? '选择中…' : '项目'}</span>
         </button>
       </div>
 
@@ -303,7 +377,12 @@ export function ThreadList() {
           </span>
         </div>
         {agents.map((a) => {
-          const isWorking = activeSessionIds.has(a.agentName);
+          // Working means "this agent is producing output", not "a channel it
+          // belongs to is busy": channels default to every agent in the
+          // workspace and only one of them answers, so membership lit the whole
+          // roster for a single reply. workingAgentNames is attributed from the
+          // status stream — see setSessionActive in workspace-context.
+          const isWorking = workingAgentNames.has(a.agentName);
           const isOffline = a.status !== 'online';
           const statusLabel = isOffline ? 'offline' : isWorking ? 'working' : 'idle';
           return (
@@ -345,11 +424,29 @@ export function ThreadList() {
 
       {/* Thread rows */}
       <div className="flex-1 overflow-y-auto px-2 py-1">
-        <div className="px-2 mt-1 mb-1">
-          <span className="text-[11px] font-semibold text-foreground-muted">Threads</span>
-        </div>
         <div className="space-y-1">
-          {filteredSessions.map((session, idx) => {
+          {groupedSessions.map((group) => (
+          <div key={group.dir ?? '__no_folder__'} className="mb-2">
+            <div className="flex items-center gap-1.5 px-2 mt-1 mb-0.5">
+              <span
+                className="text-[11px] font-semibold text-foreground-muted truncate"
+                title={group.dir ?? '不绑定任何目录 — agent 不会读写本地文件'}
+              >
+                {group.dir ? basename(group.dir) : '直接对话'}
+              </span>
+              <span className="text-[10px] font-mono tabular-nums text-foreground-extra-muted shrink-0">
+                {group.sessions.length}
+              </span>
+              <button
+                onClick={() => startChannel(group.dir)}
+                title={group.dir ? `在 ${group.dir} 下新建频道` : '新建一个不绑定目录的对话'}
+                className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+              >
+                <Plus className="size-3" />
+              </button>
+            </div>
+          {group.sessions.map((session) => {
+            const idx = orderIndex.get(session.sessionId) ?? 0;
             const isSelected = session.sessionId === currentSessionId;
             const lastMsg = lastMessageBySession[session.sessionId];
             const isActive = activeSessionIds.has(session.sessionId);
@@ -516,6 +613,8 @@ export function ThreadList() {
               </div>
             );
           })}
+          </div>
+          ))}
 
           {filteredSessions.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -526,14 +625,14 @@ export function ThreadList() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm">No threads yet</p>
-                  <p className="text-xs mt-1">Create a thread to start chatting</p>
+                  <p className="text-sm">还没有频道</p>
+                  <p className="text-xs mt-1">直接开始对话,或先选一个项目目录</p>
                   <button
-                    onClick={openNewThread}
-                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+                    onClick={() => startChannel(null)}
+                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors cursor-pointer"
                   >
                     <MessageCircle className="size-3.5" />
-                    New Thread
+                    直接对话
                   </button>
                 </>
               )}

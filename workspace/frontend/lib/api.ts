@@ -103,6 +103,20 @@ class WorkspaceApi {
     if (bearerToken !== undefined) this.bearerToken = bearerToken;
   }
 
+  /**
+   * Set only the workspace id, leaving the tokens alone.
+   *
+   * The provider calls this during render, because configure() cannot run early
+   * enough: it lives in an effect, child effects run before parent effects, and
+   * on desktop it additionally awaits a bridge call for the token. Anything a
+   * child fired on mount therefore raced an empty workspaceId. The id is known
+   * synchronously from the route, so nothing has to wait for it — only the
+   * tokens do.
+   */
+  setWorkspaceId(workspaceId: string) {
+    if (workspaceId) this.workspaceId = workspaceId;
+  }
+
   setBearerToken(bearerToken: string) {
     this.bearerToken = bearerToken;
   }
@@ -294,9 +308,11 @@ class WorkspaceApi {
   }
 
   /** Launch an agent runtime automatically in the backend. */
-  async launchAgent(agentName: string): Promise<{ message: string; agent_name: string; status: string }> {
+  async launchAgent(agentName: string, workingDir?: string): Promise<{ message: string; agent_name: string; status: string }> {
+    const params = new URLSearchParams({ network: this.workspaceId });
+    if (workingDir) params.set('working_dir', workingDir);
     return this.request<{ message: string; agent_name: string; status: string }>(
-      `/v1/agents/${encodeURIComponent(agentName)}/launch?network=${this.workspaceId}`,
+      `/v1/agents/${encodeURIComponent(agentName)}/launch?${params}`,
       { method: 'POST' }
     );
   }
@@ -335,7 +351,7 @@ class WorkspaceApi {
       sessionId: channelName,
       workspaceId: this.workspaceId,
       createdBy: 'human:user',
-      title: opts.title || 'New Thread',
+      title: opts.title || 'New Channel',
       status: 'active',
       starred: false,
       participants: opts.participants || [],
@@ -1378,35 +1394,55 @@ class WorkspaceApi {
   // ---------------------------------------------------------------------------
   // Git (read-only surface used by the workspace chrome)
   //
-  // `agentName` is how the server picks WHICH repository to report on: it maps
-  // the agent to its registered working directory. Passing it is not optional
-  // in practice — without it the server falls back to its own checkout, which
-  // is never the repo the user is looking at.
+  // `channelId` is how the server picks WHICH repository to report on: it reads
+  // the channel row's working directory server-side. Git state belongs to the
+  // project the channel is bound to, not to whichever agent happens to be in
+  // the room — an agent's working directory is fixed at launch and identical
+  // across every channel it joins, which made every channel report the same
+  // repository. The path is never sent from here, only the channel reference.
   // ---------------------------------------------------------------------------
 
-  async getGitStatus(agentName: string): Promise<import('./use-git-status').GitStatus> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+  async getGitStatus(channelId: string): Promise<import('./use-git-status').GitStatus> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
     return this.request<import('./use-git-status').GitStatus>(`/v1/git/status?${params}`);
   }
 
-  async stageGitFiles(agentName: string, files: string[]): Promise<void> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+  async stageGitFiles(channelId: string, files: string[]): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
     await this.request<unknown>(`/v1/git/stage?${params}`, {
       method: 'POST',
       body: JSON.stringify({ files }),
     });
   }
 
-  async unstageGitFiles(agentName: string, files: string[]): Promise<void> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+  async unstageGitFiles(channelId: string, files: string[]): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
     await this.request<unknown>(`/v1/git/unstage?${params}`, {
       method: 'POST',
       body: JSON.stringify({ files }),
     });
   }
 
-  async createGitCommit(agentName: string, message: string): Promise<void> {
-    const params = new URLSearchParams({ network: this.requireWorkspace(), agent_name: agentName });
+  /** Refresh remote-tracking refs. Does not touch the working tree, so it is
+   * safe to run from an ambient "sync" affordance. */
+  async fetchGitRemote(channelId: string): Promise<{ output: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
+    return this.request<{ output: string }>(`/v1/git/fetch?${params}`, { method: 'POST' });
+  }
+
+  /** Fast-forward only — the server refuses to merge or rebase on your behalf. */
+  async pullGitRemote(channelId: string): Promise<{ output: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
+    return this.request<{ output: string }>(`/v1/git/pull?${params}`, { method: 'POST' });
+  }
+
+  async pushGitRemote(channelId: string): Promise<{ output: string; branch: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
+    return this.request<{ output: string; branch: string }>(`/v1/git/push?${params}`, { method: 'POST' });
+  }
+
+  async createGitCommit(channelId: string, message: string): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
     await this.request<unknown>(`/v1/git/commit?${params}`, {
       method: 'POST',
       body: JSON.stringify({ message }),

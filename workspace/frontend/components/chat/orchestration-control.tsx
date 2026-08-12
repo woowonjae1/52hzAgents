@@ -288,8 +288,8 @@ function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, onSave }
                   type="button"
                   onClick={() => insertMention(a.agentName)}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent',
-                    i === mentionIndex && 'bg-accent',
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface2',
+                    i === mentionIndex && 'bg-surface2',
                   )}
                 >
                   <span className="font-medium">@{a.agentName}</span>

@@ -7,7 +7,6 @@ import {
   LogIn, LogOut, Shield, Moon, Sun, KeyRound, X, Crown, Users, Radar,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { ThemeSwitcher } from '@/components/layout/theme-switcher';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -79,7 +78,7 @@ function NavButton({
 
 export function SidebarContent() {
   const { viewMode, setViewMode } = useLayout();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
@@ -88,7 +87,9 @@ export function SidebarContent() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  const isDark = mounted && theme === 'dark';
+  // `resolvedTheme`, not `theme` — `theme` can be the literal string 'system',
+  // which would read as "not dark" and make the first toggle click a no-op.
+  const isDark = mounted && resolvedTheme === 'dark';
   const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
 
   const handleCopyToken = () => {
@@ -138,15 +139,13 @@ export function SidebarContent() {
           </div>
         )}
 
-        {/* Paseo theme picker — light plus the five dark tints. Its own row so it
-            doesn't compete with the icon buttons for width; move it into the
-            settings dialog if the footer gets busier. */}
-        <ThemeSwitcher className="mb-2" />
-
         <div className="flex items-center gap-1">
+          {/* The single light/dark control. A separate swatch picker used to sit
+              above this row offering the same two choices, which meant two
+              controls for one setting. */}
           <button
             onClick={toggleTheme}
-            className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
+            className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
             title={isDark ? 'Light Mode' : 'Dark Mode'}
           >
             {isDark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}

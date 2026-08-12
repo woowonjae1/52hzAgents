@@ -307,9 +307,13 @@ const buttonVariants = cva(
           'bg-transparent text-destructive/90 hover:bg-destructive/5 data-[state=open]:bg-destructive/5',
       },
       {
+        // Was `text-muted-foreground`, a dimmer tier than the `ghost` base's
+        // `text-foreground-muted` — icon-only ghost buttons (the overflow
+        // "..." menu, toolbar icons) had no text label to lean on yet were
+        // rendered fainter than their text counterparts.
         variant: 'ghost',
         mode: 'icon',
-        className: 'text-muted-foreground',
+        className: 'text-foreground-muted',
       },
 
       // Size

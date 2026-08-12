@@ -44,9 +44,12 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       className={cn(
         'flex cursor-default gap-2 select-none items-center rounded-md px-2 py-1.5 text-sm outline-hidden',
-        'focus:bg-accent focus:text-foreground',
-        'data-[state=open]:bg-accent data-[state=open]:text-foreground',
-        'data-[here=true]:bg-accent data-[here=true]:text-foreground',
+        // `bg-accent` is the achromatic near-white brand fill (pairs with
+        // `text-accent-foreground`), not a subtle hover tint — using it here
+        // with the default text color produced near-white-on-near-white.
+        'focus:bg-surface2',
+        'data-[state=open]:bg-surface2',
+        'data-[here=true]:bg-surface2',
         '[&>svg]:pointer-events-none [&_svg:not([role=img]):not([class*=text-])]:opacity-60 [&>svg]:size-4 [&>svg]:shrink-0',
         inset && 'ps-8',
         className,
@@ -120,7 +123,8 @@ function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       className={cn(
         'text-foreground relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-hidden transition-colors data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([role=img]):not([class*=text-])]:opacity-60 [&_svg:not([class*=size-])]:size-4 [&_svg]:shrink-0',
-        'focus:bg-accent focus:text-foreground',
+        // Same near-white-on-near-white issue as the sub-trigger above.
+        'focus:bg-surface2',
         'data-[active=true]:bg-accent data-[active=true]:text-accent-foreground',
         inset && 'ps-8',
         variant === 'destructive' &&

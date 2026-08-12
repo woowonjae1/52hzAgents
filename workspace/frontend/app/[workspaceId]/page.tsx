@@ -64,22 +64,16 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     }
   }, [workspaceId, token]);
 
-  // `hasBridge`/`cachedToken` can only be known once this runs in the browser,
-  // so they start at the SAME value the server rendered (false / null) and are
-  // filled in by an effect after mount. Reading `window`/`localStorage` inline
-  // during render — as this did before — makes the very first client render
-  // (the one React hydrates against) diverge from the server-rendered HTML
-  // whenever a token happens to be cached, and that mismatch is what backs
-  // React into discarding the server tree and re-rendering from scratch.
-  const [mounted, setMounted] = useState(() => typeof window !== 'undefined');
-  const [cachedToken, setCachedToken] = useState<string | null>(() => {
-    if (typeof window !== 'undefined' && !token) {
-      try {
-        return localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token') || '';
-      } catch {}
-    }
-    return null;
-  });
+  // `cachedToken` can only be known once this runs in the browser, so it
+  // starts at the SAME value on the server and the client's first render
+  // (null) and is filled in by an effect after mount. A *lazy* useState
+  // initializer does NOT achieve this — `typeof window !== 'undefined'` is
+  // true during the client's hydration render too, so it would compute a
+  // different value there than the server did, which is exactly the
+  // server/client mismatch that makes React discard the tree and cause the
+  // "Hydration failed" error. Plain initial values + an effect avoids that.
+  const [mounted, setMounted] = useState(false);
+  const [cachedToken, setCachedToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -88,22 +82,20 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
       } catch {}
     }
     setMounted(true);
-    console.log('[52hzAgents Monitor] 🏢 [WorkspaceContent] Mounted for workspaceId:', workspaceId, {
-      token: token ? '[present]' : '[none]',
-      cachedToken: cachedToken ? '[present]' : '[none]',
-      timestamp: new Date().toISOString(),
-    });
   }, [token, workspaceId]);
 
-  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const effectiveInitialToken = token || cachedToken || '';
 
   if (!mounted) {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Has workspace token in URL, cached in localStorage, or local dev mode — mount WorkspaceProvider
-  if (token || cachedToken || isLocal) {
+  // Has a workspace token, either in the URL or cached in localStorage from a
+  // previous visit — mount WorkspaceProvider. No "local dev" bypass: that
+  // path had no backend counterpart and just retried a failed auth forever.
+  // `app/page.tsx` always resolves a real slug+token before navigating here,
+  // so this should be the common case on every real visit.
+  if (token || cachedToken) {
     return (
       <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>

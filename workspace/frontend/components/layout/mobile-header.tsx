@@ -42,7 +42,7 @@ export function MobileHeader() {
   const handleNewThread = () => openNewThread();
 
   const tabs: { mode: ViewMode; icon: typeof MessageSquare; label: string }[] = [
-    { mode: 'threads', icon: MessageSquare, label: 'Threads' },
+    { mode: 'threads', icon: MessageSquare, label: 'Channels' },
     { mode: 'files', icon: FileText, label: 'Files' },
     { mode: 'browser', icon: Globe, label: 'Browser' },
   ];
@@ -82,7 +82,7 @@ export function MobileHeader() {
           <button
             onClick={handleNewThread}
             className="size-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"
-            title="New Thread"
+            title="New Channel"
           >
             <Plus className="size-4" />
           </button>

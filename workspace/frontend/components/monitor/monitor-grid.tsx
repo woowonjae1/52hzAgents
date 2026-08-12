@@ -280,7 +280,7 @@ export function MonitorGrid() {
                     <button
                       key={session.sessionId}
                       onClick={() => handleSearchSelect(session.sessionId)}
-                      className="w-full text-left px-3 py-2 hover:bg-accent transition-colors flex flex-col gap-0.5"
+                      className="w-full text-left px-3 py-2 hover:bg-surface2 transition-colors flex flex-col gap-0.5"
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium truncate flex-1">

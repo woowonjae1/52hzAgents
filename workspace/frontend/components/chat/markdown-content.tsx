@@ -194,7 +194,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       // read as a foreign tint next to the neutral surfaces.
       return (
         <div className="my-3 overflow-hidden rounded-xl border border-[#2e2e2e] bg-[#1a1a1a] text-[#ececec] font-mono shadow-sm">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-[#2e2e2e]/80 bg-[#212121]/90 text-[11px] font-semibold text-[#8a8a8a]">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-[#2e2e2e]/80 bg-[#212121]/90 text-[11px] font-semibold text-[#b4b4b4]">
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-[#4d4d4d] inline-block" />
               <span>{language}</span>
@@ -207,7 +207,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="hover:text-[#ececec] text-[#8a8a8a] transition-colors cursor-pointer text-[11px]"
+              className="hover:text-[#ececec] text-[#b4b4b4] transition-colors cursor-pointer text-[11px]"
             >
               Copy
             </button>

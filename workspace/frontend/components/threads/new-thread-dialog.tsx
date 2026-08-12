@@ -9,18 +9,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { History, Check, Minus, Folder, MessageCircle } from 'lucide-react';
+import { History, Check, Minus, Folder } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-
-/**
- * wwj (the local agent connector daemon) runs on the actual desktop and can
- * show a genuine native OS folder dialog — no in-page directory browser to
- * build or maintain. Only works when wwj runs on the same machine as this
- * browser tab, which is the only case where "pick a local folder" makes
- * sense in the first place (see the comment on `openFolder` state below).
- */
-const WWJ_BROWSE_URL = process.env.NEXT_PUBLIC_WWJ_BROWSE_URL || 'http://127.0.0.1:47893';
+import { ProjectFolderPicker, rememberWorkingDir } from '@/components/chat/project-folder-picker';
 
 interface NewThreadDialogProps {
   open: boolean;
@@ -29,10 +21,13 @@ interface NewThreadDialogProps {
   sessions?: WorkspaceSession[];
   /** Pre-checked agents when the dialog opens — normally the current thread's members. */
   defaultParticipants?: string[];
+  /** Directory to prefill — normally the current thread's, so "another thread on
+   * the same project" needs no folder step at all. */
+  defaultWorkingDir?: string | null;
   onCreateThread: (opts: { participants: string[]; resumeFrom?: string; workingDir?: string }) => void;
 }
 
-export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultParticipants, onCreateThread }: NewThreadDialogProps) {
+export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultParticipants, defaultWorkingDir, onCreateThread }: NewThreadDialogProps) {
   // Only show online agents in the picker
   const onlineAgents = agents.filter((a) => a.status === 'online');
   const offlineAgentCount = agents.length - onlineAgents.length;
@@ -40,35 +35,11 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [resumeFrom, setResumeFrom] = useState<string>('');
-  // "Open Folder" is a per-thread choice, not a per-agent one — see the
+  // The directory is a per-thread choice, not a per-agent one — see the
   // architecture note in new-thread-dialog-host.tsx / workspace-context.tsx
-  // createSession().
-  const [openFolder, setOpenFolder] = useState(false);
+  // createSession(). Empty means a plain chat with no filesystem access; there
+  // is no separate mode flag, the field's emptiness *is* the mode.
   const [workingDir, setWorkingDir] = useState('');
-  const [browsing, setBrowsing] = useState(false);
-  const [browseError, setBrowseError] = useState<string | null>(null);
-
-  const handleBrowse = async () => {
-    setBrowsing(true);
-    setBrowseError(null);
-    try {
-      const res = await fetch(`${WWJ_BROWSE_URL}/browse-folder`);
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({} as { error?: string }));
-        throw new Error(body.error || `HTTP ${res.status}`);
-      }
-      const data: { path: string | null } = await res.json();
-      if (data.path) setWorkingDir(data.path);
-    } catch (e) {
-      setBrowseError(
-        e instanceof Error
-          ? `Can't reach wwj on this machine (${e.message}). Make sure "wwj up" is running, or type the path below.`
-          : 'Failed to open the folder dialog.'
-      );
-    } finally {
-      setBrowsing(false);
-    }
-  };
 
   const isAllSelected = onlineAgents.length > 0 && selected.size === onlineAgents.length;
   const isPartiallySelected = selected.size > 0 && selected.size < onlineAgents.length;
@@ -89,9 +60,11 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
         setSelected(onlineAgents.length === 1 ? new Set([onlineAgents[0].agentName]) : new Set());
       }
       setResumeFrom('');
-      setOpenFolder(false);
+      // Deliberately empty. Prefilling the last-used directory meant "I didn't
+      // pick a folder" silently became "bind the folder I used last time" — the
+      // recent-directory chips under the field already remove the re-Browse
+      // cost without making the default a decision nobody made.
       setWorkingDir('');
-      setBrowseError(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -113,15 +86,16 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
     // only required by "master" orchestration mode).
     const participants = agentNames.filter((n) => selected.has(n));
     const trimmedDir = workingDir.trim();
+    rememberWorkingDir(trimmedDir);
     onCreateThread({
       participants,
       resumeFrom: resumeFrom || undefined,
-      workingDir: openFolder && trimmedDir ? trimmedDir : undefined,
+      workingDir: trimmedDir || undefined,
     });
     onOpenChange(false);
   };
 
-  const canCreate = selected.size > 0 && (!openFolder || workingDir.trim().length > 0);
+  const canCreate = selected.size > 0;
 
   // Filter sessions that have messages (lastEventAt != null) for resume picker
   const resumableSessions = (sessions || []).filter(
@@ -143,60 +117,26 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
-        <DialogTitle>New Thread</DialogTitle>
+        <DialogTitle>New Channel</DialogTitle>
         <DialogDescription className="text-sm text-muted-foreground">
           {multipleAgents
             ? 'Pick which agents join this conversation.'
             : 'Start a new conversation with your agent.'}
         </DialogDescription>
 
-        {/* Chat vs Open Folder — a per-thread choice. See the state comment above. */}
-        <div className="mt-3 flex gap-1.5 rounded-lg bg-surface1 p-1">
-          <button
-            type="button"
-            onClick={() => setOpenFolder(false)}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors',
-              !openFolder ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <MessageCircle className="size-3.5" />
-            Chat
-          </button>
-          <button
-            type="button"
-            onClick={() => setOpenFolder(true)}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors',
-              openFolder ? 'bg-card shadow-sm' : 'text-muted-foreground hover:text-foreground'
-            )}
-          >
-            <Folder className="size-3.5" />
-            Open Folder
-          </button>
+        {/* One optional field, not a mode switch: empty = plain chat, filled =
+            the agents get filesystem access there. See the state comment above. */}
+        <div className="mt-3">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
+            <Folder className="size-3" />
+            项目目录(可选)
+          </label>
+          <ProjectFolderPicker
+            value={workingDir}
+            onChange={setWorkingDir}
+            helperText="留空则是不接触文件系统的普通对话。"
+          />
         </div>
-        {openFolder && (
-          <div className="mt-2">
-            <div className="flex gap-1.5">
-              <input
-                type="text"
-                value={workingDir}
-                onChange={(e) => setWorkingDir(e.target.value)}
-                placeholder="D:\code\my-project"
-                className="flex-1 text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <Button variant="outline" size="sm" onClick={handleBrowse} disabled={browsing}>
-                {browsing ? 'Waiting…' : 'Browse…'}
-              </Button>
-            </div>
-            <p className="mt-1 px-0.5 text-[11px] text-muted-foreground/70">
-              Local absolute path on the machine running the agent. Agents in this thread read/edit files there.
-            </p>
-            {browseError && (
-              <p className="mt-1 px-0.5 text-[11px] text-status-danger">{browseError}</p>
-            )}
-          </div>
-        )}
 
         {/* Select All Control */}
         {onlineAgents.length > 0 && (
@@ -313,7 +253,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             disabled={!canCreate}
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
           >
-            {resumeFrom ? 'Resume Thread' : 'Start Thread'}
+            {resumeFrom ? 'Resume Channel' : 'Start Channel'}
           </Button>
         </div>
       </DialogContent>

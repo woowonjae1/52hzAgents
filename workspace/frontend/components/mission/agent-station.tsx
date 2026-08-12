@@ -136,7 +136,7 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1 text-[11px] font-semibold text-foreground-extra-muted">
             <MessageSquare className="size-3" />
-            Threads · {activeThreadCount}
+            Channels · {activeThreadCount}
           </span>
           <div className="flex items-center gap-2 text-[9px] font-semibold text-foreground-extra-muted">
             <span className="flex items-center gap-1">

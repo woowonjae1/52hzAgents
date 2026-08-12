@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ArrowUp, Paperclip, X, FileIcon, ImageIcon, Plus, CalendarClock, FolderOpen } from 'lucide-react';
+import { ArrowUp, Paperclip, X, FileIcon, ImageIcon, Plus, CalendarClock, FolderOpen, Square } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,13 +31,26 @@ interface ChatInputProps {
   /** Auto-focus the textarea when mounted or when this key changes. */
   focusKey?: number;
   onCreateRoutine?: () => void;
+  /** Absolute working directory of the thread's repository, if any. */
+  workingDir?: string;
+  /** Agents are replying: the send button becomes a stop button. */
+  isWorking?: boolean;
+  /** Stop already requested — keeps the button visible but inert. */
+  stopping?: boolean;
+  onStop?: () => void;
+}
+
+/** Last path segment of a POSIX or Windows path, for the composer's dir pill. */
+function basename(dir: string): string {
+  const parts = dir.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? dir;
 }
 
 function isImageFile(file: File): boolean {
   return file.type.startsWith('image/');
 }
 
-export function ChatInput({ onSend, disabled, className, agents = [], knowledge = [], draft, onDraftChange, onFocusChange, focusKey, onCreateRoutine }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, className, agents = [], knowledge = [], draft, onDraftChange, onFocusChange, focusKey, onCreateRoutine, workingDir, isWorking, stopping, onStop }: ChatInputProps) {
   const [message, setMessage] = React.useState(draft ?? '');
   const [showMentions, setShowMentions] = React.useState(false);
   const [mentionFilter, setMentionFilter] = React.useState('');
@@ -335,8 +348,8 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
               <button
                 key={agent.agentName}
                 className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                  idx === mentionIndex && 'bg-accent'
+                  'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-surface2 transition-colors',
+                  idx === mentionIndex && 'bg-surface2'
                 )}
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -371,8 +384,8 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                   <button
                     key={entry.id}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-accent transition-colors',
-                      idx === mentionIndex && 'bg-accent'
+                      'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-surface2 transition-colors',
+                      idx === mentionIndex && 'bg-surface2'
                     )}
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -541,32 +554,49 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Embedded Pills inside input box matching mockup */}
-            <div className="flex items-center gap-1.5 ml-1.5 border-l border-border/60 pl-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground-muted">
-                <FolderOpen className="size-3 text-foreground-extra-muted" />
-                my-project
-              </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground-muted">
-                Build
-              </span>
-            </div>
-          </div>
-          {/* Circular 28px up-arrow send button */}
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!hasContent || disabled}
-            className={cn(
-              'size-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0',
-              hasContent
-                ? 'bg-foreground text-background hover:opacity-90 shadow-xs'
-                : 'bg-surface3 text-foreground-extra-muted opacity-40 cursor-not-allowed'
+            {/* Working directory of the thread's repository. Absent until git
+                status resolves, or when no participant works in a checkout. */}
+            {workingDir && (
+              <div className="flex items-center gap-1.5 ml-1.5 border-l border-border/60 pl-2">
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3/80 border border-border-accent/60 text-foreground-muted"
+                  title={workingDir}
+                >
+                  <FolderOpen className="size-3 text-foreground-extra-muted" />
+                  {basename(workingDir)}
+                </span>
+              </div>
             )}
-            title="Send message"
-          >
-            <ArrowUp className="size-3.5" strokeWidth={2.5} />
-          </button>
+          </div>
+          {/* Circular 28px button: sends, or stops while agents are replying.
+              One control in one place — you cannot send during a reply anyway,
+              so the send affordance is free real estate for the stop. */}
+          {isWorking ? (
+            <button
+              type="button"
+              onClick={onStop}
+              disabled={stopping}
+              className="size-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 bg-status-danger text-white hover:opacity-90 shadow-xs disabled:opacity-50 disabled:pointer-events-none"
+              title={stopping ? 'Stopping…' : 'Stop'}
+            >
+              <Square className="size-3 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!hasContent || disabled}
+              className={cn(
+                'size-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0',
+                hasContent
+                  ? 'bg-foreground text-background hover:opacity-90 shadow-xs'
+                  : 'bg-surface3 text-foreground-extra-muted opacity-40 cursor-not-allowed'
+              )}
+              title="Send message"
+            >
+              <ArrowUp className="size-3.5" strokeWidth={2.5} />
+            </button>
+          )}
         </div>
       </div>
     </div>
