@@ -72,8 +72,15 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   // different value there than the server did, which is exactly the
   // server/client mismatch that makes React discard the tree and cause the
   // "Hydration failed" error. Plain initial values + an effect avoids that.
-  const [mounted, setMounted] = useState(false);
-  const [cachedToken, setCachedToken] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(() => typeof window !== 'undefined');
+  const [cachedToken, setCachedToken] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && !token) {
+      try {
+        return localStorage.getItem(`workspace_token_${workspaceId}`) || localStorage.getItem('workspace_token') || '';
+      } catch {}
+    }
+    return null;
+  });
 
   useEffect(() => {
     if (!token) {
