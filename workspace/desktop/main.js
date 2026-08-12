@@ -122,11 +122,10 @@ function createMainWindow() {
     backgroundColor: '#0e0e10',
     darkTheme: true,
     show: false,
-    frame: true, // Native titlebar with dark window title overlay matching ChatGPT/Claude
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: '#161618',
-      symbolColor: '#a1a1aa',
+      color: 'rgba(0, 0, 0, 0)',
+      symbolColor: '#8a8a8a',
       height: 38,
     },
     webPreferences: {

@@ -57,10 +57,10 @@ function WorkspaceLoadingScreen() {
 
 export function Wrapper() {
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, sidebarWidth, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
-  const { monitorMode, agents, loading } = useWorkspace();
+  const { monitorMode, agents, loading, workspace } = useWorkspace();
   const hasAgents = agents.length > 0;
 
-  if (loading) {
+  if (loading && !workspace) {
     return <WorkspaceLoadingScreen />;
   }
 
