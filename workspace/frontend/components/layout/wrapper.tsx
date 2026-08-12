@@ -130,9 +130,12 @@ export function Wrapper() {
     );
   }
 
+  const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+
   // ── Desktop layout: sidebar + center chat + collapsible right preview ──
   return (
-    <div className="flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
+    <div className={cn("flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5", isDesktop && "pt-7")}>
+      {isDesktop && <div className="fixed top-0 left-0 right-0 h-7 [app-region:drag] z-40 select-none pointer-events-auto" />}
       {!isDetailExpanded && <Sidebar />}
 
       <div className="flex flex-col flex-grow min-w-0 w-full">

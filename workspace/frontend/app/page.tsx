@@ -439,6 +439,31 @@ function resolveWorkspaceToken(workspace: WorkspaceSummary): string | undefined 
   }
 }
 
+/**
+ * Auto-enter breaker. The dashboard redirects into a workspace on mount, and the
+ * workspace route can send you back here; without a memory of "we just did
+ * this", the two bounce off each other indefinitely. sessionStorage is the right
+ * scope: it survives a reload of this window (so a reload-driven bounce is also
+ * caught) and dies with the window.
+ */
+const AUTO_ENTER_KEY = 'auto_entered_at';
+const AUTO_ENTER_COOLDOWN_MS = 15_000;
+
+function justAutoEntered(): boolean {
+  try {
+    const at = Number(sessionStorage.getItem(AUTO_ENTER_KEY) || 0);
+    return at > 0 && Date.now() - at < AUTO_ENTER_COOLDOWN_MS;
+  } catch {
+    return false;
+  }
+}
+
+function markAutoEntered() {
+  try {
+    sessionStorage.setItem(AUTO_ENTER_KEY, String(Date.now()));
+  } catch {}
+}
+
 function enterWorkspace(workspace: WorkspaceSummary, router: ReturnType<typeof useRouter>) {
   const cachedToken = resolveWorkspaceToken(workspace);
   if (typeof window !== 'undefined') {
@@ -533,6 +558,18 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
   // the grid below. Zero workspaces is handled by the effect after this one.
   useEffect(() => {
     if (loading || redirecting || workspaces.length === 0) return;
+    // `redirecting` only guards a single mount. When the workspace route sends
+    // you back to `/` — expired token, a failed load, a reload that lands on
+    // the root URL — this effect ran again and pushed you straight back in, and
+    // the two sides ping-ponged: dashboard, workspace, dashboard, forever. From
+    // the outside that reads as the window reloading on its own, flashing the
+    // "Loading your workspace…" splash each time.
+    //
+    // So auto-enter is rate-limited rather than unconditional: if we just did it
+    // and we are somehow back here, stop and let the dashboard show why. A
+    // genuine later visit is well outside the window and still lands directly
+    // in the workspace.
+    if (justAutoEntered()) return;
     let target: WorkspaceSummary | undefined;
     try {
       const lastSlug = localStorage.getItem('last_workspace_slug');
@@ -541,6 +578,7 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
     if (!target && workspaces.length === 1) target = workspaces[0];
     if (!target) return;
     setRedirecting(true);
+    markAutoEntered();
     enterWorkspace(target, router);
   }, [loading, redirecting, workspaces, router]);
 
@@ -549,7 +587,11 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
   // one, the same way `wwj workspace create` would, and land straight in it.
   useEffect(() => {
     if (!autoCreateIfEmpty || loading || redirecting || error || workspaces.length > 0) return;
+    // Same breaker as above, and here it also stops a bounce from provisioning a
+    // second, third, fourth workspace on each pass.
+    if (justAutoEntered()) return;
     setRedirecting(true);
+    markAutoEntered();
     createWorkspace('local', 'My Workspace')
       .then((ws) => {
         enterWorkspace(

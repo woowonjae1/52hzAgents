@@ -4,10 +4,11 @@
 # required) and the Next.js frontend with hot reload. Data lives under
 # workspace/.dev-sqlite so it survives restarts.
 #
-#   .\workspace\dev-sqlite.ps1            # start both
+#   .\workspace\dev-sqlite.ps1            # start both (no-op if already up)
 #   .\workspace\dev-sqlite.ps1 -Stop      # stop both
+#   .\workspace\dev-sqlite.ps1 -Force     # restart even if already up
 [CmdletBinding()]
-param([switch]$Stop)
+param([switch]$Stop, [switch]$Force)
 
 $ErrorActionPreference = 'Stop'
 $workspaceRoot = $PSScriptRoot
@@ -39,6 +40,24 @@ function Stop-Managed {
             }
         }
     } finally { Remove-Item $statePath -Force -ErrorAction SilentlyContinue }
+}
+
+# Starting is not the same as restarting. Stop-Managed below kills whatever is
+# already running, so a second caller — the desktop app spawns this script when
+# its readiness probe fails — used to tear down a healthy stack and rebuild it,
+# which is how one failed probe became an endless reload loop. If the stack is
+# already answering, attach to it and leave it alone.
+if (-not $Stop -and -not $Force) {
+    $alreadyUp = $false
+    try {
+        $probe = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:3005/' -TimeoutSec 3
+        if ($probe.StatusCode -lt 500) { $alreadyUp = $true }
+    } catch { $alreadyUp = $false }
+    if ($alreadyUp) {
+        Write-Host 'Local dev stack is already running at http://localhost:3005 — attaching, nothing was restarted.' -ForegroundColor Green
+        Write-Host 'Use -Force to restart it, or -Stop to shut it down.' -ForegroundColor DarkGray
+        return
+    }
 }
 
 Stop-Managed

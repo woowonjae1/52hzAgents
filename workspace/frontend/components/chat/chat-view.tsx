@@ -606,11 +606,13 @@ export function ChatView() {
     );
   }
 
+  const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+
   return (
     <div className="flex flex-col h-full bg-surface0">
       {/* Thread header */}
-      <div className="flex items-center gap-2 px-4 lg:px-6 py-3 border-b border-border/80 shrink-0 bg-surface0 sticky top-0 z-10">
-        <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
+      <div className={`flex items-center gap-2 px-4 lg:px-6 py-3 border-b border-border/80 shrink-0 bg-surface0 sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
+        <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0 [app-region:no-drag]">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
             <button
@@ -682,7 +684,7 @@ export function ChatView() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 [app-region:no-drag]">
           {/* Git — a compose surface (stage/commit/sync), not a settings
               toggle, so it keeps its own always-visible trigger rather than
               nesting a commit textarea inside the overflow menu below. */}

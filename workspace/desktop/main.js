@@ -33,20 +33,33 @@ function checkServerReady(url, callback) {
   });
 }
 
+// Once per app run, and never again. This used to spawn a stack on every
+// readiness check that happened to fail, and dev-sqlite.ps1 begins by killing
+// whatever stack is already running — so a single blip (a restart, a slow
+// compile) turned into a loop: probe fails, spawn, the new script kills the
+// stack that was coming up, the next probe fails, spawn again. The window sat
+// on "Loading your workspace…" the whole time, reloading.
+let devStackSpawned = false;
+
 function ensureDevStackRunning() {
   checkServerReady(TARGET_URL, (ready) => {
-    if (!ready) {
-      console.log('[52hzAgents Desktop] Starting dev-sqlite.ps1 stack...');
-      const scriptPath = path.resolve(__dirname, '../dev-sqlite.ps1');
-      const devServerProcess = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
-        cwd: path.resolve(__dirname, '..'),
-        detached: true,
-        stdio: 'ignore',
-      });
-      devServerProcess.unref();
-    } else {
+    if (ready) {
       console.log('[52hzAgents Desktop] Connected to local server at 127.0.0.1:3005.');
+      return;
     }
+    if (devStackSpawned) {
+      console.log('[52hzAgents Desktop] Dev stack already starting — waiting, not spawning another.');
+      return;
+    }
+    devStackSpawned = true;
+    console.log('[52hzAgents Desktop] Starting dev-sqlite.ps1 stack...');
+    const scriptPath = path.resolve(__dirname, '../dev-sqlite.ps1');
+    const devServerProcess = spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath], {
+      cwd: path.resolve(__dirname, '..'),
+      detached: true,
+      stdio: 'ignore',
+    });
+    devServerProcess.unref();
   });
 }
 
