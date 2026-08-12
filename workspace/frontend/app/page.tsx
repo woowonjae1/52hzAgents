@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { WorkspaceLoadingSplash } from './[workspaceId]/page';
+import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/page';
 import Image from 'next/image';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,
@@ -708,12 +708,15 @@ export default function HomePage() {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Bypass the landing page on local/custom domains (desktop app, self-host) —
-  // Dashboard resolves the real workspace (cached, or the only one, or
-  // silently creates one) and only falls back to a picker grid when that's
-  // genuinely ambiguous. No hardcoded slug: that was the earlier bug.
+  // Bypass landing page and dashboard redirect chain on local/custom domains (desktop app, self-host).
+  // Immediately render WorkspaceContent for instant 0-redirect load.
   if (!openAgentsAuth.isOpenAgentsDomain) {
-    return <Dashboard autoCreateIfEmpty />;
+    const slug = (typeof window !== 'undefined' && localStorage.getItem('last_workspace_slug')) || 'openagents-develop';
+    return (
+      <Suspense fallback={<WorkspaceLoadingSplash />}>
+        <WorkspaceContent workspaceId={slug} />
+      </Suspense>
+    );
   }
 
   if (user || openAgentsAuth.user) return <Dashboard />;

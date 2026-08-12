@@ -84,18 +84,15 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     setMounted(true);
   }, [token, workspaceId]);
 
+  const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const effectiveInitialToken = token || cachedToken || '';
 
   if (!mounted) {
     return <WorkspaceLoadingSplash />;
   }
 
-  // Has a workspace token, either in the URL or cached in localStorage from a
-  // previous visit — mount WorkspaceProvider. No "local dev" bypass: that
-  // path had no backend counterpart and just retried a failed auth forever.
-  // `app/page.tsx` always resolves a real slug+token before navigating here,
-  // so this should be the common case on every real visit.
-  if (token || cachedToken) {
+  // Has workspace token in URL, cached in localStorage, or running in local dev / desktop app mode — mount WorkspaceProvider
+  if (token || cachedToken || isLocal) {
     return (
       <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>
