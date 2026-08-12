@@ -113,12 +113,14 @@ function createTray() {
 }
 
 function createMainWindow() {
+  const appIconPath = path.join(__dirname, 'icon.png');
   mainWindow = new BrowserWindow({
     width: 1360,
     height: 860,
     minWidth: 960,
     minHeight: 640,
     title: '52hzAgents Workspace',
+    icon: appIconPath,
     backgroundColor: '#0e0e10',
     darkTheme: true,
     show: false,
@@ -217,8 +219,12 @@ ipcMain.on('window-close', () => mainWindow?.hide());
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false);
 
 app.whenReady().then(() => {
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.52hzagents.app');
+  }
   ensureDevStackRunning();
   createMainWindow();
+  createTray();
 
   // Register Global Hotkey (Alt + Space) to toggle desktop app anywhere on OS
   try {
