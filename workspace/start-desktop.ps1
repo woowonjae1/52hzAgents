@@ -1,6 +1,10 @@
 # 52hzAgents Desktop Launch Script
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Set domestic fast mirror for Electron binary downloads
+$env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+$env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   Starting 52hzAgents Desktop App     " -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
