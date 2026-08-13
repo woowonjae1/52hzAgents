@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/config';
 
 export function EmptyState() {
-  const { agents, token, workspaceId, createSession } = useWorkspace();
+  const { agents, token, workspaceId, createSession, setCurrentSessionId } = useWorkspace();
   const { setViewMode } = useLayout();
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const onlineAgents = agents.filter((a) => a.status === 'online');
@@ -60,6 +60,11 @@ export function EmptyState() {
   };
 
   const handleStartChat = async () => {
+    if (onlineAgents.length === 0) {
+      toast.error('目前无在线 Agent，请先连接 Agent');
+      setViewMode('mission');
+      return;
+    }
     if (participants.size === 0) {
       toast.error('请先勾选至少一个已连接的 Agent');
       return;
@@ -67,11 +72,15 @@ export function EmptyState() {
     setStarting(true);
     const dir = workingDir.trim();
     try {
-      await createSession({
+      const session = await createSession({
         participants: Array.from(participants),
         workingDir: dir || undefined,
       });
       rememberWorkingDir(dir);
+      if (session?.sessionId) {
+        setCurrentSessionId(session.sessionId);
+        setViewMode('threads');
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '创建对话失败');
     } finally {
@@ -105,12 +114,12 @@ export function EmptyState() {
 
   const startButton = (
     <button
-      disabled={starting || participants.size === 0}
+      disabled={starting || (hasAgents && participants.size === 0)}
       onClick={handleStartChat}
-      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
     >
       {starting ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
-      开始对话
+      {!hasAgents ? '连接 Agent 开始对话' : '开始对话'}
       {participants.size > 0 && <span className="opacity-70">({participants.size})</span>}
     </button>
   );
