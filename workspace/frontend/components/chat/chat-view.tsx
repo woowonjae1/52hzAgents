@@ -915,7 +915,21 @@ export function ChatView() {
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : displayMessages.length === 0 ? (
-          <EmptyState />
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-muted-foreground select-none">
+            <div className="size-12 rounded-2xl bg-surface2 flex items-center justify-center mb-3 border border-border/60 shadow-2xs">
+              <MessageSquare className="size-6 text-foreground-muted" />
+            </div>
+            <p className="text-sm font-semibold text-foreground">频道已就绪</p>
+            <p className="text-xs text-foreground-muted mt-1 max-w-sm leading-relaxed">
+              在下方输入框发送消息，开始与{' '}
+              <span className="font-medium text-foreground">
+                {currentSession?.participants?.length
+                  ? currentSession.participants.join(', ')
+                  : 'Agents'}
+              </span>{' '}
+              进行对话。
+            </p>
+          </div>
         ) : (
           <ChatMessages
             messages={displayMessages}

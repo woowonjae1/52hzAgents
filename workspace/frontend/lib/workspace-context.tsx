@@ -476,6 +476,10 @@ export function WorkspaceProvider({
         return next;
       });
     }
+    const now = Date.now();
+    setSessions((prev) =>
+      prev.map((s) => (s.sessionId === sessionId ? { ...s, lastEventAt: now } : s))
+    );
     setLastMessageBySession((prev) => {
       if (!content && !prev[sessionId]) return prev;
       const existing = prev[sessionId];
@@ -498,6 +502,12 @@ export function WorkspaceProvider({
    */
   const setSessionActive = useCallback((sessionId: string, active: boolean, agentName?: string | null) => {
     const isActive = active && !stoppingSessionIdsRef.current.has(sessionId);
+    if (isActive) {
+      const now = Date.now();
+      setSessions((prev) =>
+        prev.map((s) => (s.sessionId === sessionId ? { ...s, lastEventAt: now } : s))
+      );
+    }
     setActiveSessionIds((prev) => {
       const next = new Set(prev);
       if (isActive) next.add(sessionId);

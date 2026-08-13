@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus, FolderPlus, FolderOpen, MessageSquarePlus, History as HistoryIcon, CalendarClock } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
@@ -182,14 +182,16 @@ export function ThreadList() {
 
   const [showArchived, setShowArchived] = useState(false);
 
-  // Sort sessions by backend last_event_at (stable, no client-side jumping)
-  const sortedSessions = [...sessions]
-    .filter((s) => s.status !== 'deleted' && (!s.sessionId.startsWith('routine:') || s.sessionId === currentSessionId))
-    .sort((a, b) => {
-      const aTime = a.lastEventAt || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-      const bTime = b.lastEventAt || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-      return bTime - aTime;
-    });
+  const getSessionTime = useCallback((s: WorkspaceSession) => {
+    return s.lastEventAt || (s.createdAt ? new Date(s.createdAt).getTime() : 0);
+  }, []);
+
+  // Sort sessions by latest activity (lastEventAt, lastMessage timestamp, or createdAt)
+  const sortedSessions = useMemo(() => {
+    return [...sessions]
+      .filter((s) => s.status !== 'deleted' && (!s.sessionId.startsWith('routine:') || s.sessionId === currentSessionId))
+      .sort((a, b) => getSessionTime(b) - getSessionTime(a));
+  }, [sessions, currentSessionId, getSessionTime]);
 
   const activeSessions = sortedSessions.filter((s) => s.status === 'active');
   const archivedSessions = sortedSessions.filter((s) => s.status === 'archived');
@@ -204,25 +206,29 @@ export function ThreadList() {
       )
     : activeSessions;
 
-  // Channels grouped by the directory they are bound to: the directory *is* the
-  // project, and a channel is one conversation inside it. Channels with no
-  // directory are plain chats and get their own group, so "no folder" stays a
-  // visible choice instead of an unlabelled remainder. `filteredSessions` is
-  // already sorted by recency and Map preserves insertion order, so both the
-  // groups and the rows inside them come out most-recent-first.
+  // Channels grouped by Project Directory, sorted by most recent activity at both group & session level
   const groupedSessions = useMemo(() => {
-    const groups = new Map<string, { dir: string | null; sessions: WorkspaceSession[] }>();
+    const groups = new Map<string, { dir: string | null; maxTime: number; sessions: WorkspaceSession[] }>();
     for (const s of filteredSessions) {
       const key = s.workingDir || '';
+      const sTime = getSessionTime(s);
       let group = groups.get(key);
       if (!group) {
-        group = { dir: s.workingDir || null, sessions: [] };
+        group = { dir: s.workingDir || null, maxTime: sTime, sessions: [] };
         groups.set(key, group);
+      } else {
+        if (sTime > group.maxTime) group.maxTime = sTime;
       }
       group.sessions.push(s);
     }
-    return [...groups.values()];
-  }, [filteredSessions]);
+    // Sort project groups by most recently active group at the top
+    const groupList = [...groups.values()].sort((a, b) => b.maxTime - a.maxTime);
+    // Sort sessions within each group by recency
+    for (const g of groupList) {
+      g.sessions.sort((a, b) => getSessionTime(b) - getSessionTime(a));
+    }
+    return groupList;
+  }, [filteredSessions, getSessionTime]);
 
   // Flattened render order, so the 1-9 shortcuts and the numbers shown on the
   // rows agree with what the grouped list actually looks like.
