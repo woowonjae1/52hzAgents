@@ -309,8 +309,8 @@ export function ThreadList() {
     <div className="flex flex-col h-full">
 
 
-      {/* Top Action & Navigation Block (Antigravity 2.0 style) */}
-      <div className="px-2.5 pt-2 pb-1 shrink-0 space-y-1.5 select-none">
+      {/* Top Action & Navigation Block */}
+      <div className="px-2.5 pt-2 pb-1 shrink-0 space-y-1 select-none">
         {/* + New Conversation Primary Button */}
         <button
           onClick={() => startChannel(null)}
@@ -320,29 +320,17 @@ export function ThreadList() {
           <span>New Conversation</span>
         </button>
 
-        {/* Quick Nav Links: Conversation History & Scheduled Tasks */}
-        <div className="space-y-0.5 pt-0.5">
-          <button
-            onClick={() => setViewMode('threads')}
-            className={cn(
-              'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
-              viewMode === 'threads' ? 'bg-surface2 text-foreground font-semibold' : 'text-foreground-muted hover:text-foreground hover:bg-surface1/60'
-            )}
-          >
-            <HistoryIcon className="size-3.5 text-foreground-extra-muted shrink-0" />
-            <span>Conversation History</span>
-          </button>
-          <button
-            onClick={() => setViewMode('routines')}
-            className={cn(
-              'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
-              viewMode === 'routines' ? 'bg-surface2 text-foreground font-semibold' : 'text-foreground-muted hover:text-foreground hover:bg-surface1/60'
-            )}
-          >
-            <CalendarClock className="size-3.5 text-foreground-extra-muted shrink-0" />
-            <span>Scheduled Tasks</span>
-          </button>
-        </div>
+        {/* Quick Nav Link: Scheduled Tasks */}
+        <button
+          onClick={() => setViewMode('routines')}
+          className={cn(
+            'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
+            viewMode === 'routines' ? 'bg-surface2 text-foreground font-semibold' : 'text-foreground-muted hover:text-foreground hover:bg-surface1/60'
+          )}
+        >
+          <CalendarClock className="size-3.5 text-foreground-extra-muted shrink-0" />
+          <span>Scheduled Tasks</span>
+        </button>
       </div>
 
       {/* Agents Roster Section */}
