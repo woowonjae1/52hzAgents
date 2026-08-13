@@ -129,83 +129,85 @@ export function SidebarContent() {
           </div>
         )}
 
-        <div className="flex items-center gap-1">
-          {/* Navigation Mode Buttons: Chats, Agents, Knowledge Base */}
-          <button
-            onClick={() => setViewMode('threads')}
-            className={cn(
-              'size-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
-              viewMode === 'threads'
-                ? 'bg-surface3 text-foreground font-semibold shadow-xs'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
-            )}
-            title="Chats"
-          >
-            <MessageSquare className="size-4" />
-          </button>
-          <button
-            onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
-            className={cn(
-              'size-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
-              viewMode === 'mission' || viewMode === 'connect'
-                ? 'bg-surface3 text-foreground font-semibold shadow-xs'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
-            )}
-            title="Agents Overview"
-          >
-            <Users className="size-4" />
-          </button>
-          <button
-            onClick={() => setViewMode(viewMode === 'knowledge' ? 'threads' : 'knowledge')}
-            className={cn(
-              'size-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
-              viewMode === 'knowledge'
-                ? 'bg-surface3 text-foreground font-semibold shadow-xs'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
-            )}
-            title="Knowledge Base"
-          >
-            <BookOpen className="size-4" />
-          </button>
-
-          <div className="w-px h-4 bg-border/60 mx-1" />
-
-          {/* Theme, Token, Settings */}
-          <button
-            onClick={toggleTheme}
-            className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-            title={isDark ? 'Light Mode' : 'Dark Mode'}
-          >
-            {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </button>
-          {token && (
-            <button
-              onClick={handleCopyToken}
-              className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
-              title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
-            >
-              {tokenCopied ? <Check className="size-4" /> : <KeyRound className="size-4" />}
-            </button>
-          )}
+        <div className="flex items-center justify-between">
+          {/* Bottom Left: Settings Button (Matching Antigravity 2.0) */}
           <button
             onClick={() => setSettingsOpen(true)}
-            className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
             title="Settings"
           >
             <Settings className="size-4" />
+            <span>Settings</span>
           </button>
 
-          <div className="flex-grow" />
-
-          {isOpenAgentsDomain && !user && (
+          <div className="flex items-center gap-1">
+            {/* View Modes (Chats / Agents / Knowledge) */}
             <button
-              onClick={signIn}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              onClick={() => setViewMode('threads')}
+              className={cn(
+                'size-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
+                viewMode === 'threads'
+                  ? 'bg-surface3 text-foreground font-semibold shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
+              )}
+              title="Chats"
             >
-              <LogIn className="size-3.5" />
-              <span>Sign in</span>
+              <MessageSquare className="size-3.5" />
             </button>
-          )}
+            <button
+              onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
+              className={cn(
+                'size-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
+                viewMode === 'mission' || viewMode === 'connect'
+                  ? 'bg-surface3 text-foreground font-semibold shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
+              )}
+              title="Agents Overview"
+            >
+              <Users className="size-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode(viewMode === 'knowledge' ? 'threads' : 'knowledge')}
+              className={cn(
+                'size-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
+                viewMode === 'knowledge'
+                  ? 'bg-surface3 text-foreground font-semibold shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
+              )}
+              title="Knowledge Base"
+            >
+              <BookOpen className="size-3.5" />
+            </button>
+
+            <div className="w-px h-3.5 bg-border/60 mx-0.5" />
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="size-7 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+              title={isDark ? 'Light Mode' : 'Dark Mode'}
+            >
+              {isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+            </button>
+            {token && (
+              <button
+                onClick={handleCopyToken}
+                className="size-7 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
+              >
+                {tokenCopied ? <Check className="size-3.5" /> : <KeyRound className="size-3.5" />}
+              </button>
+            )}
+            {isOpenAgentsDomain && !user && (
+              <button
+                onClick={signIn}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              >
+                <LogIn className="size-3.5" />
+                <span>Sign in</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
