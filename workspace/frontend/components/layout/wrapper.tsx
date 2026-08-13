@@ -139,7 +139,7 @@ export function Wrapper() {
       {!isDetailExpanded && <Sidebar />}
 
       <div className="flex flex-col flex-grow min-w-0 w-full">
-        <div className="flex grow min-h-0 overflow-hidden mx-2.5 py-2.5 gap-2.5">
+        <div className="flex grow min-h-0 overflow-hidden">
           {/* Invisible spacer standing in for the fixed sidebar. Reads the same
               resizable width the sidebar itself does, so dragging the handle moves
               the main pane with it. */}
@@ -159,8 +159,8 @@ export function Wrapper() {
             </div>
           ) : (
             <>
-              {/* Column 2: Center Main Workspace */}
-              <div className="relative flex-grow flex-1 min-w-0 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm flex flex-col">
+              {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
+              <div className="relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden border-l border-border/60 flex flex-col">
                 {!isSidebarOpen && (
                   <button
                     onClick={sidebarToggle}

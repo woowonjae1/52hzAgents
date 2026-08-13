@@ -925,13 +925,13 @@ export function ChatView() {
             loadOlder={loadOlder}
             hasOlder={hasOlder}
             loadingOlder={loadingOlder}
-            className="flex-1 overflow-y-auto px-3 lg:px-5 py-3"
+            className="flex-1 overflow-y-auto px-4 lg:px-8 py-4"
           />
         )}
 
         {/* Input — hidden for read-only DM views */}
         {!isDM && (
-          <div className="px-3 lg:px-4 py-2 lg:py-3">
+          <div className="px-4 lg:px-8 py-3 lg:py-4">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
               {/* A thread with no agents gets no reply: the backend only borrows a
