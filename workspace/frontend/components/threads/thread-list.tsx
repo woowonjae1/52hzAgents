@@ -235,6 +235,7 @@ export function ThreadList() {
   const startChannel = async (dir: string | null) => {
     try {
       await createSession({ workingDir: dir ?? undefined });
+      setViewMode('threads');
       if (isMobile) openMobileDetail();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '创建频道失败');
@@ -348,7 +349,10 @@ export function ThreadList() {
               key={a.agentName}
               onClick={() => {
                 const s = activeSessions.find((session) => session.participants.includes(a.agentName));
-                if (s) setCurrentSessionId(s.sessionId);
+                if (s) {
+                  setCurrentSessionId(s.sessionId);
+                  setViewMode('threads');
+                }
               }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
               title={a.description || a.agentName}
@@ -510,6 +514,7 @@ export function ThreadList() {
                 key={session.sessionId}
                 onClick={() => {
                   setCurrentSessionId(session.sessionId);
+                  setViewMode('threads');
                   if (isMobile) openMobileDetail();
                 }}
                 className={cn(
