@@ -270,9 +270,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   useEffect(() => {
     if (!sessionId || !enabled) return;
 
-    if (!historyLoadedRef.current) {
-      loadHistory();
-    }
+    loadHistory();
 
     // Try SSE first for instant updates, fall back to polling
     const isDM = sessionId.startsWith('dm:');
