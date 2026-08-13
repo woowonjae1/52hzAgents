@@ -83,9 +83,11 @@ Set-Location -LiteralPath '$backendPath'
 `$env:FILE_STORAGE_PATH = '$filesPath'
 `$env:REQUESTS_PER_MINUTE = '1000'
 `$env:ROUTER_LLM_ENABLED = 'false'
-`$env:BROWSERFABRIC_API_KEY = 'bf_Pc6xXCw1sNKtljjEdikTEMSO2kfQ12dMNuBWWiuUyqA'
-& '$go' run ./cmd/server *>> '$backendLog'
 "@
+if ($env:BROWSERFABRIC_API_KEY) {
+    $backendCmd += "`$env:BROWSERFABRIC_API_KEY = '$($env:BROWSERFABRIC_API_KEY)'`n"
+}
+$backendCmd += "& '$go' run ./cmd/server *>> '$backendLog'"
 
 $connectorPath = Join-Path $workspaceRoot '..' | Join-Path -ChildPath 'packages\wwj'
 $connectorLog = Join-Path $runtimePath 'connector.log'
