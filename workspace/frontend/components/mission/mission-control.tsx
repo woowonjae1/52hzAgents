@@ -5,11 +5,16 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentStation, type StationData, type StationStatus } from './agent-station';
 import { ConnectAgentModal } from './connect-agent-modal';
+import { CustomAgentModal } from './custom-agent-modal';
 import { Users, Activity, Loader2, Plus, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
-import { eventToMessage, networkAgentToWorkspaceAgent, type WorkspaceAgent, type ONMEvent } from '@/lib/types';
+import { eventToMessage, networkAgentToWorkspaceAgent, type ONMEvent } from '@/lib/types';
+import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { toast } from 'sonner';
+import { ProjectFolderPicker, rememberWorkingDir, recentWorkingDirs } from '@/components/chat/project-folder-picker';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 /** One classified line in the collaboration activity feed. */
 interface ActivityLine {
@@ -60,19 +65,27 @@ export function MissionControl() {
 
   const [agentTokens, setAgentTokens] = useState<Record<string, number>>({});
   const [connectModalOpen, setConnectModalOpen] = useState(false);
+  const [customModalOpen, setCustomModalOpen] = useState(false);
 
   const handlePairAgent = async (agentName: string) => {
+    if (agentName.toLowerCase() === 'custom') {
+      setCustomModalOpen(true);
+      return;
+    }
     try {
       toast.loading(`Launching ${agentName}…`, { id: `launch-${agentName}` });
       await workspaceApi.launchAgent(agentName);
-      toast.success(`Launched ${agentName}. Finish setup in the terminal window.`, { id: `launch-${agentName}`, duration: 5000 });
-      try {
-        const discovery = await workspaceApi.discover();
-        const wsAgents = discovery.agents.map(networkAgentToWorkspaceAgent);
-        setAgents(wsAgents);
-      } catch {
-        // ignore discovery refresh glitch
-      }
+      toast.success(`Launched ${agentName}. Agent terminal window opened.`, { id: `launch-${agentName}`, duration: 5000 });
+      const pollFreshAgents = async () => {
+        try {
+          const discovery = await workspaceApi.discover();
+          const wsAgents = discovery.agents.map(networkAgentToWorkspaceAgent);
+          setAgents(wsAgents);
+        } catch {}
+      };
+      await pollFreshAgents();
+      setTimeout(pollFreshAgents, 2000);
+      setTimeout(pollFreshAgents, 5000);
     } catch (err: any) {
       const errorMsg = err?.message || 'Could not launch process';
       toast.error(`Launching ${agentName}: ${errorMsg}`, { id: `launch-${agentName}` });
@@ -110,21 +123,26 @@ export function MissionControl() {
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  const ALL_CATALOG_AGENTS: WorkspaceAgent[] = [
-    { agentName: 'claude-agent', role: 'worker', agentType: 'claude', serverHost: null, workingDir: null, description: 'Anthropic Claude Code autonomous agent', enabledSkills: null, status: 'offline', lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'codex-agent', role: 'worker', agentType: 'codex', serverHost: null, workingDir: null, description: 'OpenAI Codex code generation agent', enabledSkills: null, status: 'offline', lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'cline', role: 'worker', agentType: 'cline', serverHost: null, workingDir: null, description: 'VS Code Agent for autonomous coding', enabledSkills: null, status: 'offline', lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'hermes', role: 'worker', agentType: 'hermes', serverHost: null, workingDir: null, description: 'Autonomous agent framework for devops', enabledSkills: null, status: 'offline', lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'kilo', role: 'worker', agentType: 'kilo', serverHost: null, workingDir: null, description: 'Fast code editing & refactoring agent', enabledSkills: null, status: 'offline', lastHeartbeatAt: null, joinedAt: null },
-  ];
+  // The roster comes from the backend catalog, not a copy kept in this file —
+  // the copy drifted from /v1/agent-catalog once already.
+  const { catalog } = useAgentCatalog();
+  const allCatalogAgents = useMemo(() => catalogAsOfflineAgents(catalog), [catalog]);
 
   const stations = useMemo<StationData[]>(() => {
     const activeThreads = sessions.filter(
       (s) => s.status === 'active' && !s.sessionId.startsWith('routine:'),
     );
 
-    const existingNames = new Set(agents.map((a) => a.agentName.toLowerCase()));
-    const missingCandidates = ALL_CATALOG_AGENTS.filter((a) => !existingNames.has(a.agentName.toLowerCase()));
+    // Match on type as well as name: a connected agent called "claude-agent"
+    // already IS the Claude station, so adding the catalog's "claude" placeholder
+    // next to it showed the same runtime twice.
+    const covered = new Set<string>();
+    for (const a of agents) {
+      covered.add(a.agentName.toLowerCase());
+      if (a.agentType) covered.add(a.agentType.toLowerCase());
+    }
+    const missingCandidates = allCatalogAgents.filter((a) => !covered.has(a.agentName.toLowerCase()));
+    const placeholderNames = new Set(missingCandidates.map((a) => a.agentName.toLowerCase()));
     const displayAgents = [...agents, ...missingCandidates];
 
     return displayAgents
@@ -156,6 +174,7 @@ export function MissionControl() {
           activity,
           skillCount: installed.length,
           tokenCount: agentTokens[agent.agentName] || 0,
+          isCatalogPlaceholder: placeholderNames.has(agent.agentName.toLowerCase()),
         };
       })
       // Working agents first, then ready, then offline; stable by name within.
@@ -164,7 +183,7 @@ export function MissionControl() {
         if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
         return a.agent.agentName.localeCompare(b.agent.agentName);
       });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens]);
+  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, allCatalogAgents]);
 
   const onlineCount = agents.filter((a) => a.status === 'online').length;
   const workingCount = stations.filter((s) => s.status === 'working').length;
@@ -221,28 +240,7 @@ export function MissionControl() {
     return () => { cancelled = true; clearInterval(id); };
   }, [sessions]);
 
-  // ── Empty state: no agents connected yet ──
-  if (agents.length === 0) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-center px-6">
-        <div className="size-12 rounded-xl bg-surface2 flex items-center justify-center mb-4">
-          <Users className="size-6 text-foreground-extra-muted" />
-        </div>
-        <h2 className="text-base font-semibold text-foreground">No agents connected yet</h2>
-        <p className="text-sm text-foreground-muted mt-1 max-w-sm">
-          Connect an agent to see it here, alongside the threads it works on and the
-          activity it shares with the rest of your team.
-        </p>
-        <button
-          onClick={() => setViewMode('connect')}
-          className="mt-5 inline-flex items-center gap-1.5 h-9 px-4 rounded-lg bg-primary hover:bg-primary text-white dark:hover:bg-surface3 text-sm font-semibold transition-colors"
-        >
-          <Plus className="size-4" />
-          Connect your first agent
-        </button>
-      </div>
-    );
-  }
+
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-background">
@@ -255,28 +253,38 @@ export function MissionControl() {
           <h1 className="text-sm font-semibold text-foreground leading-tight">Overview</h1>
           <p className="text-[11px] text-foreground-extra-muted">Agents and shared activity in this workspace</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 shrink-0">
           <Stat icon={<Users className="size-3.5" />} value={`${onlineCount}/${agents.length}`} label="online" />
-          <Stat
-            icon={workingCount > 0 ? <Loader2 className="size-3.5 animate-spin" /> : <Activity className="size-3.5" />}
-            value={`${workingCount}`}
-            label="working"
-            accent={workingCount > 0}
-          />
-          {/* Scoped to the polled window, not a lifetime total — say so. */}
-          <Stat value={fmtTokens(totalTokens)} label="recent tokens" />
+          {workingCount > 0 && (
+            <Stat
+              icon={<Loader2 className="size-3.5 animate-spin" />}
+              value={`${workingCount}`}
+              label="working"
+              accent
+            />
+          )}
           <button
             onClick={() => setConnectModalOpen(true)}
-            className="ml-1 inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
-            title="Launch a local agent or pair a remote server"
+            className="inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-bold bg-primary text-white hover:bg-primary/90 transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+            title="Connect an agent to this workspace"
           >
-            <Plus className="size-3.5 shrink-0" />
-            <span className="whitespace-nowrap">Connect agent</span>
+            <Plus className="size-3.5 shrink-0 text-white" />
+            <span className="whitespace-nowrap">+ Connect agent</span>
           </button>
         </div>
       </div>
 
-      <ConnectAgentModal open={connectModalOpen} onOpenChange={setConnectModalOpen} />
+      <ConnectAgentModal
+        open={connectModalOpen}
+        onOpenChange={setConnectModalOpen}
+        onConfigureCustom={() => {
+          setConnectModalOpen(false);
+          setCustomModalOpen(true);
+        }}
+      />
+      <CustomAgentModal open={customModalOpen} onOpenChange={setCustomModalOpen} />
+
+
 
       {/* Body: agents roster + shared activity */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">

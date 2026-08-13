@@ -7,6 +7,7 @@ const { Installer } = require('./installer');
 const { Daemon } = require('./daemon');
 const { WorkspaceClient } = require('./workspace-client');
 const { GitHubClient } = require('./github-client');
+const { resolveAgentType } = require('./agent-types');
 
 /**
  * Main entry point for the agent-connector library.
@@ -53,20 +54,23 @@ class AgentConnector {
 
   // -- Install / Uninstall --
 
+  // Alias resolution happens here, before the installer keys any marker file
+  // or env bundle by type — otherwise `chatgpt` and `codex` would each get
+  // their own half of the same runtime's install state.
   async install(agentType) {
-    return this.installer.install(agentType);
+    return this.installer.install(resolveAgentType(agentType));
   }
 
   async uninstall(agentType) {
-    return this.installer.uninstall(agentType);
+    return this.installer.uninstall(resolveAgentType(agentType));
   }
 
   isInstalled(agentType) {
-    return this.installer.isInstalled(agentType);
+    return this.installer.isInstalled(resolveAgentType(agentType));
   }
 
   healthCheck(agentType) {
-    return this.installer.healthCheck(agentType);
+    return this.installer.healthCheck(resolveAgentType(agentType));
   }
 
   // -- Agent CRUD --
@@ -91,8 +95,16 @@ class AgentConnector {
     });
   }
 
-  addAgent({ name, type, role, path, env }) {
-    this.config.addAgent({ name, type: type || 'openclaw', role: role || 'worker', path, env });
+  addAgent({ name, type, role, path, env, command, args }) {
+    this.config.addAgent({
+      name,
+      type: resolveAgentType(type) || 'openclaw',
+      role: role || 'worker',
+      path,
+      env,
+      command,
+      args,
+    });
     return { success: true };
   }
 

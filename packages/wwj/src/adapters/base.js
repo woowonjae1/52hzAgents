@@ -227,6 +227,21 @@ class BaseAdapter {
       await this._skipExistingEvents();
       this._log('Starting poll loop...');
       await this._pollLoop();
+
+      if (this._running && !this._stopRequested) {
+        const msg = 'Message polling loop exited unexpectedly';
+        this._log(`CRITICAL: ${msg}`);
+        this._setExitInfo(REASON.ADAPTER_CRASHED, msg);
+        this._reportStatus(REASON.ADAPTER_CRASHED, msg);
+      }
+    } catch (e) {
+      if (!this._stopRequested) {
+        const msg = `Message polling loop crashed: ${e && e.message ? e.message : String(e)}`;
+        this._log(`CRITICAL: ${msg}`);
+        this._setExitInfo(REASON.ADAPTER_CRASHED, msg);
+        this._reportStatus(REASON.ADAPTER_CRASHED, msg);
+      }
+      throw e;
     } finally {
       this._running = false;
       this._wakeControlPoller();

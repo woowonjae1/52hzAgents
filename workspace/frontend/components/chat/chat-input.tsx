@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { WorkspaceAgent, KnowledgeEntry } from '@/lib/types';
+import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { BookOpen } from 'lucide-react';
 
@@ -107,12 +108,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
   };
 
   // Allow typing @ to mention ANY agent (online or offline) + catalog fallbacks
-  const catalogAgents: WorkspaceAgent[] = [
-    { agentName: 'claude-agent', role: 'worker', agentType: 'claude', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'openclaw', role: 'worker', agentType: 'openclaw', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'pi', role: 'worker', agentType: 'pi', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
-    { agentName: 'codex-agent', role: 'worker', agentType: 'codex', status: 'offline', serverHost: null, workingDir: null, description: null, enabledSkills: null, lastHeartbeatAt: null, joinedAt: null },
-  ];
+  const catalogAgents = catalogAsOfflineAgents(DEFAULT_AGENT_CATALOG);
 
   const availableAgents = agents.length > 0 ? agents : catalogAgents;
 

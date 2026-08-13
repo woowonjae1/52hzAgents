@@ -78,6 +78,20 @@ func resolveWorkspace(network string) (*models.Workspace, error) {
 	var ws models.Workspace
 	err := db.DB.Where("id = ? OR slug = ?", network, network).First(&ws).Error
 	if err != nil {
+		if err == gorm.ErrRecordNotFound && config.GlobalConfig != nil && config.GlobalConfig.AuthMode == "none" {
+			// Auto-create missing workspace entity in local dev mode
+			now := time.Now()
+			newWs := models.Workspace{
+				ID:             network,
+				Name:           network,
+				Slug:           network,
+				CreatedAt:      now,
+				LastActivityAt: now,
+			}
+			if createErr := db.DB.Create(&newWs).Error; createErr == nil {
+				return &newWs, nil
+			}
+		}
 		return nil, err
 	}
 	return &ws, nil

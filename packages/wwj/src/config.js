@@ -50,7 +50,7 @@ class Config {
     fs.writeFileSync(this.configFile, serializeYaml(config), 'utf-8');
   }
 
-  addAgent({ name, type, role, path: agentPath, env }) {
+  addAgent({ name, type, role, path: agentPath, env, command, args }) {
     const config = this.load();
     if (config.agents.some((a) => a.name === name)) {
       throw new Error(`Agent '${name}' already exists`);
@@ -58,6 +58,9 @@ class Config {
     const entry = { name, type: type || 'openclaw', role: role || 'worker' };
     if (agentPath) entry.path = agentPath;
     if (env && Object.keys(env).length > 0) entry.env = env;
+    // Type 'custom' has no built-in runtime — the command IS its definition.
+    if (command) entry.command = command;
+    if (Array.isArray(args) && args.length > 0) entry.args = args;
     config.agents.push(entry);
     this.save(config);
     return entry;

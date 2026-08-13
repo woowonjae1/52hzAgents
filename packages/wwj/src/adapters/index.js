@@ -20,6 +20,8 @@ const CopilotAdapter = require('./copilot');
 const ClineAdapter = require('./cline');
 const AmpAdapter = require('./amp');
 const PiAdapter = require('./pi');
+const CustomAdapter = require('./custom');
+const { AGENT_TYPE_ALIASES, resolveAgentType } = require('../agent-types');
 
 const ADAPTER_MAP = {
   openclaw: OpenClawAdapter,
@@ -37,7 +39,9 @@ const ADAPTER_MAP = {
   cline: ClineAdapter,
   amp: AmpAdapter,
   pi: PiAdapter,
-  custom: OpenClawAdapter,
+  // A user-supplied command, NOT OpenClaw. Pointing `custom` at OpenClawAdapter
+  // meant "connect a custom agent" quietly launched OpenClaw instead.
+  custom: CustomAdapter,
 };
 
 /**
@@ -47,11 +51,17 @@ const ADAPTER_MAP = {
  * @returns {BaseAdapter}
  */
 function createAdapter(type, opts) {
-  const AdapterClass = ADAPTER_MAP[type];
+  const AdapterClass = ADAPTER_MAP[resolveAgentType(type)];
   if (!AdapterClass) {
-    throw new Error(`Unknown agent type: ${type}. Supported: ${Object.keys(ADAPTER_MAP).join(', ')}`);
+    const supported = [...Object.keys(ADAPTER_MAP), ...Object.keys(AGENT_TYPE_ALIASES)].sort();
+    throw new Error(`Unknown agent type: ${type}. Supported: ${supported.join(', ')}`);
   }
   return new AdapterClass(opts);
+}
+
+/** Every type name `createAdapter` accepts, runtime types and aliases alike. */
+function knownAgentTypes() {
+  return [...Object.keys(ADAPTER_MAP), ...Object.keys(AGENT_TYPE_ALIASES)];
 }
 
 module.exports = {
@@ -71,6 +81,8 @@ module.exports = {
   ClineAdapter,
   AmpAdapter,
   PiAdapter,
+  CustomAdapter,
   createAdapter,
+  knownAgentTypes,
   ADAPTER_MAP,
 };

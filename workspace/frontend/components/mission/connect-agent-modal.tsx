@@ -5,20 +5,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { Terminal, Copy, Check, Play, Zap, Loader2, Globe, ShieldCheck } from 'lucide-react';
+import { Terminal, Copy, Check, Play, Zap, Loader2, Globe, ShieldCheck, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
+import { useAgentCatalog } from '@/lib/agent-catalog';
 
 import { getApiBaseUrl } from '@/lib/config';
 
 interface ConnectAgentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Hand off to the "add another agent" form — `custom` needs configuring, not launching. */
+  onConfigureCustom?: () => void;
 }
 
-export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps) {
+export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: ConnectAgentModalProps) {
   const { workspaceId, agents } = useWorkspace();
+  // Only fetched while the dialog is open — this is a modal, not a mounted view.
+  const { catalog } = useAgentCatalog(open);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [startingAgent, setStartingAgent] = useState<string | null>(null);
 
@@ -31,13 +36,22 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
     setTimeout(() => setCopiedCmd(false), 2000);
   };
 
+  // launchAgent, not sendAgentControl: a control event is delivered by the
+  // agent's own poller, so it only ever reached agents that were already
+  // running — exactly not the case for a card the user is clicking Connect on.
   const handleLaunchAgent = async (agentName: string) => {
+    // `custom` names no runtime — connecting it directly would start whatever
+    // the generic type happens to resolve to. Configure it instead.
+    if (agentName.toLowerCase() === 'custom') {
+      onConfigureCustom?.();
+      return;
+    }
     setStartingAgent(agentName);
     try {
-      await workspaceApi.sendAgentControl(agentName, 'start', {});
-      toast.success(`Launch signal sent to ${agentName}. Daemon is connecting…`);
-    } catch {
-      toast.info(`Sent reconnect signal to ${agentName}. Ensure the launcher daemon is running.`);
+      await workspaceApi.launchAgent(agentName);
+      toast.success(`Launching ${agentName}. Agent terminal window opened.`);
+    } catch (e) {
+      toast.error(`Could not launch ${agentName}: ${e instanceof Error ? e.message : 'unknown error'}`);
     } finally {
       setTimeout(() => setStartingAgent(null), 1500);
     }
@@ -71,58 +85,74 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
               <span className="text-[10px] text-foreground-extra-muted">One-click launch</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {agents.map((agent) => {
-                const isOnline = agent.status === 'online';
-                const isStarting = startingAgent === agent.agentName;
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
+              {(() => {
+                const CATALOG_TYPES = catalog.map((entry) => ({
+                  name: entry.name,
+                  label: entry.label,
+                  desc: entry.description,
+                }));
 
-                return (
-                  <div
-                    key={agent.agentName}
-                    className={cn(
-                      'p-3 rounded-xl border flex items-center justify-between transition-colors',
-                      isOnline
-                        ? 'bg-status-success/5 border-status-success/30'
-                        : 'bg-card border-border hover:border-border-accent',
-                    )}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={32} status={agent.status} showStatus />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground truncate">{agent.agentName}</p>
-                        <p className="text-[10px] text-foreground-extra-muted ">
-                          {agent.agentType || 'Worker'}
-                        </p>
-                      </div>
-                    </div>
+                const existingNames = new Set(agents.map((a) => a.agentName.toLowerCase()));
 
-                    <Button
-                      size="sm"
-                      variant={isOnline ? 'outline' : 'primary'}
-                      disabled={isStarting}
-                      onClick={() => handleLaunchAgent(agent.agentName)}
+                return CATALOG_TYPES.map((cat) => {
+                  const matchedAgent = agents.find(
+                    (a) => a.agentName.toLowerCase() === cat.name || a.agentType?.toLowerCase() === cat.name
+                  );
+                  const isOnline = matchedAgent?.status === 'online';
+                  const isStarting = startingAgent === cat.name;
+
+                  return (
+                    <div
+                      key={cat.name}
                       className={cn(
-                        'h-8 px-3 text-[11px] font-semibold gap-1.5 shrink-0',
-                        isOnline && 'border-status-success/40 text-status-success hover:bg-status-success/10',
+                        'p-3 rounded-xl border flex items-center justify-between transition-colors',
+                        isOnline
+                          ? 'bg-status-success/5 border-status-success/30'
+                          : 'bg-card border-border hover:border-border-accent',
                       )}
                     >
-                      {isStarting ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : isOnline ? (
-                        <>
-                          <ShieldCheck className="size-3" />
-                          <span>Running</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="size-3" />
-                          <span>Launch</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                );
-              })}
+                      <div className="flex items-center gap-3 min-w-0">
+                        <AgentAvatar name={cat.name} agentType={cat.name} size={32} status={matchedAgent?.status || 'offline'} showStatus />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">{cat.label}</p>
+                          <p className="text-[10px] text-foreground-extra-muted truncate">{cat.desc}</p>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant={isOnline ? 'outline' : 'primary'}
+                        disabled={isStarting}
+                        onClick={() => handleLaunchAgent(cat.name)}
+                        className={cn(
+                          'h-8 px-3 text-[11px] font-semibold gap-1.5 shrink-0 cursor-pointer',
+                          isOnline && 'border-status-success/40 text-status-success hover:bg-status-success/10',
+                        )}
+                      >
+                        {isStarting ? (
+                          <Loader2 className="size-3 animate-spin" />
+                        ) : isOnline ? (
+                          <>
+                            <ShieldCheck className="size-3" />
+                            <span>Running</span>
+                          </>
+                        ) : cat.name === 'custom' ? (
+                          <>
+                            <Settings2 className="size-3" />
+                            <span>Configure</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="size-3" />
+                            <span>Connect</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
 

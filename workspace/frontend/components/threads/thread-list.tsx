@@ -308,32 +308,7 @@ export function ThreadList() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-1 px-2 py-3 shrink-0">
-        {!isMobile && (
-          <button
-            onClick={sidebarToggle}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
-          >
-            <PanelLeft className="size-4" />
-          </button>
-        )}
-        <div className="flex items-center w-full gap-1">
-          <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-surface1/50 border border-border/80 focus-within:border-border-accent dark:border-border/80 dark:focus-within:border-border-accent text-muted-foreground transition-all">
-            <Search className="size-3.5 opacity-60" />
-            <input
-              type="text"
-              placeholder="Search messages..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="text-xs bg-transparent outline-none flex-1 placeholder:text-muted-foreground/70 font-medium text-foreground"
-            />
-            {searching && (
-              <div className="size-3 border-2 border-muted-foreground/30 border-t-muted-foreground rounded-full animate-spin" />
-            )}
-          </div>
-        </div>
-      </div>
+
 
       {/* The two ways to start, side by side and with no dialog in between.
           Which directory a channel belongs to is decided by *where* you start

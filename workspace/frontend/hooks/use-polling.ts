@@ -264,6 +264,8 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     }
   }, [sessionId, hasOlder, loadingOlder, dmPair]);
 
+  const sseFailedRef = useRef(false);
+
   // Initial load + SSE with polling fallback
   useEffect(() => {
     if (!sessionId || !enabled) return;
@@ -296,13 +298,14 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       schedule();
     };
 
-    if (!isDM) {
+    if (!isDM && !sseFailedRef.current) {
       try {
         const sseUrl = workspaceApi.getSSEUrl(sessionId);
-        eventSource = new EventSource(sseUrl);
+        const es = new EventSource(sseUrl);
+        eventSource = es;
         usingSSE = true;
 
-        eventSource.onmessage = (ev) => {
+        es.onmessage = (ev) => {
           if (sessionId !== currentSessionRef.current) return;
           try {
             const event = JSON.parse(ev.data);
@@ -323,13 +326,15 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
           }
         };
 
-        eventSource.onerror = () => {
-          eventSource?.close();
+        es.onerror = () => {
+          sseFailedRef.current = true;
+          es.close();
           eventSource = null;
           usingSSE = false;
           startPolling();
         };
       } catch {
+        sseFailedRef.current = true;
         startPolling();
       }
     } else {

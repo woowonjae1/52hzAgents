@@ -229,19 +229,33 @@ class OpenClawAdapter extends BaseAdapter {
     try {
       const ws = new WebSocket(url);
       this._gatewayWs = ws;
-      ws.on('message', (raw) => this._onGatewayFrame(raw, token));
-      ws.on('error', (e) => this._log(`OpenClaw approval relay unavailable: ${e.message}`));
+      ws.on('message', (raw) => {
+        try {
+          this._onGatewayFrame(raw, token);
+        } catch (e) {
+          this._log(`Error in OpenClaw gateway frame handler: ${e && e.message ? e.message : String(e)}`);
+        }
+      });
+      ws.on('error', (e) => {
+        this._log(`OpenClaw approval relay unavailable (${url}): ${e && e.message ? e.message : String(e)}`);
+      });
       ws.on('close', () => {
         if (this._gatewayWs === ws) {
           this._gatewayWs = null;
           this._gatewayConnected = false;
           if (this._running && !this._stopRequested) {
-            setTimeout(() => this._connectGatewayApprovalRelay(), 3000).unref?.();
+            setTimeout(() => {
+              try {
+                this._connectGatewayApprovalRelay();
+              } catch (e) {
+                this._log(`Approval relay reconnect error: ${e && e.message ? e.message : String(e)}`);
+              }
+            }, 3000).unref?.();
           }
         }
       });
     } catch (e) {
-      this._log(`OpenClaw approval relay setup failed: ${e.message}`);
+      this._log(`OpenClaw approval relay setup failed: ${e && e.message ? e.message : String(e)}`);
     }
   }
 

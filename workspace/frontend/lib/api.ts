@@ -317,6 +317,31 @@ class WorkspaceApi {
     );
   }
 
+  /**
+   * Register a local agent with the launcher without starting it. Used for
+   * runtimes outside the featured catalog, and for `custom` agents whose
+   * command the user supplies. Follow with launchAgent() to bring it online.
+   */
+  async createAgent(input: {
+    agentName: string;
+    agentType: string;
+    command?: string;
+    args?: string;
+    workingDir?: string;
+  }): Promise<{ agent_name: string; status: string; output?: string }> {
+    return this.request<{ agent_name: string; status: string; output?: string }>('/v1/agents', {
+      method: 'POST',
+      body: JSON.stringify({
+        network: this.workspaceId,
+        agent_name: input.agentName,
+        agent_type: input.agentType,
+        command: input.command || '',
+        args: input.args || '',
+        working_dir: input.workingDir || '',
+      }),
+    });
+  }
+
   /** Get network profile metadata. */
   async networkProfile(): Promise<NetworkProfile> {
     return this.request<NetworkProfile>(`/v1/profile?network=${this.workspaceId}`);

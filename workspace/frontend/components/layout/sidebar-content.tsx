@@ -105,19 +105,9 @@ export function SidebarContent() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-surface0">
-      {/* Category Switcher Row */}
-      <div className="px-3 py-2.5 border-b border-border/40 dark:border-border/40 flex items-center gap-1.5 overflow-x-auto shrink-0 scrollbar-none bg-surface1/50">
-        <CategoryTab active={viewMode === 'mission' || viewMode === 'connect'} label="Agents" onClick={() => setViewMode('mission')} />
-        <CategoryTab active={viewMode === 'threads'} label="Chats" onClick={() => setViewMode('threads')} />
-        {/* Files and Tasks are byproducts of a conversation — they live in the
-            thread header's Panels menu now, scoped to whichever thread you're
-            in, not as a workspace-wide browse-everything tab up here. */}
-        <CategoryTab active={viewMode === 'knowledge'} label="Knowledge Base" onClick={() => setViewMode('knowledge')} />
-      </div>
-
-      {/* Explorer List Area */}
+      {/* Explorer List Area (Defaults to Threads/Chats) */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {viewMode === 'threads' && <ThreadList />}
+        {(viewMode === 'threads' || viewMode === 'mission' || viewMode === 'connect') && <ThreadList />}
         {viewMode === 'files' && <FileList />}
         {viewMode === 'tasks' && <TasksView />}
         {viewMode === 'knowledge' && <KnowledgeView sidebarOnly />}
@@ -125,8 +115,8 @@ export function SidebarContent() {
         {viewMode === 'skills' && <SkillsView />}
       </div>
 
-      {/* Bottom control row */}
-      <div className="shrink-0 border-t border-border/40 dark:border-border/40 px-3.5 py-3 space-y-2.5 bg-surface1/80 backdrop-blur-md">
+      {/* Bottom control row with Agents, Chats, Knowledge Base, Theme & Settings */}
+      <div className="shrink-0 border-t border-border/40 dark:border-border/40 px-3.5 py-2.5 space-y-2 bg-surface1/80 backdrop-blur-md">
         {isOpenAgentsDomain && user && (
           <div className="flex items-center gap-2">
             <div className="size-6 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-semibold shrink-0">
@@ -140,15 +130,53 @@ export function SidebarContent() {
         )}
 
         <div className="flex items-center gap-1">
-          {/* The single light/dark control. A separate swatch picker used to sit
-              above this row offering the same two choices, which meant two
-              controls for one setting. */}
+          {/* Navigation Mode Buttons: Chats, Agents, Knowledge Base */}
+          <button
+            onClick={() => setViewMode('threads')}
+            className={cn(
+              'size-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
+              viewMode === 'threads'
+                ? 'bg-surface3 text-foreground font-semibold shadow-xs'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
+            )}
+            title="Chats"
+          >
+            <MessageSquare className="size-4" />
+          </button>
+          <button
+            onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
+            className={cn(
+              'size-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
+              viewMode === 'mission' || viewMode === 'connect'
+                ? 'bg-surface3 text-foreground font-semibold shadow-xs'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
+            )}
+            title="Agents Overview"
+          >
+            <Users className="size-4" />
+          </button>
+          <button
+            onClick={() => setViewMode(viewMode === 'knowledge' ? 'threads' : 'knowledge')}
+            className={cn(
+              'size-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer',
+              viewMode === 'knowledge'
+                ? 'bg-surface3 text-foreground font-semibold shadow-xs'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2',
+            )}
+            title="Knowledge Base"
+          >
+            <BookOpen className="size-4" />
+          </button>
+
+          <div className="w-px h-4 bg-border/60 mx-1" />
+
+          {/* Theme, Token, Settings */}
           <button
             onClick={toggleTheme}
             className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
             title={isDark ? 'Light Mode' : 'Dark Mode'}
           >
-            {isDark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
+            {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
           {token && (
             <button
@@ -156,7 +184,7 @@ export function SidebarContent() {
               className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
               title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
             >
-              {tokenCopied ? <Check className="size-4.5" /> : <KeyRound className="size-4.5" />}
+              {tokenCopied ? <Check className="size-4" /> : <KeyRound className="size-4" />}
             </button>
           )}
           <button
@@ -164,7 +192,7 @@ export function SidebarContent() {
             className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted hover:bg-surface2 transition-colors cursor-pointer"
             title="Settings"
           >
-            <Settings className="size-4.5" />
+            <Settings className="size-4" />
           </button>
 
           <div className="flex-grow" />

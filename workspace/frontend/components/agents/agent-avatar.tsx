@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { deriveIdentityColor } from '@/lib/identity-colors';
+import { resolveAgentIconName } from '@/lib/agent-catalog';
 
 const KNOWN_AGENTS = [
   'aider', 'amp', 'anthropic', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
@@ -35,10 +36,13 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
   const lowercaseName = cleanName.toLowerCase();
 
   // Cloud agents report "cloud:<provider>"; the provider is what has an icon.
-  const typeKey = (agentType || '').toLowerCase().replace(/^cloud:/, '').trim();
+  // resolveAgentIconName maps roster names with no icon of their own
+  // (chatgpt → openai) before matching.
+  const typeKey = resolveAgentIconName((agentType || '').replace(/^cloud:/, '').trim());
+  const nameKey = resolveAgentIconName(lowercaseName);
   const matchedAgent =
     (typeKey ? KNOWN_AGENTS.find(k => typeKey.includes(k)) : undefined) ||
-    KNOWN_AGENTS.find(k => lowercaseName.includes(k));
+    KNOWN_AGENTS.find(k => nameKey.includes(k));
   const isPng = matchedAgent ? PNG_AGENTS.includes(matchedAgent) : false;
   const isOffline = status === 'offline';
   const identityFill = deriveIdentityColor(cleanName || 'agent');

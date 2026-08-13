@@ -272,7 +272,14 @@ export function WorkspaceProvider({
   currentUserRef.current = currentUser;
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sessions, setSessions] = useState<WorkspaceSession[]>([]);
-  const [currentSessionId, _setCurrentSessionId] = useState<string | null>(null);
+  const [currentSessionId, _setCurrentSessionId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined' && workspaceId) {
+      try {
+        return localStorage.getItem(`last_session_id_${workspaceId}`) || localStorage.getItem('last_session_id') || null;
+      } catch {}
+    }
+    return null;
+  });
   // Set by setCurrentSessionId({ skipFocus: true }) and consumed by ChatView's
   // auto-focus effect, so keyboard-driven thread switches (1-9) don't steal
   // focus from the user. Cleared on read.
@@ -280,6 +287,14 @@ export function WorkspaceProvider({
   const setCurrentSessionId = useCallback((id: string | null, options?: { skipFocus?: boolean }) => {
     if (options?.skipFocus) skipFocusRef.current = true;
     _setCurrentSessionId(id);
+    if (typeof window !== 'undefined' && workspaceId) {
+      try {
+        if (id) {
+          localStorage.setItem(`last_session_id_${workspaceId}`, id);
+          localStorage.setItem('last_session_id', id);
+        }
+      } catch {}
+    }
     if (id) {
       setCompletedSessionIds((prev) => {
         if (!prev.has(id)) return prev;
@@ -288,7 +303,7 @@ export function WorkspaceProvider({
         return next;
       });
     }
-  }, []);
+  }, [workspaceId]);
   const consumeSkipFocus = useCallback(() => {
     const v = skipFocusRef.current;
     skipFocusRef.current = false;

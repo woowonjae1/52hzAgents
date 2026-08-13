@@ -22,7 +22,7 @@ interface QueuedMessage {
 }
 
 export function ThreadStatusBar({ channelName, messages = [] }: { channelName: string; messages?: WorkspaceMessage[] }) {
-  const { todos, refreshTodos, workingAgentNames } = useWorkspace();
+  const { todos, refreshTodos, workingAgentNames, activeSessionIds, lastMessageBySession, stopAllAgents } = useWorkspace();
   const [timers, setTimers] = useState<TimerItem[]>([]);
   const [cancelledQueueIds, setCancelledQueueIds] = useState<Set<string>>(new Set());
 
@@ -58,7 +58,6 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
 
   // Extract queued messages from status messages with queue metadata
   const queuedMessages = useMemo(() => {
-    // First pass: collect queue IDs that have been processed
     const processedIds = new Set<string>();
     for (const msg of messages) {
       if (msg.messageType !== 'status') continue;
@@ -70,7 +69,6 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
 
     const queued: QueuedMessage[] = [];
     const seen = new Set<string>();
-    // Walk messages in reverse to get latest state per queue_id
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.messageType !== 'status') continue;
@@ -87,6 +85,20 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
   const pendingCount = channelTodos.filter((t) => t.status === 'pending').length;
   const inProgressCount = channelTodos.filter((t) => t.status === 'in_progress').length;
   const activeTimers = timers.filter((t) => t.status === 'active');
+
+  // Live active agent working/thinking state in this channel
+  const isActive = activeSessionIds.has(channelName);
+  const lastInfo = lastMessageBySession[channelName];
+  const lastMsg = messages[messages.length - 1];
+  const isLastMsgWorking = lastMsg && !/stopped|execution stopped/i.test(lastMsg.content) && (
+    lastMsg.messageType === 'status' || lastMsg.messageType === 'thinking' || lastMsg.messageType === 'loading'
+  );
+  const isWorking = isActive || Boolean(isLastMsgWorking);
+
+  const activeAgentName = (lastInfo?.senderName) || (lastMsg?.senderName) || 'Agent';
+  const rawStatusText = (lastMsg && (lastMsg.messageType === 'status' || lastMsg.messageType === 'thinking'))
+    ? lastMsg.content
+    : (lastInfo?.content || '思考与处理中…');
 
   const handleCancelTimer = useCallback(async (timerId: string) => {
     setTimers((prev) => prev.filter((t) => t.id !== timerId));
@@ -115,11 +127,32 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
 
   const [tasksExpanded, setTasksExpanded] = useState(false);
 
-  const hasContent = pendingCount > 0 || inProgressCount > 0 || activeTimers.length > 0 || queuedMessages.length > 0;
+  const hasContent = isWorking || pendingCount > 0 || inProgressCount > 0 || activeTimers.length > 0 || queuedMessages.length > 0;
   if (!hasContent) return null;
 
   return (
-    <div className="flex flex-col gap-1 px-1 py-1 text-[11px] text-muted-foreground">
+    <div className="flex flex-col gap-1.5 px-1 py-1 text-[11px] text-muted-foreground">
+      {/* Live Agent Working / Thinking Indicator Card */}
+      {isWorking && (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-surface2 border border-border/80 text-xs font-medium text-foreground shadow-xs animate-in fade-in slide-in-from-bottom-1 duration-150 mb-0.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Loader2 className="size-3.5 text-status-warning animate-spin shrink-0" />
+            <span className="font-semibold text-foreground shrink-0">{activeAgentName}</span>
+            <span className="text-foreground-muted truncate text-[11.5px]">
+              {rawStatusText.length > 80 ? `${rawStatusText.slice(0, 80)}…` : rawStatusText}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => stopAllAgents(channelName)}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-danger/10 border border-status-danger/30 text-status-danger hover:bg-status-danger/20 transition-colors text-[10px] font-semibold shrink-0 cursor-pointer"
+            title="Stop agent execution"
+          >
+            <X className="size-3" />
+            <span>停止</span>
+          </button>
+        </div>
+      )}
       {/* Expanded tasks card overlay */}
       {tasksExpanded && channelTodos.length > 0 && (
         <div className="mb-1 rounded-lg border border-border bg-card p-2 shadow-lg space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">

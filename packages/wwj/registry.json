@@ -860,7 +860,7 @@
   {
     "name": "custom",
     "label": "Custom Agent",
-    "description": "Custom agent process connected via stdin/stdout or WebSocket framing.",
+    "description": "Any agent CLI wwj has no built-in adapter for. You supply the command; it runs once per message with the prompt on argv ({prompt}) or stdin.",
     "homepage": "https://openagents.org",
     "tags": ["custom"],
     "builtin": true,
@@ -870,8 +870,8 @@
       "api_only": true
     },
     "adapter": {
-      "module": "openagents.adapters.openclaw",
-      "class": "OpenClawAdapter"
+      "module": "openagents.adapters.custom",
+      "class": "CustomAdapter"
     },
     "launch": {
       "args": []

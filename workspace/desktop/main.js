@@ -153,18 +153,23 @@ function createMainWindow() {
 
   Menu.setApplicationMenu(null);
 
+  let isAppLoaded = false;
   let retryCount = 0;
   const maxRetries = 60;
 
   function loadAppUrl() {
+    if (isAppLoaded) return;
     checkServerReady(TARGET_URL, (ready) => {
+      if (isAppLoaded) return;
       if (ready) {
+        isAppLoaded = true;
         mainWindow.loadURL(TARGET_URL);
         mainWindow.show();
       } else if (retryCount < maxRetries) {
         retryCount++;
         setTimeout(loadAppUrl, 1000);
       } else {
+        isAppLoaded = true;
         mainWindow.loadURL(`data:text/html;charset=utf-8,
           <html>
             <body style="background:#0e0e10;color:#f4f4f5;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
@@ -181,8 +186,11 @@ function createMainWindow() {
 
   loadAppUrl();
 
-  // External links open in default browser
+  // External links open in default browser, internal app URLs navigate inside window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://127.0.0.1:3005') || url.startsWith('http://localhost:3005')) {
+      return { action: 'allow' };
+    }
     if (url.startsWith('http:') || url.startsWith('https:')) {
       shell.openExternal(url);
       return { action: 'deny' };

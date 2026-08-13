@@ -133,6 +133,7 @@ func main() { // 服务程序运行主入口函数。
 
 		// Agent Catalog & Cloud Agents
 		v1.GET("/agent-catalog", handlers.GetAgentCatalog)
+		v1.POST("/agents", handlers.CreateAgent)
 		v1.GET("/cloud-agents/providers", handlers.GetCloudAgentProviders)
 		v1.GET("/cloud-agents", handlers.ListCloudAgents)
 		v1.POST("/cloud-agents", handlers.AddCloudAgent)

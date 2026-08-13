@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { cn } from '@/lib/utils';
+import { resolveAgentIconName } from '@/lib/agent-catalog';
 
 interface IconProps {
   className?: string;
@@ -19,7 +20,8 @@ const NEEDS_BG = new Set([
 
 const PNG_AGENTS = new Set(['cline', 'hermes', 'kilo', 'pi']);
 
-function IconWrapper({ name, size = 20, className }: { name: string } & IconProps) {
+function IconWrapper({ name: rawName, size = 20, className }: { name: string } & IconProps) {
+  const name = resolveAgentIconName(rawName);
   const needsBg = NEEDS_BG.has(name);
   const isPng = PNG_AGENTS.has(name);
   const ext = isPng ? 'png' : 'svg';

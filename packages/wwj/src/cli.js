@@ -2,6 +2,8 @@
 
 const { AgentConnector, Daemon } = require('./index');
 const { hasCredentialMetadata, formatAuthGuidance } = require('./auth-guidance');
+const { knownAgentTypes } = require('./adapters');
+const { resolveAgentType } = require('./agent-types');
 
 // ---------------------------------------------------------------------------
 // Arg parsing
@@ -143,9 +145,24 @@ async function cmdStatus(connector) {
 
 async function cmdCreate(connector, flags, positional) {
   const name = positional[0];
-  if (!name) { print('Usage: wwj create <name> [--type <type>] [--install]'); return; }
-  const type = flags.type || 'openclaw';
+  if (!name) {
+    print('Usage: wwj create <name> [--type <type>] [--command <exe>] [--args "<a> <b>"] [--install]');
+    return;
+  }
+  const type = resolveAgentType(flags.type) || 'openclaw';
   const role = flags.role || 'worker';
+  const command = typeof flags.command === 'string' ? flags.command.trim() : '';
+  // Space-separated template, e.g. --args "chat --quiet {prompt}". Omit {prompt}
+  // and the message is written to the command's stdin instead.
+  const args = typeof flags.args === 'string' ? flags.args.split(/\s+/).filter(Boolean) : [];
+
+  if (type === 'custom' && !command) {
+    print("Error: --command is required for --type custom.");
+    print('  wwj create my-agent --type custom --command kilo --args "run {prompt}"');
+    print('Without it there is nothing to run — the agent would fail preflight.');
+    process.exitCode = 1;
+    return;
+  }
 
   // Validate the runtime type BEFORE creating any local entry. A typo'd or
   // otherwise unknown type (e.g. "calude") must not leave a broken agent in
@@ -160,7 +177,7 @@ async function cmdCreate(connector, flags, positional) {
   }
 
   try {
-    connector.addAgent({ name, type, role, path: flags.path || process.cwd() });
+    connector.addAgent({ name, type, role, path: flags.path || process.cwd(), command, args });
 
     // Signal daemon to pick up the new agent
     try { connector.sendDaemonCommand('reload'); } catch {}
@@ -179,7 +196,9 @@ async function cmdCreate(connector, flags, positional) {
       print(`Agent '${name}' created (type: ${type})`);
     }
 
-    if (!connector.isInstalled(type)) {
+    // A custom agent's runtime IS the command the user supplied — there is
+    // nothing named 'custom' to install, so don't tell them to install it.
+    if (type !== 'custom' && !connector.isInstalled(type)) {
       if (!flags.install) {
         print(`Runtime '${type}' is not installed. Run: wwj install ${type}`);
         return;
@@ -381,8 +400,16 @@ async function cmdConnect(connector, flags, positional) {
     // Auto-create agent if it doesn't exist yet
     let agent = connector.config.getAgent(name);
     if (!agent) {
-      const knownTypes = ['openclaw', 'claude', 'codex', 'aider', 'goose', 'cursor', 'opencode', 'hermes', 'cline', 'amp', 'copilot', 'gemini'];
-      const inferred = knownTypes.find((t) => name.toLowerCase().includes(t)) || flags.type || 'custom';
+      // Derived from the adapter registry rather than hand-listed: a hard-coded
+      // list silently dropped 'pi' and 'chatgpt', so those agents fell through
+      // to 'custom' (= OpenClaw) instead of their own runtime.
+      // Longest name first so 'opencode' wins over a substring match.
+      const knownTypes = knownAgentTypes()
+        .filter((t) => t !== 'custom')
+        .sort((a, b) => b.length - a.length);
+      const lowerName = name.toLowerCase();
+      const inferred =
+        resolveAgentType(knownTypes.find((t) => lowerName.includes(t)) || flags.type) || 'custom';
       print(`Agent '${name}' not created yet. Auto-creating agent '${name}' of type '${inferred}'...`);
       connector.config.addAgent({ name, type: inferred });
     }

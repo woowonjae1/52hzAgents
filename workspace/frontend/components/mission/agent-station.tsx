@@ -19,6 +19,12 @@ export interface StationData {
   activity: { content: string; senderName: string; isStatus?: boolean } | null;
   skillCount: number;
   tokenCount?: number;
+  /**
+   * True when this card is a catalog entry the workspace has no agent for yet —
+   * an offer to connect, not a real agent. Distinguishes the `custom` offer from
+   * an actual agent someone happened to name "custom".
+   */
+  isCatalogPlaceholder?: boolean;
 }
 
 const STATUS_META: Record<StationStatus, { label: string; dot: string; text: string; border: string }> = {
@@ -68,10 +74,15 @@ interface AgentStationProps {
  * Only real data is shown — no synthetic latency or health metrics.
  */
 export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: AgentStationProps) {
-  const { agent, status, threads, activity, skillCount, tokenCount } = data;
+  const { agent, status, threads, activity, skillCount, tokenCount, isCatalogPlaceholder } = data;
   const meta = STATUS_META[status];
   const isWorking = status === 'working';
   const activeThreadCount = threads.length;
+  // The `custom` card stands for "some other agent" rather than a runtime, so
+  // its button opens the configuration form instead of launching anything.
+  // There is also nothing to Open until a real agent exists behind it — opening
+  // it would put the user in a chat with an agent that was never configured.
+  const isCustomPlaceholder = isCatalogPlaceholder === true && agent.agentName.toLowerCase() === 'custom';
 
   return (
     <div
@@ -181,14 +192,21 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
         )}
 
         {/* Quick actions */}
-        <div className="grid grid-cols-2 gap-1.5 border-t border-border/60/40 pt-2.5 mt-0.5">
-          <button
-            onClick={onOpenAgent}
-            className="h-7 rounded-md border border-border bg-surface2 hover:bg-surface3 text-[10px] font-semibold text-foreground transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
-          >
-            <MessageSquare className="size-3 shrink-0 text-foreground-muted" />
-            <span className="truncate">Open</span>
-          </button>
+        <div
+          className={cn(
+            'grid gap-1.5 border-t border-border/60/40 pt-2.5 mt-0.5',
+            isCustomPlaceholder ? 'grid-cols-1' : 'grid-cols-2',
+          )}
+        >
+          {!isCustomPlaceholder && (
+            <button
+              onClick={onOpenAgent}
+              className="h-7 rounded-md border border-border bg-surface2 hover:bg-surface3 text-[10px] font-semibold text-foreground transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
+            >
+              <MessageSquare className="size-3 shrink-0 text-foreground-muted" />
+              <span className="truncate">Open</span>
+            </button>
+          )}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -201,9 +219,17 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
                 ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90 cursor-pointer'
                 : 'bg-transparent text-status-success border-status-success/30 cursor-default',
             )}
-            title={status === 'offline' ? `Launch or pair ${agent.agentName}` : `${agent.agentName} is connected`}
+            title={
+              status !== 'offline'
+                ? `${agent.agentName} is connected`
+                : isCustomPlaceholder
+                  ? 'Choose which agent to connect'
+                  : `Launch or pair ${agent.agentName}`
+            }
           >
-            <span className="truncate">{status === 'offline' ? 'Connect' : 'Connected'}</span>
+            <span className="truncate">
+              {status !== 'offline' ? 'Connected' : isCustomPlaceholder ? 'Configure' : 'Connect'}
+            </span>
           </button>
         </div>
       </div>

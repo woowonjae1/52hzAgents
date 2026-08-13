@@ -234,38 +234,38 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');
 
     return (
-      <div className="py-2.5 flex justify-end">
-        <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[75%]">
-          <div
-            className="size-8 rounded-lg shrink-0 flex items-center justify-center mt-0.5 shadow-xs border border-border/80 overflow-hidden bg-white dark:bg-surface3"
-          >
-            <img src="/logo-icon.png" alt="You" className="size-6 object-contain" />
+      <div className="py-2 flex justify-end">
+        <div className="flex items-start gap-2.5 flex-row-reverse max-w-[82%] lg:max-w-[72%] group">
+          {/* Avatar Icon */}
+          <div className="size-7 rounded-full shrink-0 flex items-center justify-center border border-border/60 overflow-hidden bg-surface2 shadow-xs mt-0.5">
+            <img src="/logo-icon.png" alt="You" className="size-4.5 object-contain" />
           </div>
-          <div className="flex-1 min-w-0 text-right">
-            <div className="flex items-center gap-2 mb-1.5 justify-end">
-              {timestamp && (
-                <span className="text-[11px] text-foreground-extra-muted font-mono">{timestamp}</span>
-              )}
-              <span className="text-sm font-semibold text-foreground">{displayName}</span>
+
+          <div className="flex flex-col items-end min-w-0">
+            {/* Header: Name & Time */}
+            <div className="flex items-center gap-1.5 mb-1 px-0.5 text-[11px] text-foreground-extra-muted select-none">
+              {timestamp && <span className="font-mono opacity-80">{timestamp}</span>}
+              <span className="font-semibold text-foreground">{displayName}</span>
             </div>
-            {/* Body sits at 14px/1.78 — the reading rhythm the ChatGPT direction
-                is built on. The bubble is the human side of the conversation, so
-                it keeps full-strength foreground rather than the muted tier. */}
-            <div className="text-sm leading-[1.78] text-foreground bg-surface2 border border-border/80 p-3.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block">
+
+            {/* Message Bubble */}
+            <div className="text-sm leading-relaxed text-foreground bg-surface2/90 border border-border/80 dark:bg-surface2/80 dark:border-border/60 px-3.5 py-2.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block max-w-full break-words">
               <MarkdownContent content={message.content} agentNames={agentNames} />
               <Attachments items={attachments} />
 
-              <div className="flex items-center justify-end gap-3.5 mt-1.5 text-[11px]">
-                {isCurrentUser && message.deliveryStatus === 'sending' && (
-                  <span className="text-foreground-extra-muted">Sending...</span>
-                )}
-                {isCurrentUser && message.deliveryStatus === 'confirmed' && (
-                  <span className="text-success">✓ Sent</span>
-                )}
-                {isCurrentUser && message.deliveryStatus === 'failed' && (
-                  <span className="text-destructive">✗ Failed to send</span>
-                )}
-              </div>
+              {isCurrentUser && message.deliveryStatus && (
+                <div className="flex items-center justify-end gap-1 mt-1 text-[10px]">
+                  {message.deliveryStatus === 'sending' && (
+                    <span className="text-foreground-extra-muted">Sending...</span>
+                  )}
+                  {message.deliveryStatus === 'confirmed' && (
+                    <span className="text-status-success font-medium">✓ Sent</span>
+                  )}
+                  {message.deliveryStatus === 'failed' && (
+                    <span className="text-status-danger font-medium">✗ Failed to send</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

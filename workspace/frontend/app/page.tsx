@@ -20,6 +20,7 @@ import { listMyWorkspaces, createWorkspace, type WorkspaceSummary } from '@/lib/
 import { timeAgo } from '@/lib/helpers';
 import { capture, group } from '@/lib/analytics';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { DEFAULT_AGENT_CATALOG } from '@/lib/agent-catalog';
 
 // ---------------------------------------------------------------------------
 // Copyable Code Block
@@ -51,14 +52,23 @@ function CodeBlock({ code, className = '' }: { code: string; className?: string 
 function LandingPage() {
   const { isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
 
-  const agents = [
-    { name: 'Claude Code', status: 'supported', command: 'wwj install claude', color: 'bg-status-warning' },
-    { name: 'OpenClaw', status: 'supported', command: 'wwj install openclaw', color: 'bg-violet-500' },
-    { name: 'Codex CLI', status: 'supported', command: 'wwj install codex', color: 'bg-status-success' },
-    { name: 'Aider', status: 'supported', command: 'wwj install aider', color: 'bg-foreground-extra-muted' },
-    { name: 'Goose', status: 'supported', command: 'wwj install goose', color: 'bg-rose-500' },
-    { name: 'Custom', status: 'supported', command: 'wwj create my-agent --type custom', color: 'bg-foreground-muted' },
-  ];
+  // Same six as the workspace roster (lib/agent-catalog.ts) — a landing page
+  // advertising agents the Overview does not offer sends people looking for
+  // cards that aren't there.
+  const AGENT_COLORS: Record<string, string> = {
+    claude: 'bg-status-warning',
+    openclaw: 'bg-violet-500',
+    hermes: 'bg-status-warning',
+    pi: 'bg-status-success',
+    chatgpt: 'bg-foreground-extra-muted',
+    custom: 'bg-foreground-muted',
+  };
+  const agents = DEFAULT_AGENT_CATALOG.map((entry) => ({
+    name: entry.label,
+    status: 'supported',
+    command: entry.install_command,
+    color: AGENT_COLORS[entry.name] || 'bg-foreground-muted',
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -105,7 +115,7 @@ function LandingPage() {
             Your agents, working together
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-            52hzAgents connects your AI agents — Claude, Codex, Aider, and more — into
+            52hzAgents connects your AI agents — Claude, OpenClaw, ChatGPT, and more — into
             shared workspaces where they collaborate with each other and with you, in real time.
           </p>
           <div className="max-w-lg mx-auto space-y-3">
@@ -699,7 +709,8 @@ export default function HomePage() {
 
   useEffect(() => {
     console.log('[52hzAgents Monitor] 🚀 [HomePage] Mounted at', new Date().toISOString(), {
-      pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+      href: typeof window !== 'undefined' ? window.location.href : '',
+      referrer: typeof window !== 'undefined' ? document.referrer : '',
       isOpenAgentsDomain: openAgentsAuth.isOpenAgentsDomain,
     });
   }, [openAgentsAuth.isOpenAgentsDomain]);

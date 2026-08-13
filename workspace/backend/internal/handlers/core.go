@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -437,6 +438,118 @@ func ensureWorkspaceConnectorToken(workspace *models.Workspace) (string, error) 
 	return token, nil
 }
 
+// agentIdentRe bounds agent names and runtime types. The launcher below hands
+// the name to `cmd /c start`, so an unconstrained value would be a command
+// injection vector.
+var agentIdentRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
+
+// wwjCLIPath locates the local wwj CLI relative to the backend's cwd, falling
+// back to a `wwj` on PATH outside the monorepo layout.
+func wwjCLIPath() string {
+	cliPath := "../../packages/wwj/src/cli.js"
+	if _, err := os.Stat(cliPath); os.IsNotExist(err) {
+		if _, err2 := os.Stat("../packages/wwj/src/cli.js"); err2 == nil {
+			return "../packages/wwj/src/cli.js"
+		}
+		return "wwj"
+	}
+	return cliPath
+}
+
+// CreateAgentRequest registers a new local agent with the launcher. This is the
+// path for agents wwj has no featured catalog entry for — either one of its
+// non-featured runtimes (goose, cline, aider…) or, with AgentType "custom", an
+// arbitrary CLI defined entirely by Command/Args.
+type CreateAgentRequest struct {
+	Network    string `json:"network" binding:"required"`
+	AgentName  string `json:"agent_name" binding:"required"`
+	AgentType  string `json:"agent_type" binding:"required"`
+	Command    string `json:"command"`
+	Args       string `json:"args"`
+	WorkingDir string `json:"working_dir"`
+}
+
+// CreateAgent registers the agent with the local launcher (`wwj create`). It
+// does NOT start it — the caller follows up with /launch, so one code path owns
+// connecting and its bookkeeping.
+func CreateAgent(c *gin.Context) {
+	var req CreateAgentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !agentIdentRe.MatchString(req.AgentName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "agent_name may contain only letters, digits, dot, underscore and hyphen (max 64)"})
+		return
+	}
+	if !agentIdentRe.MatchString(req.AgentType) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "agent_type is not a valid runtime type"})
+		return
+	}
+	// A custom agent is nothing but its command. Creating one without it would
+	// register an agent that can never run.
+	if strings.EqualFold(req.AgentType, "custom") && strings.TrimSpace(req.Command) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "command is required when agent_type is 'custom'"})
+		return
+	}
+
+	workspace, err := resolveWorkspace(req.Network)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+
+	localDevMode := config.GlobalConfig != nil && config.GlobalConfig.AuthMode == "none"
+	if !localDevMode {
+		token := workspaceToken(c)
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "X-Workspace-Token required to create an agent"})
+			return
+		}
+		if !verifyWorkspaceAccess(workspace, token) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid workspace credentials"})
+			return
+		}
+	}
+
+	cliPath := wwjCLIPath()
+	args := []string{"create", req.AgentName, "--type", req.AgentType}
+	if strings.TrimSpace(req.Command) != "" {
+		args = append(args, "--command", strings.TrimSpace(req.Command))
+	}
+	if strings.TrimSpace(req.Args) != "" {
+		args = append(args, "--args", strings.TrimSpace(req.Args))
+	}
+	if strings.TrimSpace(req.WorkingDir) != "" {
+		args = append(args, "--path", strings.TrimSpace(req.WorkingDir))
+	}
+
+	// Run directly, not through a shell: Command/Args are user-supplied and must
+	// reach the CLI as literal argv entries.
+	var runCmd *exec.Cmd
+	if cliPath == "wwj" {
+		runCmd = exec.Command("wwj", args...)
+	} else {
+		runCmd = exec.Command("node", append([]string{cliPath}, args...)...)
+	}
+	output, execErr := runCmd.CombinedOutput()
+	out := strings.TrimSpace(string(output))
+
+	if execErr != nil {
+		// Re-creating an existing agent is not a failure for this endpoint — the
+		// caller's next step is /launch either way.
+		if strings.Contains(out, "already exists") {
+			c.JSON(http.StatusOK, gin.H{"agent_name": req.AgentName, "status": "exists", "output": out})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create agent: " + execErr.Error(), "output": out})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"agent_name": req.AgentName, "status": "created", "output": out})
+}
+
 func LaunchAgent(c *gin.Context) {
 	agentName := c.Param("agent_name")
 	network := c.Query("network")
@@ -451,20 +564,18 @@ func LaunchAgent(c *gin.Context) {
 		return
 	}
 
+	// The connect step below goes through `cmd /c start`, so the name must be
+	// constrained before it reaches a shell.
+	if !agentIdentRe.MatchString(agentName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "agent_name may contain only letters, digits, dot, underscore and hyphen (max 64)"})
+		return
+	}
+
 	lowerName := strings.ToLower(agentName)
 	var execErr error
 
 	// Safe local launcher syntax routing through the workspace connector.
-	// We locate the local wwj CLI script relative to the backend cwd.
-	cliPath := "../../packages/wwj/src/cli.js"
-	if _, err := os.Stat(cliPath); os.IsNotExist(err) {
-		if _, err2 := os.Stat("../packages/wwj/src/cli.js"); err2 == nil {
-			cliPath = "../packages/wwj/src/cli.js"
-		} else {
-			// Fallback if not running in the monorepo structure
-			cliPath = "wwj"
-		}
-	}
+	cliPath := wwjCLIPath()
 
 	// In local development the browser may carry a stale workspace identifier
 	// in the token slot. Always use the database-backed connector credential so

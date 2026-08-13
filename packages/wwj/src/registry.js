@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { resolveAgentType } = require('./agent-types');
 
 const DEFAULT_REGISTRY_URL = process.env.WWJ_REGISTRY_URL || '';
 const CACHE_FILE = 'agent_catalog.json';
@@ -116,8 +117,9 @@ class Registry {
    * Get env field definitions for an agent type.
    */
   getEnvFields(agentType) {
+    const type = resolveAgentType(agentType);
     const catalog = this.getCatalogSync();
-    const entry = catalog.find((e) => e.name === agentType);
+    const entry = catalog.find((e) => e.name === type);
     return entry ? (entry.env_config || []) : [];
   }
 
@@ -125,8 +127,9 @@ class Registry {
    * Get resolve_env rules for an agent type.
    */
   getResolveRules(agentType) {
+    const type = resolveAgentType(agentType);
     const catalog = this.getCatalogSync();
-    const entry = catalog.find((e) => e.name === agentType);
+    const entry = catalog.find((e) => e.name === type);
     if (!entry || !entry.resolve_env) return [];
     return entry.resolve_env.rules || [];
   }
@@ -135,12 +138,15 @@ class Registry {
    * Get a single catalog entry by name.
    */
   getEntry(agentType) {
+    // Aliases (chatgpt → codex) must resolve here: this is the single lookup
+    // every install / launch-profile path funnels through.
+    const type = resolveAgentType(agentType);
     const catalog = this.getCatalogSync();
-    const entry = catalog.find((e) => e.name === agentType) || null;
+    const entry = catalog.find((e) => e.name === type) || null;
     if (!entry) return null;
     // Merge bundled registry fields into cached/remote entries.
     const bundled = this._loadBundled();
-    const b = bundled.find((e) => e.name === agentType);
+    const b = bundled.find((e) => e.name === type);
     if (b) {
       if (b.install) entry.install = { ...b.install };
       if (!entry.check_ready && b.check_ready) entry.check_ready = b.check_ready;

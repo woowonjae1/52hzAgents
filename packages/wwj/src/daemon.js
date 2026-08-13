@@ -47,14 +47,18 @@ class Daemon {
   // ---------------------------------------------------------------------------
 
   /**
-   * Start all configured agents and block until shutdown.
-   * Call this from the foreground daemon process.
+   * Start the supervisor and block until shutdown.
+   *
+   * Agents do NOT come up here just because they exist in the config. The
+   * desktop and web apps open with every agent Offline and the user picks
+   * which ones to connect; a daemon that silently relaunched the whole roster
+   * on every `wwj up` made that impossible. Opt an agent in with
+   * `autostart: true` in its config entry.
    */
   async start() {
-    const agents = this.config.getAgents();
-    for (const agent of agents) {
-      this._launchAgent(agent);
-    }
+    const allAgents = this.config.getAgents();
+    const agents = allAgents.filter((a) => this._shouldAutostart(a));
+    const idle = allAgents.length - agents.length;
 
     // Install signal handlers
     const shutdown = () => this.stop();
@@ -106,11 +110,19 @@ class Daemon {
     this._startBrowseServer();
 
     this._writeStatus();
-    this._cachedAgentNames = new Set(agents.map(a => a.name));
+    // Seeded from EVERY configured agent, not just the autostarted ones —
+    // _reloadUnsafe launches whatever it sees as newly added, so an idle agent
+    // missing from this set would get started by the next config reload.
+    this._cachedAgentNames = new Set(allAgents.map(a => a.name));
     this._cachedAgentConfigs = {};
-    for (const a of agents) this._cachedAgentConfigs[a.name] = this._agentConfigFingerprint(a);
+    for (const a of allAgents) this._cachedAgentConfigs[a.name] = this._agentConfigFingerprint(a);
 
-    // Parallel Async Warm-up Pool: Launch all configured agents concurrently instead of serially
+    if (idle > 0) {
+      this._log(`${idle} agent(s) left idle (no autostart) — waiting for a start/restart command.`);
+    }
+
+    // Parallel Async Warm-up Pool: launch the autostart agents concurrently
+    // instead of serially.
     this._log(`Launching ${agents.length} agent(s) in parallel warm-up pool...`);
     await Promise.allSettled(agents.map(agent => Promise.resolve(this._launchAgent(agent))));
 
@@ -120,6 +132,22 @@ class Daemon {
     await new Promise((resolve) => {
       this._shutdownResolve = resolve;
     });
+  }
+
+  /**
+   * Should this agent come up on its own when the daemon boots?
+   *
+   * Default is no — the workspace UI is the switch. `WWJ_AUTOSTART_AGENTS=all`
+   * restores the pre-opt-in behaviour for headless setups that relied on it.
+   */
+  _shouldAutostart(agent) {
+    if (String(process.env.WWJ_AUTOSTART_AGENTS || '').toLowerCase() === 'all') return true;
+    return agent.autostart === true;
+  }
+
+  /** Is this agent currently supervised (adapter loop or child process)? */
+  _isActive(name) {
+    return Boolean((this._adapters && this._adapters[name]) || this._processes[name]);
   }
 
   /**
@@ -564,6 +592,11 @@ class Daemon {
         // .claude/skills there failed with EPERM. Root it under ~/.wwj.
         workingDir: agentCfg.path || defaultAgentWorkdir(name),
         toolMode: agentCfg.tool_mode || 'skills',
+        // Generic runtime (type 'custom'): the command the user configured is
+        // the whole definition of what this agent runs.
+        customCommand: agentCfg.command,
+        customArgs: agentCfg.args,
+        customTimeoutMs: agentCfg.timeout_ms,
         // Live runtime/connectivity status → daemon.status.json (Agents list/TUI).
         onStatus: (update) => this._applyAdapterStatus(name, info, update),
       });
@@ -650,7 +683,9 @@ class Daemon {
         // A crash, or a live error report that never recovered — keep it visible.
         info.state = 'error';
       } else {
-        info.state = 'stopped';
+        info.state = 'error';
+        info.errorReason = 'adapter_crashed';
+        info.lastError = redactDiagnostic('Adapter polling loop exited unexpectedly');
       }
     }
     this._writeStatus();
@@ -833,8 +868,8 @@ class Daemon {
         } else if (cmd.startsWith('start:')) {
           const agentName = cmd.slice(6).trim();
           // 'start' must be idempotent. The launcher sends start:<name> right
-          // after (re)spawning the daemon, but the daemon's own start() already
-          // launched every configured agent. A blind restart here tears down
+          // after (re)spawning the daemon, which may already have launched that
+          // agent if it is marked autostart. A blind restart here tears down
           // the just-joined workspace session and re-joins as the same agent;
           // the server revokes the first session and the agent then stops the
           // moment it next touches the workspace (e.g. the first user message →
@@ -919,8 +954,13 @@ class Daemon {
         await this._ensureAdapterCleared(agent.name);
         this._launchAgent(agent);
         this._log(`Reload: started new agent '${agent.name}'`);
-      } else if ((oldConfigs[agent.name] || '') !== newConfigs[agent.name]) {
-        // Network or env config changed — restart agent
+      } else if (
+        (oldConfigs[agent.name] || '') !== newConfigs[agent.name] &&
+        (this._isActive(agent.name) || this._shouldAutostart(agent))
+      ) {
+        // Network or env config changed — restart agent. An idle agent the
+        // user never started stays idle: editing its config is not a request
+        // to launch it.
         await this.stopAgent(agent.name);
         this._stoppedAgents.delete(agent.name);
         await this._ensureAdapterCleared(agent.name);

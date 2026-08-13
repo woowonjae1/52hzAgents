@@ -100,15 +100,6 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 
 	content, _ := req.Payload["content"].(string)
 	mentions := mentionedAgents(content, req.Payload, participants)
-	if isHumanSource(req.Source) && len(mentions) > 1 {
-		// Solution 1: Single-Target Dispatcher (Primary Addressee Lock)
-		// If a human prompt directly addresses a primary agent at the start (e.g. "@claude-agent ..."),
-		// route exclusively to that primary addressee to prevent parallel execution race conditions.
-		trimmed := strings.TrimSpace(content)
-		if strings.HasPrefix(trimmed, "@"+mentions[0]) {
-			mentions = []string{mentions[0]}
-		}
-	}
 	online := onlineParticipants(workspaceID, participants)
 
 	// Agent-sourced messages: only route if the agent explicitly @mentions
