@@ -126,7 +126,7 @@
    * pane. `min()` still keeps it from overflowing a panel narrower than 1100px
    * — sidebar open, preview panel open, or just a small window.
    */
-  --chat-column: min(1100px, 100%);
+  --chat-column: min(1380px, 100%);
 }
 
 /**
