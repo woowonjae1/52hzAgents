@@ -107,10 +107,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       .filter((name) => agentNames.includes(name));
   };
 
-  // Allow typing @ to mention ANY agent (online or offline) + catalog fallbacks
-  const catalogAgents = catalogAsOfflineAgents(DEFAULT_AGENT_CATALOG);
-
-  const availableAgents = agents.length > 0 ? agents : catalogAgents;
+  // Only show activated / online agents in the @mention autocomplete menu
+  const onlineAgents = agents.filter((a) => a.status === 'online');
+  const availableAgents = onlineAgents;
 
   const filteredAgents = availableAgents.filter(
     (a) => a.agentName.toLowerCase().includes(mentionFilter.toLowerCase())
