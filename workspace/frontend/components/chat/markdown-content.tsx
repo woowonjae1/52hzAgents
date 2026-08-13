@@ -95,57 +95,57 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     // message body sets — that reading rhythm is the point of the direction,
     // and a local `leading-relaxed` here would quietly override it.
     h1: ({ children }) => (
-      <h1 className="text-lg font-semibold mt-4 mb-2 first:mt-0">{children}</h1>
+      <h1 className="text-base font-semibold mt-3 mb-1.5 first:mt-0">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="text-base font-semibold mt-3 mb-1.5 first:mt-0">{children}</h2>
+      <h2 className="text-[14.5px] font-semibold mt-2.5 mb-1 first:mt-0">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="font-semibold text-[15px] mt-3 mb-1 first:mt-0">{children}</h3>
+      <h3 className="font-semibold text-[13.5px] mt-2 mb-1 first:mt-0">{children}</h3>
     ),
     p: ({ children }) => (
-      <p className="mb-2 last:mb-0">{renderMentions(children, agentNames)}</p>
+      <p className="mb-2 last:mb-0 leading-[1.65]">{renderMentions(children, agentNames)}</p>
     ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-2 border-border-accent pl-3 my-2 text-muted-foreground italic">
+      <blockquote className="border-l-2 border-border-accent pl-3 my-2 text-muted-foreground italic text-[13px]">
         {children}
       </blockquote>
     ),
-    hr: () => <hr className="my-3 border-border" />,
+    hr: () => <hr className="my-2.5 border-border" />,
 
     // Lists
     ul: ({ children }) => (
-      <ul className="my-2 ml-4 space-y-0.5 list-disc">{children}</ul>
+      <ul className="my-1.5 ml-4 space-y-0.5 list-disc text-[13.5px]">{children}</ul>
     ),
     ol: ({ children }) => (
-      <ol className="my-2 ml-4 space-y-0.5 list-decimal">{children}</ol>
+      <ol className="my-1.5 ml-4 space-y-0.5 list-decimal text-[13.5px]">{children}</ol>
     ),
     li: ({ children }) => (
-      <li>{renderMentions(children, agentNames)}</li>
+      <li className="leading-[1.6]">{renderMentions(children, agentNames)}</li>
     ),
 
     // Tables
     table: ({ children }) => (
-      <div className="my-3 overflow-x-auto rounded-md border border-border">
-        <table className="min-w-full text-sm">{children}</table>
+      <div className="my-2.5 overflow-x-auto rounded-lg border border-border/80 bg-surface1/30">
+        <table className="min-w-full text-[12.5px] leading-snug">{children}</table>
       </div>
     ),
     thead: ({ children }) => (
-      <thead className="bg-surface1/50">{children}</thead>
+      <thead className="bg-surface2/60">{children}</thead>
     ),
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => (
-      <tr className="border-b border-border last:border-0">
+      <tr className="border-b border-border/50 last:border-0 hover:bg-surface1/40 transition-colors">
         {children}
       </tr>
     ),
     th: ({ children }) => (
-      <th className="px-3 py-1.5 text-left font-semibold text-xs text-muted-foreground">
+      <th className="px-2.5 py-1.5 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className="px-3 py-1.5">{renderMentions(children, agentNames)}</td>
+      <td className="px-2.5 py-1.5">{renderMentions(children, agentNames)}</td>
     ),
 
     // Code

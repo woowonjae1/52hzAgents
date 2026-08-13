@@ -314,7 +314,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               <span className="text-[11px] text-foreground-extra-muted ml-auto font-mono">{timestamp}</span>
             )}
           </div>
-          <div className="text-sm leading-[1.78] text-foreground">
+          <div className="text-[13.5px] leading-[1.65] text-foreground font-normal">
             <MarkdownContent content={message.content} agentNames={agentNames} />
             <Attachments items={attachments} />
 
