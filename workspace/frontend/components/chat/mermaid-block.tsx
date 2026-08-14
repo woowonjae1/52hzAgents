@@ -94,10 +94,14 @@ export function MermaidBlock({
 			}
 		}
 
-		void renderDiagram();
+		const debounceMs = deferErrors ? 250 : 50;
+		const renderTimer = setTimeout(() => {
+			void renderDiagram();
+		}, debounceMs);
 
 		return () => {
 			cancelled = true;
+			clearTimeout(renderTimer);
 			if (errorTimer) {
 				clearTimeout(errorTimer);
 			}

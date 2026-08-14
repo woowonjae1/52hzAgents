@@ -138,7 +138,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent } = useWorkspace();
   
   useEffect(() => {
     console.log('[52hzAgents Monitor] 💬 [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
@@ -516,6 +516,8 @@ export function ChatView() {
         userOptimisticMsg,
         loadingOptimisticMsg,
       ]);
+      updateLastMessage(currentSessionId, currentUser.name, content || 'Sent an attachment', false);
+      recordUserMessageSent(currentSessionId);
       // Make cancellation available immediately, rather than waiting for a
       // remote agent to publish its first status event.
       setSessionActive(currentSessionId, true);

@@ -41,6 +41,21 @@ function checkServerReady(url, callback) {
 // on "Loading your workspace…" the whole time, reloading.
 let devStackSpawned = false;
 
+function cleanupDevStack() {
+  if (!devStackSpawned) return;
+  try {
+    console.log('[52hzAgents Desktop] Stopping background dev stack...');
+    const scriptPath = path.resolve(__dirname, '../dev-sqlite.ps1');
+    spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-Stop'], {
+      cwd: path.resolve(__dirname, '..'),
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+  } catch (e) {
+    console.error('[52hzAgents Desktop] Error stopping dev stack:', e);
+  }
+}
+
 function ensureDevStackRunning() {
   checkServerReady(TARGET_URL, (ready) => {
     if (ready) {
@@ -286,6 +301,11 @@ app.whenReady().then(() => {
       createMainWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+  cleanupDevStack();
 });
 
 app.on('will-quit', () => {

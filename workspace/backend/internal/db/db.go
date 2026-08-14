@@ -28,6 +28,12 @@ func InitDB() {
 			sqlitePath += "&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 		}
 		DB, err = gorm.Open(sqlite.Open(sqlitePath), &gorm.Config{})
+		if err == nil {
+			if sqlDB, dbErr := DB.DB(); dbErr == nil {
+				sqlDB.SetMaxOpenConns(1)
+				sqlDB.SetMaxIdleConns(1)
+			}
+		}
 	} else {
 		// Postgres mode
 		DB, err = gorm.Open(postgres.Open(dbURL), &gorm.Config{})

@@ -139,7 +139,7 @@ function DMSection({
 }
 
 export function ThreadList() {
-  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession } = useWorkspace();
+  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode, viewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
@@ -183,8 +183,10 @@ export function ThreadList() {
   const [showArchived, setShowArchived] = useState(false);
 
   const getSessionTime = useCallback((s: WorkspaceSession) => {
+    const userTime = userSentMessageTimestamps[s.sessionId];
+    if (userTime) return userTime;
     return s.lastEventAt || (s.createdAt ? new Date(s.createdAt).getTime() : 0);
-  }, []);
+  }, [userSentMessageTimestamps]);
 
   // Sort sessions by latest activity (lastEventAt, lastMessage timestamp, or createdAt)
   const sortedSessions = useMemo(() => {
@@ -240,7 +242,8 @@ export function ThreadList() {
 
   const startChannel = async (dir: string | null) => {
     try {
-      await createSession({ workingDir: dir ?? undefined });
+      const session = await createSession({ workingDir: dir ?? undefined });
+      if (session?.sessionId) recordUserMessageSent(session.sessionId);
       setViewMode('threads');
       if (isMobile) openMobileDetail();
     } catch (e) {

@@ -145,6 +145,8 @@ interface WorkspaceContextValue {
   currentSessionId: string | null;
   loading: boolean;
   error: string | null;
+  userSentMessageTimestamps: Record<string, number>;
+  recordUserMessageSent: (sessionId: string) => void;
   lastMessageBySession: Record<string, LastMessageInfo>;
   activeSessionIds: Set<string>;
   /** Agents that are themselves producing output right now — see setSessionActive. */
@@ -338,6 +340,29 @@ export function WorkspaceProvider({
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [manuallyRenamedSessions, setManuallyRenamedSessions] = useState<Set<string>>(new Set());
 
+  const [userSentMessageTimestamps, setUserSentMessageTimestamps] = useState<Record<string, number>>(() => {
+    if (typeof window !== 'undefined' && workspaceId) {
+      try {
+        const raw = localStorage.getItem(`user_sent_times_${workspaceId}`);
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return {};
+  });
+
+  const recordUserMessageSent = useCallback((sessionId: string) => {
+    const now = Date.now();
+    setUserSentMessageTimestamps((prev) => {
+      const next = { ...prev, [sessionId]: now };
+      if (typeof window !== 'undefined' && workspaceId) {
+        try {
+          localStorage.setItem(`user_sent_times_${workspaceId}`, JSON.stringify(next));
+        } catch {}
+      }
+      return next;
+    });
+  }, [workspaceId]);
+
   // Auto-select browser tabs for split browser view:
   // - On first load: select the most recently created agent tab (if any)
   // - On subsequent polls: select any newly appearing tab
@@ -476,10 +501,6 @@ export function WorkspaceProvider({
         return next;
       });
     }
-    const now = Date.now();
-    setSessions((prev) =>
-      prev.map((s) => (s.sessionId === sessionId ? { ...s, lastEventAt: now } : s))
-    );
     setLastMessageBySession((prev) => {
       if (!content && !prev[sessionId]) return prev;
       const existing = prev[sessionId];
@@ -1500,6 +1521,8 @@ export function WorkspaceProvider({
     loading,
     error,
     lastMessageBySession,
+    userSentMessageTimestamps,
+    recordUserMessageSent,
     activeSessionIds,
     workingAgentNames,
     stoppingSessionIds,

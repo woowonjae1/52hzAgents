@@ -93,6 +93,12 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   // Reset when session changes
   useEffect(() => {
     currentSessionRef.current = sessionId;
+    sseFailedRef.current = false;
+    sseRetryCountRef.current = 0;
+    if (sseRetryTimeoutRef.current) {
+      clearTimeout(sseRetryTimeoutRef.current);
+      sseRetryTimeoutRef.current = null;
+    }
     const nextDMPair = parseDMSession(sessionId);
     const scopedInitialMessages = sessionId && initialMessages
       ? scopeMessagesToSession(initialMessages, sessionId, nextDMPair)
@@ -265,8 +271,10 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   }, [sessionId, hasOlder, loadingOlder, dmPair]);
 
   const sseFailedRef = useRef(false);
+  const sseRetryCountRef = useRef(0);
+  const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initial load + SSE with polling fallback
+  // Initial load + SSE with polling fallback and exponential backoff recovery
   useEffect(() => {
     if (!sessionId || !enabled) return;
 
@@ -296,12 +304,27 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       schedule();
     };
 
+    const scheduleSSEReconnect = () => {
+      if (sseRetryTimeoutRef.current) clearTimeout(sseRetryTimeoutRef.current);
+      const delay = Math.min(1000 * Math.pow(2, sseRetryCountRef.current), 30_000);
+      sseRetryCountRef.current++;
+      sseRetryTimeoutRef.current = setTimeout(() => {
+        sseFailedRef.current = false;
+        setReconnectNonce((n) => n + 1);
+      }, delay);
+    };
+
     if (!isDM && !sseFailedRef.current) {
       try {
         const sseUrl = workspaceApi.getSSEUrl(sessionId);
         const es = new EventSource(sseUrl);
         eventSource = es;
         usingSSE = true;
+
+        es.onopen = () => {
+          sseRetryCountRef.current = 0;
+          sseFailedRef.current = false;
+        };
 
         es.onmessage = (ev) => {
           if (sessionId !== currentSessionRef.current) return;
@@ -319,6 +342,9 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
               if (prev.some((m) => m.messageId === msg.messageId)) return prev;
               return [...prev, msg];
             });
+            // Successful receipt confirms live channel
+            sseRetryCountRef.current = 0;
+            sseFailedRef.current = false;
           } catch {
             // malformed event
           }
@@ -330,10 +356,12 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
           eventSource = null;
           usingSSE = false;
           startPolling();
+          scheduleSSEReconnect();
         };
       } catch {
         sseFailedRef.current = true;
         startPolling();
+        scheduleSSEReconnect();
       }
     } else {
       startPolling();
@@ -342,24 +370,43 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     return () => {
       if (eventSource) eventSource.close();
       if (timeout) clearTimeout(timeout);
+      if (sseRetryTimeoutRef.current) clearTimeout(sseRetryTimeoutRef.current);
     };
   }, [sessionId, enabled, poll, loadHistory, reconnectNonce]);
 
-  // Recover after the tab is backgrounded (esp. mobile browsers, which suspend
-  // timers and kill the EventSource). On return to the foreground: immediately
-  // poll to catch up any messages missed while hidden — so the UI doesn't sit
-  // on a stale "thinking…" after the agent already answered — and bump the
-  // reconnect nonce to re-establish a fresh SSE connection for live updates.
+  // Recover after the tab is backgrounded or network comes back online.
+  // On return to the foreground/online: immediately poll to catch up any messages
+  // missed while hidden or offline and reset SSE retry state to reconnect immediately.
   useEffect(() => {
     if (!sessionId || !enabled) return;
-    const onVisibility = () => {
-      if (document.visibilityState !== 'visible') return;
+    const recoverConnection = () => {
       lastActivityRef.current = Date.now();
+      sseFailedRef.current = false;
+      sseRetryCountRef.current = 0;
+      if (sseRetryTimeoutRef.current) {
+        clearTimeout(sseRetryTimeoutRef.current);
+        sseRetryTimeoutRef.current = null;
+      }
       poll();
       setReconnectNonce((n) => n + 1);
     };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        recoverConnection();
+      }
+    };
+
+    const onOnline = () => {
+      recoverConnection();
+    };
+
     document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+    };
   }, [sessionId, enabled, poll]);
 
   // If seeded with cache, do a background refresh to catch any new messages

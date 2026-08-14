@@ -85,6 +85,35 @@ function renderMentions(children: ReactNode, agentNames: string[]): ReactNode {
   return processNode(children);
 }
 
+class MarkdownErrorBoundary extends React.Component<
+  { fallbackContent: string; children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { fallbackContent: string; children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.warn('[MarkdownContent] Render fallback triggered:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-foreground opacity-90">
+          {this.props.fallbackContent}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const MarkdownContent = memo(function MarkdownContent({ content, agentNames }: MarkdownContentProps) {
   const hasStreamingMermaidFence = hasOpenMermaidFence(content);
 
@@ -176,22 +205,25 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         );
       }
 
-      // Attempt to extract language class
-      const codeElement = React.Children.only(children) as React.ReactElement<{ className?: string; children?: React.ReactNode }>;
+      // Safely extract codeElement without throwing if children is an array or contains text nodes
+      const childArray = React.Children.toArray(children);
+      const codeElement = childArray.find(
+        (child): child is React.ReactElement<{ className?: string; children?: React.ReactNode }> =>
+          React.isValidElement(child)
+      );
       const className = codeElement?.props?.className || '';
       const match = /language-(\w+)/.exec(className);
       const language = match ? match[1].toUpperCase() : 'CODE';
 
+      const rawCodeText = codeElement ? nodeToText(codeElement.props?.children) : nodeToText(children);
+
       // Fenced ```diff / ```patch → real unified-diff renderer
       if (language === 'DIFF' || language === 'PATCH') {
-        return <DiffBlock code={nodeToText(codeElement?.props?.children).replace(/\n$/, '')} />;
+        return <DiffBlock code={rawCodeText.replace(/\n$/, '')} />;
       }
 
       // Code blocks stay dark in BOTH themes so the syntax-highlight palette
-      // (tuned for a dark ground) keeps its contrast. The values are pinned
-      // rather than tokenized for that reason, but they are true neutrals
-      // matching the app's ramp — the old zinc scale carried a blue bias that
-      // read as a foreign tint next to the neutral surfaces.
+      // (tuned for a dark ground) keeps its contrast.
       return (
         <div className="my-3 overflow-hidden rounded-xl border border-[#2e2e2e] bg-[#1a1a1a] text-[#ececec] font-mono shadow-sm">
           <div className="flex items-center justify-between px-4 py-2 border-b border-[#2e2e2e]/80 bg-[#212121]/90 text-[11px] font-semibold text-[#b4b4b4]">
@@ -201,7 +233,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             </span>
             <button
               onClick={() => {
-                const text = nodeToText(codeElement?.props?.children).trim();
+                const text = rawCodeText.trim();
                 if (text) {
                   navigator.clipboard.writeText(text);
                   toast.success('Code copied to clipboard');
@@ -238,15 +270,17 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
   }), [agentNames, hasStreamingMermaidFence]);
 
   return (
-    <div className="markdown-content">
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
-        components={components}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
+    <MarkdownErrorBoundary fallbackContent={content}>
+      <div className="markdown-content">
+        <ReactMarkdown
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePlugins}
+          components={components}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    </MarkdownErrorBoundary>
   );
 }, arePropsEqual);
 
