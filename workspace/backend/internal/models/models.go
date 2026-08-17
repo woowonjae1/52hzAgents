@@ -367,6 +367,26 @@ func (AgentLogRecord) TableName() string {
 	return "agent_logs"
 }
 
+// AgentUsageRecord stores subscription quota, rate limits and 5-hour/weekly usage.
+type AgentUsageRecord struct {
+	WorkspaceID        string    `gorm:"primaryKey;type:uuid" json:"workspace_id"`
+	AgentName          string    `gorm:"primaryKey;type:text" json:"agent_name"`
+	SessionUsedPercent int       `gorm:"type:integer;not null;default:0" json:"session_used_percent"`
+	SessionResetsAt    *string   `gorm:"type:text" json:"session_resets_at"`
+	WeekUsedPercent    int       `gorm:"type:integer;not null;default:0" json:"week_used_percent"`
+	WeekResetsAt       *string   `gorm:"type:text" json:"week_resets_at"`
+	Last24hSummary     *string   `gorm:"type:text" json:"last_24h_summary"`
+	Last7dSummary      *string   `gorm:"type:text" json:"last_7d_summary"`
+	CurrentModel       *string   `gorm:"type:text" json:"current_model"`
+	AvailableModels    *string   `gorm:"type:text" json:"available_models"`
+	RawText            *string   `gorm:"type:text" json:"raw_text"`
+	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (AgentUsageRecord) TableName() string {
+	return "agent_usages"
+}
+
 type AgentApprovalRecord struct {
 	ID          string     `gorm:"primaryKey;type:text" json:"id"`
 	WorkspaceID string     `gorm:"type:uuid;not null;index:idx_agent_approvals_workspace_status" json:"workspace_id"`

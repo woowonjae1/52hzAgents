@@ -1035,6 +1035,22 @@ class WorkspaceClient {
       req.end();
     });
   }
+
+  /**
+   * Report subscription / rate limit usage for an agent.
+   */
+  async reportAgentUsage(workspaceId, agentName, usageData, token) {
+    try {
+      const data = await this._post(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/agents/${encodeURIComponent(agentName)}/usage`,
+        usageData,
+        this._wsHeaders(token)
+      );
+      return data.data || data;
+    } catch {
+      return null;
+    }
+  }
 }
 
 module.exports = { WorkspaceClient, SessionRevokedError };

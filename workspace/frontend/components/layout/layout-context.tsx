@@ -17,7 +17,7 @@ import {
   storeSidebarWidth,
 } from '@/lib/panel-store';
 
-export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills';
+export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
 
 export type RightPanelTab = 'browser' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | null;
 

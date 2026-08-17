@@ -352,6 +352,21 @@ export interface AgentRuntime {
   updatedAt: string | null;
 }
 
+export interface AgentUsage {
+  workspace_id: string;
+  agent_name: string;
+  session_used_percent: number;
+  session_resets_at: string | null;
+  week_used_percent: number;
+  week_resets_at: string | null;
+  last_24h_summary: string | null;
+  last_7d_summary: string | null;
+  current_model?: string | null;
+  available_models?: string | null;
+  raw_text: string | null;
+  updated_at: string;
+}
+
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;

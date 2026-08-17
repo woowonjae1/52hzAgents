@@ -1,13 +1,50 @@
 {
   "name": "52hzagents-desktop",
   "version": "1.0.0",
-  "description": "52hzAgents ChatGPT/Claude-Quality Desktop Client",
+  "description": "52hzAgents Local-First Multi-Agent Orchestration Desktop Client",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron ."
+    "dev": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win"
   },
   "devDependencies": {
-    "electron": "^31.7.7"
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.52hzagents.desktop",
+    "productName": "52hzAgents",
+    "copyright": "Copyright © 2026 52hzAgents",
+    "directories": {
+      "output": "release-dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png",
+      "tray-icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "."
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "52hzAgents"
+    }
   }
 }

@@ -41,11 +41,25 @@ export function rememberWorkingDir(dir: string): void {
 }
 
 /**
- * Ask wwj to show the OS folder dialog. Returns null if the user cancelled.
- * Exported so surfaces that add a project directly — the sidebar's "add a
- * project folder" — can reuse it without rendering the whole picker.
+ * Ask native Electron bridge (instant 0ms) or local wwj daemon to show the OS folder dialog.
+ * Returns null if the user cancelled.
  */
-export async function browseForFolder(): Promise<string | null> {
+export async function browseForFolder(defaultPath?: string): Promise<string | null> {
+  // 1. In Electron desktop, invoke the native C++ Win32 IFileDialog via Electron IPC (instant popup, 0ms delay)
+  const bridge = typeof window !== 'undefined'
+    ? (window as unknown as { electronBridge?: { browseFolder?: (defaultPath?: string) => Promise<string | null> } }).electronBridge
+    : undefined;
+
+  if (bridge?.browseFolder) {
+    try {
+      const selected = await bridge.browseFolder(defaultPath);
+      return selected;
+    } catch (err) {
+      console.warn('[Desktop Bridge] Native folder browse failed, falling back to daemon:', err);
+    }
+  }
+
+  // 2. Fallback to WWJ local daemon if running in a regular web browser tab
   const res = await fetch(`${WWJ_BROWSE_URL}/browse-folder`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({} as { error?: string }));

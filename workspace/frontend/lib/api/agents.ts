@@ -3,6 +3,7 @@ import type {
   AgentCatalogEntry,
   AgentLogEntry,
   AgentRuntime,
+  AgentUsage,
   CloudAgentConfig,
   CloudAgentModelInfo,
   CloudAgentProvider,
@@ -241,5 +242,13 @@ export class AgentsApi extends BaseWorkspaceApi {
       resolvedBy: (raw.resolved_by ?? null) as string | null, resolvedAt: (raw.resolved_at ?? null) as string | null,
       createdAt: (raw.created_at ?? null) as string | null,
     };
+  }
+
+  async getAgentUsage(agentName: string): Promise<AgentUsage | null> {
+    try {
+      return await this.request<AgentUsage>(`/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentName)}/usage`);
+    } catch {
+      return null;
+    }
   }
 }

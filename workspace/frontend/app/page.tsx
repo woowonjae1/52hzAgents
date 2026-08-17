@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/page';
+import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/workspace-client';
 import Image from 'next/image';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,

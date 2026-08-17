@@ -23,7 +23,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check } from 'lucide-react';
+import { ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -32,8 +32,37 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
+import { AgentQuotaCapsule } from './agent-quota-capsule';
+import { AgentModelSwitcher } from './agent-model-switcher';
 import { eventToMessage } from '@/lib/types'; 
 import type { WorkspaceMessage } from '@/lib/types';
+
+const PROMPT_SUGGESTIONS = [
+  {
+    icon: '⚡',
+    title: '代码重构与审查',
+    desc: '审查当前工作区代码质量，指出潜在隐患并给出重构建议',
+    prompt: '请帮我全面审查当前工作区的核心代码架构与实现，指出潜在的逻辑或性能隐患，并给出优化建议。',
+  },
+  {
+    icon: '🔍',
+    title: '深度搜索与调研',
+    desc: '联网检索主流技术方案，输出对比评测分析报告',
+    prompt: '请帮我调研当前主流的本地多 Agent 协同架构方案与最佳实践，并对比它们的优缺点。',
+  },
+  {
+    icon: '💻',
+    title: '终端自动化排查',
+    desc: '运行本地命令，检测开发环境依赖与系统运行状态',
+    prompt: '请帮我检查当前项目的 Git 提交状态与环境依赖完整性，并排查潜在异常。',
+  },
+  {
+    icon: '📐',
+    title: '架构设计与接口规划',
+    desc: '规划新业务模块的架构设计与前后端 API 规范',
+    prompt: '请为我们即将开发的新功能编写一份系统架构设计说明书与核心接口定义草案。',
+  },
+];
 
 /**
  * The side panels, previously four always-visible toolbar buttons. They are
@@ -686,7 +715,16 @@ export function ChatView() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0 [app-region:no-drag]">
+        <div className="flex items-center gap-1.5 shrink-0 [app-region:no-drag]">
+          {/* Claude Model Switcher (only shown when Claude is in thread & connected) */}
+          <AgentModelSwitcher
+            agentName={channelAgentNames.find((n) => n.toLowerCase().includes('claude')) || 'claude'}
+            sessionId={currentSessionId}
+          />
+
+          {/* Claude 5-hour & weekly quota capsule (only shown when Claude is in thread & connected) */}
+          <AgentQuotaCapsule agentName={channelAgentNames.find((n) => n.toLowerCase().includes('claude')) || 'claude'} />
+
           {/* Git — a compose surface (stage/commit/sync), not a settings
               toggle, so it keeps its own always-visible trigger rather than
               nesting a commit textarea inside the overflow menu below. */}
@@ -912,25 +950,58 @@ export function ChatView() {
 
       {/* Messages */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        {loading ? (
+        {loading && displayMessages.length === 0 ? (
           <div className="flex items-center justify-center flex-1">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : displayMessages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-muted-foreground select-none">
-            <div className="size-12 rounded-2xl bg-surface2 flex items-center justify-center mb-3 border border-border/60 shadow-2xs">
-              <MessageSquare className="size-6 text-foreground-muted" />
+          <div className="flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
+            <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-5 animate-[fadeIn_0.2s_ease-out]">
+              {/* Brand Emblem */}
+              <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center shadow-xs">
+                <Sparkles className="size-6 text-primary" />
+              </div>
+
+              {/* Title & Greeting */}
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                  有什么我可以协助你构建的？
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+                  52hzAgents 本地多 Agent 协同工作区 · 快捷呼出 · 深度推理与安全执行
+                </p>
+              </div>
+
+              {/* 4 Interactive Prompt Starter Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left pt-2">
+                {PROMPT_SUGGESTIONS.map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      handleDraftChange(item.prompt);
+                      setFocusKey((k) => k + 1);
+                    }}
+                    className="flex items-start gap-3 p-3 rounded-xl bg-surface1/80 hover:bg-surface2/90 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                  >
+                    <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center shrink-0 text-base group-hover:scale-105 transition-transform">
+                      {item.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                        <span>{item.title}</span>
+                        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
+                          ↵
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 leading-snug">
+                        {item.desc}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-sm font-semibold text-foreground">频道已就绪</p>
-            <p className="text-xs text-foreground-muted mt-1 max-w-sm leading-relaxed">
-              在下方输入框发送消息，开始与{' '}
-              <span className="font-medium text-foreground">
-                {currentSession?.participants?.length
-                  ? currentSession.participants.join(', ')
-                  : 'Agents'}
-              </span>{' '}
-              进行对话。
-            </p>
           </div>
         ) : (
           <ChatMessages
@@ -950,16 +1021,34 @@ export function ChatView() {
           <div className="px-4 lg:px-8 py-3 lg:py-4">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
-              {/* A thread with no agents gets no reply: the backend only borrows a
-                  workspace agent when the choice is unambiguous. Say so instead of
-                  letting the message vanish into silence. */}
+              {/* Agent Quick Selector Tray */}
               {currentSession && (currentSession.participants?.length ?? 0) === 0 && (
-                <div className="mb-2 flex items-center gap-2 rounded-lg border border-border-accent bg-surface2 px-3 py-2 text-xs text-status-warning dark:border-border-accent dark:bg-surface2 dark:text-status-warning">
-                  <AlertTriangle className="size-3.5 shrink-0" />
-                  <span className="flex-1">
-                    No agents in this thread — messages won&apos;t be answered. Use
-                    {' '}<span className="font-medium">Add agent</span> in the header.
-                  </span>
+                <div className="mb-2.5 flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-surface1/90 border border-border/60 text-xs">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Sparkles className="size-3.5 text-primary" />
+                    <span>选择参与对话的 Agent：</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {agents.filter(a => a.status === 'online').length > 0 ? (
+                      agents.filter(a => a.status === 'online').map((agent) => (
+                        <button
+                          key={agent.agentName}
+                          onClick={() => {
+                            if (currentSessionId) addParticipant(currentSessionId, agent.agentName);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/50 text-[11px] font-medium transition-colors cursor-pointer"
+                        >
+                          <AgentAvatar name={agent.agentName} size={14} />
+                          <span>@{agent.agentName}</span>
+                          <Plus className="size-3 opacity-60" />
+                        </button>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        默认自动路由至本地可用 Agent
+                      </span>
+                    )}
+                  </div>
                 </div>
               )}
               {currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}

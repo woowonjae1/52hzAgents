@@ -538,6 +538,7 @@ class OpenClawAdapter extends BaseAdapter {
         '--log-level', 'trace',
         'agent',
         '--agent', this.openclawAgentId,
+        '--local',
         '--session-id', sessionKey,
         '--message', userMessage,
         '--json',

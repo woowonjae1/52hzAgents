@@ -76,7 +76,90 @@ class ClaudeAdapter extends BaseAdapter {
     } catch {}
   }
 
+  async fetchAndReportUsage(force = false) {
+    if (!this.workspaceId || !this.client) return null;
+    if (!force && this._cachedUsage && (Date.now() - (this._cachedUsageTime || 0) < 120_000)) {
+      return this._cachedUsage;
+    }
+    try {
+      const claudeBin = this._findClaudeBinary();
+      if (!claudeBin) return null;
+      const { execFile } = require('child_process');
+      const util = require('util');
+      const execFileAsync = util.promisify(execFile);
+      
+      const res = await execFileAsync(claudeBin, ['-p', '/usage', '--output-format', 'json'], {
+        timeout: 10000,
+        env: { ...process.env, CLAUDE_CODE_SAFE_MODE: '1' },
+      });
+      const data = JSON.parse(res.stdout);
+      const text = data.result || '';
+      
+      const sessionMatch = text.match(/Current session:\s*(\d+)%?\s*used\s*·\s*resets\s*([^\n]+)/i);
+      const weekMatch = text.match(/Current week[^:]*:\s*(\d+)%?\s*used\s*·\s*resets\s*([^\n]+)/i);
+      const h24Match = text.match(/Last 24h\s*·\s*([^\n]+)/i);
+      const d7Match = text.match(/Last 7d\s*·\s*([^\n]+)/i);
+
+      let currentModel = null;
+      let availableModels = null;
+      try {
+        const modelRes = await execFileAsync(claudeBin, ['-p', '/model', '--output-format', 'json'], {
+          timeout: 8000,
+          env: { ...process.env, CLAUDE_CODE_SAFE_MODE: '1' },
+        });
+        const modelData = JSON.parse(modelRes.stdout);
+        const modelText = modelData.result || '';
+        const curMatch = modelText.match(/Current model:\s*([^\n]+)/i);
+        if (curMatch) currentModel = curMatch[1].trim();
+        const availMatch = modelText.match(/Available:\s*([^\n\.]+)/i);
+        if (availMatch) availableModels = availMatch[1].trim();
+      } catch {}
+
+      const usagePayload = {
+        session_used_percent: sessionMatch ? parseInt(sessionMatch[1], 10) : 0,
+        session_resets_at: sessionMatch ? sessionMatch[2].trim() : null,
+        week_used_percent: weekMatch ? parseInt(weekMatch[1], 10) : 0,
+        week_resets_at: weekMatch ? weekMatch[2].trim() : null,
+        last_24h_summary: h24Match ? h24Match[1].trim() : null,
+        last_7d_summary: d7Match ? d7Match[1].trim() : null,
+        current_model: currentModel,
+        available_models: availableModels,
+        raw_text: text,
+      };
+
+      this._cachedUsage = usagePayload;
+      this._cachedUsageTime = Date.now();
+
+      await this.client.reportAgentUsage(this.workspaceId, this.agentName, usagePayload, this.token);
+      return usagePayload;
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+      return null;
+    }
+  }
+
   async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const model = payload && payload.model;
+      const channel = payload && payload.channel;
+      if (model) {
+        if (channel) {
+          this._channelModels = this._channelModels || {};
+          this._channelModels[channel] = model;
+          if (this._persistentProcs[channel]) {
+            const pp = this._persistentProcs[channel];
+            if (pp.proc) {
+              try { pp.proc.kill(); } catch {}
+            }
+            delete this._persistentProcs[channel];
+          }
+        } else {
+          this.model = model;
+        }
+        this._log(`Model updated to '${model}' for channel=${channel || 'all'}`);
+      }
+      return;
+    }
     if (action === 'stop') {
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
       if (channel) {
@@ -425,6 +508,12 @@ class ClaudeAdapter extends BaseAdapter {
     const sessionId = this._channelSessions[channelName];
     if (sessionId && !skipResume) {
       cmd.push('--resume', sessionId);
+    }
+
+    // Model selection (sonnet, haiku, opus, etc.)
+    const selectedModel = (this._channelModels && this._channelModels[channelName]) || this.model;
+    if (selectedModel) {
+      cmd.push('--model', selectedModel);
     }
 
     // ── Skills mode: write SKILL.md, no MCP server ──
@@ -816,7 +905,8 @@ class ClaudeAdapter extends BaseAdapter {
           await this.sendStatus(pp.msgChannel, String(message) || 'Compacting conversation...');
         }
       } else if (eventType === 'rate_limit_event') {
-        this._log(`Rate limited: ${JSON.stringify(event).slice(0, 200)}`);
+        this._log(`Rate limited event: ${JSON.stringify(event).slice(0, 200)}`);
+        this.fetchAndReportUsage(true).catch(() => {});
       }
     };
 
@@ -1212,6 +1302,16 @@ class ClaudeAdapter extends BaseAdapter {
     if (mcpConfigFile) {
       try { fs.unlinkSync(mcpConfigFile); } catch {}
     }
+  }
+
+  async run() {
+    setTimeout(() => {
+      this.fetchAndReportUsage().catch(() => {});
+    }, 2000);
+    this._usageInterval = setInterval(() => {
+      this.fetchAndReportUsage().catch(() => {});
+    }, 180000);
+    return super.run();
   }
 }
 

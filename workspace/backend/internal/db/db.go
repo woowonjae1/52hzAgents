@@ -23,16 +23,23 @@ func InitDB() {
 			sqlitePath = "gorm.db"
 		}
 		if !strings.Contains(sqlitePath, "?") {
-			sqlitePath += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+			sqlitePath += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)"
 		} else if !strings.Contains(sqlitePath, "journal_mode") {
-			sqlitePath += "&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+			sqlitePath += "&_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)"
 		}
-		DB, err = gorm.Open(sqlite.Open(sqlitePath), &gorm.Config{})
+		DB, err = gorm.Open(sqlite.Open(sqlitePath), &gorm.Config{
+			PrepareStmt: true,
+		})
 		if err == nil {
 			if sqlDB, dbErr := DB.DB(); dbErr == nil {
-				sqlDB.SetMaxOpenConns(1)
-				sqlDB.SetMaxIdleConns(1)
+				// Allow concurrent readers in WAL mode while SQLite handles serialized writes cleanly
+				sqlDB.SetMaxOpenConns(50)
+				sqlDB.SetMaxIdleConns(10)
 			}
+			DB.Exec("PRAGMA journal_mode = WAL;")
+			DB.Exec("PRAGMA busy_timeout = 10000;")
+			DB.Exec("PRAGMA synchronous = NORMAL;")
+			DB.Exec("PRAGMA temp_store = MEMORY;")
 		}
 	} else {
 		// Postgres mode
@@ -66,6 +73,7 @@ func InitDB() {
 		&models.RoutineRecord{},
 		&models.NotificationRecord{},
 		&models.AgentRuntimeRecord{},
+		&models.AgentUsageRecord{},
 		&models.AgentLogRecord{},
 		&models.AgentApprovalRecord{},
 		&models.AuditRecord{},

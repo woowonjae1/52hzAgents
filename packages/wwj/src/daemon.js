@@ -7,6 +7,7 @@ const { spawn, execSync, execFileSync, execFile } = require('child_process');
 const os = require('os');
 const { WorkspaceClient } = require('./workspace-client');
 const { getEnhancedEnv, whichBinary, IS_WINDOWS, defaultAgentWorkdir } = require('./paths');
+const { AuthDiscovery } = require('./auth-discovery');
 
 // Local-only HTTP server so the (browser-based) frontend can offer a real
 // folder picker for "Open Folder" threads. A browser can never learn a real
@@ -56,6 +57,17 @@ class Daemon {
    * `autostart: true` in its config entry.
    */
   async start() {
+    // Auto-discover local API keys and environment credentials on startup
+    try {
+      if (this.envManager) {
+        const discovery = new AuthDiscovery();
+        const res = discovery.importToAgents(this.envManager);
+        if (res && res.keysFound > 0) {
+          console.log(`[wwj] Auth discovery: Identified ${res.keysFound} credentials, configured for ${res.agentsUpdated} agents.`);
+        }
+      }
+    } catch (e) {}
+
     const allAgents = this.config.getAgents();
     const agents = allAgents.filter((a) => this._shouldAutostart(a));
     const idle = allAgents.length - agents.length;

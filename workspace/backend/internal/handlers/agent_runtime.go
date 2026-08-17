@@ -109,6 +109,65 @@ func ListAgentRuntimes(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"runtimes": records})
 }
 
+type ReportAgentUsageRequest struct {
+	SessionUsedPercent int     `json:"session_used_percent"`
+	SessionResetsAt    *string `json:"session_resets_at"`
+	WeekUsedPercent    int     `json:"week_used_percent"`
+	WeekResetsAt       *string `json:"week_resets_at"`
+	Last24hSummary     *string `json:"last_24h_summary"`
+	Last7dSummary      *string `json:"last_7d_summary"`
+	CurrentModel       *string `json:"current_model"`
+	AvailableModels    *string `json:"available_models"`
+	RawText            *string `json:"raw_text"`
+}
+
+func ReportAgentUsage(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+	var req ReportAgentUsageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	agentName := c.Param("agent_name")
+	record := models.AgentUsageRecord{
+		WorkspaceID:        workspace.ID,
+		AgentName:          agentName,
+		SessionUsedPercent: req.SessionUsedPercent,
+		SessionResetsAt:    req.SessionResetsAt,
+		WeekUsedPercent:    req.WeekUsedPercent,
+		WeekResetsAt:       req.WeekResetsAt,
+		Last24hSummary:     req.Last24hSummary,
+		Last7dSummary:      req.Last7dSummary,
+		CurrentModel:       req.CurrentModel,
+		AvailableModels:    req.AvailableModels,
+		RawText:            req.RawText,
+	}
+	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).
+		Assign(record).FirstOrCreate(&record).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save agent usage"})
+		return
+	}
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.agent.usage.updated", "openagents:"+agentName, "", gin.H{"usage": record})
+	c.JSON(http.StatusOK, record)
+}
+
+func GetAgentUsage(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+	agentName := c.Param("agent_name")
+	var record models.AgentUsageRecord
+	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).First(&record).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Agent usage not found"})
+		return
+	}
+	c.JSON(http.StatusOK, record)
+}
+
 type CreateAgentLogRequest struct {
 	SessionID string `json:"session_id" binding:"required"`
 	Level     string `json:"level"`

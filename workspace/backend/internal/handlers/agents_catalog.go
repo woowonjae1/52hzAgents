@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"os/exec"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -11,8 +12,28 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetAgentCatalog 返回本地支持的 Agent 客户端类型列表
+func detectLocalBinary(name string, aliases ...string) (bool, string) {
+	if p, err := exec.LookPath(name); err == nil {
+		return true, p
+	}
+	for _, alias := range aliases {
+		if p, err := exec.LookPath(alias); err == nil {
+			return true, p
+		}
+	}
+	return false, ""
+}
+
+// GetAgentCatalog 返回本地支持的 Agent 客户端类型列表（附带本地 PATH 探测状态）
 func GetAgentCatalog(c *gin.Context) {
+	claudeDetected, claudePath := detectLocalBinary("claude")
+	openclawDetected, openclawPath := detectLocalBinary("openclaw")
+	hermesDetected, hermesPath := detectLocalBinary("hermes")
+	piDetected, piPath := detectLocalBinary("pi")
+	codexDetected, codexPath := detectLocalBinary("codex", "chatgpt")
+	cursorDetected, cursorPath := detectLocalBinary("cursor")
+	aiderDetected, aiderPath := detectLocalBinary("aider")
+
 	c.JSON(http.StatusOK, []gin.H{
 		{
 			"name":            "claude",
@@ -22,6 +43,8 @@ func GetAgentCatalog(c *gin.Context) {
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"coding", "cli"},
 			"builtin":         true,
+			"detected":        claudeDetected,
+			"binary_path":     claudePath,
 		},
 		{
 			"name":            "openclaw",
@@ -31,6 +54,8 @@ func GetAgentCatalog(c *gin.Context) {
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"coding", "cli"},
 			"builtin":         true,
+			"detected":        openclawDetected,
+			"binary_path":     openclawPath,
 		},
 		{
 			"name":            "hermes",
@@ -40,6 +65,8 @@ func GetAgentCatalog(c *gin.Context) {
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"coding", "cli"},
 			"builtin":         true,
+			"detected":        hermesDetected,
+			"binary_path":     hermesPath,
 		},
 		{
 			"name":            "pi",
@@ -49,6 +76,8 @@ func GetAgentCatalog(c *gin.Context) {
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"coding", "cli"},
 			"builtin":         true,
+			"detected":        piDetected,
+			"binary_path":     piPath,
 		},
 		{
 			"name":            "chatgpt",
@@ -58,15 +87,40 @@ func GetAgentCatalog(c *gin.Context) {
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"coding", "cli"},
 			"builtin":         true,
+			"detected":        codexDetected,
+			"binary_path":     codexPath,
+		},
+		{
+			"name":            "cursor",
+			"label":           "Cursor Agent",
+			"description":     "Cursor AI code editor agent CLI bridge.",
+			"install_command": "wwj install cursor",
+			"homepage":        "https://openagents.org",
+			"tags":            []string{"coding", "ide"},
+			"builtin":         true,
+			"detected":        cursorDetected,
+			"binary_path":     cursorPath,
+		},
+		{
+			"name":            "aider",
+			"label":           "Aider",
+			"description":     "AI pair programming in your terminal.",
+			"install_command": "wwj install aider",
+			"homepage":        "https://openagents.org",
+			"tags":            []string{"coding", "cli"},
+			"builtin":         true,
+			"detected":        aiderDetected,
+			"binary_path":     aiderPath,
 		},
 		{
 			"name":            "custom",
-			"label":           "Custom (Goose, Cline, Kilo, Aider...)",
-			"description":     "Define and connect your own custom agent client (Goose, Cline, Kilo, Aider, etc.).",
+			"label":           "Custom (Goose, Cline, Kilo...)",
+			"description":     "Define and connect your own custom agent client (Goose, Cline, Kilo, etc.).",
 			"install_command": "wwj create my-agent --type custom",
 			"homepage":        "https://openagents.org",
 			"tags":            []string{"custom"},
 			"builtin":         false,
+			"detected":        false,
 		},
 	})
 }

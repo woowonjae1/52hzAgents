@@ -2,9 +2,12 @@ package main // 声明 main 主包。
 
 // 引入所需标准库，以及 Gin 框架和内部编写的配置、数据库、事件处理器、广播 Hub 以及后台调度器。
 import (
-	"fmt"      // 用于进行格式化拼接生成监听地址字符串。
-	"log"      // 用于输出后台服务的启动和错误日志。
-	"net/http" // 包含标准 HTTP 状态码定义。
+	"fmt"           // 用于进行格式化拼接生成监听地址字符串。
+	"log"           // 用于输出后台服务的启动和错误日志。
+	"net/http"      // 包含标准 HTTP 状态码定义。
+	"os"            // 文件系统操作与路径探测
+	"path/filepath" // 文件路径处理
+	"strings"       // 字符串前缀判断
 
 	"github.com/gin-gonic/gin"                                             // Gin Web 核心路由与上下文。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"   // 环境变量加载包。
@@ -125,6 +128,8 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/agents/:agent_name/runtime", handlers.ReportAgentRuntime)
 		v1.GET("/workspaces/:workspace_id/agents/:agent_name/runtime", handlers.GetAgentRuntime)
 		v1.GET("/workspaces/:workspace_id/agents/runtime", handlers.ListAgentRuntimes)
+		v1.POST("/workspaces/:workspace_id/agents/:agent_name/usage", handlers.ReportAgentUsage)
+		v1.GET("/workspaces/:workspace_id/agents/:agent_name/usage", handlers.GetAgentUsage)
 		v1.POST("/workspaces/:workspace_id/agents/:agent_name/logs", handlers.CreateAgentLog)
 		v1.GET("/workspaces/:workspace_id/agents/:agent_name/logs", handlers.ListAgentLogs)
 		v1.POST("/approvals", handlers.CreateAgentApproval)
@@ -222,6 +227,47 @@ func main() { // 服务程序运行主入口函数。
 			"status": "ok", // 回复状态。
 		}) // 渲染。
 	}) // 结束。
+
+	// Static frontend serving (for standalone single-binary / desktop mode)
+	staticPaths := []string{
+		os.Getenv("FRONTEND_STATIC_PATH"),
+		"./public",
+		"./frontend_out",
+		"../frontend/out",
+		"../../frontend/out",
+	}
+	var staticDir string
+	for _, p := range staticPaths {
+		if p != "" {
+			if stat, err := os.Stat(p); err == nil && stat.IsDir() {
+				staticDir = p
+				break
+			}
+		}
+	}
+	if staticDir != "" {
+		log.Printf("Serving static frontend assets from %s", staticDir)
+		router.NoRoute(func(c *gin.Context) {
+			reqPath := c.Request.URL.Path
+			if strings.HasPrefix(reqPath, "/v1/") || strings.HasPrefix(reqPath, "/api/") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
+				return
+			}
+			filePath := filepath.Join(staticDir, filepath.Clean(reqPath))
+			if stat, err := os.Stat(filePath); err == nil && !stat.IsDir() {
+				c.File(filePath)
+				return
+			}
+			// Check if HTML file matching route exists (Next.js export)
+			htmlPath := filePath + ".html"
+			if stat, err := os.Stat(htmlPath); err == nil && !stat.IsDir() {
+				c.File(htmlPath)
+				return
+			}
+			// Fallback to index.html for client-side routing
+			c.File(filepath.Join(staticDir, "index.html"))
+		})
+	}
 
 	address := fmt.Sprintf("%s:%d", config.GlobalConfig.Host, config.GlobalConfig.Port) // 格式化拼接生成服务监听地址。
 	log.Printf("Starting server on %s", address)                                        // 打印准备开始监听的日志。

@@ -400,19 +400,16 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
         </div>
       )}
 
-      {/* rounded-3xl (24px) rather than a small radius: the composer is the one
-          control the eye returns to constantly, and the large radius is what
-          reads as "product" instead of "instrument panel". Padding grows with
-          the radius so the text doesn't crowd the rounded corners. */}
+      {/* Floating Prompt Island */}
       <div className={cn(
-        'relative flex flex-col gap-2 bg-surface2 transition-all duration-150 rounded-3xl border border-border/80 px-4 py-3 shadow-xs',
-        isDragging && 'border-accent border-dashed bg-surface1',
-        isFocused && !isDragging && 'border-border-accent shadow-sm ring-1 ring-border/50'
+        'relative flex flex-col gap-2 bg-surface1/95 backdrop-blur-md transition-all duration-200 rounded-2xl border border-border/80 px-4 py-3 shadow-md ring-1 ring-black/5 dark:ring-white/5',
+        isDragging && 'border-primary border-dashed bg-surface2/60',
+        isFocused && !isDragging && 'border-primary/40 shadow-lg ring-1 ring-primary/30'
       )}>
         {/* Drag overlay */}
         {isDragging && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-3xl z-10 pointer-events-none">
-            <span className="text-sm font-medium text-primary">Drop files here</span>
+          <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10 pointer-events-none bg-background/80 backdrop-blur-xs">
+            <span className="text-sm font-medium text-primary">拖放文件到此处上传</span>
           </div>
         )}
 
@@ -421,7 +418,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
           <div className="space-y-1.5 pb-1">
             <div className="flex items-center justify-between px-1">
               <span className="text-[11px] font-medium text-foreground-muted">
-                Attachments ({pendingFiles.length})
+                附件 ({pendingFiles.length})
               </span>
               <button
                 type="button"
@@ -429,7 +426,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                 className="text-[11px] font-medium text-status-danger hover:text-destructive transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <X className="size-3" />
-                <span>Clear all</span>
+                <span>清空全部</span>
               </button>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto max-w-full pb-1 scrollbar-thin">
@@ -455,9 +452,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                   <button
                     type="button"
                     onClick={() => removeFile(i)}
-                    className="absolute top-0.5 right-0.5 size-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-1 right-1 size-4 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
                   >
-                    <X className="size-3" />
+                    <X className="size-2.5" />
                   </button>
                 </div>
               ))}
@@ -474,11 +471,11 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             onPaste={handlePaste}
             onFocus={() => { setIsFocused(true); onFocusChange?.(true); }}
             onBlur={() => { setIsFocused(false); onFocusChange?.(false); }}
-            placeholder={agents.length > 1 || knowledge.length > 0 ? '@ 提及 agent / 引用文件 · # 引用知识 · ! 运行命令' : '发送消息... (使用 @ 提及 Agent)'}
+            placeholder={agents.length > 1 || knowledge.length > 0 ? '向 52hzAgents 发送消息，或输入 @ 呼叫指定 Agent...' : '向 52hzAgents 发送消息... (输入 @ 呼叫 Agent)'}
             rows={1}
             disabled={disabled}
             data-chat-input
-            className="w-full border-0 bg-transparent shadow-none focus:outline-none placeholder:text-muted-foreground/70 h-auto px-0 text-sm py-2 resize-none font-sans"
+            className="w-full border-0 bg-transparent shadow-none focus:outline-none placeholder:text-muted-foreground/60 h-auto px-0 text-sm py-2 resize-none font-sans leading-relaxed"
           />
           {/* Shortcut hint: always show 'esc' when focused, show 'i' when not focused and empty */}
           {isFocused ? (

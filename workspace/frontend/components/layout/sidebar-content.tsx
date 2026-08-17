@@ -107,12 +107,10 @@ export function SidebarContent() {
     <div className="flex flex-col h-full min-h-0 bg-surface0">
       {/* Explorer List Area (Defaults to Threads/Chats) */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {(viewMode === 'threads' || viewMode === 'mission' || viewMode === 'connect') && <ThreadList />}
+        {(viewMode === 'threads' || viewMode === 'mission' || viewMode === 'connect' || viewMode === 'skills' || viewMode === 'knowledge' || viewMode === 'settings') && <ThreadList />}
         {viewMode === 'files' && <FileList />}
         {viewMode === 'tasks' && <TasksView />}
-        {viewMode === 'knowledge' && <KnowledgeView sidebarOnly />}
         {viewMode === 'routines' && <RoutineList />}
-        {viewMode === 'skills' && <SkillsView />}
       </div>
 
       {/* Bottom control row with Agents, Chats, Knowledge Base, Theme & Settings */}
@@ -130,13 +128,18 @@ export function SidebarContent() {
         )}
 
         <div className="flex items-center justify-between">
-          {/* Bottom Left: Settings Button (Clean Antigravity 2.0 style) */}
+          {/* Bottom Left: Settings Button (Direct Page Navigation) */}
           <button
-            onClick={() => setSettingsOpen(true)}
-            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+            onClick={() => setViewMode(viewMode === 'settings' ? 'threads' : 'settings')}
+            className={cn(
+              "flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer",
+              viewMode === 'settings'
+                ? "bg-primary/15 text-primary font-semibold"
+                : "text-foreground hover:bg-surface2"
+            )}
             title="Settings"
           >
-            <Settings className="size-4 text-foreground-muted" />
+            <Settings className={cn("size-4", viewMode === 'settings' ? "text-primary" : "text-foreground-muted")} />
             <span>Settings</span>
           </button>
 
@@ -149,13 +152,15 @@ export function SidebarContent() {
             >
               {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>
+
+            {/* Management Token Copy */}
             {token && (
               <button
                 onClick={handleCopyToken}
                 className="size-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-                title={tokenCopied ? 'Copied!' : 'Copy workspace token'}
+                title="Copy Management Token"
               >
-                {tokenCopied ? <Check className="size-4" /> : <KeyRound className="size-4" />}
+                {tokenCopied ? <Check className="size-4 text-emerald-500" /> : <KeyRound className="size-4" />}
               </button>
             )}
             {isOpenAgentsDomain && !user && (
@@ -170,8 +175,6 @@ export function SidebarContent() {
           </div>
         </div>
       </div>
-
-      <SettingsDialogPortal open={settingsOpen} onOpenChange={setSettingsOpen} workspace={workspace} refreshWorkspace={refreshWorkspace} />
     </div>
   );
 }
@@ -255,180 +258,4 @@ function SettingsDialogPortal({ open, onOpenChange, workspace, refreshWorkspace 
       setSaving(false);
     }
   };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Workspace Settings</DialogTitle></DialogHeader>
-        <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label>Workspace Name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My Workspace" />
-          </div>
-          <div className="space-y-2">
-            <Label variant="secondary">Workspace URL</Label>
-            <div className="flex items-center gap-2">
-              <Input value={workspaceUrl} readOnly className="text-xs font-mono" />
-              <Button variant="outline" size="icon" onClick={() => copyUrl(workspaceUrl)}>
-                {urlCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              </Button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label variant="secondary">Workspace ID</Label>
-            <div className="flex items-center gap-2">
-              <Input value={workspaceSlug} readOnly className="text-xs font-mono" />
-              <Button variant="outline" size="icon" onClick={() => copyToken(workspaceSlug)}>
-                {tokenCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              </Button>
-            </div>
-          </div>
-
-          {/* Experimental */}
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-input px-4 py-3">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <Label>Monitor Mode</Label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground font-medium">
-                  Experimental
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Show a 2x3 grid overview of recent threads instead of the thread list.
-              </p>
-            </div>
-            <Switch checked={monitorMode} onCheckedChange={setMonitorMode} size="sm" />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-input px-4 py-3">
-            <div className="space-y-0.5">
-              <Label>Notification Sound</Label>
-              <p className="text-xs text-muted-foreground">
-                Play a sound when an agent completes a task.
-              </p>
-            </div>
-            <Switch checked={notificationSound} onCheckedChange={setNotificationSound} size="sm" />
-          </div>
-
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-input px-4 py-3">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <Label>Split Browser View</Label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground font-medium">
-                  Experimental
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Show browser tab side-by-side with chat when viewing threads.
-              </p>
-            </div>
-            <Switch checked={splitBrowser} onCheckedChange={setSplitBrowser} size="sm" />
-          </div>
-
-          {/* Collaborators */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Users className="size-4 text-muted-foreground" />
-              <Label>Collaborators</Label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Add people by email. They can access this workspace by signing in.
-            </p>
-            <div className="flex items-center gap-2">
-              <Input
-                value={collabEmail}
-                onChange={(e) => setCollabEmail(e.target.value)}
-                placeholder="colleague@example.com"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && collabEmail.trim()) {
-                    setCollabAdding(true);
-                    workspaceApi.addCollaborator(collabEmail.trim().toLowerCase(), 'editor')
-                      .then(() => {
-                        toast.success(`Added ${collabEmail.trim()}`);
-                        setCollabEmail('');
-                        return workspaceApi.listCollaborators();
-                      })
-                      .then((d) => setCollaborators(d.collaborators))
-                      .catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'))
-                      .finally(() => setCollabAdding(false));
-                  }
-                }}
-                className="flex-1"
-              />
-              <Button
-                onClick={() => {
-                  if (!collabEmail.trim()) return;
-                  setCollabAdding(true);
-                  workspaceApi.addCollaborator(collabEmail.trim().toLowerCase(), 'editor')
-                    .then(() => {
-                      toast.success(`Added ${collabEmail.trim()}`);
-                      setCollabEmail('');
-                      return workspaceApi.listCollaborators();
-                    })
-                    .then((d) => setCollaborators(d.collaborators))
-                    .catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'))
-                    .finally(() => setCollabAdding(false));
-                }}
-                disabled={collabAdding || !collabEmail.trim()}
-                size="sm"
-              >
-                {collabAdding ? '...' : 'Add'}
-              </Button>
-            </div>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto">
-              {collabOwner && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/30 text-sm">
-                  <Crown className="size-3.5 text-status-warning shrink-0" />
-                  <span className="truncate flex-1">{collabOwner}</span>
-                  <span className="text-xs text-muted-foreground">Owner</span>
-                </div>
-              )}
-              {collaborators.map((c) => (
-                <div key={c.email} className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/30 text-sm">
-                  <span className="truncate flex-1">{c.email}</span>
-                  <button
-                    onClick={() => {
-                      workspaceApi.removeCollaborator(c.email)
-                        .then(() => setCollaborators((prev) => prev.filter((x) => x.email !== c.email)))
-                        .catch((e) => toast.error(e instanceof Error ? e.message : 'Failed'));
-                    }}
-                    className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
-                  >
-                    <X className="size-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Browser Fabric API Key */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Globe className="size-4 text-muted-foreground" />
-              <Label>Browser Fabric API Key</Label>
-            </div>
-            {workspace?.browserfabricApiKey && (
-              <p className="text-xs text-muted-foreground font-mono">
-                Current: {workspace.browserfabricApiKey}
-              </p>
-            )}
-            <Input
-              value={bfApiKey}
-              onChange={(e) => setBfApiKey(e.target.value)}
-              placeholder={workspace?.browserfabricApiKey ? 'Enter new key to replace' : 'bf_... (optional — auto-provisioned if empty)'}
-              className="text-xs font-mono"
-            />
-            <p className="text-xs text-muted-foreground">
-              Each workspace gets a free-tier key automatically. Set a custom key to use your own BrowserFabric account.
-            </p>
-          </div>
-
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving || !name.trim()}>{saving ? 'Saving...' : 'Save'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }

@@ -699,6 +699,22 @@ class BaseAdapter {
 
         if (isHuman) {
           this._agentHopCounts[hopChannel] = 0;
+
+          // If the human message explicitly targets specific agent(s) via @mention or targetAgents,
+          // other agents who were NOT mentioned/targeted MUST NOT process or interrupt this message.
+          const explicitTargeted = Array.isArray(msg.targetAgents) && msg.targetAgents.length > 0;
+          const explicitMentions = Array.isArray(msg.mentions) && msg.mentions.length > 0;
+          const textMentionMatches = (typeof msg.content === 'string' ? msg.content.match(/(?:^|\s)@([a-zA-Z0-9_-]+)/g) : []) || [];
+          const agentMentions = textMentionMatches
+            .map(m => m.trim().replace(/^@/, ''))
+            .filter(name => !name.startsWith('knowledge:') && !name.includes('.'));
+
+          const hasSpecificTarget = explicitTargeted || explicitMentions || agentMentions.length > 0;
+
+          if (hasSpecificTarget && !mentionsMe && !targetedMe) {
+            this._log(`Ignoring human message targeted at other agent(s): mentionsMe=${mentionsMe}, targetedMe=${targetedMe}`);
+            continue;
+          }
         }
 
         if (!isHuman) {

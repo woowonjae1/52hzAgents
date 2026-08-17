@@ -22,6 +22,7 @@ import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { MissionControl } from '@/components/mission/mission-control';
 import { RadarPanel } from '@/components/mission/radar-panel';
 import { useWorkspace } from '@/lib/workspace-context';
+import { SettingsView } from '@/components/settings/settings-view';
 import { EmptyState } from '@/components/chat/empty-state';
 import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
@@ -102,6 +103,10 @@ export function Wrapper() {
           ) : viewMode === 'knowledge' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
               <KnowledgeView />
+            </div>
+          ) : viewMode === 'settings' ? (
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+              <SettingsView />
             </div>
           ) : mobilePane === 'list' ? (
             /* List pane — full width */
@@ -186,6 +191,8 @@ export function Wrapper() {
                   <SkillsView />
                 ) : viewMode === 'knowledge' ? (
                   <KnowledgeView />
+                ) : viewMode === 'settings' ? (
+                  <SettingsView />
                 ) : viewMode === 'browser' ? (
                   <BrowserView />
                 ) : (

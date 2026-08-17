@@ -1,7 +1,9 @@
-const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
-const { spawn } = require('child_process');
+const net = require('net');
+const fs = require('fs');
+const { spawn, execSync, fork } = require('child_process');
 
 // 1. Isolate userData folder & disable GPU shader cache lock (0x5)
 try {
@@ -12,60 +14,231 @@ try {
 } catch (e) {}
 
 let mainWindow = null;
+let quickBarWindow = null;
 let tray = null;
 let isQuitting = false;
 
-const TARGET_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:3005/';
+// Production / Development Configuration
+const isPackaged = app.isPackaged;
+const DEFAULT_PORT = 8000;
+let serverPort = DEFAULT_PORT;
+let TARGET_URL = process.env.FRONTEND_URL || (isPackaged ? `http://127.0.0.1:${DEFAULT_PORT}/` : 'http://127.0.0.1:3005/');
+
+let backendProcess = null;
+let connectorProcess = null;
+let sseReq = null;
+let devStackSpawned = false;
+
+// Dynamic port discovery helper
+function findFreePort(startPort = 8000) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(startPort, '127.0.0.1', () => {
+      const { port } = server.address();
+      server.close(() => resolve(port));
+    });
+    server.on('error', () => {
+      resolve(findFreePort(startPort + 1));
+    });
+  });
+}
 
 function checkServerReady(url, callback) {
   const testUrl = url.replace('localhost', '127.0.0.1');
   const req = http.get(testUrl, (res) => {
-    if (res.statusCode && res.statusCode < 400) {
+    if (res.statusCode && res.statusCode < 500) {
       callback(true);
     } else {
       callback(false);
     }
   });
   req.on('error', () => callback(false));
-  req.setTimeout(3000, () => {
+  req.setTimeout(2500, () => {
     req.destroy();
     callback(false);
   });
 }
 
-// Once per app run, and never again. This used to spawn a stack on every
-// readiness check that happened to fail, and dev-sqlite.ps1 begins by killing
-// whatever stack is already running — so a single blip (a restart, a slow
-// compile) turned into a loop: probe fails, spawn, the new script kills the
-// stack that was coming up, the next probe fails, spawn again. The window sat
-// on "Loading your workspace…" the whole time, reloading.
-let devStackSpawned = false;
+// Kill child process tree cleanly on Windows and Unix
+function killProcessTree(pid) {
+  if (!pid) return;
+  try {
+    if (process.platform === 'win32') {
+      execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' });
+    } else {
+      process.kill(-pid, 'SIGKILL');
+    }
+  } catch (e) {}
+}
+
+// Clean up any lingering 52hz-server orphan processes from previous crashes
+function cleanupOrphans() {
+  if (process.platform === 'win32') {
+    try {
+      execSync('taskkill /IM 52hz-server.exe /F', { stdio: 'ignore' });
+    } catch (e) {}
+  }
+  // Clear any stale WWJ daemon PID file and kill stale daemon process
+  try {
+    const os = require('os');
+    const wwjConfigDir = path.join(os.homedir(), '.wwj');
+    const pidFile = path.join(wwjConfigDir, 'daemon.pid');
+    if (fs.existsSync(pidFile)) {
+      const pidStr = fs.readFileSync(pidFile, 'utf8').trim();
+      const pid = parseInt(pidStr, 10);
+      if (pid) {
+        killProcessTree(pid);
+      }
+      try { fs.unlinkSync(pidFile); } catch {}
+    }
+  } catch (e) {}
+}
+
+async function startProductionStack() {
+  const userData = app.getPath('userData');
+  const dbPath = path.join(userData, 'workspace.db');
+  const filesPath = path.join(userData, 'files');
+
+  try {
+    fs.mkdirSync(filesPath, { recursive: true });
+  } catch (e) {}
+
+  cleanupOrphans();
+
+  // Find an available port dynamically
+  serverPort = await findFreePort(DEFAULT_PORT);
+  TARGET_URL = `http://127.0.0.1:${serverPort}/`;
+  console.log(`[52hzAgents Desktop] Selected port: ${serverPort}`);
+
+  // Locate 52hz-server binary
+  const binaryName = process.platform === 'win32' ? '52hz-server.exe' : '52hz-server';
+  const possibleServerPaths = [
+    path.join(process.resourcesPath, 'bin', binaryName),
+    path.join(process.resourcesPath, binaryName),
+    path.join(__dirname, 'resources', 'bin', binaryName),
+    path.join(__dirname, '..', 'backend', binaryName),
+  ];
+
+  const possiblePublicPaths = [
+    path.join(process.resourcesPath, 'public'),
+    path.join(__dirname, 'resources', 'public'),
+    path.join(__dirname, '..', 'frontend', 'out'),
+  ];
+
+  let serverBin = possibleServerPaths.find((p) => fs.existsSync(p));
+  let publicPath = possiblePublicPaths.find((p) => fs.existsSync(p)) || path.join(process.resourcesPath, 'public');
+
+  if (serverBin) {
+    console.log(`[52hzAgents Desktop] Starting bundled server from ${serverBin}`);
+    backendProcess = spawn(serverBin, [], {
+      env: {
+        ...process.env,
+        CGO_ENABLED: '0',
+        PORT: `${serverPort}`,
+        DATABASE_URL: `sqlite://${dbPath.replace(/\\/g, '/')}`,
+        FILE_STORAGE_PATH: filesPath,
+        AUTH_MODE: 'none',
+        CORS_ORIGINS: '*',
+        FRONTEND_STATIC_PATH: publicPath,
+      },
+      stdio: 'ignore',
+      detached: false,
+    });
+  } else {
+    console.warn('[52hzAgents Desktop] Bundled 52hz-server binary not found, attempting fallback');
+  }
+
+  // Launch WWJ Agent Connector in foreground mode using Electron's internal Node runtime
+  const possibleWwjPaths = [
+    path.join(process.resourcesPath, 'wwj', 'bin', 'agent-connector.js'),
+    path.join(__dirname, 'resources', 'wwj', 'bin', 'agent-connector.js'),
+    path.join(__dirname, '..', '..', 'packages', 'wwj', 'bin', 'agent-connector.js'),
+  ];
+
+  const wwjEntry = possibleWwjPaths.find((p) => fs.existsSync(p));
+  if (wwjEntry) {
+    console.log(`[52hzAgents Desktop] Starting WWJ connector from ${wwjEntry} (endpoint: http://127.0.0.1:${serverPort})`);
+    connectorProcess = fork(wwjEntry, ['up', '--foreground', '--endpoint', `http://127.0.0.1:${serverPort}`], {
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        WWJ_WORKSPACE_ENDPOINT: `http://127.0.0.1:${serverPort}`,
+      },
+      stdio: 'ignore',
+    });
+  }
+
+  // Subscribe to live SSE events for approval notifications
+  setTimeout(() => subscribeApprovalEvents(`http://127.0.0.1:${serverPort}`), 3000);
+}
+
+function subscribeApprovalEvents(baseUrl) {
+  try {
+    const sseUrl = `${baseUrl}/v1/events/stream?network=default`;
+    sseReq = http.get(sseUrl, (res) => {
+      if (res.statusCode !== 200) {
+        console.warn(`[52hzAgents Desktop] SSE stream returned HTTP ${res.statusCode}, retrying in 5s...`);
+        setTimeout(() => subscribeApprovalEvents(baseUrl), 5000);
+        return;
+      }
+      let buffer = '';
+      res.on('data', (chunk) => {
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep partial line
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            try {
+              const event = JSON.parse(line.slice(5).trim());
+              if (event && event.type === 'workspace.agent.approval.requested') {
+                const payload = event.payload || {};
+                const approvalId = payload.approval_id || payload.id || event.id;
+                const agentName = payload.agent_name || event.source || 'Agent';
+                const action = payload.action || payload.command || 'Sensitive Operation';
+                showApprovalNotification(agentName, action, approvalId);
+              }
+            } catch (err) {}
+          }
+        }
+      });
+      res.on('end', () => {
+        setTimeout(() => subscribeApprovalEvents(baseUrl), 3000);
+      });
+      res.on('error', () => {
+        setTimeout(() => subscribeApprovalEvents(baseUrl), 5000);
+      });
+    });
+    sseReq.on('error', () => {
+      setTimeout(() => subscribeApprovalEvents(baseUrl), 5000);
+    });
+  } catch (e) {}
+}
 
 function cleanupDevStack() {
   if (!devStackSpawned) return;
   try {
-    console.log('[52hzAgents Desktop] Stopping background dev stack...');
     const scriptPath = path.resolve(__dirname, '../dev-sqlite.ps1');
     spawn('powershell.exe', ['-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-Stop'], {
       cwd: path.resolve(__dirname, '..'),
       stdio: 'ignore',
       windowsHide: true,
     });
-  } catch (e) {
-    console.error('[52hzAgents Desktop] Error stopping dev stack:', e);
-  }
+  } catch (e) {}
 }
 
 function ensureDevStackRunning() {
+  if (isPackaged) {
+    startProductionStack();
+    return;
+  }
+
   checkServerReady(TARGET_URL, (ready) => {
     if (ready) {
       console.log('[52hzAgents Desktop] Connected to local server at 127.0.0.1:3005.');
+      subscribeApprovalEvents('http://127.0.0.1:8000');
       return;
     }
-    if (devStackSpawned) {
-      console.log('[52hzAgents Desktop] Dev stack already starting — waiting, not spawning another.');
-      return;
-    }
+    if (devStackSpawned) return;
     devStackSpawned = true;
     console.log('[52hzAgents Desktop] Starting dev-sqlite.ps1 stack...');
     const scriptPath = path.resolve(__dirname, '../dev-sqlite.ps1');
@@ -75,12 +248,12 @@ function ensureDevStackRunning() {
       stdio: 'ignore',
     });
     devServerProcess.unref();
+    setTimeout(() => subscribeApprovalEvents('http://127.0.0.1:8000'), 5000);
   });
 }
 
 function createTray() {
   try {
-    // Basic text/blank tray fallback if icon file is pending
     const iconPath = path.join(__dirname, 'tray-icon.png');
     tray = new Tray(iconPath);
     tray.setToolTip('52hzAgents Workspace');
@@ -96,12 +269,20 @@ function createTray() {
         },
       },
       {
-        label: '隐藏到托盘',
+        label: '呼出 Quick Bar (Alt+Space)',
         click: () => {
-          if (mainWindow) mainWindow.hide();
+          toggleQuickBar();
         },
       },
       { type: 'separator' },
+      {
+        label: '开机自动启动',
+        type: 'checkbox',
+        checked: app.getLoginItemSettings().openAtLogin,
+        click: (item) => {
+          app.setLoginItemSettings({ openAtLogin: item.checked });
+        },
+      },
       {
         label: '刷新界面 (F5)',
         click: () => {
@@ -188,7 +369,7 @@ function createMainWindow() {
         mainWindow.loadURL(`data:text/html;charset=utf-8,
           <html>
             <body style="background:#0e0e10;color:#f4f4f5;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
-              <h2>Unable to connect to 52hzAgents Web Server</h2>
+              <h2>Unable to connect to 52hzAgents Server</h2>
               <p style="color:#a1a1aa">Target URL: ${TARGET_URL}</p>
               <button onclick="location.reload()" style="background:#27272a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:16px;">Retry Connection</button>
             </body>
@@ -201,9 +382,8 @@ function createMainWindow() {
 
   loadAppUrl();
 
-  // External links open in default browser, internal app URLs navigate inside window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1:3005') || url.startsWith('http://localhost:3005')) {
+    if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
       return { action: 'allow' };
     }
     if (url.startsWith('http:') || url.startsWith('https:')) {
@@ -213,23 +393,6 @@ function createMainWindow() {
     return { action: 'allow' };
   });
 
-  // Short-cut keys: F5 / Ctrl+R reload, F12 toggle DevTools
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown') {
-      if ((input.control || input.meta) && input.key.toLowerCase() === 'r') {
-        mainWindow.reload();
-        event.preventDefault();
-      } else if (input.key === 'F5') {
-        mainWindow.reload();
-        event.preventDefault();
-      } else if (input.key === 'F12' || ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i')) {
-        mainWindow.webContents.toggleDevTools();
-        event.preventDefault();
-      }
-    }
-  });
-
-  // Minimize to tray on close
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault();
@@ -240,6 +403,76 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+}
+
+function createQuickBarWindow() {
+  quickBarWindow = new BrowserWindow({
+    width: 740,
+    height: 120,
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    transparent: true,
+    hasShadow: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  const quickBarUrl = TARGET_URL.endsWith('/')
+    ? `${TARGET_URL}quickbar`
+    : `${TARGET_URL}/quickbar`;
+
+  quickBarWindow.loadURL(quickBarUrl).catch(() => {});
+
+  quickBarWindow.on('blur', () => {
+    if (quickBarWindow && quickBarWindow.isVisible()) {
+      quickBarWindow.hide();
+    }
+  });
+}
+
+function toggleQuickBar() {
+  if (!quickBarWindow) {
+    createQuickBarWindow();
+  }
+
+  if (quickBarWindow.isVisible()) {
+    quickBarWindow.hide();
+  } else {
+    quickBarWindow.show();
+    quickBarWindow.focus();
+  }
+}
+
+// OS Notification for Approvals
+function showApprovalNotification(agentName, action, approvalId) {
+  if (!Notification.isSupported()) return;
+
+  const notif = new Notification({
+    title: `52hzAgents: Approval Required`,
+    body: `Agent @${agentName} requested permission to execute: ${action}`,
+    actions: [
+      { type: 'button', text: 'Approve' },
+      { type: 'button', text: 'Reject' },
+    ],
+  });
+
+  notif.on('action', (event, index) => {
+    const decision = index === 0 ? 'approved' : 'rejected';
+    const req = http.request(
+      `http://127.0.0.1:${serverPort}/v1/approvals/${approvalId}`,
+      { method: 'PATCH', headers: { 'Content-Type': 'application/json' } }
+    );
+    req.write(JSON.stringify({ status: decision }));
+    req.end();
+  });
+
+  notif.show();
 }
 
 // IPC Handlers
@@ -254,13 +487,44 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => mainWindow?.hide());
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false);
 
-// One app, one instance. Nothing in this file reloads the window — loadAppUrl()
-// runs once — so the same URL getting loaded over and over can only come from
-// another instance. And closing the window merely hides it (tray + the 'close'
-// handler below), so every extra `start-desktop.ps1` run left a live instance
-// behind, each loading http://127.0.0.1:3005/ on its own schedule and each
-// bouncing through the workspace picker. Hand the launch to the instance that is
-// already running instead of starting a rival.
+ipcMain.on('quickbar-hide', () => quickBarWindow?.hide());
+ipcMain.on('main-window-open', (event, route) => {
+  if (mainWindow) {
+    if (route) {
+      const fullUrl = route.startsWith('http') ? route : `${TARGET_URL.replace(/\/$/, '')}${route}`;
+      mainWindow.loadURL(fullUrl);
+    }
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
+
+ipcMain.handle('app-get-autostart', () => app.getLoginItemSettings().openAtLogin);
+ipcMain.handle('app-set-autostart', (event, enabled) => {
+  app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+  return app.getLoginItemSettings().openAtLogin;
+});
+
+// Instant Native Folder Picker (0ms delay using Win32 IFileDialog via Electron C++ API)
+ipcMain.handle('dialog-open-folder', async (event, defaultPath) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    const result = await dialog.showOpenDialog(win, {
+      title: '选择本地项目或工作区目录',
+      defaultPath: defaultPath || undefined,
+      properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
+    });
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths[0];
+  } catch (err) {
+    console.error('[52hzAgents] Native dialog-open-folder error:', err);
+    return null;
+  }
+});
+
+// Single Instance Lock
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -273,38 +537,44 @@ if (!gotTheLock) {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!gotTheLock) return;
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.52hzagents.app');
   }
-  ensureDevStackRunning();
+
+  if (isPackaged) {
+    await startProductionStack();
+  } else {
+    ensureDevStackRunning();
+  }
+
   createMainWindow();
+  createQuickBarWindow();
   createTray();
 
-  // Register Global Hotkey (Alt + Space) to toggle desktop app anywhere on OS
+  // Register Global Hotkey (Alt + Space) to summon Quick Bar
   try {
     globalShortcut.register('Alt+Space', () => {
-      if (mainWindow) {
-        if (mainWindow.isVisible() && mainWindow.isFocused()) {
-          mainWindow.hide();
-        } else {
-          mainWindow.show();
-          mainWindow.focus();
-        }
-      }
+      toggleQuickBar();
     });
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[52hzAgents Desktop] Failed to register Alt+Space global shortcut:', e);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
+      createQuickBarWindow();
     }
   });
 });
 
 app.on('before-quit', () => {
   isQuitting = true;
+  if (sseReq) sseReq.destroy();
+  if (backendProcess) killProcessTree(backendProcess.pid);
+  if (connectorProcess) killProcessTree(connectorProcess.pid);
   cleanupDevStack();
 });
 

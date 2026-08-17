@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Sparkles, Search, ExternalLink, Star, ArrowRight, Check, Plus, Loader2, AlertCircle, Upload, Package } from 'lucide-react';
+import { Sparkles, Search, ExternalLink, Star, ArrowRight, ArrowLeft, Check, Plus, Loader2, AlertCircle, Upload, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { workspaceApi } from '@/lib/api';
 import type { WorkspaceCustomSkill } from '@/lib/types';
@@ -499,6 +500,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
 export function SkillsView() {
   const { workspace } = useWorkspace();
+  const { setViewMode } = useLayout();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
@@ -551,12 +553,22 @@ export function SkillsView() {
       {/* Header */}
       <div className="shrink-0 px-5 pt-4 pb-3 border-b border-border space-y-3">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('threads')}
+            className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+            title="返回对话"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>返回对话</span>
+          </button>
+          <div className="h-3.5 w-px bg-border/60" />
           <Sparkles className="size-4 text-status-warning" />
           <ScreenTitle>Skill Hub</ScreenTitle>
           <span className="text-xs text-muted-foreground">{allSkills.length} skills</span>
           <button
             onClick={() => setUploadOpen(true)}
-            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
           >
             <Upload className="size-3.5" />
             Upload custom skill

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, Plus, FolderPlus, FolderOpen, MessageSquarePlus, History as HistoryIcon, CalendarClock } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, History as HistoryIcon, CalendarClock, BookOpen, Sparkles } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -320,26 +320,74 @@ export function ThreadList() {
 
 
       {/* Top Action & Navigation Block */}
-      <div className="px-2.5 pt-2 pb-1 shrink-0 space-y-1 select-none">
+      <div className="px-3 pt-3 pb-2 shrink-0 space-y-2 select-none">
         {/* + New Conversation Primary Button */}
         <button
           onClick={() => startChannel(null)}
-          className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-surface2 border border-border/80 text-[13px] font-semibold text-foreground hover:bg-surface3 transition-all cursor-pointer shadow-2xs group"
+          className="w-full flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-sm group font-medium text-xs"
         >
-          <Plus className="size-4 text-foreground-muted group-hover:scale-110 transition-transform" />
-          <span>New Conversation</span>
+          <div className="flex items-center gap-2">
+            <Plus className="size-4 group-hover:rotate-90 transition-transform duration-200" />
+            <span className="font-semibold">新对话 (New Chat)</span>
+          </div>
+          <kbd className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded bg-primary-foreground/15 text-primary-foreground font-semibold">
+            Ctrl+N
+          </kbd>
         </button>
 
-        {/* Quick Nav Link: Scheduled Tasks */}
+        {/* Quick Nav Segmented Tabs: Chats, Knowledge, Skills */}
+        <div className="flex items-center p-1 rounded-xl bg-surface2/90 border border-border/60 text-xs">
+          <button
+            onClick={() => setViewMode('threads')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
+              viewMode === 'threads'
+                ? 'bg-background text-foreground shadow-2xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            title="Chat Conversations"
+          >
+            <MessageSquare className="size-3.5" />
+            <span>对话</span>
+          </button>
+
+          <button
+            onClick={() => setViewMode(viewMode === 'knowledge' ? 'threads' : 'knowledge')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
+              viewMode === 'knowledge'
+                ? 'bg-background text-foreground shadow-2xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            title="Workspace Knowledge Base"
+          >
+            <BookOpen className="size-3.5" />
+            <span>知识库</span>
+          </button>
+          <button
+            onClick={() => setViewMode('skills')}
+            className={cn(
+              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
+              viewMode === 'skills'
+                ? 'bg-background text-foreground shadow-2xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            title="Skill Catalog & Extensions"
+          >
+            <Sparkles className="size-3.5" />
+            <span>技能</span>
+          </button>
+        </div>
+
         <button
-          onClick={() => setViewMode('routines')}
+          onClick={() => setViewMode(viewMode === 'routines' ? 'threads' : 'routines')}
           className={cn(
             'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
             viewMode === 'routines' ? 'bg-surface2 text-foreground font-semibold' : 'text-foreground-muted hover:text-foreground hover:bg-surface1/60'
           )}
         >
           <CalendarClock className="size-3.5 text-foreground-extra-muted shrink-0" />
-          <span>Scheduled Tasks</span>
+          <span>Scheduled Tasks (定时任务)</span>
         </button>
       </div>
 

@@ -24,7 +24,7 @@ function timeAgo(dateStr: string | null): string {
 
 export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }) {
   const { knowledge, refreshKnowledge, deleteKnowledge, agents } = useWorkspace();
-  const { isMobile } = useLayout();
+  const { isMobile, setViewMode } = useLayout();
   const agentNames = agents.map((a) => a.agentName);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -92,6 +92,16 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     <div className="h-full flex flex-col">
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('threads')}
+            className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+            title="返回对话"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span>返回对话</span>
+          </button>
+          <div className="h-3.5 w-px bg-border/60" />
           <BookOpen className="size-4 text-status-warning" />
           <ScreenTitle>Knowledge</ScreenTitle>
           {knowledge.length > 0 && (
