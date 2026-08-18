@@ -1,7 +1,7 @@
 'use client';
 
-import { ArrowLeft, BookOpen, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, BookOpen, Pencil, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
@@ -9,6 +9,12 @@ import type { KnowledgeEntry } from '@/lib/types';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { KnowledgeEditor } from './knowledge-editor';
+import {
+  KNOWLEDGE_IMPORT_ACCEPT,
+  KnowledgeDropOverlay,
+  KnowledgeImportDialog,
+  useKnowledgeDropzone,
+} from './knowledge-import';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -33,8 +39,13 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<(KnowledgeEntry & { content: string }) | null>(null);
   const [mobileDetail, setMobileDetail] = useState(false);
+  const [importFiles, setImportFiles] = useState<File[]>([]);
+  const filePickerRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { refreshKnowledge(); }, [refreshKnowledge]);
+
+  const handleDroppedFiles = useCallback((files: File[]) => { setImportFiles(files); }, []);
+  const isDragging = useKnowledgeDropzone(handleDroppedFiles);
 
   const selectedEntry = knowledge.find((k) => k.id === selectedId) || null;
 
@@ -117,6 +128,16 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           >
             <Plus className="size-3.5" />
           </button>
+          {/* Same import path as drag-and-drop — a dropzone alone is
+              undiscoverable and unreachable by keyboard. */}
+          <button
+            type="button"
+            onClick={() => filePickerRef.current?.click()}
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
+            title="Import .md / .txt files"
+          >
+            <Upload className="size-3.5" />
+          </button>
           <button
             type="button"
             onClick={refreshKnowledge}
@@ -134,6 +155,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             <BookOpen className="size-8 opacity-30" />
             <p className="text-sm">No knowledge entries yet</p>
             <p className="text-xs opacity-60">Create shared knowledge for your agents</p>
+            <p className="text-xs opacity-60">or drop .md / .txt files here to import</p>
             <button
               type="button"
               onClick={() => { setEditingEntry(null); setEditorOpen(true); }}
@@ -199,10 +221,6 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     </div>
   );
 
-  if (sidebarOnly) {
-    return EntryList;
-  }
-
   // Detail component
   const EntryDetail = selectedEntry ? (
     <div className="h-full flex flex-col">
@@ -251,20 +269,46 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     </div>
   );
 
-  // Mobile: single pane switching
-  if (isMobile) {
-    return mobileDetail && selectedEntry ? EntryDetail : EntryList;
-  }
+  const body = sidebarOnly
+    ? EntryList
+    // Mobile: single pane switching. Desktop: split view.
+    : isMobile
+      ? (mobileDetail && selectedEntry ? EntryDetail : EntryList)
+      : (
+        <div className="h-full flex w-full">
+          <div className="w-[300px] xl:w-[360px] shrink-0 border-r border-border overflow-hidden">
+            {EntryList}
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            {EntryDetail}
+          </div>
+        </div>
+      );
 
-  // Desktop: split view
+  // Import surface wraps every layout so a drop lands the same way in the
+  // sidebar, on mobile detail, and in the desktop split.
   return (
-    <div className="h-full flex w-full">
-      <div className="w-[300px] xl:w-[360px] shrink-0 border-r border-border overflow-hidden">
-        {EntryList}
-      </div>
-      <div className="flex-1 min-w-0 overflow-hidden">
-        {EntryDetail}
-      </div>
+    <div className="relative h-full">
+      {body}
+      <KnowledgeDropOverlay visible={isDragging} />
+      <input
+        ref={filePickerRef}
+        type="file"
+        multiple
+        accept={KNOWLEDGE_IMPORT_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          const picked = e.target.files;
+          if (picked && picked.length > 0) setImportFiles(Array.from(picked));
+          // Reset so picking the same file twice still fires onChange.
+          e.target.value = '';
+        }}
+      />
+      <KnowledgeImportDialog
+        files={importFiles}
+        onClose={() => setImportFiles([])}
+        onImported={refreshKnowledge}
+      />
     </div>
   );
 }

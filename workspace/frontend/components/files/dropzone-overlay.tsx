@@ -2,14 +2,25 @@
 
 import { UploadCloud } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { toast } from 'sonner';
 
 export function DropzoneOverlay() {
   const [isDragging, setIsDragging] = useState(false);
   const { uploadFile } = useWorkspace();
+  const { viewMode } = useLayout();
+
+  // The knowledge view owns drops while it is open — a .md dropped there is an
+  // import, not a shared-storage upload. Standing down entirely (rather than
+  // racing on the same window events) keeps that unambiguous.
+  const suspended = viewMode === 'knowledge';
 
   useEffect(() => {
+    if (suspended) {
+      setIsDragging(false);
+      return;
+    }
     let dragCounter = 0;
 
     const handleDragEnter = (e: DragEvent) => {
@@ -69,7 +80,7 @@ export function DropzoneOverlay() {
       window.removeEventListener('dragover', handleDragOver);
       window.removeEventListener('drop', handleDrop);
     };
-  }, [uploadFile]);
+  }, [uploadFile, suspended]);
 
   if (!isDragging) return null;
 

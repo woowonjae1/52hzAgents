@@ -23,7 +23,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug } from 'lucide-react';
+import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -34,8 +34,10 @@ import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
 import { AgentModelSwitcher } from './agent-model-switcher';
-import { eventToMessage } from '@/lib/types'; 
+import { eventToMessage } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
+import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
+import { toast } from 'sonner';
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -330,6 +332,60 @@ export function ChatView() {
 
   const isDM = currentSessionId?.startsWith('dm:') ?? false;
   const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
+
+  const [exporting, setExporting] = useState(false);
+
+  /**
+   * Export the whole thread as one Markdown file.
+   *
+   * Deliberately not built from the in-view `messages`: that list is paginated
+   * (loadOlder / hasOlder), so exporting it would silently truncate any thread
+   * long enough to be worth archiving. Page the history from the API instead,
+   * and say so out loud if even that hits the page ceiling.
+   */
+  const handleExportMarkdown = useCallback(async () => {
+    const sessionId = currentSessionIdRef.current;
+    if (!sessionId || exporting) return;
+    setExporting(true);
+    try {
+      const MAX_PAGES = 40;
+      const PAGE_SIZE = 100;
+      const chronological: WorkspaceMessage[] = [];
+      let before: string | undefined;
+      let truncated = false;
+
+      for (let page = 0; ; page++) {
+        if (page >= MAX_PAGES) { truncated = true; break; }
+        const res = await workspaceApi.loadMessageHistory(sessionId, { before, limit: PAGE_SIZE });
+        const batch = res.events
+          .map(eventToMessage)
+          .filter((m) => m.sessionId === sessionId);
+        if (batch.length === 0) break;
+        // The API returns newest-first; each page is older than the last.
+        chronological.unshift(...batch.slice().reverse());
+        before = batch[batch.length - 1].messageId;
+        if (!res.has_more) break;
+      }
+
+      const title = currentSession?.title || sessionId;
+      const markdown = messagesToMarkdown(chronological, {
+        title,
+        channelName: sessionId,
+        participants: currentSession?.participants,
+      });
+      downloadTextFile(conversationFilename(title), markdown);
+
+      toast.success(
+        truncated
+          ? `Exported the most recent ${chronological.length} messages (thread is longer)`
+          : 'Conversation exported',
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }, [currentSession, exporting]);
 
   // Which repository the git chip and the context line report on: the folder
   // this channel is bound to, resolved server-side from the channel id.
@@ -921,6 +977,17 @@ export function ChatView() {
               <DropdownMenuItem onClick={() => setShareDialogOpen(true)} className="gap-2 text-xs">
                 <Share2 className="size-3.5 text-foreground-muted" />
                 Share conversation
+              </DropdownMenuItem>
+
+              {/* Export — the whole thread as one .md file, for Obsidian /
+                  Notion / committing next to the code it describes. */}
+              <DropdownMenuItem
+                onSelect={(e) => { e.preventDefault(); void handleExportMarkdown(); }}
+                disabled={exporting || !currentSessionId}
+                className="gap-2 text-xs"
+              >
+                <Download className="size-3.5 text-foreground-muted" />
+                {exporting ? 'Exporting...' : 'Export as Markdown'}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
