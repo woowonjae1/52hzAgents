@@ -49,14 +49,14 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
   React.useEffect(() => {
     if (!isClaudeConnected) return;
     fetchUsage();
-    const interval = setInterval(fetchUsage, 45_000);
+    const interval = setInterval(fetchUsage, 30_000);
     return () => clearInterval(interval);
   }, [fetchUsage, isClaudeConnected]);
 
   if (!isClaudeConnected) return null;
 
-  const sessionPercent = usage?.session_used_percent ?? 12;
-  const weekPercent = usage?.week_used_percent ?? 5;
+  const sessionPercent = usage?.session_used_percent ?? 0;
+  const weekPercent = usage?.week_used_percent ?? 0;
 
   const getStatusColor = (pct: number) => {
     if (pct >= 85) return 'text-rose-500 bg-rose-500/10 border-rose-500/30';
@@ -71,7 +71,13 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
+    <Popover
+      open={isOpen}
+      onOpenChange={(open) => {
+        setIsOpen(open);
+        if (open) fetchUsage();
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -159,7 +165,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
           <div className="flex items-center justify-between text-[11px] text-foreground-muted pt-0.5">
             <span>重置时间</span>
             <span className="font-medium text-foreground/90">
-              {usage?.session_resets_at || '今天 19:09 (Asia/Shanghai)'}
+              {usage?.session_resets_at || (loading ? '加载中…' : '--')}
             </span>
           </div>
         </div>
@@ -187,7 +193,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
           <div className="flex items-center justify-between text-[11px] text-foreground-muted pt-0.5">
             <span>重置时间</span>
             <span className="font-medium text-foreground/90">
-              {usage?.week_resets_at || '8月22日 12:59am (Asia/Shanghai)'}
+              {usage?.week_resets_at || (loading ? '加载中…' : '--')}
             </span>
           </div>
         </div>

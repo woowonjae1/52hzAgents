@@ -76,24 +76,58 @@ class ClaudeAdapter extends BaseAdapter {
     } catch {}
   }
 
+  _runHiddenCli(bin, args, timeoutMs = 10000) {
+    return new Promise((resolve) => {
+      try {
+        const proc = spawn(bin, args, {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          shell: true,
+          env: { ...(this.agentEnv || process.env), CLAUDE_CODE_SAFE_MODE: '1' },
+        });
+        let stdout = '';
+        let stderr = '';
+        const timer = setTimeout(() => {
+          try { proc.kill(); } catch {}
+          resolve(null);
+        }, timeoutMs);
+
+        if (proc.stdout) proc.stdout.on('data', (d) => { stdout += d; });
+        if (proc.stderr) proc.stderr.on('data', (d) => { stderr += d; });
+        proc.on('close', () => {
+          clearTimeout(timer);
+          const all = (stdout + '\n' + stderr).trim();
+          const match = all.match(/\{[\s\S]*\}/);
+          if (match) {
+            try {
+              const parsed = JSON.parse(match[0]);
+              resolve(parsed);
+              return;
+            } catch {}
+          }
+          resolve(null);
+        });
+        proc.on('error', () => {
+          clearTimeout(timer);
+          resolve(null);
+        });
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
   async fetchAndReportUsage(force = false) {
     if (!this.workspaceId || !this.client) return null;
-    if (!force && this._cachedUsage && (Date.now() - (this._cachedUsageTime || 0) < 120_000)) {
+    if (!force && this._cachedUsage && (Date.now() - (this._cachedUsageTime || 0) < 30_000)) {
       return this._cachedUsage;
     }
     try {
       const claudeBin = this._findClaudeBinary();
       if (!claudeBin) return null;
-      const { execFile } = require('child_process');
-      const util = require('util');
-      const execFileAsync = util.promisify(execFile);
       
-      const res = await execFileAsync(claudeBin, ['-p', '/usage', '--output-format', 'json'], {
-        timeout: 10000,
-        env: { ...process.env, CLAUDE_CODE_SAFE_MODE: '1' },
-      });
-      const data = JSON.parse(res.stdout);
-      const text = data.result || '';
+      const usageData = await this._runHiddenCli(claudeBin, ['-p', '/usage', '--output-format', 'json']);
+      const text = (usageData && usageData.result) || '';
       
       const sessionMatch = text.match(/Current session:\s*(\d+)%?\s*used\s*·\s*resets\s*([^\n]+)/i);
       const weekMatch = text.match(/Current week[^:]*:\s*(\d+)%?\s*used\s*·\s*resets\s*([^\n]+)/i);
@@ -103,12 +137,8 @@ class ClaudeAdapter extends BaseAdapter {
       let currentModel = null;
       let availableModels = null;
       try {
-        const modelRes = await execFileAsync(claudeBin, ['-p', '/model', '--output-format', 'json'], {
-          timeout: 8000,
-          env: { ...process.env, CLAUDE_CODE_SAFE_MODE: '1' },
-        });
-        const modelData = JSON.parse(modelRes.stdout);
-        const modelText = modelData.result || '';
+        const modelData = await this._runHiddenCli(claudeBin, ['-p', '/model', '--output-format', 'json']);
+        const modelText = (modelData && modelData.result) || '';
         const curMatch = modelText.match(/Current model:\s*([^\n]+)/i);
         if (curMatch) currentModel = curMatch[1].trim();
         const availMatch = modelText.match(/Available:\s*([^\n\.]+)/i);
@@ -131,6 +161,7 @@ class ClaudeAdapter extends BaseAdapter {
       this._cachedUsageTime = Date.now();
 
       await this.client.reportAgentUsage(this.workspaceId, this.agentName, usagePayload, this.token);
+      this._log(`Reported Claude usage: session=${usagePayload.session_used_percent}%, week=${usagePayload.week_used_percent}%, model=${usagePayload.current_model || 'default'}`);
       return usagePayload;
     } catch (e) {
       this._log(`fetchAndReportUsage error: ${e.message}`);
