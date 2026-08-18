@@ -320,11 +320,11 @@ export function ThreadList() {
 
 
       {/* Top Action & Navigation Block */}
-      <div className="px-3 pt-3 pb-2 shrink-0 space-y-2 select-none">
+      <div className="px-3.5 pt-2.5 pb-2 shrink-0 space-y-3 select-none">
         {/* + New Conversation Primary Button */}
         <button
           onClick={() => startChannel(null)}
-          className="w-full flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-sm group font-medium text-xs"
+          className="w-full flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs group font-medium text-xs"
         >
           <div className="flex items-center gap-2">
             <Plus className="size-4 group-hover:rotate-90 transition-transform duration-200" />
@@ -336,7 +336,7 @@ export function ThreadList() {
         </button>
 
         {/* Quick Nav Segmented Tabs: Chats, Knowledge, Skills */}
-        <div className="flex items-center p-1 rounded-xl bg-surface2/90 border border-border/60 text-xs">
+        <div className="flex items-center p-1 rounded-xl bg-surface2/90 border border-border/50 text-xs">
           <button
             onClick={() => setViewMode('threads')}
             className={cn(
@@ -382,7 +382,7 @@ export function ThreadList() {
         <button
           onClick={() => setViewMode(viewMode === 'routines' ? 'threads' : 'routines')}
           className={cn(
-            'w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
+            'w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
             viewMode === 'routines' ? 'bg-surface2 text-foreground font-semibold' : 'text-foreground-muted hover:text-foreground hover:bg-surface1/60'
           )}
         >
@@ -392,8 +392,8 @@ export function ThreadList() {
       </div>
 
       {/* Agents Roster Section */}
-      <div className="px-2.5 pt-2 pb-1 border-b border-border/40 shrink-0">
-        <div className="flex items-baseline justify-between px-1 mb-1">
+      <div className="px-3 pt-3 pb-2 shrink-0">
+        <div className="flex items-baseline justify-between px-1 mb-1.5">
           <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">Agents</span>
           <span className="text-[11px] font-mono tabular-nums text-foreground-extra-muted">
             {onlineAgentCount} / {agents.length}

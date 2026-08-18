@@ -666,7 +666,7 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full bg-surface0">
       {/* Thread header */}
-      <div className={`flex items-center gap-2 px-4 lg:px-6 py-3 border-b border-border/80 shrink-0 bg-surface0 sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
+      <div className={`flex items-center gap-2 px-5 lg:px-8 py-3.5 shrink-0 bg-surface0/90 backdrop-blur-md sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0 [app-region:no-drag]">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (

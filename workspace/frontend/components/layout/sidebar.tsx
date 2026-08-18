@@ -70,7 +70,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'fixed overflow-hidden bg-surface-sidebar border-r border-border/80 top-0 bottom-0 start-0 z-20 flex flex-col shrink-0 shadow-xs',
+        'fixed overflow-hidden bg-surface-sidebar border-r border-border/40 top-0 bottom-0 start-0 z-20 flex flex-col shrink-0',
         // No width transition mid-drag, or the edge visibly lags the cursor.
         !isResizing && 'transition-all duration-300',
       )}

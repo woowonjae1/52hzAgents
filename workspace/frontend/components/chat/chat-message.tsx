@@ -373,7 +373,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             )}
 
             {/* Model Metadata Footer matching mockup */}
-            <div className="flex items-center justify-between gap-2 mt-2.5 pt-1.5 border-t border-border/40 text-[11px] font-mono text-foreground-extra-muted">
+            <div className="flex items-center justify-between gap-2 mt-2 pt-0.5 text-[11px] font-mono text-foreground-extra-muted">
               <div className="flex items-center gap-2">
                 <span>
                   {typeof message.metadata?.model === 'string'

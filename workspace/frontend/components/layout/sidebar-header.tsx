@@ -9,7 +9,7 @@ export function SidebarHeader() {
   const { workspace } = useWorkspace();
 
   return (
-    <div className="flex items-center justify-between shrink-0 px-3.5 py-3 border-b border-border/60 bg-surface-sidebar [app-region:drag] select-none">
+    <div className="flex items-center justify-between shrink-0 px-4 pt-3.5 pb-2.5 bg-surface-sidebar [app-region:drag] select-none">
       {/* Left: Brand logo with status dot */}
       <div className="flex items-center gap-2 [app-region:no-drag] min-w-0">
         <span className="size-2 rounded-full bg-status-success shrink-0" title="Workspace Connected" />
