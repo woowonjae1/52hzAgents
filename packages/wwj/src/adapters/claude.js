@@ -105,6 +105,10 @@ class ClaudeAdapter extends BaseAdapter {
               return;
             } catch {}
           }
+          if (all) {
+            resolve({ result: all });
+            return;
+          }
           resolve(null);
         });
         proc.on('error', () => {
@@ -127,12 +131,44 @@ class ClaudeAdapter extends BaseAdapter {
       if (!claudeBin) return null;
       
       const usageData = await this._runHiddenCli(claudeBin, ['-p', '/usage', '--output-format', 'json']);
-      const text = (usageData && usageData.result) || '';
+      let text = (usageData && usageData.result) || '';
+      if (!text && typeof usageData === 'string') text = usageData;
       
-      const sessionMatch = text.match(/Current session:\s*(\d+)%?\s*used\s*·\s*resets\s*([^\n]+)/i);
-      const weekMatch = text.match(/Current week[^:]*:\s*(\d+)%?\s*used\s*·\s*resets\s*([^\n]+)/i);
+      let sessionPercent = null;
+      let sessionReset = null;
+      let weekPercent = null;
+      let weekReset = null;
+
+      const sessionMatch = text.match(/Current session:\s*(\d+)%?\s*used(?:\s*·\s*resets\s*([^\n]+))?/i);
+      if (sessionMatch) {
+        sessionPercent = parseInt(sessionMatch[1], 10);
+        sessionReset = sessionMatch[2] ? sessionMatch[2].trim() : null;
+      } else {
+        const fallbackSession = text.match(/session[^\d:]*:\s*(\d+)%/i) || text.match(/(\d+)%\s*used/i);
+        if (fallbackSession) {
+          sessionPercent = parseInt(fallbackSession[1], 10);
+        }
+      }
+
+      const weekMatch = text.match(/Current week[^:]*:\s*(\d+)%?\s*used(?:\s*·\s*resets\s*([^\n]+))?/i);
+      if (weekMatch) {
+        weekPercent = parseInt(weekMatch[1], 10);
+        weekReset = weekMatch[2] ? weekMatch[2].trim() : null;
+      } else {
+        const fallbackWeek = text.match(/week[^\d:]*:\s*(\d+)%/i);
+        if (fallbackWeek) {
+          weekPercent = parseInt(fallbackWeek[1], 10);
+        }
+      }
+
       const h24Match = text.match(/Last 24h\s*·\s*([^\n]+)/i);
       const d7Match = text.match(/Last 7d\s*·\s*([^\n]+)/i);
+
+      let parseStatus = 'ok';
+      if (sessionPercent === null && weekPercent === null && text.length > 0) {
+        parseStatus = 'unparsed';
+        this._log(`Warning: Claude /usage output format did not match expected regex: ${text.slice(0, 160)}`);
+      }
 
       let currentModel = null;
       let availableModels = null;
@@ -146,22 +182,23 @@ class ClaudeAdapter extends BaseAdapter {
       } catch {}
 
       const usagePayload = {
-        session_used_percent: sessionMatch ? parseInt(sessionMatch[1], 10) : 0,
-        session_resets_at: sessionMatch ? sessionMatch[2].trim() : null,
-        week_used_percent: weekMatch ? parseInt(weekMatch[1], 10) : 0,
-        week_resets_at: weekMatch ? weekMatch[2].trim() : null,
+        session_used_percent: sessionPercent !== null ? sessionPercent : 0,
+        session_resets_at: sessionReset,
+        week_used_percent: weekPercent !== null ? weekPercent : 0,
+        week_resets_at: weekReset,
         last_24h_summary: h24Match ? h24Match[1].trim() : null,
         last_7d_summary: d7Match ? d7Match[1].trim() : null,
         current_model: currentModel,
         available_models: availableModels,
         raw_text: text,
+        parse_status: parseStatus,
       };
 
       this._cachedUsage = usagePayload;
       this._cachedUsageTime = Date.now();
 
       await this.client.reportAgentUsage(this.workspaceId, this.agentName, usagePayload, this.token);
-      this._log(`Reported Claude usage: session=${usagePayload.session_used_percent}%, week=${usagePayload.week_used_percent}%, model=${usagePayload.current_model || 'default'}`);
+      this._log(`Reported Claude usage: session=${usagePayload.session_used_percent}%, week=${usagePayload.week_used_percent}%, parse=${parseStatus}`);
       return usagePayload;
     } catch (e) {
       this._log(`fetchAndReportUsage error: ${e.message}`);

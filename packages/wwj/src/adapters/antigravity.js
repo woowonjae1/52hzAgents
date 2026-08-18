@@ -143,56 +143,58 @@ class AntigravityAdapter extends BaseAdapter {
 
     try {
       const currentModel = this.getCurrentModel();
-      let sessionCount = 0;
-      let dayCount = 0;
+      const conversationsDir = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'conversations');
+      let activeSessions5h = 0;
+      let activeSessions24h = 0;
+      let activeSessions7d = 0;
+      let totalConversations = 0;
 
-      // Estimate usage from history.jsonl if available
       try {
-        if (fs.existsSync(this._historyPath)) {
-          const content = fs.readFileSync(this._historyPath, 'utf-8');
-          const lines = content.trim().split('\n');
+        if (fs.existsSync(conversationsDir)) {
+          const files = fs.readdirSync(conversationsDir);
           const now = Date.now();
           const fiveHoursAgo = now - 5 * 3600 * 1000;
           const oneDayAgo = now - 24 * 3600 * 1000;
+          const sevenDaysAgo = now - 7 * 24 * 3600 * 1000;
 
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const item = JSON.parse(line);
-              const t = item.timestamp ? new Date(item.timestamp).getTime() : 0;
-              if (t >= fiveHoursAgo) sessionCount++;
-              if (t >= oneDayAgo) dayCount++;
-            } catch {}
+          for (const file of files) {
+            if (file.endsWith('.pb') || file.endsWith('.db')) {
+              totalConversations++;
+              try {
+                const stat = fs.statSync(path.join(conversationsDir, file));
+                const mtime = stat.mtimeMs;
+                if (mtime >= fiveHoursAgo) activeSessions5h++;
+                if (mtime >= oneDayAgo) activeSessions24h++;
+                if (mtime >= sevenDaysAgo) activeSessions7d++;
+              } catch {}
+            }
           }
         }
       } catch {}
 
-      // Calculate approximate percentages (e.g. 5-hour rolling pool vs daily pool)
-      const sessionPercent = Math.min(100, Math.round((sessionCount / 50) * 100));
-      const weekPercent = Math.min(100, Math.round((dayCount / 200) * 100));
-
-      const now = new Date();
-      const nextResetHour = new Date(now);
-      nextResetHour.setHours(now.getHours() + 1, 0, 0, 0);
-      const resetTimeStr = `${String(nextResetHour.getHours()).padStart(2, '0')}:00`;
+      // Calculate activity levels for visual monitoring
+      const sessionPercent = Math.min(100, activeSessions5h * 20);
+      const weekPercent = Math.min(100, activeSessions7d * 10);
 
       const usagePayload = {
+        is_estimated: true,
         session_used_percent: sessionPercent,
-        session_resets_at: `${resetTimeStr} (5小时窗口)`,
+        session_resets_at: '滚动刷新 (本地会话活跃度)',
         week_used_percent: weekPercent,
-        week_resets_at: '每日 00:00',
-        last_24h_summary: `${dayCount} 次请求已完成`,
-        last_7d_summary: 'Gemini 3.5 标准速率配额',
+        week_resets_at: '7天窗口',
+        last_24h_summary: `近 24h 活跃 ${activeSessions24h} 个会话 (累计 ${totalConversations} 个项目会话)`,
+        last_7d_summary: `近 7 天活跃 ${activeSessions7d} 个会话`,
         current_model: currentModel,
         available_models: ANTIGRAVITY_MODELS.map((m) => m.name).join(', '),
-        raw_text: `Antigravity Engine (${currentModel}) · 状态正常`,
+        raw_text: `Antigravity Engine (${currentModel}) · 状态正常 · 本地活跃会话: 24h内${activeSessions24h}个`,
+        parse_status: 'ok',
       };
 
       this._cachedUsage = usagePayload;
       this._cachedUsageTime = Date.now();
 
       await this.client.reportAgentUsage(this.workspaceId, this.agentName, usagePayload, this.token);
-      this._log(`Reported Antigravity usage: model=${currentModel}, session=${sessionPercent}%`);
+      this._log(`Reported Antigravity usage: model=${currentModel}, 24h_active=${activeSessions24h}, total=${totalConversations}`);
       return usagePayload;
     } catch (e) {
       this._log(`fetchAndReportUsage error: ${e.message}`);

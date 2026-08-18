@@ -533,6 +533,7 @@ func CreateAgent(c *gin.Context) {
 	} else {
 		runCmd = exec.Command("node", append([]string{cliPath}, args...)...)
 	}
+	setWindowsHidden(runCmd)
 	output, execErr := runCmd.CombinedOutput()
 	out := strings.TrimSpace(string(output))
 
@@ -602,17 +603,16 @@ func LaunchAgent(c *gin.Context) {
 		}
 	}
 
-	runArgs := []string{"/c", "start", "cmd", "/k"}
+	var runCmd *exec.Cmd
 	if cliPath == "wwj" {
-		runArgs = append(runArgs, "wwj", "connect", agentName, "-", "--endpoint", "http://localhost:8000")
+		runCmd = exec.Command("wwj", "connect", agentName, reqToken, "--endpoint", "http://127.0.0.1:8000")
 	} else {
-		runArgs = append(runArgs, "node", cliPath, "connect", agentName, "-", "--endpoint", "http://localhost:8000")
+		runCmd = exec.Command("node", cliPath, "connect", agentName, reqToken, "--endpoint", "http://127.0.0.1:8000")
 	}
-	runCmd := exec.Command("cmd", runArgs...)
 	runCmd.Env = append(os.Environ(),
 		"WWJ_WORKSPACE_TOKEN="+reqToken,
 		"OPENAGENTS_TOKEN="+reqToken,
-		"WWJ_WORKSPACE_ENDPOINT=http://localhost:8000",
+		"WWJ_WORKSPACE_ENDPOINT=http://127.0.0.1:8000",
 	)
 	// The chosen project directory becomes the connector process's cwd, so the
 	// agent it spawns reads/edits files there instead of the backend's own
@@ -620,10 +620,11 @@ func LaunchAgent(c *gin.Context) {
 	if workingDir != "" {
 		runCmd.Dir = workingDir
 	}
+	setWindowsHidden(runCmd)
 
-	execErr = runCmd.Start()
+	output, execErr := runCmd.CombinedOutput()
 	if execErr != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to launch agent process: " + execErr.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to launch agent process: " + execErr.Error(), "output": string(output)})
 		return
 	}
 

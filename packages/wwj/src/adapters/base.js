@@ -284,6 +284,11 @@ class BaseAdapter {
       await this.client.heartbeat(this.workspaceId, this.agentName, this.token, this._sessionId);
       this._heartbeatFailStreak = 0;
       this._reportStatus(null); // alive → clear any prior connectivity error
+
+      // Periodic quota & usage background refresh
+      if (typeof this.fetchAndReportUsage === 'function') {
+        this.fetchAndReportUsage().catch(() => {});
+      }
     } catch (e) {
       if (e instanceof SessionRevokedError) {
         this._log(`SESSION REVOKED: another client joined as '${this.agentName}'. Stopping adapter.`);
