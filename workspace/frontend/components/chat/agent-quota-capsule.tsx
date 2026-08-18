@@ -19,17 +19,31 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
   const [loading, setLoading] = React.useState(false);
   const [isOpen, setIsOpen] = React.useState(false);
 
-  const isClaudeConnected = React.useMemo(() => {
+  const isAntigravity = React.useMemo(() => {
     if (!agentName) return false;
-    const isClaudeName = agentName.toLowerCase().includes('claude');
-    const hasOnlineClaude = agents.some(
-      (a) => a.agentName.toLowerCase().includes('claude') && a.status === 'online'
+    const lower = agentName.toLowerCase();
+    return lower.includes('antigravity') || lower.includes('agy');
+  }, [agentName]);
+
+  const isClaude = React.useMemo(() => {
+    if (!agentName) return false;
+    return agentName.toLowerCase().includes('claude');
+  }, [agentName]);
+
+  const isConnected = React.useMemo(() => {
+    if (!agentName) return false;
+    const lower = agentName.toLowerCase();
+    return agents.some(
+      (a) =>
+        (a.agentName.toLowerCase() === lower ||
+          (isAntigravity && (a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy'))) ||
+          (isClaude && a.agentName.toLowerCase().includes('claude'))) &&
+        a.status === 'online'
     );
-    return isClaudeName && hasOnlineClaude;
-  }, [agentName, agents]);
+  }, [agentName, agents, isAntigravity, isClaude]);
 
   const fetchUsage = React.useCallback(async () => {
-    if (!agentName || !isClaudeConnected) return;
+    if (!agentName || !isConnected) return;
     try {
       setLoading(true);
       if (workspaceId) {
@@ -44,31 +58,28 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
     } finally {
       setLoading(false);
     }
-  }, [workspaceId, agentName, isClaudeConnected]);
+  }, [workspaceId, agentName, isConnected]);
 
   React.useEffect(() => {
-    if (!isClaudeConnected) return;
+    if (!isConnected) return;
     fetchUsage();
     const interval = setInterval(fetchUsage, 30_000);
     return () => clearInterval(interval);
-  }, [fetchUsage, isClaudeConnected]);
+  }, [fetchUsage, isConnected]);
 
-  if (!isClaudeConnected) return null;
+  if (!isConnected) return null;
 
   const sessionPercent = usage?.session_used_percent ?? 0;
   const weekPercent = usage?.week_used_percent ?? 0;
-
-  const getStatusColor = (pct: number) => {
-    if (pct >= 85) return 'text-rose-500 bg-rose-500/10 border-rose-500/30';
-    if (pct >= 60) return 'text-amber-500 bg-amber-500/10 border-amber-500/30';
-    return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30';
-  };
 
   const getBarColor = (pct: number) => {
     if (pct >= 85) return 'bg-rose-500';
     if (pct >= 60) return 'bg-amber-500';
     return 'bg-emerald-500';
   };
+
+  const agentLabel = isAntigravity ? 'Antigravity' : 'Claude';
+  const badgeLabel = isAntigravity ? 'Gemini 3.5' : 'Pro / Max';
 
   return (
     <Popover
@@ -86,7 +97,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
             'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
             className
           )}
-          title="点击查看 Claude 5小时与周配额刷新状态"
+          title={`点击查看 ${agentLabel} 配额与刷新状态`}
         >
           <span className="relative flex size-2 shrink-0 items-center justify-center">
             <span
@@ -102,12 +113,12 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
               )}
             />
           </span>
-          <span className="text-foreground-muted font-normal">5h</span>
+          <span className="text-foreground-muted font-normal">{isAntigravity ? '会话' : '5h'}</span>
           <span className={cn('font-semibold tabular-nums', sessionPercent >= 85 ? 'text-rose-500' : sessionPercent >= 60 ? 'text-amber-500' : 'text-foreground')}>
             {sessionPercent}%
           </span>
           <span className="text-foreground-extra-muted">·</span>
-          <span className="text-foreground-muted font-normal">周</span>
+          <span className="text-foreground-muted font-normal">{isAntigravity ? '周期' : '周'}</span>
           <span className="font-semibold tabular-nums text-foreground">{weekPercent}%</span>
         </button>
       </PopoverTrigger>
@@ -121,12 +132,12 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
             </div>
             <div>
               <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                Claude 配额监控
+                {agentLabel} 配额监控
                 <span className="text-[10px] font-normal px-1.5 py-0.2 rounded bg-surface3 text-foreground-muted">
-                  Pro / Max
+                  {badgeLabel}
                 </span>
               </div>
-              <p className="text-[10.5px] text-foreground-muted">本地 CLI 实时用量与刷新周期</p>
+              <p className="text-[10.5px] text-foreground-muted">本地引擎实时用量与刷新周期</p>
             </div>
           </div>
           <button
@@ -147,7 +158,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 font-medium text-foreground">
               <Clock className="size-3.5 text-primary" />
-              <span>5 小时会话限额</span>
+              <span>{isAntigravity ? '会话速率限额' : '5 小时会话限额'}</span>
             </div>
             <span className={cn('font-semibold tabular-nums text-xs', sessionPercent >= 85 ? 'text-rose-500' : sessionPercent >= 60 ? 'text-amber-500' : 'text-emerald-500')}>
               {sessionPercent}% used
@@ -175,7 +186,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
           <div className="flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 font-medium text-foreground">
               <Calendar className="size-3.5 text-primary" />
-              <span>周使用限额 (All Models)</span>
+              <span>{isAntigravity ? '周期总限额 (Gemini Models)' : '周使用限额 (All Models)'}</span>
             </div>
             <span className="font-semibold tabular-nums text-xs text-foreground">
               {weekPercent}% used
@@ -210,7 +221,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
             {usage.last_7d_summary && (
               <div className="flex items-start gap-1.5">
                 <Zap className="size-3 text-muted-foreground shrink-0 mt-0.5" />
-                <span>近 7d：{usage.last_7d_summary}</span>
+                <span>引擎状态：{usage.last_7d_summary}</span>
               </div>
             )}
           </div>
@@ -218,7 +229,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
 
         {/* Tip */}
         <div className="text-[10px] text-foreground-extra-muted leading-relaxed pt-1">
-          💡 提示：额度由 Anthropic 动态计算。若 5 小时额度紧张，可切换为 Haiku 或轻量模型节省消耗。
+          💡 提示：额度由本地与服务端动态计算。若额度紧张，可切换为轻量模型（如 Flash-Lite）节省消耗。
         </div>
       </PopoverContent>
     </Popover>

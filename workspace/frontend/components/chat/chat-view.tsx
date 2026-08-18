@@ -358,6 +358,17 @@ export function ChatView() {
   const canChatInCurrentSession = hasSpecificParticipants ? sessionOnlineAgents.length > 0 : hasOnlineAgents;
   const isMissingParticipant = hasSpecificParticipants && sessionOnlineAgents.length === 0;
 
+  const activeModelAgentName = useMemo(() => {
+    const inChannel = channelAgentNames.find(
+      (n) => n.toLowerCase().includes('antigravity') || n.toLowerCase().includes('agy') || n.toLowerCase().includes('claude')
+    );
+    if (inChannel) return inChannel;
+    const online = onlineAgents.find(
+      (a) => a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy') || a.agentName.toLowerCase().includes('claude')
+    );
+    return online?.agentName || 'claude';
+  }, [channelAgentNames, onlineAgents]);
+
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
     [currentSessionId, optimisticMessages]
@@ -729,14 +740,14 @@ export function ChatView() {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0 [app-region:no-drag]">
-          {/* Claude Model Switcher (only shown when Claude is in thread & connected) */}
+          {/* Agent Model Switcher (Claude / Antigravity) */}
           <AgentModelSwitcher
-            agentName={channelAgentNames.find((n) => n.toLowerCase().includes('claude')) || 'claude'}
+            agentName={activeModelAgentName}
             sessionId={currentSessionId}
           />
 
-          {/* Claude 5-hour & weekly quota capsule (only shown when Claude is in thread & connected) */}
-          <AgentQuotaCapsule agentName={channelAgentNames.find((n) => n.toLowerCase().includes('claude')) || 'claude'} />
+          {/* Agent Quota & Usage Capsule (Claude / Antigravity) */}
+          <AgentQuotaCapsule agentName={activeModelAgentName} />
 
           {/* Git — a compose surface (stage/commit/sync), not a settings
               toggle, so it keeps its own always-visible trigger rather than

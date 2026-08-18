@@ -155,6 +155,33 @@
     "env_config": []
   },
   {
+    "name": "antigravity",
+    "label": "Google Antigravity (AGY)",
+    "description": "Google Antigravity agentic coding platform with Gemini 3.5 models",
+    "homepage": "https://antigravity.google",
+    "tags": [
+      "coding",
+      "cli",
+      "gemini",
+      "google"
+    ],
+    "featured": true,
+    "order": 2,
+    "support": { "install": true, "workspace": true, "collaboration": true },
+    "builtin": true,
+    "install": {
+      "binary": "agy"
+    },
+    "adapter": {
+      "module": "openagents.adapters.antigravity",
+      "class": "AntigravityAdapter"
+    },
+    "launch": {
+      "args": []
+    },
+    "env_config": []
+  },
+  {
     "name": "cline",
     "label": "Cline",
     "description": "Autonomous coding agent CLI by Cline Bot",

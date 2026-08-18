@@ -13,13 +13,13 @@ import { workspaceApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-export interface ClaudeModelOption {
+export interface AgentModelOption {
   id: string;
   name: string;
   shortName: string;
 }
 
-export const CLAUDE_MODELS: ClaudeModelOption[] = [
+export const CLAUDE_MODELS: AgentModelOption[] = [
   {
     id: 'sonnet',
     name: 'Claude Sonnet 5',
@@ -37,6 +37,29 @@ export const CLAUDE_MODELS: ClaudeModelOption[] = [
   },
 ];
 
+export const ANTIGRAVITY_MODELS: AgentModelOption[] = [
+  {
+    id: 'gemini-3.5-flash',
+    name: 'Gemini 3.5 Flash (Medium)',
+    shortName: 'Flash 3.5',
+  },
+  {
+    id: 'gemini-3.5-pro',
+    name: 'Gemini 3.5 Pro (Large)',
+    shortName: 'Pro 3.5',
+  },
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash-Lite (Fast)',
+    shortName: 'Lite 3.5',
+  },
+  {
+    id: 'gemini-3.0-pro',
+    name: 'Gemini 3.0 Pro',
+    shortName: 'Pro 3.0',
+  },
+];
+
 interface AgentModelSwitcherProps {
   agentName?: string;
   sessionId?: string | null;
@@ -49,32 +72,52 @@ export function AgentModelSwitcher({
   className,
 }: AgentModelSwitcherProps) {
   const { workspaceId, agents } = useWorkspace();
-  const [selectedModelId, setSelectedModelId] = React.useState<string>('sonnet');
 
-  // Check if Claude is connected / online
-  const isClaudeConnected = React.useMemo(() => {
+  const isAntigravity = React.useMemo(() => {
     if (!agentName) return false;
-    const isClaudeName = agentName.toLowerCase().includes('claude');
-    const hasOnlineClaude = agents.some(
-      (a) => a.agentName.toLowerCase().includes('claude') && a.status === 'online'
+    const lower = agentName.toLowerCase();
+    return lower.includes('antigravity') || lower.includes('agy');
+  }, [agentName]);
+
+  const isClaude = React.useMemo(() => {
+    if (!agentName) return false;
+    return agentName.toLowerCase().includes('claude');
+  }, [agentName]);
+
+  const isConnected = React.useMemo(() => {
+    if (!agentName) return false;
+    const lower = agentName.toLowerCase();
+    return agents.some(
+      (a) =>
+        (a.agentName.toLowerCase() === lower ||
+          (isAntigravity && (a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy'))) ||
+          (isClaude && a.agentName.toLowerCase().includes('claude'))) &&
+        a.status === 'online'
     );
-    return isClaudeName && hasOnlineClaude;
-  }, [agentName, agents]);
+  }, [agentName, agents, isAntigravity, isClaude]);
+
+  const availableModels = isAntigravity ? ANTIGRAVITY_MODELS : CLAUDE_MODELS;
+  const defaultModelId = isAntigravity ? 'gemini-3.5-flash' : 'sonnet';
+  const [selectedModelId, setSelectedModelId] = React.useState<string>(defaultModelId);
 
   // Load saved preference
   React.useEffect(() => {
     if (!sessionId) return;
     try {
       const saved = localStorage.getItem(`52hz_model_${sessionId}_${agentName}`);
-      if (saved && CLAUDE_MODELS.some((m) => m.id === saved)) {
+      if (saved && availableModels.some((m) => m.id === saved)) {
         setSelectedModelId(saved);
+      } else {
+        setSelectedModelId(defaultModelId);
       }
-    } catch {}
-  }, [sessionId, agentName]);
+    } catch {
+      setSelectedModelId(defaultModelId);
+    }
+  }, [sessionId, agentName, availableModels, defaultModelId]);
 
-  if (!isClaudeConnected) return null;
+  if (!isConnected) return null;
 
-  const currentModel = CLAUDE_MODELS.find((m) => m.id === selectedModelId) || CLAUDE_MODELS[0];
+  const currentModel = availableModels.find((m) => m.id === selectedModelId) || availableModels[0];
 
   const handleSelectModelId = async (modelId: string, modelName: string) => {
     setSelectedModelId(modelId);
@@ -117,8 +160,8 @@ export function AgentModelSwitcher({
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" className="w-44 p-1 shadow-lg border-border/80 bg-surface1/95 backdrop-blur-xl">
-        {CLAUDE_MODELS.map((m) => {
+      <DropdownMenuContent align="start" className="w-48 p-1 shadow-lg border-border/80 bg-surface1/95 backdrop-blur-xl">
+        {availableModels.map((m) => {
           const isSelected = m.id === currentModel.id;
           return (
             <DropdownMenuItem

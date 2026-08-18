@@ -27,6 +27,7 @@ func detectLocalBinary(name string, aliases ...string) (bool, string) {
 // GetAgentCatalog 返回本地支持的 Agent 客户端类型列表（附带本地 PATH 探测状态）
 func GetAgentCatalog(c *gin.Context) {
 	claudeDetected, claudePath := detectLocalBinary("claude")
+	antigravityDetected, antigravityPath := detectLocalBinary("agy", "antigravity")
 	openclawDetected, openclawPath := detectLocalBinary("openclaw")
 	hermesDetected, hermesPath := detectLocalBinary("hermes")
 	piDetected, piPath := detectLocalBinary("pi")
@@ -45,6 +46,17 @@ func GetAgentCatalog(c *gin.Context) {
 			"builtin":         true,
 			"detected":        claudeDetected,
 			"binary_path":     claudePath,
+		},
+		{
+			"name":            "antigravity",
+			"label":           "Google Antigravity",
+			"description":     "Google Antigravity (AGY) agentic coding platform with Gemini 3.5 models.",
+			"install_command": "wwj connect antigravity",
+			"homepage":        "https://antigravity.google",
+			"tags":            []string{"coding", "cli", "gemini"},
+			"builtin":         true,
+			"detected":        antigravityDetected,
+			"binary_path":     antigravityPath,
 		},
 		{
 			"name":            "openclaw",

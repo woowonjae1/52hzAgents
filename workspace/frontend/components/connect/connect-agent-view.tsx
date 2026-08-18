@@ -31,9 +31,11 @@ function reportLoadFailure(what: string, reason: unknown) {
 // ---------------------------------------------------------------------------
 
 const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
-  claude:    { bg: 'bg-orange-500',  text: 'text-white' },
-  codex:     { bg: 'bg-green-600',   text: 'text-white' },
-  gemini:    { bg: 'bg-blue-500',    text: 'text-white' },
+  claude:      { bg: 'bg-orange-500',  text: 'text-white' },
+  antigravity: { bg: 'bg-blue-600',    text: 'text-white' },
+  agy:         { bg: 'bg-blue-600',    text: 'text-white' },
+  codex:       { bg: 'bg-green-600',   text: 'text-white' },
+  gemini:      { bg: 'bg-blue-500',    text: 'text-white' },
   openclaw:  { bg: 'bg-violet-600',  text: 'text-white' },
   amp:       { bg: 'bg-rose-500',    text: 'text-white' },
   aider:     { bg: 'bg-status-success', text: 'text-white' },

@@ -20,6 +20,7 @@ const CopilotAdapter = require('./copilot');
 const ClineAdapter = require('./cline');
 const AmpAdapter = require('./amp');
 const PiAdapter = require('./pi');
+const AntigravityAdapter = require('./antigravity');
 const CustomAdapter = require('./custom');
 const { AGENT_TYPE_ALIASES, resolveAgentType } = require('../agent-types');
 
@@ -32,6 +33,8 @@ const ADAPTER_MAP = {
   cursor: CursorAdapter,
   hermes: HermesAdapter,
   gemini: GeminiAdapter,
+  antigravity: AntigravityAdapter,
+  agy: AntigravityAdapter,
   kimi: KimiAdapter,
   aider: AiderAdapter,
   goose: GooseAdapter,
@@ -74,6 +77,7 @@ module.exports = {
   CursorAdapter,
   HermesAdapter,
   GeminiAdapter,
+  AntigravityAdapter,
   KimiAdapter,
   AiderAdapter,
   GooseAdapter,

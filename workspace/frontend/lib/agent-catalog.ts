@@ -27,6 +27,15 @@ export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
     builtin: true,
   },
   {
+    name: 'antigravity',
+    label: 'Google Antigravity',
+    description: 'Google Antigravity (AGY) agentic coding platform with Gemini 3.5 models.',
+    install_command: 'wwj connect antigravity',
+    homepage: 'https://antigravity.google',
+    tags: ['coding', 'cli', 'gemini'],
+    builtin: true,
+  },
+  {
     name: 'openclaw',
     label: 'OpenClaw',
     description: 'A community-driven coding agent with autonomous task execution capabilities.',
@@ -97,6 +106,8 @@ export const EXTRA_AGENT_RUNTIMES: { name: string; label: string }[] = [
  */
 export const AGENT_ICON_ALIASES: Record<string, string> = {
   chatgpt: 'openai',
+  antigravity: 'gemini',
+  agy: 'gemini',
 };
 
 /** Icon file base name for an agent/provider name. */
