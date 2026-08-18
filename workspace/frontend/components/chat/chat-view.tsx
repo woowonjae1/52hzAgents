@@ -23,7 +23,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight } from 'lucide-react';
+import { ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -178,6 +178,7 @@ export function ChatView() {
     isMobile,
     openMobileList,
     viewMode,
+    setViewMode,
     splitBrowser,
     setSplitBrowser,
     showBrowserPreview,
@@ -345,6 +346,18 @@ export function ChatView() {
   // happening in, which is also the only place the distinction is actionable.
   const channelAgentNames = currentSession?.participants ?? [];
   const workingHere = channelAgentNames.filter((name) => workingAgentNames.has(name));
+
+  const onlineAgents = useMemo(() => agents.filter((a) => a.status === 'online'), [agents]);
+  const hasOnlineAgents = onlineAgents.length > 0;
+  const sessionParticipants = currentSession?.participants || [];
+  const hasSpecificParticipants = sessionParticipants.length > 0;
+  const sessionOnlineAgents = useMemo(
+    () => hasSpecificParticipants ? onlineAgents.filter((a) => sessionParticipants.includes(a.agentName)) : onlineAgents,
+    [hasSpecificParticipants, onlineAgents, sessionParticipants]
+  );
+  const canChatInCurrentSession = hasSpecificParticipants ? sessionOnlineAgents.length > 0 : hasOnlineAgents;
+  const isMissingParticipant = hasSpecificParticipants && sessionOnlineAgents.length === 0;
+
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
     [currentSessionId, optimisticMessages]
@@ -956,7 +969,7 @@ export function ChatView() {
           </div>
         ) : displayMessages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
-            <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-5 animate-[fadeIn_0.2s_ease-out]">
+            <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.2s_ease-out]">
               {/* Brand Emblem */}
               <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center shadow-xs">
                 <Sparkles className="size-6 text-primary" />
@@ -972,35 +985,59 @@ export function ChatView() {
                 </p>
               </div>
 
-              {/* 4 Interactive Prompt Starter Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left pt-2">
-                {PROMPT_SUGGESTIONS.map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      handleDraftChange(item.prompt);
-                      setFocusKey((k) => k + 1);
-                    }}
-                    className="flex items-start gap-3 p-3 rounded-xl bg-surface1/80 hover:bg-surface2/90 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
-                  >
-                    <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center shrink-0 text-base group-hover:scale-105 transition-transform">
-                      {item.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
-                        <span>{item.title}</span>
-                        <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
-                          ↵
-                        </span>
+              {!hasOnlineAgents ? (
+                <div className="w-full max-w-md p-5 rounded-2xl bg-surface1/95 border border-border/80 shadow-sm flex flex-col items-center text-center space-y-3.5 mt-2">
+                  <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                    <Radio className="size-5 animate-pulse" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-semibold text-foreground">暂无在线的 Agent</h2>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      当前工作区未检测到已连接的 Agent。请启动本地连接器或前往连接页面接入 Agent（如 Claude、OpenClaw 等）后即可开始对话。
+                    </p>
+                  </div>
+                  <div className="pt-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('connect')}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                    >
+                      <Plug className="size-3.5" />
+                      <span>连接 Agent</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* 4 Interactive Prompt Starter Cards */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left pt-2">
+                  {PROMPT_SUGGESTIONS.map((item, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        handleDraftChange(item.prompt);
+                        setFocusKey((k) => k + 1);
+                      }}
+                      className="flex items-start gap-3 p-3 rounded-xl bg-surface1/80 hover:bg-surface2/90 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                    >
+                      <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center shrink-0 text-base group-hover:scale-105 transition-transform">
+                        {item.icon}
                       </div>
-                      <div className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 leading-snug">
-                        {item.desc}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                          <span>{item.title}</span>
+                          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
+                            ↵
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 leading-snug">
+                          {item.desc}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1021,36 +1058,75 @@ export function ChatView() {
           <div className="px-4 lg:px-8 py-3 lg:py-4">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
-              {/* Agent Quick Selector Tray */}
-              {currentSession && (currentSession.participants?.length ?? 0) === 0 && (
+              {/* Offline Warning Banner / Agent Selector */}
+              {!hasOnlineAgents ? (
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                    <span className="truncate">当前没有 Agent 在线，请先连接 Agent 后方可开始对话</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('connect')}
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
+                  >
+                    <span>前往连接</span>
+                    <ArrowRight className="size-3" />
+                  </button>
+                </div>
+              ) : isMissingParticipant ? (
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                    <span className="truncate">
+                      当前会话指定的 Agent ({sessionParticipants.map(p => `@${p}`).join(', ')}) 处于离线状态
+                    </span>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-1.5">
+                    {onlineAgents.slice(0, 2).map((a) => (
+                      <button
+                        key={a.agentName}
+                        type="button"
+                        onClick={() => currentSessionId && addParticipant(currentSessionId, a.agentName)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
+                      >
+                        <Plus className="size-3" />
+                        <span>添加 @{a.agentName}</span>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('connect')}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
+                    >
+                      <span>连接</span>
+                    </button>
+                  </div>
+                </div>
+              ) : currentSession && (currentSession.participants?.length ?? 0) === 0 && (
                 <div className="mb-2.5 flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-surface1/90 border border-border/60 text-xs">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Sparkles className="size-3.5 text-primary" />
                     <span>选择参与对话的 Agent：</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {agents.filter(a => a.status === 'online').length > 0 ? (
-                      agents.filter(a => a.status === 'online').map((agent) => (
-                        <button
-                          key={agent.agentName}
-                          onClick={() => {
-                            if (currentSessionId) addParticipant(currentSessionId, agent.agentName);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/50 text-[11px] font-medium transition-colors cursor-pointer"
-                        >
-                          <AgentAvatar name={agent.agentName} size={14} />
-                          <span>@{agent.agentName}</span>
-                          <Plus className="size-3 opacity-60" />
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">
-                        默认自动路由至本地可用 Agent
-                      </span>
-                    )}
+                    {onlineAgents.map((agent) => (
+                      <button
+                        key={agent.agentName}
+                        onClick={() => {
+                          if (currentSessionId) addParticipant(currentSessionId, agent.agentName);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/50 text-[11px] font-medium transition-colors cursor-pointer"
+                      >
+                        <AgentAvatar name={agent.agentName} size={14} />
+                        <span>@{agent.agentName}</span>
+                        <Plus className="size-3 opacity-60" />
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
+
               {currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}
               <ChatInput
                 onSend={handleSend}
@@ -1065,7 +1141,7 @@ export function ChatView() {
                 isWorking={!!currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId))}
                 stopping={!!currentSessionId && stoppingSessionIds.has(currentSessionId)}
                 onStop={() => currentSessionId && stopAllAgents(currentSessionId)}
-                disabled={!currentUser.name.trim()}
+                disabled={!currentUser.name.trim() || !canChatInCurrentSession}
               />
             </div>
           </div>

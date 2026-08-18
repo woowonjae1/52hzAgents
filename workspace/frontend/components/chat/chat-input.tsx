@@ -404,10 +404,11 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
       <div className={cn(
         'relative flex flex-col gap-2 bg-surface1/95 backdrop-blur-md transition-all duration-200 rounded-2xl border border-border/80 px-4 py-3 shadow-md ring-1 ring-black/5 dark:ring-white/5',
         isDragging && 'border-primary border-dashed bg-surface2/60',
-        isFocused && !isDragging && 'border-primary/40 shadow-lg ring-1 ring-primary/30'
+        isFocused && !isDragging && !disabled && 'border-primary/40 shadow-lg ring-1 ring-primary/30',
+        disabled && 'opacity-80 bg-surface1/70 border-border/50'
       )}>
         {/* Drag overlay */}
-        {isDragging && (
+        {isDragging && !disabled && (
           <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10 pointer-events-none bg-background/80 backdrop-blur-xs">
             <span className="text-sm font-medium text-primary">拖放文件到此处上传</span>
           </div>
@@ -471,27 +472,36 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             onPaste={handlePaste}
             onFocus={() => { setIsFocused(true); onFocusChange?.(true); }}
             onBlur={() => { setIsFocused(false); onFocusChange?.(false); }}
-            placeholder={agents.length > 1 || knowledge.length > 0 ? '向 52hzAgents 发送消息，或输入 @ 呼叫指定 Agent...' : '向 52hzAgents 发送消息... (输入 @ 呼叫 Agent)'}
+            placeholder={
+              disabled
+                ? (onlineAgents.length === 0 ? '当前没有 Agent 在线，请先连接 Agent 后开始对话...' : '当前会话中的 Agent 离线，请先添加在线 Agent 或连接 Agent...')
+                : (agents.length > 1 || knowledge.length > 0 ? '向 52hzAgents 发送消息，或输入 @ 呼叫指定 Agent...' : '向 52hzAgents 发送消息... (输入 @ 呼叫 Agent)')
+            }
             rows={1}
             disabled={disabled}
             data-chat-input
-            className="w-full border-0 bg-transparent shadow-none focus:outline-none placeholder:text-muted-foreground/60 h-auto px-0 text-sm py-2 resize-none font-sans leading-relaxed"
+            className={cn(
+              "w-full border-0 bg-transparent shadow-none focus:outline-none placeholder:text-muted-foreground/60 h-auto px-0 text-sm py-2 resize-none font-sans leading-relaxed",
+              disabled && "cursor-not-allowed opacity-60"
+            )}
           />
           {/* Shortcut hint: always show 'esc' when focused, show 'i' when not focused and empty */}
-          {isFocused ? (
-            <kbd
-              className="pointer-events-none absolute right-1 top-2.5 flex items-center justify-center rounded text-[9px] font-mono font-medium bg-muted text-muted-foreground border border-input h-4 px-1"
-              title="Press Esc to exit typing mode"
-            >
-              esc
-            </kbd>
-          ) : !message && (
-            <kbd
-              className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center rounded text-[9px] font-mono font-medium bg-muted text-muted-foreground border border-input size-4"
-              title="Press any key to start typing"
-            >
-              i
-            </kbd>
+          {!disabled && (
+            isFocused ? (
+              <kbd
+                className="pointer-events-none absolute right-1 top-2.5 flex items-center justify-center rounded text-[9px] font-mono font-medium bg-muted text-muted-foreground border border-input h-4 px-1"
+                title="Press Esc to exit typing mode"
+              >
+                esc
+              </kbd>
+            ) : !message && (
+              <kbd
+                className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 flex items-center justify-center rounded text-[9px] font-mono font-medium bg-muted text-muted-foreground border border-input size-4"
+                title="Press any key to start typing"
+              >
+                i
+              </kbd>
+            )
           )}
         </div>
 
@@ -506,13 +516,15 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
               className="hidden"
             />
             <button
+              disabled={disabled}
               onClick={() => fileInputRef.current?.click()}
-              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               title="Attach file"
             >
               <Paperclip className="size-3.5" />
             </button>
             <button
+              disabled={disabled}
               onClick={() => {
                 if (fileInputRef.current) {
                   fileInputRef.current.accept = 'image/*';
@@ -524,7 +536,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
                   }, 1000);
                 }
               }}
-              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               title="Attach image"
             >
               <ImageIcon className="size-3.5" />
@@ -532,7 +544,8 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                  disabled={disabled}
+                  className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   title="More actions"
                 >
                   <Plus className="size-3.5" />
