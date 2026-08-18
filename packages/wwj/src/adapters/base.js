@@ -944,7 +944,7 @@ class BaseAdapter {
     this._wakeControlPoller();
   }
 
-  _cancelQueuedMessage(channel, queueId) {
+  async cancelQueuedMessage(channel, queueId) {
     const queue = this._channelQueues[channel];
     if (!queue) return false;
     const idx = queue.findIndex((m) => m._queueId === queueId);
@@ -970,9 +970,13 @@ class BaseAdapter {
       try {
         let entry = null;
         if (this.client && this.workspaceId && this.token) {
-          entry = await this.client.getKnowledgeBySlug(this.workspaceId, this.token, slug);
+          try {
+            entry = await this.client.getKnowledgeBySlug(this.workspaceId, this.token, slug);
+          } catch (e) {}
           if (!entry || !entry.content) {
-            entry = await this.client.getKnowledge(this.workspaceId, this.token, slug);
+            try {
+              entry = await this.client.getKnowledge(this.workspaceId, this.token, slug);
+            } catch (e) {}
           }
         }
         if (entry && (entry.content || entry.title)) {

@@ -164,9 +164,15 @@ function leadingMentions(content) {
   const names = [];
   let rest = String(content || '').trimStart();
   for (;;) {
+    // If it is a knowledge mention like @knowledge:slug, it is not an agent mention!
+    if (/^@knowledge:[a-zA-Z0-9_-]+/i.test(rest)) {
+      break;
+    }
     const match = rest.match(/^[@/]([a-zA-Z0-9_-]+)/);
     if (!match) break;
-    names.push(match[1].toLowerCase());
+    const name = match[1].toLowerCase();
+    if (name === 'knowledge') break;
+    names.push(name);
     rest = rest.slice(match[0].length).replace(/^[,，、:：\s]+/, '');
   }
   return names;

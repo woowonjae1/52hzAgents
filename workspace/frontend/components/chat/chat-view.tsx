@@ -485,14 +485,9 @@ export function ChatView() {
   // Track whether the agent is actively working in this session
   const prevActiveSessionRef = useRef<string | null>(null);
   useEffect(() => {
-    // Clear active state for previously viewed session when switching
-    if (prevActiveSessionRef.current && prevActiveSessionRef.current !== currentSessionId) {
-      setSessionActive(prevActiveSessionRef.current, false);
-    }
     prevActiveSessionRef.current = currentSessionId;
 
     if (!currentSessionId || displayMessages.length === 0) {
-      if (currentSessionId) setSessionActive(currentSessionId, false);
       return;
     }
     const lastMsg = displayMessages[displayMessages.length - 1];
