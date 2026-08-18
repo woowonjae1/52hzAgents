@@ -39,24 +39,39 @@ export const CLAUDE_MODELS: AgentModelOption[] = [
 
 export const ANTIGRAVITY_MODELS: AgentModelOption[] = [
   {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    shortName: 'Gemini 3.7 Flash',
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    shortName: 'Gemini 3.6 Flash',
+  },
+  {
     id: 'gemini-3.5-flash',
-    name: 'Gemini 3.5 Flash (Medium)',
-    shortName: 'Flash 3.5',
+    name: 'Gemini 3.5 Flash',
+    shortName: 'Gemini 3.5 Flash',
   },
   {
-    id: 'gemini-3.5-pro',
-    name: 'Gemini 3.5 Pro (Large)',
-    shortName: 'Pro 3.5',
+    id: 'gemini-3.1-pro',
+    name: 'Gemini 3.1 Pro',
+    shortName: 'Gemini 3.1 Pro',
   },
   {
-    id: 'gemini-3.5-flash-lite',
-    name: 'Gemini 3.5 Flash-Lite (Fast)',
-    shortName: 'Lite 3.5',
+    id: 'claude-sonnet-4.6',
+    name: 'Claude Sonnet 4.6 (Thinking)',
+    shortName: 'Sonnet 4.6',
   },
   {
-    id: 'gemini-3.0-pro',
-    name: 'Gemini 3.0 Pro',
-    shortName: 'Pro 3.0',
+    id: 'claude-opus-4.6',
+    name: 'Claude Opus 4.6 (Thinking)',
+    shortName: 'Opus 4.6',
+  },
+  {
+    id: 'gpt-oss-120b',
+    name: 'GPT-OSS 120B (Medium)',
+    shortName: 'GPT-OSS 120B',
   },
 ];
 

@@ -22,12 +22,15 @@ const { buildClaudeSystemPrompt } = require('./workspace-prompt');
 
 const IS_WINDOWS = process.platform === 'win32';
 
-// Standard Antigravity Gemini Model Catalog
+// Standard Antigravity Model Catalog (Exact matching from Antigravity client)
 const ANTIGRAVITY_MODELS = [
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash (Medium)', shortName: 'Flash 3.5' },
-  { id: 'gemini-3.5-pro', name: 'Gemini 3.5 Pro (Large)', shortName: 'Pro 3.5' },
-  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite (Fast)', shortName: 'Flash-Lite 3.5' },
-  { id: 'gemini-3.0-pro', name: 'Gemini 3.0 Pro', shortName: 'Pro 3.0' },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', shortName: 'Gemini 3.7 Flash' },
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', shortName: 'Gemini 3.6 Flash' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', shortName: 'Gemini 3.5 Flash' },
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', shortName: 'Gemini 3.1 Pro' },
+  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6 (Thinking)', shortName: 'Sonnet 4.6' },
+  { id: 'claude-opus-4.6', name: 'Claude Opus 4.6 (Thinking)', shortName: 'Opus 4.6' },
+  { id: 'gpt-oss-120b', name: 'GPT-OSS 120B (Medium)', shortName: 'GPT-OSS 120B' },
 ];
 
 function stripAnsi(str) {
