@@ -32,7 +32,7 @@ export const CLAUDE_MODELS: AgentModelOption[] = [
   },
   {
     id: 'haiku',
-    name: 'Claude 4.5 Haiku',
+    name: 'Claude Haiku 4.5',
     shortName: 'Haiku 4.5',
   },
 ];
@@ -88,57 +88,76 @@ export function AgentModelSwitcher({
 }: AgentModelSwitcherProps) {
   const { workspaceId, agents } = useWorkspace();
 
-  const isAntigravity = React.useMemo(() => {
-    if (!agentName) return false;
-    const lower = agentName.toLowerCase();
-    return lower.includes('antigravity') || lower.includes('agy');
-  }, [agentName]);
+  // Find online agents that support model selection
+  const onlineAgents = React.useMemo(() => {
+    return agents.filter((a) => a.status === 'online');
+  }, [agents]);
 
-  const isClaude = React.useMemo(() => {
-    if (!agentName) return false;
-    return agentName.toLowerCase().includes('claude');
-  }, [agentName]);
-
-  const isConnected = React.useMemo(() => {
-    if (!agentName) return false;
-    const lower = agentName.toLowerCase();
-    return agents.some(
-      (a) =>
-        (a.agentName.toLowerCase() === lower ||
-          (isAntigravity && (a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy'))) ||
-          (isClaude && a.agentName.toLowerCase().includes('claude'))) &&
-        a.status === 'online'
+  const antigravityAgent = React.useMemo(() => {
+    return onlineAgents.find(
+      (a) => a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy')
     );
-  }, [agentName, agents, isAntigravity, isClaude]);
+  }, [onlineAgents]);
 
-  const availableModels = isAntigravity ? ANTIGRAVITY_MODELS : CLAUDE_MODELS;
-  const defaultModelId = isAntigravity ? 'gemini-3.5-flash' : 'sonnet';
-  const [selectedModelId, setSelectedModelId] = React.useState<string>(defaultModelId);
+  const claudeAgent = React.useMemo(() => {
+    return onlineAgents.find((a) => a.agentName.toLowerCase().includes('claude'));
+  }, [onlineAgents]);
 
-  // Load saved preference
+  // Current active agent to display on trigger
+  const [activeTargetAgent, setActiveTargetAgent] = React.useState<string>(agentName);
+
+  React.useEffect(() => {
+    if (agentName) {
+      setActiveTargetAgent(agentName);
+    }
+  }, [agentName]);
+
+  const isAntigravity = React.useMemo(() => {
+    const lower = (activeTargetAgent || '').toLowerCase();
+    return lower.includes('antigravity') || lower.includes('agy');
+  }, [activeTargetAgent]);
+
+  // Model states per agent
+  const [antigravityModelId, setAntigravityModelId] = React.useState<string>('gemini-3.5-flash');
+  const [claudeModelId, setClaudeModelId] = React.useState<string>('sonnet');
+
+  // Load saved preferences
   React.useEffect(() => {
     if (!sessionId) return;
     try {
-      const saved = localStorage.getItem(`52hz_model_${sessionId}_${agentName}`);
-      if (saved && availableModels.some((m) => m.id === saved)) {
-        setSelectedModelId(saved);
-      } else {
-        setSelectedModelId(defaultModelId);
+      if (antigravityAgent) {
+        const savedAgy = localStorage.getItem(`52hz_model_${sessionId}_${antigravityAgent.agentName}`);
+        if (savedAgy && ANTIGRAVITY_MODELS.some((m) => m.id === savedAgy)) {
+          setAntigravityModelId(savedAgy);
+        }
       }
-    } catch {
-      setSelectedModelId(defaultModelId);
+      if (claudeAgent) {
+        const savedClaude = localStorage.getItem(`52hz_model_${sessionId}_${claudeAgent.agentName}`);
+        if (savedClaude && CLAUDE_MODELS.some((m) => m.id === savedClaude)) {
+          setClaudeModelId(savedClaude);
+        }
+      }
+    } catch {}
+  }, [sessionId, antigravityAgent, claudeAgent]);
+
+  const hasAnyModelAgent = !!antigravityAgent || !!claudeAgent;
+  if (!hasAnyModelAgent) return null;
+
+  const currentModelOption = isAntigravity
+    ? ANTIGRAVITY_MODELS.find((m) => m.id === antigravityModelId) || ANTIGRAVITY_MODELS[2]
+    : CLAUDE_MODELS.find((m) => m.id === claudeModelId) || CLAUDE_MODELS[0];
+
+  const handleSelectModel = async (targetAgentName: string, modelId: string, modelName: string, isAgy: boolean) => {
+    if (isAgy) {
+      setAntigravityModelId(modelId);
+    } else {
+      setClaudeModelId(modelId);
     }
-  }, [sessionId, agentName, availableModels, defaultModelId]);
+    setActiveTargetAgent(targetAgentName);
 
-  if (!isConnected) return null;
-
-  const currentModel = availableModels.find((m) => m.id === selectedModelId) || availableModels[0];
-
-  const handleSelectModelId = async (modelId: string, modelName: string) => {
-    setSelectedModelId(modelId);
     if (sessionId) {
       try {
-        localStorage.setItem(`52hz_model_${sessionId}_${agentName}`, modelId);
+        localStorage.setItem(`52hz_model_${sessionId}_${targetAgentName}`, modelId);
       } catch {}
     }
 
@@ -146,13 +165,13 @@ export function AgentModelSwitcher({
       if (workspaceId) {
         workspaceApi.setWorkspaceId(workspaceId);
       }
-      await workspaceApi.sendAgentControl(agentName, 'set_model', {
+      await workspaceApi.sendAgentControl(targetAgentName, 'set_model', {
         model: modelId,
         channel: sessionId || undefined,
       });
-      toast.success(`已切换至 ${modelName}`);
+      toast.success(`${targetAgentName} 已切换至 ${modelName}`);
     } catch {
-      toast.success(`已切换至 ${modelName}`);
+      toast.success(`${targetAgentName} 已切换至 ${modelName}`);
     }
   };
 
@@ -166,34 +185,71 @@ export function AgentModelSwitcher({
             'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
             className
           )}
-          title={`当前模型：${currentModel.name} · 点击切换`}
+          title={`当前模型：${currentModelOption.name} · 点击切换`}
         >
           <span className="font-semibold text-foreground truncate">
-            {currentModel.shortName}
+            {currentModelOption.shortName}
           </span>
           <ChevronDown className="size-3 text-foreground-extra-muted shrink-0" />
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" className="w-48 p-1 shadow-lg border-border/80 bg-surface1/95 backdrop-blur-xl">
-        {availableModels.map((m) => {
-          const isSelected = m.id === currentModel.id;
-          return (
-            <DropdownMenuItem
-              key={m.id}
-              onClick={() => handleSelectModelId(m.id, m.name)}
-              className={cn(
-                'flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors',
-                isSelected
-                  ? 'bg-surface3 text-foreground font-semibold'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
-              )}
-            >
-              <span>{m.name}</span>
-              {isSelected && <Check className="size-3.5 text-primary shrink-0 ml-2" />}
-            </DropdownMenuItem>
-          );
-        })}
+      <DropdownMenuContent align="start" className="w-56 p-1.5 shadow-xl border-border/80 bg-surface1/95 backdrop-blur-xl max-h-[400px] overflow-y-auto">
+        {antigravityAgent && (
+          <div className="space-y-0.5">
+            <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+              {antigravityAgent.agentName} 模型
+            </div>
+            {ANTIGRAVITY_MODELS.map((m) => {
+              const isSelected = antigravityModelId === m.id && isAntigravity;
+              return (
+                <DropdownMenuItem
+                  key={m.id}
+                  onClick={() => handleSelectModel(antigravityAgent.agentName, m.id, m.name, true)}
+                  className={cn(
+                    'flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors',
+                    isSelected
+                      ? 'bg-surface3 text-foreground font-semibold'
+                      : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
+                  )}
+                >
+                  <span className="truncate">{m.name}</span>
+                  {isSelected && <Check className="size-3.5 text-primary shrink-0 ml-2" />}
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
+        )}
+
+        {antigravityAgent && claudeAgent && (
+          <div className="my-1.5 border-t border-border/40" />
+        )}
+
+        {claudeAgent && (
+          <div className="space-y-0.5">
+            <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+              {claudeAgent.agentName} 模型
+            </div>
+            {CLAUDE_MODELS.map((m) => {
+              const isSelected = claudeModelId === m.id && !isAntigravity;
+              return (
+                <DropdownMenuItem
+                  key={m.id}
+                  onClick={() => handleSelectModel(claudeAgent.agentName, m.id, m.name, false)}
+                  className={cn(
+                    'flex items-center justify-between px-2.5 py-1.5 rounded-md cursor-pointer text-xs font-medium transition-colors',
+                    isSelected
+                      ? 'bg-surface3 text-foreground font-semibold'
+                      : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
+                  )}
+                >
+                  <span className="truncate">{m.name}</span>
+                  {isSelected && <Check className="size-3.5 text-primary shrink-0 ml-2" />}
+                </DropdownMenuItem>
+              );
+            })}
+          </div>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
