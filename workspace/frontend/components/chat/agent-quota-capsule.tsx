@@ -161,7 +161,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
                 </span>
               </div>
               <p className="text-[10.5px] text-foreground-muted">
-                {isEstimated ? '本地会话记录活跃度统计' : '官方实时配额与刷新周期'}
+                {isEstimated ? '本地会话活跃度估算 · 非实时配额' : '官方实时配额与刷新周期'}
               </p>
             </div>
           </div>
@@ -279,7 +279,7 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
         {/* Tip */}
         <div className="text-[10px] text-foreground-extra-muted leading-relaxed pt-1">
           {isEstimated
-            ? '💡 提示：Antigravity 当前基于本地项目会话记录统计活跃度。'
+            ? '💡 提示：这不是 Antigravity 的真实配额。此处仅按本地项目会话记录统计活跃度，非实时，且与 Antigravity 客户端内显示的官方配额（周/5 小时剩余额度）不同步。'
             : '💡 提示：配额由后台心跳（30s）与发送消息时自动同步。'}
         </div>
       </PopoverContent>

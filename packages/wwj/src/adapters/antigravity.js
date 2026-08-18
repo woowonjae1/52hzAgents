@@ -272,7 +272,7 @@ class AntigravityAdapter extends BaseAdapter {
 
     const agyBin = this._findAntigravityBinary();
     if (!agyBin) {
-      await this.postMessage(
+      await this.sendError(
         channel,
         '⚠️ 未在当前系统中找到 Antigravity (`agy`) 可执行程序。请确认已正确安装 Google Antigravity 或配置 PATH 环境变量。'
       );
@@ -337,9 +337,9 @@ class AntigravityAdapter extends BaseAdapter {
         const cleanOutput = stripAnsi(rawOutput);
 
         if (cleanOutput) {
-          await this.postMessage(channel, cleanOutput);
+          await this.sendResponse(channel, cleanOutput);
         } else if (code !== 0) {
-          await this.postMessage(channel, `⚠️ Antigravity 执行结束（退出码: ${code}），未产生输出。`);
+          await this.sendResponse(channel, `⚠️ Antigravity 执行结束（退出码: ${code}），未产生输出。`);
         }
 
         // Auto-title session if needed
@@ -361,7 +361,7 @@ class AntigravityAdapter extends BaseAdapter {
         delete this._channelProcesses[channel];
         await this.sendStatus(channel, 'idle');
         this._log(`Antigravity spawn error: ${err.message}`);
-        await this.postMessage(channel, `❌ 启动 Antigravity 失败: ${err.message}`);
+        await this.sendError(channel, `❌ 启动 Antigravity 失败: ${err.message}`);
         resolve();
       });
     });
