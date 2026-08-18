@@ -1072,7 +1072,7 @@ export function ChatView() {
                   <div className="pt-1 flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setViewMode('connect')}
+                      onClick={() => setViewMode('mission')}
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                     >
                       <Plug className="size-3.5" />
@@ -1140,7 +1140,7 @@ export function ChatView() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setViewMode('connect')}
+                    onClick={() => setViewMode('mission')}
                     className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
                   >
                     <span>前往连接</span>
@@ -1169,7 +1169,7 @@ export function ChatView() {
                     ))}
                     <button
                       type="button"
-                      onClick={() => setViewMode('connect')}
+                      onClick={() => setViewMode('mission')}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
                     >
                       <span>连接</span>

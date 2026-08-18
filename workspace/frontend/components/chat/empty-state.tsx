@@ -163,7 +163,7 @@ export function EmptyState() {
               连接新的 Agent
             </button>
             <button
-              onClick={() => setViewMode('connect')}
+              onClick={() => setViewMode('mission')}
               className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
             >
               <Cloud className="size-3.5 opacity-70" />

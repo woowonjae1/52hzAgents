@@ -830,10 +830,13 @@ class BaseAdapter {
           // other agents who were NOT mentioned/targeted MUST NOT process or interrupt this message.
           const explicitTargeted = Array.isArray(msg.targetAgents) && msg.targetAgents.length > 0;
           const explicitMentions = Array.isArray(msg.mentions) && msg.mentions.length > 0;
-          const textMentionMatches = (typeof msg.content === 'string' ? msg.content.match(/(?:^|\s)[@/]([a-zA-Z0-9_-]+)/g) : []) || [];
+          const contentWithoutKnowledge = typeof msg.content === 'string'
+            ? msg.content.replace(/@knowledge:[a-zA-Z0-9_-]+/gi, ' ')
+            : '';
+          const textMentionMatches = contentWithoutKnowledge.match(/(?:^|\s)[@/]([a-zA-Z0-9_-]+)/g) || [];
           const agentMentions = textMentionMatches
             .map(m => m.trim().replace(/^[@/]/, ''))
-            .filter(name => !name.startsWith('knowledge:') && !name.includes('.'));
+            .filter(name => name.toLowerCase() !== 'knowledge' && !name.includes('.'));
 
           const hasSpecificTarget = explicitTargeted || explicitMentions || agentMentions.length > 0;
 
