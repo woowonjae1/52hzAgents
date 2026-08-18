@@ -18,8 +18,10 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { WorkspaceClient, SessionRevokedError } = require('../workspace-client');
-const { generateSessionTitle, SESSION_DEFAULT_RE } = require('./utils');
+const { generateSessionTitle, SESSION_DEFAULT_RE, leadingMentions } = require('./utils');
 const { defaultAgentWorkdir } = require('../paths');
 const {
   REASON,
@@ -44,6 +46,26 @@ const HEARTBEAT_ERROR_THRESHOLD = 2;
 // limit is hit, regardless of message wording. Any human message resets it.
 const MAX_AGENT_HOPS_WITHOUT_HUMAN = 20;
 
+// Extension -> MIME for files agents produce. The workspace stores whatever it
+// is given, but the Files panel previews by content type, so plain-text
+// artifacts (the common case: a .md report) must not be sent as a binary blob.
+const CONTENT_TYPES = {
+  md: 'text/markdown', markdown: 'text/markdown', txt: 'text/plain',
+  json: 'application/json', csv: 'text/csv', yaml: 'text/yaml', yml: 'text/yaml',
+  html: 'text/html', css: 'text/css', js: 'text/javascript', ts: 'text/plain',
+  py: 'text/x-python', go: 'text/x-go', sh: 'text/x-shellscript',
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  webp: 'image/webp', svg: 'image/svg+xml', pdf: 'application/pdf',
+  zip: 'application/zip', log: 'text/plain',
+};
+
+function guessContentType(filename) {
+  const dot = String(filename || '').lastIndexOf('.');
+  if (dot < 0) return 'application/octet-stream';
+  const ext = filename.slice(dot + 1).toLowerCase();
+  return CONTENT_TYPES[ext] || 'application/octet-stream';
+}
+
 // How long _resolveWorkingDir() trusts its per-channel cache before re-checking
 // the channel's bound directory. Short enough that toggling/re-pointing Open
 // Folder on a thread takes effect quickly; long enough to avoid a network
@@ -59,7 +81,7 @@ class BaseAdapter {
    * @param {string} opts.agentName
    * @param {string} [opts.endpoint]
    */
-  constructor({ workspaceId, channelName, token, agentName, endpoint, agentEnv, agentType, workingDir, onStatus }) {
+  constructor({ workspaceId, channelName, token, agentName, endpoint, agentEnv, agentType, workingDir, onStatus, logFile }) {
     this.workspaceId = workspaceId;
     this.channelName = channelName;
     this.token = token;
@@ -105,10 +127,99 @@ class BaseAdapter {
     // (e.g. after a `restart` IPC bounce) so uptime tracks "time since last
     // restart" rather than the long-running daemon's process uptime.
     this._startedAt = Date.now();
+    // path|size|mtime of files already registered into the workspace Files space,
+    // so an unchanged file is not re-uploaded on every turn that touches it.
+    this._registeredFiles = new Set();
+    // Adapter logs must reach ~/.wwj/daemon.log the same way Daemon._log does:
+    // by appending to the file directly. Relying on console.log only works when
+    // the daemon's stdout is redirected into the log file (the `wwj up` path,
+    // daemon.js `stdio: ['ignore', logFd, logFd]`). When the desktop app spawns
+    // the daemon itself there is no such redirection, so every adapter line was
+    // silently lost — which makes any spawn/error diagnostics invisible.
+    this._logFile = logFile || path.join(os.homedir(), '.wwj', 'daemon.log');
     this._log = (msg) => {
       const ts = new Date().toISOString();
-      console.log(`${ts} INFO adapter [${this.agentName}]: ${msg}`);
+      const line = `${ts} INFO adapter [${this.agentName}]: ${msg}`;
+      try {
+        fs.appendFileSync(this._logFile, line + '\n', 'utf-8');
+      } catch {}
+      if (process.stdout.isTTY) {
+        console.log(line);
+      }
     };
+  }
+
+  // ------------------------------------------------------------------
+  // Produced-file registration
+  // ------------------------------------------------------------------
+
+  /**
+   * Register a file the agent just produced into the workspace's shared Files
+   * space, so it shows up in the Files panel alongside human uploads.
+   *
+   * The panel lists the workspace's own storage directory only; an agent writes
+   * into its working directory, which is not part of it. Rather than widening
+   * the backend scan (which previously pulled in unrelated files and produced a
+   * junk file list), the agent that made the file registers it explicitly.
+   *
+   * Best-effort by design: never throws, and skips anything that is not a real
+   * user-facing artifact (internal agent config, oversized files, unchanged
+   * re-writes).
+   *
+   * @param {string} channel
+   * @param {string} absPath
+   * @returns {Promise<boolean>} whether the file was uploaded
+   */
+  async registerProducedFile(channel, absPath) {
+    try {
+      if (!absPath || !this.workspaceId || !this.client) return false;
+      const filePath = path.resolve(String(absPath));
+
+      // Internal scaffolding the agent writes for itself is not an artifact, and
+      // a dotfile (.env above all) must never be published into a shared space.
+      // Split on path.sep rather than a character-class regex: path.resolve has
+      // already normalised separators, and this cannot be broken by escaping.
+      const base = path.basename(filePath);
+      if (!base || base.startsWith('.')) return false;
+      const internal = ['.claude', '.git', '.gemini', 'node_modules', '__pycache__', '.venv'];
+      const segments = filePath.split(path.sep).map((seg) => seg.toLowerCase());
+      if (segments.some((seg) => internal.includes(seg))) return false;
+
+      let stat;
+      try {
+        stat = fs.statSync(filePath);
+      } catch {
+        return false; // the tool call may have failed, or the path is a scratch target
+      }
+      if (!stat.isFile() || stat.size === 0) return false;
+      // Server rejects >50MB; skip rather than fail the upload.
+      if (stat.size > 50 * 1024 * 1024) {
+        this._log(`Files: skipping ${base} — ${Math.round(stat.size / 1048576)}MB exceeds the 50MB limit`);
+        return false;
+      }
+
+      const key = `${filePath}|${stat.size}|${stat.mtimeMs}`;
+      if (this._registeredFiles.has(key)) return false;
+
+      const data = fs.readFileSync(filePath);
+      await this.client.uploadFile(
+        this.workspaceId,
+        this.token,
+        base,
+        data.toString('base64'),
+        {
+          contentType: guessContentType(base),
+          source: `openagents:${this.agentName}`,
+          channelName: channel || undefined,
+        }
+      );
+      this._registeredFiles.add(key);
+      this._log(`Files: registered ${base} (${stat.size}B) from ${filePath}`);
+      return true;
+    } catch (e) {
+      this._log(`Files: failed to register ${absPath}: ${e && e.message ? e.message : e}`);
+      return false;
+    }
   }
 
   // ------------------------------------------------------------------
@@ -689,11 +800,18 @@ class BaseAdapter {
         // 方案 2 落地：禁止 Agent 自动对系统连线或非目标消息打招呼。
         // 只有当消息来自用户 (human)，或者显式 @ 当前 Agent / 指定 targetAgents 时才激活回应。
         const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || (msg.senderId || '').startsWith('human:') || (msg.senderId || '').startsWith('user:');
-        const mentionsMe = (Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName)) ||
-          (typeof msg.content === 'string' && (
-            msg.content.includes(`@${this.agentName}`) ||
-            msg.content.toLowerCase().includes(`@${this.agentName.toLowerCase()}`)
-          ));
+        // Addressing is the run of @mentions at the START of the message. A
+        // mention further in is content: "@a 确定日期 然后交给@b 写文档" calls
+        // only `a` and tells it to hand off — it is not also a direct call to
+        // `b`. The composer collects every @name anywhere in the text into
+        // `mentions`, so without this both agents took the message and each did
+        // the whole job in parallel instead of one delegating to the other.
+        const addressedAgents = leadingMentions(msg.content);
+        const selfLower = this.agentName.toLowerCase();
+        const mentionsMe = addressedAgents.length > 0
+          ? addressedAgents.includes(selfLower)
+          : ((Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName)) ||
+            (typeof msg.content === 'string' && msg.content.toLowerCase().includes(`@${selfLower}`)));
         const targetedMe = Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName);
         const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 
@@ -833,9 +951,51 @@ class BaseAdapter {
     return true;
   }
 
+  /**
+   * Auto-resolves any `@knowledge:slug` mentions in the message content
+   * by pulling the full markdown content from the workspace knowledge base and expanding/inlining it.
+   */
+  async _resolveKnowledgeMentions(content) {
+    if (!content || typeof content !== 'string') return content;
+    const matches = content.match(/@knowledge:([a-zA-Z0-9_-]+)/g);
+    if (!matches || matches.length === 0) return content;
+
+    const slugs = Array.from(new Set(matches.map((m) => m.replace(/^@knowledge:/, ''))));
+    const attachedKnowledge = [];
+
+    for (const slug of slugs) {
+      try {
+        let entry = null;
+        if (this.client && this.workspaceId && this.token) {
+          entry = await this.client.getKnowledgeBySlug(this.workspaceId, this.token, slug);
+          if (!entry || !entry.content) {
+            entry = await this.client.getKnowledge(this.workspaceId, this.token, slug);
+          }
+        }
+        if (entry && (entry.content || entry.title)) {
+          this._log(`Auto-injected knowledge base entry: ${entry.title || slug} (@knowledge:${slug})`);
+          attachedKnowledge.push(
+            `\n---\n📁 [系统附带知识库文档: ${entry.title || slug} (@knowledge:${slug})]\n${entry.content || ''}\n---`
+          );
+        }
+      } catch (err) {
+        this._log(`Failed to resolve knowledge mention @knowledge:${slug}: ${err.message}`);
+      }
+    }
+
+    if (attachedKnowledge.length > 0) {
+      return `${attachedKnowledge.join('\n\n')}\n\n${content}`;
+    }
+
+    return content;
+  }
+
   async _channelWorker(channel, msg) {
     this._channelBusy.add(channel);
     try {
+      if (msg && typeof msg.content === 'string') {
+        msg.content = await this._resolveKnowledgeMentions(msg.content);
+      }
       await this._handleMessage(msg);
     } catch (e) {
       this._log(`Error in channel worker for ${channel}: ${e.message}`);
@@ -851,6 +1011,9 @@ class BaseAdapter {
         try { await this.sendStatus(channel, 'processing queued message', { queue_id: nextMsg._queueId, queue_status: 'processed' }); } catch {}
       }
       try {
+        if (nextMsg && typeof nextMsg.content === 'string') {
+          nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content);
+        }
         await this._handleMessage(nextMsg);
       } catch (e) {
         this._log(`Error processing queued message in ${channel}: ${e.message}`);
