@@ -15,29 +15,41 @@ import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 // ── Message Grouping ──
 
 type MessageGroup =
-  | { type: 'chat'; message: WorkspaceMessage }
+  | { type: 'chat'; message: WorkspaceMessage; steps?: WorkspaceMessage[] }
   | { type: 'thinking'; sender: string; messages: WorkspaceMessage[] }
   | { type: 'steps'; messages: WorkspaceMessage[] };
 
 function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
-  let currentSteps: WorkspaceMessage[] = [];
+  // Steps are held PER SENDER: in a multi-agent channel several agents work at
+  // once, and a reply from one of them must not absorb another's tool calls.
+  // Each agent's pending steps attach to that agent's own next message, so the
+  // trace is rendered inside the bubble it explains instead of as a shared block
+  // above the conversation.
+  const pendingSteps = new Map<string, WorkspaceMessage[]>();
 
-  const flushSteps = () => {
-    if (currentSteps.length > 0) {
-      groups.push({ type: 'steps', messages: [...currentSteps] });
-      currentSteps = [];
+  const takeSteps = (sender: string): WorkspaceMessage[] | undefined => {
+    const own = pendingSteps.get(sender);
+    if (!own || own.length === 0) return undefined;
+    pendingSteps.delete(sender);
+    return own;
+  };
+
+  // Steps from an agent that never followed up with a message (it is still
+  // working, or it only ever emitted status) still have to be shown.
+  const flushOrphanSteps = () => {
+    for (const [, own] of pendingSteps) {
+      if (own.length > 0) groups.push({ type: 'steps', messages: [...own] });
     }
+    pendingSteps.clear();
   };
 
   const visibleMessages = messages.filter((msg) => !msg.content.startsWith('__queue_cancel:'));
 
   visibleMessages.forEach((msg) => {
     if (msg.messageType === 'thinking') {
-      // Thinking is a first-level block (shown with its author), so flush any
-      // pending sub-level steps first to keep ordering. Consecutive thinking
-      // chunks from the same sender collapse into one block.
-      flushSteps();
+      // Thinking is a first-level block shown with its author. Consecutive
+      // thinking chunks from the same sender collapse into one block.
       const last = groups[groups.length - 1];
       if (last && last.type === 'thinking' && last.sender === msg.senderName) {
         last.messages.push(msg);
@@ -45,15 +57,15 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
         groups.push({ type: 'thinking', sender: msg.senderName, messages: [msg] });
       }
     } else if (msg.messageType === 'status' || msg.messageType === 'todos') {
-      // Tool calls / status / todos stay clustered at the sub level.
-      currentSteps.push(msg);
+      const own = pendingSteps.get(msg.senderName);
+      if (own) own.push(msg);
+      else pendingSteps.set(msg.senderName, [msg]);
     } else {
-      flushSteps();
-      groups.push({ type: 'chat', message: msg });
+      groups.push({ type: 'chat', message: msg, steps: takeSteps(msg.senderName) });
     }
   });
 
-  flushSteps();
+  flushOrphanSteps();
   return groups;
 }
 
@@ -501,6 +513,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         agents={agents}
                         isApproved={isApproved}
                         isRejected={isRejected}
+                        steps={group.steps}
                       />
                     );
                   })()

@@ -59,19 +59,37 @@ Write-Host "`n[3/4] Building Next.js Frontend..." -ForegroundColor Yellow
 $FrontendDir = Join-Path $WorkspaceRoot "workspace\frontend"
 Push-Location $FrontendDir
 try {
-    npm run build
-    # Copy exported / public assets
     $NextOut = Join-Path $FrontendDir "out"
     $NextPublic = Join-Path $FrontendDir "public"
+
+    # Drop any previous export first: if the build fails we must NOT silently
+    # package yesterday's bundle.
+    if (Test-Path $NextOut) {
+        Remove-Item -Recurse -Force $NextOut
+    }
+
+    # $ErrorActionPreference = "Stop" turns ANY stderr line from a native command
+    # (including harmless next build warnings) into a terminating NativeCommandError.
+    # Relax it here and judge success by the real exit code instead.
+    $PrevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    npm run build
+    $BuildExit = $LASTEXITCODE
+    $ErrorActionPreference = $PrevEAP
+
+    if ($BuildExit -ne 0) {
+        throw "next build failed with exit code $BuildExit - aborting instead of packaging a stale frontend."
+    }
+    if (-not (Test-Path $NextOut)) {
+        throw "next build exited 0 but produced no 'out' directory (next.config.mjs uses output: 'export') - aborting."
+    }
+
+    # Copy exported / public assets
     if (Test-Path $NextPublic) {
         Copy-Item -Recurse -Force "$NextPublic\*" $PublicDir
     }
-    if (Test-Path $NextOut) {
-        Copy-Item -Recurse -Force "$NextOut\*" $PublicDir
-    }
-    Write-Host "  -> Frontend assets ready in resources/public." -ForegroundColor Green
-} catch {
-    Write-Host "  -> Warning: Frontend build skipped or using dynamic mode: $_" -ForegroundColor DarkYellow
+    Copy-Item -Recurse -Force "$NextOut\*" $PublicDir
+    Write-Host "  -> Frontend assets ready in resources/public (built $(Get-Date -Format 'HH:mm:ss'))." -ForegroundColor Green
 } finally {
     Pop-Location
 }

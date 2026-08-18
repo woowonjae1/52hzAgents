@@ -17,7 +17,7 @@ const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
 const { whereBinary } = require('../paths');
-const { formatAttachmentsForPrompt, SESSION_DEFAULT_RE, generateSessionTitle } = require('./utils');
+const { formatAttachmentsForPrompt, SESSION_DEFAULT_RE, generateSessionTitle, stripSelfMention } = require('./utils');
 const { buildClaudeSystemPrompt } = require('./workspace-prompt');
 
 const IS_WINDOWS = process.platform === 'win32';
@@ -264,11 +264,28 @@ class AntigravityAdapter extends BaseAdapter {
   }
 
   async _handleMessage(msg) {
-    const channel = msg.channel;
-    const content = msg.content || '';
+    // Messages carry the channel in `sessionId`, not `channel` — reading
+    // msg.channel yielded undefined, so every status/response was posted to a
+    // non-existent channel and the UI spun forever. Mirror _dispatchMessage()
+    // exactly so this key matches the one used for queueing and the `stop`
+    // control action (_channelProcesses / _channelQueues are keyed by it).
+    let channel = this.channelName || 'general';
+    if (msg.sessionId && !msg.sessionId.startsWith('openagents:') && !msg.sessionId.startsWith('agent:')) {
+      channel = msg.sessionId;
+    }
+    // The "@antigravity" a user types to address this agent in a shared channel
+    // is addressing, not part of the question — keep it out of the prompt.
+    const content = stripSelfMention(msg.content || '', this.agentName);
     const sender = msg.sender || 'user';
 
     this._log(`Received message in channel ${channel}: ${content.slice(0, 80)}...`);
+
+    // A bare "@antigravity" with no question left after stripping is an
+    // address with no request — don't spawn agy with an empty -p.
+    if (!content) {
+      this._log(`Ignoring empty message in channel ${channel} (mention only)`);
+      return;
+    }
 
     const agyBin = this._findAntigravityBinary();
     if (!agyBin) {
@@ -281,9 +298,8 @@ class AntigravityAdapter extends BaseAdapter {
 
     const workingDir = await this._resolveWorkingDir(channel);
     const conversationId = this._channelSessions[channel] || null;
-
+    this.fetchAndReportUsage().catch(() => {}); // 不阻塞消息处理：用量上报失败或超时都不应挡住 agy 启动
     await this.sendStatus(channel, 'thinking', 'Antigravity 正在推理中...');
-    await this.fetchAndReportUsage();
 
     return new Promise((resolve) => {
       const args = ['-p', content, '--dangerously-skip-permissions'];
@@ -294,16 +310,36 @@ class AntigravityAdapter extends BaseAdapter {
         args.push('--add-dir', workingDir);
       }
 
+      const spawnEnv = { ...(this.agentEnv || process.env) };
       this._log(`Spawning ${agyBin} ${args.join(' ')} (cwd: ${workingDir || process.cwd()})`);
+      this._log(`[spawn] pre: bin_exists=${fs.existsSync(agyBin)} isBatch=${IS_WINDOWS && /\.(cmd|bat)$/i.test(agyBin)} hasPATH=${!!(spawnEnv.PATH || spawnEnv.Path)} hasCOMSPEC=${!!spawnEnv.ComSpec} envKeys=${Object.keys(spawnEnv).length} argv=${JSON.stringify(args)}`);
 
-      const proc = spawn(agyBin, args, {
+      // No `shell: true`: on Windows it hands the joined command line to
+      // cmd.exe WITHOUT quoting, so any argument containing a space is split
+      // into separate argv entries — `-p` then received only the first word of
+      // the user's message and the rest became stray positional args. A binary
+      // path containing spaces breaks outright the same way. Batch wrappers
+      // still need a shell, so route only those through `cmd.exe /c`
+      // (same approach as the claude adapter).
+      const isBatch = IS_WINDOWS && /\.(cmd|bat)$/i.test(agyBin);
+      const spawnCmd = isBatch ? 'cmd.exe' : agyBin;
+      const spawnArgs = isBatch ? ['/c', agyBin, ...args] : args;
+
+      const proc = spawn(spawnCmd, spawnArgs, {
         cwd: workingDir || undefined,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
-        shell: true,
-        env: {
-          ...(this.agentEnv || process.env),
-        },
+        env: spawnEnv,
+      });
+
+      this._log(`[spawn] post: pid=${proc.pid == null ? 'NULL(spawn failed synchronously)' : proc.pid} killed=${proc.killed} channel=${channel}`);
+
+      proc.on('spawn', () => {
+        this._log(`[spawn] event=spawn channel=${channel} pid=${proc.pid} — child process actually started`);
+      });
+
+      proc.on('exit', (code, signal) => {
+        this._log(`[spawn] event=exit channel=${channel} pid=${proc.pid} code=${code} signal=${signal}`);
       });
 
       this._channelProcesses[channel] = proc;
@@ -324,6 +360,8 @@ class AntigravityAdapter extends BaseAdapter {
       }
 
       proc.on('close', async (code) => {
+        this._log(`[spawn] event=close channel=${channel} pid=${proc.pid} code=${code} stdout=${stdout.length}B stderr=${stderr.length}B stopping=${this._stoppingChannels.has(channel)}`);
+        if (stderr.trim()) this._log(`[spawn] stderr head: ${stripAnsi(stderr).trim().slice(0, 500)}`);
         delete this._channelProcesses[channel];
         await this.sendStatus(channel, 'idle');
 
@@ -360,7 +398,7 @@ class AntigravityAdapter extends BaseAdapter {
       proc.on('error', async (err) => {
         delete this._channelProcesses[channel];
         await this.sendStatus(channel, 'idle');
-        this._log(`Antigravity spawn error: ${err.message}`);
+        this._log(`[spawn] event=error channel=${channel} code=${err.code || 'n/a'} errno=${err.errno != null ? err.errno : 'n/a'} syscall=${err.syscall || 'n/a'} path=${err.path || 'n/a'} msg=${err.message}`);
         await this.sendError(channel, `❌ 启动 Antigravity 失败: ${err.message}`);
         resolve();
       });

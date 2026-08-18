@@ -105,7 +105,22 @@ async function cmdDown(connector) {
   }
 }
 
-async function cmdRestart(connector, flags) {
+async function cmdRestart(connector, flags, positional) {
+  // `wwj restart <name>` restarts that single agent; the extra argument used to
+  // be silently dropped, so it bounced the whole daemon instead — including,
+  // when the desktop app owns the daemon, replacing the app's daemon with one
+  // started from the shell. Bare `wwj restart` still restarts the daemon.
+  const name = positional && positional[0];
+  if (name) {
+    if (!connector.getDaemonPid()) {
+      print('Daemon is not running. Run `wwj up` first.');
+      return;
+    }
+    connector.sendDaemonCommand(`restart:${name}`);
+    print(`Sent restart command for '${name}'`);
+    return;
+  }
+
   // Stop then start. stopDaemon() already SIGTERM/SIGKILLs and waits for the
   // process to die, but poll getDaemonPid() (which checks liveness) until the
   // pid clears so the singleton guard in cmdUp can't trip on a not-yet-gone
@@ -770,6 +785,7 @@ Commands:
   up [--foreground]           Start daemon (background by default)
   down                        Stop daemon
   restart [--foreground]      Restart daemon (down + up)
+  restart <name>              Restart a single agent
   status                      Show agent status
   list                        List configured agents
   create <name> [--type T]    Create a new agent
@@ -854,7 +870,7 @@ async function main() {
     tui: () => { const { run } = require('./tui'); run(); },
     up: () => cmdUp(connector, flags),
     down: () => cmdDown(connector),
-    restart: () => cmdRestart(connector, flags),
+    restart: () => cmdRestart(connector, flags, positional),
     status: () => cmdStatus(connector),
     list: () => cmdList(connector),
     create: () => cmdCreate(connector, flags, positional),

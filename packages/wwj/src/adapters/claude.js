@@ -23,6 +23,14 @@ const { defaultAgentWorkdir, whichBinary, whereBinary } = require('../paths');
 
 const IS_WINDOWS = process.platform === 'win32';
 
+// Tools whose target path becomes a user-facing artifact worth surfacing in the
+// workspace Files panel. Read-only tools (Read/Grep/Glob) and Bash are excluded:
+// Bash's side effects are not knowable from its command string.
+const FILE_WRITING_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+
+// Max transcript lines in a channel-context prefix.
+const RECAP_TAIL_LINES = 20;
+
 class ClaudeAdapter extends BaseAdapter {
   /**
    * @param {object} opts - BaseAdapter opts plus:
@@ -35,6 +43,11 @@ class ClaudeAdapter extends BaseAdapter {
     /** @type {'mcp' | 'skills'} Tool integration mode */
     this.toolMode = opts.toolMode || 'skills';
     this._channelSessions = {}; // channel → Claude CLI session_id
+    // channel → messageId of the last channel message already accounted for in
+    // the CLI session. Anything newer is pushed in as a context prefix on the
+    // next turn. In-memory only: after a restart the session may resume but we
+    // no longer know what it saw, so the first turn falls back to a full recap.
+    this._recapCursor = {};
     this._channelProcesses = {}; // channel → child process
     this._stoppingChannels = new Set();
     // Channels that have already announced "Execution stopped by user." for the
@@ -376,27 +389,80 @@ class ClaudeAdapter extends BaseAdapter {
   }
 
   /**
-   * Build a short transcript of the channel's last chat exchanges, used to
-   * re-seed context when --resume fails and we have to start a fresh
-   * Claude Code session. Returns null when there's nothing useful to add.
+   * Build the channel-context prefix for one turn.
    *
-   * Excludes the user's current message (the for-loop will append it
-   * normally) and any status/thinking events, which are mostly tool-call
-   * noise and inflate the prompt without adding signal.
+   * We are only *delivered* messages that @mention us (see BaseAdapter's
+   * addressing filter), so everything else said in the channel — including
+   * whole analyses posted by sibling agents — never reaches the CLI session.
+   * A message like "@claude 你对以上分析怎么看" then resolves "以上" against
+   * our own last turn instead of the message it actually points at. Pushing
+   * the gap in is the only fix: the agent cannot know it is missing context,
+   * so `workspace_get_history` (a pull) is never called.
+   *
+   * Two shapes, both keyed off `_recapCursor`:
+   * - `full` (fresh CLI, or the cursor fell out of the fetch window): the
+   *   old behaviour — a tail recap of the recent conversation, own messages
+   *   included, since the new session has no history at all.
+   * - incremental (a live/resumed session): only what was posted after the
+   *   cursor, minus our own posts. Normally one to three lines.
+   *
+   * The cursor advances on every call, injected or not, so nothing replays.
+   * Returns null when there is nothing worth adding.
    */
-  async _buildChannelRecap(channelName, currentMessage) {
+  async _buildChannelContext(channelName, opts = {}) {
+    const {
+      currentMessage = '',
+      currentMessageId = null,
+      full = false,
+    } = opts;
+
     const messages = await this.client.getRecentMessages(
       this.workspaceId, channelName, this.token, 60
     );
     if (!messages || messages.length === 0) return null;
 
+    const cursor = full ? null : this._recapCursor[channelName];
+
+    let startIdx = 0;
+    let incremental = false;
+    if (cursor) {
+      const idx = messages.findIndex((m) => m.messageId === cursor);
+      if (idx === -1) {
+        // Cursor aged out of the window — fall back to a tail recap rather
+        // than replaying all 60 messages.
+        startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
+      } else {
+        startIdx = idx + 1;
+        incremental = true;
+      }
+    } else {
+      startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
+    }
+
+    // Advance the cursor before any early return: these messages are now
+    // accounted for whether or not they made it into the prefix.
+    const ids = new Set();
+    for (const m of messages) if (m.messageId) ids.add(m.messageId);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].messageId) { this._recapCursor[channelName] = messages[i].messageId; break; }
+    }
+    // The message we are handling may not have propagated to the events API
+    // yet; pin the cursor to it so the next turn doesn't echo it back at us.
+    if (currentMessageId && !ids.has(currentMessageId)) {
+      this._recapCursor[channelName] = currentMessageId;
+    }
+
     const lines = [];
-    for (const m of messages) {
+    for (let i = startIdx; i < messages.length; i++) {
+      const m = messages[i];
       const mt = m.messageType || 'chat';
       if (mt === 'status' || mt === 'thinking' || mt === 'loading') continue;
       const text = (m.content || '').trim();
       if (!text) continue;
-      if (text === currentMessage) continue;
+      // Exclude the message being handled — the caller appends it below.
+      if (currentMessageId ? m.messageId === currentMessageId : text === currentMessage) continue;
+      // Our own posts are already in a live session's history.
+      if (incremental && m.senderType !== 'human' && m.senderName === this.agentName) continue;
       const who = m.senderType === 'human'
         ? (m.senderName || 'user')
         : (m.senderName || 'agent');
@@ -405,11 +471,23 @@ class ClaudeAdapter extends BaseAdapter {
     }
     if (lines.length === 0) return null;
 
-    const tail = lines.slice(-20).join('\n');
+    const tail = lines.slice(-RECAP_TAIL_LINES).join('\n');
+    if (!incremental) {
+      return (
+        'You previously worked in this channel but your prior session is no ' +
+        'longer available, so here is the recent conversation for context:\n\n' +
+        tail
+      );
+    }
     return (
-      'You previously worked in this channel but your prior session is no ' +
-      'longer available, so here is the recent conversation for context:\n\n' +
-      tail
+      '## Channel context you have not seen\n' +
+      'Posted in this channel after your last turn. These were not delivered ' +
+      'to you (only messages that @mention you are), so they are NOT in your ' +
+      'conversation history:\n\n' +
+      tail + '\n\n' +
+      'The message below is the one addressed to you. If it refers to "the ' +
+      'above", "that analysis", "the previous message" or anything similar, ' +
+      'it means the channel messages above — not your own earlier work.'
     );
   }
 
@@ -871,6 +949,10 @@ class ClaudeAdapter extends BaseAdapter {
       postedThinking: false,
       everPostedAnything: false,
       stderrBuf: '',
+      // Absolute paths of files this turn's tools wrote, registered into the
+      // workspace Files space once the turn ends (at tool_use time the tool has
+      // not run yet, so the file may not exist or still be stale).
+      producedFiles: new Set(),
       alive: true,
       lastStdoutTime: Date.now(),
       watchdogTimer: null,
@@ -916,6 +998,10 @@ class ClaudeAdapter extends BaseAdapter {
                 await this.sendTodos(pp.msgChannel, wsTodos);
               } catch {}
             }
+            if (FILE_WRITING_TOOLS.has(toolName) && block.input && typeof block.input === 'object') {
+              const written = block.input.file_path || block.input.path || block.input.notebook_path;
+              if (written) pp.producedFiles.add(String(written));
+            }
             let inputPreview = '';
             if (block.input && typeof block.input === 'object') {
               const inp = block.input;
@@ -948,6 +1034,9 @@ class ClaudeAdapter extends BaseAdapter {
           pp.lastErrorText = String(event.result || '').trim();
           this._log(`Claude error: ${pp.lastErrorText.slice(0, 200)}`);
         }
+        // Fire-and-forget: registering produced files must never delay
+        // resolving the turn or posting the reply.
+        this._flushProducedFiles(pp);
         if (pp.messageResolve) {
           pp.messageResolve({ resultEvent: event });
           pp.messageResolve = null;
@@ -1071,6 +1160,28 @@ class ClaudeAdapter extends BaseAdapter {
     return `Claude error: ${msg}`;
   }
 
+  /**
+   * Register the files this turn's tools wrote into the workspace Files space.
+   * Drains the set so a later turn in the same persistent process does not
+   * re-submit them (BaseAdapter also dedupes by size+mtime, which covers a file
+   * genuinely rewritten with identical content).
+   *
+   * Never rejects — a failed upload must not affect the conversation.
+   *
+   * @param {object} pp persistent-process state
+   */
+  async _flushProducedFiles(pp) {
+    if (!pp || !pp.producedFiles || pp.producedFiles.size === 0) return;
+    const paths = [...pp.producedFiles];
+    pp.producedFiles.clear();
+    const channel = pp.msgChannel;
+    for (const filePath of paths) {
+      try {
+        await this.registerProducedFile(channel, filePath);
+      } catch {}
+    }
+  }
+
   async _handleMessage(msg) {
     let content = (msg.content || '').trim();
     const attachments = msg.attachments || [];
@@ -1126,7 +1237,17 @@ class ClaudeAdapter extends BaseAdapter {
       this._log(`Reusing persistent process for ${msgChannel}`);
       this._resetIdleTimer(msgChannel);
       existingPP.msgChannel = msgChannel;
-      const result = await this._sendToPersistentProc(existingPP, content);
+      // The live session only ever saw messages addressed to us — push in
+      // whatever else the channel said since our last turn.
+      let turnContent = content;
+      try {
+        const ctx = await this._buildChannelContext(msgChannel, {
+          currentMessage: content,
+          currentMessageId: msg.messageId,
+        });
+        if (ctx) turnContent = `${ctx}\n\n---\n\n${content}`;
+      } catch {}
+      const result = await this._sendToPersistentProc(existingPP, turnContent);
       if (result.resultEvent) {
         const fullResponse = existingPP.lastResponseText.join('\n').trim();
         if (existingPP.lastErrorText) {
@@ -1227,23 +1348,30 @@ class ClaudeAdapter extends BaseAdapter {
     // Spawn a persistent process and send the first message via stdin
     let effectiveContent = content;
 
-    // When starting without a session (no --resume), prepend channel
-    // history so the fresh CLI has conversation context.
-    if (!this._channelSessions[msgChannel]) {
-      try {
-        const recap = await this._buildChannelRecap(msgChannel, content);
-        if (recap) effectiveContent = `${recap}\n\n---\n\n${content}`;
-      } catch {}
-    }
+    // Without a session (no --resume) the fresh CLI needs the full recap;
+    // with one it only needs the messages posted since our last turn.
+    try {
+      const ctx = await this._buildChannelContext(msgChannel, {
+        currentMessage: content,
+        currentMessageId: msg.messageId,
+        full: !this._channelSessions[msgChannel],
+      });
+      if (ctx) effectiveContent = `${ctx}\n\n---\n\n${content}`;
+    } catch {}
 
     for (let attempt = 0; attempt < 2; attempt++) {
       if (mcpConfigFile) { try { fs.unlinkSync(mcpConfigFile); } catch {} mcpConfigFile = null; }
 
       if (attempt > 0) {
         this._killPersistentProc(msgChannel);
-        // Rebuild recap for retry without resume
+        // Retry spawns a brand-new CLI (skipResume), so it needs the full
+        // recap regardless of what the cursor thinks the old session saw.
         try {
-          const recap = await this._buildChannelRecap(msgChannel, content);
+          const recap = await this._buildChannelContext(msgChannel, {
+            currentMessage: content,
+            currentMessageId: msg.messageId,
+            full: true,
+          });
           if (recap) effectiveContent = `${recap}\n\n---\n\n${content}`;
         } catch {}
       }

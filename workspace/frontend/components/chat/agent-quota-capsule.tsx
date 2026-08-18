@@ -9,65 +9,99 @@ import type { AgentUsage } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface AgentQuotaCapsuleProps {
+  /** 外部建议展示的 agent（通常是当前选中模型所属的），用户可在面板内切换到其他 agent。 */
   agentName?: string;
   className?: string;
 }
 
+type QuotaKind = 'antigravity' | 'claude';
+
+interface QuotaAgent {
+  name: string;
+  kind: QuotaKind;
+  online: boolean;
+}
+
+/** 判断某个 agent 是否有可展示的用量面板，以及属于哪一类。 */
+function quotaKindOf(name: string): QuotaKind | null {
+  const lower = (name || '').toLowerCase();
+  if (lower.includes('antigravity') || lower.includes('agy')) return 'antigravity';
+  if (lower.includes('claude')) return 'claude';
+  return null;
+}
+
 export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuotaCapsuleProps) {
   const { workspaceId, agents } = useWorkspace();
-  const [usage, setUsage] = React.useState<AgentUsage | null>(null);
-  const [loading, setLoading] = React.useState(false);
+  // 按 agent 名缓存用量，切换时不会闪回空白。
+  const [usageByAgent, setUsageByAgent] = React.useState<Record<string, AgentUsage>>({});
+  const [loadingAgent, setLoadingAgent] = React.useState<string | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
+  // 用户在面板里手动选择的 agent；为空时跟随外部传入的当前模型。
+  const [manualAgent, setManualAgent] = React.useState<string | null>(null);
 
-  const isAntigravity = React.useMemo(() => {
-    if (!agentName) return false;
-    const lower = agentName.toLowerCase();
-    return lower.includes('antigravity') || lower.includes('agy');
-  }, [agentName]);
+  const quotaAgents = React.useMemo<QuotaAgent[]>(
+    () =>
+      agents
+        .map((a) => {
+          const kind = quotaKindOf(a.agentName);
+          return kind ? { name: a.agentName, kind, online: a.status === 'online' } : null;
+        })
+        .filter((a): a is QuotaAgent => a !== null),
+    [agents]
+  );
 
-  const isClaude = React.useMemo(() => {
-    if (!agentName) return false;
-    return agentName.toLowerCase().includes('claude');
-  }, [agentName]);
+  const onlineAgents = React.useMemo(() => quotaAgents.filter((a) => a.online), [quotaAgents]);
 
-  const isConnected = React.useMemo(() => {
-    if (!agentName) return false;
-    const lower = agentName.toLowerCase();
-    return agents.some(
-      (a) =>
-        (a.agentName.toLowerCase() === lower ||
-          (isAntigravity && (a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy'))) ||
-          (isClaude && a.agentName.toLowerCase().includes('claude'))) &&
-        a.status === 'online'
-    );
-  }, [agentName, agents, isAntigravity, isClaude]);
+  // 选中优先级：手动切换 > 外部传入的当前模型 > 第一个在线的
+  const selected = React.useMemo<QuotaAgent | null>(() => {
+    const pick = (n?: string | null) => {
+      if (!n) return undefined;
+      const lower = n.toLowerCase();
+      const exact = onlineAgents.find((a) => a.name.toLowerCase() === lower);
+      if (exact) return exact;
+      const kind = quotaKindOf(n);
+      return kind ? onlineAgents.find((a) => a.kind === kind) : undefined;
+    };
+    return pick(manualAgent) ?? pick(agentName) ?? onlineAgents[0] ?? null;
+  }, [manualAgent, agentName, onlineAgents]);
 
-  const fetchUsage = React.useCallback(async () => {
-    if (!agentName || !isConnected) return;
-    try {
-      setLoading(true);
-      if (workspaceId) {
-        workspaceApi.setWorkspaceId(workspaceId);
+  const selectedName = selected?.name;
+
+  const fetchUsage = React.useCallback(
+    async (target?: string) => {
+      const name = target ?? selectedName;
+      if (!name) return;
+      try {
+        setLoadingAgent(name);
+        if (workspaceId) {
+          workspaceApi.setWorkspaceId(workspaceId);
+        }
+        const data = await workspaceApi.getAgentUsage(name);
+        if (data && (data.session_used_percent !== undefined || data.week_used_percent !== undefined || data.raw_text)) {
+          setUsageByAgent((prev) => ({ ...prev, [name]: data }));
+        }
+      } catch {
+        // silently ignore
+      } finally {
+        setLoadingAgent((cur) => (cur === name ? null : cur));
       }
-      const data = await workspaceApi.getAgentUsage(agentName);
-      if (data && (data.session_used_percent !== undefined || data.week_used_percent !== undefined || data.raw_text)) {
-        setUsage(data);
-      }
-    } catch {
-      // silently ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId, agentName, isConnected]);
+    },
+    [workspaceId, selectedName]
+  );
 
   React.useEffect(() => {
-    if (!isConnected) return;
-    fetchUsage();
-    const interval = setInterval(fetchUsage, 30_000);
+    if (!selectedName) return;
+    fetchUsage(selectedName);
+    const interval = setInterval(() => fetchUsage(selectedName), 30_000);
     return () => clearInterval(interval);
-  }, [fetchUsage, isConnected]);
+  }, [fetchUsage, selectedName]);
 
-  if (!isConnected) return null;
+  // 只有在没有任何可展示用量的 agent 在线时才完全隐藏。
+  if (!selected) return null;
+
+  const isAntigravity = selected.kind === 'antigravity';
+  const usage = usageByAgent[selected.name] ?? null;
+  const loading = loadingAgent === selected.name;
 
   const sessionPercent = usage?.session_used_percent ?? 0;
   const weekPercent = usage?.week_used_percent ?? 0;
@@ -177,6 +211,45 @@ export function AgentQuotaCapsule({ agentName = 'claude', className }: AgentQuot
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
           </button>
         </div>
+
+        {/* Agent 切换器：有多个可展示用量的 Agent 时出现，离线项保留但不可选 */}
+        {quotaAgents.length > 1 && (
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface2/70 border border-border/50">
+            {quotaAgents.map((a) => {
+              const active = a.name === selected.name;
+              return (
+                <button
+                  key={a.name}
+                  type="button"
+                  disabled={!a.online}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setManualAgent(a.name);
+                    fetchUsage(a.name);
+                  }}
+                  className={cn(
+                    'flex-1 min-w-0 px-2 py-1 rounded-md text-[11px] font-medium transition-colors truncate border',
+                    active
+                      ? 'bg-surface1 text-foreground border-border/60 shadow-2xs'
+                      : 'text-foreground-muted hover:text-foreground border-transparent',
+                    !a.online && 'opacity-40 cursor-not-allowed hover:text-foreground-muted'
+                  )}
+                  title={a.online ? `查看 ${a.name} 的用量` : `${a.name} 当前离线，上线后可查看`}
+                >
+                  <span className="inline-flex items-center gap-1 max-w-full">
+                    <span
+                      className={cn(
+                        'size-1.5 rounded-full shrink-0',
+                        a.online ? 'bg-emerald-500' : 'bg-foreground-extra-muted'
+                      )}
+                    />
+                    <span className="truncate">{a.name}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Unparsed warning alert */}
         {isUnparsed && (

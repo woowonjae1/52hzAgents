@@ -74,6 +74,26 @@ function parseStepContent(content: string): ParsedStep {
     };
   }
 
+  // Adapters post tool activity as a plain "Name > args" status line (see the
+  // claude adapter's sendStatus on tool_use). Without this branch it fell
+  // through to a generic `status` step, losing the tool's identity, its icon and
+  // the expandable detail — which is why long arguments appeared truncated with
+  // no way to read them. Checked before the /compact/ test so a command that
+  // merely contains the word "compact" is not misread as a compaction notice.
+  const inlineToolMatch = content.match(/^([A-Za-z][\w.-]*)\s*›\s*([\s\S]+)$/);
+  if (inlineToolMatch) {
+    const toolDisplay = cleanToolName(inlineToolMatch[1].trim());
+    const args = inlineToolMatch[2].trim();
+    const oneLine = args.replace(/\s+/g, ' ').trim();
+    return {
+      type: 'tool_call',
+      tool: toolDisplay,
+      toolDisplay,
+      args,
+      summary: oneLine.length > 100 ? oneLine.slice(0, 100) + '…' : oneLine,
+    };
+  }
+
   if (/compact/i.test(content)) {
     return { type: 'compacting', text: content };
   }
@@ -295,6 +315,64 @@ function isTerminalStatus(step: WorkspaceMessage) {
     /stopped|stopping failed/i.test(step.content)
   );
 }
+
+// ── Tool Calls Disclosure ──
+
+interface ToolCallsDisclosureProps {
+  steps: WorkspaceMessage[];
+  defaultOpen?: boolean;
+}
+
+/**
+ * The tool activity that led to a reply, rendered INSIDE that reply's bubble and
+ * collapsed by default.
+ *
+ * Tool activity arrives as separate `status` events, so it used to render as its
+ * own block above the messages, with every agent's steps interleaved in one
+ * list — in a multi-agent channel it was impossible to tell who had done what.
+ * Attaching the steps to their author's message makes attribution structural,
+ * and collapsing them keeps the conversation readable while the detail stays one
+ * click away.
+ */
+export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
+  steps,
+  defaultOpen = false,
+}: ToolCallsDisclosureProps) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const renderable = (steps || []).filter((s) => !isPlaceholderThinking(s));
+  if (renderable.length === 0) return null;
+
+  const toolCount = renderable.filter((s) => {
+    if (s.messageType === 'todos' || s.messageType === 'thinking') return false;
+    return parseStepContent(s.content).type === 'tool_call';
+  }).length;
+  const label = toolCount > 0
+    ? `${toolCount} tool call${toolCount === 1 ? '' : 's'}`
+    : `${renderable.length} step${renderable.length === 1 ? '' : 's'}`;
+
+  return (
+    <div className="mb-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="flex items-center gap-1.5 text-[11px] text-foreground-muted hover:text-foreground transition-colors rounded px-1.5 py-1 -ml-1.5 hover:bg-surface2/60"
+      >
+        <ChevronRight className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')} />
+        <Wrench className="size-3 shrink-0" />
+        <span className="font-medium">{label}</span>
+      </button>
+      {open && (
+        <div className="mt-1 ml-1 border-l-2 border-border pl-3 min-w-0">
+          {renderable.map((step, i) => (
+            <SingleStep key={`${step.messageId || 'step'}-${i}`} message={step} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
 
 // ── Intermediate Steps Group ──
 

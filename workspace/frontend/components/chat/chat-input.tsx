@@ -99,9 +99,9 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
 
   const agentNames = agents.map((a) => a.agentName);
 
-  // Extract @mentions from message text
+  // Extract @mentions or /agent commands from message text
   const extractMentions = (text: string): string[] => {
-    const matches = text.match(/@([\w-]+)/g) || [];
+    const matches = text.match(/[@/]([\w-]+)/g) || [];
     return matches
       .map((m) => m.slice(1))
       .filter((name) => agentNames.includes(name));
@@ -177,9 +177,12 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
     const textAfter = message.slice(cursorPos);
 
     const atIndex = textBefore.lastIndexOf('@');
-    if (atIndex === -1) return;
+    const slashIndex = textBefore.lastIndexOf('/');
+    const triggerIndex = Math.max(atIndex, slashIndex);
+    if (triggerIndex === -1) return;
 
-    const newText = textBefore.slice(0, atIndex) + `@${mentionText} ` + textAfter;
+    const prefix = textBefore[triggerIndex]; // '@' or '/'
+    const newText = textBefore.slice(0, triggerIndex) + `${prefix}${mentionText} ` + textAfter;
     setMessage(newText);
     onDraftChange?.(newText);
     setShowMentions(false);
@@ -187,7 +190,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], knowledge 
 
     setTimeout(() => {
       textarea.focus();
-      const newCursorPos = atIndex + mentionText.length + 2;
+      const newCursorPos = triggerIndex + mentionText.length + 2;
       textarea.setSelectionRange(newCursorPos, newCursorPos);
     }, 0);
   };

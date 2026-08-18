@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -445,15 +446,42 @@ var agentIdentRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 // wwjCLIPath locates the local wwj CLI relative to the backend's cwd, falling
 // back to a `wwj` on PATH outside the monorepo layout.
+// wwjCLIPath resolves the workspace connector CLI that /launch and /create
+// shell out to.
+//
+// The packaged desktop app ships its own connector under resources/wwj
+// (build-desktop.ps1 assembles it), so that copy is tried FIRST and is resolved
+// from the backend executable's own location. Working-directory-relative paths
+// cannot be used for it: they do not survive packaging, and /launch deliberately
+// sets the child's cwd to the user's chosen project directory. Previously only
+// the two dev-tree paths below were tried, so a packaged build always fell
+// through to the bare "wwj" on PATH — making the app depend on a global npm
+// install (and fail outright when that install was stale or broken), while the
+// bundled copy went unused.
 func wwjCLIPath() string {
-	cliPath := "../../packages/wwj/src/cli.js"
-	if _, err := os.Stat(cliPath); os.IsNotExist(err) {
-		if _, err2 := os.Stat("../packages/wwj/src/cli.js"); err2 == nil {
-			return "../packages/wwj/src/cli.js"
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		bundled := []string{
+			// packaged: resources/bin/52hz-server.exe -> resources/wwj/src/cli.js
+			filepath.Join(exeDir, "..", "wwj", "src", "cli.js"),
+			// binary sitting directly alongside the wwj directory
+			filepath.Join(exeDir, "wwj", "src", "cli.js"),
 		}
-		return "wwj"
+		for _, candidate := range bundled {
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
+		}
 	}
-	return cliPath
+
+	// Development tree: backend run from workspace/backend, or from workspace.
+	for _, candidate := range []string{"../../packages/wwj/src/cli.js", "../packages/wwj/src/cli.js"} {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate
+		}
+	}
+
+	return "wwj"
 }
 
 // CreateAgentRequest registers a new local agent with the launcher. This is the

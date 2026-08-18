@@ -8,6 +8,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { MarkdownContent } from './markdown-content';
+import { ToolCallsDisclosure } from './intermediate-steps';
 import { workspaceApi } from '@/lib/api';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -106,6 +107,8 @@ interface ChatMessageProps {
   agents?: WorkspaceAgent[];
   isApproved?: boolean;
   isRejected?: boolean;
+  /** Tool calls / status this sender emitted before this message, if any. */
+  steps?: WorkspaceMessage[];
 }
 
 function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: string; name: string }): boolean {
@@ -118,7 +121,7 @@ function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: str
   return Boolean(currentUserName && senderName === currentUserName);
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected, steps }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
@@ -315,6 +318,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             )}
           </div>
           <div className="text-[13.5px] leading-[1.65] text-foreground font-normal">
+            {steps && steps.length > 0 && <ToolCallsDisclosure steps={steps} />}
             <MarkdownContent content={message.content} agentNames={agentNames} />
             <Attachments items={attachments} />
 

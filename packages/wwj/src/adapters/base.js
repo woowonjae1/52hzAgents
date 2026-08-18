@@ -811,7 +811,10 @@ class BaseAdapter {
         const mentionsMe = addressedAgents.length > 0
           ? addressedAgents.includes(selfLower)
           : ((Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName)) ||
-            (typeof msg.content === 'string' && msg.content.toLowerCase().includes(`@${selfLower}`)));
+            (typeof msg.content === 'string' && (
+              msg.content.toLowerCase().includes(`@${selfLower}`) ||
+              msg.content.toLowerCase().includes(`/${selfLower}`)
+            )));
         const targetedMe = Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName);
         const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 
@@ -823,13 +826,13 @@ class BaseAdapter {
         if (isHuman) {
           this._agentHopCounts[hopChannel] = 0;
 
-          // If the human message explicitly targets specific agent(s) via @mention or targetAgents,
+          // If the human message explicitly targets specific agent(s) via @mention, /agent or targetAgents,
           // other agents who were NOT mentioned/targeted MUST NOT process or interrupt this message.
           const explicitTargeted = Array.isArray(msg.targetAgents) && msg.targetAgents.length > 0;
           const explicitMentions = Array.isArray(msg.mentions) && msg.mentions.length > 0;
-          const textMentionMatches = (typeof msg.content === 'string' ? msg.content.match(/(?:^|\s)@([a-zA-Z0-9_-]+)/g) : []) || [];
+          const textMentionMatches = (typeof msg.content === 'string' ? msg.content.match(/(?:^|\s)[@/]([a-zA-Z0-9_-]+)/g) : []) || [];
           const agentMentions = textMentionMatches
-            .map(m => m.trim().replace(/^@/, ''))
+            .map(m => m.trim().replace(/^[@/]/, ''))
             .filter(name => !name.startsWith('knowledge:') && !name.includes('.'));
 
           const hasSpecificTarget = explicitTargeted || explicitMentions || agentMentions.length > 0;
