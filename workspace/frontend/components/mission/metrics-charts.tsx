@@ -119,6 +119,8 @@ export function RingProgress({
   label,
   className,
 }: RingProgressProps) {
+  if (value <= 0) return null;
+
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (Math.min(100, Math.max(0, value)) / 100) * circumference;
@@ -134,20 +136,18 @@ export function RingProgress({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        {value > 0 && (
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke={color}
-            strokeWidth={strokeWidth}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            fill="none"
-            className="transition-all duration-500 ease-out"
-          />
-        )}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          fill="none"
+          className="transition-all duration-500 ease-out"
+        />
       </svg>
       {label && (
         <span className="absolute text-[10px] font-mono font-medium text-foreground">
@@ -197,7 +197,7 @@ export function MetricCard({
               {icon}
             </span>
           )}
-          <span className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground truncate font-mono">
+          <span className="text-[11px] font-medium tracking-tight text-muted-foreground truncate">
             {title}
           </span>
         </div>
@@ -205,7 +205,7 @@ export function MetricCard({
         {badge && (
           <span
             className={cn(
-              'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-mono font-medium',
+              'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium',
               badge.trend === 'up'
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : badge.trend === 'down'
@@ -227,7 +227,7 @@ export function MetricCard({
             {value}
           </div>
           {subtitle && (
-            <div className="text-[10.5px] text-muted-foreground mt-0.5 truncate">
+            <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
               {subtitle}
             </div>
           )}

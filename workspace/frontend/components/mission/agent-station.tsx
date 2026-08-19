@@ -12,6 +12,8 @@ import {
   Clock,
   Check,
   X,
+  RotateCw,
+  Hash,
 } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { toast } from 'sonner';
@@ -45,7 +47,7 @@ function fmtTokens(n: number): string {
 
 function stripMarkdown(text: string): string {
   return text
-    .replace(/```[\s\S]*?```/g, '[code]')
+    .replace(/```[\s\S]*?```/g, '[代码块]')
     .replace(/\*\*/g, '')
     .replace(/`{1,3}/g, '')
     .replace(/\n+/g, ' ')
@@ -88,18 +90,20 @@ export function AgentStation({
   const [busy, setBusy] = React.useState(false);
 
   // Heartbeat timeout calculation
-  const isHeartbeatTimeout = React.useMemo(() => {
-    if (!lastHeartbeatAt || status !== 'ready') return false;
+  const heartbeatDiffSec = React.useMemo(() => {
+    if (!lastHeartbeatAt) return null;
     const timeMs = typeof lastHeartbeatAt === 'string' ? new Date(lastHeartbeatAt).getTime() : lastHeartbeatAt;
-    if (!timeMs || isNaN(timeMs)) return false;
-    return Date.now() - timeMs > 30000;
-  }, [lastHeartbeatAt, status]);
+    if (!timeMs || isNaN(timeMs)) return null;
+    return Math.max(1, Math.round((Date.now() - timeMs) / 1000));
+  }, [lastHeartbeatAt]);
+
+  const isHeartbeatTimeout = heartbeatDiffSec !== null && heartbeatDiffSec > 30;
 
   // Single Source of Truth for Status Badge
   const statusBadge = React.useMemo(() => {
     if (isBlocked) {
       return {
-        label: 'Action Required',
+        label: '等待审批',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
         badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 font-medium',
@@ -108,15 +112,16 @@ export function AgentStation({
     if (isStalled) {
       const sec = stalledMs ? Math.round(stalledMs / 1000) : 30;
       return {
-        label: `Stalled · ${sec}s`,
+        label: `停滞 · ${sec}s`,
         dot: 'bg-rose-500',
         ring: 'ring-rose-500/25',
         badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium',
       };
     }
     if (isHeartbeatTimeout) {
+      const hbTime = typeof lastHeartbeatAt === 'string' ? lastHeartbeatAt : new Date(lastHeartbeatAt!).toISOString();
       return {
-        label: 'Heartbeat Timeout',
+        label: `心跳超时 · ${timeAgo(hbTime)}`,
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
         badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
@@ -124,7 +129,7 @@ export function AgentStation({
     }
     if (isWorking) {
       return {
-        label: 'Working',
+        label: '执行中',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
         badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
@@ -132,7 +137,7 @@ export function AgentStation({
     }
     if (status === 'ready') {
       return {
-        label: 'Online',
+        label: '在线就绪',
         dot: 'bg-emerald-500',
         ring: 'ring-emerald-500/25',
         badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium',
@@ -140,19 +145,19 @@ export function AgentStation({
     }
     if (isCatalogPlaceholder) {
       return {
-        label: 'Available',
+        label: '未接入',
         dot: 'bg-muted-foreground/40',
         ring: 'ring-muted-foreground/10',
         badge: 'bg-surface2/60 text-muted-foreground font-medium',
       };
     }
     return {
-      label: 'Offline',
+      label: '离线',
       dot: 'bg-muted-foreground/50',
       ring: 'ring-muted-foreground/10',
       badge: 'bg-surface2/80 text-muted-foreground font-medium',
     };
-  }, [isBlocked, isStalled, isHeartbeatTimeout, isWorking, status, isCatalogPlaceholder, stalledMs]);
+  }, [isBlocked, isStalled, isHeartbeatTimeout, isWorking, status, isCatalogPlaceholder, stalledMs, lastHeartbeatAt]);
 
   const handleApprove = async () => {
     if (!pendingApproval || !activeThread) return;
@@ -176,10 +181,10 @@ export function AgentStation({
         },
         visibility: 'channel',
       });
-      toast.success(`Approved @${agent.agentName}`);
+      toast.success(`已批准 @${agent.agentName} 执行`);
       onApprovalResolved?.();
     } catch {
-      toast.error('Failed to submit approval');
+      toast.error('批准失败');
     } finally {
       setBusy(false);
     }
@@ -207,16 +212,14 @@ export function AgentStation({
         },
         visibility: 'channel',
       });
-      toast.info(`Rejected @${agent.agentName}`);
+      toast.info(`已拒绝 @${agent.agentName}`);
       onApprovalResolved?.();
     } catch {
-      toast.error('Failed to reject');
+      toast.error('拒绝操作失败');
     } finally {
       setBusy(false);
     }
   };
-
-  const hasTelemetry = (tokenCount > 0 || threads.length > 0) && !isCatalogPlaceholder;
 
   return (
     <div
@@ -226,6 +229,7 @@ export function AgentStation({
         'border border-border/30 hover:border-border/60 hover:shadow-xs',
         isBlocked && 'ring-2 ring-amber-500/20 bg-amber-500/[0.02]',
         isStalled && 'ring-2 ring-rose-500/20 bg-rose-500/[0.02]',
+        isHeartbeatTimeout && 'border-amber-500/30',
         status === 'offline' && !isCatalogPlaceholder && 'opacity-85',
         isCatalogPlaceholder && 'bg-surface1/30'
       )}
@@ -251,7 +255,7 @@ export function AgentStation({
               </span>
               {agent.role === 'master' && (
                 <span className="text-[9px] px-1 rounded bg-surface3 text-foreground font-mono font-medium">
-                  leader
+                  主导
                 </span>
               )}
             </div>
@@ -286,7 +290,7 @@ export function AgentStation({
           <div className="flex items-center justify-between text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
             <span className="flex items-center gap-1">
               <ShieldAlert className="size-3" />
-              <span>Approval · {pendingApproval.tool}</span>
+              <span>待批执行 · {pendingApproval.tool}</span>
             </span>
           </div>
           {pendingApproval.command && (
@@ -302,7 +306,7 @@ export function AgentStation({
               className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 cursor-pointer"
             >
               <X className="size-2.5" />
-              <span>Deny</span>
+              <span>拒绝</span>
             </button>
             <button
               type="button"
@@ -311,49 +315,46 @@ export function AgentStation({
               className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 cursor-pointer shadow-xs"
             >
               <Check className="size-2.5" />
-              <span>Approve</span>
+              <span>批准</span>
             </button>
           </div>
         </div>
-      ) : hasTelemetry ? (
-        /* Connected Agent with Seamless Telemetry Grid (No inner vertical lines) */
+      ) : !isCatalogPlaceholder ? (
+        /* Configured Agent: Telemetry & Activity (Only show non-zero metrics) */
         <div className="my-2 space-y-1.5">
-          <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-[10.5px]">
-            <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Tokens</span>
-              <span className="font-semibold font-mono text-foreground truncate">
-                {fmtTokens(tokenCount)}
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface2/50 text-[11px]">
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Hash className="size-3 text-primary" />
+              <span>{threads.length} 个协作频道</span>
+            </span>
+            {tokenCount > 0 ? (
+              <span className="font-mono text-muted-foreground text-[10.5px]">
+                {fmtTokens(tokenCount)} tok
               </span>
-            </div>
-
-            <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Threads</span>
-              <span className="font-semibold font-mono text-foreground truncate">
-                {threads.length}
+            ) : skillCount > 0 ? (
+              <span className="font-mono text-muted-foreground text-[10.5px]">
+                {skillCount} 项技能
               </span>
-            </div>
-
-            <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Skills</span>
-              <span className="font-semibold font-mono text-foreground truncate">
-                {skillCount}
+            ) : (
+              <span className="text-[10.5px] text-muted-foreground/70">
+                {status === 'ready' ? '就绪' : '待激活'}
               </span>
-            </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground px-1 truncate">
             {isWorking ? (
               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium truncate animate-pulse">
                 <Wrench className="size-3 shrink-0" />
-                <span className="truncate">{stripMarkdown(activity?.content || 'Executing task...')}</span>
+                <span className="truncate">{stripMarkdown(activity?.content || '正在执行任务...')}</span>
               </span>
             ) : activeThread ? (
               <button
                 type="button"
                 onClick={() => onOpenThread(activeThread.sessionId)}
-                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left font-mono text-[10.5px]"
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left text-[10.5px]"
               >
-                <span className="text-primary font-medium">#{activeThread.title || 'channel'}</span>
+                <span className="text-primary font-medium">#{activeThread.title || '新频道'}</span>
                 {activeThread.lastEventAt && (
                   <span className="text-muted-foreground/70">
                     · {timeAgo(new Date(activeThread.lastEventAt).toISOString())}
@@ -362,19 +363,19 @@ export function AgentStation({
               </button>
             ) : (
               <span className="text-muted-foreground/60 italic text-[10.5px]">
-                {status === 'offline' ? 'Daemon offline' : 'Standby / Ready'}
+                {isHeartbeatTimeout ? '进程心跳中断' : status === 'offline' ? '进程未启动' : '待命中'}
               </span>
             )}
           </div>
         </div>
       ) : (
-        /* Unconnected / Template Agent: Clean Capability Description */
+        /* Unconnected Template Agent */
         <div className="my-2 px-1 py-1 text-[11px] text-muted-foreground leading-relaxed line-clamp-2 min-h-[38px]">
-          {agent.description || 'Configurable ACP/MCP agent workspace adapter with tool support.'}
+          {agent.description || '支持 ACP / MCP 协议的智能体工作区适配器。'}
         </div>
       )}
 
-      {/* Footer Controls (Seamless without top dividing line) */}
+      {/* Footer Controls */}
       <div className="flex items-center gap-1.5 pt-2">
         {!isCatalogPlaceholder && (
           <button
@@ -383,7 +384,7 @@ export function AgentStation({
             className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-2xs"
           >
             <MessageSquare className="size-3 text-muted-foreground" />
-            <span>Chat</span>
+            <span>对话</span>
           </button>
         )}
 
@@ -393,22 +394,29 @@ export function AgentStation({
             e.stopPropagation();
             onPairAgent?.();
           }}
-          disabled={status !== 'offline'}
+          disabled={status === 'ready' && !isHeartbeatTimeout}
           className={cn(
             'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all shadow-2xs',
-            status === 'offline'
-              ? 'bg-surface2/80 hover:bg-surface3 text-foreground cursor-pointer'
-              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
+            status === 'ready' && !isHeartbeatTimeout
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
+              : isHeartbeatTimeout
+              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 cursor-pointer font-semibold'
+              : 'bg-surface2/80 hover:bg-surface3 text-foreground cursor-pointer'
           )}
         >
-          {status !== 'offline' ? (
-            <span>Connected</span>
+          {status === 'ready' && !isHeartbeatTimeout ? (
+            <span>已连接</span>
+          ) : isHeartbeatTimeout ? (
+            <>
+              <RotateCw className="size-3" />
+              <span>重新连接</span>
+            </>
           ) : isCustomPlaceholder ? (
-            <span>Configure</span>
+            <span>配置</span>
           ) : (
             <>
               <Plug className="size-3 text-muted-foreground" />
-              <span>Connect</span>
+              <span>连接</span>
             </>
           )}
         </button>

@@ -9,7 +9,10 @@ import {
   ShieldAlert,
   AlertCircle,
   MessageSquare,
+  BookOpen,
   ChevronRight,
+  User,
+  Bot,
 } from 'lucide-react';
 
 export interface TimelineEventItem {
@@ -19,7 +22,8 @@ export interface TimelineEventItem {
   channel: string;
   channelId: string;
   content: string;
-  type: 'command' | 'success' | 'error' | 'thinking' | 'approval' | 'info';
+  type: 'command' | 'success' | 'error' | 'thinking' | 'approval' | 'knowledge' | 'info';
+  isHuman?: boolean;
 }
 
 interface ActivityTimelineProps {
@@ -30,71 +34,122 @@ interface ActivityTimelineProps {
   className?: string;
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, '[代码块]')
+    .replace(/\*\*/g, '')
+    .replace(/`{1,3}/g, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+}
+
 export function ActivityTimeline({
   events,
-  agents,
   onOpenThread,
   loading = false,
   className,
 }: ActivityTimelineProps) {
   const [selectedType, setSelectedType] = React.useState<string>('all');
 
+  // Filter out noisy idle / empty status events
+  const cleanedEvents = React.useMemo(() => {
+    return events
+      .filter((ev) => {
+        const raw = ev.content.trim().toLowerCase();
+        // Discard plain idle noise
+        if (raw === 'idle' || raw === 'standby' || raw === 'agent status: idle') return false;
+        // Discard empty thinking
+        if (ev.type === 'thinking' && (!raw || raw === 'thinking' || raw === 'thinking...')) return false;
+        return true;
+      })
+      .map((ev) => {
+        let detectedType = ev.type;
+        const text = ev.content;
+        if (text.includes('@knowledge') || text.includes('知识库') || text.includes('knowledge:')) {
+          detectedType = 'knowledge';
+        } else if (text.startsWith('$') || text.includes('exec') || text.includes('tool:') || ev.type === 'command') {
+          detectedType = 'command';
+        }
+        return {
+          ...ev,
+          type: detectedType,
+          isHuman: ev.sender.toLowerCase().includes('user') || ev.sender.toLowerCase().includes('guest') || ev.sender.toLowerCase().includes('human'),
+        };
+      });
+  }, [events]);
+
   const filteredEvents = React.useMemo(() => {
-    return events.filter((ev) => {
+    return cleanedEvents.filter((ev) => {
       if (selectedType === 'issues' && ev.type !== 'error' && ev.type !== 'approval') return false;
-      if (selectedType === 'thinking' && ev.type !== 'thinking') return false;
+      if (selectedType === 'knowledge' && ev.type !== 'knowledge') return false;
       if (selectedType === 'tools' && ev.type !== 'command' && ev.type !== 'success') return false;
+      if (selectedType === 'chat' && ev.type !== 'info' && ev.type !== 'knowledge') return false;
       return true;
     });
-  }, [events, selectedType]);
+  }, [cleanedEvents, selectedType]);
 
-  const grouped = React.useMemo(() => {
-    const now = Date.now();
-    const justNow: TimelineEventItem[] = [];
-    const recent: TimelineEventItem[] = [];
-    const earlier: TimelineEventItem[] = [];
+  // Group consecutive messages by same sender in same channel
+  const groupedTimeline = React.useMemo(() => {
+    const groups: {
+      key: string;
+      sender: string;
+      isHuman: boolean;
+      channel: string;
+      channelId: string;
+      time: Date;
+      items: TimelineEventItem[];
+    }[] = [];
 
     filteredEvents.forEach((ev) => {
-      const diffMs = now - ev.time.getTime();
-      if (diffMs < 60 * 1000) {
-        justNow.push(ev);
-      } else if (diffMs < 10 * 60 * 1000) {
-        recent.push(ev);
+      const prev = groups[groups.length - 1];
+      const timeDiff = prev ? Math.abs(prev.time.getTime() - ev.time.getTime()) : Infinity;
+
+      if (
+        prev &&
+        prev.sender === ev.sender &&
+        prev.channelId === ev.channelId &&
+        timeDiff < 2 * 60 * 1000 // within 2 minutes
+      ) {
+        prev.items.push(ev);
       } else {
-        earlier.push(ev);
+        groups.push({
+          key: ev.id,
+          sender: ev.sender,
+          isHuman: Boolean(ev.isHuman),
+          channel: ev.channel,
+          channelId: ev.channelId,
+          time: ev.time,
+          items: [ev],
+        });
       }
     });
 
-    return [
-      { label: 'Just now', items: justNow },
-      { label: 'Last 10 minutes', items: recent },
-      { label: 'Earlier today', items: earlier },
-    ].filter((g) => g.items.length > 0);
+    return groups;
   }, [filteredEvents]);
 
   return (
     <aside
       className={cn(
-        'flex flex-col h-full bg-surface1/40 backdrop-blur-md border-l border-border/30 overflow-hidden',
+        'flex flex-col h-full bg-surface1/40 backdrop-blur-md border-l border-border/25 overflow-hidden',
         className
       )}
     >
-      {/* Header (No harsh bottom border) */}
+      {/* Header */}
       <div className="p-3.5 space-y-2.5 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
+            <span className="size-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
             <span className="text-xs font-semibold tracking-tight text-foreground">
-              Activity Stream
+              实时协同流
             </span>
           </div>
-          <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
-            {filteredEvents.length} events
+          <span className="text-[10.5px] font-mono text-muted-foreground tabular-nums">
+            {groupedTimeline.length} 组动态
           </span>
         </div>
 
         {/* Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-[10.5px] font-medium no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-medium no-scrollbar">
           <button
             type="button"
             onClick={() => setSelectedType('all')}
@@ -105,31 +160,19 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            All
+            全部
           </button>
           <button
             type="button"
-            onClick={() => setSelectedType('issues')}
+            onClick={() => setSelectedType('knowledge')}
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
-              selectedType === 'issues'
-                ? 'bg-rose-600 text-white'
+              selectedType === 'knowledge'
+                ? 'bg-amber-600 text-white'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            Issues & Approvals
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedType('thinking')}
-            className={cn(
-              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
-              selectedType === 'thinking'
-                ? 'bg-violet-600 text-white'
-                : 'bg-surface2 text-muted-foreground hover:text-foreground'
-            )}
-          >
-            Reasoning
+            知识库
           </button>
           <button
             type="button"
@@ -141,88 +184,103 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            Tools
+            工具调用
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedType('issues')}
+            className={cn(
+              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
+              selectedType === 'issues'
+                ? 'bg-rose-600 text-white'
+                : 'bg-surface2 text-muted-foreground hover:text-foreground'
+            )}
+          >
+            待批与异常
           </button>
         </div>
       </div>
 
       {/* Timeline Stream */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-2.5">
         {loading && events.length === 0 ? (
           <div className="space-y-2">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-14 rounded-xl bg-surface2/40 animate-pulse" />
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-16 rounded-xl bg-surface2/40 animate-pulse" />
             ))}
           </div>
-        ) : filteredEvents.length === 0 ? (
+        ) : groupedTimeline.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-1">
             <MessageSquare className="size-5 opacity-30" />
-            <span className="text-xs">No recent activity</span>
+            <span className="text-xs">暂无活动记录</span>
           </div>
         ) : (
-          grouped.map((group, gIdx) => (
-            <div key={gIdx} className="space-y-1.5">
-              <div className="text-[10px] font-mono font-medium uppercase tracking-wider text-muted-foreground px-1">
-                {group.label}
-              </div>
-
-              <div className="space-y-1.5">
-                {group.items.map((ev) => {
-                  const isError = ev.type === 'error';
-                  const isApproval = ev.type === 'approval';
-                  const isThinking = ev.type === 'thinking';
-
-                  return (
-                    <button
-                      key={ev.id}
-                      type="button"
-                      onClick={() => onOpenThread(ev.channelId)}
+          groupedTimeline.map((group) => {
+            return (
+              <div
+                key={group.key}
+                onClick={() => onOpenThread(group.channelId)}
+                className="group p-2.5 rounded-xl bg-surface1/60 hover:bg-surface2/80 border border-border/20 hover:border-border/50 transition-all cursor-pointer shadow-2xs space-y-1.5"
+              >
+                {/* Group Sender Header */}
+                <div className="flex items-center justify-between gap-1 text-[11px]">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span
                       className={cn(
-                        'w-full text-left flex items-start gap-2 p-2.5 rounded-xl transition-all cursor-pointer shadow-2xs group',
-                        isError
-                          ? 'bg-rose-500/[0.06] border border-rose-500/30'
-                          : isApproval
-                          ? 'bg-amber-500/[0.06] border border-amber-500/30'
-                          : 'bg-surface1/60 hover:bg-surface2/80 border border-border/20 hover:border-border/50'
+                        'size-4 rounded-md flex items-center justify-center text-[10px] shrink-0',
+                        group.isHuman
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                          : 'bg-violet-500/10 text-violet-600 dark:text-violet-400'
                       )}
                     >
-                      <span className="mt-0.5 shrink-0">
-                        {isError ? (
-                          <AlertCircle className="size-3.5 text-rose-500" />
-                        ) : isApproval ? (
-                          <ShieldAlert className="size-3.5 text-amber-500 animate-pulse" />
-                        ) : isThinking ? (
-                          <Brain className="size-3.5 text-violet-500" />
-                        ) : (
-                          <Terminal className="size-3.5 text-emerald-500" />
-                        )}
-                      </span>
+                      {group.isHuman ? <User className="size-2.5" /> : <Bot className="size-2.5" />}
+                    </span>
+                    <span className="font-semibold text-foreground truncate">
+                      {group.sender}
+                    </span>
+                    <span className="text-[10px] font-mono text-muted-foreground/80 truncate">
+                      #{group.channel}
+                    </span>
+                  </div>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 text-[10.5px]">
-                          <span className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                            {ev.sender}
-                          </span>
-                          <span className="font-mono text-muted-foreground/70 text-[9.5px] shrink-0">
-                            {timeAgo(ev.time.toISOString())}
-                          </span>
-                        </div>
+                  <span className="font-mono text-muted-foreground/70 text-[9.5px] shrink-0">
+                    {timeAgo(group.time.toISOString())}
+                  </span>
+                </div>
 
-                        <p className="text-[11.5px] text-foreground/85 line-clamp-2 mt-0.5 leading-snug">
-                          {ev.content}
+                {/* Sub-items in this conversation turn */}
+                <div className="space-y-1 pl-5 text-[11.5px]">
+                  {group.items.map((item) => {
+                    const isKnowledge = item.type === 'knowledge';
+                    const isTool = item.type === 'command' || item.type === 'success';
+                    const isError = item.type === 'error';
+                    const isApproval = item.type === 'approval';
+
+                    return (
+                      <div key={item.id} className="flex items-start gap-1.5 leading-snug text-foreground/85">
+                        <span className="mt-0.5 shrink-0">
+                          {isKnowledge ? (
+                            <BookOpen className="size-3 text-amber-500" />
+                          ) : isTool ? (
+                            <Terminal className="size-3 text-emerald-500" />
+                          ) : isApproval ? (
+                            <ShieldAlert className="size-3 text-amber-500 animate-pulse" />
+                          ) : isError ? (
+                            <AlertCircle className="size-3 text-rose-500" />
+                          ) : (
+                            <MessageSquare className="size-3 text-blue-500/70" />
+                          )}
+                        </span>
+                        <p className="min-w-0 flex-1 line-clamp-3">
+                          {stripMarkdown(item.content)}
                         </p>
-
-                        <div className="flex items-center justify-between gap-1 mt-1 text-[9.5px] font-mono text-muted-foreground/80">
-                          <span className="truncate">#{ev.channel}</span>
-                          <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </div>
                       </div>
-                    </button>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </aside>

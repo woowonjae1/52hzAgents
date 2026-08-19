@@ -16,13 +16,14 @@ import {
   Users,
   Activity,
   Zap,
-  BookOpen,
   LayoutGrid,
   Clock,
   ShieldAlert,
   Layers,
   ChevronDown,
   ChevronUp,
+  Play,
+  RotateCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
@@ -225,7 +226,7 @@ export function MissionControl() {
         type: 'stalled',
         agentName: s.agent.agentName,
         channelId: s.focusThread?.sessionId || '',
-        channelTitle: s.focusThread?.title || 'thread',
+        channelTitle: s.focusThread?.title || '新频道',
         stalledMs: s.stalledMs || 35000,
         timestamp: new Date(),
       }));
@@ -248,10 +249,10 @@ export function MissionControl() {
           id: `swim-${s.agent.agentName}`,
           agentName: s.agent.agentName,
           type: isBlock ? 'blocked' : isStall ? 'stalled' : isWork ? 'tool' : 'message',
-          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || 'Task running',
+          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || '任务运行中',
           startOffsetSec: isWork || isBlock ? 60 : 15,
           durationSec: isWork || isBlock ? 45 : 15,
-          channelTitle: s.focusThread?.title || 'channel',
+          channelTitle: s.focusThread?.title || '频道',
           sessionId: s.focusThread?.sessionId || '',
           status: isBlock ? 'blocked' : isStall ? 'error' : isWork ? 'running' : 'success',
         };
@@ -290,13 +291,13 @@ export function MissionControl() {
       return;
     }
     try {
-      toast.info(`Connecting ${agentName}...`);
+      toast.info(`正在连接 ${agentName}...`);
       await workspaceApi.launchAgent(agentName);
-      toast.success(`${agentName} is now online`);
+      toast.success(`${agentName} 已上线`);
       const updated = await workspaceApi.listAgents();
       setAgents(updated);
     } catch {
-      toast.error(`Unable to connect ${agentName}`);
+      toast.error(`无法连接 ${agentName}`);
     }
   };
 
@@ -346,7 +347,7 @@ export function MissionControl() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header Strip with Clean Whitespace (No Harsh Border Bottom) */}
+      {/* Header Strip */}
       <div className="shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -355,10 +356,10 @@ export function MissionControl() {
             </div>
             <div className="min-w-0">
               <h1 className="text-sm font-bold tracking-tight text-foreground">
-                Mission Control
+                指挥中心
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Real-time agent orchestration, telemetry, and parallel execution
+                多智能体协同调度 · 负载监控 · 实时动态追踪
               </p>
             </div>
           </div>
@@ -376,7 +377,7 @@ export function MissionControl() {
               )}
             >
               <LayoutGrid className="size-3.5" />
-              <span>Cards</span>
+              <span>席位卡片</span>
             </button>
             <button
               type="button"
@@ -389,81 +390,116 @@ export function MissionControl() {
               )}
             >
               <Clock className="size-3.5" />
-              <span>Swimlane</span>
+              <span>并行泳道</span>
             </button>
           </div>
         </div>
 
-        {/* 4 Clean Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Card 1: Action Required / Blocked */}
-          <div
-            onClick={() => setFilterTab(filterTab === 'blocked' ? 'all' : 'blocked')}
-            className="cursor-pointer"
-          >
-            <MetricCard
-              title="Action Required"
-              value={blockedCount}
-              subtitle={blockedCount > 0 ? 'Requires immediate action' : 'No blocked tasks'}
-              icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
-              badge={blockedCount > 0 ? { text: 'Attention', trend: 'down' } : undefined}
-              className={cn(
-                filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
-                blockedCount > 0 && 'bg-amber-500/[0.04]'
-              )}
-            />
-          </div>
+        {/* Dynamic Metric Display: Compact Status Bar when All Offline; Rich Cards when Active */}
+        {isAllOffline ? (
+          /* Hero C-Position Action Card when all are offline */
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-surface1/90 border border-primary/20 shadow-xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Play className="size-4 fill-current ml-0.5" />
+              </div>
+              <div className="space-y-0.5 min-w-0">
+                <div className="text-xs font-bold text-foreground">
+                  {agents.length} 个智能体已就绪，当前全部处于离线待命
+                </div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  点击下方卡片分别启动，或一键唤醒工作区所有智能体进程
+                </div>
+              </div>
+            </div>
 
-          {/* Card 2: Working Now */}
-          <div
-            onClick={() => setFilterTab(filterTab === 'working' ? 'all' : 'working')}
-            className="cursor-pointer"
-          >
-            <MetricCard
-              title="Working Now"
-              value={workingCount}
-              subtitle={workingCount > 0 ? `${workingCount} active execution` : 'All agents standby'}
-              icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
-              badge={workingCount > 0 ? { text: `${workingCount} active`, trend: 'neutral' } : undefined}
-              className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
-            />
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  agents.forEach((a) => handlePairAgent(a.agentName));
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <RotateCw className="size-3.5" />
+                <span>一键连接全部</span>
+              </button>
+            </div>
           </div>
+        ) : (
+          /* 4 Rich Metric Cards when at least one is online or tasks exist */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Card 1: Action Required */}
+            <div
+              onClick={() => setFilterTab(filterTab === 'blocked' ? 'all' : 'blocked')}
+              className="cursor-pointer"
+            >
+              <MetricCard
+                title="待办处理"
+                value={blockedCount}
+                subtitle={blockedCount > 0 ? '⚠️ 需要立即人工确认' : '运行正常，无阻塞'}
+                icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
+                badge={blockedCount > 0 ? { text: '待处理', trend: 'down' } : undefined}
+                className={cn(
+                  filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
+                  blockedCount > 0 && 'bg-amber-500/[0.04]'
+                )}
+              />
+            </div>
 
-          {/* Card 3: Agents Online */}
-          <div
-            onClick={() => setFilterTab(filterTab === 'online' ? 'all' : 'online')}
-            className="cursor-pointer"
-          >
-            <MetricCard
-              title="Agents Online"
-              value={`${onlineCount} / ${agents.length}`}
-              subtitle={onlineCount > 0 ? 'Daemon heartbeat active' : 'Daemons offline'}
-              icon={<Users className="size-3.5 text-emerald-500" />}
-              chart={
-                agents.length > 0 ? (
-                  <RingProgress
-                    value={(onlineCount / agents.length) * 100}
-                    size={32}
-                    strokeWidth={3}
-                    color="#10b981"
-                    label={`${onlineCount}`}
-                  />
-                ) : undefined
-              }
-              className={cn(filterTab === 'online' && 'ring-2 ring-primary border-primary')}
-            />
-          </div>
+            {/* Card 2: Working Now */}
+            <div
+              onClick={() => setFilterTab(filterTab === 'working' ? 'all' : 'working')}
+              className="cursor-pointer"
+            >
+              <MetricCard
+                title="运行中"
+                value={workingCount}
+                subtitle={workingCount > 0 ? `${workingCount} 个正在执行任务` : '全部处于待命就绪态'}
+                icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
+                badge={workingCount > 0 ? { text: `${workingCount} 活跃`, trend: 'neutral' } : undefined}
+                chart={workingCount > 0 ? <SparklineBar data={[12, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} /> : undefined}
+                className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
+              />
+            </div>
 
-          {/* Card 4: Tokens Reported */}
-          <div>
-            <MetricCard
-              title="Tokens Reported"
-              value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
-              subtitle={totalTokens > 0 ? 'Reported by active sessions' : 'No tokens recorded'}
-              icon={<Zap className="size-3.5 text-violet-500" />}
-            />
+            {/* Card 3: Agents Online */}
+            <div
+              onClick={() => setFilterTab(filterTab === 'online' ? 'all' : 'online')}
+              className="cursor-pointer"
+            >
+              <MetricCard
+                title="在线智能体"
+                value={`${onlineCount} / ${agents.length}`}
+                subtitle={onlineCount > 0 ? '心跳守护进程正常' : '全部离线'}
+                icon={<Users className="size-3.5 text-emerald-500" />}
+                chart={
+                  onlineCount > 0 ? (
+                    <RingProgress
+                      value={(onlineCount / agents.length) * 100}
+                      size={32}
+                      strokeWidth={3}
+                      color="#10b981"
+                      label={`${onlineCount}`}
+                    />
+                  ) : undefined
+                }
+                className={cn(filterTab === 'online' && 'ring-2 ring-primary border-primary')}
+              />
+            </div>
+
+            {/* Card 4: Tokens Reported */}
+            <div>
+              <MetricCard
+                title="Token 消耗"
+                value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
+                subtitle={totalTokens > 0 ? '累计会话消耗量' : '暂无消耗记录'}
+                icon={<Zap className="size-3.5 text-violet-500" />}
+                chart={totalTokens > 0 ? <SparklineArea data={[10, 18, 14, 26, 22, 34, 30]} color="#8b5cf6" height={30} width={72} /> : undefined}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <ConnectAgentModal
@@ -494,33 +530,6 @@ export function MissionControl() {
             />
           )}
 
-          {/* Configured but Offline Guidance Banner */}
-          {isAllOffline && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface2/50 shadow-2xs">
-              <div className="space-y-0.5">
-                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-muted-foreground/50" />
-                  <span>{agents.length} configured agents are currently offline</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Click &ldquo;Connect&rdquo; on any agent card below to initialize their process daemon.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    agents.forEach((a) => handlePairAgent(a.agentName));
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-                >
-                  Connect All
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* View Tab 1: Grid Cards */}
           {viewTab === 'grid' && (
             <div className="space-y-7">
@@ -529,14 +538,14 @@ export function MissionControl() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
                     <Users className="size-3.5 text-primary" />
-                    <span>My Agents ({filteredMyStations.length})</span>
+                    <span>我的智能体 ({filteredMyStations.length})</span>
                     {filterTab !== 'all' && (
                       <button
                         type="button"
                         onClick={() => setFilterTab('all')}
-                        className="ml-2 text-[10.5px] text-primary hover:underline cursor-pointer lowercase"
+                        className="ml-2 text-[11px] text-primary hover:underline cursor-pointer"
                       >
-                        (clear filter: {filterTab})
+                        (清除筛选: {filterTab})
                       </button>
                     )}
                   </div>
@@ -544,7 +553,7 @@ export function MissionControl() {
 
                 {filteredMyStations.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl bg-surface1/40 text-xs text-muted-foreground">
-                    No matching agents found for filter: {filterTab}
+                    未找到符合筛选条件的智能体
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
@@ -568,7 +577,7 @@ export function MissionControl() {
                 )}
               </div>
 
-              {/* Section 2: Available Integrations (Collapsible without harsh top line) */}
+              {/* Section 2: Available Integrations */}
               {integrationStations.length > 0 && filterTab === 'all' && (
                 <div className="space-y-3 pt-2">
                   <button
@@ -576,7 +585,7 @@ export function MissionControl() {
                     onClick={() => setShowIntegrations((prev) => !prev)}
                     className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer select-none"
                   >
-                    <span>Available Integrations ({integrationStations.length})</span>
+                    <span>可用集成模板 ({integrationStations.length})</span>
                     {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                   </button>
 
@@ -608,7 +617,7 @@ export function MissionControl() {
           )}
         </div>
 
-        {/* Right Activity Timeline (Softer left boundary) */}
+        {/* Right Activity Timeline */}
         <ActivityTimeline
           events={activityFeed}
           agents={agents.map((a) => a.agentName)}

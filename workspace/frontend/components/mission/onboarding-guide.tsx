@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Sparkles, ArrowRight, Plug, Plus } from 'lucide-react';
+import { Sparkles, ArrowRight, Plug } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_AGENT_CATALOG } from '@/lib/agent-catalog';
 
@@ -24,11 +24,11 @@ export function OnboardingGuide({ onQuickConnect, className }: OnboardingGuidePr
             <Sparkles className="size-4" />
           </span>
           <h2 className="text-base font-bold text-foreground tracking-tight">
-            Add Your First Agent
+            添加你的第一个智能体
           </h2>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-          Connect a built-in agent template or configure a custom ACP / MCP adapter to start collaborating in this workspace:
+          选择内置智能体模板或配置自定义 ACP / MCP 适配器，开启多智能体协同：
         </p>
       </div>
 
@@ -39,10 +39,10 @@ export function OnboardingGuide({ onQuickConnect, className }: OnboardingGuidePr
             key={cat.name}
             type="button"
             onClick={() => onQuickConnect(cat.name)}
-            className="flex items-center justify-between p-3.5 rounded-2xl bg-surface2/60 hover:bg-surface3 border border-border/70 text-left transition-all cursor-pointer shadow-2xs group hover:border-primary/40"
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-surface2/60 hover:bg-surface3 border border-border/50 text-left transition-all cursor-pointer shadow-2xs group hover:border-primary/40"
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="size-8 rounded-xl bg-surface1 border border-border/60 flex items-center justify-center text-primary shrink-0 group-hover:scale-105 transition-transform">
+              <span className="size-8 rounded-xl bg-surface1 flex items-center justify-center text-primary shrink-0 group-hover:scale-105 transition-transform">
                 <Plug className="size-4" />
               </span>
               <div className="min-w-0">
@@ -50,7 +50,7 @@ export function OnboardingGuide({ onQuickConnect, className }: OnboardingGuidePr
                   {cat.name}
                 </div>
                 <div className="text-[10.5px] text-muted-foreground line-clamp-1 truncate mt-0.5">
-                  {cat.description || 'Agent integration'}
+                  {cat.description || '智能体集成适配器'}
                 </div>
               </div>
             </div>
