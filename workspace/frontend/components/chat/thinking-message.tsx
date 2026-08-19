@@ -1,9 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { Brain } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { Reasoning } from '@/components/ai-elements/reasoning';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
 interface ThinkingMessageProps {
@@ -12,80 +10,25 @@ interface ThinkingMessageProps {
   agents?: WorkspaceAgent[];
 }
 
-/** True for placeholder thinking with no real content. */
 function isPlaceholder(text: string): boolean {
   const t = text.trim().toLowerCase();
   return t === '' || t === 'thinking...' || t === 'thinking';
 }
 
-/**
- * First-level "thinking" block. Unlike tool calls (which stay clustered at the
- * sub level in IntermediateSteps), an agent's reasoning is promoted to the same
- * level as chat messages and attributed to its author (avatar + name), while
- * still being visually muted so it reads as reasoning, not the final answer.
- */
-export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages, agents = [] }: ThinkingMessageProps) {
-  const agent = agents.find((a) => a.agentName === sender);
-
+export const ThinkingMessage = memo(function ThinkingMessage({ messages }: ThinkingMessageProps) {
   const texts = messages.map((m) => m.content).filter((t) => t && !isPlaceholder(t));
   if (texts.length === 0) return null;
 
-  const timestamp = messages[0]?.createdAt
-    ? new Date(messages[0].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : null;
+  const combinedContent = texts.join('\n\n');
+  const startTime = messages[0]?.createdAt ? new Date(messages[0].createdAt).getTime() : undefined;
 
   return (
-    <div className="py-1.5">
-      <div className="flex items-start gap-2">
-        <AgentAvatar name={sender} agentType={agent?.agentType} size={36} square className="mt-0.5 opacity-70" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold text-foreground truncate">{sender}</span>
-            {/* "thinking" is a transient state label, not a warning — it reads in
-                the muted text tier rather than borrowing a semantic colour. */}
-            <span className="inline-flex items-center gap-1 text-[11px] text-foreground-extra-muted italic shrink-0">
-              <Brain className="size-3.5" />
-              thinking
-            </span>
-            {agent && (
-              <span className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
-                agent.role === 'master'
-                  ? 'bg-surface3 text-foreground'
-                  : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
-              )}>
-                {agent.role}
-              </span>
-            )}
-            {timestamp && (
-              <span className="text-[11px] font-mono text-muted-foreground">{timestamp}</span>
-            )}
-          </div>
-          <div className="mt-0.5 text-sm leading-[1.78] text-foreground/60">
-            {texts.length === 1 ? (
-              <div className="whitespace-pre-wrap">{texts[0]}</div>
-            ) : (
-              // Multiple thinking chunks stream in over time; mark distinct
-              // reasoning lines with a bullet. The bullet hangs in the left
-              // gutter (absolute) so the text stays aligned with the agent
-              // name above; the first line needs no bullet.
-              <div className="space-y-2">
-                {texts.map((t, i) => (
-                  <div key={i} className="relative whitespace-pre-wrap">
-                    {i > 0 && (
-                      <span
-                        aria-hidden
-                        className="absolute -left-3 top-[11px] size-1.5 -translate-y-1/2 rounded-full bg-foreground-extra-muted/50"
-                      />
-                    )}
-                    {t}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="py-1">
+      <Reasoning
+        content={combinedContent}
+        startTime={startTime}
+        defaultExpanded={false}
+      />
     </div>
   );
 });

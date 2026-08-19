@@ -777,7 +777,15 @@ class WorkspaceClient {
         const m = Array.isArray(payload.mentions) ? [...payload.mentions] : [];
         const text = payload.content || event.content || '';
         if (text) {
-          const matches = Array.from(text.matchAll(/@([a-zA-Z0-9._-]+)/g), (mat) => mat[1]);
+            // `@knowledge:slug` is knowledge-base syntax, not an agent address.
+          // Scanned as-is it yields "knowledge", which lands in `mentions` and
+          // makes the addressing filter in _dispatchMessage read the message as
+          // aimed at some other agent — every agent then backs off and a bare
+          // "@knowledge:x <question>" is silently dropped. The same exclusion
+          // exists on the text-derived mention paths (leadingMentions,
+          // agentMentions); this is the third source feeding that decision.
+          const addressable = text.replace(/@knowledge:[a-zA-Z0-9_-]+/gi, ' ');
+          const matches = Array.from(addressable.matchAll(/@([a-zA-Z0-9._-]+)/g), (mat) => mat[1]);
           for (const item of matches) {
             if (!m.includes(item)) m.push(item);
           }

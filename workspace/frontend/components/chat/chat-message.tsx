@@ -2,13 +2,17 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, User, FileIcon, Download, Eye, GitBranch } from 'lucide-react';
+import { Copy, Check, User, FileIcon, Download, Eye, GitBranch, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { MarkdownContent } from './markdown-content';
 import { ToolCallsDisclosure } from './intermediate-steps';
+import { Reasoning } from '@/components/ai-elements/reasoning';
+import { ToolCard } from '@/components/ai-elements/tool-card';
+import { MessageActions } from '@/components/ai-elements/message-actions';
+import { SourcesCard, type SourceItem } from '@/components/ai-elements/sources-card';
 import { workspaceApi } from '@/lib/api';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -26,6 +30,17 @@ function isPreviewable(contentType: string, filename: string): boolean {
   if (contentType === 'text/markdown' || /\.mdx?$/i.test(filename)) return true;
   if (contentType?.startsWith('text/') || /\.(json|js|ts|tsx|jsx|py|rs|go|java|rb|sh|yaml|yml)$/i.test(filename)) return true;
   return false;
+}
+
+function extractThinking(text: string): { thinking: string | null; answer: string } {
+  if (!text || typeof text !== 'string') return { thinking: null, answer: text || '' };
+  const thinkMatch = text.match(/<think>([\s\S]*?)<\/think>/i);
+  if (thinkMatch) {
+    const thinking = thinkMatch[1].trim();
+    const answer = text.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
+    return { thinking, answer };
+  }
+  return { thinking: null, answer: text };
 }
 
 function Attachments({ items }: { items: Attachment[] }) {
@@ -56,7 +71,7 @@ function Attachments({ items }: { items: Attachment[] }) {
               key={img.fileId}
               type="button"
               onClick={() => openPreview(img.fileId)}
-              className="block rounded-lg overflow-hidden border hover:shadow-md transition-shadow max-w-sm cursor-pointer text-left"
+              className="block rounded-xl overflow-hidden border border-border/70 hover:border-primary/40 hover:shadow-md transition-all max-w-sm cursor-pointer text-left shadow-2xs"
             >
               <img
                 src={img.url}
@@ -77,9 +92,9 @@ function Attachments({ items }: { items: Attachment[] }) {
                 key={file.fileId}
                 type="button"
                 onClick={() => openPreview(file.fileId)}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-muted hover:bg-muted/80 transition-colors text-sm cursor-pointer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium cursor-pointer shadow-2xs"
               >
-                <Eye className="size-4 text-muted-foreground shrink-0" />
+                <Eye className="size-3.5 text-primary shrink-0" />
                 <span className="truncate max-w-[200px]">{file.filename}</span>
               </button>
             ) : (
@@ -88,9 +103,9 @@ function Attachments({ items }: { items: Attachment[] }) {
                 href={file.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-muted hover:bg-muted/80 transition-colors text-sm"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs"
               >
-                <FileIcon className="size-4 text-muted-foreground shrink-0" />
+                <FileIcon className="size-3.5 text-muted-foreground shrink-0" />
                 <span className="truncate max-w-[200px]">{file.filename}</span>
                 <Download className="size-3 text-muted-foreground shrink-0" />
               </a>
@@ -125,7 +140,6 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
-  const [copied, setCopied] = useState(false);
   const [localStatus, setLocalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   const approvalRequest = message.metadata?.tool_approval_request;
@@ -203,15 +217,19 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(message.content);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error('Failed to copy');
-    }
-  };
+  // Extract thinking content if any
+  const { thinking: inlineThinking, answer: cleanContent } = useMemo(
+    () => extractThinking(message.content),
+    [message.content]
+  );
+  const explicitThinking = (message.metadata?.thinking || message.metadata?.reasoning) as string | undefined;
+  const activeThinking = inlineThinking || explicitThinking;
+
+  // Extract sources if any
+  const sources = useMemo<SourceItem[]>(() => {
+    const rawSources = (message.metadata?.sources || []) as SourceItem[];
+    return rawSources;
+  }, [message.metadata]);
 
   if (isSystem) {
     const isQueued = message.content.includes('queued');
@@ -237,22 +255,22 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');
 
     return (
-      <div className="py-2 flex justify-end">
-        <div className="flex items-start gap-2.5 flex-row-reverse max-w-[82%] lg:max-w-[72%] group">
+      <div className="py-2.5 flex justify-end group/usermsg">
+        <div className="flex items-start gap-2.5 flex-row-reverse max-w-[85%] lg:max-w-[75%] relative">
           {/* Avatar Icon */}
           <div className="size-7 rounded-full shrink-0 flex items-center justify-center border border-border/60 overflow-hidden bg-surface2 shadow-xs mt-0.5">
-            <img src="/logo-icon.png" alt="You" className="size-4.5 object-contain" />
+            <img src="/logo-icon.png" alt="You" className="size-4 object-contain" />
           </div>
 
           <div className="flex flex-col items-end min-w-0">
             {/* Header: Name & Time */}
-            <div className="flex items-center gap-1.5 mb-1 px-0.5 text-[11px] text-foreground-extra-muted select-none">
+            <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-foreground-extra-muted select-none">
               {timestamp && <span className="font-mono opacity-80">{timestamp}</span>}
               <span className="font-semibold text-foreground">{displayName}</span>
             </div>
 
             {/* Message Bubble */}
-            <div className="text-sm leading-relaxed text-foreground bg-surface2/90 border border-border/80 dark:bg-surface2/80 dark:border-border/60 px-3.5 py-2.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block max-w-full break-words">
+            <div className="relative text-[13.5px] leading-relaxed text-foreground bg-surface2/90 border border-border/80 dark:bg-surface2/80 dark:border-border/60 px-4 py-2.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block max-w-full break-words">
               <MarkdownContent content={message.content} agentNames={agentNames} />
               <Attachments items={attachments} />
 
@@ -270,6 +288,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                 </div>
               )}
             </div>
+
+            {/* Hover Message Actions */}
+            <div className="mt-1 flex justify-end">
+              <MessageActions content={message.content} senderType="user" />
+            </div>
           </div>
         </div>
       </div>
@@ -277,148 +300,145 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
   }
 
   // ── AI Agent Messages (Left Aligned) ──
-  // Derived from the name (not the roster) so it stays stable even for a sender
-  // who has since left the workspace.
   const identityColour = deriveIdentityColor(message.senderName);
 
-  // No avatar and no card: a bubble or a portrait per reply stacks into a wall
-  // of boxes once several agents are in one thread. What identifies the
-  // speaker is a 2px rail in the agent's identity colour plus a matching 6px
-  // dot beside the name — unlike a portrait, a rail shows where a block
-  // STARTS and ENDS, which is the thing that's hard to follow when three
-  // agents interleave. Only the human's message keeps a filled bubble, so the
-  // two sides stay easy to tell apart.
   return (
-    <div className="py-2.5 group/msg">
+    <div className="py-3 group/agentmsg">
       <div
-        className="pl-3 border-l-2"
+        className="pl-3.5 border-l-2 relative"
         style={{ borderColor: identityColour }}
       >
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="size-1.5 rounded-full shrink-0" style={{ background: identityColour }} />
-            <span className="text-xs font-semibold truncate" style={{ color: identityColour }}>
-              {message.senderName}
+        {/* Header: Agent Identity */}
+        <div className="flex items-center gap-2 mb-1.5 select-none">
+          <span className="size-2 rounded-full shrink-0 animate-pulse" style={{ background: identityColour }} />
+          <span className="text-xs font-semibold truncate tracking-tight" style={{ color: identityColour }}>
+            {message.senderName}
+          </span>
+          {agent && (
+            <span className={cn(
+              'text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 border',
+              agent.role === 'master'
+                ? 'bg-surface3 text-foreground border-border-accent shadow-2xs'
+                : 'bg-surface2 text-foreground-muted border-border/40'
+            )}>
+              {agent.role}
             </span>
-            {agent && (
-              // Role reads as normal-case text, not a shouted chip: the uppercase
-              // + letter-spaced treatment is the "instrument panel" signal this
-              // direction drops. `master` is distinguished by surface weight
-              // rather than a colour, since the palette has no brand accent.
-              <span className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded-full font-semibold shrink-0 border',
-                agent.role === 'master'
-                  ? 'bg-surface3 text-foreground border-border-accent'
-                  : 'bg-surface2/80 text-foreground-muted border-border/40'
-              )}>
-                {agent.role}
-              </span>
-            )}
-            {timestamp && (
-              <span className="text-[11px] text-foreground-extra-muted ml-auto font-mono">{timestamp}</span>
-            )}
-          </div>
-          <div className="text-[13.5px] leading-[1.65] text-foreground font-normal">
-            {steps && steps.length > 0 && <ToolCallsDisclosure steps={steps} />}
-            <MarkdownContent content={message.content} agentNames={agentNames} />
-            <Attachments items={attachments} />
+          )}
+          {timestamp && (
+            <span className="text-[11px] text-foreground-extra-muted ml-auto font-mono">{timestamp}</span>
+          )}
+        </div>
 
-            {approvalRequest && (
-              <div className="mt-3.5 p-3.5 rounded-lg border bg-surface1/50 border-border space-y-2.5 max-w-full">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <span className="size-1.5 rounded-full bg-status-warning animate-pulse" />
-                    Action Approval Required
-                  </span>
-                  <span className="text-[11px] text-muted-foreground font-mono">
-                    ID: {approvalRequest.approval_id}
-                  </span>
-                </div>
-                <div className="text-xs space-y-1.5 font-mono bg-surface2/50 border border-border/80 p-2.5 rounded overflow-x-auto max-w-full text-foreground">
-                  <div className="font-semibold">Tool: {approvalRequest.tool}</div>
-                  {approvalRequest.args?.command && (
-                    <div className="whitespace-pre-wrap text-foreground-muted font-mono">$ {approvalRequest.args.command}</div>
-                  )}
-                  {approvalRequest.args?.path && (
-                    <div className="text-foreground-muted">File: {approvalRequest.args.path}</div>
-                  )}
-                </div>
-                
-                <div className="flex items-center gap-2 mt-2">
-                  {hasStatus ? (
-                    <span className={cn(
-                      "text-xs font-semibold px-2 py-1 rounded",
-                      currentApproved 
-                        ? "bg-surface2 text-foreground"
-                        : "bg-surface2 text-foreground"
-                    )}>
-                      {currentApproved ? '✓ Approved' : '✗ Denied'}
-                    </span>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        className="h-8 px-3 bg-primary hover:bg-primary text-white dark:hover:bg-surface3 font-medium"
-                        onClick={handleApprove}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 px-3 text-muted-foreground border-border hover:bg-surface2 hover:text-foreground font-medium"
-                        onClick={handleReject}
-                      >
-                        Deny
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
+        {/* Content Body */}
+        <div className="text-[13.5px] leading-[1.68] text-foreground font-normal space-y-2">
+          {/* Tool Calls & Intermediate Steps */}
+          {steps && steps.length > 0 && <ToolCallsDisclosure steps={steps} />}
 
-            {/* Model Metadata Footer matching mockup */}
-            <div className="flex items-center justify-between gap-2 mt-2 pt-0.5 text-[11px] font-mono text-foreground-extra-muted">
-              <div className="flex items-center gap-2">
-                <span>
-                  {typeof message.metadata?.model === 'string'
-                    ? message.metadata.model
-                    : agent?.agentType
-                    ? `${agent.agentType}-agent`
-                    : message.senderName}
+          {/* Vercel AI Elements Collapsible Reasoning */}
+          {activeThinking && (
+            <Reasoning content={activeThinking} defaultExpanded={false} />
+          )}
+
+          {/* Main Answer Content */}
+          {cleanContent && (
+            <MarkdownContent content={cleanContent} agentNames={agentNames} />
+          )}
+
+          {/* Attachments */}
+          <Attachments items={attachments} />
+
+          {/* Knowledge & Sources Citations */}
+          {sources.length > 0 && (
+            <SourcesCard sources={sources} />
+          )}
+
+          {/* Action Approval Banner */}
+          {approvalRequest && (
+            <div className="mt-3.5 p-3.5 rounded-xl border bg-surface1/80 border-border/80 shadow-xs space-y-2.5 max-w-full">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-status-warning animate-pulse" />
+                  Action Approval Required
                 </span>
-                <span>·</span>
-                <span>{typeof message.metadata?.mode === 'string' ? message.metadata.mode : (agent?.role || 'exec')}</span>
-                {typeof message.metadata?.elapsed === 'string' && (
+                <span className="text-[11px] text-muted-foreground font-mono">
+                  ID: {approvalRequest.approval_id}
+                </span>
+              </div>
+              <div className="text-xs space-y-1.5 font-mono bg-surface2/70 border border-border/80 p-2.5 rounded-lg overflow-x-auto max-w-full text-foreground">
+                <div className="font-semibold text-primary">Tool: {approvalRequest.tool}</div>
+                {approvalRequest.args?.command && (
+                  <div className="whitespace-pre-wrap text-foreground-muted font-mono">$ {approvalRequest.args.command}</div>
+                )}
+                {approvalRequest.args?.path && (
+                  <div className="text-foreground-muted">File: {approvalRequest.args.path}</div>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2 mt-2">
+                {hasStatus ? (
+                  <span className={cn(
+                    "text-xs font-semibold px-2.5 py-1 rounded-lg border shadow-2xs",
+                    currentApproved 
+                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+                  )}>
+                    {currentApproved ? '✓ Approved' : '✗ Denied'}
+                  </span>
+                ) : (
                   <>
-                    <span>·</span>
-                    <span>{message.metadata.elapsed}</span>
+                    <Button
+                      size="sm"
+                      className="h-7 px-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg text-xs"
+                      onClick={handleApprove}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-3 text-muted-foreground border-border hover:bg-surface2 hover:text-foreground font-medium rounded-lg text-xs"
+                      onClick={handleReject}
+                    >
+                      Deny
+                    </Button>
                   </>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 opacity-80 hover:opacity-100 transition-opacity">
-                <button
-                  onClick={handleCopy}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-                  title="Copy text"
-                >
-                  {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
-                </button>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`@${message.senderName} ${message.content}`);
-                    toast.success(`Forked from @${message.senderName}`);
-                  }}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-                  title="Fork thread"
-                >
-                  <GitBranch className="size-3" />
-                  <span>Fork</span>
-                </button>
-              </div>
             </div>
+          )}
+
+          {/* Model Metadata Footer & Message Actions */}
+          <div className="flex items-center justify-between gap-2 pt-1 text-[11px] font-mono text-foreground-extra-muted border-t border-border/30">
+            <div className="flex items-center gap-1.5 truncate">
+              <span>
+                {typeof message.metadata?.model === 'string'
+                  ? message.metadata.model
+                  : agent?.agentType
+                  ? `${agent.agentType}-agent`
+                  : message.senderName}
+              </span>
+              <span>·</span>
+              <span>{typeof message.metadata?.mode === 'string' ? message.metadata.mode : (agent?.role || 'exec')}</span>
+              {typeof message.metadata?.elapsed === 'string' && (
+                <>
+                  <span>·</span>
+                  <span>{message.metadata.elapsed}</span>
+                </>
+              )}
+            </div>
+
+            {/* Hover Action Bar */}
+            <MessageActions
+              content={cleanContent || message.content}
+              senderType="agent"
+              onRegenerate={() => {
+                navigator.clipboard.writeText(`@${message.senderName} 请重新生成上一轮回答`);
+                toast.success('已复制重新生成指令');
+              }}
+            />
           </div>
         </div>
+      </div>
     </div>
   );
 });

@@ -31,7 +31,7 @@ function nodeToText(node: React.ReactNode): string {
 
 interface MarkdownContentProps {
   content: string;
-  agentNames: string[];
+  agentNames?: string[];
 }
 
 /** Walk React children and colorize @agentname tokens in text nodes. */
@@ -114,7 +114,7 @@ class MarkdownErrorBoundary extends React.Component<
   }
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ content, agentNames }: MarkdownContentProps) {
+export const MarkdownContent = memo(function MarkdownContent({ content, agentNames = [] }: MarkdownContentProps) {
   const hasStreamingMermaidFence = hasOpenMermaidFence(content);
 
   const components: Components = useMemo(() => ({
@@ -291,9 +291,11 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 // which reads as a flash. Skipping the re-render when content and names are
 // value-equal keeps rendered messages static between polls.
 function arePropsEqual(prev: MarkdownContentProps, next: MarkdownContentProps): boolean {
+  const prevNames = prev.agentNames || [];
+  const nextNames = next.agentNames || [];
   return (
     prev.content === next.content &&
-    prev.agentNames.length === next.agentNames.length &&
-    prev.agentNames.every((name, i) => name === next.agentNames[i])
+    prevNames.length === nextNames.length &&
+    prevNames.every((name, i) => name === nextNames[i])
   );
 }
