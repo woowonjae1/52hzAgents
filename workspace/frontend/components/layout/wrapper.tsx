@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { Sidebar } from './sidebar';
 import { MobileHeader } from './mobile-header';
 import { useLayout } from './layout-context';
@@ -56,10 +57,35 @@ function WorkspaceLoadingScreen() {
   );
 }
 
+const MIN_DOCKED_WIDTH = 680;
+
 export function Wrapper() {
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, sidebarWidth, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading, workspace } = useWorkspace();
   const hasAgents = agents.length > 0;
+  const desktopContainerRef = React.useRef<HTMLDivElement>(null);
+  const narrowStateRef = React.useRef<boolean | null>(null);
+
+  // ShellFit container query: auto-collapse sidebar if the parent container box width drops below 680px
+  React.useEffect(() => {
+    if (isMobile) return;
+    const el = desktopContainerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width;
+      const isNarrow = width < MIN_DOCKED_WIDTH;
+      if (narrowStateRef.current === isNarrow) return;
+      narrowStateRef.current = isNarrow;
+
+      if (isNarrow && isSidebarOpen) {
+        sidebarToggle();
+      }
+    });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isMobile, isSidebarOpen, sidebarToggle]);
 
   if (loading && !workspace) {
     return <WorkspaceLoadingScreen />;
@@ -139,7 +165,7 @@ export function Wrapper() {
 
   // ── Desktop layout: sidebar + center chat + collapsible right preview ──
   return (
-    <div className={cn("flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5", isDesktop && "pt-7")}>
+    <div ref={desktopContainerRef} className={cn("flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5", isDesktop && "pt-7")}>
       {isDesktop && <div className="fixed top-0 left-0 right-0 h-7 [app-region:drag] z-40 select-none pointer-events-auto" />}
       {!isDetailExpanded && <Sidebar />}
 

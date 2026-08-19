@@ -11,6 +11,10 @@ import { MarkdownContent } from './markdown-content';
 import { ToolCallsDisclosure } from './intermediate-steps';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { ToolCard } from '@/components/ai-elements/tool-card';
+import { ToolConfirmation } from '@/components/ai-elements/tool-confirmation';
+import { TodoList, type TodoItem } from '@/components/ai-elements/todo-list';
+import { FileDiff, type DiffLine } from '@/components/ai-elements/file-diff';
+import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { MessageActions } from '@/components/ai-elements/message-actions';
 import { SourcesCard, type SourceItem } from '@/components/ai-elements/sources-card';
 import { workspaceApi } from '@/lib/api';
@@ -223,12 +227,39 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     [message.content]
   );
   const explicitThinking = (message.metadata?.thinking || message.metadata?.reasoning) as string | undefined;
-  const activeThinking = inlineThinking || explicitThinking;
+  const activeThinking: string | null = inlineThinking || (typeof explicitThinking === 'string' ? explicitThinking : null);
 
   // Extract sources if any
   const sources = useMemo<SourceItem[]>(() => {
     const rawSources = (message.metadata?.sources || []) as SourceItem[];
     return rawSources;
+  }, [message.metadata]);
+
+  // Extract execution plan / todo list if any
+  const planItems = useMemo<TodoItem[] | null>(() => {
+    const raw = message.metadata?.plan || message.metadata?.todos || message.metadata?.todo_list;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw as TodoItem[];
+    }
+    return null;
+  }, [message.metadata]);
+
+  // Extract file diff if any
+  const fileDiff = useMemo<{ file: string; lines?: DiffLine[]; rawDiff?: string } | null>(() => {
+    const raw = message.metadata?.file_diff as { file?: string; lines?: DiffLine[]; rawDiff?: string } | undefined;
+    if (raw && raw.file) {
+      return { file: raw.file, lines: raw.lines, rawDiff: raw.rawDiff };
+    }
+    return null;
+  }, [message.metadata]);
+
+  // Extract approval decision questions if any
+  const decisionQuestions = useMemo<ApprovalCardQuestion[] | null>(() => {
+    const raw = message.metadata?.questions || message.metadata?.decision_questions;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw as ApprovalCardQuestion[];
+    }
+    return null;
   }, [message.metadata]);
 
   if (isSystem) {
@@ -335,14 +366,46 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
           {steps && steps.length > 0 && <ToolCallsDisclosure steps={steps} />}
 
           {/* Vercel AI Elements Collapsible Reasoning */}
-          {activeThinking && (
+          {activeThinking ? (
             <Reasoning content={activeThinking} defaultExpanded={false} />
-          )}
+          ) : null}
+
+          {/* Multi-step Plan / Todo List */}
+          {planItems && planItems.length > 0 ? (
+            <TodoList items={planItems} />
+          ) : null}
 
           {/* Main Answer Content */}
-          {cleanContent && (
+          {cleanContent ? (
             <MarkdownContent content={cleanContent} agentNames={agentNames} />
-          )}
+          ) : null}
+
+          {/* Interactive File Diff */}
+          {fileDiff ? (
+            <FileDiff
+              file={fileDiff.file}
+              lines={fileDiff.lines}
+              rawDiff={fileDiff.rawDiff}
+            />
+          ) : null}
+
+          {/* Decision Question Card */}
+          {decisionQuestions && decisionQuestions.length > 0 ? (
+            <ApprovalCard
+              questions={decisionQuestions}
+              onSubmit={(answers) => {
+                const answerSummary = Object.entries(answers)
+                  .map(([k, v]) => `${k}: ${v}`)
+                  .join('\n');
+                workspaceApi.sendMessage(
+                  message.sessionId,
+                  `【决策确认】\n${answerSummary}`,
+                  'User'
+                );
+                toast.success('决策已提交');
+              }}
+            />
+          ) : null}
 
           {/* Attachments */}
           <Attachments items={attachments} />
@@ -352,59 +415,16 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             <SourcesCard sources={sources} />
           )}
 
-          {/* Action Approval Banner */}
+          {/* Action Tool Confirmation */}
           {approvalRequest && (
-            <div className="mt-3.5 p-3.5 rounded-xl border bg-surface1/80 border-border/80 shadow-xs space-y-2.5 max-w-full">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <span className="size-2 rounded-full bg-status-warning animate-pulse" />
-                  Action Approval Required
-                </span>
-                <span className="text-[11px] text-muted-foreground font-mono">
-                  ID: {approvalRequest.approval_id}
-                </span>
-              </div>
-              <div className="text-xs space-y-1.5 font-mono bg-surface2/70 border border-border/80 p-2.5 rounded-lg overflow-x-auto max-w-full text-foreground">
-                <div className="font-semibold text-primary">Tool: {approvalRequest.tool}</div>
-                {approvalRequest.args?.command && (
-                  <div className="whitespace-pre-wrap text-foreground-muted font-mono">$ {approvalRequest.args.command}</div>
-                )}
-                {approvalRequest.args?.path && (
-                  <div className="text-foreground-muted">File: {approvalRequest.args.path}</div>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-2 mt-2">
-                {hasStatus ? (
-                  <span className={cn(
-                    "text-xs font-semibold px-2.5 py-1 rounded-lg border shadow-2xs",
-                    currentApproved 
-                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                      : "bg-rose-500/10 text-rose-600 border-rose-500/20"
-                  )}>
-                    {currentApproved ? '✓ Approved' : '✗ Denied'}
-                  </span>
-                ) : (
-                  <>
-                    <Button
-                      size="sm"
-                      className="h-7 px-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-lg text-xs"
-                      onClick={handleApprove}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 px-3 text-muted-foreground border-border hover:bg-surface2 hover:text-foreground font-medium rounded-lg text-xs"
-                      onClick={handleReject}
-                    >
-                      Deny
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
+            <ToolConfirmation
+              toolName={approvalRequest.tool || 'command'}
+              args={approvalRequest.args}
+              approvalId={approvalRequest.approval_id}
+              status={currentApproved ? 'approved' : currentRejected ? 'denied' : 'pending'}
+              onApprove={handleApprove}
+              onDeny={handleReject}
+            />
           )}
 
           {/* Model Metadata Footer & Message Actions */}

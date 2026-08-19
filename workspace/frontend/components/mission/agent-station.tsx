@@ -13,7 +13,6 @@ import {
   Check,
   X,
   RotateCw,
-  Hash,
 } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { toast } from 'sonner';
@@ -320,26 +319,29 @@ export function AgentStation({
           </div>
         </div>
       ) : !isCatalogPlaceholder ? (
-        /* Configured Agent: Telemetry & Activity (Only show non-zero metrics) */
+        /* Configured Agent: 3 Micro Metrics Grid + Activity */
         <div className="my-2 space-y-1.5">
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface2/50 text-[11px]">
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Hash className="size-3 text-primary" />
-              <span>{threads.length} 个协作频道</span>
-            </span>
-            {tokenCount > 0 ? (
-              <span className="font-mono text-muted-foreground text-[10.5px]">
-                {fmtTokens(tokenCount)} tok
+          <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-[10.5px]">
+            <div className="flex flex-col min-w-0 px-1 text-center">
+              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">Tokens</span>
+              <span className="font-semibold font-mono text-foreground truncate">
+                {fmtTokens(tokenCount)}
               </span>
-            ) : skillCount > 0 ? (
-              <span className="font-mono text-muted-foreground text-[10.5px]">
-                {skillCount} 项技能
+            </div>
+
+            <div className="flex flex-col min-w-0 px-1 text-center">
+              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">频道</span>
+              <span className="font-semibold font-mono text-foreground truncate">
+                {threads.length}
               </span>
-            ) : (
-              <span className="text-[10.5px] text-muted-foreground/70">
-                {status === 'ready' ? '就绪' : '待激活'}
+            </div>
+
+            <div className="flex flex-col min-w-0 px-1 text-center">
+              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">技能</span>
+              <span className="font-semibold font-mono text-foreground truncate">
+                {skillCount}
               </span>
-            )}
+            </div>
           </div>
 
           <div className="flex items-center gap-1 text-[11px] text-muted-foreground px-1 truncate">

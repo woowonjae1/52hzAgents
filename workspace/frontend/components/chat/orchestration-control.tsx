@@ -167,9 +167,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
 
 // ---------------------------------------------------------------------------
 // Plan editor with @agent autocomplete
-// ---------------------------------------------------------------------------
-
-interface DialogProps {
+export interface WorkflowPlanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agents: WorkspaceAgent[];
@@ -177,7 +175,7 @@ interface DialogProps {
   onSave: (instruction: string) => void;
 }
 
-function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, onSave }: DialogProps) {
+export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, onSave }: WorkflowPlanDialogProps) {
   const [value, setValue] = React.useState(initialValue);
   const [showMentions, setShowMentions] = React.useState(false);
   const [mentionFilter, setMentionFilter] = React.useState('');

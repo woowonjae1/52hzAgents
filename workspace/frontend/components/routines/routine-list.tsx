@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { CalendarClock, RefreshCw, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
@@ -40,7 +40,7 @@ function timeUntil(dateStr: string): string {
 
 export function RoutineList() {
   const { routines, refreshRoutines, createRoutine, currentSessionId, setCurrentSessionId, agents } = useWorkspace();
-  const { isMobile, openMobileDetail } = useLayout();
+  const { isMobile, openMobileDetail, setViewMode } = useLayout();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
@@ -75,27 +75,39 @@ export function RoutineList() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="shrink-0 px-3 py-2.5 border-b border-border flex items-center justify-between">
+      {/* Header with Back Navigation */}
+      <div className="shrink-0 px-3 py-2.5 border-b border-border flex items-center justify-between bg-surface1/40">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('threads')}
+            className="p-1 -ml-1 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+            title="返回对话列表"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span className="text-xs font-medium">返回</span>
+          </button>
+          <div className="h-3.5 w-px bg-border/60" />
           <CalendarClock className="size-3.5 text-violet-500" />
-          <ScreenTitle>Routines</ScreenTitle>
+          <ScreenTitle>定时任务</ScreenTitle>
           {activeRoutines.length > 0 && (
-            <span className="text-xs text-muted-foreground">{activeRoutines.length}</span>
+            <span className="text-xs text-muted-foreground font-mono">({activeRoutines.length})</span>
           )}
         </div>
         <div className="flex items-center gap-0.5">
           <button
+            type="button"
             onClick={() => setShowCreateDialog(true)}
-            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
-            title="Create routine"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+            title="创建定时任务"
           >
             <Plus className="size-3.5" />
           </button>
           <button
+            type="button"
             onClick={refreshRoutines}
-            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
-            title="Refresh"
+            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+            title="刷新"
           >
             <RefreshCw className="size-3.5" />
           </button>

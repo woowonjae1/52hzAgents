@@ -576,7 +576,11 @@ export function ChatView() {
   }, [displayMessages, updateAgentMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = useCallback(
-    async (content: string, mentions: string[] = [], files: PendingFile[] = []) => {
+    async (
+      content: string,
+      mentions: string[] = [],
+      files: PendingFile[] = []
+    ) => {
       if (!currentSessionId) return;
       if (!currentUser.id || !currentUser.name.trim()) return;
 
@@ -602,8 +606,6 @@ export function ChatView() {
       const loadingOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-loading-${timestamp}`,
         sessionId: currentSessionId,
-        // Whoever the message is actually addressed to owns the pending row, so
-        // "@openclaw ..." acknowledges as openclaw rather than as the master.
         senderName: mentions[0] || agents.find((a) => a.role === 'master')?.agentName || agents[0]?.agentName || 'Agent',
         senderType: 'agent',
         content: '',
@@ -622,8 +624,6 @@ export function ChatView() {
       ]);
       updateLastMessage(currentSessionId, currentUser.name, content || 'Sent an attachment', false);
       recordUserMessageSent(currentSessionId);
-      // Make cancellation available immediately, rather than waiting for a
-      // remote agent to publish its first status event.
       setSessionActive(currentSessionId, true);
       setScrollKey((k) => k + 1);
 
@@ -672,9 +672,10 @@ export function ChatView() {
             .filter((m) => m.messageId !== loadingOptimisticMsg.messageId)
             .map((m) => m.messageId === userOptimisticMsg.messageId ? { ...m, deliveryStatus: 'failed' } : m)
         );
+        setSessionActive(currentSessionId, false);
       }
     },
-    [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive]
+    [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive, updateLastMessage, recordUserMessageSent]
   );
 
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');
@@ -1199,6 +1200,9 @@ export function ChatView() {
                 onSend={handleSend}
                 agents={agents}
                 knowledge={knowledge}
+                session={currentSession || undefined}
+                onOrchestrationChange={(updates) => currentSessionId && setSessionOrchestration(currentSessionId, updates)}
+                onMasterChange={(agentName) => currentSessionId && setSessionMaster(currentSessionId, agentName)}
                 draft={currentDraft}
                 onDraftChange={handleDraftChange}
                 onFocusChange={(focused) => focused ? notifyFocus() : notifyBlur()}

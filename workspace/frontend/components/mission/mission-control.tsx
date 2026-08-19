@@ -200,7 +200,7 @@ export function MissionControl() {
     });
   }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
 
-  // Section 2: Available Catalog Presets (Not yet configured)
+  // Section 2: Available Catalog Presets
   const integrationStations: StationData[] = useMemo(() => {
     const liveNames = new Set(agents.map((a) => a.agentName.toLowerCase()));
     const unconfigured = allCatalogAgents.filter((a) => !liveNames.has(a.agentName.toLowerCase()));
@@ -347,8 +347,8 @@ export function MissionControl() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header Strip */}
-      <div className="shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-4">
+      {/* Header Strip with 4 Always-Visible Analytics Cards */}
+      <div className="shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-3.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface2 text-primary shadow-2xs">
@@ -395,111 +395,78 @@ export function MissionControl() {
           </div>
         </div>
 
-        {/* Dynamic Metric Display: Compact Status Bar when All Offline; Rich Cards when Active */}
-        {isAllOffline ? (
-          /* Hero C-Position Action Card when all are offline */
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-surface1/90 border border-primary/20 shadow-xs">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Play className="size-4 fill-current ml-0.5" />
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className="text-xs font-bold text-foreground">
-                  {agents.length} 个智能体已就绪，当前全部处于离线待命
-                </div>
-                <div className="text-[11px] text-muted-foreground truncate">
-                  点击下方卡片分别启动，或一键唤醒工作区所有智能体进程
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  agents.forEach((a) => handlePairAgent(a.agentName));
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-              >
-                <RotateCw className="size-3.5" />
-                <span>一键连接全部</span>
-              </button>
-            </div>
+        {/* 4 Rich Metric Cards (Always Visible) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Card 1: Action Required */}
+          <div
+            onClick={() => setFilterTab(filterTab === 'blocked' ? 'all' : 'blocked')}
+            className="cursor-pointer"
+          >
+            <MetricCard
+              title="待办处理"
+              value={blockedCount}
+              subtitle={blockedCount > 0 ? '⚠️ 需要立即人工确认' : '运行正常，无阻塞'}
+              icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
+              badge={blockedCount > 0 ? { text: '待处理', trend: 'down' } : undefined}
+              className={cn(
+                filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
+                blockedCount > 0 && 'bg-amber-500/[0.04]'
+              )}
+            />
           </div>
-        ) : (
-          /* 4 Rich Metric Cards when at least one is online or tasks exist */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Card 1: Action Required */}
-            <div
-              onClick={() => setFilterTab(filterTab === 'blocked' ? 'all' : 'blocked')}
-              className="cursor-pointer"
-            >
-              <MetricCard
-                title="待办处理"
-                value={blockedCount}
-                subtitle={blockedCount > 0 ? '⚠️ 需要立即人工确认' : '运行正常，无阻塞'}
-                icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
-                badge={blockedCount > 0 ? { text: '待处理', trend: 'down' } : undefined}
-                className={cn(
-                  filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
-                  blockedCount > 0 && 'bg-amber-500/[0.04]'
-                )}
-              />
-            </div>
 
-            {/* Card 2: Working Now */}
-            <div
-              onClick={() => setFilterTab(filterTab === 'working' ? 'all' : 'working')}
-              className="cursor-pointer"
-            >
-              <MetricCard
-                title="运行中"
-                value={workingCount}
-                subtitle={workingCount > 0 ? `${workingCount} 个正在执行任务` : '全部处于待命就绪态'}
-                icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
-                badge={workingCount > 0 ? { text: `${workingCount} 活跃`, trend: 'neutral' } : undefined}
-                chart={workingCount > 0 ? <SparklineBar data={[12, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} /> : undefined}
-                className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
-              />
-            </div>
-
-            {/* Card 3: Agents Online */}
-            <div
-              onClick={() => setFilterTab(filterTab === 'online' ? 'all' : 'online')}
-              className="cursor-pointer"
-            >
-              <MetricCard
-                title="在线智能体"
-                value={`${onlineCount} / ${agents.length}`}
-                subtitle={onlineCount > 0 ? '心跳守护进程正常' : '全部离线'}
-                icon={<Users className="size-3.5 text-emerald-500" />}
-                chart={
-                  onlineCount > 0 ? (
-                    <RingProgress
-                      value={(onlineCount / agents.length) * 100}
-                      size={32}
-                      strokeWidth={3}
-                      color="#10b981"
-                      label={`${onlineCount}`}
-                    />
-                  ) : undefined
-                }
-                className={cn(filterTab === 'online' && 'ring-2 ring-primary border-primary')}
-              />
-            </div>
-
-            {/* Card 4: Tokens Reported */}
-            <div>
-              <MetricCard
-                title="Token 消耗"
-                value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
-                subtitle={totalTokens > 0 ? '累计会话消耗量' : '暂无消耗记录'}
-                icon={<Zap className="size-3.5 text-violet-500" />}
-                chart={totalTokens > 0 ? <SparklineArea data={[10, 18, 14, 26, 22, 34, 30]} color="#8b5cf6" height={30} width={72} /> : undefined}
-              />
-            </div>
+          {/* Card 2: Working Now */}
+          <div
+            onClick={() => setFilterTab(filterTab === 'working' ? 'all' : 'working')}
+            className="cursor-pointer"
+          >
+            <MetricCard
+              title="运行中"
+              value={workingCount}
+              subtitle={workingCount > 0 ? `${workingCount} 个正在执行任务` : '全部处于待命就绪态'}
+              icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
+              badge={workingCount > 0 ? { text: `${workingCount} 活跃`, trend: 'neutral' } : undefined}
+              chart={workingCount > 0 ? <SparklineBar data={[12, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} /> : undefined}
+              className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
+            />
           </div>
-        )}
+
+          {/* Card 3: Agents Online */}
+          <div
+            onClick={() => setFilterTab(filterTab === 'online' ? 'all' : 'online')}
+            className="cursor-pointer"
+          >
+            <MetricCard
+              title="在线智能体"
+              value={`${onlineCount} / ${agents.length}`}
+              subtitle={onlineCount > 0 ? '心跳守护进程正常' : '全部离线待命'}
+              icon={<Users className="size-3.5 text-emerald-500" />}
+              chart={
+                onlineCount > 0 ? (
+                  <RingProgress
+                    value={(onlineCount / agents.length) * 100}
+                    size={32}
+                    strokeWidth={3}
+                    color="#10b981"
+                    label={`${onlineCount}`}
+                  />
+                ) : undefined
+              }
+              className={cn(filterTab === 'online' && 'ring-2 ring-primary border-primary')}
+            />
+          </div>
+
+          {/* Card 4: Tokens Reported */}
+          <div>
+            <MetricCard
+              title="Token 消耗"
+              value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
+              subtitle={totalTokens > 0 ? '累计会话消耗量' : '暂无消耗记录'}
+              icon={<Zap className="size-3.5 text-violet-500" />}
+              chart={totalTokens > 0 ? <SparklineArea data={[10, 18, 14, 26, 22, 34, 30]} color="#8b5cf6" height={30} width={72} /> : undefined}
+            />
+          </div>
+        </div>
       </div>
 
       <ConnectAgentModal
@@ -528,6 +495,38 @@ export function MissionControl() {
               onQuickConnect={handlePairAgent}
               className="my-2"
             />
+          )}
+
+          {/* All Offline Wakeup Callout Banner */}
+          {isAllOffline && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 rounded-2xl bg-surface1/90 border border-primary/20 shadow-2xs">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Play className="size-3.5 fill-current ml-0.5" />
+                </div>
+                <div className="space-y-0.5 min-w-0">
+                  <div className="text-xs font-semibold text-foreground">
+                    {agents.length} 个智能体已就绪，当前全部处于离线待命
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    点击下方各席位分别连接，或一键快速连接所有席位
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    agents.forEach((a) => handlePairAgent(a.agentName));
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                >
+                  <RotateCw className="size-3" />
+                  <span>一键连接全部</span>
+                </button>
+              </div>
+            </div>
           )}
 
           {/* View Tab 1: Grid Cards */}
