@@ -6,24 +6,18 @@ import {
   Paperclip,
   X,
   FileIcon,
-  ImageIcon,
-  Plus,
   CalendarClock,
-  FolderOpen,
   Square,
   Sparkles,
   BookOpen,
   AtSign,
-  Command,
-  Loader2,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import type { WorkspaceAgent, KnowledgeEntry } from '@/lib/types';
 import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export interface PendingFile {
   file: File;
@@ -56,6 +50,14 @@ function isImageFile(file: File): boolean {
   return file.type.startsWith('image/');
 }
 
+/** 底部控制条上的紧凑胶囊按钮样式 */
+const pillButton = cn(
+  'inline-flex items-center gap-1.5 h-7 px-2 rounded-lg cursor-pointer',
+  'text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
+  'transition-colors duration-200',
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
+);
+
 export function PromptComposer({
   onSend,
   disabled,
@@ -82,6 +84,7 @@ export function PromptComposer({
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const dragCountRef = React.useRef(0);
+  const reduceMotion = useReducedMotion();
 
   const resizeTextarea = React.useCallback(() => {
     const ta = textareaRef.current;
@@ -261,50 +264,90 @@ export function PromptComposer({
     setShowMentions(false);
   };
 
-  const mentionItems = React.useMemo(() => {
-    const agentList = mergedAgents.map((a) => ({
-      type: 'agent' as const,
-      name: a.agentName,
-      desc: a.description || a.agentType,
-      agent: a,
-    }));
-    const knowledgeList = (knowledge || []).map((k) => ({
-      type: 'knowledge' as const,
-      name: `knowledge:${k.slug || k.id}`,
-      desc: k.title,
-      knowledge: k,
-    }));
-    const all = [...agentList, ...knowledgeList];
-    if (!mentionFilter) return all;
-    return all.filter(
-      (item) =>
-        item.name.toLowerCase().includes(mentionFilter) ||
-        (item.desc && item.desc.toLowerCase().includes(mentionFilter))
-    );
+  const mentionGroups = React.useMemo(() => {
+    const filterLower = mentionFilter.toLowerCase();
+    const agentList = mergedAgents
+      .map((a) => ({
+        type: 'agent' as const,
+        name: a.agentName,
+        desc: a.description || a.agentType,
+        agent: a,
+      }))
+      .filter(
+        (item) =>
+          !filterLower ||
+          item.name.toLowerCase().includes(filterLower) ||
+          (item.desc && item.desc.toLowerCase().includes(filterLower))
+      );
+
+    const knowledgeList = (knowledge || [])
+      .map((k) => ({
+        type: 'knowledge' as const,
+        name: `knowledge:${k.slug || k.id}`,
+        desc: k.title,
+        knowledge: k,
+      }))
+      .filter(
+        (item) =>
+          !filterLower ||
+          item.name.toLowerCase().includes(filterLower) ||
+          (item.desc && item.desc.toLowerCase().includes(filterLower))
+      );
+
+    return {
+      agents: agentList,
+      knowledge: knowledgeList,
+      all: [...agentList, ...knowledgeList],
+    };
   }, [mergedAgents, knowledge, mentionFilter]);
 
+  const mentionItems = mentionGroups.all;
+
   const insertMention = (item: (typeof mentionItems)[0]) => {
-    const cursorPos = textareaRef.current?.selectionStart || message.length;
+    const cursorPos = textareaRef.current?.selectionStart ?? message.length;
     const textBeforeCursor = message.slice(0, cursorPos);
     const atIndex = textBeforeCursor.lastIndexOf('@');
     const slashIndex = textBeforeCursor.lastIndexOf('/');
     const triggerIndex = Math.max(atIndex, slashIndex);
 
-    if (triggerIndex !== -1) {
-      const triggerChar = message[triggerIndex] === '/' ? '/' : '@';
+    let newText = '';
+    let newCursorPos = cursorPos;
+
+    // If cursor is immediately after '@' or '/' (active trigger word)
+    if (triggerIndex !== -1 && !/\s/.test(textBeforeCursor.slice(triggerIndex + 1))) {
+      const triggerChar = message[triggerIndex] === '/' && item.type === 'agent' ? '/' : '@';
       const before = message.slice(0, triggerIndex);
       const after = message.slice(cursorPos);
-      const newText = `${before}${triggerChar}${item.name} ${after}`;
-      setMessage(newText);
-      onDraftChange?.(newText);
+      const inserted = `${triggerChar}${item.name} `;
+      newText = `${before}${inserted}${after}`;
+      newCursorPos = before.length + inserted.length;
+    } else {
+      // User clicked bottom button without typing '@': cleanly append/insert
+      const before = message.slice(0, cursorPos);
+      const after = message.slice(cursorPos);
+      const prefix = before.length > 0 && !/\s$/.test(before) ? ' ' : '';
+      const inserted = `${prefix}@${item.name} `;
+      newText = `${before}${inserted}${after}`;
+      newCursorPos = before.length + inserted.length;
     }
+
+    setMessage(newText);
+    onDraftChange?.(newText);
     setShowMentions(false);
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 0);
+    setMentionFilter('');
+
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
   };
 
-  const canSend = (message.trim().length > 0 || pendingFiles.length > 0) && !disabled;
+  const hasPayload = message.trim().length > 0 || pendingFiles.length > 0;
+  const canSend = hasPayload && !disabled;
+  // 键盘提示：聚焦且内容为空时露出，避免遮挡正在输入的文本
+  const showHint = isFocused && !hasPayload && !isWorking;
 
   return (
     <div className={cn('relative w-full', className)}>
@@ -315,75 +358,156 @@ export function PromptComposer({
             initial={{ opacity: 0, y: 8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute bottom-full left-0 mb-2.5 w-72 max-h-64 overflow-y-auto rounded-2xl bg-surface1/95 backdrop-blur-xl border border-border/80 shadow-xl z-50 p-1.5 space-y-0.5"
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            className="absolute bottom-full left-0 mb-2.5 w-80 max-h-80 overflow-y-auto rounded-2xl bg-surface1/95 backdrop-blur-xl border border-border/80 shadow-2xl z-50 p-2 space-y-2"
           >
-            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-              {mentionFilter ? '匹配的 Agent 与知识库' : '选择呼叫的 Agent 或知识库'}
-            </div>
-            {mentionItems.map((item, idx) => {
-              const isSelected = idx === mentionIndex;
-              return (
-                <button
-                  key={`${item.type}-${item.name}`}
-                  type="button"
-                  onClick={() => insertMention(item)}
-                  className={cn(
-                    'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs',
-                    isSelected
-                      ? 'bg-primary text-primary-foreground font-medium'
-                      : 'hover:bg-surface2 text-foreground'
-                  )}
-                >
-                  {item.type === 'agent' ? (
-                    <AgentAvatar
-                      name={item.name}
-                      agentType={item.agent.agentType}
-                      size={20}
-                      status={item.agent.status}
-                    />
-                  ) : (
-                    <div
-                      className={cn(
-                        'size-5 rounded-lg flex items-center justify-center shrink-0',
-                        isSelected ? 'bg-primary-foreground/20' : 'bg-primary/10 text-primary'
-                      )}
-                    >
-                      <BookOpen className="size-3" />
-                    </div>
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate font-medium">{item.name}</div>
-                    {item.desc && (
-                      <div
+            {/* Section 1: Agents */}
+            {mentionGroups.agents.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">
+                  <AtSign className="size-3" />
+                  <span>智能体 ({mentionGroups.agents.length})</span>
+                </div>
+                <div className="space-y-0.5">
+                  {mentionGroups.agents.map((item) => {
+                    const globalIdx = mentionItems.indexOf(item);
+                    const isSelected = globalIdx === mentionIndex;
+                    const isOnline = item.agent.status === 'online';
+                    return (
+                      <button
+                        key={`${item.type}-${item.name}`}
+                        type="button"
+                        onClick={() => insertMention(item)}
                         className={cn(
-                          'text-[10px] truncate',
-                          isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-all duration-150 cursor-pointer text-xs group',
+                          isSelected
+                            ? 'bg-primary text-primary-foreground font-medium shadow-xs'
+                            : 'hover:bg-surface2 text-foreground'
                         )}
                       >
-                        {item.desc}
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
+                        <AgentAvatar
+                          name={item.name}
+                          agentType={item.agent.agentType}
+                          size={22}
+                          status={item.agent.status}
+                        />
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate font-medium">{item.name}</span>
+                            <span
+                              className={cn(
+                                'text-[9.5px] px-1.5 py-0.2 rounded font-mono',
+                                isSelected
+                                  ? 'bg-primary-foreground/20 text-primary-foreground'
+                                  : isOnline
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                  : 'bg-surface3 text-foreground-extra-muted'
+                              )}
+                            >
+                              {isOnline ? 'online' : 'offline'}
+                            </span>
+                          </div>
+                          {item.desc && (
+                            <div
+                              className={cn(
+                                'text-[10.5px] truncate',
+                                isSelected ? 'text-primary-foreground/80' : 'text-foreground-extra-muted'
+                              )}
+                            >
+                              {item.desc}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Section 2: Knowledge Bases */}
+            {mentionGroups.knowledge.length > 0 && (
+              <div className={cn(mentionGroups.agents.length > 0 && 'border-t border-border/50 pt-1.5')}>
+                <div className="flex items-center gap-1.5 px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  <BookOpen className="size-3" />
+                  <span>知识库文档 ({mentionGroups.knowledge.length})</span>
+                </div>
+                <div className="space-y-0.5">
+                  {mentionGroups.knowledge.map((item) => {
+                    const globalIdx = mentionItems.indexOf(item);
+                    const isSelected = globalIdx === mentionIndex;
+                    return (
+                      <button
+                        key={`${item.type}-${item.name}`}
+                        type="button"
+                        onClick={() => insertMention(item)}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-all duration-150 cursor-pointer text-xs group',
+                          isSelected
+                            ? 'bg-emerald-600 text-white font-medium shadow-xs'
+                            : 'hover:bg-emerald-500/10 text-foreground border border-transparent hover:border-emerald-500/20'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'size-6 rounded-lg flex items-center justify-center shrink-0 border transition-colors',
+                            isSelected
+                              ? 'bg-white/20 border-white/30 text-white'
+                              : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                          )}
+                        >
+                          <BookOpen className="size-3.5" />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="truncate font-medium">
+                              {item.knowledge.title || item.knowledge.slug}
+                            </span>
+                            <span
+                              className={cn(
+                                'text-[9.5px] px-1.5 py-0.2 rounded font-mono',
+                                isSelected
+                                  ? 'bg-white/20 text-white'
+                                  : 'bg-surface2 text-foreground-extra-muted'
+                              )}
+                            >
+                              doc
+                            </span>
+                          </div>
+                          <div
+                            className={cn(
+                              'text-[10px] font-mono truncate',
+                              isSelected ? 'text-white/80' : 'text-emerald-600/80 dark:text-emerald-400/80'
+                            )}
+                          >
+                            @{item.name}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main Composer Box */}
+      {/* Main Composer Island */}
       <div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         className={cn(
-          'relative rounded-2xl bg-surface1/90 dark:bg-surface1/60 backdrop-blur-xl',
-          'border border-border/80 shadow-xs transition-all duration-200',
-          isFocused ? 'border-primary/50 ring-2 ring-primary/15 shadow-md' : 'hover:border-border-accent/80',
-          isDragging && 'border-primary ring-4 ring-primary/20 bg-primary/[0.03]'
+          'relative rounded-2xl overflow-hidden',
+          'bg-surface1/90 dark:bg-surface1/60 backdrop-blur-xl',
+          'border border-border/70 shadow-sm transition-all duration-200',
+          'hover:border-border-accent/80',
+          'focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary/40 focus-within:shadow-md',
+          isDragging && 'border-primary/60 ring-4 ring-primary/20 bg-primary/[0.03]'
         )}
       >
         {/* Drag Overlay */}
@@ -393,43 +517,84 @@ export function PromptComposer({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 rounded-2xl bg-primary/10 backdrop-blur-xs flex items-center justify-center gap-2 text-primary font-medium text-xs z-30 pointer-events-none"
+              transition={reduceMotion ? { duration: 0 } : undefined}
+              className="absolute inset-0 rounded-2xl bg-primary/10 backdrop-blur-xs flex items-center justify-center gap-2 text-foreground font-medium text-xs z-30 pointer-events-none"
             >
-              <Sparkles className="size-4 animate-bounce" />
+              <Sparkles className={cn('size-4', !reduceMotion && 'animate-bounce')} />
               <span>拖放文件到此处附加</span>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Pending Files Tray */}
-        {pendingFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-3 pb-0">
-            {pendingFiles.map((pf, idx) => (
-              <div
-                key={idx}
-                className="group relative flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-xl bg-surface2/90 border border-border/70 text-xs text-foreground shadow-2xs animate-in fade-in zoom-in-95 duration-150"
-              >
-                {pf.preview ? (
-                  <img
-                    src={pf.preview}
-                    alt={pf.file.name}
-                    className="size-5 rounded-md object-cover border border-border/50 shrink-0"
-                  />
-                ) : (
-                  <FileIcon className="size-4 text-primary shrink-0" />
-                )}
-                <span className="max-w-[130px] truncate font-medium text-[11.5px]">{pf.file.name}</span>
-                <button
-                  type="button"
-                  onClick={() => removeFile(idx)}
-                  className="size-4 rounded-full hover:bg-surface3 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                >
-                  <X className="size-3" />
-                </button>
+        {/* Attachment Tray — 缩略图卡片，位于输入框上方、同一座岛内 */}
+        <AnimatePresence initial={false}>
+          {pendingFiles.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="flex flex-wrap gap-2 px-3 pt-3">
+                {pendingFiles.map((pf, idx) => (
+                  <motion.div
+                    key={`${pf.file.name}-${idx}`}
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.94 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                    className={cn(
+                      'group/file relative flex items-center gap-2 pl-1 pr-2.5 py-1 rounded-xl',
+                      'bg-surface2/80 border border-border/60 shadow-2xs',
+                      'transition-colors duration-200 hover:border-border-accent/80'
+                    )}
+                  >
+                    {pf.preview ? (
+                      <img
+                        src={pf.preview}
+                        alt={pf.file.name}
+                        className="size-7 rounded-lg object-cover border border-border/50 shrink-0"
+                      />
+                    ) : (
+                      <span className="size-7 rounded-lg bg-surface1 border border-border/50 flex items-center justify-center shrink-0 text-foreground-muted">
+                        <FileIcon className="size-3.5" />
+                      </span>
+                    )}
+
+                    <span className="flex flex-col min-w-0 leading-tight">
+                      <span className="max-w-[140px] truncate text-[11.5px] font-medium text-foreground">
+                        {pf.file.name}
+                      </span>
+                      <span className="text-[10px] font-mono text-foreground-extra-muted tabular-nums">
+                        {pf.file.size < 1024
+                          ? `${pf.file.size} B`
+                          : pf.file.size < 1024 * 1024
+                          ? `${(pf.file.size / 1024).toFixed(0)} KB`
+                          : `${(pf.file.size / 1024 / 1024).toFixed(1)} MB`}
+                      </span>
+                    </span>
+
+                    {/* Hover 删除角标 */}
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      aria-label={`移除 ${pf.file.name}`}
+                      className={cn(
+                        'absolute -top-1.5 -right-1.5 size-4 rounded-full cursor-pointer',
+                        'flex items-center justify-center',
+                        'bg-foreground text-background border border-border/50 shadow-sm',
+                        'opacity-0 group-hover/file:opacity-100 focus-visible:opacity-100',
+                        'transition-opacity duration-200'
+                      )}
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </motion.div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Text Area */}
         <textarea
@@ -448,13 +613,13 @@ export function PromptComposer({
           placeholder={disabled ? '请先连接在线 Agent...' : '向 52hzAgents 发送指令，输入 @ 或 / 唤起 Agent 或知识库...'}
           disabled={disabled}
           rows={1}
-          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-[13.5px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[48px]"
+          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2 text-[13.5px] leading-relaxed text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden disabled:opacity-50 min-h-[48px]"
         />
 
-        {/* Bottom Actions Bar */}
-        <div className="flex items-center justify-between px-3 pb-2.5 pt-1 border-t border-border/40">
+        {/* Bottom Control Row */}
+        <div className="flex items-center justify-between gap-2 px-2.5 pb-2 pt-1">
           {/* Left Controls */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1 min-w-0">
             {/* Model Switcher Pill */}
             <AgentModelSwitcher />
 
@@ -462,11 +627,10 @@ export function PromptComposer({
             <button
               type="button"
               onClick={() => {
-                setMessage((prev) => prev + '@');
+                setShowMentions((prev) => !prev);
                 textareaRef.current?.focus();
-                setShowMentions(true);
               }}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors text-xs cursor-pointer"
+              className={cn(pillButton, showMentions && 'bg-surface3 text-foreground border-border-accent')}
               title="呼叫 Agent 或知识库 (@)"
             >
               <AtSign className="size-3.5" />
@@ -477,7 +641,7 @@ export function PromptComposer({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+              className={cn(pillButton, 'px-0 w-7 justify-center')}
               title="添加文件或图片"
             >
               <Paperclip className="size-3.5" />
@@ -500,7 +664,7 @@ export function PromptComposer({
               <button
                 type="button"
                 onClick={onCreateRoutine}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors text-xs cursor-pointer"
+                className={pillButton}
                 title="创建定时任务"
               >
                 <CalendarClock className="size-3.5" />
@@ -509,43 +673,79 @@ export function PromptComposer({
             )}
           </div>
 
-          {/* Right Controls (Send / Stop Button) */}
+          {/* Right Controls (Hint + Send / Stop) */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Word/Char Counter & Shortcut Hint */}
-            <span className="text-[10px] text-muted-foreground/60 hidden sm:inline select-none font-mono">
-              ↵ 发送
-            </span>
+            {/* Keyboard hint — 仅在聚焦且为空时显示 */}
+            <AnimatePresence initial={false}>
+              {showHint && (
+                <motion.span
+                  initial={reduceMotion ? false : { opacity: 0, x: 4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 4 }}
+                  transition={{ duration: 0.15 }}
+                  className="hidden sm:inline select-none text-[10px] font-mono text-foreground-extra-muted"
+                >
+                  ↵ 发送 · ⇧↵ 换行
+                </motion.span>
+              )}
+            </AnimatePresence>
 
-            {/* Send or Stop Action */}
-            {isWorking ? (
-              <button
-                type="button"
-                onClick={onStop}
-                disabled={stopping}
-                className={cn(
-                  'flex items-center justify-center size-7 rounded-xl bg-status-danger text-white shadow-xs hover:opacity-90 transition-all cursor-pointer',
-                  stopping && 'opacity-50 cursor-not-allowed'
+            {/* Send ⇄ Stop —— 同一颗圆形按钮内形变 */}
+            <button
+              type="button"
+              onClick={isWorking ? onStop : handleSend}
+              disabled={isWorking ? stopping : !canSend}
+              aria-label={isWorking ? '停止当前任务' : '发送消息'}
+              title={isWorking ? '停止当前任务' : '发送消息 (Enter)'}
+              className={cn(
+                'relative flex items-center justify-center size-8 rounded-full shrink-0',
+                'shadow-sm transition-all duration-200 cursor-pointer',
+                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30',
+                isWorking
+                  ? cn(
+                      'bg-status-danger text-white hover:opacity-90',
+                      stopping && 'opacity-50 cursor-not-allowed'
+                    )
+                  : canSend
+                  ? 'bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95'
+                  : 'bg-surface3 text-foreground-extra-muted opacity-40 cursor-not-allowed'
+              )}
+            >
+              {/* 运行中的呼吸光环 */}
+              {isWorking && !reduceMotion && (
+                <motion.span
+                  aria-hidden
+                  className="absolute inset-0 rounded-full bg-status-danger/40"
+                  animate={{ scale: [1, 1.35], opacity: [0.5, 0] }}
+                  transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+                />
+              )}
+              <AnimatePresence mode="wait" initial={false}>
+                {isWorking ? (
+                  <motion.span
+                    key="stop"
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.6, rotate: -90 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6, rotate: 90 }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative flex items-center justify-center"
+                  >
+                    <Square className="size-3 fill-current" />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="send"
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.6, rotate: 90 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6, rotate: -90 }}
+                    transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                    className="relative flex items-center justify-center"
+                  >
+                    <ArrowUp className="size-4" />
+                  </motion.span>
                 )}
-                title="停止当前任务"
-              >
-                <Square className="size-3.5 fill-current" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!canSend}
-                className={cn(
-                  'flex items-center justify-center size-7 rounded-xl transition-all shadow-xs cursor-pointer',
-                  canSend
-                    ? 'bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95'
-                    : 'bg-surface3 text-muted-foreground opacity-40 cursor-not-allowed'
-                )}
-                title="发送消息 (Enter)"
-              >
-                <ArrowUp className="size-4" />
-              </button>
-            )}
+              </AnimatePresence>
+            </button>
           </div>
         </div>
       </div>

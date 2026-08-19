@@ -1,7 +1,7 @@
 'use client';
 
-import { ChevronDown, Sparkles, Clock, Copy, Check } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { ChevronDown, Brain, Copy, Check } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
@@ -26,6 +26,7 @@ export function Reasoning({
 }: ReasoningProps) {
   const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded || isStreaming);
   const [copied, setCopied] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   // Calculate thinking duration text
   const durationText = useMemo(() => {
@@ -40,6 +41,9 @@ export function Reasoning({
     return null;
   }, [durationMs, startTime]);
 
+  // Collapsed capsule label: live shimmer while streaming, "思考了 x.xs" once settled
+  const label = isStreaming ? '正在思考…' : durationText ? `思考了 ${durationText}` : '思考过程';
+
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!content) return;
@@ -52,67 +56,82 @@ export function Reasoning({
   if (!content && !isStreaming) return null;
 
   return (
-    <div
-      className={cn(
-        'group/reasoning my-2 rounded-xl border border-violet-500/20 dark:border-violet-500/30',
-        'bg-violet-500/[0.02] dark:bg-violet-950/20 backdrop-blur-xs',
-        'transition-all duration-200 overflow-hidden',
-        className
-      )}
-    >
-      {/* Header Bar */}
-      <button
-        type="button"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className={cn(
-          'w-full flex items-center justify-between px-3.5 py-2 select-none text-left cursor-pointer',
-          'hover:bg-violet-500/[0.04] dark:hover:bg-violet-500/[0.08] transition-colors'
-        )}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <div
+    <div className={cn('group/reasoning my-2 w-full', className)}>
+      {/* Collapsed capsule / toggle */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setIsExpanded((prev) => !prev)}
+          aria-expanded={isExpanded}
+          className={cn(
+            'inline-flex items-center gap-2 select-none cursor-pointer',
+            'rounded-full border border-border/70 bg-surface1/70 dark:bg-surface1/40',
+            'pl-2 pr-2.5 py-1 shadow-2xs backdrop-blur-xs',
+            'transition-all duration-200',
+            'hover:bg-surface2/70 hover:border-border-accent/80',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
+          )}
+        >
+          <span
             className={cn(
-              'size-5 rounded-lg flex items-center justify-center shrink-0 transition-colors',
+              'size-4 rounded-full flex items-center justify-center shrink-0 transition-colors duration-200',
               isStreaming
-                ? 'bg-violet-500/15 text-violet-600 dark:text-violet-400'
-                : 'bg-violet-500/10 text-violet-500 dark:text-violet-400'
+                ? 'bg-primary/10 text-foreground'
+                : 'bg-surface2/80 text-foreground-muted group-hover/reasoning:text-foreground'
             )}
           >
-            <Sparkles className={cn('size-3', isStreaming && 'animate-pulse')} />
-          </div>
+            <Brain className="size-2.5" />
+          </span>
 
-          <div className="flex items-center gap-1.5 text-xs font-medium text-violet-950 dark:text-violet-200">
-            <span>{isStreaming ? '正在深度思考...' : '思考过程'}</span>
-            {durationText && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-violet-500/10 text-[10px] text-violet-600 dark:text-violet-400 font-mono">
-                <Clock className="size-2.5 opacity-70" />
-                {durationText}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          {content && (
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="opacity-0 group-hover/reasoning:opacity-100 p-1 rounded-md text-violet-400 hover:text-violet-600 dark:hover:text-violet-200 hover:bg-violet-500/10 transition-all cursor-pointer"
-              title="复制思考过程"
+          {isStreaming && !reduceMotion ? (
+            // Gentle shimmer sweep across the label while reasoning streams in
+            <motion.span
+              className="text-[11px] font-medium bg-clip-text text-transparent"
+              style={{
+                backgroundImage:
+                  'linear-gradient(90deg, var(--foreground-muted) 0%, var(--foreground) 50%, var(--foreground-muted) 100%)',
+                backgroundSize: '220% 100%',
+              }}
+              animate={{ backgroundPositionX: ['160%', '-60%'] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
             >
-              {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-            </button>
+              {label}
+            </motion.span>
+          ) : (
+            <span
+              className={cn(
+                'text-[11px] font-medium transition-colors duration-200',
+                'text-foreground-muted group-hover/reasoning:text-foreground'
+              )}
+            >
+              {label}
+            </span>
           )}
 
-          <motion.div
+          <motion.span
             animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="text-violet-400 dark:text-violet-500"
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-foreground-extra-muted"
           >
-            <ChevronDown className="size-3.5" />
-          </motion.div>
-        </div>
-      </button>
+            <ChevronDown className="size-3" />
+          </motion.span>
+        </button>
+
+        {content && (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className={cn(
+              'opacity-0 group-hover/reasoning:opacity-100 focus-visible:opacity-100',
+              'p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
+              'transition-all duration-200 cursor-pointer'
+            )}
+            title="复制思考过程"
+          >
+            {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+          </button>
+        )}
+      </div>
 
       {/* Collapsible Content */}
       <AnimatePresence initial={false}>
@@ -121,18 +140,24 @@ export function Reasoning({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
           >
-            <div className="px-4 pb-3 pt-1 border-t border-violet-500/10 dark:border-violet-500/20 text-xs text-muted-foreground/90 font-mono leading-relaxed overflow-x-auto">
-              <div className="relative pl-3 border-l-2 border-violet-500/30 dark:border-violet-500/40 my-1">
-                {content ? (
-                  <div className="text-xs text-foreground/80 leading-relaxed font-sans">
-                    <MarkdownContent content={content} />
-                  </div>
-                ) : (
-                  <span className="italic text-muted-foreground animate-pulse">正在梳理推理逻辑与上下文...</span>
-                )}
-              </div>
+            {/* Soft left gradient rail keeps reasoning visually subordinate to the answer */}
+            <div className="relative mt-2 ml-2 pl-3.5 pr-1 pb-1">
+              <span
+                aria-hidden
+                className="absolute left-0 top-0.5 bottom-0.5 w-px rounded-full bg-gradient-to-b from-border-accent/80 via-border/60 to-transparent"
+              />
+              {content ? (
+                <div className="text-xs leading-[1.7] text-foreground-muted [&_*]:text-xs [&_p]:my-1 [&_pre]:text-[11px]">
+                  <MarkdownContent content={content} />
+                </div>
+              ) : (
+                <span className="text-xs italic text-foreground-extra-muted animate-pulse">
+                  正在梳理推理逻辑与上下文...
+                </span>
+              )}
             </div>
           </motion.div>
         )}

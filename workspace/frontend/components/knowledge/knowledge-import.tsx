@@ -14,7 +14,8 @@
  * overwrite, but every one of them is listed before anything is written.
  */
 
-import { AlertCircle, BookOpen, FileText, UploadCloud } from 'lucide-react';
+import { AlertCircle, BookOpen, Check, FileText, RefreshCw, UploadCloud } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import type { KnowledgeEntry } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 
 /** Accept string shared by the drop handler and the file picker. */
@@ -39,6 +41,10 @@ const ACCEPTED_EXTENSIONS = ['.md', '.markdown', '.mdx', '.txt'];
  * bloat every agent prompt that references the entry.
  */
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+/** Micro-label typography shared with the rest of the knowledge surface. */
+const MICRO =
+  'text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted';
 
 type ImportAction = 'create' | 'overwrite' | 'skip';
 
@@ -155,16 +161,77 @@ export function useKnowledgeDropzone(onFiles: (files: File[]) => void): boolean 
 }
 
 export function KnowledgeDropOverlay({ visible }: { visible: boolean }) {
+  const reduceMotion = useReducedMotion();
   if (!visible) return null;
   return (
-    <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border-accent bg-surface1/95 backdrop-blur-sm p-6 text-center">
-      <div className="size-14 rounded-full bg-surface3 border border-border-accent flex items-center justify-center">
-        <UploadCloud className="size-7 text-status-warning" />
+    <div className="absolute inset-0 z-40 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md">
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, scale: 0.98, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="flex w-full max-w-md flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary/50 bg-surface1/70 p-8 text-center shadow-sm"
+      >
+        <div className="flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <UploadCloud className="size-6" />
+        </div>
+        <p className="text-sm font-semibold tracking-tight text-foreground">
+          Drop documents to import
+        </p>
+        <p className="max-w-xs text-sm text-foreground-muted">
+          Markdown or plain text — each file becomes a knowledge entry your agents can reference
+        </p>
+        <div className="mt-1 flex flex-wrap items-center justify-center gap-1.5">
+          {ACCEPTED_EXTENSIONS.map((ext) => (
+            <span
+              key={ext}
+              className="rounded-md bg-surface2 px-1.5 py-0.5 font-mono text-[10px] text-foreground-muted"
+            >
+              {ext}
+            </span>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+/** Status chip describing what will happen to one row on import. */
+function StatusChip({ doc }: { doc: ParsedDoc }) {
+  const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium';
+  if (doc.error) {
+    return (
+      <span className={cn(base, 'bg-red-500/10 text-red-600 dark:bg-red-400/10 dark:text-red-400')}>
+        <AlertCircle className="size-3" /> Unusable
+      </span>
+    );
+  }
+  if (doc.action === 'skip') {
+    return <span className={cn(base, 'bg-surface2 text-foreground-muted')}>Skipped</span>;
+  }
+  if (doc.action === 'overwrite') {
+    return (
+      <span className={cn(base, 'bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400')}>
+        <RefreshCw className="size-3" /> Replaces
+      </span>
+    );
+  }
+  return (
+    <span className={cn(base, 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400')}>
+      <Check className="size-3" /> New
+    </span>
+  );
+}
+
+/** Skeleton row matching the parsed-document card while files are read. */
+function DocSkeleton() {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-surface1 p-4 shadow-sm">
+      <div className="size-8 shrink-0 rounded-lg bg-surface3 animate-pulse" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="h-3.5 w-1/3 rounded bg-surface3 animate-pulse" />
+        <div className="h-2.5 w-1/2 rounded bg-surface2 animate-pulse" />
       </div>
-      <p className="text-sm font-semibold">Drop documents to import</p>
-      <p className="text-xs text-muted-foreground max-w-xs">
-        Markdown or plain text — each file becomes a knowledge entry your agents can reference
-      </p>
+      <div className="h-6 w-20 shrink-0 rounded-md bg-surface2 animate-pulse" />
     </div>
   );
 }
@@ -181,6 +248,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
   const [docs, setDocs] = useState<ParsedDoc[]>([]);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const open = files.length > 0;
 
@@ -296,85 +364,143 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
   const conflictCount = docs.filter((d) => !d.error && d.conflict).length;
   const errorCount = docs.filter((d) => d.error).length;
 
+  const selectClass =
+    'cursor-pointer rounded-lg border border-border/70 bg-surface1 px-2 py-1 text-xs text-foreground shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v && !importing) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <BookOpen className="size-4 text-status-warning" />
-            Import to knowledge base
-          </DialogTitle>
+      <DialogContent className="sm:max-w-2xl gap-0 p-0 overflow-hidden">
+        <DialogHeader className="mb-0 border-b border-border/70 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
+              <BookOpen className="size-4" />
+            </span>
+            <div className="min-w-0 text-start">
+              <DialogTitle className="text-sm font-semibold tracking-tight text-foreground">
+                Import to knowledge base
+              </DialogTitle>
+              <p className="mt-0.5 text-sm text-foreground-muted">
+                Review what each document will do before anything is written.
+              </p>
+            </div>
+          </div>
         </DialogHeader>
 
-        {parsing ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">Reading files...</div>
-        ) : (
-          <>
-            <div className="max-h-[50vh] overflow-y-auto -mx-1 px-1">
-              <div className="divide-y divide-border rounded-md border border-border">
-                {docs.map((doc) => (
-                  <div key={doc.key} className="flex items-start gap-3 p-3">
-                    <FileText className={`size-4 mt-0.5 shrink-0 ${doc.error ? 'text-muted-foreground/40' : 'text-muted-foreground'}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-medium truncate ${doc.error ? 'text-muted-foreground line-through' : ''}`}>
-                        {doc.title}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5">
-                        {doc.fileName} · {formatBytes(doc.bytes)}
-                      </p>
-                      {doc.error && (
-                        <p className="text-[11px] text-status-danger mt-1 flex items-center gap-1">
-                          <AlertCircle className="size-3 shrink-0" />
-                          {doc.error}
-                        </p>
+        <div className="px-6 py-5">
+          {parsing ? (
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => <DocSkeleton key={i} />)}
+            </div>
+          ) : (
+            <>
+              <div className="max-h-[46vh] overflow-y-auto -mx-1 px-1">
+                <div className="grid grid-cols-1 gap-3">
+                  {docs.map((doc, index) => (
+                    <motion.div
+                      key={doc.key}
+                      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: reduceMotion ? 0 : Math.min(index, 12) * 0.03 }}
+                      className={cn(
+                        'flex items-start gap-3 rounded-xl border bg-surface1 p-4 shadow-sm transition-all duration-200 hover:shadow-md',
+                        doc.error
+                          ? 'border-red-500/25 dark:border-red-400/25'
+                          : 'border-border/70',
                       )}
-                      {!doc.error && doc.conflict && (
-                        <p className="text-[11px] text-status-warning mt-1">
-                          Already exists as <span className="font-mono">@knowledge:{doc.conflict.slug}</span>
-                        </p>
-                      )}
-                    </div>
+                    >
+                      <span
+                        className={cn(
+                          'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg',
+                          doc.error
+                            ? 'bg-red-500/10 text-red-500/70 dark:bg-red-400/10 dark:text-red-400/70'
+                            : 'bg-surface2 text-foreground-muted',
+                        )}
+                      >
+                        <FileText className="size-4" />
+                      </span>
 
-                    {!doc.error && (
-                      <div className="shrink-0">
-                        {doc.conflict ? (
-                          <select
-                            value={doc.action}
-                            onChange={(e) => setAction(doc.key, e.target.value as ImportAction)}
-                            className="text-xs bg-surface2 border border-border rounded-md px-2 py-1 cursor-pointer"
-                            aria-label={`Action for ${doc.fileName}`}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p
+                            className={cn(
+                              'truncate text-sm font-semibold tracking-tight',
+                              doc.error
+                                ? 'text-foreground-extra-muted line-through'
+                                : 'text-foreground',
+                            )}
                           >
-                            <option value="overwrite">Replace</option>
-                            <option value="create">Keep both</option>
-                            <option value="skip">Skip</option>
-                          </select>
-                        ) : (
-                          <select
-                            value={doc.action}
-                            onChange={(e) => setAction(doc.key, e.target.value as ImportAction)}
-                            className="text-xs bg-surface2 border border-border rounded-md px-2 py-1 cursor-pointer"
-                            aria-label={`Action for ${doc.fileName}`}
-                          >
-                            <option value="create">Add</option>
-                            <option value="skip">Skip</option>
-                          </select>
+                            {doc.title}
+                          </p>
+                          <StatusChip doc={doc} />
+                        </div>
+                        <p className={cn(MICRO, 'mt-1 truncate normal-case tracking-normal')}>
+                          {doc.fileName} · {formatBytes(doc.bytes)}
+                        </p>
+                        {doc.error && (
+                          <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                            <AlertCircle className="size-3 shrink-0" />
+                            {doc.error}
+                          </p>
+                        )}
+                        {!doc.error && doc.conflict && (
+                          <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                            Already exists as{' '}
+                            <span className="font-mono">@knowledge:{doc.conflict.slug}</span>
+                          </p>
                         )}
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {!doc.error && (
+                        <div className="shrink-0">
+                          {doc.conflict ? (
+                            <select
+                              value={doc.action}
+                              onChange={(e) => setAction(doc.key, e.target.value as ImportAction)}
+                              className={selectClass}
+                              aria-label={`Action for ${doc.fileName}`}
+                            >
+                              <option value="overwrite">Replace</option>
+                              <option value="create">Keep both</option>
+                              <option value="skip">Skip</option>
+                            </select>
+                          ) : (
+                            <select
+                              value={doc.action}
+                              onChange={(e) => setAction(doc.key, e.target.value as ImportAction)}
+                              className={selectClass}
+                              aria-label={`Action for ${doc.fileName}`}
+                            >
+                              <option value="create">Add</option>
+                              <option value="skip">Skip</option>
+                            </select>
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <p className="text-[11px] text-muted-foreground">
-              {importable.length} of {docs.length} will be imported
-              {conflictCount > 0 && ` · ${conflictCount} already exist`}
-              {errorCount > 0 && ` · ${errorCount} unusable`}
-            </p>
-          </>
-        )}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className={cn(MICRO, 'tabular-nums')}>
+                  {importable.length} of {docs.length} will be imported
+                </span>
+                {conflictCount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 tabular-nums">
+                    {conflictCount} already exist
+                  </span>
+                )}
+                {errorCount > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400 tabular-nums">
+                    {errorCount} unusable
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-border/70 bg-surface2/50 px-6 py-4 pt-4">
           <Button variant="ghost" onClick={onClose} disabled={importing}>Cancel</Button>
           <Button onClick={handleImport} disabled={importing || parsing || importable.length === 0}>
             {importing ? 'Importing...' : `Import ${importable.length || ''}`.trim()}

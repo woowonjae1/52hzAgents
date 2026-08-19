@@ -11,6 +11,7 @@ import { MermaidBlock } from './mermaid-block';
 import { DiffBlock } from './diff-block';
 import { getMermaidSource, hasOpenMermaidFence } from './mermaid-utils';
 import { toast } from 'sonner';
+import { BookOpen } from 'lucide-react';
 
 // Stable plugin arrays — avoids re-creating on every render
 const remarkPlugins = [remarkGfm];
@@ -34,12 +35,15 @@ interface MarkdownContentProps {
   agentNames?: string[];
 }
 
-/** Walk React children and colorize @agentname tokens in text nodes. */
-function renderMentions(children: ReactNode, agentNames: string[]): ReactNode {
-  if (!children || agentNames.length === 0) return children;
+/** Walk React children and colorize @agentname and @knowledge:slug tokens in text nodes. */
+function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNode {
+  if (!children) return children;
 
   const escaped = agentNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  const mentionRegex = new RegExp(`(@(?:${escaped.join('|')}))(?![\\w-])`, 'g');
+  const agentTokens = escaped.length > 0 ? `[@/](?:${escaped.join('|')})(?![\\w-])` : '';
+  const knowledgeTokens = `@knowledge:[a-zA-Z0-9_-]+`;
+  const pattern = agentTokens ? `(${knowledgeTokens}|${agentTokens})` : `(${knowledgeTokens})`;
+  const mentionRegex = new RegExp(pattern, 'gi');
 
   let keyCounter = 0;
 
@@ -49,18 +53,30 @@ function renderMentions(children: ReactNode, agentNames: string[]): ReactNode {
       if (parts.length === 1) return node;
       return parts.map((part) => {
         keyCounter++;
-        if (part.startsWith('@') && agentNames.includes(part.slice(1))) {
-          // Same source as the message rail and the roster dot, so one agent is
-          // one colour everywhere. It used to come from a second, parallel
-          // Tailwind palette keyed on the agent's index in the roster, which
-          // meant a mention changed colour whenever someone joined or left.
+        if (part.toLowerCase().startsWith('@knowledge:')) {
+          const slug = part.replace(/^@knowledge:/i, '');
+          return (
+            <span
+              key={`knowledge-${keyCounter}`}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-mono text-[11px] font-medium align-baseline shadow-2xs"
+            >
+              <BookOpen className="size-3 shrink-0" />
+              <span>{slug}</span>
+            </span>
+          );
+        }
+
+        const agentClean = part.replace(/^[@/]/, '');
+        if ((part.startsWith('@') || part.startsWith('/')) && agentNames.includes(agentClean)) {
+          const color = deriveIdentityColor(agentClean);
           return (
             <span
               key={`mention-${keyCounter}`}
-              className="font-medium rounded px-0.5"
-              style={{ color: deriveIdentityColor(part.slice(1)) }}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border/70 text-foreground font-medium text-[11.5px] align-baseline shadow-2xs"
+              style={{ color }}
             >
-              {part}
+              <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
+              <span>{part}</span>
             </span>
           );
         }

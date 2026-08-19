@@ -27,26 +27,42 @@ export interface StationData {
   isCatalogPlaceholder?: boolean;
 }
 
-const STATUS_META: Record<StationStatus, { label: string; dot: string; text: string; border: string }> = {
+/**
+ * Status is the only place colour is allowed in this surface: everything else
+ * is the neutral surface/foreground token ramp, so a single amber or emerald dot reads
+ * as a signal instead of decoration.
+ */
+const STATUS_META: Record<
+  StationStatus,
+  { label: string; dot: string; ring: string; pill: string; icon: string; streamLabel: string }
+> = {
   working: {
     label: 'Working',
-    dot: 'bg-status-warning',
-    text: 'text-status-warning',
-    border: 'border-status-warning/30',
+    dot: 'bg-amber-500 dark:bg-amber-400',
+    ring: 'ring-amber-500/25 dark:ring-amber-400/25',
+    pill: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-400',
+    icon: 'text-amber-600 dark:text-amber-400',
+    streamLabel: 'Current activity',
   },
   ready: {
     label: 'Online',
-    dot: 'bg-status-success',
-    text: 'text-status-success',
-    border: 'border-border',
+    dot: 'bg-emerald-500 dark:bg-emerald-400',
+    ring: 'ring-emerald-500/25 dark:ring-emerald-400/25',
+    pill: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-400',
+    icon: 'text-emerald-600 dark:text-emerald-400',
+    streamLabel: 'Standby',
   },
   offline: {
     label: 'Offline',
     dot: 'bg-foreground-extra-muted',
-    text: 'text-foreground-extra-muted',
-    border: 'border-border opacity-75',
+    ring: 'ring-foreground-extra-muted/20',
+    pill: 'border-border bg-surface2 text-foreground-muted',
+    icon: 'text-foreground-extra-muted',
+    streamLabel: 'Not connected',
   },
 };
+
+const MICRO_LABEL = 'text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted';
 
 function stripMarkdown(text: string): string {
   return text
@@ -72,6 +88,9 @@ interface AgentStationProps {
  * A single agent card in the Overview. Agent-first: it aggregates one agent's
  * real status, current activity, the threads it drives, and its skill loadout.
  * Only real data is shown — no synthetic latency or health metrics.
+ *
+ * Visually it is one parallel work stream: a micro-label naming the runtime, a
+ * live status, and the one line of "what is it doing right now".
  */
 export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: AgentStationProps) {
   const { agent, status, threads, activity, skillCount, tokenCount, isCatalogPlaceholder } = data;
@@ -87,55 +106,73 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
   return (
     <div
       className={cn(
-        'group relative flex flex-col rounded-xl border bg-card overflow-hidden transition-colors',
-        'hover:border-border-accent',
-        meta.border,
+        'group relative flex h-full flex-col overflow-hidden rounded-xl border shadow-sm transition-all duration-200',
+        'border-border/70 bg-surface1 hover:border-border-accent hover:shadow-md',
+        status === 'offline' && 'bg-surface1/70',
       )}
     >
-      {/* Live top edge: subtle shimmer only while working */}
-      <div className={cn('h-0.5 w-full shrink-0', isWorking ? 'thread-wip' : 'bg-transparent')} />
+      {/* Live top edge: a single hairline, amber only while the agent works */}
+      <div
+        className={cn(
+          'h-0.5 w-full shrink-0 transition-colors duration-200',
+          isWorking
+            ? 'bg-gradient-to-r from-amber-500/0 via-amber-500/70 to-amber-500/0 dark:via-amber-400/70 motion-safe:animate-pulse'
+            : 'bg-transparent',
+        )}
+      />
 
-      {/* Header — click opens the agent's focused stream */}
-      <button onClick={onOpenAgent} className="flex items-center gap-3 px-4 pt-4 pb-2 text-left w-full">
+      {/* Identity — micro-label above the name, click opens the agent's stream */}
+      <button onClick={onOpenAgent} className="flex w-full items-center gap-3 px-4 pb-3 pt-4 text-left">
         <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={36} status={agent.status} showStatus />
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-semibold text-foreground truncate block">{agent.agentName}</span>
-          {agent.agentType && (
-            <span className="text-[11px] font-semibold text-foreground-extra-muted truncate block mt-0.5">
-              {agent.agentType}
-            </span>
-          )}
+        <div className="min-w-0 flex-1">
+          <p className={cn(MICRO_LABEL, 'truncate')}>{agent.agentType || 'Agent'}</p>
+          <p className="mt-0.5 truncate text-sm font-semibold tracking-tight text-foreground">
+            {agent.agentName}
+          </p>
         </div>
-        {/* Status pill */}
-        <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-surface2/60 shrink-0', meta.text)}>
-          <span className={cn('size-1.5 rounded-full', meta.dot, isWorking && 'animate-pulse')} />
+        <span
+          className={cn(
+            'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5',
+            'text-[10px] font-medium uppercase tracking-wider',
+            meta.pill,
+          )}
+        >
+          <span className={cn('size-1.5 rounded-full ring-2', meta.dot, meta.ring, isWorking && 'motion-safe:animate-pulse')} />
           {meta.label}
         </span>
       </button>
 
-      {/* Activity ticker — the live "what is it doing right now" line */}
-      <div className="px-4 pb-3">
+      {/* Work stream — the live "what is it doing right now" line */}
+      <div className="px-4 pb-4">
         <div
           className={cn(
-            'rounded-lg px-3 py-2.5 min-h-[50px] flex items-start gap-2 text-xs border transition-colors',
+            'min-h-[78px] rounded-lg border p-3 transition-colors duration-200',
             isWorking
-              ? 'bg-status-warning/5 border-status-warning/15'
-              : 'bg-surface1/30 border-border/50',
+              ? 'border-amber-500/20 bg-amber-500/[0.06] dark:border-amber-400/20 dark:bg-amber-400/[0.08]'
+              : 'border-border/70 bg-surface2/50',
           )}
         >
-          {isWorking ? (
-            <Wrench className="size-3.5 shrink-0 mt-0.5 text-status-warning" />
-          ) : status === 'ready' ? (
-            <Radio className="size-3.5 shrink-0 mt-0.5 text-status-success" />
-          ) : (
-            <Cpu className="size-3.5 shrink-0 mt-0.5 text-foreground-extra-muted" />
-          )}
+          <div className="flex items-center gap-1.5">
+            {isWorking ? (
+              <Wrench className={cn('size-3 shrink-0', meta.icon)} />
+            ) : status === 'ready' ? (
+              <Radio className={cn('size-3 shrink-0', meta.icon)} />
+            ) : (
+              <Cpu className={cn('size-3 shrink-0', meta.icon)} />
+            )}
+            <p className={cn(MICRO_LABEL, isWorking && 'text-amber-700 dark:text-amber-400')}>{meta.streamLabel}</p>
+          </div>
           {activity ? (
-            <p className={cn('line-clamp-2 min-w-0 leading-normal', isWorking ? 'text-status-warning font-medium' : 'text-foreground-muted')}>
+            <p
+              className={cn(
+                'mt-1.5 line-clamp-2 min-w-0 text-sm leading-relaxed',
+                isWorking ? 'font-medium text-amber-800 dark:text-amber-300' : 'text-foreground-muted',
+              )}
+            >
               {stripMarkdown(activity.content).slice(0, 160) || (isWorking ? 'Working…' : 'Idle')}
             </p>
           ) : (
-            <p className="text-foreground-extra-muted">
+            <p className="mt-1.5 text-sm leading-relaxed text-foreground-extra-muted">
               {status === 'offline' ? 'Agent is offline' : status === 'ready' ? 'Standby — awaiting a task' : 'Warming up…'}
             </p>
           )}
@@ -143,24 +180,27 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
       </div>
 
       {/* Footer — threads this agent drives + skill/token summary */}
-      <div className="mt-auto border-t border-border/50 bg-surface1/40 px-4 py-3 flex flex-col gap-2.5">
-        <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-[11px] font-semibold text-foreground-extra-muted">
+      <div className="mt-auto flex flex-col gap-2.5 border-t border-border/70 px-4 py-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className={cn(MICRO_LABEL, 'flex items-center gap-1.5')}>
             <MessageSquare className="size-3" />
-            Channels · {activeThreadCount}
+            Channels · <span className="tabular-nums">{activeThreadCount}</span>
           </span>
-          <div className="flex items-center gap-2 text-[9px] font-semibold text-foreground-extra-muted">
+          <div className="flex items-center gap-2.5 text-[10px] font-medium text-foreground-muted">
             <span className="flex items-center gap-1">
               <Zap className="size-3" />
-              {skillCount} skill{skillCount === 1 ? '' : 's'}
+              <span className="tabular-nums">{skillCount}</span> skill{skillCount === 1 ? '' : 's'}
             </span>
             {tokenCount ? (
-              <span className="tabular-nums" title="Tokens this agent reported in recent messages">{fmtTokens(tokenCount)} tok</span>
+              <span className="tabular-nums" title="Tokens this agent reported in recent messages">
+                {fmtTokens(tokenCount)} tok
+              </span>
             ) : null}
           </div>
         </div>
+
         {threads.length === 0 ? (
-          <p className="text-[10px] text-foreground-extra-muted">No threads yet</p>
+          <p className="text-xs text-foreground-extra-muted">No threads yet</p>
         ) : (
           <div className="flex flex-col gap-0.5">
             {threads.slice(0, 2).map((t) => {
@@ -169,14 +209,14 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
                 <button
                   key={t.sessionId}
                   onClick={() => onOpenThread(t.sessionId)}
-                  className="flex items-center gap-1.5 px-1.5 py-1 -mx-1.5 rounded-md hover:bg-surface2/40 transition-colors text-left group/thread"
+                  className="group/thread -mx-1.5 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-surface2"
                 >
-                  <Hash className={cn('size-3 shrink-0', live ? 'text-status-warning' : 'text-foreground-extra-muted')} />
-                  <span className="text-[10px] text-foreground-muted truncate flex-1 group-hover/thread:text-foreground dark:group-hover/thread:text-primary-foreground font-medium">
+                  <Hash className={cn('size-3 shrink-0', live ? 'text-amber-600 dark:text-amber-400' : 'text-foreground-extra-muted')} />
+                  <span className="flex-1 truncate text-xs font-medium text-foreground-muted transition-colors group-hover/thread:text-foreground">
                     {t.title || 'Untitled'}
                   </span>
                   {t.lastEventAt && (
-                    <span className="text-[9px] text-foreground-extra-muted shrink-0">
+                    <span className="shrink-0 text-[10px] tabular-nums text-foreground-extra-muted">
                       {timeAgo(new Date(t.lastEventAt).toISOString())}
                     </span>
                   )}
@@ -184,7 +224,10 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
               );
             })}
             {threads.length > 2 && (
-              <button onClick={onOpenAgent} className="text-[9px] text-foreground-extra-muted hover:text-foreground-muted text-left px-1.5 pt-0.5 font-medium transition-colors">
+              <button
+                onClick={onOpenAgent}
+                className="px-1.5 pt-0.5 text-left text-[10px] font-medium text-foreground-extra-muted transition-colors hover:text-foreground-muted"
+              >
                 + {threads.length - 2} more thread{threads.length - 2 === 1 ? '' : 's'}
               </button>
             )}
@@ -194,16 +237,16 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
         {/* Quick actions */}
         <div
           className={cn(
-            'grid gap-1.5 border-t border-border/60/40 pt-2.5 mt-0.5',
+            'mt-0.5 grid gap-2 border-t border-border/70 pt-2.5',
             isCustomPlaceholder ? 'grid-cols-1' : 'grid-cols-2',
           )}
         >
           {!isCustomPlaceholder && (
             <button
               onClick={onOpenAgent}
-              className="h-7 rounded-md border border-border bg-surface2 hover:bg-surface3 text-[10px] font-semibold text-foreground transition-colors flex items-center justify-center gap-1 truncate px-1 cursor-pointer"
+              className="flex h-8 cursor-pointer items-center justify-center gap-1.5 truncate rounded-lg border border-border bg-surface1 px-2 text-xs font-medium text-foreground transition-colors hover:bg-surface2"
             >
-              <MessageSquare className="size-3 shrink-0 text-foreground-muted" />
+              <MessageSquare className="size-3 shrink-0 text-foreground-extra-muted" />
               <span className="truncate">Open</span>
             </button>
           )}
@@ -214,10 +257,10 @@ export function AgentStation({ data, onOpenAgent, onOpenThread, onPairAgent }: A
             }}
             disabled={status !== 'offline'}
             className={cn(
-              'h-7 rounded-md border text-[10px] font-semibold transition-colors flex items-center justify-center gap-1 truncate px-1',
+              'flex h-8 items-center justify-center gap-1.5 truncate rounded-lg border px-2 text-xs font-medium transition-colors',
               status === 'offline'
-                ? 'bg-primary text-primary-foreground border-primary hover:bg-primary/90 cursor-pointer'
-                : 'bg-transparent text-status-success border-status-success/30 cursor-default',
+                ? 'cursor-pointer border-primary bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'cursor-default border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/5 dark:text-emerald-400',
             )}
             title={
               status !== 'offline'
