@@ -184,8 +184,8 @@ export function MetricCard({
     <div
       className={cn(
         'relative flex flex-col justify-between p-3.5 rounded-2xl',
-        'bg-surface1/80 dark:bg-surface1/50 border border-border/70 shadow-2xs backdrop-blur-md',
-        'hover:border-border-accent/80 transition-all duration-150',
+        'bg-surface1/70 dark:bg-surface1/40 shadow-2xs backdrop-blur-md',
+        'border border-border/30 hover:border-border/60 transition-all duration-150',
         className
       )}
     >
@@ -193,7 +193,7 @@ export function MetricCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {icon && (
-            <span className="size-5 rounded-md bg-surface2 border border-border/40 flex items-center justify-center text-foreground-muted shrink-0">
+            <span className="size-5 rounded-md bg-surface2 flex items-center justify-center text-foreground-muted shrink-0">
               {icon}
             </span>
           )}

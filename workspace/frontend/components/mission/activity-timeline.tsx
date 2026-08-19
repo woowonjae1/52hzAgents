@@ -75,12 +75,12 @@ export function ActivityTimeline({
   return (
     <aside
       className={cn(
-        'flex flex-col h-full bg-surface1/60 backdrop-blur-md border-l border-border/70 overflow-hidden',
+        'flex flex-col h-full bg-surface1/40 backdrop-blur-md border-l border-border/30 overflow-hidden',
         className
       )}
     >
-      {/* Header */}
-      <div className="p-3 border-b border-border/70 space-y-2 shrink-0">
+      {/* Header (No harsh bottom border) */}
+      <div className="p-3.5 space-y-2.5 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
@@ -94,15 +94,15 @@ export function ActivityTimeline({
         </div>
 
         {/* Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-[10.5px] font-medium no-scrollbar pt-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto text-[10.5px] font-medium no-scrollbar">
           <button
             type="button"
             onClick={() => setSelectedType('all')}
             className={cn(
-              'px-2 py-0.5 rounded-lg border transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'all'
-                ? 'bg-primary text-primary-foreground border-transparent'
-                : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
             All
@@ -111,10 +111,10 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('issues')}
             className={cn(
-              'px-2 py-0.5 rounded-lg border transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'issues'
-                ? 'bg-rose-600 text-white border-transparent'
-                : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
+                ? 'bg-rose-600 text-white'
+                : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
             Issues & Approvals
@@ -123,10 +123,10 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('thinking')}
             className={cn(
-              'px-2 py-0.5 rounded-lg border transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'thinking'
-                ? 'bg-violet-600 text-white border-transparent'
-                : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
+                ? 'bg-violet-600 text-white'
+                : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
             Reasoning
@@ -135,10 +135,10 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('tools')}
             className={cn(
-              'px-2 py-0.5 rounded-lg border transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'tools'
-                ? 'bg-emerald-600 text-white border-transparent'
-                : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
             Tools
@@ -147,16 +147,16 @@ export function ActivityTimeline({
       </div>
 
       {/* Timeline Stream */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-4">
         {loading && events.length === 0 ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-14 rounded-xl bg-surface2/60 animate-pulse border border-border/40" />
+              <div key={i} className="h-14 rounded-xl bg-surface2/40 animate-pulse" />
             ))}
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-1">
-            <MessageSquare className="size-5 opacity-40" />
+            <MessageSquare className="size-5 opacity-30" />
             <span className="text-xs">No recent activity</span>
           </div>
         ) : (
@@ -178,12 +178,12 @@ export function ActivityTimeline({
                       type="button"
                       onClick={() => onOpenThread(ev.channelId)}
                       className={cn(
-                        'w-full text-left flex items-start gap-2 p-2.5 rounded-xl border transition-all cursor-pointer shadow-2xs group',
+                        'w-full text-left flex items-start gap-2 p-2.5 rounded-xl transition-all cursor-pointer shadow-2xs group',
                         isError
-                          ? 'bg-rose-500/[0.04] border-rose-500/30 hover:border-rose-500/50'
+                          ? 'bg-rose-500/[0.06] border border-rose-500/30'
                           : isApproval
-                          ? 'bg-amber-500/[0.04] border-amber-500/30 hover:border-amber-500/50'
-                          : 'bg-surface1 hover:bg-surface2 border-border/60 hover:border-border-accent/80'
+                          ? 'bg-amber-500/[0.06] border border-amber-500/30'
+                          : 'bg-surface1/60 hover:bg-surface2/80 border border-border/20 hover:border-border/50'
                       )}
                     >
                       <span className="mt-0.5 shrink-0">

@@ -23,9 +23,6 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  Terminal,
-  Copy,
-  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
@@ -38,7 +35,6 @@ export function MissionControl() {
     agents,
     setAgents,
     sessions,
-    knowledge = [],
     activeSessionIds,
     workingAgentNames,
     setCurrentSessionId,
@@ -49,7 +45,6 @@ export function MissionControl() {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
   const [showIntegrations, setShowIntegrations] = useState(true);
-  const [copiedAgn, setCopiedAgn] = useState(false);
 
   // View state: 'grid' | 'swimlane'
   const [viewTab, setViewTab] = useState<'grid' | 'swimlane'>('grid');
@@ -221,8 +216,6 @@ export function MissionControl() {
     }));
   }, [agents, allCatalogAgents]);
 
-  const allStations = useMemo(() => [...myStations, ...integrationStations], [myStations, integrationStations]);
-
   // Stalled items for ActionRequiredBanner
   const stalledItems: PendingActionItem[] = useMemo(() => {
     return myStations
@@ -353,16 +346,16 @@ export function MissionControl() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header Strip with Truthful Data & Metric Cards */}
-      <div className="shrink-0 border-b border-border/70 bg-surface1/70 backdrop-blur-md px-6 py-4 space-y-3.5">
+      {/* Header Strip with Clean Whitespace (No Harsh Border Bottom) */}
+      <div className="shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-surface2 shadow-2xs">
-              <Layers className="size-4 text-primary" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface2 text-primary shadow-2xs">
+              <Layers className="size-4" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-2">
-                <span>Mission Control</span>
+              <h1 className="text-sm font-bold tracking-tight text-foreground">
+                Mission Control
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Real-time agent orchestration, telemetry, and parallel execution
@@ -371,14 +364,14 @@ export function MissionControl() {
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-surface2 border border-border/60 text-xs shadow-2xs">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-surface2 text-xs shadow-2xs">
             <button
               type="button"
               onClick={() => setViewTab('grid')}
               className={cn(
                 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer',
                 viewTab === 'grid'
-                  ? 'bg-surface1 text-foreground shadow-xs border border-border/70'
+                  ? 'bg-surface1 text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -391,7 +384,7 @@ export function MissionControl() {
               className={cn(
                 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer',
                 viewTab === 'swimlane'
-                  ? 'bg-surface1 text-foreground shadow-xs border border-border/70'
+                  ? 'bg-surface1 text-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -401,7 +394,7 @@ export function MissionControl() {
           </div>
         </div>
 
-        {/* 4 Clean Metric Cards (No Fake Charts on 0) */}
+        {/* 4 Clean Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Action Required / Blocked */}
           <div
@@ -416,7 +409,7 @@ export function MissionControl() {
               badge={blockedCount > 0 ? { text: 'Attention', trend: 'down' } : undefined}
               className={cn(
                 filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
-                blockedCount > 0 && 'border-amber-500/40 bg-amber-500/[0.03]'
+                blockedCount > 0 && 'bg-amber-500/[0.04]'
               )}
             />
           </div>
@@ -503,7 +496,7 @@ export function MissionControl() {
 
           {/* Configured but Offline Guidance Banner */}
           {isAllOffline && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface1/80 border border-border/70 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface2/50 shadow-2xs">
               <div className="space-y-0.5">
                 <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-muted-foreground/50" />
@@ -530,7 +523,7 @@ export function MissionControl() {
 
           {/* View Tab 1: Grid Cards */}
           {viewTab === 'grid' && (
-            <div className="space-y-6">
+            <div className="space-y-7">
               {/* Section 1: My Configured Agents */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -550,7 +543,7 @@ export function MissionControl() {
                 </div>
 
                 {filteredMyStations.length === 0 ? (
-                  <div className="p-8 text-center border border-dashed border-border/70 rounded-2xl bg-surface1/30 text-xs text-muted-foreground">
+                  <div className="p-8 text-center rounded-2xl bg-surface1/40 text-xs text-muted-foreground">
                     No matching agents found for filter: {filterTab}
                   </div>
                 ) : (
@@ -575,9 +568,9 @@ export function MissionControl() {
                 )}
               </div>
 
-              {/* Section 2: Available Integrations (Collapsible) */}
+              {/* Section 2: Available Integrations (Collapsible without harsh top line) */}
               {integrationStations.length > 0 && filterTab === 'all' && (
-                <div className="space-y-3 pt-2 border-t border-border/40">
+                <div className="space-y-3 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowIntegrations((prev) => !prev)}
@@ -615,7 +608,7 @@ export function MissionControl() {
           )}
         </div>
 
-        {/* Right Filterable Activity Timeline */}
+        {/* Right Activity Timeline (Softer left boundary) */}
         <ActivityTimeline
           events={activityFeed}
           agents={agents.map((a) => a.agentName)}

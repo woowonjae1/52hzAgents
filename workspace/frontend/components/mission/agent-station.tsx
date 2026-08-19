@@ -6,18 +6,12 @@ import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import {
   MessageSquare,
-  Zap,
-  Radio,
   Wrench,
-  ChevronRight,
   Plug,
   ShieldAlert,
   Clock,
   Check,
   X,
-  Terminal,
-  Activity,
-  Sparkles,
 } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { toast } from 'sonner';
@@ -108,7 +102,7 @@ export function AgentStation({
         label: 'Action Required',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
-        badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-medium',
+        badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 font-medium',
       };
     }
     if (isStalled) {
@@ -117,7 +111,7 @@ export function AgentStation({
         label: `Stalled · ${sec}s`,
         dot: 'bg-rose-500',
         ring: 'ring-rose-500/25',
-        badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25 font-medium',
+        badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium',
       };
     }
     if (isHeartbeatTimeout) {
@@ -125,7 +119,7 @@ export function AgentStation({
         label: 'Heartbeat Timeout',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
-        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium',
+        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
       };
     }
     if (isWorking) {
@@ -133,7 +127,7 @@ export function AgentStation({
         label: 'Working',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
-        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium',
+        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
       };
     }
     if (status === 'ready') {
@@ -141,7 +135,7 @@ export function AgentStation({
         label: 'Online',
         dot: 'bg-emerald-500',
         ring: 'ring-emerald-500/25',
-        badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium',
+        badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium',
       };
     }
     if (isCatalogPlaceholder) {
@@ -149,14 +143,14 @@ export function AgentStation({
         label: 'Available',
         dot: 'bg-muted-foreground/40',
         ring: 'ring-muted-foreground/10',
-        badge: 'bg-surface2/80 text-muted-foreground border-border/40 font-medium',
+        badge: 'bg-surface2/60 text-muted-foreground font-medium',
       };
     }
     return {
       label: 'Offline',
       dot: 'bg-muted-foreground/50',
       ring: 'ring-muted-foreground/10',
-      badge: 'bg-surface2 text-muted-foreground border-border/50 font-medium',
+      badge: 'bg-surface2/80 text-muted-foreground font-medium',
     };
   }, [isBlocked, isStalled, isHeartbeatTimeout, isWorking, status, isCatalogPlaceholder, stalledMs]);
 
@@ -227,13 +221,13 @@ export function AgentStation({
   return (
     <div
       className={cn(
-        'group relative flex flex-col justify-between rounded-2xl border p-3.5',
-        'bg-surface1/80 dark:bg-surface1/50 backdrop-blur-md shadow-2xs transition-all duration-150',
-        'hover:border-border-accent/80 hover:shadow-xs',
-        isBlocked && 'border-amber-500/50 ring-2 ring-amber-500/20 bg-amber-500/[0.02]',
-        isStalled && 'border-rose-500/50 ring-2 ring-rose-500/20 bg-rose-500/[0.02]',
-        status === 'offline' && !isCatalogPlaceholder && 'border-border/60 opacity-85',
-        isCatalogPlaceholder && 'border-border/40 bg-surface1/40'
+        'group relative flex flex-col justify-between rounded-2xl p-3.5',
+        'bg-surface1/70 dark:bg-surface1/40 backdrop-blur-md shadow-2xs transition-all duration-150',
+        'border border-border/30 hover:border-border/60 hover:shadow-xs',
+        isBlocked && 'ring-2 ring-amber-500/20 bg-amber-500/[0.02]',
+        isStalled && 'ring-2 ring-rose-500/20 bg-rose-500/[0.02]',
+        status === 'offline' && !isCatalogPlaceholder && 'opacity-85',
+        isCatalogPlaceholder && 'bg-surface1/30'
       )}
     >
       {/* Top Header */}
@@ -256,7 +250,7 @@ export function AgentStation({
                 {agent.agentName}
               </span>
               {agent.role === 'master' && (
-                <span className="text-[9px] px-1 rounded bg-surface3 border border-border-accent text-foreground font-mono font-medium">
+                <span className="text-[9px] px-1 rounded bg-surface3 text-foreground font-mono font-medium">
                   leader
                 </span>
               )}
@@ -270,7 +264,7 @@ export function AgentStation({
         {/* Unified Status Badge */}
         <span
           className={cn(
-            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border shrink-0',
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] shrink-0',
             statusBadge.badge
           )}
         >
@@ -288,7 +282,7 @@ export function AgentStation({
 
       {/* Inline Blocked Approval */}
       {isBlocked && pendingApproval ? (
-        <div className="my-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
+        <div className="my-2 p-2 rounded-xl bg-amber-500/10 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
             <span className="flex items-center gap-1">
               <ShieldAlert className="size-3" />
@@ -296,7 +290,7 @@ export function AgentStation({
             </span>
           </div>
           {pendingApproval.command && (
-            <div className="font-mono text-[10.5px] text-foreground font-medium truncate p-1 bg-surface1 rounded border border-border/40">
+            <div className="font-mono text-[10.5px] text-foreground font-medium truncate p-1 bg-surface1 rounded">
               $ {pendingApproval.command}
             </div>
           )}
@@ -305,7 +299,7 @@ export function AgentStation({
               type="button"
               onClick={handleDeny}
               disabled={busy}
-              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 border border-rose-500/20 cursor-pointer"
+              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 cursor-pointer"
             >
               <X className="size-2.5" />
               <span>Deny</span>
@@ -322,24 +316,24 @@ export function AgentStation({
           </div>
         </div>
       ) : hasTelemetry ? (
-        /* Connected Agent with Real Telemetry */
+        /* Connected Agent with Seamless Telemetry Grid (No inner vertical lines) */
         <div className="my-2 space-y-1.5">
-          <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface2/60 border border-border/40 text-[10.5px]">
-            <div className="flex flex-col min-w-0 px-1">
+          <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-[10.5px]">
+            <div className="flex flex-col min-w-0 px-1 text-center">
               <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Tokens</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {fmtTokens(tokenCount)}
               </span>
             </div>
 
-            <div className="flex flex-col min-w-0 px-1 border-l border-border/40">
+            <div className="flex flex-col min-w-0 px-1 text-center">
               <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Threads</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {threads.length}
               </span>
             </div>
 
-            <div className="flex flex-col min-w-0 px-1 border-l border-border/40">
+            <div className="flex flex-col min-w-0 px-1 text-center">
               <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Skills</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {skillCount}
@@ -374,19 +368,19 @@ export function AgentStation({
           </div>
         </div>
       ) : (
-        /* Unconnected / Template Agent: Show Capability Description instead of empty 0 boxes */
+        /* Unconnected / Template Agent: Clean Capability Description */
         <div className="my-2 px-1 py-1 text-[11px] text-muted-foreground leading-relaxed line-clamp-2 min-h-[38px]">
           {agent.description || 'Configurable ACP/MCP agent workspace adapter with tool support.'}
         </div>
       )}
 
-      {/* Footer Controls */}
-      <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
+      {/* Footer Controls (Seamless without top dividing line) */}
+      <div className="flex items-center gap-1.5 pt-2">
         {!isCatalogPlaceholder && (
           <button
             type="button"
             onClick={onOpenAgent}
-            className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2 hover:bg-surface3 border border-border/60 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-2xs"
           >
             <MessageSquare className="size-3 text-muted-foreground" />
             <span>Chat</span>
@@ -403,8 +397,8 @@ export function AgentStation({
           className={cn(
             'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all shadow-2xs',
             status === 'offline'
-              ? 'bg-surface2 hover:bg-surface3 text-foreground border border-border/80 cursor-pointer'
-              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
+              ? 'bg-surface2/80 hover:bg-surface3 text-foreground cursor-pointer'
+              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
           )}
         >
           {status !== 'offline' ? (
