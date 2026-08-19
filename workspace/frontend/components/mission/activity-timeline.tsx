@@ -9,12 +9,8 @@ import {
   ShieldAlert,
   AlertCircle,
   MessageSquare,
-  Filter,
-  CheckCircle2,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react';
-import type { ONMEvent } from '@/lib/types';
 
 export interface TimelineEventItem {
   id: string;
@@ -41,24 +37,17 @@ export function ActivityTimeline({
   loading = false,
   className,
 }: ActivityTimelineProps) {
-  const [selectedAgent, setSelectedAgent] = React.useState<string>('all');
   const [selectedType, setSelectedType] = React.useState<string>('all');
 
-  // Filter events
   const filteredEvents = React.useMemo(() => {
     return events.filter((ev) => {
-      if (selectedAgent !== 'all' && ev.sender.toLowerCase() !== selectedAgent.toLowerCase()) {
-        return false;
-      }
-      if (selectedType === 'error' && ev.type !== 'error' && ev.type !== 'approval') return false;
+      if (selectedType === 'issues' && ev.type !== 'error' && ev.type !== 'approval') return false;
       if (selectedType === 'thinking' && ev.type !== 'thinking') return false;
-      if (selectedType === 'tool' && ev.type !== 'command' && ev.type !== 'success') return false;
-      if (selectedType === 'chat' && ev.type !== 'info') return false;
+      if (selectedType === 'tools' && ev.type !== 'command' && ev.type !== 'success') return false;
       return true;
     });
-  }, [events, selectedAgent, selectedType]);
+  }, [events, selectedType]);
 
-  // Group events by time bucket (Just now < 1m, Recent < 10m, Earlier)
   const grouped = React.useMemo(() => {
     const now = Date.now();
     const justNow: TimelineEventItem[] = [];
@@ -77,9 +66,9 @@ export function ActivityTimeline({
     });
 
     return [
-      { label: '刚刚 (Just now)', items: justNow },
-      { label: '10分钟内 (Recent)', items: recent },
-      { label: '更早活动 (Earlier)', items: earlier },
+      { label: 'Just now', items: justNow },
+      { label: 'Last 10 minutes', items: recent },
+      { label: 'Earlier today', items: earlier },
     ].filter((g) => g.items.length > 0);
   }, [filteredEvents]);
 
@@ -94,13 +83,13 @@ export function ActivityTimeline({
       <div className="p-3 border-b border-border/70 space-y-2 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
+            <span className="size-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20" />
             <span className="text-xs font-semibold tracking-tight text-foreground">
-              实时协同流 (Activity Stream)
+              Activity Stream
             </span>
           </div>
           <span className="text-[10px] font-mono text-muted-foreground tabular-nums">
-            {filteredEvents.length} / {events.length} 条
+            {filteredEvents.length} events
           </span>
         </div>
 
@@ -116,19 +105,19 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
             )}
           >
-            全部
+            All
           </button>
           <button
             type="button"
-            onClick={() => setSelectedType('error')}
+            onClick={() => setSelectedType('issues')}
             className={cn(
               'px-2 py-0.5 rounded-lg border transition-colors cursor-pointer shrink-0',
-              selectedType === 'error'
+              selectedType === 'issues'
                 ? 'bg-rose-600 text-white border-transparent'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
             )}
           >
-            ⚠️ 异常/审批
+            Issues & Approvals
           </button>
           <button
             type="button"
@@ -140,19 +129,19 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
             )}
           >
-            🧠 推理
+            Reasoning
           </button>
           <button
             type="button"
-            onClick={() => setSelectedType('tool')}
+            onClick={() => setSelectedType('tools')}
             className={cn(
               'px-2 py-0.5 rounded-lg border transition-colors cursor-pointer shrink-0',
-              selectedType === 'tool'
+              selectedType === 'tools'
                 ? 'bg-emerald-600 text-white border-transparent'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground border-border/50'
             )}
           >
-            ⚡ 执行
+            Tools
           </button>
         </div>
       </div>
@@ -167,13 +156,13 @@ export function ActivityTimeline({
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-1">
-            <MessageSquare className="size-5 opacity-50" />
-            <span className="text-xs">没有匹配的活动记录</span>
+            <MessageSquare className="size-5 opacity-40" />
+            <span className="text-xs">No recent activity</span>
           </div>
         ) : (
           grouped.map((group, gIdx) => (
             <div key={gIdx} className="space-y-1.5">
-              <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground px-1">
+              <div className="text-[10px] font-mono font-medium uppercase tracking-wider text-muted-foreground px-1">
                 {group.label}
               </div>
 
@@ -194,10 +183,9 @@ export function ActivityTimeline({
                           ? 'bg-rose-500/[0.04] border-rose-500/30 hover:border-rose-500/50'
                           : isApproval
                           ? 'bg-amber-500/[0.04] border-amber-500/30 hover:border-amber-500/50'
-                          : 'bg-surface1 hover:bg-surface2 border-border/60 hover:border-border-accent'
+                          : 'bg-surface1 hover:bg-surface2 border-border/60 hover:border-border-accent/80'
                       )}
                     >
-                      {/* Status Icon */}
                       <span className="mt-0.5 shrink-0">
                         {isError ? (
                           <AlertCircle className="size-3.5 text-rose-500" />
@@ -210,7 +198,6 @@ export function ActivityTimeline({
                         )}
                       </span>
 
-                      {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-1 text-[10.5px]">
                           <span className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">

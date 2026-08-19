@@ -20,9 +20,12 @@ import {
   LayoutGrid,
   Clock,
   ShieldAlert,
-  Radio,
   Layers,
-  Sparkles,
+  ChevronDown,
+  ChevronUp,
+  Terminal,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
@@ -45,6 +48,8 @@ export function MissionControl() {
 
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [customModalOpen, setCustomModalOpen] = useState(false);
+  const [showIntegrations, setShowIntegrations] = useState(true);
+  const [copiedAgn, setCopiedAgn] = useState(false);
 
   // View state: 'grid' | 'swimlane'
   const [viewTab, setViewTab] = useState<'grid' | 'swimlane'>('grid');
@@ -76,7 +81,6 @@ export function MissionControl() {
           const msgs = (res.events || []).map(eventToMessage);
           if (!msgs.length) return;
 
-          // Check for pending approval in recent messages
           const respondedApprovalIds = new Set(
             msgs.map((m) => m.metadata?.tool_approval_response?.approval_id).filter(Boolean)
           );
@@ -134,100 +138,105 @@ export function MissionControl() {
     return () => clearInterval(id);
   }, [fetchRecentData]);
 
-  // Build station cards & detect stalled agents
-  const stations: StationData[] = useMemo(() => {
-    const liveNames = new Set(agents.map((a) => a.agentName.toLowerCase()));
-    const placeholderNames = new Set<string>();
-    const missingCandidates = allCatalogAgents.filter((a) => {
-      const match = liveNames.has(a.agentName.toLowerCase());
-      if (!match) placeholderNames.add(a.agentName.toLowerCase());
-      return !match;
-    });
-
+  // Section 1: User's Configured Agents
+  const myStations: StationData[] = useMemo(() => {
     const activeThreads = sessions.filter((s) => s.status !== 'archived');
-    const displayAgents = [...agents, ...missingCandidates];
     const now = Date.now();
 
-    return displayAgents
-      .map((agent): StationData => {
-        const threads = activeThreads
-          .filter((s) => s.participants.includes(agent.agentName) || s.master === agent.agentName)
-          .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
+    return agents.map((agent): StationData => {
+      const threads = activeThreads
+        .filter((s) => s.participants.includes(agent.agentName) || s.master === agent.agentName)
+        .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
 
-        const isWorking = workingAgentNames.has(agent.agentName);
-        const workingThread = isWorking ? threads.find((t) => activeSessionIds.has(t.sessionId)) || null : null;
-        const focusThread = workingThread || threads[0] || null;
-        const activity = focusThread ? lastMessageBySession[focusThread.sessionId] || null : null;
+      const isWorking = workingAgentNames.has(agent.agentName);
+      const workingThread = isWorking ? threads.find((t) => activeSessionIds.has(t.sessionId)) || null : null;
+      const focusThread = workingThread || threads[0] || null;
+      const activity = focusThread ? lastMessageBySession[focusThread.sessionId] || null : null;
 
-        // Check if there is a pending approval for this agent
-        const pendingApp = pendingApprovals.find((p) => p.agentName.toLowerCase() === agent.agentName.toLowerCase());
+      const pendingApp = pendingApprovals.find((p) => p.agentName.toLowerCase() === agent.agentName.toLowerCase());
 
-        let stationStatus: StationStatus;
-        let stalledMs: number | undefined;
+      let stationStatus: StationStatus;
+      let stalledMs: number | undefined;
 
-        if (agent.status !== 'online') {
-          stationStatus = 'offline';
-        } else if (pendingApp) {
-          stationStatus = 'blocked';
-        } else if (isWorking) {
-          const lastActivityTime = activity?.timestamp || (focusThread?.lastEventAt ? focusThread.lastEventAt : now);
-          const elapsed = now - lastActivityTime;
-          // If working for > 35s with no activity, mark as stalled
-          if (elapsed > 35000) {
-            stationStatus = 'stalled';
-            stalledMs = elapsed;
-          } else {
-            stationStatus = 'working';
-          }
+      if (agent.status !== 'online') {
+        stationStatus = 'offline';
+      } else if (pendingApp) {
+        stationStatus = 'blocked';
+      } else if (isWorking) {
+        const lastActivityTime = activity?.timestamp || (focusThread?.lastEventAt ? focusThread.lastEventAt : now);
+        const elapsed = now - lastActivityTime;
+        if (elapsed > 35000) {
+          stationStatus = 'stalled';
+          stalledMs = elapsed;
         } else {
-          stationStatus = 'ready';
+          stationStatus = 'working';
         }
+      } else {
+        stationStatus = 'ready';
+      }
 
-        const installed = (agent.enabledSkills?.installed as string[] | undefined) || [];
+      const installed = (agent.enabledSkills?.installed as string[] | undefined) || [];
 
-        return {
-          agent,
-          status: stationStatus,
-          threads,
-          focusThread,
-          activity,
-          skillCount: installed.length,
-          tokenCount: agentTokens[agent.agentName] || 0,
-          isCatalogPlaceholder: placeholderNames.has(agent.agentName.toLowerCase()),
-          stalledMs,
-          pendingApproval: pendingApp
-            ? {
-                approvalId: pendingApp.approvalId || '',
-                tool: pendingApp.toolName || 'command',
-                command: pendingApp.command,
-                path: pendingApp.path,
-              }
-            : undefined,
-          lastHeartbeatAt: agent.lastHeartbeatAt,
-        };
-      })
-      .sort((a, b) => {
-        // Priority order: blocked (0) -> stalled (1) -> working (2) -> ready (3) -> offline (4)
-        const rank = { blocked: 0, stalled: 1, working: 2, ready: 3, offline: 4 } as const;
-        if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
-        return a.agent.agentName.localeCompare(b.agent.agentName);
-      });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, allCatalogAgents, pendingApprovals]);
+      return {
+        agent,
+        status: stationStatus,
+        threads,
+        focusThread,
+        activity,
+        skillCount: installed.length,
+        tokenCount: agentTokens[agent.agentName] || 0,
+        isCatalogPlaceholder: false,
+        stalledMs,
+        pendingApproval: pendingApp
+          ? {
+              approvalId: pendingApp.approvalId || '',
+              tool: pendingApp.toolName || 'command',
+              command: pendingApp.command,
+              path: pendingApp.path,
+            }
+          : undefined,
+        lastHeartbeatAt: agent.lastHeartbeatAt,
+      };
+    }).sort((a, b) => {
+      const rank = { blocked: 0, stalled: 1, working: 2, ready: 3, offline: 4 } as const;
+      if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+      return a.agent.agentName.localeCompare(b.agent.agentName);
+    });
+  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
+
+  // Section 2: Available Catalog Presets (Not yet configured)
+  const integrationStations: StationData[] = useMemo(() => {
+    const liveNames = new Set(agents.map((a) => a.agentName.toLowerCase()));
+    const unconfigured = allCatalogAgents.filter((a) => !liveNames.has(a.agentName.toLowerCase()));
+
+    return unconfigured.map((agent): StationData => ({
+      agent,
+      status: 'offline',
+      threads: [],
+      focusThread: null,
+      activity: null,
+      skillCount: 0,
+      tokenCount: 0,
+      isCatalogPlaceholder: true,
+    }));
+  }, [agents, allCatalogAgents]);
+
+  const allStations = useMemo(() => [...myStations, ...integrationStations], [myStations, integrationStations]);
 
   // Stalled items for ActionRequiredBanner
   const stalledItems: PendingActionItem[] = useMemo(() => {
-    return stations
+    return myStations
       .filter((s) => s.status === 'stalled')
       .map((s) => ({
         id: `stall-${s.agent.agentName}`,
         type: 'stalled',
         agentName: s.agent.agentName,
         channelId: s.focusThread?.sessionId || '',
-        channelTitle: s.focusThread?.title || '新频道',
+        channelTitle: s.focusThread?.title || 'thread',
         stalledMs: s.stalledMs || 35000,
         timestamp: new Date(),
       }));
-  }, [stations]);
+  }, [myStations]);
 
   const allActionRequired = useMemo(() => {
     return [...pendingApprovals, ...stalledItems];
@@ -235,7 +244,7 @@ export function MissionControl() {
 
   // Swimlane events mapping
   const swimlaneEvents: SwimlaneEvent[] = useMemo(() => {
-    return stations
+    return myStations
       .filter((s) => s.status !== 'offline')
       .map((s): SwimlaneEvent => {
         const isBlock = s.status === 'blocked';
@@ -246,27 +255,27 @@ export function MissionControl() {
           id: `swim-${s.agent.agentName}`,
           agentName: s.agent.agentName,
           type: isBlock ? 'blocked' : isStall ? 'stalled' : isWork ? 'tool' : 'message',
-          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || '执行任务中',
+          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || 'Task running',
           startOffsetSec: isWork || isBlock ? 60 : 15,
           durationSec: isWork || isBlock ? 45 : 15,
-          channelTitle: s.focusThread?.title || '新频道',
+          channelTitle: s.focusThread?.title || 'channel',
           sessionId: s.focusThread?.sessionId || '',
           status: isBlock ? 'blocked' : isStall ? 'error' : isWork ? 'running' : 'success',
         };
       });
-  }, [stations]);
+  }, [myStations]);
 
   // Filtered station cards
-  const filteredStations = useMemo(() => {
-    if (filterTab === 'working') return stations.filter((s) => s.status === 'working' || s.status === 'stalled');
-    if (filterTab === 'blocked') return stations.filter((s) => s.status === 'blocked' || s.status === 'stalled');
-    if (filterTab === 'online') return stations.filter((s) => s.status !== 'offline');
-    return stations;
-  }, [stations, filterTab]);
+  const filteredMyStations = useMemo(() => {
+    if (filterTab === 'working') return myStations.filter((s) => s.status === 'working' || s.status === 'stalled');
+    if (filterTab === 'blocked') return myStations.filter((s) => s.status === 'blocked' || s.status === 'stalled');
+    if (filterTab === 'online') return myStations.filter((s) => s.status !== 'offline');
+    return myStations;
+  }, [myStations, filterTab]);
 
   const onlineCount = agents.filter((a) => a.status === 'online').length;
-  const workingCount = stations.filter((s) => s.status === 'working').length;
-  const blockedCount = stations.filter((s) => s.status === 'blocked' || s.status === 'stalled').length;
+  const workingCount = myStations.filter((s) => s.status === 'working').length;
+  const blockedCount = myStations.filter((s) => s.status === 'blocked' || s.status === 'stalled').length;
   const totalTokens = useMemo(() => Object.values(agentTokens).reduce((sum, v) => sum + v, 0), [agentTokens]);
   const fmtTokens = (n: number) => (n > 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
 
@@ -288,13 +297,13 @@ export function MissionControl() {
       return;
     }
     try {
-      toast.info(`正在连接 ${agentName}...`);
+      toast.info(`Connecting ${agentName}...`);
       await workspaceApi.launchAgent(agentName);
-      toast.success(`${agentName} 已成功上线`);
+      toast.success(`${agentName} is now online`);
       const updated = await workspaceApi.listAgents();
       setAgents(updated);
     } catch {
-      toast.error(`无法连接 ${agentName}，请检查服务配置`);
+      toast.error(`Unable to connect ${agentName}`);
     }
   };
 
@@ -339,12 +348,12 @@ export function MissionControl() {
     return () => { cancelled = true; clearInterval(id); };
   }, [sessions]);
 
-  const rosterLoading = catalogLoading && stations.length === 0;
-  const isAllOffline = onlineCount === 0 && !catalogLoading;
+  const hasZeroAgents = agents.length === 0 && !catalogLoading;
+  const isAllOffline = agents.length > 0 && onlineCount === 0;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header Strip with Interactive Analytics Metric Cards */}
+      {/* Header Strip with Truthful Data & Metric Cards */}
       <div className="shrink-0 border-b border-border/70 bg-surface1/70 backdrop-blur-md px-6 py-4 space-y-3.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -354,17 +363,14 @@ export function MissionControl() {
             <div className="min-w-0">
               <h1 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-2">
                 <span>Mission Control</span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-mono font-medium">
-                  指挥台
-                </span>
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                实时调度中枢 · 异常与审批拦截 · 并行时序追踪
+                Real-time agent orchestration, telemetry, and parallel execution
               </p>
             </div>
           </div>
 
-          {/* View Tab Switcher (Cards vs Swimlane) */}
+          {/* View Mode Switcher */}
           <div className="flex items-center gap-1 p-1 rounded-xl bg-surface2 border border-border/60 text-xs shadow-2xs">
             <button
               type="button"
@@ -377,7 +383,7 @@ export function MissionControl() {
               )}
             >
               <LayoutGrid className="size-3.5" />
-              <span>卡片席位</span>
+              <span>Cards</span>
             </button>
             <button
               type="button"
@@ -390,12 +396,12 @@ export function MissionControl() {
               )}
             >
               <Clock className="size-3.5" />
-              <span>并行泳道</span>
+              <span>Swimlane</span>
             </button>
           </div>
         </div>
 
-        {/* 4 Clickable Metric Drilldown Cards */}
+        {/* 4 Clean Metric Cards (No Fake Charts on 0) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Card 1: Action Required / Blocked */}
           <div
@@ -403,11 +409,11 @@ export function MissionControl() {
             className="cursor-pointer"
           >
             <MetricCard
-              title="待处理与停滞 (Attention)"
+              title="Action Required"
               value={blockedCount}
-              subtitle={blockedCount > 0 ? '⚠️ 需要立即人工处理' : '运行正常，无阻塞'}
+              subtitle={blockedCount > 0 ? 'Requires immediate action' : 'No blocked tasks'}
               icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
-              badge={{ text: blockedCount > 0 ? 'Action Req' : 'Clear', trend: blockedCount > 0 ? 'down' : 'neutral' }}
+              badge={blockedCount > 0 ? { text: 'Attention', trend: 'down' } : undefined}
               className={cn(
                 filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
                 blockedCount > 0 && 'border-amber-500/40 bg-amber-500/[0.03]'
@@ -421,12 +427,11 @@ export function MissionControl() {
             className="cursor-pointer"
           >
             <MetricCard
-              title="并行工作中 (Working)"
+              title="Working Now"
               value={workingCount}
-              subtitle={workingCount > 0 ? `${workingCount} 个 Agent 正在运行` : '处于空闲就绪态'}
+              subtitle={workingCount > 0 ? `${workingCount} active execution` : 'All agents standby'}
               icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
-              badge={{ text: `${workingCount} Active`, trend: 'neutral' }}
-              chart={<SparklineBar data={[10, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} />}
+              badge={workingCount > 0 ? { text: `${workingCount} active`, trend: 'neutral' } : undefined}
               className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
             />
           </div>
@@ -437,33 +442,32 @@ export function MissionControl() {
             className="cursor-pointer"
           >
             <MetricCard
-              title="在线 Agent (Online)"
-              value={`${onlineCount} / ${agents.length || 3}`}
-              subtitle="双向心跳守护通道"
+              title="Agents Online"
+              value={`${onlineCount} / ${agents.length}`}
+              subtitle={onlineCount > 0 ? 'Daemon heartbeat active' : 'Daemons offline'}
               icon={<Users className="size-3.5 text-emerald-500" />}
-              badge={{ text: onlineCount > 0 ? 'Connected' : 'Offline', trend: 'neutral' }}
               chart={
-                <RingProgress
-                  value={agents.length > 0 ? (onlineCount / agents.length) * 100 : 0}
-                  size={32}
-                  strokeWidth={3.5}
-                  color="#10b981"
-                  label={`${onlineCount}`}
-                />
+                agents.length > 0 ? (
+                  <RingProgress
+                    value={(onlineCount / agents.length) * 100}
+                    size={32}
+                    strokeWidth={3}
+                    color="#10b981"
+                    label={`${onlineCount}`}
+                  />
+                ) : undefined
               }
               className={cn(filterTab === 'online' && 'ring-2 ring-primary border-primary')}
             />
           </div>
 
-          {/* Card 4: Tokens Used */}
+          {/* Card 4: Tokens Reported */}
           <div>
             <MetricCard
-              title="Token 消耗总量"
+              title="Tokens Reported"
               value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
-              subtitle="7日协同执行消耗"
+              subtitle={totalTokens > 0 ? 'Reported by active sessions' : 'No tokens recorded'}
               icon={<Zap className="size-3.5 text-violet-500" />}
-              badge={{ text: '+15%', trend: 'up' }}
-              chart={<SparklineArea data={[12, 20, 16, 32, 26, 42, 38]} color="#8b5cf6" height={30} width={75} />}
             />
           </div>
         </div>
@@ -481,69 +485,124 @@ export function MissionControl() {
 
       {/* Main Body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="min-w-0 flex-1 space-y-4 overflow-y-auto p-5">
-          {/* Top Priority Action Required Banner (Only shows when blocked/stalled/error exists) */}
+        <div className="min-w-0 flex-1 space-y-5 overflow-y-auto p-5">
+          {/* Top Priority Action Required Banner */}
           <ActionRequiredBanner
             items={allActionRequired}
             onOpenThread={openThread}
             onResolved={fetchRecentData}
           />
 
-          {/* 0 Agents Onboarding Guide (Step 6) */}
-          {isAllOffline && (
+          {/* True 0 Configuration State */}
+          {hasZeroAgents && (
             <OnboardingGuide
               onQuickConnect={handlePairAgent}
               className="my-2"
             />
           )}
 
-          {/* Filter Bar */}
-          <div className="flex items-center justify-between pt-1">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-              <Users className="size-3.5 text-primary" />
-              <span>智能体协同席位 ({filteredStations.length})</span>
-              {filterTab !== 'all' && (
+          {/* Configured but Offline Guidance Banner */}
+          {isAllOffline && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-surface1/80 border border-border/70 shadow-2xs">
+              <div className="space-y-0.5">
+                <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-muted-foreground/50" />
+                  <span>{agents.length} configured agents are currently offline</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Click &ldquo;Connect&rdquo; on any agent card below to initialize their process daemon.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setFilterTab('all')}
-                  className="ml-2 text-[11px] text-primary hover:underline cursor-pointer"
+                  onClick={() => {
+                    agents.forEach((a) => handlePairAgent(a.agentName));
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                 >
-                  清除筛选 ({filterTab})
+                  Connect All
                 </button>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* View Tab 1: Grid Cards */}
           {viewTab === 'grid' && (
-            <>
-              {rosterLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3.5">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <div key={`skel-${i}`} className="h-40 rounded-2xl bg-surface2/60 animate-pulse border border-border/40" />
-                  ))}
+            <div className="space-y-6">
+              {/* Section 1: My Configured Agents */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
+                    <Users className="size-3.5 text-primary" />
+                    <span>My Agents ({filteredMyStations.length})</span>
+                    {filterTab !== 'all' && (
+                      <button
+                        type="button"
+                        onClick={() => setFilterTab('all')}
+                        className="ml-2 text-[10.5px] text-primary hover:underline cursor-pointer lowercase"
+                      >
+                        (clear filter: {filterTab})
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3.5">
-                  {filteredStations.map((s, idx) => (
-                    <motion.div
-                      key={s.agent.agentName}
-                      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2, ease: 'easeOut', delay: Math.min(idx, 12) * 0.02 }}
-                    >
-                      <AgentStation
-                        data={s}
-                        onOpenAgent={() => openAgent(s.agent.agentName, s.focusThread?.sessionId ?? null)}
-                        onOpenThread={openThread}
-                        onPairAgent={() => handlePairAgent(s.agent.agentName)}
-                        onApprovalResolved={fetchRecentData}
-                      />
-                    </motion.div>
-                  ))}
+
+                {filteredMyStations.length === 0 ? (
+                  <div className="p-8 text-center border border-dashed border-border/70 rounded-2xl bg-surface1/30 text-xs text-muted-foreground">
+                    No matching agents found for filter: {filterTab}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+                    {filteredMyStations.map((s, idx) => (
+                      <motion.div
+                        key={s.agent.agentName}
+                        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.15, ease: 'easeOut', delay: Math.min(idx, 8) * 0.02 }}
+                      >
+                        <AgentStation
+                          data={s}
+                          onOpenAgent={() => openAgent(s.agent.agentName, s.focusThread?.sessionId ?? null)}
+                          onOpenThread={openThread}
+                          onPairAgent={() => handlePairAgent(s.agent.agentName)}
+                          onApprovalResolved={fetchRecentData}
+                        />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Available Integrations (Collapsible) */}
+              {integrationStations.length > 0 && filterTab === 'all' && (
+                <div className="space-y-3 pt-2 border-t border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => setShowIntegrations((prev) => !prev)}
+                    className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer select-none"
+                  >
+                    <span>Available Integrations ({integrationStations.length})</span>
+                    {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                  </button>
+
+                  {showIntegrations && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+                      {integrationStations.map((s) => (
+                        <AgentStation
+                          key={s.agent.agentName}
+                          data={s}
+                          onOpenAgent={() => openAgent(s.agent.agentName, null)}
+                          onOpenThread={openThread}
+                          onPairAgent={() => handlePairAgent(s.agent.agentName)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-            </>
+            </div>
           )}
 
           {/* View Tab 2: Swimlane Timeline */}
@@ -562,7 +621,7 @@ export function MissionControl() {
           agents={agents.map((a) => a.agentName)}
           onOpenThread={openThread}
           loading={feedLoading}
-          className="lg:w-[330px] xl:w-[360px]"
+          className="lg:w-[320px] xl:w-[350px]"
         />
       </div>
     </div>

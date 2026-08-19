@@ -2,11 +2,10 @@
 
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { motion } from 'motion/react';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 export interface SparklineBarProps {
-  data: number[];
+  data?: number[];
   height?: number;
   barWidth?: number;
   barGap?: number;
@@ -16,12 +15,14 @@ export interface SparklineBarProps {
 
 export function SparklineBar({
   data,
-  height = 36,
+  height = 32,
   barWidth = 4,
   barGap = 2,
-  color = '#8b5cf6', // default violet
+  color = '#8b5cf6',
   className,
 }: SparklineBarProps) {
+  if (!data || data.length === 0 || data.every((v) => v === 0)) return null;
+
   const max = Math.max(...data, 1);
 
   return (
@@ -43,7 +44,7 @@ export function SparklineBar({
               style={{
                 height: `${barHeight}px`,
                 backgroundColor: color,
-                opacity: 0.4 + 0.6 * pct,
+                opacity: 0.35 + 0.65 * pct,
               }}
             />
           </div>
@@ -54,7 +55,7 @@ export function SparklineBar({
 }
 
 export interface SparklineAreaProps {
-  data: number[];
+  data?: number[];
   height?: number;
   width?: number;
   color?: string;
@@ -63,12 +64,12 @@ export interface SparklineAreaProps {
 
 export function SparklineArea({
   data,
-  height = 36,
-  width = 80,
-  color = '#10b981', // emerald
+  height = 32,
+  width = 72,
+  color = '#10b981',
   className,
 }: SparklineAreaProps) {
-  if (data.length < 2) return null;
+  if (!data || data.length < 2 || data.every((v) => v === 0)) return null;
 
   const min = Math.min(...data);
   const max = Math.max(...data, min + 1);
@@ -88,12 +89,12 @@ export function SparklineArea({
       <svg width={width} height={height} className="overflow-visible">
         <defs>
           <linearGradient id={`grad-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+            <stop offset="0%" stopColor={color} stopOpacity={0.25} />
             <stop offset="100%" stopColor={color} stopOpacity={0.0} />
           </linearGradient>
         </defs>
         <path d={areaD} fill={`url(#grad-${color.replace('#', '')})`} />
-        <path d={pathD} fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={pathD} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </div>
   );
@@ -111,10 +112,10 @@ export interface RingProgressProps {
 
 export function RingProgress({
   value,
-  size = 40,
-  strokeWidth = 3.5,
-  color = '#8b5cf6',
-  trackColor = 'rgba(128, 128, 128, 0.15)',
+  size = 36,
+  strokeWidth = 3,
+  color = '#10b981',
+  trackColor = 'rgba(128, 128, 128, 0.12)',
   label,
   className,
 }: RingProgressProps) {
@@ -133,21 +134,23 @@ export function RingProgress({
           strokeWidth={strokeWidth}
           fill="none"
         />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          fill="none"
-          className="transition-all duration-500 ease-out"
-        />
+        {value > 0 && (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            fill="none"
+            className="transition-all duration-500 ease-out"
+          />
+        )}
       </svg>
       {label && (
-        <span className="absolute text-[10px] font-mono font-semibold text-foreground">
+        <span className="absolute text-[10px] font-mono font-medium text-foreground">
           {label}
         </span>
       )}
@@ -181,8 +184,8 @@ export function MetricCard({
     <div
       className={cn(
         'relative flex flex-col justify-between p-3.5 rounded-2xl',
-        'bg-surface1/90 dark:bg-surface1/60 border border-border/80 shadow-2xs backdrop-blur-md',
-        'hover:border-border-accent hover:shadow-xs transition-all duration-200',
+        'bg-surface1/80 dark:bg-surface1/50 border border-border/70 shadow-2xs backdrop-blur-md',
+        'hover:border-border-accent/80 transition-all duration-150',
         className
       )}
     >
@@ -190,11 +193,11 @@ export function MetricCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {icon && (
-            <span className="size-6 rounded-lg bg-surface2 border border-border/50 flex items-center justify-center text-foreground-muted shrink-0">
+            <span className="size-5 rounded-md bg-surface2 border border-border/40 flex items-center justify-center text-foreground-muted shrink-0">
               {icon}
             </span>
           )}
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+          <span className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground truncate font-mono">
             {title}
           </span>
         </div>
@@ -202,7 +205,7 @@ export function MetricCard({
         {badge && (
           <span
             className={cn(
-              'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium',
+              'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-mono font-medium',
               badge.trend === 'up'
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : badge.trend === 'down'
@@ -210,8 +213,8 @@ export function MetricCard({
                 : 'bg-surface2 text-muted-foreground'
             )}
           >
-            {badge.trend === 'up' && <ArrowUpRight className="size-3" />}
-            {badge.trend === 'down' && <ArrowDownRight className="size-3" />}
+            {badge.trend === 'up' && <ArrowUpRight className="size-2.5" />}
+            {badge.trend === 'down' && <ArrowDownRight className="size-2.5" />}
             <span>{badge.text}</span>
           </span>
         )}
@@ -220,11 +223,11 @@ export function MetricCard({
       {/* Body: Value & Chart */}
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-xl font-bold font-mono tracking-tight text-foreground truncate">
+          <div className="text-xl font-semibold font-mono tracking-tight text-foreground truncate">
             {value}
           </div>
           {subtitle && (
-            <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+            <div className="text-[10.5px] text-muted-foreground mt-0.5 truncate">
               {subtitle}
             </div>
           )}

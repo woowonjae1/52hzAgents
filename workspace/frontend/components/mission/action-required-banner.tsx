@@ -1,8 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Check, X, Square, Clock, Terminal, FileCode, ShieldAlert, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { AlertTriangle, Check, X, Square, Clock, Terminal, ShieldAlert, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
@@ -61,10 +60,10 @@ export function ActionRequiredBanner({
         },
         visibility: 'channel',
       });
-      toast.success(`已批准 @${item.agentName} 的执行请求`);
+      toast.success(`Approved @${item.agentName} execution`);
       onResolved?.(item.id);
     } catch {
-      toast.error('批准操作提交失败');
+      toast.error('Failed to submit approval');
     } finally {
       setProcessingId(null);
     }
@@ -92,10 +91,10 @@ export function ActionRequiredBanner({
         },
         visibility: 'channel',
       });
-      toast.info(`已拒绝 @${item.agentName} 的执行请求`);
+      toast.info(`Rejected @${item.agentName} execution`);
       onResolved?.(item.id);
     } catch {
-      toast.error('拒绝操作提交失败');
+      toast.error('Failed to submit rejection');
     } finally {
       setProcessingId(null);
     }
@@ -105,10 +104,10 @@ export function ActionRequiredBanner({
     setProcessingId(item.id);
     try {
       await workspaceApi.sendAgentControl(item.agentName, 'stop');
-      toast.success(`已强制终止 @${item.agentName}`);
+      toast.success(`Stopped @${item.agentName}`);
       onResolved?.(item.id);
     } catch {
-      toast.error('终止请求失败');
+      toast.error('Failed to stop agent');
     } finally {
       setProcessingId(null);
     }
@@ -129,7 +128,7 @@ export function ActionRequiredBanner({
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-              需要你立即处理 (Action Required)
+              Action Required
             </span>
             <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold">
               {items.length}
@@ -137,8 +136,8 @@ export function ActionRequiredBanner({
           </div>
         </div>
 
-        <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80 hidden sm:inline">
-          Agent 正在等待人工确认或发生停滞
+        <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80 hidden sm:inline font-mono">
+          Waiting for manual approval or stalled response
         </span>
       </div>
 
@@ -157,7 +156,7 @@ export function ActionRequiredBanner({
               {/* Top info */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="size-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
                   <span className="font-semibold text-xs text-foreground truncate">
                     @{item.agentName}
                   </span>
@@ -176,7 +175,7 @@ export function ActionRequiredBanner({
                       : 'bg-surface2 text-muted-foreground'
                   )}
                 >
-                  {isApproval ? '等待审批' : isStalled ? '执行停滞' : '异常'}
+                  {isApproval ? 'Approval Required' : isStalled ? 'Stalled' : 'Error'}
                 </span>
               </div>
 
@@ -196,7 +195,7 @@ export function ActionRequiredBanner({
                   <div className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
                     <Clock className="size-3" />
                     <span>
-                      已无新事件响应超过 {item.stalledMs ? `${Math.round(item.stalledMs / 1000)}s` : '30s'}
+                      No response for {item.stalledMs ? `${Math.round(item.stalledMs / 1000)}s` : '30s'}
                     </span>
                   </div>
                 )}
@@ -209,7 +208,7 @@ export function ActionRequiredBanner({
                   onClick={() => onOpenThread(item.channelId)}
                   className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
-                  <span>前往会话</span>
+                  <span>Open Thread</span>
                   <ArrowRight className="size-3" />
                 </button>
 
@@ -223,7 +222,7 @@ export function ActionRequiredBanner({
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-500/10 border border-rose-500/20 transition-colors cursor-pointer"
                       >
                         <X className="size-3" />
-                        <span>拒绝</span>
+                        <span>Deny</span>
                       </button>
                       <button
                         type="button"
@@ -232,7 +231,7 @@ export function ActionRequiredBanner({
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                       >
                         <Check className="size-3" />
-                        <span>批准执行</span>
+                        <span>Approve</span>
                       </button>
                     </>
                   ) : (
@@ -243,7 +242,7 @@ export function ActionRequiredBanner({
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-600 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
                     >
                       <Square className="size-3 fill-current" />
-                      <span>强制终止</span>
+                      <span>Force Stop</span>
                     </button>
                   )}
                 </div>

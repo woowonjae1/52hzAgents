@@ -3,8 +3,8 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { Terminal, Brain, Wrench, ShieldAlert, CheckCircle2, Clock, Play } from 'lucide-react';
-import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
+import { Terminal, Brain, ShieldAlert, Clock } from 'lucide-react';
+import type { WorkspaceAgent } from '@/lib/types';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 
 export interface SwimlaneEvent {
@@ -32,7 +32,6 @@ export function SwimlaneTimeline({
   onOpenThread,
   className,
 }: SwimlaneTimelineProps) {
-  // Sort agents: active agents first
   const sortedAgents = React.useMemo(() => {
     return [...agents].sort((a, b) => {
       const aHas = events.some((e) => e.agentName === a.agentName);
@@ -42,21 +41,21 @@ export function SwimlaneTimeline({
     });
   }, [agents, events]);
 
-  const timeMarkers = [120, 90, 60, 30, 0]; // seconds ago
+  const timeMarkers = [120, 90, 60, 30, 0];
 
   return (
     <div
       className={cn(
-        'rounded-2xl border border-border/80 bg-surface1/80 backdrop-blur-md p-4 space-y-3 shadow-2xs',
+        'rounded-2xl border border-border/70 bg-surface1/80 backdrop-blur-md p-4 space-y-3 shadow-2xs',
         className
       )}
     >
       {/* Header & Legend */}
-      <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2.5">
+      <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2.5">
         <div className="flex items-center gap-2">
           <Clock className="size-4 text-primary" />
           <span className="text-xs font-semibold text-foreground">
-            多 Agent 并行时序泳道 (Live Swimlane Timeline)
+            Parallel Execution Timeline
           </span>
         </div>
 
@@ -64,19 +63,19 @@ export function SwimlaneTimeline({
         <div className="flex items-center gap-3 text-[10.5px] font-mono text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-emerald-500" />
-            <span>工具执行</span>
+            <span>Tools</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-violet-500" />
-            <span>深度推理</span>
+            <span>Reasoning</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-amber-500 animate-pulse" />
-            <span>等待审批</span>
+            <span>Approval</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-rose-500" />
-            <span>超时停滞</span>
+            <span>Stalled</span>
           </span>
         </div>
       </div>
@@ -94,7 +93,6 @@ export function SwimlaneTimeline({
         <div className="space-y-1.5 divide-y divide-border/30">
           {sortedAgents.map((agent) => {
             const agentEvents = events.filter((e) => e.agentName === agent.agentName);
-            const identityColor = deriveIdentityColor(agent.agentName);
             const isOnline = agent.status === 'online';
 
             return (
@@ -102,7 +100,7 @@ export function SwimlaneTimeline({
                 key={agent.agentName}
                 className="flex items-center pt-1.5 first:pt-0 group/row hover:bg-surface2/40 rounded-xl transition-colors"
               >
-                {/* Agent Left Label (36 = 144px width) */}
+                {/* Agent Left Label */}
                 <div className="w-36 shrink-0 flex items-center gap-2 pr-2 select-none">
                   <AgentAvatar
                     name={agent.agentName}
@@ -120,12 +118,10 @@ export function SwimlaneTimeline({
                   </div>
                 </div>
 
-                {/* Track Bar Area (120s total scale) */}
+                {/* Track Bar Area */}
                 <div className="flex-1 h-7 rounded-lg bg-surface2/60 border border-border/40 relative overflow-hidden flex items-center px-1">
-                  {/* Grid Lines */}
                   <div className="absolute inset-0 grid grid-cols-4 pointer-events-none opacity-20 divide-x divide-border" />
 
-                  {/* Execution Event Blocks */}
                   {agentEvents.length === 0 ? (
                     <span className="text-[10px] font-mono text-muted-foreground/40 italic pl-2">
                       {isOnline ? 'idle / ready' : 'standby'}
@@ -158,7 +154,7 @@ export function SwimlaneTimeline({
                             'flex items-center gap-1 border shadow-xs transition-transform hover:scale-105 cursor-pointer z-10 truncate',
                             bgClass
                           )}
-                          title={`${ev.title} · ${ev.durationSec}s · Click to view in #${ev.channelTitle}`}
+                          title={`${ev.title} · ${ev.durationSec}s · #${ev.channelTitle}`}
                         >
                           {ev.type === 'thinking' ? (
                             <Brain className="size-3 shrink-0" />

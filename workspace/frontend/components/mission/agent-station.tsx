@@ -17,9 +17,9 @@ import {
   X,
   Terminal,
   Activity,
+  Sparkles,
 } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
-import { deriveIdentityColor } from '@/lib/identity-colors';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 
@@ -43,42 +43,6 @@ export interface StationData {
   };
   lastHeartbeatAt?: string | number | null;
 }
-
-const STATUS_META: Record<
-  StationStatus,
-  { label: string; dot: string; ring: string; badge: string }
-> = {
-  blocked: {
-    label: '等待审批',
-    dot: 'bg-amber-500',
-    ring: 'ring-amber-500/25',
-    badge: 'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30 font-semibold',
-  },
-  stalled: {
-    label: '执行停滞',
-    dot: 'bg-rose-500',
-    ring: 'ring-rose-500/25',
-    badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25 font-semibold',
-  },
-  working: {
-    label: '工作中',
-    dot: 'bg-amber-500',
-    ring: 'ring-amber-500/25',
-    badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  },
-  ready: {
-    label: '就绪',
-    dot: 'bg-emerald-500',
-    ring: 'ring-emerald-500/25',
-    badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-  },
-  offline: {
-    label: '离线',
-    dot: 'bg-muted-foreground/50',
-    ring: 'ring-muted-foreground/10',
-    badge: 'bg-surface2 text-muted-foreground border-border/50',
-  },
-};
 
 function fmtTokens(n: number): string {
   if (!n || n <= 0) return '0';
@@ -115,31 +79,86 @@ export function AgentStation({
     threads,
     activity,
     skillCount,
-    tokenCount,
-    isCatalogPlaceholder,
+    tokenCount = 0,
+    isCatalogPlaceholder = false,
     stalledMs,
     pendingApproval,
     lastHeartbeatAt,
   } = data;
-  const meta = STATUS_META[status];
+
   const isWorking = status === 'working';
   const isBlocked = status === 'blocked';
   const isStalled = status === 'stalled';
   const isCustomPlaceholder = isCatalogPlaceholder === true && agent.agentName.toLowerCase() === 'custom';
   const activeThread = threads[0];
-
   const [busy, setBusy] = React.useState(false);
 
-  // Heartbeat text
-  const heartbeatText = React.useMemo(() => {
-    if (!lastHeartbeatAt) return null;
+  // Heartbeat timeout calculation
+  const isHeartbeatTimeout = React.useMemo(() => {
+    if (!lastHeartbeatAt || status !== 'ready') return false;
     const timeMs = typeof lastHeartbeatAt === 'string' ? new Date(lastHeartbeatAt).getTime() : lastHeartbeatAt;
-    if (!timeMs || isNaN(timeMs)) return null;
-    const diff = Math.max(1, Math.round((Date.now() - timeMs) / 1000));
-    if (diff < 5) return '心跳正常';
-    if (diff < 30) return `心跳 ${diff}s 前`;
-    return '心跳超时';
-  }, [lastHeartbeatAt]);
+    if (!timeMs || isNaN(timeMs)) return false;
+    return Date.now() - timeMs > 30000;
+  }, [lastHeartbeatAt, status]);
+
+  // Single Source of Truth for Status Badge
+  const statusBadge = React.useMemo(() => {
+    if (isBlocked) {
+      return {
+        label: 'Action Required',
+        dot: 'bg-amber-500',
+        ring: 'ring-amber-500/25',
+        badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 font-medium',
+      };
+    }
+    if (isStalled) {
+      const sec = stalledMs ? Math.round(stalledMs / 1000) : 30;
+      return {
+        label: `Stalled · ${sec}s`,
+        dot: 'bg-rose-500',
+        ring: 'ring-rose-500/25',
+        badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25 font-medium',
+      };
+    }
+    if (isHeartbeatTimeout) {
+      return {
+        label: 'Heartbeat Timeout',
+        dot: 'bg-amber-500',
+        ring: 'ring-amber-500/25',
+        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium',
+      };
+    }
+    if (isWorking) {
+      return {
+        label: 'Working',
+        dot: 'bg-amber-500',
+        ring: 'ring-amber-500/25',
+        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium',
+      };
+    }
+    if (status === 'ready') {
+      return {
+        label: 'Online',
+        dot: 'bg-emerald-500',
+        ring: 'ring-emerald-500/25',
+        badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-medium',
+      };
+    }
+    if (isCatalogPlaceholder) {
+      return {
+        label: 'Available',
+        dot: 'bg-muted-foreground/40',
+        ring: 'ring-muted-foreground/10',
+        badge: 'bg-surface2/80 text-muted-foreground border-border/40 font-medium',
+      };
+    }
+    return {
+      label: 'Offline',
+      dot: 'bg-muted-foreground/50',
+      ring: 'ring-muted-foreground/10',
+      badge: 'bg-surface2 text-muted-foreground border-border/50 font-medium',
+    };
+  }, [isBlocked, isStalled, isHeartbeatTimeout, isWorking, status, isCatalogPlaceholder, stalledMs]);
 
   const handleApprove = async () => {
     if (!pendingApproval || !activeThread) return;
@@ -163,10 +182,10 @@ export function AgentStation({
         },
         visibility: 'channel',
       });
-      toast.success(`已批准 @${agent.agentName} 执行`);
+      toast.success(`Approved @${agent.agentName}`);
       onApprovalResolved?.();
     } catch {
-      toast.error('批准失败');
+      toast.error('Failed to submit approval');
     } finally {
       setBusy(false);
     }
@@ -194,27 +213,30 @@ export function AgentStation({
         },
         visibility: 'channel',
       });
-      toast.info(`已拒绝 @${agent.agentName} 执行`);
+      toast.info(`Rejected @${agent.agentName}`);
       onApprovalResolved?.();
     } catch {
-      toast.error('拒绝操作失败');
+      toast.error('Failed to reject');
     } finally {
       setBusy(false);
     }
   };
 
+  const hasTelemetry = (tokenCount > 0 || threads.length > 0) && !isCatalogPlaceholder;
+
   return (
     <div
       className={cn(
         'group relative flex flex-col justify-between rounded-2xl border p-3.5',
-        'bg-surface1/90 dark:bg-surface1/60 backdrop-blur-md shadow-2xs transition-all duration-200',
-        'hover:border-border-accent hover:shadow-md',
+        'bg-surface1/80 dark:bg-surface1/50 backdrop-blur-md shadow-2xs transition-all duration-150',
+        'hover:border-border-accent/80 hover:shadow-xs',
         isBlocked && 'border-amber-500/50 ring-2 ring-amber-500/20 bg-amber-500/[0.02]',
         isStalled && 'border-rose-500/50 ring-2 ring-rose-500/20 bg-rose-500/[0.02]',
-        status === 'offline' ? 'border-border/60 opacity-90' : 'border-border/90'
+        status === 'offline' && !isCatalogPlaceholder && 'border-border/60 opacity-85',
+        isCatalogPlaceholder && 'border-border/40 bg-surface1/40'
       )}
     >
-      {/* Top Header Row */}
+      {/* Top Header */}
       <div className="flex items-start justify-between gap-2">
         <button
           type="button"
@@ -224,7 +246,7 @@ export function AgentStation({
           <AgentAvatar
             name={agent.agentName}
             agentType={agent.agentType}
-            size={30}
+            size={28}
             status={agent.status}
           />
 
@@ -239,46 +261,38 @@ export function AgentStation({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground truncate font-mono mt-0.5">
-              <span>{agent.agentType || 'agent'}</span>
-              {heartbeatText && (
-                <>
-                  <span>·</span>
-                  <span className={heartbeatText === '心跳超时' ? 'text-rose-500 font-medium' : ''}>
-                    {heartbeatText}
-                  </span>
-                </>
-              )}
+            <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5">
+              {agent.agentType || 'agent'}
             </div>
           </div>
         </button>
 
-        {/* Status Badge */}
+        {/* Unified Status Badge */}
         <span
           className={cn(
-            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0',
-            meta.badge
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border shrink-0',
+            statusBadge.badge
           )}
         >
           <span
             className={cn(
               'size-1.5 rounded-full ring-2',
-              meta.dot,
-              meta.ring,
+              statusBadge.dot,
+              statusBadge.ring,
               (isWorking || isBlocked) && 'animate-pulse'
             )}
           />
-          <span>{meta.label}</span>
+          <span>{statusBadge.label}</span>
         </span>
       </div>
 
-      {/* Inline Blocked Approval Bar if blocked */}
-      {isBlocked && pendingApproval && (
+      {/* Inline Blocked Approval */}
+      {isBlocked && pendingApproval ? (
         <div className="my-2 p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
             <span className="flex items-center gap-1">
               <ShieldAlert className="size-3" />
-              <span>待批执行 · {pendingApproval.tool}</span>
+              <span>Approval · {pendingApproval.tool}</span>
             </span>
           </div>
           {pendingApproval.command && (
@@ -294,7 +308,7 @@ export function AgentStation({
               className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 border border-rose-500/20 cursor-pointer"
             >
               <X className="size-2.5" />
-              <span>拒绝</span>
+              <span>Deny</span>
             </button>
             <button
               type="button"
@@ -303,95 +317,79 @@ export function AgentStation({
               className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 cursor-pointer shadow-xs"
             >
               <Check className="size-2.5" />
-              <span>批准</span>
+              <span>Approve</span>
             </button>
           </div>
         </div>
-      )}
-
-      {/* Stalled Banner if stalled */}
-      {isStalled && (
-        <div className="my-2 p-2 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-1 text-xs text-rose-600 dark:text-rose-400">
-          <div className="flex items-center gap-1 font-medium text-[11px]">
-            <Clock className="size-3 shrink-0" />
-            <span>停滞已超 {stalledMs ? `${Math.round(stalledMs / 1000)}s` : '30s'}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => activeThread && onOpenThread(activeThread.sessionId)}
-            className="text-[10.5px] underline cursor-pointer hover:opacity-80"
-          >
-            检查状态
-          </button>
-        </div>
-      )}
-
-      {/* Stats & Current Activity Row */}
-      {!isBlocked && (
+      ) : hasTelemetry ? (
+        /* Connected Agent with Real Telemetry */
         <div className="my-2 space-y-1.5">
-          {/* Micro Metrics Grid */}
           <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-surface2/60 border border-border/40 text-[10.5px]">
             <div className="flex flex-col min-w-0 px-1">
-              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">Tokens</span>
+              <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Tokens</span>
               <span className="font-semibold font-mono text-foreground truncate">
-                {fmtTokens(tokenCount || 0)}
+                {fmtTokens(tokenCount)}
               </span>
             </div>
 
             <div className="flex flex-col min-w-0 px-1 border-l border-border/40">
-              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">Channels</span>
+              <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Threads</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {threads.length}
               </span>
             </div>
 
             <div className="flex flex-col min-w-0 px-1 border-l border-border/40">
-              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">Skills</span>
+              <span className="text-[9px] uppercase font-mono text-muted-foreground truncate">Skills</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {skillCount}
               </span>
             </div>
           </div>
 
-          {/* Status / Activity Snippet */}
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground px-1 truncate">
+          <div className="flex items-center gap-1 text-[11px] text-muted-foreground px-1 truncate">
             {isWorking ? (
               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium truncate animate-pulse">
                 <Wrench className="size-3 shrink-0" />
-                <span className="truncate">{stripMarkdown(activity?.content || '正在执行任务...')}</span>
+                <span className="truncate">{stripMarkdown(activity?.content || 'Executing task...')}</span>
               </span>
             ) : activeThread ? (
               <button
                 type="button"
                 onClick={() => onOpenThread(activeThread.sessionId)}
-                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left"
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left font-mono text-[10.5px]"
               >
-                <span className="text-primary font-medium">#{activeThread.title || '新频道'}</span>
+                <span className="text-primary font-medium">#{activeThread.title || 'channel'}</span>
                 {activeThread.lastEventAt && (
-                  <span className="text-[10px] text-muted-foreground/70 font-mono">
+                  <span className="text-muted-foreground/70">
                     · {timeAgo(new Date(activeThread.lastEventAt).toISOString())}
                   </span>
                 )}
               </button>
             ) : (
-              <span className="text-muted-foreground/60 italic">
-                {status === 'offline' ? '未连接' : '就绪等待指令'}
+              <span className="text-muted-foreground/60 italic text-[10.5px]">
+                {status === 'offline' ? 'Daemon offline' : 'Standby / Ready'}
               </span>
             )}
           </div>
+        </div>
+      ) : (
+        /* Unconnected / Template Agent: Show Capability Description instead of empty 0 boxes */
+        <div className="my-2 px-1 py-1 text-[11px] text-muted-foreground leading-relaxed line-clamp-2 min-h-[38px]">
+          {agent.description || 'Configurable ACP/MCP agent workspace adapter with tool support.'}
         </div>
       )}
 
       {/* Footer Controls */}
       <div className="flex items-center gap-1.5 pt-2 border-t border-border/40">
-        {!isCustomPlaceholder && (
+        {!isCatalogPlaceholder && (
           <button
             type="button"
             onClick={onOpenAgent}
             className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2 hover:bg-surface3 border border-border/60 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-2xs"
           >
             <MessageSquare className="size-3 text-muted-foreground" />
-            <span>对话</span>
+            <span>Chat</span>
           </button>
         )}
 
@@ -405,18 +403,18 @@ export function AgentStation({
           className={cn(
             'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all shadow-2xs',
             status === 'offline'
-              ? 'bg-primary text-primary-foreground hover:opacity-90 cursor-pointer'
+              ? 'bg-surface2 hover:bg-surface3 text-foreground border border-border/80 cursor-pointer'
               : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-default'
           )}
         >
           {status !== 'offline' ? (
-            <span>已连接</span>
+            <span>Connected</span>
           ) : isCustomPlaceholder ? (
-            <span>配置</span>
+            <span>Configure</span>
           ) : (
             <>
-              <Plug className="size-3" />
-              <span>连接</span>
+              <Plug className="size-3 text-muted-foreground" />
+              <span>Connect</span>
             </>
           )}
         </button>
