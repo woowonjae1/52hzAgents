@@ -791,12 +791,6 @@ export function ChatView() {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0 [app-region:no-drag]">
-          {/* Agent Model Switcher (Claude / Antigravity) */}
-          <AgentModelSwitcher
-            agentName={activeModelAgentName}
-            sessionId={currentSessionId}
-          />
-
           {/* Agent Quota & Usage Capsule (Claude / Antigravity) */}
           <AgentQuotaCapsule agentName={activeModelAgentName} />
 

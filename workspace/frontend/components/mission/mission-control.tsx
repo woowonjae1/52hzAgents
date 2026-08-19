@@ -265,14 +265,6 @@ export function MissionControl() {
               Agents and shared activity in this workspace
             </p>
           </div>
-          <button
-            onClick={() => setConnectModalOpen(true)}
-            className="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
-            title="Connect an agent to this workspace"
-          >
-            <Plus className="size-3.5 shrink-0" />
-            <span className="whitespace-nowrap">Connect agent</span>
-          </button>
         </div>
 
         {/* Live workspace metrics */}
