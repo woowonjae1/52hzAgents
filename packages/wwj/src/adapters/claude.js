@@ -59,7 +59,7 @@ class ClaudeAdapter extends BaseAdapter {
     this._persistentProcs = {}; // channel → { proc, lineBuffer, pendingLines, idleTimer, messageResolve }
     this._IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
     this._WATCHDOG_INTERVAL_MS = 15_000; // 15s between checks
-    this._WATCHDOG_MAX_TIMEOUTS = 20;    // 20 * 15s = 5 min of silence → kill
+    this._WATCHDOG_MAX_TIMEOUTS = parseInt(process.env.WWJ_CLAUDE_WATCHDOG_TIMEOUTS || '80', 10); // 80 * 15s = 20 min of silence before watchdog kill
     this._sessionsFile = path.join(
       os.homedir(), '.wwj', 'sessions',
       `${this.workspaceId}_${this.agentName}.json`
@@ -873,14 +873,15 @@ class ClaudeAdapter extends BaseAdapter {
       consecutiveTimeouts++;
       pp.lastStdoutTime = Date.now();
 
-      if (consecutiveTimeouts === 2) {
-        try { await this.sendStatus(pp.msgChannel, 'Still processing...'); } catch {}
+      if (consecutiveTimeouts === 2 || consecutiveTimeouts % 4 === 0) {
+        const mins = Math.round((consecutiveTimeouts * 15) / 60);
+        try { await this.sendStatus(pp.msgChannel, `Still processing${mins > 0 ? ` (${mins}m)` : ''}...`); } catch {}
       }
 
       if (consecutiveTimeouts >= this._WATCHDOG_MAX_TIMEOUTS) {
         this._log(`Watchdog: process unresponsive for ${consecutiveTimeouts * 15}s on ${pp.msgChannel} — killing`);
         this._stopWatchdog(pp);
-        try { await this.sendError(pp.msgChannel, 'Agent process became unresponsive and was restarted.'); } catch {}
+        try { await this.sendError(pp.msgChannel, `⚠️ Agent execution exceeded watchdog limit (${Math.round((consecutiveTimeouts * 15) / 60)}m) and was restarted.`); } catch {}
         if (pp.messageResolve) {
           const resolve = pp.messageResolve;
           pp.messageResolve = null;

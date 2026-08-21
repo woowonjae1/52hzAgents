@@ -52,7 +52,7 @@ const IS_WINDOWS = process.platform === 'win32';
 // backstop that prevents a thread spinning on "thinking…" forever.
 const WATCHDOG_INTERVAL_MS = 15_000;
 const WATCHDOG_NUDGE_AT = 2;     // ~30s of silence → "still working"
-const WATCHDOG_MAX = 20;         // ~5 min of silence → kill
+const WATCHDOG_MAX = parseInt(process.env.WWJ_CLINE_WATCHDOG_TIMEOUTS || '80', 10); // ~20 min of silence → kill
 
 // The ONE known-benign stderr {type:"error"} diagnostic Cline emits on every
 // run (verified v3.0.27). Matched EXACTLY (whole, trimmed message) so it can
