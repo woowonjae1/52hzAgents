@@ -512,7 +512,6 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         />
                         <div className="flex items-center gap-2 py-1.5 min-w-0">
                           <span className="text-xs font-semibold text-foreground truncate">{pendingName}</span>
-                          <span className="text-xs text-foreground-muted shrink-0">is working</span>
                           <WorkingIndicator />
                         </div>
                       </div>

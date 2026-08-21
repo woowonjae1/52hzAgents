@@ -166,7 +166,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                       workingAgentNames.has(todo.assignee) ? (
                         <span className="flex items-center gap-1 text-status-warning font-medium">
                           <Loader2 className="size-2.5 animate-spin" />
-                          {todo.assignee} is working
+                          {todo.assignee} 处理中
                         </span>
                       ) : todo.status === 'in_progress' ? (
                         <span className="text-foreground-muted font-medium">In progress</span>

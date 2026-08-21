@@ -3,24 +3,24 @@
 import { cn } from '@/lib/utils';
 
 /**
- * Animated "agent is working" indicator — a thin ticker of hairline bars that
- * rise and fall in a slow, staggered ripple. Pure CSS (see `.working-bar` /
- * `@keyframes working-bar` in globals.css), so it stays crisp at any resolution
- * and uses a neutral `--muted-foreground` gray (adapts light/dark). Replaces
- * the old `/breathing-dots.gif`.
+ * Option 3: Modern Fluid Bouncing Glowing Dots indicator.
+ * 3 micro-orbs moving with smooth cubic-bezier physics and gentle breathing glow.
  */
 export function WorkingIndicator({ className }: { className?: string }) {
   return (
     <div
-      className={cn('flex items-center gap-[2px] h-4 text-muted-foreground', className)}
+      className={cn(
+        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface2/60 border border-border/40 text-foreground shadow-2xs backdrop-blur-xs',
+        className
+      )}
       role="status"
-      aria-label="Agent is working"
+      aria-label="Thinking"
     >
-      {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+      {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="working-bar w-[2px] h-[14px] rounded-[1px] bg-current"
-          style={{ animationDelay: `${i * 0.13}s` }}
+          className="fluid-dot size-1.5 rounded-full bg-current inline-block"
+          style={{ animationDelay: `${i * 0.18}s` }}
         />
       ))}
     </div>
