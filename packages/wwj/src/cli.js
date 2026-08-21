@@ -433,13 +433,15 @@ async function cmdConnect(connector, flags, positional) {
     connector.connectWorkspace(name, slug);
     print(`'${name}' connected to workspace '${wsName}'`);
 
-    // Signal daemon reload
+    // Signal daemon reload / start
     const pid = connector.getDaemonPid();
     if (pid) {
+      connector.sendDaemonCommand(`start:${name}`);
       connector.sendDaemonCommand(`restart:${name}`);
-      print('Daemon notified');
+      print('Daemon notified to launch ' + name);
     } else {
-      print('Daemon is not running. Run `wwj up` to bring this agent online.');
+      print('Daemon is not running. Auto-starting daemon with ' + name + '...');
+      await cmdUp(connector, flags);
     }
   } catch (e) {
     print(`Error: ${e.message}`);

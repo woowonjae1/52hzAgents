@@ -642,16 +642,27 @@ func LaunchAgent(c *gin.Context) {
 		}
 	}
 
+	serverPort := "8000"
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		serverPort = envPort
+	} else if config.GlobalConfig != nil && config.GlobalConfig.Port > 0 {
+		serverPort = fmt.Sprintf("%d", config.GlobalConfig.Port)
+	}
+	endpoint := fmt.Sprintf("http://127.0.0.1:%s", serverPort)
+	if envEndpoint := os.Getenv("WWJ_WORKSPACE_ENDPOINT"); envEndpoint != "" {
+		endpoint = envEndpoint
+	}
+
 	var runCmd *exec.Cmd
 	if cliPath == "wwj" {
-		runCmd = exec.Command("wwj", "connect", agentName, reqToken, "--endpoint", "http://127.0.0.1:8000")
+		runCmd = exec.Command("wwj", "connect", agentName, reqToken, "--endpoint", endpoint)
 	} else {
-		runCmd = exec.Command("node", cliPath, "connect", agentName, reqToken, "--endpoint", "http://127.0.0.1:8000")
+		runCmd = exec.Command("node", cliPath, "connect", agentName, reqToken, "--endpoint", endpoint)
 	}
 	runCmd.Env = append(os.Environ(),
 		"WWJ_WORKSPACE_TOKEN="+reqToken,
 		"OPENAGENTS_TOKEN="+reqToken,
-		"WWJ_WORKSPACE_ENDPOINT=http://127.0.0.1:8000",
+		"WWJ_WORKSPACE_ENDPOINT="+endpoint,
 	)
 	// The chosen project directory becomes the connector process's cwd, so the
 	// agent it spawns reads/edits files there instead of the backend's own
