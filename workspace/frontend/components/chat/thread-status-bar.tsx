@@ -98,7 +98,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
   const activeAgentName = (lastInfo?.senderName) || (lastMsg?.senderName) || 'Agent';
   const rawStatusText = (lastMsg && (lastMsg.messageType === 'status' || lastMsg.messageType === 'thinking'))
     ? lastMsg.content
-    : (lastInfo?.content || '思考与处理中…');
+    : (lastInfo?.content || 'Thinking…');
 
   const handleCancelTimer = useCallback(async (timerId: string) => {
     setTimers((prev) => prev.filter((t) => t.id !== timerId));
@@ -131,11 +131,11 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
   if (!hasContent) return null;
 
   return (
-    <div className="flex flex-col gap-1.5 px-1 py-1 text-[11px] text-muted-foreground">
+    <div className="flex flex-col gap-1.5 px-1 py-1 text-2xs text-muted-foreground">
       {/* Expanded tasks card overlay */}
       {tasksExpanded && channelTodos.length > 0 && (
         <div className="mb-1 rounded-lg border border-border bg-card p-2 shadow-lg space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="flex items-center justify-between px-1 pb-1 border-b border-border text-[11px] font-semibold text-muted-foreground">
+          <div className="flex items-center justify-between px-1 pb-1 border-b border-border text-2xs font-medium text-muted-foreground">
             <span>Current Tasks ({channelTodos.length})</span>
             <button
               type="button"
@@ -155,7 +155,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground leading-snug break-words">{todo.content}</p>
-                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-0.5 text-3xs text-muted-foreground">
                     {todo.createdBy && <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>}
                     {todo.assignee && <span>assigned to {todo.assignee}</span>}
                     {/* A handoff used to go silent here: the agent that wrote the
@@ -166,12 +166,12 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                       workingAgentNames.has(todo.assignee) ? (
                         <span className="flex items-center gap-1 text-status-warning font-medium">
                           <Loader2 className="size-2.5 animate-spin" />
-                          {todo.assignee} 工作中
+                          {todo.assignee} is working
                         </span>
                       ) : todo.status === 'in_progress' ? (
-                        <span className="text-foreground-muted font-medium">进行中</span>
+                        <span className="text-foreground-muted font-medium">In progress</span>
                       ) : (
-                        <span className="text-foreground-extra-muted">等待 {todo.assignee}</span>
+                        <span className="text-foreground-extra-muted">Waiting on {todo.assignee}</span>
                       )
                     )}
                   </div>

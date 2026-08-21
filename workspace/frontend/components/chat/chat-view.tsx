@@ -23,7 +23,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug } from 'lucide-react';
+import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2 } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -41,28 +41,28 @@ import { toast } from 'sonner';
 
 const PROMPT_SUGGESTIONS = [
   {
-    icon: '⚡',
-    title: '代码重构与审查',
-    desc: '审查当前工作区代码质量，指出潜在隐患并给出重构建议',
-    prompt: '请帮我全面审查当前工作区的核心代码架构与实现，指出潜在的逻辑或性能隐患，并给出优化建议。',
+    icon: Zap,
+    title: 'Refactor & review',
+    desc: 'Review the code in this workspace, flag risks, suggest refactors',
+    prompt: 'Review the core architecture and implementation of this workspace. Point out logic or performance risks and suggest concrete improvements.',
   },
   {
-    icon: '🔍',
-    title: '深度搜索与调研',
-    desc: '联网检索主流技术方案，输出对比评测分析报告',
-    prompt: '请帮我调研当前主流的本地多 Agent 协同架构方案与最佳实践，并对比它们的优缺点。',
+    icon: Search,
+    title: 'Research & compare',
+    desc: 'Search the web for approaches and write a comparison',
+    prompt: 'Research current approaches and best practices for local multi-agent orchestration, then compare their trade-offs.',
   },
   {
-    icon: '💻',
-    title: '终端自动化排查',
-    desc: '运行本地命令，检测开发环境依赖与系统运行状态',
-    prompt: '请帮我检查当前项目的 Git 提交状态与环境依赖完整性，并排查潜在异常。',
+    icon: Terminal,
+    title: 'Diagnose the environment',
+    desc: 'Run local commands to check dependencies and runtime state',
+    prompt: 'Check this project’s git status and dependency health, and surface anything that looks broken.',
   },
   {
-    icon: '📐',
-    title: '架构设计与接口规划',
-    desc: '规划新业务模块的架构设计与前后端 API 规范',
-    prompt: '请为我们即将开发的新功能编写一份系统架构设计说明书与核心接口定义草案。',
+    icon: Layers,
+    title: 'Design an architecture',
+    desc: 'Plan module architecture and the API contract between front and back end',
+    prompt: 'Draft a system architecture document and the core API contract for the feature we are about to build.',
   },
 ];
 
@@ -172,7 +172,7 @@ export function ChatView() {
   const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent } = useWorkspace();
   
   useEffect(() => {
-    console.log('[52hzAgents Monitor] 💬 [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
+    console.log('[52hzAgents Monitor] [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
   }, [currentSessionId]);
 
   const [showCreateRoutine, setShowCreateRoutine] = useState(false);
@@ -191,6 +191,7 @@ export function ChatView() {
     sidebarToggle,
     openNewThread,
     setSelectedAgentName,
+    openSettings,
   } = useLayout();
 
   // Continuously refresh message caches for top recent sessions in the background.
@@ -415,15 +416,14 @@ export function ChatView() {
   const isMissingParticipant = hasSpecificParticipants && sessionOnlineAgents.length === 0;
 
   const activeModelAgentName = useMemo(() => {
-    const inChannel = channelAgentNames.find(
-      (n) => n.toLowerCase().includes('antigravity') || n.toLowerCase().includes('agy') || n.toLowerCase().includes('claude')
-    );
-    if (inChannel) return inChannel;
-    const online = onlineAgents.find(
-      (a) => a.agentName.toLowerCase().includes('antigravity') || a.agentName.toLowerCase().includes('agy') || a.agentName.toLowerCase().includes('claude')
-    );
-    return online?.agentName || 'claude';
-  }, [channelAgentNames, onlineAgents]);
+    if (currentSession?.master) {
+      return currentSession.master;
+    }
+    if (channelAgentNames.length > 0) {
+      return channelAgentNames[0];
+    }
+    return onlineAgents[0]?.agentName || 'claude';
+  }, [currentSession?.master, channelAgentNames, onlineAgents]);
 
   const sessionOptimisticMessages = useMemo(
     () => currentSessionId ? messagesForSession(currentSessionId, optimisticMessages) : [],
@@ -603,10 +603,20 @@ export function ChatView() {
         clientMessageId,
         deliveryStatus: 'sending',
       };
+      const onlineAgents = agents.filter((a) => a.status === 'online');
+      const predictedAgentName =
+        mentions[0] ||
+        (currentSession?.master && onlineAgents.some((a) => a.agentName === currentSession.master) ? currentSession.master : null) ||
+        (onlineAgents.length === 1 ? onlineAgents[0].agentName : null) ||
+        (onlineAgents.length > 1 ? onlineAgents[0].agentName : null) ||
+        agents.find((a) => a.role === 'master')?.agentName ||
+        agents[0]?.agentName ||
+        'Agent';
+
       const loadingOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-loading-${timestamp}`,
         sessionId: currentSessionId,
-        senderName: mentions[0] || agents.find((a) => a.role === 'master')?.agentName || agents[0]?.agentName || 'Agent',
+        senderName: predictedAgentName,
         senderType: 'agent',
         content: '',
         messageType: 'loading',
@@ -697,9 +707,9 @@ export function ChatView() {
             <div className="flex items-center p-4 rounded-full bg-primary/10 mb-4">
               <MessageSquare className="size-8 text-primary" />
             </div>
-            <p className="text-lg font-semibold text-foreground">开一个新频道</p>
+            <p className="text-lg font-semibold text-foreground">Start a new channel</p>
             <p className="text-sm mt-1 max-w-xs">
-              建一个频道,选好参与的 agent,就可以开始协作了。
+              Create a channel, pick the agents to include, and start collaborating.
             </p>
             {agents.length > 0 && (
               <Button className="mt-5 gap-1.5" onClick={openNewThread}>
@@ -734,7 +744,7 @@ export function ChatView() {
             <h2 className="text-sm font-semibold tracking-tight truncate flex items-center gap-1.5 text-foreground">
               <MessageSquare className="size-3.5 text-muted-foreground" />
               {currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-normal">
+              <span className="text-3xs px-1.5 py-0.2 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-normal">
                 read-only
               </span>
             </h2>
@@ -768,7 +778,7 @@ export function ChatView() {
             <div className="hidden sm:flex items-center gap-2 shrink min-w-0 max-w-[45%]">
               <span className="h-3.5 w-px bg-border/70 shrink-0" />
               {workingHere.length > 0 ? (
-                <span className="flex items-center gap-1.5 min-w-0 text-[12.5px]">
+                <span className="flex items-center gap-1.5 min-w-0 text-xs">
                   <span className="flex items-end gap-[2px] h-3 shrink-0">
                     {[0, 1, 2].map((i) => (
                       <span
@@ -779,20 +789,20 @@ export function ChatView() {
                     ))}
                   </span>
                   <span className="font-medium text-foreground truncate">{workingHere.join('、')}</span>
-                  <span className="text-foreground-muted shrink-0">工作中</span>
+                  <span className="text-foreground-muted shrink-0">Working</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 min-w-0 text-[12.5px] text-foreground-muted">
+                <span className="flex items-center gap-1.5 min-w-0 text-xs text-foreground-muted">
                   <span className="size-1.5 rounded-full bg-surface4 shrink-0" />
                   <span className="truncate">{channelAgentNames.join('、')}</span>
-                  <span className="shrink-0">空闲</span>
+                  <span className="shrink-0">Idle</span>
                 </span>
               )}
             </div>
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0 [app-region:no-drag]">
-          {/* Agent Quota & Usage Capsule (Claude / Antigravity) */}
+          {/* Agent Quota & Usage Capsule (Claude) */}
           <AgentQuotaCapsule agentName={activeModelAgentName} />
 
           {/* Git — a compose surface (stage/commit/sync), not a settings
@@ -800,192 +810,45 @@ export function ChatView() {
               nesting a commit textarea inside the overflow menu below. */}
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
-          {/* Everything else — new topic, agent membership, step detail,
-              side panels, collaboration mode, share — lives behind one
-              overflow menu so the header reads as title-plus-one-button. */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" mode="icon" size="sm" title="More">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {/* New topic — same agents, empty context. The participants are
-                  inherited from this thread on purpose: a channel with no
-                  members falls back to every agent in the workspace on the
-                  backend, which would make the first message fan out to everyone. */}
-              {!isDM && (currentSession?.participants?.length ?? 0) > 0 && (
-                <DropdownMenuItem
-                  onClick={() => void createSession({ participants: currentSession!.participants })}
-                  className="gap-2 text-xs"
-                >
-                  <MessageSquarePlus className="size-3.5 text-foreground-muted" />
-                  New topic
-                </DropdownMenuItem>
-              )}
+          {/* Quick Share button */}
+          <button
+            onClick={() => setShareDialogOpen(true)}
+            className="size-8 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title="分享对话 (Share conversation)"
+          >
+            <Share2 className="size-4" />
+          </button>
 
-              {/* Manage thread agents (add / remove / set leader). Deliberately
-                  shown even with zero agents: this is the only way to add one. */}
-              {!isDM && (() => {
-                const participants = currentSession?.participants || [];
-                // In-thread list must include OFFLINE participants too — otherwise an
-                // agent whose daemon is down can never be removed from the thread.
-                const agentByName = new Map(agents.map((a) => [a.agentName, a]));
-                const inThread = participants.map(
-                  (name) => agentByName.get(name) || { agentName: name, status: 'offline' }
-                );
-                // The "Add to thread" picker still only offers online agents.
-                const notInThread = agents.filter(
-                  (a) => a.status === 'online' && !participants.includes(a.agentName)
-                );
-                return (
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="gap-2 text-xs">
-                      <Users className="size-3.5 text-foreground-muted" />
-                      Manage agents
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-56">
-                      {inThread.length > 0 && (
-                        <>
-                          <DropdownMenuLabel>In this thread</DropdownMenuLabel>
-                          {inThread.map((agent) => (
-                            <div
-                              key={agent.agentName}
-                              className="flex items-center gap-2 px-2 py-1.5 rounded-md group"
-                            >
-                              <AgentAvatar name={agent.agentName} size={20} />
-                              <span className="text-sm flex-1 truncate">{agent.agentName}</span>
-                              {agent.status !== 'online' && (
-                                <span className="text-[10px] text-muted-foreground shrink-0">offline</span>
-                              )}
-                              {currentSession?.master === agent.agentName ? (
-                                <span
-                                  className="flex items-center gap-1 text-[10px] text-status-warning shrink-0"
-                                  title="Channel leader — receives messages that don't @mention anyone"
-                                >
-                                  <Crown className="size-3" /> leader
-                                </span>
-                              ) : (
-                                <button
-                                  onClick={() => currentSessionId && setSessionMaster(currentSessionId, agent.agentName)}
-                                  className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-warning opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                                  title="Set as thread leader"
-                                >
-                                  <Crown className="size-3" />
-                                </button>
-                              )}
-                              {inThread.length > 1 && (
-                                <button
-                                  onClick={() => currentSessionId && removeParticipant(currentSessionId, agent.agentName)}
-                                  className="size-5 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger opacity-0 group-hover:opacity-100 transition-all shrink-0"
-                                  title="Remove from thread"
-                                >
-                                  <X className="size-3" />
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </>
-                      )}
-                      {notInThread.length > 0 && (
-                        <>
-                          {inThread.length > 0 && <DropdownMenuSeparator />}
-                          <DropdownMenuLabel>Add to thread</DropdownMenuLabel>
-                          {notInThread.map((agent) => (
-                            <button
-                              key={agent.agentName}
-                              onClick={() => currentSessionId && addParticipant(currentSessionId, agent.agentName)}
-                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface2 transition-colors"
-                            >
-                              <AgentAvatar name={agent.agentName} size={20} />
-                              <span className="text-sm flex-1 truncate text-left">{agent.agentName}</span>
-                              <Plus className="size-3 text-muted-foreground shrink-0" />
-                            </button>
-                          ))}
-                        </>
-                      )}
-                      {inThread.length === 0 && notInThread.length === 0 && (
-                        <p className="text-sm text-muted-foreground px-2 py-3 text-center">No agents online</p>
-                      )}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                );
-              })()}
+          {/* Quick Export Markdown button */}
+          <button
+            onClick={() => void handleExportMarkdown()}
+            disabled={exporting || !currentSessionId}
+            className="size-8 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30"
+            title="导出为 Markdown (Export as Markdown)"
+          >
+            {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          </button>
 
-              {/* All steps toggle */}
-              {hasStatusMessages && (
-                <DropdownMenuCheckboxItem
-                  checked={showAllSteps}
-                  onCheckedChange={(v) => setShowAllSteps(v)}
-                  className="gap-2 text-xs"
-                >
-                  <ListTree className="size-3.5 text-foreground-muted" />
-                  Show all steps
-                </DropdownMenuCheckboxItem>
-              )}
+          {/* Quick Panels toggle */}
+          <button
+            onClick={() => setActiveRightTab(activeRightTab ? null : 'preview')}
+            className={cn(
+              'size-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+              activeRightTab ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+            )}
+            title="切换内置浏览器预览面板 (Toggle Browser Preview)"
+          >
+            <PanelRight className="size-4" />
+          </button>
 
-              {/* Side panels (see SIDE_PANELS) */}
-              {!isMobile && (
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="gap-2 text-xs">
-                    <PanelRight className="size-3.5 text-foreground-muted" />
-                    Panels
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-44">
-                    {SIDE_PANELS.map((panel) => {
-                      const Icon = panel.icon;
-                      const isOpen = activeRightTab === panel.id;
-                      return (
-                        <DropdownMenuItem
-                          key={panel.id}
-                          onClick={() => setActiveRightTab(isOpen ? null : panel.id)}
-                          className="gap-2 text-xs"
-                        >
-                          <Icon className="size-3.5 text-foreground-muted" />
-                          <span className="flex-1">{panel.label}</span>
-                          {isOpen && <Check className="size-3.5" />}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              )}
-
-              {/* Collaboration mode — only for multi-agent threads */}
-              {!isDM && currentSession && (() => {
-                const participants = currentSession.participants || [];
-                const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
-                if (sessionAgents.length < 2) return null;
-                return (
-                  <OrchestrationControl
-                    variant="submenu"
-                    session={currentSession}
-                    agents={sessionAgents}
-                    onChange={(updates) => setSessionOrchestration(currentSessionId!, updates)}
-                  />
-                );
-              })()}
-
-              <DropdownMenuSeparator />
-
-              {/* Share conversation */}
-              <DropdownMenuItem onClick={() => setShareDialogOpen(true)} className="gap-2 text-xs">
-                <Share2 className="size-3.5 text-foreground-muted" />
-                Share conversation
-              </DropdownMenuItem>
-
-              {/* Export — the whole thread as one .md file, for Obsidian /
-                  Notion / committing next to the code it describes. */}
-              <DropdownMenuItem
-                onSelect={(e) => { e.preventDefault(); void handleExportMarkdown(); }}
-                disabled={exporting || !currentSessionId}
-                className="gap-2 text-xs"
-              >
-                <Download className="size-3.5 text-foreground-muted" />
-                {exporting ? 'Exporting...' : 'Export as Markdown'}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Settings Center shortcut */}
+          <button
+            onClick={() => openSettings('general')}
+            className="size-8 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title="设置中心 (智能体/辅助面板/导出/技能)"
+          >
+            <Settings className="size-4" />
+          </button>
         </div>
       </div>
 
@@ -1002,7 +865,7 @@ export function ChatView() {
         return (
           <div className="flex items-center gap-2 px-3 py-1.5 border-b shrink-0 overflow-x-auto bg-surface2 text-status-warning">
             <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
-            <span className="text-[11px] leading-snug shrink-0 font-medium">
+            <span className="text-2xs leading-snug shrink-0 font-medium">
               Routing may be less accurate — no description for:
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
@@ -1010,7 +873,7 @@ export function ChatView() {
                 <button
                   key={a.agentName}
                   onClick={() => setSelectedAgentName(a.agentName)}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors cursor-pointer text-foreground"
+                  className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors cursor-pointer text-foreground"
                   title={`Add a description for ${a.agentName}`}
                 >
                   <Sparkles className="size-2.5 text-status-warning" />
@@ -1039,17 +902,17 @@ export function ChatView() {
           <div className="flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
             <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.2s_ease-out]">
               {/* Brand Emblem */}
-              <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center shadow-xs">
-                <Sparkles className="size-6 text-primary" />
+              <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center p-2 shadow-xs overflow-hidden">
+                <img src="/logo-icon.png" alt="52hzAgents Logo" className="size-7 object-contain" />
               </div>
 
               {/* Title & Greeting */}
               <div className="space-y-1">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                  有什么我可以协助你构建的？
+                  What can I help you build?
                 </h1>
                 <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                  52hzAgents 本地多 Agent 协同工作区 · 快捷呼出 · 深度推理与安全执行
+                  52hzAgents — a local multi-agent workspace. Quick recall, deep reasoning, safe execution.
                 </p>
               </div>
 
@@ -1059,9 +922,9 @@ export function ChatView() {
                     <Radio className="size-5 animate-pulse" />
                   </div>
                   <div className="space-y-1">
-                    <h2 className="text-sm font-semibold text-foreground">暂无在线的 Agent</h2>
+                    <h2 className="text-sm font-semibold text-foreground">No agents online</h2>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      当前工作区未检测到已连接的 Agent。请启动本地连接器或前往连接页面接入 Agent（如 Claude、OpenClaw 等）后即可开始对话。
+                      No connected agents were found in this workspace. Start the local connector, or open the connect page to add an agent (Claude, OpenClaw, and so on) before starting a conversation.
                     </p>
                   </div>
                   <div className="pt-1 flex items-center gap-2">
@@ -1071,14 +934,16 @@ export function ChatView() {
                       className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                     >
                       <Plug className="size-3.5" />
-                      <span>连接 Agent</span>
+                      <span>Connect agent</span>
                     </button>
                   </div>
                 </div>
               ) : (
                 /* 4 Interactive Prompt Starter Cards */
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left pt-2">
-                  {PROMPT_SUGGESTIONS.map((item, idx) => (
+                  {PROMPT_SUGGESTIONS.map((item, idx) => {
+                    const SuggestionIcon = item.icon;
+                    return (
                     <button
                       key={idx}
                       type="button"
@@ -1088,22 +953,23 @@ export function ChatView() {
                       }}
                       className="flex items-start gap-3 p-3 rounded-xl bg-surface1/80 hover:bg-surface2/90 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
                     >
-                      <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center shrink-0 text-base group-hover:scale-105 transition-transform">
-                        {item.icon}
+                      <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                        <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-primary transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
                           <span>{item.title}</span>
-                          <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
+                          <span className="text-3xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
                             ↵
                           </span>
                         </div>
-                        <div className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 leading-snug">
+                        <div className="text-2xs text-muted-foreground line-clamp-1 mt-0.5 leading-snug">
                           {item.desc}
                         </div>
                       </div>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1131,14 +997,14 @@ export function ChatView() {
                 <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
-                    <span className="truncate">当前没有 Agent 在线，请先连接 Agent 后方可开始对话</span>
+                    <span className="truncate">No agents are online — connect one before starting a conversation</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setViewMode('mission')}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-2xs font-medium transition-colors cursor-pointer"
                   >
-                    <span>前往连接</span>
+                    <span>Go to connect</span>
                     <ArrowRight className="size-3" />
                   </button>
                 </div>
@@ -1147,7 +1013,7 @@ export function ChatView() {
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
                     <span className="truncate">
-                      当前会话指定的 Agent ({sessionParticipants.map(p => `@${p}`).join(', ')}) 处于离线状态
+                      The agents assigned to this thread ({sessionParticipants.map(p => `@${p}`).join(', ')}) are offline
                     </span>
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
@@ -1156,18 +1022,18 @@ export function ChatView() {
                         key={a.agentName}
                         type="button"
                         onClick={() => currentSessionId && addParticipant(currentSessionId, a.agentName)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-2xs font-medium transition-colors cursor-pointer"
                       >
                         <Plus className="size-3" />
-                        <span>添加 @{a.agentName}</span>
+                        <span>Add @{a.agentName}</span>
                       </button>
                     ))}
                     <button
                       type="button"
                       onClick={() => setViewMode('mission')}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-2xs font-medium transition-colors cursor-pointer"
                     >
-                      <span>连接</span>
+                      <span>Connect</span>
                     </button>
                   </div>
                 </div>
@@ -1175,7 +1041,7 @@ export function ChatView() {
                 <div className="mb-2.5 flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-surface1/90 border border-border/60 text-xs">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Sparkles className="size-3.5 text-primary" />
-                    <span>选择参与对话的 Agent：</span>
+                    <span>Choose the agents for this conversation</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {onlineAgents.map((agent) => (
@@ -1184,7 +1050,7 @@ export function ChatView() {
                         onClick={() => {
                           if (currentSessionId) addParticipant(currentSessionId, agent.agentName);
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/50 text-[11px] font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/50 text-2xs font-medium transition-colors cursor-pointer"
                       >
                         <AgentAvatar name={agent.agentName} size={14} />
                         <span>@{agent.agentName}</span>

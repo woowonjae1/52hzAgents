@@ -261,7 +261,7 @@ export function FileGrid() {
                   >
                     <Folder className="size-12 text-status-warning" />
                     <span className="text-xs font-medium truncate w-full">{entry.name}</span>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-3xs text-muted-foreground">
                       {entry.fileCount} {entry.fileCount === 1 ? 'item' : 'items'}
                     </span>
                   </button>
@@ -300,7 +300,7 @@ export function FileGrid() {
                   </span>
 
                   {/* Metadata */}
-                  <span className="text-[10px] text-muted-foreground leading-tight">
+                  <span className="text-3xs text-muted-foreground leading-tight">
                     {formatSize(file.size)}
                     {file.createdAt && ` · ${timeAgo(file.createdAt)}`}
                   </span>

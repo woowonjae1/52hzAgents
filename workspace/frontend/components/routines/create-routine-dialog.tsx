@@ -207,7 +207,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
             <div className="space-y-3">
               <div className="flex gap-2">
                 <div className="flex-1 space-y-1">
-                  <label className="text-[11px] text-muted-foreground">Hour (UTC)</label>
+                  <label className="text-2xs text-muted-foreground">Hour (UTC)</label>
                   <select
                     value={hour}
                     onChange={(e) => setHour(Number(e.target.value))}
@@ -220,7 +220,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                   </select>
                 </div>
                 <div className="flex-1 space-y-1">
-                  <label className="text-[11px] text-muted-foreground">Minute</label>
+                  <label className="text-2xs text-muted-foreground">Minute</label>
                   <select
                     value={minute}
                     onChange={(e) => setMinute(Number(e.target.value))}
@@ -234,7 +234,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] text-muted-foreground">Days</label>
+                <label className="text-2xs text-muted-foreground">Days</label>
                 <div className="flex gap-1">
                   {DAY_LABELS.map((label, i) => (
                     <button
@@ -242,7 +242,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
                       onClick={() => toggleDay(i)}
                       disabled={submitting}
                       className={cn(
-                        'flex-1 text-[10px] font-medium py-1.5 rounded-md transition-colors border',
+                        'flex-1 text-3xs font-medium py-1.5 rounded-md transition-colors border',
                         days.has(i)
                           ? 'bg-primary border-primary text-white font-semibold'
                           : 'border-border text-muted-foreground hover:bg-surface1 dark:hover:bg-primary'

@@ -344,7 +344,41 @@ function createMainWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: true,
+      // Enables <webview> for the Local Preview panel. A <webview> is its own
+      // WebContents, which is the only way to show a dev server running on this
+      // machine: an <iframe> in the renderer is blocked as mixed content when
+      // the workspace is served over https, is refused outright by any target
+      // sending X-Frame-Options, and can never expose its console to us.
+      //
+      // It also widens the attack surface, so `will-attach-webview` below locks
+      // down what may be attached. Only this window gets the flag — the
+      // quick-bar window has no use for it.
+      webviewTag: true,
     },
+  });
+
+  // Guard every <webview> attach. Two independent things are enforced here:
+  //
+  //  1. The child gets no preload and no node integration, whatever the
+  //     renderer asked for. Without this a compromised renderer could attach a
+  //     webview that runs with the app's own preload bridge.
+  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+
+    let allowed = false;
+    try {
+      const u = new URL(params.src);
+      allowed = u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      allowed = false;
+    }
+
+    if (!allowed) {
+      console.warn(`[preview] blocked non-http(s) webview src: ${params.src}`);
+      event.preventDefault();
+    }
   });
 
   Menu.setApplicationMenu(null);
@@ -386,11 +420,29 @@ function createMainWindow() {
     if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
       return { action: 'allow' };
     }
+    if (url.startsWith('file:') || url.startsWith('vscode:') || url.startsWith('cursor:')) {
+      try {
+        if (url.startsWith('file:')) {
+          let filePath = decodeURIComponent(url.replace(/^file:\/\/\/?/, '')).split('#')[0];
+          if (process.platform === 'win32') {
+            if (filePath.startsWith('/') && /^[a-zA-Z]:/.test(filePath.slice(1))) {
+              filePath = filePath.slice(1);
+            }
+          }
+          shell.openPath(filePath);
+        } else {
+          shell.openExternal(url);
+        }
+      } catch (e) {
+        console.error('[52hzAgents] Failed to open local file link:', e);
+      }
+      return { action: 'deny' };
+    }
     if (url.startsWith('http:') || url.startsWith('https:')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }
-    return { action: 'allow' };
+    return { action: 'deny' };
   });
 
   mainWindow.on('close', (event) => {
@@ -521,6 +573,41 @@ ipcMain.handle('dialog-open-folder', async (event, defaultPath) => {
   } catch (err) {
     console.error('[52hzAgents] Native dialog-open-folder error:', err);
     return null;
+  }
+});
+
+// Shell local file & folder openers
+ipcMain.handle('shell-open-path', async (event, pathStr) => {
+  if (!pathStr) return false;
+  try {
+    let cleanPath = decodeURIComponent(pathStr.replace(/^file:\/\/\/?/, '')).split('#')[0];
+    if (process.platform === 'win32') {
+      if (cleanPath.startsWith('/') && /^[a-zA-Z]:/.test(cleanPath.slice(1))) {
+        cleanPath = cleanPath.slice(1);
+      }
+    }
+    const err = await shell.openPath(cleanPath);
+    return !err;
+  } catch (e) {
+    console.error('[52hzAgents] shell-open-path error:', e);
+    return false;
+  }
+});
+
+ipcMain.handle('shell-show-item', async (event, pathStr) => {
+  if (!pathStr) return false;
+  try {
+    let cleanPath = decodeURIComponent(pathStr.replace(/^file:\/\/\/?/, '')).split('#')[0];
+    if (process.platform === 'win32') {
+      if (cleanPath.startsWith('/') && /^[a-zA-Z]:/.test(cleanPath.slice(1))) {
+        cleanPath = cleanPath.slice(1);
+      }
+    }
+    shell.showItemInFolder(cleanPath);
+    return true;
+  } catch (e) {
+    console.error('[52hzAgents] shell-show-item error:', e);
+    return false;
   }
 });
 

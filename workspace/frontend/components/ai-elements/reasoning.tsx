@@ -42,14 +42,14 @@ export function Reasoning({
   }, [durationMs, startTime]);
 
   // Collapsed capsule label: live shimmer while streaming, "思考了 x.xs" once settled
-  const label = isStreaming ? '正在思考…' : durationText ? `思考了 ${durationText}` : '思考过程';
+  const label = isStreaming ? 'Thinking…' : durationText ? `Thought for ${durationText}` : 'Reasoning';
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!content) return;
     navigator.clipboard.writeText(content);
     setCopied(true);
-    toast.success('思考过程已复制');
+    toast.success('Reasoning copied');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -86,7 +86,7 @@ export function Reasoning({
           {isStreaming && !reduceMotion ? (
             // Gentle shimmer sweep across the label while reasoning streams in
             <motion.span
-              className="text-[11px] font-medium bg-clip-text text-transparent"
+              className="text-2xs font-medium bg-clip-text text-transparent"
               style={{
                 backgroundImage:
                   'linear-gradient(90deg, var(--foreground-muted) 0%, var(--foreground) 50%, var(--foreground-muted) 100%)',
@@ -100,7 +100,7 @@ export function Reasoning({
           ) : (
             <span
               className={cn(
-                'text-[11px] font-medium transition-colors duration-200',
+                'text-2xs font-medium transition-colors duration-200',
                 'text-foreground-muted group-hover/reasoning:text-foreground'
               )}
             >
@@ -126,7 +126,7 @@ export function Reasoning({
               'p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
               'transition-all duration-200 cursor-pointer'
             )}
-            title="复制思考过程"
+            title="Copy reasoning"
           >
             {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
           </button>
@@ -150,12 +150,12 @@ export function Reasoning({
                 className="absolute left-0 top-0.5 bottom-0.5 w-px rounded-full bg-gradient-to-b from-border-accent/80 via-border/60 to-transparent"
               />
               {content ? (
-                <div className="text-xs leading-[1.7] text-foreground-muted [&_*]:text-xs [&_p]:my-1 [&_pre]:text-[11px]">
+                <div className="text-xs leading-[1.7] text-foreground-muted [&_*]:text-xs [&_p]:my-1 [&_pre]:text-2xs">
                   <MarkdownContent content={content} />
                 </div>
               ) : (
                 <span className="text-xs italic text-foreground-extra-muted animate-pulse">
-                  正在梳理推理逻辑与上下文...
+                  Working through the reasoning…
                 </span>
               )}
             </div>

@@ -57,7 +57,7 @@ export function ConnectAgentsEmpty() {
         />
 
         <div className="rounded-xl border border-input p-4 space-y-2">
-          <p className="text-[10px] font-medium tracking-wider text-muted-foreground">
+          <p className="text-3xs font-medium tracking-wider text-muted-foreground">
             WORKSPACE
           </p>
           <LabeledValue label="ID" value={workspace?.slug || ''} />
@@ -105,7 +105,7 @@ function StepCard({
   return (
     <div className="rounded-xl border border-input p-3.5 space-y-2.5">
       <div className="flex items-start gap-2.5">
-        <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+        <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full bg-primary text-2xs font-bold text-primary-foreground">
           {number}
         </span>
         <div className="min-w-0">

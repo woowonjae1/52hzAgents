@@ -109,11 +109,11 @@ export function SidebarContent() {
                   className="size-5 rounded-full shrink-0 object-cover"
                 />
               ) : (
-                <div className="size-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[9px] font-bold shrink-0">
+                <div className="size-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-3xs font-bold shrink-0">
                   {user.email[0].toUpperCase()}
                 </div>
               )}
-              <span className="text-[11px] text-muted-foreground truncate flex-1">
+              <span className="text-2xs text-muted-foreground truncate flex-1">
                 {user.email}
               </span>
               <button
@@ -159,7 +159,7 @@ function TabButton({
       {badge !== undefined && badge > 0 && (
         <span
           className={cn(
-            'min-w-[1.25rem] px-1.5 h-4 rounded-full text-[10px] font-semibold flex items-center justify-center',
+            'min-w-[1.25rem] px-1.5 h-4 rounded-full text-3xs font-medium flex items-center justify-center',
             active
               ? 'bg-indigo-500 text-white'
               : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300',

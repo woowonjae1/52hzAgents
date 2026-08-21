@@ -4,11 +4,12 @@ package scheduler
 // 导入包依赖，处理 JSON、日志以及数据库操作。
 import (
 	"encoding/json" // 编码事件负载。
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
-	"log"  // 打印到期任务触发日志。
-	"time" // 控制轮询间隔与到期比对。
+	"log"           // 打印到期任务触发日志。
+	"time"          // 控制轮询间隔与到期比对。
 
-	"github.com/google/uuid"                                               // 生成事件唯一 UUID 主键。
+	"github.com/google/uuid" // 生成事件唯一 UUID 主键。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"       // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/handlers" // 引入 ComputeNextFiresAt 算法。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"      // 内存广播 Hub。
@@ -24,6 +25,8 @@ func StartScheduler() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop() // 方法结束时释放计时器。
 
+		compactionCounter := 0
+
 		// 无限循环监听计时器 Tick 信号，并带有 panic 容错恢复保护。
 		for range ticker.C {
 			func() {
@@ -35,6 +38,13 @@ func StartScheduler() {
 				expireStaleAgents()
 				fireDueTimers()   // 执行到期 Timers 触发扫描。
 				fireDueRoutines() // 执行到期 Routines 触发扫描。
+
+				// Auto-compact active channels every 60 seconds (12 ticks * 5s)
+				compactionCounter++
+				if compactionCounter >= 12 {
+					compactionCounter = 0
+					compactActiveChannels()
+				}
 			}()
 		}
 	}()
@@ -258,5 +268,27 @@ func fireDueRoutines() {
 		}
 
 		log.Printf("Routine %s (Name: %s) successfully fired in channel: %s", r.ID, r.Name, r.ChannelName)
+	}
+}
+
+func compactActiveChannels() {
+	if db.DB == nil {
+		return
+	}
+	var activeChannels []models.Channel
+	// Scan active channels that have received events
+	if err := db.DB.Where("status = ? AND last_event_at IS NOT NULL", "active").Limit(20).Find(&activeChannels).Error; err != nil {
+		return
+	}
+
+	for _, ch := range activeChannels {
+		res, err := compaction.CompactChannel(ch.WorkspaceID, ch.Name, nil)
+		if err != nil {
+			log.Printf("scheduler: compaction error on channel %s: %v", ch.Name, err)
+			continue
+		}
+		if res != nil && !res.Skipped {
+			log.Printf("scheduler: auto-compacted channel %s (%d msgs, %d tokens saved)", ch.Name, res.CompactedCount, res.TokensSaved)
+		}
 	}
 }

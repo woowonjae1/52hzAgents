@@ -97,10 +97,10 @@ export function AgentProfilePanel() {
           <div className="flex items-center gap-3">
             <AgentAvatar name={agent.agentName} size={40} status={agent.status} showStatus />
             <div className="flex-1 min-w-0">
-              <h3 className="text-[15px] font-semibold leading-tight truncate">{agent.agentName}</h3>
+              <h3 className="text-base font-semibold leading-tight truncate">{agent.agentName}</h3>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={cn(
-                  'inline-flex items-center gap-1 text-[11px] px-1.5 py-px rounded font-medium',
+                  'inline-flex items-center gap-1 text-2xs px-1.5 py-px rounded font-medium',
                   isOnline ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'
                 )}>
                   <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-green-500' : 'bg-zinc-400')} />
@@ -120,7 +120,7 @@ export function AgentProfilePanel() {
             </div>
             <div className="p-3">
               <textarea
-                className="w-full text-[13px] leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/50 min-h-[60px]"
+                className="w-full text-sm leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/50 min-h-[60px]"
                 placeholder={`Describe what ${agent.agentName} does so other agents know when to delegate work...`}
                 value={description}
                 onChange={(e) => {
@@ -135,7 +135,7 @@ export function AgentProfilePanel() {
                   <button
                     onClick={handleSaveDescription}
                     disabled={saving}
-                    className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium transition-colors"
+                    className="text-2xs px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save'}
                   </button>
@@ -158,7 +158,7 @@ export function AgentProfilePanel() {
                   </div>
                   <div className="flex-1 min-w-0 flex items-start gap-1">
                     <span className={cn(
-                      'text-[13px] break-all leading-snug',
+                      'text-sm break-all leading-snug',
                       item.label !== 'Type' ? 'font-mono' : 'font-medium capitalize'
                     )}>
                       {item.value}

@@ -65,7 +65,7 @@ function NotificationCard({
             {notification.title}
           </span>
           {notification.priority === 'high' && (
-            <span className="text-[10px] px-1 py-0.5 rounded bg-surface2 text-status-danger font-medium shrink-0">
+            <span className="text-3xs px-1 py-0.5 rounded bg-surface2 text-status-danger font-medium shrink-0">
               High
             </span>
           )}
@@ -74,10 +74,10 @@ function NotificationCard({
           {notification.message}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          <span className="text-[10px] text-muted-foreground">{agentName}</span>
-          <span className="text-[10px] text-muted-foreground">{timeAgo(notification.createdAt)}</span>
+          <span className="text-3xs text-muted-foreground">{agentName}</span>
+          <span className="text-3xs text-muted-foreground">{timeAgo(notification.createdAt)}</span>
           {notification.channelName && (
-            <span className="text-[10px] text-foreground-muted flex items-center gap-0.5">
+            <span className="text-3xs text-foreground-muted flex items-center gap-0.5">
               <ArrowRight className="size-2.5" />
               Go to thread
             </span>
@@ -87,7 +87,7 @@ function NotificationCard({
               href={notification.linkUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] text-foreground-muted flex items-center gap-0.5"
+              className="text-3xs text-foreground-muted flex items-center gap-0.5"
               onClick={(e) => e.stopPropagation()}
             >
               <ExternalLink className="size-2.5" />

@@ -10,7 +10,6 @@ import { SwimlaneTimeline, type SwimlaneEvent } from './swimlane-timeline';
 import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
 import { OnboardingGuide } from './onboarding-guide';
 import { ConnectAgentModal } from './connect-agent-modal';
-import { CustomAgentModal } from './custom-agent-modal';
 import { MetricCard, SparklineBar, SparklineArea, RingProgress } from './metrics-charts';
 import {
   Users,
@@ -40,11 +39,10 @@ export function MissionControl() {
     workingAgentNames,
     setCurrentSessionId,
   } = useWorkspace();
-  const { setViewMode } = useLayout();
+  const { setViewMode, isSidebarOpen } = useLayout();
   const reduceMotion = useReducedMotion();
 
   const [connectModalOpen, setConnectModalOpen] = useState(false);
-  const [customModalOpen, setCustomModalOpen] = useState(false);
   const [showIntegrations, setShowIntegrations] = useState(true);
 
   // View state: 'grid' | 'swimlane'
@@ -226,7 +224,7 @@ export function MissionControl() {
         type: 'stalled',
         agentName: s.agent.agentName,
         channelId: s.focusThread?.sessionId || '',
-        channelTitle: s.focusThread?.title || '新频道',
+        channelTitle: s.focusThread?.title || 'New channel',
         stalledMs: s.stalledMs || 35000,
         timestamp: new Date(),
       }));
@@ -249,10 +247,10 @@ export function MissionControl() {
           id: `swim-${s.agent.agentName}`,
           agentName: s.agent.agentName,
           type: isBlock ? 'blocked' : isStall ? 'stalled' : isWork ? 'tool' : 'message',
-          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || '任务运行中',
+          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || 'Task running',
           startOffsetSec: isWork || isBlock ? 60 : 15,
           durationSec: isWork || isBlock ? 45 : 15,
-          channelTitle: s.focusThread?.title || '频道',
+          channelTitle: s.focusThread?.title || 'Channel',
           sessionId: s.focusThread?.sessionId || '',
           status: isBlock ? 'blocked' : isStall ? 'error' : isWork ? 'running' : 'success',
         };
@@ -286,18 +284,14 @@ export function MissionControl() {
   };
 
   const handlePairAgent = async (agentName: string) => {
-    if (agentName.toLowerCase() === 'custom') {
-      setCustomModalOpen(true);
-      return;
-    }
     try {
-      toast.info(`正在连接 ${agentName}...`);
+      toast.info(`Connecting ${agentName}…`);
       await workspaceApi.launchAgent(agentName);
-      toast.success(`${agentName} 已上线`);
+      toast.success(`${agentName} is online`);
       const updated = await workspaceApi.listAgents();
       setAgents(updated);
     } catch {
-      toast.error(`无法连接 ${agentName}`);
+      toast.error(`Could not connect ${agentName}`);
     }
   };
 
@@ -348,7 +342,7 @@ export function MissionControl() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
       {/* Header Strip with 4 Always-Visible Analytics Cards */}
-      <div className="shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-3.5">
+      <div className={cn("shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-3.5 transition-all duration-200", !isSidebarOpen && "pl-14")}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface2 text-primary shadow-2xs">
@@ -356,10 +350,10 @@ export function MissionControl() {
             </div>
             <div className="min-w-0">
               <h1 className="text-sm font-bold tracking-tight text-foreground">
-                指挥中心
+                Mission control
               </h1>
               <p className="text-xs text-muted-foreground mt-0.5">
-                多智能体协同调度 · 负载监控 · 实时动态追踪
+                Multi-agent scheduling, load monitoring, and live activity
               </p>
             </div>
           </div>
@@ -377,7 +371,7 @@ export function MissionControl() {
               )}
             >
               <LayoutGrid className="size-3.5" />
-              <span>席位卡片</span>
+              <span>Stations</span>
             </button>
             <button
               type="button"
@@ -390,7 +384,7 @@ export function MissionControl() {
               )}
             >
               <Clock className="size-3.5" />
-              <span>并行泳道</span>
+              <span>Swimlanes</span>
             </button>
           </div>
         </div>
@@ -403,11 +397,11 @@ export function MissionControl() {
             className="cursor-pointer"
           >
             <MetricCard
-              title="待办处理"
+              title="Needs attention"
               value={blockedCount}
-              subtitle={blockedCount > 0 ? '⚠️ 需要立即人工确认' : '运行正常，无阻塞'}
+              subtitle={blockedCount > 0 ? 'Human confirmation required' : 'Running clean, nothing blocked'}
               icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
-              badge={blockedCount > 0 ? { text: '待处理', trend: 'down' } : undefined}
+              badge={blockedCount > 0 ? { text: 'Blocked', trend: 'down' } : undefined}
               className={cn(
                 filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
                 blockedCount > 0 && 'bg-amber-500/[0.04]'
@@ -421,11 +415,11 @@ export function MissionControl() {
             className="cursor-pointer"
           >
             <MetricCard
-              title="运行中"
+              title="Running"
               value={workingCount}
-              subtitle={workingCount > 0 ? `${workingCount} 个正在执行任务` : '全部处于待命就绪态'}
+              subtitle={workingCount > 0 ? `${workingCount} working on a task` : 'All agents standing by'}
               icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
-              badge={workingCount > 0 ? { text: `${workingCount} 活跃`, trend: 'neutral' } : undefined}
+              badge={workingCount > 0 ? { text: `${workingCount} active`, trend: 'neutral' } : undefined}
               chart={workingCount > 0 ? <SparklineBar data={[12, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} /> : undefined}
               className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
             />
@@ -437,9 +431,9 @@ export function MissionControl() {
             className="cursor-pointer"
           >
             <MetricCard
-              title="在线智能体"
+              title="Agents online"
               value={`${onlineCount} / ${agents.length}`}
-              subtitle={onlineCount > 0 ? '心跳守护进程正常' : '全部离线待命'}
+              subtitle={onlineCount > 0 ? 'Heartbeat healthy' : 'All agents offline'}
               icon={<Users className="size-3.5 text-emerald-500" />}
               chart={
                 onlineCount > 0 ? (
@@ -459,9 +453,9 @@ export function MissionControl() {
           {/* Card 4: Tokens Reported */}
           <div>
             <MetricCard
-              title="Token 消耗"
+              title="Token usage"
               value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
-              subtitle={totalTokens > 0 ? '累计会话消耗量' : '暂无消耗记录'}
+              subtitle={totalTokens > 0 ? 'Cumulative across sessions' : 'Nothing recorded yet'}
               icon={<Zap className="size-3.5 text-violet-500" />}
               chart={totalTokens > 0 ? <SparklineArea data={[10, 18, 14, 26, 22, 34, 30]} color="#8b5cf6" height={30} width={72} /> : undefined}
             />
@@ -472,12 +466,7 @@ export function MissionControl() {
       <ConnectAgentModal
         open={connectModalOpen}
         onOpenChange={setConnectModalOpen}
-        onConfigureCustom={() => {
-          setConnectModalOpen(false);
-          setCustomModalOpen(true);
-        }}
       />
-      <CustomAgentModal open={customModalOpen} onOpenChange={setCustomModalOpen} />
 
       {/* Main Body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -506,10 +495,10 @@ export function MissionControl() {
                 </div>
                 <div className="space-y-0.5 min-w-0">
                   <div className="text-xs font-semibold text-foreground">
-                    {agents.length} 个智能体已就绪，当前全部处于离线待命
+                    {agents.length} agents configured — all currently offline
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    点击下方各席位分别连接，或一键快速连接所有席位
+                  <div className="text-2xs text-muted-foreground truncate">
+                    Connect a station below, or connect them all at once
                   </div>
                 </div>
               </div>
@@ -523,7 +512,7 @@ export function MissionControl() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                 >
                   <RotateCw className="size-3" />
-                  <span>一键连接全部</span>
+                  <span>Connect all</span>
                 </button>
               </div>
             </div>
@@ -537,14 +526,14 @@ export function MissionControl() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
                     <Users className="size-3.5 text-primary" />
-                    <span>我的智能体 ({filteredMyStations.length})</span>
+                    <span>My agents ({filteredMyStations.length})</span>
                     {filterTab !== 'all' && (
                       <button
                         type="button"
                         onClick={() => setFilterTab('all')}
-                        className="ml-2 text-[11px] text-primary hover:underline cursor-pointer"
+                        className="ml-2 text-2xs text-primary hover:underline cursor-pointer"
                       >
-                        (清除筛选: {filterTab})
+                        (clear filter: {filterTab})
                       </button>
                     )}
                   </div>
@@ -552,7 +541,7 @@ export function MissionControl() {
 
                 {filteredMyStations.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl bg-surface1/40 text-xs text-muted-foreground">
-                    未找到符合筛选条件的智能体
+                    No agents match this filter
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
@@ -584,7 +573,7 @@ export function MissionControl() {
                     onClick={() => setShowIntegrations((prev) => !prev)}
                     className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer select-none"
                   >
-                    <span>可用集成模板 ({integrationStations.length})</span>
+                    <span>Available integrations ({integrationStations.length})</span>
                     {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                   </button>
 

@@ -394,8 +394,14 @@ class WorkspaceClient {
       return {
         sessionId: result.name || channelName,
         title: result.title || channelName,
-        titleManuallySet: result.titleManuallySet || false,
-        resumeFrom: result.resumeFrom || null,
+        // The API serialises snake_case (`json:"title_manually_set"` in
+        // internal/models/models.go), so the camelCase read was always
+        // undefined and this collapsed to `false` unconditionally — leaving
+        // `_autoTitleChannel`'s "don't touch a title the user set" guard dead
+        // for as long as it has existed. Both spellings are accepted so the
+        // fix does not depend on which shape a given build returns.
+        titleManuallySet: result.title_manually_set ?? result.titleManuallySet ?? false,
+        resumeFrom: result.resume_from ?? result.resumeFrom ?? null,
         status: result.status || 'active',
         workingDir: result.working_dir || null,
       };
@@ -461,6 +467,20 @@ class WorkspaceClient {
       status: a.status || 'offline',
       enabledSkills: a.enabled_skills || null,
     }));
+  }
+
+  /**
+   * Execute a terminal command via POST /v1/terminal/execute.
+   */
+  async executeTerminalCommand(workspaceId, { command, workingDir, agentName, approvalId } = {}, token) {
+    const body = {
+      network: workspaceId,
+      command,
+    };
+    if (workingDir) body.working_dir = workingDir;
+    if (agentName) body.agent_name = agentName;
+    if (approvalId) body.approval_id = approvalId;
+    return this._post('/v1/terminal/execute', body, this._wsHeaders(token));
   }
 
   // ── File methods ──

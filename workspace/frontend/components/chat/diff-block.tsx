@@ -87,7 +87,7 @@ export function DiffBlock({ code }: DiffBlockProps) {
   };
 
   return (
-    <div className="my-3 overflow-hidden rounded-xl border border-border bg-primary font-mono text-[12.5px] shadow-sm">
+    <div className="my-3 overflow-hidden rounded-xl border border-border bg-primary font-mono text-xs shadow-sm">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 h-9 border-b border-border bg-primary/60 select-none">
         <button
@@ -96,11 +96,11 @@ export function DiffBlock({ code }: DiffBlockProps) {
         >
           <ChevronDown className={cn('size-3.5 shrink-0 transition-transform', collapsed && '-rotate-90')} />
           <FileDiff className="size-3.5 shrink-0 text-foreground-muted" />
-          <span className="text-[11px] truncate text-foreground-extra-muted">{file || 'diff'}</span>
+          <span className="text-2xs truncate text-foreground-extra-muted">{file || 'diff'}</span>
         </button>
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          {adds > 0 && <span className="text-[10px] font-semibold text-status-success tabular-nums">+{adds}</span>}
-          {dels > 0 && <span className="text-[10px] font-semibold text-status-danger tabular-nums">−{dels}</span>}
+          {adds > 0 && <span className="text-3xs font-medium text-status-success tabular-nums">+{adds}</span>}
+          {dels > 0 && <span className="text-3xs font-medium text-status-danger tabular-nums">−{dels}</span>}
           <button onClick={copy} className="text-foreground-muted hover:text-foreground-extra-muted transition-colors" title="Copy diff">
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           </button>
@@ -117,10 +117,10 @@ export function DiffBlock({ code }: DiffBlockProps) {
               return (
                 <div key={i} className={cn('flex items-stretch leading-5', s.row)}>
                   {/* line numbers */}
-                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-[11px] select-none', s.num)}>
+                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-2xs select-none', s.num)}>
                     {r.oldNo ?? ''}
                   </span>
-                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-[11px] select-none border-r border-border/80', s.num)}>
+                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-2xs select-none border-r border-border/80', s.num)}>
                     {r.newNo ?? ''}
                   </span>
                   {/* sign */}

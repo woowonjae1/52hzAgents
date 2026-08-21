@@ -33,7 +33,7 @@ export function NewThreadDialogHost() {
         try {
           await createSession({ participants, resumeFrom, workingDir });
         } catch (e) {
-          toast.error(e instanceof Error ? e.message : '创建频道失败');
+          toast.error(e instanceof Error ? e.message : 'Could not create the channel');
           return;
         }
         setViewMode('threads');

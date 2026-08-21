@@ -92,7 +92,14 @@ export function PromptComposer({
 
   // Real Multi-Agent Orchestration & Workflow State
   const currentMode: OrchestrationMode = (session?.orchestrationMode as OrchestrationMode) || 'dynamic';
-  const masterAgentName = session?.master || agents.find((a) => a.role === 'master')?.agentName || agents[0]?.agentName || 'claude';
+  const onlineAgents = agents.filter((a) => a.status === 'online');
+  const masterAgentName =
+    session?.master ||
+    (onlineAgents.length === 1 ? onlineAgents[0].agentName : null) ||
+    agents.find((a) => a.role === 'master')?.agentName ||
+    (onlineAgents.length > 0 ? onlineAgents[0].agentName : null) ||
+    agents[0]?.agentName ||
+    'claude';
   const [masterDropdownOpen, setMasterDropdownOpen] = React.useState(false);
   const [workflowPlanOpen, setWorkflowPlanOpen] = React.useState(false);
 
@@ -354,9 +361,9 @@ export function PromptComposer({
           >
             {mentionGroups.agents.length > 0 && (
               <div>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="flex items-center gap-1.5 px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
                   <AtSign className="size-3 text-primary" />
-                  <span>智能体 ({mentionGroups.agents.length})</span>
+                  <span>Agents ({mentionGroups.agents.length})</span>
                 </div>
                 <div className="space-y-0.5">
                   {mentionGroups.agents.map((item) => {
@@ -385,11 +392,11 @@ export function PromptComposer({
                             <span className="truncate font-medium">@{item.name}</span>
                             <span
                               className={cn(
-                                'text-[9.5px] px-1 rounded font-mono',
+                                'text-3xs px-1 rounded font-mono',
                                 isSelected ? 'bg-white/20 text-white' : 'bg-surface2 text-muted-foreground'
                               )}
                             >
-                              {item.isOnline ? '在线' : '未连接'}
+                              {item.isOnline ? 'Online' : 'Not connected'}
                             </span>
                           </div>
                         </div>
@@ -402,9 +409,9 @@ export function PromptComposer({
 
             {mentionGroups.knowledge.length > 0 && (
               <div className={cn(mentionGroups.agents.length > 0 && 'border-t border-border/50 pt-1.5')}>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-[10.5px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                <div className="flex items-center gap-1.5 px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                   <BookOpen className="size-3" />
-                  <span>知识库文档 ({mentionGroups.knowledge.length})</span>
+                  <span>Knowledge ({mentionGroups.knowledge.length})</span>
                 </div>
                 <div className="space-y-0.5">
                   {mentionGroups.knowledge.map((item) => {
@@ -456,20 +463,20 @@ export function PromptComposer({
         <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-2 border-b border-border/25 text-xs select-none">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             {/* Real Collaboration Mode Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-surface2 text-[11px] font-medium text-muted-foreground shrink-0 shadow-2xs">
+            <div className="flex items-center p-0.5 rounded-lg bg-surface2 text-2xs font-medium text-muted-foreground shrink-0 shadow-2xs">
               <button
                 type="button"
                 onClick={() => onOrchestrationChange?.({ mode: 'dynamic' })}
                 className={cn(
                   'px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1',
                   currentMode === 'dynamic'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    ? 'bg-surface1 text-foreground shadow-xs font-medium'
                     : 'hover:text-foreground'
                 )}
-                title="动态路由：按上下文自动选择最佳 Agent 响应"
+                title="Dynamic routing — pick the best agent for each message from context"
               >
                 <Sparkles className="size-3 text-primary" />
-                <span>智能动态</span>
+                <span>Dynamic</span>
               </button>
 
               <button
@@ -478,13 +485,13 @@ export function PromptComposer({
                 className={cn(
                   'px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1',
                   currentMode === 'master'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    ? 'bg-surface1 text-foreground shadow-xs font-medium'
                     : 'hover:text-foreground'
                 )}
-                title="主从协同：由主导 Agent 统一调度并分发子任务"
+                title="Master / sub — one lead agent schedules and delegates subtasks"
               >
                 <Crown className="size-3 text-amber-500" />
-                <span>主从协同</span>
+                <span>Master / Sub</span>
               </button>
 
               <button
@@ -498,13 +505,13 @@ export function PromptComposer({
                 className={cn(
                   'px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1',
                   currentMode === 'workflow'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    ? 'bg-surface1 text-foreground shadow-xs font-medium'
                     : 'hover:text-foreground'
                 )}
-                title="流程编排：编写自定义执行工作流计划"
+                title="Workflow — write an explicit execution plan"
               >
                 <Waypoints className="size-3 text-violet-500" />
-                <span>流程编排</span>
+                <span>Workflow</span>
               </button>
             </div>
 
@@ -516,9 +523,10 @@ export function PromptComposer({
                   <button
                     type="button"
                     onClick={() => setMasterDropdownOpen((v) => !v)}
-                    className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-[10.5px] font-semibold cursor-pointer hover:bg-amber-500/20 transition-colors"
+                    className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-3xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors"
                   >
-                    <span>👑 主导: @{masterAgentName}</span>
+                    <Crown className="size-2.5" />
+                    <span>Master: @{masterAgentName}</span>
                     <ChevronDown className="size-2.5" />
                   </button>
 
@@ -547,8 +555,8 @@ export function PromptComposer({
                   )}
                 </div>
 
-                <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                  子智能体协助处理
+                <span className="text-3xs text-muted-foreground hidden sm:inline">
+                  Sub-agents assist
                 </span>
               </div>
             )}
@@ -558,17 +566,17 @@ export function PromptComposer({
                 <button
                   type="button"
                   onClick={() => setWorkflowPlanOpen(true)}
-                  className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 text-[10.5px] font-semibold cursor-pointer hover:bg-violet-500/20 transition-colors"
+                  className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 text-3xs font-medium cursor-pointer hover:bg-violet-500/20 transition-colors"
                 >
                   <FileEdit className="size-2.5" />
-                  <span>编辑工作流计划…</span>
+                  <span>Edit workflow plan…</span>
                 </button>
               </div>
             )}
 
             {currentMode === 'dynamic' && (
-              <span className="text-[10px] text-muted-foreground/80 hidden md:inline pl-1">
-                按意图自动选择参与智能体
+              <span className="text-3xs text-muted-foreground/80 hidden md:inline pl-1">
+                Agents are picked automatically from intent
               </span>
             )}
           </div>
@@ -599,7 +607,7 @@ export function PromptComposer({
                       <FileIcon className="size-3.5" />
                     </span>
                   )}
-                  <span className="max-w-[120px] truncate text-[11px] font-medium text-foreground">
+                  <span className="max-w-[120px] truncate text-2xs font-medium text-foreground">
                     {pf.file.name}
                   </span>
                   <button
@@ -631,18 +639,18 @@ export function PromptComposer({
           }}
           placeholder={
             disabled
-              ? '请先连接在线 Agent...'
-              : '向 52hzAgents 发送指令，输入 @ 或 / 唤起 Agent 或知识库...'
+              ? 'Connect an agent first…'
+              : 'Message 52hzAgents — type @ or / to call an agent or the knowledge base…'
           }
           disabled={disabled}
           rows={1}
-          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-[13.5px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[46px]"
+          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[46px]"
         />
 
         {/* Bottom Control Row */}
         <div className="flex items-center justify-between gap-2 px-2.5 pb-2 pt-1">
           <div className="flex items-center gap-1 min-w-0">
-            <AgentModelSwitcher />
+            <AgentModelSwitcher agentName={masterAgentName} sessionId={session?.sessionId} />
 
             <button
               type="button"
@@ -651,17 +659,17 @@ export function PromptComposer({
                 textareaRef.current?.focus();
               }}
               className={cn(pillButton, showMentions && 'bg-surface3 text-foreground')}
-              title="呼叫 Agent 或知识库 (@)"
+              title="Mention an agent or knowledge doc (@)"
             >
               <AtSign className="size-3.5" />
-              <span className="text-[11px] font-medium hidden sm:inline">Agent / 知识库</span>
+              <span className="text-2xs font-medium hidden sm:inline">Agent / Knowledge</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className={cn(pillButton, 'px-0 w-7 justify-center')}
-              title="添加文件或图片"
+              title="Attach a file or image"
             >
               <Paperclip className="size-3.5" />
             </button>
@@ -683,10 +691,10 @@ export function PromptComposer({
                 type="button"
                 onClick={onCreateRoutine}
                 className={pillButton}
-                title="创建定时任务"
+                title="Create a scheduled task"
               >
                 <CalendarClock className="size-3.5" />
-                <span className="text-[11px] font-medium hidden md:inline">定时</span>
+                <span className="text-2xs font-medium hidden md:inline">Schedule</span>
               </button>
             )}
           </div>
@@ -698,9 +706,9 @@ export function PromptComposer({
                   initial={{ opacity: 0, x: 4 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 4 }}
-                  className="hidden sm:inline select-none text-[10px] font-mono text-muted-foreground/70"
+                  className="hidden sm:inline select-none text-3xs font-mono text-muted-foreground/70"
                 >
-                  ↵ 发送 · ⇧↵ 换行
+                  Enter to send · Shift+Enter for a new line
                 </motion.span>
               )}
             </AnimatePresence>

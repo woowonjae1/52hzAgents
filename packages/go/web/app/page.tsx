@@ -652,7 +652,7 @@ function LoginScreen() {
         ) : (
           <p className="text-xs text-muted-foreground text-center">
             Sign-in is not available on this domain. Open a workspace with{' '}
-            <code className="bg-muted px-1.5 py-0.5 rounded text-[11px]">?token=…</code> in the URL instead.
+            <code className="bg-muted px-1.5 py-0.5 rounded text-2xs">?token=…</code> in the URL instead.
           </p>
         )}
       </div>

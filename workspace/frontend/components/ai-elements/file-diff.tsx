@@ -102,7 +102,7 @@ export function FileDiff({
       .join('\n');
     navigator.clipboard.writeText(text);
     setCopied(true);
-    toast.success('已复制差异代码');
+    toast.success('Diff copied');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -131,7 +131,7 @@ export function FileDiff({
 
         <div className="flex items-center gap-2 shrink-0">
           {/* Stats Badge */}
-          <div className="flex items-center gap-1 text-[11px] font-medium">
+          <div className="flex items-center gap-1 text-2xs font-medium">
             {addedCount > 0 && (
               <span className="text-emerald-600 dark:text-emerald-400 flex items-center">
                 +{addedCount}
@@ -149,7 +149,7 @@ export function FileDiff({
             type="button"
             onClick={handleCopy}
             className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
-            title="复制 Diff 内容"
+            title="Copy diff"
           >
             {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
           </button>
@@ -166,7 +166,7 @@ export function FileDiff({
             transition={{ duration: 0.15 }}
             className="overflow-x-auto overflow-y-hidden"
           >
-            <div className="min-w-full divide-y divide-border/20 text-[11.5px] leading-relaxed">
+            <div className="min-w-full divide-y divide-border/20 text-2xs leading-relaxed">
               {parsedLines.map((line) => {
                 const isAdded = line.type === 'added';
                 const isRemoved = line.type === 'removed';
@@ -181,7 +181,7 @@ export function FileDiff({
                     )}
                   >
                     {/* Line Numbers Gutter */}
-                    <div className="flex select-none shrink-0 text-[10px] text-muted-foreground/60 border-r border-border/40 bg-surface1/60">
+                    <div className="flex select-none shrink-0 text-3xs text-muted-foreground/60 border-r border-border/40 bg-surface1/60">
                       <span className="w-9 px-1.5 py-0.5 text-right tabular-nums">
                         {line.oldLine ?? ''}
                       </span>

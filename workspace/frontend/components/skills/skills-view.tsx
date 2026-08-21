@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Sparkles, Search, ExternalLink, Star, ArrowRight, ArrowLeft, Check, Plus, Loader2, AlertCircle, Upload, Package } from 'lucide-react';
+import { Sparkles, Search, ExternalLink, Star, ArrowRight, ArrowLeft, Check, Plus, Loader2, AlertCircle, Upload, Package, LayoutGrid, Brain, Palette, Server, Database, Rocket, FlaskConical, Lock, Link2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -169,18 +169,18 @@ const SKILLS: Skill[] = [
 // ---------------------------------------------------------------------------
 
 const CATEGORIES = [
-  { id: 'all', label: 'All', icon: '🔥' },
-  { id: 'ai-ml', label: 'AI & ML', icon: '🧠' },
-  { id: 'frontend', label: 'Frontend', icon: '🎨' },
-  { id: 'backend', label: 'Backend', icon: '⚙️' },
-  { id: 'database', label: 'Database', icon: '🗄️' },
-  { id: 'devops', label: 'DevOps', icon: '🚀' },
-  { id: 'testing', label: 'Testing', icon: '🧪' },
-  { id: 'security', label: 'Security', icon: '🔒' },
-  { id: 'integrations', label: 'Integrations', icon: '🔗' },
-  { id: 'documents', label: 'Documents', icon: '📄' },
-  { id: 'sensenova', label: 'SenseNova', icon: '🌟' },
-  { id: 'custom', label: 'Custom', icon: '📦' },
+  { id: 'all', label: 'All', icon: LayoutGrid },
+  { id: 'ai-ml', label: 'AI & ML', icon: Brain },
+  { id: 'frontend', label: 'Frontend', icon: Palette },
+  { id: 'backend', label: 'Backend', icon: Server },
+  { id: 'database', label: 'Database', icon: Database },
+  { id: 'devops', label: 'DevOps', icon: Rocket },
+  { id: 'testing', label: 'Testing', icon: FlaskConical },
+  { id: 'security', label: 'Security', icon: Lock },
+  { id: 'integrations', label: 'Integrations', icon: Link2 },
+  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'sensenova', label: 'SenseNova', icon: Sparkles },
+  { id: 'custom', label: 'Custom', icon: Package },
 ];
 
 // ---------------------------------------------------------------------------
@@ -207,15 +207,15 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
         <div className="flex-1 min-w-0">
           {/* Name + badge */}
           <div className="flex items-center gap-1.5">
-            <h3 className="text-[13px] font-semibold leading-tight truncate">{skill.name}</h3>
+            <h3 className="text-sm font-semibold leading-tight truncate">{skill.name}</h3>
             {skill.author === 'Anthropic' && (
-              <span className="shrink-0 text-[8px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
+              <span className="shrink-0 text-3xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
                 Official
               </span>
             )}
           </div>
           {/* Description */}
-          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mt-0.5">
+          <p className="text-2xs text-muted-foreground leading-relaxed line-clamp-2 mt-0.5">
             {skill.description}
           </p>
         </div>
@@ -224,7 +224,7 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
       {/* Tags */}
       <div className="flex flex-wrap gap-1 mt-2.5 ml-[52px]">
         {skill.tags.map(tag => (
-          <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+          <span key={tag} className="text-3xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
             {tag}
           </span>
         ))}
@@ -232,10 +232,10 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-2.5 ml-[52px]">
-        <span className="text-[9px] text-muted-foreground">
+        <span className="text-3xs text-muted-foreground">
           {skill.sourceRepo ? skill.sourceRepo.split('/')[0] : (skill.author || 'Custom')}
         </span>
-        <span className="text-[10px] text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
+        <span className="text-3xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5">
           View <ArrowRight className="size-2.5" />
         </span>
       </div>
@@ -331,13 +331,13 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-semibold">{skill.name}</h2>
                 {skill.author === 'Anthropic' && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">Official</span>
+                  <span className="text-3xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">Official</span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{skill.description}</p>
               <div className="flex flex-wrap gap-1 mt-2">
                 {skill.tags.map(tag => (
-                  <span key={tag} className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{tag}</span>
+                  <span key={tag} className="text-3xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{tag}</span>
                 ))}
               </div>
             </div>
@@ -347,7 +347,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {/* Add to Agent */}
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-            <div className="text-[10px] font-semibold text-primary mb-2">Add to Agent</div>
+            <div className="text-3xs font-medium text-primary mb-2">Add to Agent</div>
             {onlineAgents.length === 0 ? (
               <p className="text-xs text-muted-foreground">No online agents. Connect an agent to install skills.</p>
             ) : (
@@ -366,7 +366,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
                           onClick={() => handleUninstall(agent.agentName)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-status-success/10 text-status-success hover:bg-surface3 hover:text-status-danger transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-status-success/10 text-status-success hover:bg-surface3 hover:text-status-danger transition-colors"
                         >
                           <Check className="size-3" />
                           Installed
@@ -381,7 +381,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
                           disabled
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-muted text-muted-foreground disabled:opacity-70"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-muted text-muted-foreground disabled:opacity-70"
                         >
                           <Loader2 className="size-3 animate-spin" />
                           Installing…
@@ -396,7 +396,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
                           onClick={() => handleInstall(agent.agentName)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-status-danger/10 text-status-danger hover:bg-surface30/20 transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-status-danger/10 text-status-danger hover:bg-surface30/20 transition-colors"
                           title="Installation failed — click to retry"
                         >
                           <AlertCircle className="size-3" />
@@ -411,7 +411,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                       <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                       <button
                         onClick={() => handleInstall(agent.agentName)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                       >
                         <Plus className="size-3" />
                         Add
@@ -425,11 +425,11 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg border border-border p-2.5">
-              <div className="text-[9px] font-medium text-muted-foreground mb-0.5">Category</div>
+              <div className="text-3xs font-medium text-muted-foreground mb-0.5">Category</div>
               <div className="text-xs font-medium">{CATEGORIES.find(c => c.id === skill.category)?.label}</div>
             </div>
             <div className="rounded-lg border border-border p-2.5">
-              <div className="text-[9px] font-medium text-muted-foreground mb-0.5">Author</div>
+              <div className="text-3xs font-medium text-muted-foreground mb-0.5">Author</div>
               <div className="text-xs font-medium">{skill.author || 'Workspace user'}</div>
             </div>
           </div>
@@ -438,11 +438,11 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
               GitHub source / CLI install command. */}
           {isCustom ? (
             <div className="rounded-lg border border-border p-2.5">
-              <div className="text-[9px] font-medium text-muted-foreground mb-1">Uploaded package</div>
+              <div className="text-3xs font-medium text-muted-foreground mb-1">Uploaded package</div>
               <div className="flex items-center gap-2">
                 <Package className="size-3.5 text-muted-foreground shrink-0" />
                 <span className="text-xs font-medium truncate">{skill.filename || `${skill.id}.${skill.packageType || 'md'}`}</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold shrink-0">
+                <span className="text-3xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium shrink-0">
                   {skill.packageType || 'md'}
                 </span>
               </div>
@@ -451,7 +451,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
             <>
               {skill.sourceRepo && (
                 <div className="rounded-lg border border-border p-2.5">
-                  <div className="text-[9px] font-medium text-muted-foreground mb-0.5">Source</div>
+                  <div className="text-3xs font-medium text-muted-foreground mb-0.5">Source</div>
                   <a href={ghUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                     {skill.sourceRepo}/{skill.sourcePath} <ExternalLink className="size-2.5" />
                   </a>
@@ -460,8 +460,8 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
               {skill.sourceRepo && (
                 <div className="rounded-lg border border-border p-3 bg-muted/30">
-                  <div className="text-[9px] font-medium text-muted-foreground mb-1.5">CLI Install</div>
-                  <code className="text-[11px] font-mono block bg-background rounded-md p-2.5 border border-border select-all break-all">
+                  <div className="text-3xs font-medium text-muted-foreground mb-1.5">CLI Install</div>
+                  <code className="text-2xs font-mono block bg-background rounded-md p-2.5 border border-border select-all break-all">
                     npx @anthropic-ai/skills install {skill.sourceRepo}/{skill.sourcePath}
                   </code>
                 </div>
@@ -470,12 +470,12 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
           )}
 
           <div className="rounded-lg border border-border p-2.5">
-            <div className="text-[9px] font-medium text-muted-foreground mb-1">Compatible With</div>
+            <div className="text-3xs font-medium text-muted-foreground mb-1">Compatible With</div>
             <div className="flex flex-wrap gap-1.5">
               {['Claude Code', 'Codex', 'Cursor', 'Gemini CLI', 'OpenCode', 'VS Code', 'Roo Code'].map(a => (
-                <span key={a} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">{a}</span>
+                <span key={a} className="text-3xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">{a}</span>
               ))}
-              <span className="text-[10px] text-muted-foreground">+10 more</span>
+              <span className="text-3xs text-muted-foreground">+10 more</span>
             </div>
           </div>
         </div>
@@ -557,10 +557,10 @@ export function SkillsView() {
             type="button"
             onClick={() => setViewMode('threads')}
             className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-            title="返回对话"
+            title="Back to chats"
           >
             <ArrowLeft className="size-3.5" />
-            <span>返回对话</span>
+            <span>Back</span>
           </button>
           <div className="h-3.5 w-px bg-border/60" />
           <Sparkles className="size-4 text-status-warning" />
@@ -568,7 +568,7 @@ export function SkillsView() {
           <span className="text-xs text-muted-foreground">{allSkills.length} skills</span>
           <button
             onClick={() => setUploadOpen(true)}
-            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-2xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
           >
             <Upload className="size-3.5" />
             Upload custom skill
@@ -593,13 +593,13 @@ export function SkillsView() {
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
               className={cn(
-                'shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-colors',
+                'shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-2xs font-medium transition-colors',
                 activeCategory === cat.id
                   ? 'bg-primary/10 text-primary'
                   : 'hover:bg-muted text-muted-foreground hover:text-foreground',
               )}
             >
-              <span className="text-xs">{cat.icon}</span>
+              <cat.icon className="size-3.5" />
               <span>{cat.label}</span>
             </button>
           ))}
@@ -621,7 +621,7 @@ export function SkillsView() {
               <div>
                 <div className="flex items-center gap-2 mb-2.5">
                   <Star className="size-3.5 text-status-warning fill-status-warning" />
-                  <h3 className="text-xs font-semibold text-muted-foreground">Featured</h3>
+                  <h3 className="text-xs font-medium text-muted-foreground">Featured</h3>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
                   {featured.map(skill => (
@@ -635,8 +635,8 @@ export function SkillsView() {
             <div>
               {activeCategory === 'all' && !search && (
                 <div className="flex items-center gap-2 mb-2.5">
-                  <h3 className="text-xs font-semibold text-muted-foreground">All Skills</h3>
-                  <span className="text-[10px] text-muted-foreground">({categoryCounts.all})</span>
+                  <h3 className="text-xs font-medium text-muted-foreground">All Skills</h3>
+                  <span className="text-3xs text-muted-foreground">({categoryCounts.all})</span>
                 </div>
               )}
               <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
@@ -727,7 +727,7 @@ function UploadSkillDialog({
         <div className="space-y-3">
           {/* File picker */}
           <div>
-            <label className="text-[11px] font-semibold text-muted-foreground">
+            <label className="text-2xs font-medium text-muted-foreground">
               Skill package (.md or .zip)
             </label>
             <label className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-input px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors">
@@ -736,7 +736,7 @@ function UploadSkillDialog({
                 {file ? file.name : 'Choose a .md or .zip file…'}
               </span>
               {file && (
-                <span className="text-[10px] text-muted-foreground shrink-0">
+                <span className="text-3xs text-muted-foreground shrink-0">
                   {(file.size / 1024).toFixed(1)} KB
                 </span>
               )}
@@ -748,16 +748,16 @@ function UploadSkillDialog({
               />
             </label>
             {file && !extOk && (
-              <p className="mt-1 text-[11px] text-status-danger">Only .md and .zip files are supported.</p>
+              <p className="mt-1 text-2xs text-status-danger">Only .md and .zip files are supported.</p>
             )}
-            <p className="mt-1 text-[10px] text-muted-foreground">
+            <p className="mt-1 text-3xs text-muted-foreground">
               A .zip must contain a SKILL.md (at the root or in a single top-level folder).
             </p>
           </div>
 
           {/* Skill id */}
           <div>
-            <label className="text-[11px] font-semibold text-muted-foreground">Skill ID</label>
+            <label className="text-2xs font-medium text-muted-foreground">Skill ID</label>
             <input
               type="text"
               value={id}
@@ -766,7 +766,7 @@ function UploadSkillDialog({
               className="mt-1 w-full px-3 py-2 text-sm rounded-lg bg-muted/50 border border-input focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {id !== '' && !idValid && (
-              <p className="mt-1 text-[11px] text-status-danger">
+              <p className="mt-1 text-2xs text-status-danger">
                 Use letters, digits, &quot;.&quot;, &quot;_&quot; or &quot;-&quot;, not starting with a dash.
               </p>
             )}
@@ -774,7 +774,7 @@ function UploadSkillDialog({
 
           {/* Name */}
           <div>
-            <label className="text-[11px] font-semibold text-muted-foreground">Name</label>
+            <label className="text-2xs font-medium text-muted-foreground">Name</label>
             <input
               type="text"
               value={name}
@@ -786,7 +786,7 @@ function UploadSkillDialog({
 
           {/* Description */}
           <div>
-            <label className="text-[11px] font-semibold text-muted-foreground">Description (optional)</label>
+            <label className="text-2xs font-medium text-muted-foreground">Description (optional)</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -799,7 +799,7 @@ function UploadSkillDialog({
           {error && (
             <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-status-danger/5 px-3 py-2">
               <AlertCircle className="size-3.5 text-status-danger shrink-0 mt-0.5" />
-              <p className="text-[11px] text-status-danger">{error}</p>
+              <p className="text-2xs text-status-danger">{error}</p>
             </div>
           )}
         </div>

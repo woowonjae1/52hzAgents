@@ -22,6 +22,8 @@ const os = require('os');
 const path = require('path');
 const { WorkspaceClient, SessionRevokedError } = require('../workspace-client');
 const { generateSessionTitle, SESSION_DEFAULT_RE, leadingMentions } = require('./utils');
+const { extractDecisionQuestions } = require('./decision-parser');
+const { extractPreview } = require('./preview-parser');
 const { defaultAgentWorkdir } = require('../paths');
 const {
   REASON,
@@ -799,23 +801,18 @@ class BaseAdapter {
 
         // 方案 2 落地：禁止 Agent 自动对系统连线或非目标消息打招呼。
         // 只有当消息来自用户 (human)，或者显式 @ 当前 Agent / 指定 targetAgents 时才激活回应。
-        const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || (msg.senderId || '').startsWith('human:') || (msg.senderId || '').startsWith('user:');
-        // Addressing is the run of @mentions at the START of the message. A
-        // mention further in is content: "@a 确定日期 然后交给@b 写文档" calls
-        // only `a` and tells it to hand off — it is not also a direct call to
-        // `b`. The composer collects every @name anywhere in the text into
-        // `mentions`, so without this both agents took the message and each did
-        // the whole job in parallel instead of one delegating to the other.
+        const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || msg.senderType === 'pipeline' || (msg.senderId || '').startsWith('human:') || (msg.senderId || '').startsWith('user:');
         const addressedAgents = leadingMentions(msg.content);
         const selfLower = this.agentName.toLowerCase();
+        const rawTargetAgents = msg.targetAgents || msg.target_agents || msg.metadata?.target_agents || [];
+        const targetedMe = Array.isArray(rawTargetAgents) && rawTargetAgents.some((t) => String(t).toLowerCase() === selfLower);
         const mentionsMe = addressedAgents.length > 0
           ? addressedAgents.includes(selfLower)
-          : ((Array.isArray(msg.mentions) && msg.mentions.includes(this.agentName)) ||
+          : (targetedMe || (Array.isArray(msg.mentions) && msg.mentions.map((m) => String(m).toLowerCase()).includes(selfLower)) ||
             (typeof msg.content === 'string' && (
               msg.content.toLowerCase().includes(`@${selfLower}`) ||
               msg.content.toLowerCase().includes(`/${selfLower}`)
             )));
-        const targetedMe = Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName);
         const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 
         if (isSelf) continue;
@@ -1104,12 +1101,18 @@ class BaseAdapter {
   // ------------------------------------------------------------------
 
   async sendStatus(channel, content, extraMeta) {
+    // Spreading a non-object here silently explodes it into char-indexed keys
+    // ({0:'A',1:'n',...}), which is how a mis-passed status label ended up
+    // corrupting the event metadata instead of failing loudly.
+    const meta = (extraMeta && typeof extraMeta === 'object' && !Array.isArray(extraMeta))
+      ? extraMeta
+      : undefined;
     try {
       await this.client.sendMessage(this.workspaceId, channel, this.token, content, {
         senderType: 'agent',
         senderName: this.agentName,
         messageType: 'status',
-        metadata: { agent_mode: this._mode, ...extraMeta },
+        metadata: { agent_mode: this._mode, ...meta },
         sessionId: this._sessionId,
       });
     } catch (e) {
@@ -1134,11 +1137,51 @@ class BaseAdapter {
   }
 
   async sendResponse(channel, content) {
+    // Promote an explicit ```decision block into metadata the workspace renders
+    // as an interactive card. Sits here rather than in each adapter because
+    // every adapter funnels its final reply through this one method — the
+    // per-adapter streaming paths (sendThinking/sendStatus) deliberately do NOT
+    // parse, since a card that appears mid-stream and then moves is worse than
+    // one that appears once at the end.
+    const decision = extractDecisionQuestions(content);
+    const questions = decision.questions;
+    if (decision.invalid > 0) {
+      this._log(
+        `Decision block ignored (${decision.invalid} malformed) — left as text ` +
+        `so the question still reaches the user`
+      );
+    }
+
+    // Preview runs on the decision pass's OUTPUT, so a reply carrying both
+    // blocks has each stripped exactly once.
+    const previewResult = extractPreview(decision.text);
+    const preview = previewResult.preview;
+    if (previewResult.invalid > 0) {
+      this._log(
+        `Preview block ignored (${previewResult.invalid} malformed or ` +
+        `non-loopback) — left as text`
+      );
+    }
+    if (preview) this._log(`Preview target reported: ${preview.url}`);
+
+    // If the reply was nothing but blocks, an empty body renders as a blank
+    // bubble above the card. Fall back to something that says what happened.
+    let body = previewResult.text;
+    if (!body) {
+      if (questions) body = questions[0].title;
+      else if (preview) body = `Dev server running at ${preview.url}`;
+    }
+
+    const metadata = {};
+    if (questions) metadata.questions = questions;
+    if (preview) metadata.preview = preview;
+
     try {
-      await this.client.sendMessage(this.workspaceId, channel, this.token, content, {
+      await this.client.sendMessage(this.workspaceId, channel, this.token, body, {
         senderType: 'agent',
         senderName: this.agentName,
         sessionId: this._sessionId,
+        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
       });
     } catch (e) {
       if (e instanceof SessionRevokedError) {

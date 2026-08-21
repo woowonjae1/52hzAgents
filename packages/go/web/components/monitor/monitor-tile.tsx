@@ -156,10 +156,10 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
         {isCompleted ? (
           <CheckCircle2 className="size-3.5 shrink-0 text-amber-500" />
         ) : (
-          <span className="text-[10px] text-muted-foreground shrink-0">{displayTime}</span>
+          <span className="text-3xs text-muted-foreground shrink-0">{displayTime}</span>
         )}
         {shortcutKey && (
-          <kbd className="size-4 flex items-center justify-center rounded text-[9px] font-mono font-medium bg-muted text-muted-foreground border border-input shrink-0">
+          <kbd className="size-4 flex items-center justify-center rounded text-3xs font-mono font-medium bg-muted text-muted-foreground border border-input shrink-0">
             {shortcutKey}
           </kbd>
         )}
@@ -199,7 +199,7 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
                       parsed.type === 'compacting' && 'text-violet-500 animate-spin',
                     )} />
                     <span className={cn(
-                      'text-[11px] truncate min-w-0 text-muted-foreground',
+                      'text-2xs truncate min-w-0 text-muted-foreground',
                       parsed.type === 'thinking' && 'italic',
                       parsed.type === 'compacting' && 'italic text-violet-500/80',
                     )}>

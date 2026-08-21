@@ -103,7 +103,7 @@ export function FileList() {
 
       {/* Section label */}
       <div className="px-3 pb-1.5 shrink-0">
-        <span className="text-[11px] font-semibold text-muted-foreground">
+        <span className="text-2xs font-medium text-muted-foreground">
           Recent Files
         </span>
       </div>
@@ -145,8 +145,8 @@ export function FileList() {
             >
               {getFileIcon(file.contentType, file.filename)}
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-medium truncate">{basename(file.filename)}</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-sm font-medium truncate">{basename(file.filename)}</p>
+                <p className="text-2xs text-muted-foreground">
                   {formatSize(file.size)} · {(file.uploadedBy || 'unknown').replace(/^(openagents:|human:)/, '')}
                   {file.createdAt && ` · ${timeAgo(file.createdAt)}`}
                 </p>

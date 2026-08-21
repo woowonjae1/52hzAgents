@@ -432,6 +432,25 @@ function buildToolDefs(disabledModules) {
     );
   }
 
+  // -- Terminal Execution --
+  if (!disabledModules.has('terminal')) {
+    tools.push({
+      name: 'workspace_terminal_execute',
+      description:
+        'Execute a shell command within the workspace. Safe read commands run automatically; ' +
+        'state-modifying commands (npm install, rm, git push) trigger human approval workflow in the workspace UI.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: 'Shell command to execute' },
+          working_dir: { type: 'string', description: 'Working directory relative to workspace root (optional)' },
+          approval_id: { type: 'string', description: 'Approval ID if granted by human (optional)' },
+        },
+        required: ['command'],
+      },
+    });
+  }
+
   return tools;
 }
 
@@ -540,8 +559,22 @@ class McpServer {
       case 'workspace_get_history': {
         const limit = args.limit || 20;
         const channel = args.channel || this.channelName;
+
+        let summaryText = '';
+        try {
+          const compData = await this.ws._get(
+            `/v1/workspaces/${this.workspaceId}/channels/${channel}/summary`,
+            this.ws._wsHeaders(this.token)
+          );
+          if (compData && compData.has_summary && compData.summary && compData.summary.summary) {
+            summaryText = `=== [HISTORICAL CONTEXT SUMMARY (Compacted Checkpoint)] ===\n${compData.summary.summary.trim()}\n========================================================\n\n`;
+          }
+        } catch {
+          // Fallback seamlessly to raw message history
+        }
+
         const messages = await this.ws.getRecentMessages(this.workspaceId, channel, this.token, limit);
-        if (!messages.length) return text('No messages yet.');
+        if (!messages.length && !summaryText) return text('No messages yet.');
         const lines = messages.map((m) => {
           const mt = m.messageType || 'chat';
           if (mt === 'status') return null;
@@ -556,8 +589,8 @@ class McpServer {
           }
           return line;
         }).filter(Boolean);
-        if (!lines.length) return text('No messages yet.');
-        return text(lines.join('\n'));
+        if (!lines.length && !summaryText) return text('No messages yet.');
+        return text(summaryText + lines.join('\n'));
       }
 
       case 'workspace_get_agents': {
@@ -973,6 +1006,34 @@ class McpServer {
       case 'workspace_delete_knowledge': {
         await this.ws.deleteKnowledge(this.workspaceId, this.token, args.entry_id);
         return text(`Knowledge entry deleted: ${args.entry_id}`);
+      }
+
+      // ── Terminal Execution ──
+
+      case 'workspace_terminal_execute': {
+        const res = await this.ws.executeTerminalCommand(
+          this.workspaceId,
+          {
+            command: args.command,
+            workingDir: args.working_dir,
+            agentName: this.agentName,
+            approvalId: args.approval_id,
+          },
+          this.token
+        );
+        if (res.status === 'approval_required') {
+          return text(
+            `[APPROVAL REQUIRED] Command "${args.command}" requires human approval before execution.\n` +
+            `Approval ID: ${res.approval_id}\n` +
+            `Risk Level: ${res.risk}\n` +
+            `Reason: ${res.reason}\n` +
+            `Please ask the human to click Approve in the 52hzAgents desktop workspace.`
+          );
+        }
+        if (res.status === 'denied') {
+          return text(`[EXECUTION DENIED] Command blocked by workspace security policy.\nReason: ${res.reason}`);
+        }
+        return text(`[COMMAND EXECUTED (exit code: ${res.exit_code || 0})]\n${res.output || '(No output)'}`);
       }
 
       default:

@@ -334,7 +334,7 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode; titl
 function CLIGroup({ title, commands }: { title: string; commands: { cmd: string; desc: string }[] }) {
   return (
     <div>
-      <h3 className="font-semibold text-[11px] font-semibold text-muted-foreground mb-3">{title}</h3>
+      <h3 className="text-2xs font-medium text-muted-foreground mb-3">{title}</h3>
       <div className="rounded-lg border bg-card overflow-hidden divide-y">
         {commands.map((c) => (
           <div key={c.cmd} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 px-4 py-2.5">
@@ -505,17 +505,17 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
         <div className="flex items-start justify-between gap-2.5">
           <div className="min-w-0">
             <h3 className="font-semibold text-sm text-foreground tracking-tight truncate">{workspace.name}</h3>
-            <p className="text-[9px] text-muted-foreground font-mono mt-1 truncate" title={workspace.slug}>
+            <p className="text-3xs text-muted-foreground font-mono mt-1 truncate" title={workspace.slug}>
               ID: {workspace.slug}
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-border/50 dark:border-border/40 bg-surface1/50">
             <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-status-success' : 'bg-foreground-muted'}`} />
-            <span className="text-[10px] font-semibold text-foreground-muted capitalize">{workspace.status}</span>
+            <span className="text-3xs font-medium text-foreground-muted capitalize">{workspace.status}</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-3.5 text-[10px] font-medium text-foreground-muted border-t border-border/60/40 pt-3">
+        <div className="flex items-center gap-3.5 text-3xs font-medium text-foreground-muted border-t border-border/60/40 pt-3">
           <span className="flex items-center gap-1">
             <Users className="size-3.5 text-foreground-extra-muted" />
             {workspace.agentCount} agent{workspace.agentCount !== 1 ? 's' : ''}
@@ -629,7 +629,7 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
             <h1 className="font-semibold text-sm tracking-tight">52hzAgents Workspaces</h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[11px] font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
+            <span className="text-2xs font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>
             <Button variant="ghost" size="sm" onClick={logout} className="size-8 p-0 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground">
               <LogOut className="size-4" />
             </Button>
@@ -708,7 +708,7 @@ export default function HomePage() {
   const openAgentsAuth = useOpenAgentsAuth();
 
   useEffect(() => {
-    console.log('[52hzAgents Monitor] 🚀 [HomePage] Mounted at', new Date().toISOString(), {
+    console.log('[52hzAgents Monitor] [HomePage] Mounted at', new Date().toISOString(), {
       href: typeof window !== 'undefined' ? window.location.href : '',
       referrer: typeof window !== 'undefined' ? document.referrer : '',
       isOpenAgentsDomain: openAgentsAuth.isOpenAgentsDomain,
@@ -722,7 +722,7 @@ export default function HomePage() {
   // Bypass landing page and dashboard redirect chain on local/custom domains (desktop app, self-host).
   // Immediately render WorkspaceContent for instant 0-redirect load.
   if (!openAgentsAuth.isOpenAgentsDomain) {
-    const slug = (typeof window !== 'undefined' && localStorage.getItem('last_workspace_slug')) || 'openagents-develop';
+    const slug = (typeof window !== 'undefined' && localStorage.getItem('last_workspace_slug')) || '52hz';
     return (
       <Suspense fallback={<WorkspaceLoadingSplash />}>
         <WorkspaceContent workspaceId={slug} />

@@ -124,16 +124,6 @@ func GetAgentCatalog(c *gin.Context) {
 			"detected":        aiderDetected,
 			"binary_path":     aiderPath,
 		},
-		{
-			"name":            "custom",
-			"label":           "Custom (Goose, Cline, Kilo...)",
-			"description":     "Define and connect your own custom agent client (Goose, Cline, Kilo, etc.).",
-			"install_command": "wwj create my-agent --type custom",
-			"homepage":        "https://openagents.org",
-			"tags":            []string{"custom"},
-			"builtin":         false,
-			"detected":        false,
-		},
 	})
 }
 

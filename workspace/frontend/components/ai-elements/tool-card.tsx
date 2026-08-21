@@ -130,7 +130,7 @@ export function ToolCard({
     if (!textToCopy) return;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
-    toast.success('输出内容已复制');
+    toast.success('Output copied');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -175,7 +175,7 @@ export function ToolCard({
         {/* Status + duration */}
         <span className="flex items-center gap-2 shrink-0">
           {durationMs && durationMs > 0 ? (
-            <span className="text-[10px] font-mono text-foreground-extra-muted tabular-nums hidden sm:inline">
+            <span className="text-3xs font-mono text-foreground-extra-muted tabular-nums hidden sm:inline">
               {(durationMs / 1000).toFixed(1)}s
             </span>
           ) : null}
@@ -183,7 +183,7 @@ export function ToolCard({
           <span
             className={cn(
               'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border',
-              'text-[10px] font-medium leading-none transition-colors duration-200',
+              'text-3xs font-medium leading-none transition-colors duration-200',
               chip.className,
               status === 'running' && !reduceMotion && 'animate-pulse'
             )}
@@ -217,10 +217,10 @@ export function ToolCard({
             <div className="p-3 space-y-2.5">
               {inputStr && (
                 <div className="space-y-1">
-                  <div className="text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted">
+                  <div className="text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted">
                     Parameters / Command
                   </div>
-                  <pre className="p-2.5 rounded-lg bg-surface2/80 border border-border/50 font-mono text-[11px] text-foreground-muted overflow-x-auto leading-relaxed">
+                  <pre className="p-2.5 rounded-lg bg-surface2/80 border border-border/50 font-mono text-2xs text-foreground-muted overflow-x-auto leading-relaxed">
                     {inputStr}
                   </pre>
                 </div>
@@ -229,7 +229,7 @@ export function ToolCard({
               {(toolOutput || error) && (
                 <div className="space-y-1 group/output">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted">
+                    <span className="text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted">
                       Output
                     </span>
                     <button
@@ -237,7 +237,7 @@ export function ToolCard({
                       onClick={handleCopyOutput}
                       className={cn(
                         'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md',
-                        'text-[10px] font-medium text-foreground-extra-muted',
+                        'text-3xs font-medium text-foreground-extra-muted',
                         'hover:text-foreground hover:bg-surface2 transition-colors duration-200 cursor-pointer'
                       )}
                     >
@@ -251,7 +251,7 @@ export function ToolCard({
                   </div>
                   <pre
                     className={cn(
-                      'p-2.5 rounded-lg border font-mono text-[11px] leading-relaxed',
+                      'p-2.5 rounded-lg border font-mono text-2xs leading-relaxed',
                       'max-h-60 overflow-y-auto overflow-x-auto',
                       error
                         ? 'bg-red-500/[0.06] dark:bg-red-400/[0.08] text-red-600 dark:text-red-400 border-red-500/20 dark:border-red-400/20'

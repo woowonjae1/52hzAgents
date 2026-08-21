@@ -59,6 +59,7 @@ func InitDB() {
 		&models.WorkspaceMember{},
 		&models.Channel{},
 		&models.ChannelMember{},
+		&models.ChannelPipeline{},
 		&models.ChannelHumanMember{},
 		&models.Invitation{},
 		&models.WorkspaceCollaborator{},
@@ -80,6 +81,7 @@ func InitDB() {
 		&models.CloudAgentConfig{},
 		&models.ShareSnapshot{},
 		&models.Agent{},
+		&models.ChannelCompactionRecord{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)

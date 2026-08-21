@@ -3,20 +3,431 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"log"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/evaluator"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
 )
 
 var (
-	rrMutex    sync.Mutex
-	rrIndexMap = make(map[string]int) // channelID -> last routed index
+	rrMutex       sync.Mutex
+	rrIndexMap    = make(map[string]int) // channelID -> last routed index
+	pipelineRegex = regexp.MustCompile(`(?i)(?:^|\s)[@/]([a-zA-Z0-9_-]+)`)
 )
+
+func parseAgentPipeline(content string, participants []string) []models.PipelineStep {
+	if len(participants) < 2 {
+		return nil
+	}
+	allowed := make(map[string]string, len(participants))
+	for _, p := range participants {
+		allowed[strings.ToLower(p)] = p
+	}
+
+	matches := pipelineRegex.FindAllStringSubmatchIndex(content, -1)
+	if len(matches) < 2 {
+		return nil
+	}
+
+	var segments []models.PipelineStep
+	for i := 0; i < len(matches); i++ {
+		nameStart, nameEnd := matches[i][2], matches[i][3]
+		rawName := strings.ToLower(content[nameStart:nameEnd])
+		if rawName == "knowledge" {
+			continue
+		}
+		agentName, ok := allowed[rawName]
+		if !ok {
+			continue
+		}
+
+		instructionStart := matches[i][1]
+		var instructionEnd int
+		if i+1 < len(matches) {
+			instructionEnd = matches[i+1][0]
+		} else {
+			instructionEnd = len(content)
+		}
+
+		instruction := strings.TrimSpace(content[instructionStart:instructionEnd])
+		segments = append(segments, models.PipelineStep{
+			Agent:       agentName,
+			Instruction: instruction,
+			Status:      "pending",
+			MaxRetries:  3,
+			RetryCount:  0,
+		})
+	}
+
+	if len(segments) < 2 {
+		return nil
+	}
+	return segments
+}
+
+// startPipeline persists a freshly parsed relay chain for a channel, replacing
+// whatever chain that channel had. Step 0 starts out running because
+// routeMessage returns it as the target of the message that opened the chain.
+func startPipeline(workspaceID, channelID, startedBy string, steps []models.PipelineStep) {
+	nowMs := time.Now().UnixMilli()
+	steps[0].Status = "running"
+	steps[0].StartedAt = &nowMs
+	if steps[0].MaxRetries <= 0 {
+		steps[0].MaxRetries = 3
+	}
+
+	encoded, err := json.Marshal(steps)
+	if err != nil {
+		log.Printf("pipeline: failed to encode chain for channel %s: %v", channelID, err)
+		return
+	}
+
+	clearPipeline(channelID)
+	record := models.ChannelPipeline{
+		ID:           uuid.NewString(),
+		WorkspaceID:  workspaceID,
+		ChannelID:    channelID,
+		Steps:        encoded,
+		CurrentIndex: 0,
+		Status:       "running",
+		StartedBy:    startedBy,
+	}
+	if err := db.DB.Create(&record).Error; err != nil {
+		log.Printf("pipeline: failed to persist chain for channel %s: %v", channelID, err)
+	}
+}
+
+// clearPipeline drops the channel's chain. A plain human message ends any relay
+// that was in flight.
+func clearPipeline(channelID string) {
+	if err := db.DB.Where("channel_id = ?", channelID).Delete(&models.ChannelPipeline{}).Error; err != nil {
+		log.Printf("pipeline: failed to clear chain for channel %s: %v", channelID, err)
+	}
+}
+
+// CheckAndTriggerNextPipelineStep evaluates the current step's execution quality
+// and either advances the chain to the next agent or triggers a self-correction retry.
+func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source string) {
+	if !strings.HasPrefix(target, "channel/") {
+		return
+	}
+	actor := agentNameFromSource(source)
+	if actor == "" {
+		return
+	}
+	channelName := strings.TrimPrefix(target, "channel/")
+
+	var channel models.Channel
+	if err := db.DB.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error; err != nil {
+		return
+	}
+
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ? AND status = ?", channel.ID, "running").First(&record).Error; err != nil {
+		return
+	}
+
+	var steps []models.PipelineStep
+	if err := json.Unmarshal(record.Steps, &steps); err != nil {
+		log.Printf("pipeline: chain %s has unreadable steps: %v", record.ID, err)
+		return
+	}
+	idx := record.CurrentIndex
+	if idx < 0 || idx >= len(steps) {
+		log.Printf("pipeline: chain %s has out-of-range index %d of %d steps", record.ID, idx, len(steps))
+		return
+	}
+	if !strings.EqualFold(steps[idx].Agent, actor) {
+		return
+	}
+
+	// 1. Gather recent turn messages produced during this step for quality evaluation
+	var turnEvents []models.EventRecord
+	turnQuery := db.DB.Where("network_id = ? AND target = ? AND type LIKE ?", workspaceID, target, "workspace.message%")
+	if steps[idx].StartedAt != nil {
+		turnQuery = turnQuery.Where("timestamp >= ?", *steps[idx].StartedAt)
+	}
+	turnQuery.Order("timestamp asc, id asc").Limit(20).Find(&turnEvents)
+
+	var turnMessages []string
+	for _, te := range turnEvents {
+		var p map[string]interface{}
+		if json.Unmarshal(te.Payload, &p) == nil {
+			if c, ok := p["content"].(string); ok && strings.TrimSpace(c) != "" {
+				turnMessages = append(turnMessages, c)
+			}
+		}
+	}
+
+	// 2. Evaluate step execution quality
+	evalRes := evaluator.EvaluateTurn(actor, steps[idx], turnMessages)
+	nowMs := time.Now().UnixMilli()
+
+	// 3. Handle Failures with Bounded Self-Correction Loop
+	if evalRes.Status == evaluator.EvalFail {
+		maxRetries := steps[idx].MaxRetries
+		if maxRetries <= 0 {
+			maxRetries = 3
+		}
+
+		if steps[idx].RetryCount < maxRetries {
+			// Trigger self-correction retry
+			steps[idx].RetryCount++
+			steps[idx].Status = "retrying"
+			errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
+			steps[idx].LastError = &errDetailStr
+
+			encoded, _ := json.Marshal(steps)
+			db.DB.Model(&models.ChannelPipeline{}).
+				Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
+				Update("steps", encoded)
+
+			relaySelfCorrection(workspaceID, target, actor, evalRes.FeedbackMessage)
+			return
+		}
+
+		// Retries exhausted: fail the pipeline and halt
+		steps[idx].Status = "failed"
+		errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
+		steps[idx].LastError = &errDetailStr
+		steps[idx].FinishedAt = &nowMs
+
+		encoded, _ := json.Marshal(steps)
+		db.DB.Model(&models.ChannelPipeline{}).
+			Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
+			Updates(map[string]interface{}{
+				"steps":  encoded,
+				"status": "failed",
+			})
+
+		haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted] Step %d (@%s) failed after %d attempts.\nErrors:\n> %s\nHuman intervention required.",
+			idx+1, actor, steps[idx].RetryCount, strings.Join(evalRes.ErrorDetails, "\n> "))
+		relayPipelineAlert(workspaceID, target, haltMsg)
+		return
+	}
+
+	// 4. Handle Pass: Advance to next step
+	steps[idx].Status = "done"
+	steps[idx].FinishedAt = &nowMs
+
+	nextIdx := idx + 1
+	nextStatus := "running"
+	if nextIdx >= len(steps) {
+		nextIdx = idx
+		nextStatus = "completed"
+	} else {
+		steps[nextIdx].Status = "running"
+		steps[nextIdx].StartedAt = &nowMs
+	}
+
+	encoded, err := json.Marshal(steps)
+	if err != nil {
+		log.Printf("pipeline: failed to encode chain %s: %v", record.ID, err)
+		return
+	}
+
+	// Compare-and-swap on (current_index, status) so two replies racing through
+	// this path cannot advance the chain twice.
+	result := db.DB.Model(&models.ChannelPipeline{}).
+		Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
+		Updates(map[string]interface{}{
+			"steps":         encoded,
+			"current_index": nextIdx,
+			"status":        nextStatus,
+		})
+	if result.Error != nil {
+		log.Printf("pipeline: failed to advance chain %s: %v", record.ID, result.Error)
+		return
+	}
+	if result.RowsAffected == 0 || nextStatus == "completed" {
+		return
+	}
+
+	relayPipelineStep(workspaceID, target, steps[nextIdx])
+}
+
+// relaySelfCorrection posts diagnostic feedback to the same agent to prompt self-repair.
+func relaySelfCorrection(workspaceID, target, agentName, feedbackMessage string) {
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+
+		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+		eventID := uuid.New().String()
+		promptContent := "@" + agentName + "\n" + feedbackMessage
+
+		payload := map[string]interface{}{
+			"content":      promptContent,
+			"sender_name":  "Pipeline Evaluator",
+			"sender_type":  "pipeline",
+			"message_type": "chat",
+		}
+		metadata := map[string]interface{}{
+			"target_agents": []string{agentName},
+			"pipeline_step": true,
+			"self_correct":  true,
+		}
+
+		payloadBytes, _ := json.Marshal(payload)
+		metaBytes, _ := json.Marshal(metadata)
+
+		eventRec := models.EventRecord{
+			ID:         eventID,
+			NetworkID:  workspaceID,
+			Type:       "workspace.message.posted",
+			Source:     "system:evaluator",
+			Target:     target,
+			Payload:    payloadBytes,
+			Metadata:   metaBytes,
+			Timestamp:  nowUnixMs,
+			Visibility: "channel",
+		}
+		_ = db.DB.Create(&eventRec)
+
+		fullEvent, _ := json.Marshal(gin.H{
+			"id":        eventID,
+			"event_id":  eventID,
+			"network":   workspaceID,
+			"type":      "workspace.message.posted",
+			"source":    "system:evaluator",
+			"target":    target,
+			"payload":   payload,
+			"metadata":  metadata,
+			"timestamp": nowUnixMs,
+			"status":    "confirmed",
+		})
+		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+			WorkspaceID: workspaceID,
+			ChannelName: target,
+			Payload:     string(fullEvent),
+		})
+	}()
+}
+
+// relayPipelineAlert broadcasts a critical pipeline notification/error to the channel.
+func relayPipelineAlert(workspaceID, target, alertContent string) {
+	go func() {
+		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+		eventID := uuid.New().String()
+
+		payload := map[string]interface{}{
+			"content":      alertContent,
+			"sender_name":  "Pipeline Supervisor",
+			"sender_type":  "pipeline",
+			"message_type": "chat",
+		}
+		metadata := map[string]interface{}{
+			"pipeline_alert": true,
+		}
+
+		payloadBytes, _ := json.Marshal(payload)
+		metaBytes, _ := json.Marshal(metadata)
+
+		eventRec := models.EventRecord{
+			ID:         eventID,
+			NetworkID:  workspaceID,
+			Type:       "workspace.message.posted",
+			Source:     "system:pipeline",
+			Target:     target,
+			Payload:    payloadBytes,
+			Metadata:   metaBytes,
+			Timestamp:  nowUnixMs,
+			Visibility: "channel",
+		}
+		_ = db.DB.Create(&eventRec)
+
+		fullEvent, _ := json.Marshal(gin.H{
+			"id":        eventID,
+			"event_id":  eventID,
+			"network":   workspaceID,
+			"type":      "workspace.message.posted",
+			"source":    "system:pipeline",
+			"target":    target,
+			"payload":   payload,
+			"metadata":  metadata,
+			"timestamp": nowUnixMs,
+			"status":    "confirmed",
+		})
+		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+			WorkspaceID: workspaceID,
+			ChannelName: target,
+			Payload:     string(fullEvent),
+		})
+	}()
+}
+
+// relayPipelineStep posts the next hop's instruction into the channel as if the
+// user had sent it, waking exactly that agent.
+func relayPipelineStep(workspaceID string, target string, nextSeg models.PipelineStep) {
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+
+		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+		eventID := uuid.New().String()
+		promptContent := "@" + nextSeg.Agent
+		if nextSeg.Instruction != "" {
+			promptContent += " " + nextSeg.Instruction
+		}
+
+		payload := map[string]interface{}{
+			"content":      promptContent,
+			"sender_name":  "Pipeline Relay",
+			"sender_type":  "pipeline",
+			"message_type": "chat",
+		}
+		metadata := map[string]interface{}{
+			"target_agents": []string{nextSeg.Agent},
+			"pipeline_step": true,
+			"auto_relay":    true,
+		}
+
+		payloadBytes, _ := json.Marshal(payload)
+		metaBytes, _ := json.Marshal(metadata)
+
+		eventRec := models.EventRecord{
+			ID:         eventID,
+			NetworkID:  workspaceID,
+			Type:       "workspace.message.posted",
+			Source:     "human:pipeline",
+			Target:     target,
+			Payload:    payloadBytes,
+			Metadata:   metaBytes,
+			Timestamp:  nowUnixMs,
+			Visibility: "channel",
+		}
+
+		if err := db.DB.Create(&eventRec).Error; err == nil {
+			fullEvent := gin.H{
+				"id":         eventRec.ID,
+				"event_id":   eventRec.ID,
+				"network":    workspaceID,
+				"type":       eventRec.Type,
+				"source":     eventRec.Source,
+				"target":     eventRec.Target,
+				"payload":    payload,
+				"metadata":   metadata,
+				"timestamp":  eventRec.Timestamp,
+				"visibility": eventRec.Visibility,
+				"status":     "confirmed",
+			}
+			fullEventBytes, _ := json.Marshal(fullEvent)
+			hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+				WorkspaceID: workspaceID,
+				ChannelName: target,
+				Payload:     string(fullEventBytes),
+			})
+		}
+	}()
+}
 
 const noResponseAgent = "__no_response__"
 
@@ -50,19 +461,8 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		return nil, false, nil
 	}
 
-	// channel_members has a composite (channel_id, agent_name) primary key and no
-	// id column — in the AutoMigrate schema and in 0001_initial_schema.sql alike.
-	// The previous Order("id ASC") therefore failed on every single query ("no
-	// such column: id"); the error was discarded, memberships stayed empty, and
-	// EVERY channel silently behaved as if it had no members of its own. That is
-	// what let agents outside a thread be picked to answer in it. Order by
-	// agent_name instead: the column exists and the order stays deterministic,
-	// which the round-robin index in fallbackTargets depends on.
 	var memberships []models.ChannelMember
 	if err := db.DB.Where("channel_id = ?", channel.ID).Order("agent_name ASC").Find(&memberships).Error; err != nil {
-		// Membership is unreadable, so no routing decision can be correct. Store
-		// the message and wake nobody rather than falling through to the
-		// workspace-wide fallback and borrowing an unrelated agent.
 		return []string{noResponseAgent}, true, nil
 	}
 	participants := make([]string, 0, len(memberships))
@@ -72,14 +472,6 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		}
 	}
 
-	// 频道没有自己的成员时，只在选择唯一时才回退到工作区成员。
-	//
-	// This fallback used to take *every* agent in the workspace, which let an
-	// agent that was never added to the channel be picked as the recipient — a
-	// message in an empty channel would be answered by an unrelated agent chosen
-	// by round-robin. Restricting it to a single-agent workspace keeps legacy
-	// single-agent channels working while removing that surprise. With two or
-	// more agents nobody answers, and the UI tells the user to add one.
 	if len(participants) == 0 {
 		var wsMembers []models.WorkspaceMember
 		db.DB.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
@@ -101,6 +493,16 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	content, _ := req.Payload["content"].(string)
 	mentions := mentionedAgents(content, req.Payload, participants)
 	online := onlineParticipants(workspaceID, participants)
+
+	// If human message contains multi-agent pipeline (@agent1 ... @agent2 ... @agent3 ...)
+	if isHumanSource(req.Source) {
+		if segments := parseAgentPipeline(content, participants); len(segments) >= 2 {
+			startPipeline(workspaceID, channel.ID, req.Source, segments)
+			return []string{segments[0].Agent}, true, nil
+		}
+		// Clear any previous pipeline if user sends a normal message
+		clearPipeline(channel.ID)
+	}
 
 	// Agent-sourced messages: only route if the agent explicitly @mentions
 	// another agent. Without a mention, the reply is stored but must NOT wake

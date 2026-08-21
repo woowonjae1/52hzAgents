@@ -79,7 +79,7 @@ export function Sidebar() {
         borderRightWidth: isSidebarOpen ? '1px' : '0px',
       }}
     >
-      <div className="flex flex-col h-full shrink-0" style={{ width: `${sidebarWidth}px` }}>
+      <div className="flex flex-col h-full shrink-0 min-w-0" style={{ width: `${sidebarWidth}px` }}>
         <SidebarHeader />
         <SidebarContent />
       </div>

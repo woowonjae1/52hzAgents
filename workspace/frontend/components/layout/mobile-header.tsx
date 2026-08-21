@@ -104,7 +104,7 @@ export function MobileHeader() {
               )}
             >
               <Icon className="size-5" />
-              <span className="text-[10px] font-medium">{label}</span>
+              <span className="text-3xs font-medium">{label}</span>
             </button>
           ))}
         </div>

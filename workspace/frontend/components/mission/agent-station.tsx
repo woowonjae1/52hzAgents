@@ -46,7 +46,7 @@ function fmtTokens(n: number): string {
 
 function stripMarkdown(text: string): string {
   return text
-    .replace(/```[\s\S]*?```/g, '[代码块]')
+    .replace(/```[\s\S]*?```/g, '[code block]')
     .replace(/\*\*/g, '')
     .replace(/`{1,3}/g, '')
     .replace(/\n+/g, ' ')
@@ -102,7 +102,7 @@ export function AgentStation({
   const statusBadge = React.useMemo(() => {
     if (isBlocked) {
       return {
-        label: '等待审批',
+        label: 'Awaiting approval',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
         badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 font-medium',
@@ -111,7 +111,7 @@ export function AgentStation({
     if (isStalled) {
       const sec = stalledMs ? Math.round(stalledMs / 1000) : 30;
       return {
-        label: `停滞 · ${sec}s`,
+        label: `Stalled · ${sec}s`,
         dot: 'bg-rose-500',
         ring: 'ring-rose-500/25',
         badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium',
@@ -120,7 +120,7 @@ export function AgentStation({
     if (isHeartbeatTimeout) {
       const hbTime = typeof lastHeartbeatAt === 'string' ? lastHeartbeatAt : new Date(lastHeartbeatAt!).toISOString();
       return {
-        label: `心跳超时 · ${timeAgo(hbTime)}`,
+        label: `Heartbeat lost · ${timeAgo(hbTime)}`,
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
         badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
@@ -128,7 +128,7 @@ export function AgentStation({
     }
     if (isWorking) {
       return {
-        label: '执行中',
+        label: 'Running',
         dot: 'bg-amber-500',
         ring: 'ring-amber-500/25',
         badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
@@ -136,7 +136,7 @@ export function AgentStation({
     }
     if (status === 'ready') {
       return {
-        label: '在线就绪',
+        label: 'Ready',
         dot: 'bg-emerald-500',
         ring: 'ring-emerald-500/25',
         badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium',
@@ -144,14 +144,14 @@ export function AgentStation({
     }
     if (isCatalogPlaceholder) {
       return {
-        label: '未接入',
+        label: 'Not connected',
         dot: 'bg-muted-foreground/40',
         ring: 'ring-muted-foreground/10',
         badge: 'bg-surface2/60 text-muted-foreground font-medium',
       };
     }
     return {
-      label: '离线',
+      label: 'Offline',
       dot: 'bg-muted-foreground/50',
       ring: 'ring-muted-foreground/10',
       badge: 'bg-surface2/80 text-muted-foreground font-medium',
@@ -180,10 +180,10 @@ export function AgentStation({
         },
         visibility: 'channel',
       });
-      toast.success(`已批准 @${agent.agentName} 执行`);
+      toast.success(`Approved @${agent.agentName}`);
       onApprovalResolved?.();
     } catch {
-      toast.error('批准失败');
+      toast.error('Approval failed');
     } finally {
       setBusy(false);
     }
@@ -211,10 +211,10 @@ export function AgentStation({
         },
         visibility: 'channel',
       });
-      toast.info(`已拒绝 @${agent.agentName}`);
+      toast.info(`Denied @${agent.agentName}`);
       onApprovalResolved?.();
     } catch {
-      toast.error('拒绝操作失败');
+      toast.error('Could not submit the denial');
     } finally {
       setBusy(false);
     }
@@ -253,12 +253,12 @@ export function AgentStation({
                 {agent.agentName}
               </span>
               {agent.role === 'master' && (
-                <span className="text-[9px] px-1 rounded bg-surface3 text-foreground font-mono font-medium">
-                  主导
+                <span className="text-3xs px-1 rounded bg-surface3 text-foreground font-mono font-medium">
+                  Master
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-muted-foreground truncate font-mono mt-0.5">
+            <div className="text-3xs text-muted-foreground truncate font-mono mt-0.5">
               {agent.agentType || 'agent'}
             </div>
           </div>
@@ -267,7 +267,7 @@ export function AgentStation({
         {/* Unified Status Badge */}
         <span
           className={cn(
-            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] shrink-0',
+            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs shrink-0',
             statusBadge.badge
           )}
         >
@@ -286,14 +286,14 @@ export function AgentStation({
       {/* Inline Blocked Approval */}
       {isBlocked && pendingApproval ? (
         <div className="my-2 p-2 rounded-xl bg-amber-500/10 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
-          <div className="flex items-center justify-between text-[10.5px] font-semibold text-amber-700 dark:text-amber-300">
+          <div className="flex items-center justify-between text-3xs font-medium text-amber-700 dark:text-amber-300">
             <span className="flex items-center gap-1">
               <ShieldAlert className="size-3" />
-              <span>待批执行 · {pendingApproval.tool}</span>
+              <span>Awaiting approval · {pendingApproval.tool}</span>
             </span>
           </div>
           {pendingApproval.command && (
-            <div className="font-mono text-[10.5px] text-foreground font-medium truncate p-1 bg-surface1 rounded">
+            <div className="font-mono text-3xs text-foreground font-medium truncate p-1 bg-surface1 rounded">
               $ {pendingApproval.command}
             </div>
           )}
@@ -302,61 +302,61 @@ export function AgentStation({
               type="button"
               onClick={handleDeny}
               disabled={busy}
-              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium text-rose-600 hover:bg-rose-500/10 cursor-pointer"
+              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium text-rose-600 hover:bg-rose-500/10 cursor-pointer"
             >
               <X className="size-2.5" />
-              <span>拒绝</span>
+              <span>Deny</span>
             </button>
             <button
               type="button"
               onClick={handleApprove}
               disabled={busy}
-              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-[11px] font-medium bg-primary text-primary-foreground hover:opacity-90 cursor-pointer shadow-xs"
+              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium bg-primary text-primary-foreground hover:opacity-90 cursor-pointer shadow-xs"
             >
               <Check className="size-2.5" />
-              <span>批准</span>
+              <span>Approve</span>
             </button>
           </div>
         </div>
       ) : !isCatalogPlaceholder ? (
         /* Configured Agent: 3 Micro Metrics Grid + Activity */
         <div className="my-2 space-y-1.5">
-          <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-[10.5px]">
+          <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-3xs">
             <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">Tokens</span>
+              <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Tokens</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {fmtTokens(tokenCount)}
               </span>
             </div>
 
             <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">频道</span>
+              <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Channel</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {threads.length}
               </span>
             </div>
 
             <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-[9.5px] uppercase font-mono text-muted-foreground truncate">技能</span>
+              <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Skills</span>
               <span className="font-semibold font-mono text-foreground truncate">
                 {skillCount}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 text-[11px] text-muted-foreground px-1 truncate">
+          <div className="flex items-center gap-1 text-2xs text-muted-foreground px-1 truncate">
             {isWorking ? (
               <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium truncate animate-pulse">
                 <Wrench className="size-3 shrink-0" />
-                <span className="truncate">{stripMarkdown(activity?.content || '正在执行任务...')}</span>
+                <span className="truncate">{stripMarkdown(activity?.content || 'Working…')}</span>
               </span>
             ) : activeThread ? (
               <button
                 type="button"
                 onClick={() => onOpenThread(activeThread.sessionId)}
-                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left text-[10.5px]"
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left text-3xs"
               >
-                <span className="text-primary font-medium">#{activeThread.title || '新频道'}</span>
+                <span className="text-primary font-medium">#{activeThread.title || 'New channel'}</span>
                 {activeThread.lastEventAt && (
                   <span className="text-muted-foreground/70">
                     · {timeAgo(new Date(activeThread.lastEventAt).toISOString())}
@@ -364,16 +364,16 @@ export function AgentStation({
                 )}
               </button>
             ) : (
-              <span className="text-muted-foreground/60 italic text-[10.5px]">
-                {isHeartbeatTimeout ? '进程心跳中断' : status === 'offline' ? '进程未启动' : '待命中'}
+              <span className="text-muted-foreground/60 italic text-3xs">
+                {isHeartbeatTimeout ? 'Heartbeat lost' : status === 'offline' ? 'Process not running' : 'Standing by'}
               </span>
             )}
           </div>
         </div>
       ) : (
         /* Unconnected Template Agent */
-        <div className="my-2 px-1 py-1 text-[11px] text-muted-foreground leading-relaxed line-clamp-2 min-h-[38px]">
-          {agent.description || '支持 ACP / MCP 协议的智能体工作区适配器。'}
+        <div className="my-2 px-1 py-1 text-2xs text-muted-foreground leading-relaxed line-clamp-2 min-h-[38px]">
+          {agent.description || 'Workspace adapter for ACP / MCP capable agents.'}
         </div>
       )}
 
@@ -386,7 +386,7 @@ export function AgentStation({
             className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-2xs"
           >
             <MessageSquare className="size-3 text-muted-foreground" />
-            <span>对话</span>
+            <span>Chat</span>
           </button>
         )}
 
@@ -407,18 +407,18 @@ export function AgentStation({
           )}
         >
           {status === 'ready' && !isHeartbeatTimeout ? (
-            <span>已连接</span>
+            <span>Connected</span>
           ) : isHeartbeatTimeout ? (
             <>
               <RotateCw className="size-3" />
-              <span>重新连接</span>
+              <span>Reconnect</span>
             </>
           ) : isCustomPlaceholder ? (
-            <span>配置</span>
+            <span>Configure</span>
           ) : (
             <>
               <Plug className="size-3 text-muted-foreground" />
-              <span>连接</span>
+              <span>Connect</span>
             </>
           )}
         </button>

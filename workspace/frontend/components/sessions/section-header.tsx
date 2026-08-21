@@ -5,7 +5,7 @@ interface SectionHeaderProps {
 export function SectionHeader({ label }: SectionHeaderProps) {
   return (
     <div className="flex items-center gap-1.5 px-0.5">
-      <span className="text-[11px] font-semibold text-muted-foreground">
+      <span className="text-2xs font-medium text-muted-foreground">
         {label}
       </span>
     </div>

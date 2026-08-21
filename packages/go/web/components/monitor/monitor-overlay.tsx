@@ -212,7 +212,7 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
               <button
                 onClick={() => stopAllAgents(sessionId)}
                 disabled={isStopping}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
               >
                 <Square className="size-3 fill-current" />
                 {isStopping ? 'Stopping...' : 'Stop'}

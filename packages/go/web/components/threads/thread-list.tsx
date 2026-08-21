@@ -35,7 +35,7 @@ function AvatarStack({ agents, max = 2 }: { agents: WorkspaceAgent[]; max?: numb
         </div>
       ))}
       {extra > 0 && (
-        <div className="size-[18px] rounded-full bg-zinc-200 flex items-center justify-center text-[7px] font-medium text-zinc-600 ring-2 ring-white dark:ring-zinc-900">
+        <div className="size-[18px] rounded-full bg-zinc-200 flex items-center justify-center text-3xs font-medium text-zinc-600 ring-2 ring-white dark:ring-zinc-900">
           +{extra}
         </div>
       )}

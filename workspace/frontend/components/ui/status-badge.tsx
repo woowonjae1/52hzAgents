@@ -37,7 +37,7 @@ export function StatusBadge({
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-normal transition-colors border',
+        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-normal transition-colors border',
         variant === 'success' && (dense
           ? 'bg-status-muted-success/10 border-status-muted-success/20 text-status-muted-success'
           : 'bg-status-success/10 border-status-success/20 text-status-success'),

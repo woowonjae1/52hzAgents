@@ -84,6 +84,50 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
 
+  /**
+   * Type families — kept in sync with workspace/frontend/styles/globals.css.
+   *
+   * `--font-inter` / `--font-jetbrains-mono` are injected by `app/fonts.ts`
+   * onto <html>; the rest is fallback, ordered the way a browser resolves a
+   * missing glyph — per character, first family in the list that has it. So
+   * Latin always comes from the self-hosted face while Han/Kana/Hangul fall to
+   * the platform's own UI face. Previously the Inter here was `subsets:
+   * ['latin']` with no fallbacks declared, so any Chinese character dropped
+   * straight to the browser default: SimSun beside Inter on Windows.
+   *
+   * No CJK webfont is shipped on purpose — a Han face runs 2-6MB per weight,
+   * and the named system faces are already present on every target machine.
+   *
+   * `Microsoft YaHei UI` precedes `Microsoft YaHei` because Windows hints the
+   * UI cut for the small sizes this app uses. Emoji families sit last: they
+   * carry no ideographs, so they only win for codepoints nothing above covers.
+   */
+  /* Kept on one line deliberately: Tailwind v4 silently drops a multi-line
+     value inside `@theme` — no build error, the utility just falls back to the
+     default stack. */
+  --font-sans: var(--font-inter), 'PingFang SC', 'HarmonyOS Sans SC', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Hiragino Sans GB', 'PingFang TC', 'Microsoft JhengHei UI', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
+  /**
+   * The CJK families repeat here because there is no true monospaced Han face,
+   * but Han glyphs are full-width in all of them, so a Chinese comment inside a
+   * code block still lands on the character grid.
+   */
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
+  /**
+   * Sub-`xs` steps, mirroring workspace/frontend. Tailwind stops at `xs`
+   * (12px); the two tiers below it were being written inline as
+   * `text-[10px]` / `text-[11px]` at 54 sites.
+   *
+   * No matching `--text-*--line-height` on purpose: the arbitrary values these
+   * replace set font-size only and inherited their leading, so declaring one
+   * here would silently reflow every site.
+   *
+   * One line each — Tailwind v4 silently drops a multi-line `@theme` value.
+   */
+  --text-3xs: 10px;
+  --text-2xs: 11px;
+
   /** Base Styles **/
   --color-border: var(--border);
   --color-input: var(--input);
@@ -159,6 +203,26 @@
 
   *:focus-visible {
     @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
+  }
+
+  /**
+   * Monospace defaults. `tabular-nums` keeps figures from jittering as values
+   * update in place, and ligatures are off because JetBrains Mono ships code
+   * ligatures on by default — `!=` draws as `≠`, `->` as `→`, which is a
+   * preference in an editor and a hazard on commands and slugs meant to be
+   * read literally and copied.
+   *
+   * Note this file does NOT set `-webkit-font-smoothing: antialiased` the way
+   * the workspace does. That pairing is specific to a dark-by-default ground;
+   * this shell defaults to light, where subpixel rendering is the better call.
+   */
+  .font-mono,
+  code,
+  kbd,
+  pre,
+  samp {
+    font-variant-numeric: tabular-nums;
+    font-variant-ligatures: none;
   }
 
   /** Agent activity dot animation **/

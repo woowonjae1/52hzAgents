@@ -217,10 +217,10 @@ export function AgentProfilePanel() {
           <div className="flex items-center gap-3">
             <AgentAvatar name={agent.agentName} size={40} status={agent.status} showStatus />
             <div className="flex-1 min-w-0">
-              <h3 className="text-[15px] font-semibold leading-tight truncate">{agent.agentName}</h3>
+              <h3 className="text-base font-semibold leading-tight truncate">{agent.agentName}</h3>
               <div className="flex items-center gap-1.5 mt-1">
                 <span className={cn(
-                  'inline-flex items-center gap-1 text-[11px] px-1.5 py-px rounded font-medium',
+                  'inline-flex items-center gap-1 text-2xs px-1.5 py-px rounded font-medium',
                   isOnline ? 'bg-status-success/10 text-status-success' : 'bg-surface2 text-foreground-muted dark:text-foreground-extra-muted'
                 )}>
                   <span className={cn('size-1.5 rounded-full', isOnline ? 'bg-status-success' : 'bg-foreground-extra-muted')} />
@@ -240,7 +240,7 @@ export function AgentProfilePanel() {
               <button
                 onClick={handleGenerateDescription}
                 disabled={generatingDesc}
-                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors shrink-0"
+                className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors shrink-0"
                 title="Auto-generate a description from this agent's activity and skills"
               >
                 {generatingDesc
@@ -251,7 +251,7 @@ export function AgentProfilePanel() {
             </div>
             <div className="p-3">
               <textarea
-                className="w-full text-[13px] leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/50 min-h-[60px]"
+                className="w-full text-sm leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/50 min-h-[60px]"
                 placeholder={`Describe what ${agent.agentName} does so other agents know when to delegate work...`}
                 value={description}
                 onChange={(e) => {
@@ -266,7 +266,7 @@ export function AgentProfilePanel() {
                   <button
                     onClick={handleSaveDescription}
                     disabled={saving}
-                    className="text-[11px] px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium transition-colors"
+                    className="text-2xs px-2.5 py-1 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 font-medium transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save'}
                   </button>
@@ -289,7 +289,7 @@ export function AgentProfilePanel() {
                   </div>
                   <div className="flex-1 min-w-0 flex items-start gap-1">
                     <span className={cn(
-                      'text-[13px] break-all leading-snug',
+                      'text-sm break-all leading-snug',
                       item.label !== 'Type' ? 'font-mono' : 'font-medium capitalize'
                     )}>
                       {item.value}
@@ -319,11 +319,11 @@ export function AgentProfilePanel() {
                 {/* API Key */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] text-muted-foreground">API Key</span>
+                    <span className="text-2xs text-muted-foreground">API Key</span>
                     {!editingKey && (
                       <button
                         onClick={() => setEditingKey(true)}
-                        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center gap-1 text-3xs text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <KeyRound className="size-2.5" />
                         Update
@@ -343,13 +343,13 @@ export function AgentProfilePanel() {
                       <button
                         onClick={handleUpdateApiKey}
                         disabled={savingKey || !newApiKey}
-                        className="px-2 py-1.5 text-[10px] font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                        className="px-2 py-1.5 text-3xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                       >
                         {savingKey ? <RefreshCw className="size-2.5 animate-spin" /> : 'Save'}
                       </button>
                       <button
                         onClick={() => { setEditingKey(false); setNewApiKey(''); }}
-                        className="px-2 py-1.5 text-[10px] font-medium rounded border hover:bg-surface2 transition-colors"
+                        className="px-2 py-1.5 text-3xs font-medium rounded border hover:bg-surface2 transition-colors"
                       >
                         Cancel
                       </button>
@@ -362,7 +362,7 @@ export function AgentProfilePanel() {
                 {/* System prompt (if set) */}
                 {cloudConfig.systemPrompt && (
                   <div>
-                    <span className="text-[11px] text-muted-foreground">System Prompt</span>
+                    <span className="text-2xs text-muted-foreground">System Prompt</span>
                     <p className="text-xs text-foreground mt-1 whitespace-pre-wrap line-clamp-3">{cloudConfig.systemPrompt}</p>
                   </div>
                 )}
@@ -388,18 +388,18 @@ export function AgentProfilePanel() {
                   </span>
                 ) : <span className="text-muted-foreground">No runtime report</span>}
               </div>
-              {runtime?.lastError && <p className="px-3.5 py-2 text-[11px] text-status-danger bg-surface2 break-words">{runtime.lastError}</p>}
+              {runtime?.lastError && <p className="px-3.5 py-2 text-2xs text-status-danger bg-surface2 break-words">{runtime.lastError}</p>}
               {approvals.map((approval) => (
                 <div key={approval.id} className="px-3.5 py-2.5">
                   <div className="text-xs font-medium break-words">Approval: {approval.action}</div>
                   <div className="mt-2 flex gap-1.5">
-                    <button onClick={() => void resolveApproval(approval, 'approved')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded bg-status-success text-white hover:bg-status-success/85"><ShieldCheck className="size-3" />Approve</button>
-                    <button onClick={() => void resolveApproval(approval, 'rejected')} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] rounded border text-status-danger hover:bg-surface3"><ShieldX className="size-3" />Reject</button>
+                    <button onClick={() => void resolveApproval(approval, 'approved')} className="inline-flex items-center gap-1 px-2 py-1 text-3xs rounded bg-status-success text-white hover:bg-status-success/85"><ShieldCheck className="size-3" />Approve</button>
+                    <button onClick={() => void resolveApproval(approval, 'rejected')} className="inline-flex items-center gap-1 px-2 py-1 text-3xs rounded border text-status-danger hover:bg-surface3"><ShieldX className="size-3" />Reject</button>
                   </div>
                 </div>
               ))}
               {logs.slice(0, 5).map((entry) => (
-                <div key={entry.id} className="px-3.5 py-2 text-[11px] font-mono flex gap-1.5">
+                <div key={entry.id} className="px-3.5 py-2 text-2xs font-mono flex gap-1.5">
                   <Terminal className={cn('size-3 shrink-0 mt-0.5', entry.level === 'error' ? 'text-status-danger' : 'text-muted-foreground')} />
                   <span className="break-all">{entry.message}</span>
                 </div>
@@ -461,7 +461,7 @@ export function AgentProfilePanel() {
                 <div className="px-3.5 py-2.5 border-b flex items-center gap-1.5">
                   <Sparkles className="size-3 text-status-warning" />
                   <span className="text-xs font-medium">Installed Skills</span>
-                  <span className="text-[10px] text-muted-foreground ml-auto">{installed.length}</span>
+                  <span className="text-3xs text-muted-foreground ml-auto">{installed.length}</span>
                 </div>
                 <div className="divide-y">
                   {installed.map(skillId => {
@@ -472,7 +472,7 @@ export function AgentProfilePanel() {
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           {info ? <img src={info.logo} alt="" className="h-3.5 w-3.5 object-contain dark:invert" /> : <Sparkles className="size-3 text-muted-foreground" />}
                         </div>
-                        <span className="text-[13px] font-medium flex-1 truncate">{info?.name || skillId}</span>
+                        <span className="text-sm font-medium flex-1 truncate">{info?.name || skillId}</span>
                         <a
                           href={`https://github.com/${skillId.includes('-') ? 'TerminalSkills/skills/tree/main/skills/' : 'anthropics/skills/tree/main/skills/'}${skillId}`}
                           target="_blank"

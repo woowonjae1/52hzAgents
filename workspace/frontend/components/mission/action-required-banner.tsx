@@ -60,10 +60,10 @@ export function ActionRequiredBanner({
         },
         visibility: 'channel',
       });
-      toast.success(`已批准 @${item.agentName} 的执行请求`);
+      toast.success(`Approved @${item.agentName}`);
       onResolved?.(item.id);
     } catch {
-      toast.error('批准提交失败');
+      toast.error('Approval failed');
     } finally {
       setProcessingId(null);
     }
@@ -91,10 +91,10 @@ export function ActionRequiredBanner({
         },
         visibility: 'channel',
       });
-      toast.info(`已拒绝 @${item.agentName} 的执行请求`);
+      toast.info(`Denied @${item.agentName}`);
       onResolved?.(item.id);
     } catch {
-      toast.error('拒绝操作失败');
+      toast.error('Could not submit the denial');
     } finally {
       setProcessingId(null);
     }
@@ -104,10 +104,10 @@ export function ActionRequiredBanner({
     setProcessingId(item.id);
     try {
       await workspaceApi.sendAgentControl(item.agentName, 'stop');
-      toast.success(`已强制终止 @${item.agentName}`);
+      toast.success(`Force-stopped @${item.agentName}`);
       onResolved?.(item.id);
     } catch {
-      toast.error('终止请求失败');
+      toast.error('Stop request failed');
     } finally {
       setProcessingId(null);
     }
@@ -128,16 +128,16 @@ export function ActionRequiredBanner({
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-              待办处理
+              Needs attention
             </span>
-            <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-[10px] font-mono font-bold">
+            <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-3xs font-mono font-bold">
               {items.length}
             </span>
           </div>
         </div>
 
-        <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80 hidden sm:inline">
-          智能体正在等待人工执行审批或已超时停滞
+        <span className="text-2xs text-amber-700/80 dark:text-amber-400/80 hidden sm:inline">
+          Agents are waiting on human approval, or have stalled past their timeout
         </span>
       </div>
 
@@ -160,14 +160,14 @@ export function ActionRequiredBanner({
                   <span className="font-semibold text-xs text-foreground truncate">
                     @{item.agentName}
                   </span>
-                  <span className="text-[10px] text-muted-foreground truncate font-mono">
+                  <span className="text-3xs text-muted-foreground truncate font-mono">
                     #{item.channelTitle || item.channelId}
                   </span>
                 </div>
 
                 <span
                   className={cn(
-                    'text-[10px] px-1.5 py-0.5 rounded font-mono font-medium shrink-0',
+                    'text-3xs px-1.5 py-0.5 rounded font-mono font-medium shrink-0',
                     isApproval
                       ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
                       : isStalled
@@ -175,27 +175,27 @@ export function ActionRequiredBanner({
                       : 'bg-surface2 text-muted-foreground'
                   )}
                 >
-                  {isApproval ? '等待审批' : isStalled ? '执行停滞' : '异常'}
+                  {isApproval ? 'Awaiting approval' : isStalled ? 'Stalled' : 'Error'}
                 </span>
               </div>
 
               {/* Command / Details Preview */}
-              <div className="p-2 rounded-lg bg-surface2 font-mono text-[11px] text-foreground-muted space-y-1">
+              <div className="p-2 rounded-lg bg-surface2 font-mono text-2xs text-foreground-muted space-y-1">
                 {item.toolName && (
-                  <div className="flex items-center gap-1 text-[10px] text-foreground font-semibold">
+                  <div className="flex items-center gap-1 text-3xs text-foreground font-medium">
                     <Terminal className="size-3 text-amber-500" />
-                    <span>工具: {item.toolName}</span>
+                    <span>Tool: {item.toolName}</span>
                   </div>
                 )}
                 {item.command && (
                   <div className="truncate text-foreground font-medium">$ {item.command}</div>
                 )}
-                {item.path && <div className="truncate">文件: {item.path}</div>}
+                {item.path && <div className="truncate">File: {item.path}</div>}
                 {isStalled && (
                   <div className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
                     <Clock className="size-3" />
                     <span>
-                      已停滞超过 {item.stalledMs ? `${Math.round(item.stalledMs / 1000)}s` : '30s'}
+                      Stalled for over {item.stalledMs ? `${Math.round(item.stalledMs / 1000)}s` : '30s'}
                     </span>
                   </div>
                 )}
@@ -206,9 +206,9 @@ export function ActionRequiredBanner({
                 <button
                   type="button"
                   onClick={() => onOpenThread(item.channelId)}
-                  className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
-                  <span>前往频道</span>
+                  <span>Open channel</span>
                   <ArrowRight className="size-3" />
                 </button>
 
@@ -222,7 +222,7 @@ export function ActionRequiredBanner({
                         className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-500/10 border border-rose-500/20 transition-colors cursor-pointer"
                       >
                         <X className="size-3" />
-                        <span>拒绝</span>
+                        <span>Deny</span>
                       </button>
                       <button
                         type="button"
@@ -231,7 +231,7 @@ export function ActionRequiredBanner({
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                       >
                         <Check className="size-3" />
-                        <span>批准执行</span>
+                        <span>Approve</span>
                       </button>
                     </>
                   ) : (
@@ -242,7 +242,7 @@ export function ActionRequiredBanner({
                       className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-600 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
                     >
                       <Square className="size-3 fill-current" />
-                      <span>强制终止</span>
+                      <span>Force stop</span>
                     </button>
                   )}
                 </div>

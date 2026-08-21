@@ -3,7 +3,6 @@
  *
  * Bridges the local Antigravity CLI (agy) / Google Antigravity Agent to 52hzAgents:
  * - Reads and syncs model configurations with ~/.gemini/antigravity-cli/settings.json
- * - Provides live quota, usage tracking, and 5-hour/daily reset status
  * - Supports dynamic model switching across Gemini 3.5 Pro / Flash / Lite
  * - Runs commands non-interactively in the background with windowsHide
  */
@@ -38,6 +37,26 @@ function stripAnsi(str) {
   return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
+const FILE_WRITING_TOOLS = new Set([
+  'Write', 'Edit', 'NotebookEdit', 'write_to_file', 'replace_file_content',
+  'multi_replace_file_content', 'sed_file', 'notebook_edit'
+]);
+
+function formatToolPreview(toolName, params) {
+  if (!params || typeof params !== 'object') return '';
+  if (params.CommandLine) return params.CommandLine;
+  if (params.TargetFile) return params.TargetFile;
+  if (params.AbsolutePath) return params.AbsolutePath;
+  if (params.file_path) return params.file_path;
+  if (params.DirectoryPath) return params.DirectoryPath;
+  if (params.Query) return params.Query;
+  if (params.Pattern) return params.Pattern;
+  if (params.Url) return params.Url;
+  if (params.prompt) return params.prompt;
+  const str = JSON.stringify(params);
+  return str.length > 150 ? str.slice(0, 150) + '…' : str;
+}
+
 class AntigravityAdapter extends BaseAdapter {
   constructor(opts) {
     super(opts);
@@ -45,8 +64,6 @@ class AntigravityAdapter extends BaseAdapter {
     this._channelSessions = {};
     this._channelProcesses = {};
     this._stoppingChannels = new Set();
-    this._cachedUsage = null;
-    this._cachedUsageTime = 0;
 
     this._settingsPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
     this._historyPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'history.jsonl');
@@ -135,73 +152,6 @@ class AntigravityAdapter extends BaseAdapter {
     return settings.model || 'Gemini 3.5 Flash (Medium)';
   }
 
-  async fetchAndReportUsage(force = false) {
-    if (!this.workspaceId || !this.client) return null;
-    if (!force && this._cachedUsage && (Date.now() - (this._cachedUsageTime || 0) < 30_000)) {
-      return this._cachedUsage;
-    }
-
-    try {
-      const currentModel = this.getCurrentModel();
-      const conversationsDir = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'conversations');
-      let activeSessions5h = 0;
-      let activeSessions24h = 0;
-      let activeSessions7d = 0;
-      let totalConversations = 0;
-
-      try {
-        if (fs.existsSync(conversationsDir)) {
-          const files = fs.readdirSync(conversationsDir);
-          const now = Date.now();
-          const fiveHoursAgo = now - 5 * 3600 * 1000;
-          const oneDayAgo = now - 24 * 3600 * 1000;
-          const sevenDaysAgo = now - 7 * 24 * 3600 * 1000;
-
-          for (const file of files) {
-            if (file.endsWith('.pb') || file.endsWith('.db')) {
-              totalConversations++;
-              try {
-                const stat = fs.statSync(path.join(conversationsDir, file));
-                const mtime = stat.mtimeMs;
-                if (mtime >= fiveHoursAgo) activeSessions5h++;
-                if (mtime >= oneDayAgo) activeSessions24h++;
-                if (mtime >= sevenDaysAgo) activeSessions7d++;
-              } catch {}
-            }
-          }
-        }
-      } catch {}
-
-      // Calculate activity levels for visual monitoring
-      const sessionPercent = Math.min(100, activeSessions5h * 20);
-      const weekPercent = Math.min(100, activeSessions7d * 10);
-
-      const usagePayload = {
-        is_estimated: true,
-        session_used_percent: sessionPercent,
-        session_resets_at: '滚动刷新 (本地会话活跃度)',
-        week_used_percent: weekPercent,
-        week_resets_at: '7天窗口',
-        last_24h_summary: `近 24h 活跃 ${activeSessions24h} 个会话 (累计 ${totalConversations} 个项目会话)`,
-        last_7d_summary: `近 7 天活跃 ${activeSessions7d} 个会话`,
-        current_model: currentModel,
-        available_models: ANTIGRAVITY_MODELS.map((m) => m.name).join(', '),
-        raw_text: `Antigravity Engine (${currentModel}) · 状态正常 · 本地活跃会话: 24h内${activeSessions24h}个`,
-        parse_status: 'ok',
-      };
-
-      this._cachedUsage = usagePayload;
-      this._cachedUsageTime = Date.now();
-
-      await this.client.reportAgentUsage(this.workspaceId, this.agentName, usagePayload, this.token);
-      this._log(`Reported Antigravity usage: model=${currentModel}, 24h_active=${activeSessions24h}, total=${totalConversations}`);
-      return usagePayload;
-    } catch (e) {
-      this._log(`fetchAndReportUsage error: ${e.message}`);
-      return null;
-    }
-  }
-
   async _onControlAction(action, payload) {
     if (action === 'set_model') {
       const modelIdOrName = payload && payload.model;
@@ -216,7 +166,6 @@ class AntigravityAdapter extends BaseAdapter {
         this._saveSettings(settings);
         this.model = targetModelName;
         this._log(`Switched Antigravity model to: ${targetModelName}`);
-        await this.fetchAndReportUsage(true);
       }
       return;
     }
@@ -264,24 +213,14 @@ class AntigravityAdapter extends BaseAdapter {
   }
 
   async _handleMessage(msg) {
-    // Messages carry the channel in `sessionId`, not `channel` — reading
-    // msg.channel yielded undefined, so every status/response was posted to a
-    // non-existent channel and the UI spun forever. Mirror _dispatchMessage()
-    // exactly so this key matches the one used for queueing and the `stop`
-    // control action (_channelProcesses / _channelQueues are keyed by it).
     let channel = this.channelName || 'general';
     if (msg.sessionId && !msg.sessionId.startsWith('openagents:') && !msg.sessionId.startsWith('agent:')) {
       channel = msg.sessionId;
     }
-    // The "@antigravity" a user types to address this agent in a shared channel
-    // is addressing, not part of the question — keep it out of the prompt.
     const content = stripSelfMention(msg.content || '', this.agentName);
-    const sender = msg.sender || 'user';
 
     this._log(`Received message in channel ${channel}: ${content.slice(0, 80)}...`);
 
-    // A bare "@antigravity" with no question left after stripping is an
-    // address with no request — don't spawn agy with an empty -p.
     if (!content) {
       this._log(`Ignoring empty message in channel ${channel} (mention only)`);
       return;
@@ -298,11 +237,10 @@ class AntigravityAdapter extends BaseAdapter {
 
     const workingDir = await this._resolveWorkingDir(channel);
     const conversationId = this._channelSessions[channel] || null;
-    this.fetchAndReportUsage().catch(() => {}); // 不阻塞消息处理：用量上报失败或超时都不应挡住 agy 启动
-    await this.sendStatus(channel, 'thinking', 'Antigravity 正在推理中...');
+    await this.sendStatus(channel, 'Antigravity 正在推理中...');
 
     return new Promise((resolve) => {
-      const args = ['-p', content, '--dangerously-skip-permissions'];
+      const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
       if (conversationId) {
         args.push('--conversation', conversationId);
       }
@@ -312,15 +250,7 @@ class AntigravityAdapter extends BaseAdapter {
 
       const spawnEnv = { ...(this.agentEnv || process.env) };
       this._log(`Spawning ${agyBin} ${args.join(' ')} (cwd: ${workingDir || process.cwd()})`);
-      this._log(`[spawn] pre: bin_exists=${fs.existsSync(agyBin)} isBatch=${IS_WINDOWS && /\.(cmd|bat)$/i.test(agyBin)} hasPATH=${!!(spawnEnv.PATH || spawnEnv.Path)} hasCOMSPEC=${!!spawnEnv.ComSpec} envKeys=${Object.keys(spawnEnv).length} argv=${JSON.stringify(args)}`);
 
-      // No `shell: true`: on Windows it hands the joined command line to
-      // cmd.exe WITHOUT quoting, so any argument containing a space is split
-      // into separate argv entries — `-p` then received only the first word of
-      // the user's message and the rest became stray positional args. A binary
-      // path containing spaces breaks outright the same way. Batch wrappers
-      // still need a shell, so route only those through `cmd.exe /c`
-      // (same approach as the claude adapter).
       const isBatch = IS_WINDOWS && /\.(cmd|bat)$/i.test(agyBin);
       const spawnCmd = isBatch ? 'cmd.exe' : agyBin;
       const spawnArgs = isBatch ? ['/c', agyBin, ...args] : args;
@@ -332,36 +262,110 @@ class AntigravityAdapter extends BaseAdapter {
         env: spawnEnv,
       });
 
-      this._log(`[spawn] post: pid=${proc.pid == null ? 'NULL(spawn failed synchronously)' : proc.pid} killed=${proc.killed} channel=${channel}`);
-
-      proc.on('spawn', () => {
-        this._log(`[spawn] event=spawn channel=${channel} pid=${proc.pid} — child process actually started`);
-      });
-
-      proc.on('exit', (code, signal) => {
-        this._log(`[spawn] event=exit channel=${channel} pid=${proc.pid} code=${code} signal=${signal}`);
-      });
-
       this._channelProcesses[channel] = proc;
 
-      let stdout = '';
-      let stderr = '';
+      let lineBuffer = '';
+      let pendingLines = Promise.resolve();
+      let finalResponse = '';
+      let lastErrorText = '';
+      const textDeltas = [];
+      const reportedSteps = new Set();
+      let rawStdout = '';
+      let rawStderr = '';
+
+      const processLine = async (line) => {
+        line = line.trim();
+        if (!line) return;
+        let data;
+        try {
+          data = JSON.parse(line);
+        } catch {
+          return;
+        }
+
+        if (data.event === 'init') {
+          const convId = data.conversation_id || (data.init && data.init.conversation_id);
+          if (convId) {
+            this._channelSessions[channel] = convId;
+            this._saveSessions();
+          }
+        } else if (data.event === 'step_update') {
+          const su = data.step_update || {};
+          if (su.conversation_id) {
+            this._channelSessions[channel] = su.conversation_id;
+            this._saveSessions();
+          }
+
+          if (su.step_type === 'tool') {
+            const toolName = su.tool_name || (su.tool_info && su.tool_info.name) || 'tool';
+            const params = (su.tool_info && su.tool_info.parameters) || {};
+            const preview = formatToolPreview(toolName, params);
+            const stepKey = `${su.step_index}:${toolName}:${su.state}`;
+
+            if (!reportedSteps.has(stepKey)) {
+              reportedSteps.add(stepKey);
+              if (preview) {
+                try { await this.sendStatus(channel, `${toolName} › ${preview}`); } catch {}
+              } else {
+                try { await this.sendStatus(channel, `${toolName}`); } catch {}
+              }
+            }
+
+            if (su.state === 'DONE' && FILE_WRITING_TOOLS.has(toolName)) {
+              const written = params.TargetFile || params.AbsolutePath || params.file_path;
+              if (written) {
+                this.registerProducedFile(channel, written).catch(() => {});
+              }
+            }
+          } else if (su.step_type === 'agent_response') {
+            if (su.text_delta) {
+              textDeltas.push(su.text_delta);
+              try { await this.sendThinking(channel, su.text_delta); } catch {}
+            }
+          } else if (su.step_type === 'checkpoint') {
+            try { await this.sendStatus(channel, 'Checkpoint reached'); } catch {}
+          }
+        } else if (data.event === 'result') {
+          const res = data.result || {};
+          if (res.conversation_id) {
+            this._channelSessions[channel] = res.conversation_id;
+            this._saveSessions();
+          }
+          if (res.response) {
+            finalResponse = res.response;
+          }
+          if (res.error || res.status === 'ERROR') {
+            lastErrorText = res.error || 'Execution encountered an error';
+          }
+        }
+      };
 
       if (proc.stdout) {
         proc.stdout.on('data', (data) => {
-          stdout += data.toString('utf-8');
+          const str = data.toString('utf-8');
+          rawStdout += str;
+          lineBuffer += str;
+          const lines = lineBuffer.split('\n');
+          lineBuffer = lines.pop();
+          for (const line of lines) {
+            pendingLines = pendingLines.then(() => processLine(line)).catch(() => {});
+          }
         });
       }
 
       if (proc.stderr) {
         proc.stderr.on('data', (data) => {
-          stderr += data.toString('utf-8');
+          rawStderr += data.toString('utf-8');
         });
       }
 
       proc.on('close', async (code) => {
-        this._log(`[spawn] event=close channel=${channel} pid=${proc.pid} code=${code} stdout=${stdout.length}B stderr=${stderr.length}B stopping=${this._stoppingChannels.has(channel)}`);
-        if (stderr.trim()) this._log(`[spawn] stderr head: ${stripAnsi(stderr).trim().slice(0, 500)}`);
+        if (lineBuffer.trim()) {
+          pendingLines = pendingLines.then(() => processLine(lineBuffer)).catch(() => {});
+        }
+        await pendingLines;
+
+        this._log(`[spawn] event=close channel=${channel} pid=${proc.pid} code=${code} stdout=${rawStdout.length}B stderr=${rawStderr.length}B`);
         delete this._channelProcesses[channel];
         await this.sendStatus(channel, 'idle');
 
@@ -371,11 +375,12 @@ class AntigravityAdapter extends BaseAdapter {
           return;
         }
 
-        const rawOutput = (stdout || stderr || '').trim();
-        const cleanOutput = stripAnsi(rawOutput);
+        const cleanOutput = stripAnsi(finalResponse || (textDeltas.length ? textDeltas.join('') : rawStdout)).trim();
 
         if (cleanOutput) {
           await this.sendResponse(channel, cleanOutput);
+        } else if (lastErrorText) {
+          await this.sendError(channel, `❌ Antigravity: ${lastErrorText}`);
         } else if (code !== 0) {
           await this.sendResponse(channel, `⚠️ Antigravity 执行结束（退出码: ${code}），未产生输出。`);
         }
@@ -391,14 +396,13 @@ class AntigravityAdapter extends BaseAdapter {
           }
         }
 
-        await this.fetchAndReportUsage(true);
         resolve();
       });
 
       proc.on('error', async (err) => {
         delete this._channelProcesses[channel];
         await this.sendStatus(channel, 'idle');
-        this._log(`[spawn] event=error channel=${channel} code=${err.code || 'n/a'} errno=${err.errno != null ? err.errno : 'n/a'} syscall=${err.syscall || 'n/a'} path=${err.path || 'n/a'} msg=${err.message}`);
+        this._log(`[spawn] event=error channel=${channel} msg=${err.message}`);
         await this.sendError(channel, `❌ 启动 Antigravity 失败: ${err.message}`);
         resolve();
       });

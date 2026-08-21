@@ -96,7 +96,7 @@ export function SidebarHeader({ searchQuery, onSearchChange }: SidebarHeaderProp
                   <p className="text-sm font-medium truncate">
                     {workspace?.name || 'Workspace'}
                   </p>
-                  <p className="text-[10px] text-muted-foreground truncate font-mono">
+                  <p className="text-3xs text-muted-foreground truncate font-mono">
                     {workspace?.slug || ''}
                   </p>
                 </div>

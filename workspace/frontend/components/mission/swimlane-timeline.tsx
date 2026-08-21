@@ -54,27 +54,27 @@ export function SwimlaneTimeline({
         <div className="flex items-center gap-2">
           <Clock className="size-4 text-primary" />
           <span className="text-xs font-semibold text-foreground">
-            多 Agent 并行时序泳道
+            Multi-agent swimlanes
           </span>
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-3 text-[10.5px] font-mono text-muted-foreground">
+        <div className="flex items-center gap-3 text-3xs font-mono text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-emerald-500" />
-            <span>工具执行</span>
+            <span>Tool run</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-violet-500" />
-            <span>深度思考</span>
+            <span>Reasoning</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-amber-500 animate-pulse" />
-            <span>等待审批</span>
+            <span>Awaiting approval</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-2 rounded bg-rose-500" />
-            <span>执行停滞</span>
+            <span>Stalled</span>
           </span>
         </div>
       </div>
@@ -82,9 +82,9 @@ export function SwimlaneTimeline({
       {/* Swimlane Grid */}
       <div className="space-y-2 relative">
         {/* Time Axis Header */}
-        <div className="flex items-center pl-36 pr-2 text-[10px] font-mono text-muted-foreground/70 justify-between select-none">
+        <div className="flex items-center pl-36 pr-2 text-3xs font-mono text-muted-foreground/70 justify-between select-none">
           {timeMarkers.map((sec) => (
-            <span key={sec}>{sec === 0 ? '现在' : `-${sec}s`}</span>
+            <span key={sec}>{sec === 0 ? 'now' : `-${sec}s`}</span>
           ))}
         </div>
 
@@ -111,8 +111,8 @@ export function SwimlaneTimeline({
                     <div className="text-xs font-semibold text-foreground truncate">
                       {agent.agentName}
                     </div>
-                    <div className="text-[9.5px] font-mono text-muted-foreground truncate">
-                      {isOnline ? '在线' : '离线'}
+                    <div className="text-3xs font-mono text-muted-foreground truncate">
+                      {isOnline ? 'Online' : 'Offline'}
                     </div>
                   </div>
                 </div>
@@ -122,8 +122,8 @@ export function SwimlaneTimeline({
                   <div className="absolute inset-0 grid grid-cols-4 pointer-events-none opacity-20 divide-x divide-border" />
 
                   {agentEvents.length === 0 ? (
-                    <span className="text-[10px] font-mono text-muted-foreground/40 italic pl-2">
-                      {isOnline ? '空闲待命中' : '进程未连接'}
+                    <span className="text-3xs font-mono text-muted-foreground/40 italic pl-2">
+                      {isOnline ? 'Idle, standing by' : 'Process not connected'}
                     </span>
                   ) : (
                     agentEvents.map((ev) => {
@@ -149,7 +149,7 @@ export function SwimlaneTimeline({
                             width: `${widthPct}%`,
                           }}
                           className={cn(
-                            'absolute h-5 rounded-md px-1.5 text-[10.5px] font-mono font-medium',
+                            'absolute h-5 rounded-md px-1.5 text-3xs font-mono font-medium',
                             'flex items-center gap-1 border shadow-xs transition-transform hover:scale-105 cursor-pointer z-10 truncate',
                             bgClass
                           )}

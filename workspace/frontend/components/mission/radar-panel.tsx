@@ -47,7 +47,7 @@ const STATUS_COLOR: Record<Status, { dot: string; ring: string; text: string; la
   },
 };
 
-const MICRO_LABEL = 'text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted';
+const MICRO_LABEL = 'text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted';
 
 function stripMarkdown(text: string): string {
   return text.replace(/```[\s\S]*?```/g, '[code]').replace(/\*\*/g, '').replace(/`{1,3}/g, '').replace(/\n+/g, ' ').trim();
@@ -125,7 +125,7 @@ export function RadarPanel() {
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 pl-4 pr-12">
         <Users className="size-4 text-foreground-muted" />
         <span className="text-sm font-semibold tracking-tight text-foreground">Agents</span>
-        <span className="ml-auto rounded-full bg-surface2 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-foreground-muted">
+        <span className="ml-auto rounded-full bg-surface2 px-1.5 py-0.5 text-3xs font-medium tabular-nums text-foreground-muted">
           {panelAgents.length}
         </span>
       </div>
@@ -153,12 +153,12 @@ export function RadarPanel() {
               <span
                 className={cn(
                   'flex-1 truncate text-xs',
-                  isSel ? 'font-semibold text-foreground' : 'font-medium text-foreground-muted',
+                  isSel ? 'font-medium text-foreground' : 'font-medium text-foreground-muted',
                 )}
               >
                 {r.agent.agentName}
               </span>
-              <span className={cn('shrink-0 text-[10px] font-medium uppercase tracking-wider', c.text)}>{c.label}</span>
+              <span className={cn('shrink-0 text-3xs font-medium uppercase tracking-wider', c.text)}>{c.label}</span>
             </motion.button>
           );
         })}
@@ -185,7 +185,7 @@ export function RadarPanel() {
               </div>
               <span
                 className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider',
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-3xs font-medium uppercase tracking-wider',
                   STATUS_COLOR[current.status].pill,
                 )}
               >
@@ -245,7 +245,7 @@ export function RadarPanel() {
               <div className="flex items-center gap-1.5">
                 <MessageSquare className="size-3 text-foreground-extra-muted" />
                 <span className={MICRO_LABEL}>Channels</span>
-                <span className="rounded-full bg-surface2 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-foreground-muted">
+                <span className="rounded-full bg-surface2 px-1.5 py-0.5 text-3xs font-medium tabular-nums text-foreground-muted">
                   {current.threads.length}
                 </span>
               </div>
@@ -267,7 +267,7 @@ export function RadarPanel() {
                         {t.title || 'Untitled'}
                       </span>
                       {t.lastEventAt && (
-                        <span className="shrink-0 text-[10px] tabular-nums text-foreground-extra-muted">
+                        <span className="shrink-0 text-3xs tabular-nums text-foreground-extra-muted">
                           {timeAgo(new Date(t.lastEventAt).toISOString())}
                         </span>
                       )}

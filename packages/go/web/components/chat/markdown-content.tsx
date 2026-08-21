@@ -69,7 +69,7 @@ function HtmlBlock({ html }: { html: string }) {
     <>
       <div className="my-2 rounded-md border border-zinc-200 dark:border-zinc-700 overflow-hidden bg-zinc-50 dark:bg-zinc-900/40">
         <div className="flex items-center gap-1.5 px-2 py-1 border-b border-zinc-200 dark:border-zinc-700">
-          <span className="text-[10px] font-mono text-muted-foreground">html</span>
+          <span className="text-3xs font-mono text-muted-foreground">html</span>
           <div className="flex-1" />
           <button
             onClick={() => setOpen(true)}
@@ -167,7 +167,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       <h2 className="text-base font-bold mt-3 mb-1.5 first:mt-0">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="font-semibold text-[15px] mt-3 mb-1 first:mt-0">{children}</h3>
+      <h3 className="font-semibold text-base mt-3 mb-1 first:mt-0">{children}</h3>
     ),
     p: ({ children }) => (
       <p className="leading-relaxed mb-2 last:mb-0">{renderMentions(children, agentNames)}</p>
@@ -206,7 +206,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       </tr>
     ),
     th: ({ children }) => (
-      <th className="px-3 py-1.5 text-left font-semibold text-xs text-muted-foreground">
+      <th className="px-3 py-1.5 text-left font-medium text-xs text-muted-foreground">
         {children}
       </th>
     ),
@@ -225,13 +225,13 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       }
       if (isBlock) {
         return (
-          <code className={cn('text-[13px]', className)} {...props}>
+          <code className={cn('text-sm', className)} {...props}>
             {children}
           </code>
         );
       }
       return (
-        <code className="text-[13px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">
+        <code className="text-xs px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 font-mono">
           {children}
         </code>
       );
@@ -248,7 +248,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         return <>{children}</>;
       }
       return (
-        <pre className="my-2 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 overflow-x-auto text-[13px] leading-relaxed font-mono">
+        <pre className="my-2 rounded-md bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 overflow-x-auto text-xs leading-relaxed font-mono">
           {children}
         </pre>
       );

@@ -13,7 +13,7 @@ function StatusLetter({ letter }: { letter: string }) {
       : letter === 'D' ? 'text-status-danger'
         : 'text-status-warning';
   return (
-    <span className={cn('w-2.5 shrink-0 text-[10px] font-semibold font-mono', tone)}>
+    <span className={cn('w-2.5 shrink-0 text-3xs font-medium font-mono', tone)}>
       {letter === '?' ? 'U' : letter}
     </span>
   );
@@ -21,12 +21,12 @@ function StatusLetter({ letter }: { letter: string }) {
 
 function FileRow({ file }: { file: GitStatus['files'][number] }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-0.5 text-[11px]">
+    <div className="flex items-center gap-2 px-3 py-0.5 text-2xs">
       <StatusLetter letter={file.status} />
       <span className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono" dir="rtl" title={file.path}>
         {file.path}
       </span>
-      <span className="shrink-0 font-mono tabular-nums text-[10.5px]">
+      <span className="shrink-0 font-mono tabular-nums text-3xs">
         {file.additions > 0 && <span className="text-status-success">+{file.additions}</span>}
         {file.additions > 0 && file.deletions > 0 && ' '}
         {file.deletions > 0 && <span className="text-status-danger">−{file.deletions}</span>}
@@ -76,12 +76,12 @@ export function GitChip({
     setCommitting(true);
     try {
       await workspaceApi.createGitCommit(channelId, message.trim());
-      toast.success('已提交更改');
+      toast.success('Changes committed');
       setMessage('');
       setOpen(false);
       await refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '提交失败');
+      toast.error(e instanceof Error ? e.message : 'Commit failed');
     } finally {
       setCommitting(false);
     }
@@ -95,9 +95,9 @@ export function GitChip({
     try {
       await workspaceApi.fetchGitRemote(channelId);
       await refresh();
-      toast.success('已与远端同步');
+      toast.success('Synced with remote');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '同步失败');
+      toast.error(e instanceof Error ? e.message : 'Sync failed');
     } finally {
       setSyncing(false);
     }
@@ -109,11 +109,11 @@ export function GitChip({
     try {
       await workspaceApi.pullGitRemote(channelId);
       await refresh();
-      toast.success('已拉取远端更改');
+      toast.success('Pulled from remote');
     } catch (e) {
       // --ff-only refusals land here; the git message names the real problem
       // (diverged branches), so show it rather than a generic failure.
-      toast.error(e instanceof Error ? e.message : '拉取失败');
+      toast.error(e instanceof Error ? e.message : 'Pull failed');
     } finally {
       setPulling(false);
     }
@@ -125,9 +125,9 @@ export function GitChip({
     try {
       const res = await workspaceApi.pushGitRemote(channelId);
       await refresh();
-      toast.success(`已推送到 origin/${res.branch}`);
+      toast.success(`Pushed to origin/${res.branch}`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '推送失败');
+      toast.error(e instanceof Error ? e.message : 'Push failed');
     } finally {
       setPushing(false);
     }
@@ -138,9 +138,9 @@ export function GitChip({
     try {
       await workspaceApi.stageGitFiles(channelId, unstaged.map((f) => f.path));
       await refresh();
-      toast.success('所有文件已暂存');
+      toast.success('All files staged');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '暂存失败');
+      toast.error(e instanceof Error ? e.message : 'Stage failed');
     }
   };
 
@@ -149,9 +149,9 @@ export function GitChip({
     try {
       await workspaceApi.unstageGitFiles(channelId, staged.map((f) => f.path));
       await refresh();
-      toast.success('已取消暂存');
+      toast.success('Unstaged');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '取消暂存失败');
+      toast.error(e instanceof Error ? e.message : 'Unstage failed');
     }
   };
 
@@ -159,16 +159,16 @@ export function GitChip({
     <div ref={rootRef} className="relative shrink-0">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[12px] bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors cursor-pointer"
         title={`${status.dir}${status.commit ? ` @ ${status.commit}` : ''}`}
       >
         <GitBranch className="size-3 text-foreground-muted shrink-0" />
         <span className="font-medium max-w-[120px] truncate">{status.branch || 'detached'}</span>
         {status.additions > 0 && (
-          <span className="font-mono tabular-nums text-[11px] text-status-success">+{status.additions}</span>
+          <span className="font-mono tabular-nums text-2xs text-status-success">+{status.additions}</span>
         )}
         {status.deletions > 0 && (
-          <span className="font-mono tabular-nums text-[11px] text-status-danger">−{status.deletions}</span>
+          <span className="font-mono tabular-nums text-2xs text-status-danger">−{status.deletions}</span>
         )}
         <ChevronDown className={cn('size-2.5 text-foreground-muted transition-transform', open && 'rotate-180')} />
       </button>
@@ -179,9 +179,9 @@ export function GitChip({
           <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-surface1/60">
             <div className="flex items-center gap-2 min-w-0">
               <GitBranch className="size-3.5 text-foreground-extra-muted shrink-0" />
-              <span className="text-[12.5px] font-semibold text-foreground truncate">{status.branch || 'detached'}</span>
+              <span className="text-xs font-semibold text-foreground truncate">{status.branch || 'detached'}</span>
               {(status.ahead > 0 || status.behind > 0) && (
-                <span className="text-[10.5px] font-mono text-foreground-extra-muted shrink-0">
+                <span className="text-3xs font-mono text-foreground-extra-muted shrink-0">
                   {status.ahead > 0 && `↑${status.ahead}`}{status.behind > 0 && ` ↓${status.behind}`}
                 </span>
               )}
@@ -189,29 +189,29 @@ export function GitChip({
             <button
               onClick={handleSync}
               disabled={syncing}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/50"
-              title="git fetch --prune,然后重读状态"
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/50"
+              title="git fetch --prune, then re-read status"
             >
               <RefreshCw className={cn("size-2.5 text-muted-foreground", syncing && "animate-spin")} />
-              同步
+              Sync
             </button>
           </div>
 
           {/* File list */}
           <div className="max-h-[220px] overflow-y-auto py-1">
             {status.files.length === 0 && (
-              <p className="px-3 py-3 text-[11.5px] text-foreground-extra-muted text-center">工作区干净 (Working tree clean)</p>
+              <p className="px-3 py-3 text-2xs text-foreground-extra-muted text-center">Working tree clean</p>
             )}
 
             {staged.length > 0 && (
               <>
                 <div className="flex items-baseline justify-between px-3 pt-1.5 pb-1">
-                  <span className="text-[11px] font-semibold text-foreground-muted">已暂存 ({staged.length})</span>
+                  <span className="text-2xs font-medium text-foreground-muted">Staged ({staged.length})</span>
                   <button
                     onClick={unstageAll}
-                    className="text-[11px] text-primary hover:underline transition-colors cursor-pointer"
+                    className="text-2xs text-primary hover:underline transition-colors cursor-pointer"
                   >
-                    取消暂存
+                    Unstage
                   </button>
                 </div>
                 {staged.map((f) => <FileRow key={`s-${f.path}`} file={f} />)}
@@ -221,12 +221,12 @@ export function GitChip({
             {unstaged.length > 0 && (
               <>
                 <div className="flex items-baseline justify-between px-3 pt-2 pb-1">
-                  <span className="text-[11px] font-semibold text-foreground-muted">未暂存 ({unstaged.length})</span>
+                  <span className="text-2xs font-medium text-foreground-muted">Unstaged ({unstaged.length})</span>
                   <button
                     onClick={stageAll}
-                    className="text-[11px] text-primary hover:underline transition-colors cursor-pointer"
+                    className="text-2xs text-primary hover:underline transition-colors cursor-pointer"
                   >
-                    暂存全部
+                    Stage all
                   </button>
                 </div>
                 {unstaged.map((f) => <FileRow key={`u-${f.path}`} file={f} />)}
@@ -239,19 +239,19 @@ export function GitChip({
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder={staged.length === 0 ? '暂存文件后输入 Commit 描述...' : '输入 Commit 提交说明...'}
+              placeholder={staged.length === 0 ? 'Stage files, then write a commit message…' : 'Write a commit message…'}
               rows={2}
               disabled={staged.length === 0}
-              className="w-full resize-none rounded-lg bg-surface0 border border-border-accent px-2.5 py-2 text-[12px] text-foreground placeholder:text-foreground-extra-muted outline-none focus:border-accent disabled:opacity-50 transition-colors"
+              className="w-full resize-none rounded-lg bg-surface0 border border-border-accent px-2.5 py-2 text-xs text-foreground placeholder:text-foreground-extra-muted outline-none focus:border-accent disabled:opacity-50 transition-colors"
             />
 
             <button
               onClick={commit}
               disabled={committing || staged.length === 0 || !message.trim()}
-              className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-[12px] font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+              className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
             >
               {committing && <Loader2 className="size-3 animate-spin" />}
-              提交
+              Commit
             </button>
 
             {/* Remote actions. Always available — ahead/behind can be stale until
@@ -261,20 +261,20 @@ export function GitChip({
               <button
                 onClick={handlePull}
                 disabled={pulling || !channelId}
-                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-[12px] font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
                 title="git pull --ff-only"
               >
                 {pulling ? <Loader2 className="size-3 animate-spin" /> : <ArrowDownToLine className="size-3 text-foreground-muted" />}
-                拉取{status.behind > 0 ? ` (${status.behind})` : ''}
+                Pull{status.behind > 0 ? ` (${status.behind})` : ''}
               </button>
               <button
                 onClick={handlePush}
                 disabled={pushing || !channelId}
-                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-[12px] font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
-                title="git push -u origin <当前分支>"
+                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                title="git push -u origin <current branch>"
               >
                 {pushing ? <Loader2 className="size-3 animate-spin" /> : <ArrowUpFromLine className="size-3 text-foreground-muted" />}
-                推送{status.ahead > 0 ? ` (${status.ahead})` : ''}
+                Push{status.ahead > 0 ? ` (${status.ahead})` : ''}
               </button>
             </div>
           </div>

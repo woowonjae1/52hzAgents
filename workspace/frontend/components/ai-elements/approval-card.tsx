@@ -106,7 +106,7 @@ export function ApprovalCard({
                       <div className="flex-1 min-w-0">
                         <div className="truncate">{opt.label}</div>
                         {opt.description && (
-                          <div className="text-[10.5px] text-muted-foreground font-normal mt-0.5">
+                          <div className="text-3xs text-muted-foreground font-normal mt-0.5">
                             {opt.description}
                           </div>
                         )}
@@ -140,7 +140,7 @@ export function ApprovalCard({
                       disabled={status !== 'pending'}
                       value={customInputs[q.id] || ''}
                       onChange={(e) => handleCustomChange(q.id, e.target.value)}
-                      placeholder={q.customPlaceholder || '输入其他选项说明…'}
+                      placeholder={q.customPlaceholder || 'Describe another option…'}
                       className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden"
                     />
                   </div>
@@ -155,17 +155,17 @@ export function ApprovalCard({
           {status === 'answered' ? (
             <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium text-xs">
               <Check className="size-3.5" />
-              <span>{result || '决策已提交并同步给 Agent'}</span>
+              <span>{result || 'Decision sent to the agent'}</span>
             </div>
           ) : status === 'submitting' ? (
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
               <Loader2 className="size-3.5 animate-spin text-primary" />
-              <span>正在提交选择…</span>
+              <span>Submitting…</span>
             </div>
           ) : (
             <>
-              <span className="text-[11px] text-muted-foreground">
-                请选择或输入决策方案
+              <span className="text-2xs text-muted-foreground">
+                Choose an option, or write your own
               </span>
               <button
                 type="submit"
@@ -177,7 +177,7 @@ export function ApprovalCard({
                     : 'bg-surface3 text-muted-foreground opacity-50 cursor-not-allowed'
                 )}
               >
-                <span>确认并继续</span>
+                <span>Confirm and continue</span>
                 <ArrowRight className="size-3" />
               </button>
             </>

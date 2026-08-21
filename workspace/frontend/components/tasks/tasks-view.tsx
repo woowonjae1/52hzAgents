@@ -178,7 +178,7 @@ export function TasksView() {
     if (!items.length) return null;
     return (
       <section key={sectionStatus}>
-        <h3 className="mb-2 text-[11px] font-semibold text-muted-foreground">
+        <h3 className="mb-2 text-2xs font-medium text-muted-foreground">
           {STATUS_LABEL[sectionStatus]} <span className="text-muted-foreground/60">{items.length}</span>
         </h3>
         <div className="overflow-hidden rounded-lg border border-border bg-card divide-y divide-border">
@@ -199,9 +199,9 @@ export function TasksView() {
                   <p className={cn('text-sm leading-snug', (todo.status === 'completed' || todo.status === 'cancelled') && 'line-through text-muted-foreground')}>
                     {todo.content}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-muted-foreground">
                     <span className={cn(
-                      'px-1.5 py-0.5 rounded text-[11px] font-semibold',
+                      'px-1.5 py-0.5 rounded text-2xs font-medium',
                       todo.status === 'in_progress' && 'bg-surface3 text-foreground-muted border border-border-accent',
                       todo.status === 'completed' && 'bg-status-success/10 text-status-success border border-border-accent',
                       todo.status === 'pending' && 'bg-surface2 text-muted-foreground border border-border/50',

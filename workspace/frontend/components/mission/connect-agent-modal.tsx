@@ -16,11 +16,9 @@ import { getApiBaseUrl } from '@/lib/config';
 interface ConnectAgentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Hand off to the "add another agent" form — `custom` needs configuring, not launching. */
-  onConfigureCustom?: () => void;
 }
 
-export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: ConnectAgentModalProps) {
+export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps) {
   const { workspaceId, agents } = useWorkspace();
   // Only fetched while the dialog is open — this is a modal, not a mounted view.
   const { catalog } = useAgentCatalog(open);
@@ -40,12 +38,6 @@ export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: Con
   // agent's own poller, so it only ever reached agents that were already
   // running — exactly not the case for a card the user is clicking Connect on.
   const handleLaunchAgent = async (agentName: string) => {
-    // `custom` names no runtime — connecting it directly would start whatever
-    // the generic type happens to resolve to. Configure it instead.
-    if (agentName.toLowerCase() === 'custom') {
-      onConfigureCustom?.();
-      return;
-    }
     setStartingAgent(agentName);
     try {
       await workspaceApi.launchAgent(agentName);
@@ -78,11 +70,11 @@ export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: Con
           {/* Section 1: One-Click Local Agent Launcher */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
+              <h3 className="text-xs font-medium text-foreground-muted flex items-center gap-1.5">
                 <Play className="size-3.5" />
                 Local agent runtimes
               </h3>
-              <span className="text-[10px] text-foreground-extra-muted">One-click launch</span>
+              <span className="text-3xs text-foreground-extra-muted">One-click launch</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1">
@@ -116,7 +108,7 @@ export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: Con
                         <AgentAvatar name={cat.name} agentType={cat.name} size={32} status={matchedAgent?.status || 'offline'} showStatus />
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-foreground truncate">{cat.label}</p>
-                          <p className="text-[10px] text-foreground-extra-muted truncate">{cat.desc}</p>
+                          <p className="text-3xs text-foreground-extra-muted truncate">{cat.desc}</p>
                         </div>
                       </div>
 
@@ -126,7 +118,7 @@ export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: Con
                         disabled={isStarting}
                         onClick={() => handleLaunchAgent(cat.name)}
                         className={cn(
-                          'h-8 px-3 text-[11px] font-semibold gap-1.5 shrink-0 cursor-pointer',
+                          'h-8 px-3 text-2xs font-medium gap-1.5 shrink-0 cursor-pointer',
                           isOnline && 'border-status-success/40 text-status-success hover:bg-status-success/10',
                         )}
                       >
@@ -136,11 +128,6 @@ export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: Con
                           <>
                             <ShieldCheck className="size-3" />
                             <span>Running</span>
-                          </>
-                        ) : cat.name === 'custom' ? (
-                          <>
-                            <Settings2 className="size-3" />
-                            <span>Configure</span>
                           </>
                         ) : (
                           <>
@@ -159,14 +146,14 @@ export function ConnectAgentModal({ open, onOpenChange, onConfigureCustom }: Con
           {/* Section 2: Remote Pairing Command */}
           <div className="space-y-2.5 pt-2 border-t border-border/80">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold text-foreground-muted flex items-center gap-1.5">
+              <h3 className="text-xs font-medium text-foreground-muted flex items-center gap-1.5">
                 <Globe className="size-3.5" />
                 Pair a remote server
               </h3>
-              <span className="text-[10px] text-foreground-extra-muted">Any machine</span>
+              <span className="text-3xs text-foreground-extra-muted">Any machine</span>
             </div>
 
-            <p className="text-[11px] text-foreground-muted leading-relaxed">
+            <p className="text-2xs text-foreground-muted leading-relaxed">
               Run this command on any remote server, dev container, or laptop to pair its agents into this workspace:
             </p>
 

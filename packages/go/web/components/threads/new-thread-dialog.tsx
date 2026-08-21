@@ -167,14 +167,14 @@ export function NewThreadDialog({ open, onOpenChange, agents, humans, sessions, 
                 {/* Lead badge / set-as-lead button — only show when multiple agents */}
                 {multipleAgents && isSelected && (
                   isMaster ? (
-                    <span className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium shrink-0">
+                    <span className="flex items-center gap-1 text-2xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium shrink-0">
                       <Star className="size-3 fill-current" />
                       lead
                     </span>
                   ) : (
                     <button
                       onClick={(e) => { e.stopPropagation(); setAsMaster(agent.agentName); }}
-                      className="text-[11px] px-2 py-0.5 rounded-full text-muted-foreground hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shrink-0"
+                      className="text-2xs px-2 py-0.5 rounded-full text-muted-foreground hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors shrink-0"
                     >
                       set lead
                     </button>
@@ -187,7 +187,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, humans, sessions, 
 
         {/* Lead explanation — only when multiple agents are selected */}
         {multipleAgents && selected.size > 1 && (
-          <p className="text-[11px] text-muted-foreground/70 mt-2 px-1">
+          <p className="text-2xs text-muted-foreground/70 mt-2 px-1">
             The <Star className="size-2.5 inline fill-amber-500 text-amber-500 -mt-px" /> lead agent coordinates the others and responds to your messages first.
           </p>
         )}
@@ -196,7 +196,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, humans, sessions, 
             get a push for every message in this chat, not just @mentions. */}
         {humanList.length > 0 && (
           <div className="mt-3">
-            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1.5 px-1">People</p>
+            <p className="text-2xs uppercase tracking-wider text-muted-foreground mb-1.5 px-1">People</p>
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {humanList.map((h) => {
                 const isSelected = selectedHumans.has(h.email);
@@ -223,7 +223,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, humans, sessions, 
                     <div className="flex-1 min-w-0">
                       <span className="text-sm font-medium truncate block">{h.displayName || h.email}</span>
                       {h.displayName && (
-                        <span className="text-[11px] text-muted-foreground truncate block">{h.email}</span>
+                        <span className="text-2xs text-muted-foreground truncate block">{h.email}</span>
                       )}
                     </div>
                   </div>

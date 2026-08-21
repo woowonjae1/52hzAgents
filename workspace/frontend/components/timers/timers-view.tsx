@@ -120,7 +120,7 @@ export function TimersView() {
                 <Clock3 className="mt-0.5 size-4 shrink-0 text-foreground-muted" />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm leading-snug">{timer.message}</p>
-                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-muted-foreground">
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
                     <span>{timer.channelName}</span>
                     <span>for {timer.createdBy.replace(/^openagents:/, '')}</span>
                     <span title={formatDate(timer.firesAt)}>{timeUntil(timer.firesAt)}</span>
@@ -160,7 +160,7 @@ export function TimersView() {
               <label className="text-xs font-medium text-muted-foreground">Remind after</label>
               <div className="grid grid-cols-4 gap-1.5">
                 {DELAY_PRESETS.map((preset) => (
-                  <button key={preset.seconds} type="button" onClick={() => setDelaySeconds(preset.seconds)} disabled={submitting} className={delaySeconds === preset.seconds ? 'rounded-md bg-primary text-primary-foreground px-2 py-1.5 text-xs font-semibold' : 'rounded-md border border-input px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted'}>
+                  <button key={preset.seconds} type="button" onClick={() => setDelaySeconds(preset.seconds)} disabled={submitting} className={delaySeconds === preset.seconds ? 'rounded-md bg-primary text-primary-foreground px-2 py-1.5 text-xs font-medium' : 'rounded-md border border-input px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted'}>
                     {preset.label}
                   </button>
                 ))}

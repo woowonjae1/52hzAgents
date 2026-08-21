@@ -240,7 +240,7 @@ function WorkspaceSelectorDialog({
             {/* Recent workspaces chip row */}
             {topRecents.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                <p className="text-3xs font-medium tracking-wider text-muted-foreground">
                   RECENT WORKSPACES
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -317,7 +317,7 @@ function WorkspaceSelectorDialog({
                           <p className="text-sm font-medium truncate">
                             {entry.name || entry.workspaceId}
                           </p>
-                          <p className="text-[11px] text-muted-foreground truncate font-mono">
+                          <p className="text-2xs text-muted-foreground truncate font-mono">
                             {entry.workspaceId}
                           </p>
                         </div>
@@ -347,7 +347,7 @@ function WorkspaceSelectorDialog({
                     URL above (self-hosted setups). Saved together with this workspace.
                   </p>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                    <p className="text-3xs font-medium tracking-wider text-muted-foreground">
                       API URL
                     </p>
                     <input
@@ -383,7 +383,7 @@ function WorkspaceSelectorDialog({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-[10px] font-medium tracking-wider text-muted-foreground">
+                <span className="text-3xs font-medium tracking-wider text-muted-foreground">
                   OR
                 </span>
                 <div className="flex-1 h-px bg-border" />
@@ -440,7 +440,7 @@ function WorkspaceSelectorDialog({
                 separate window-toolbar slot. */}
             {workspace && (
               <div className="border-t border-border pt-4 space-y-1">
-                <p className="text-[10px] font-medium tracking-wider text-muted-foreground px-1 pb-1">
+                <p className="text-3xs font-medium tracking-wider text-muted-foreground px-1 pb-1">
                   THIS WORKSPACE
                 </p>
                 <MenuItem
@@ -475,9 +475,9 @@ function WorkspaceSelectorDialog({
               </div>
             )}
 
-            <p className="text-[11px] text-muted-foreground text-center pt-1">
+            <p className="text-2xs text-muted-foreground text-center pt-1">
               Get a workspace URL by running{' '}
-              <code className="bg-muted px-1.5 py-0.5 rounded text-[10px]">
+              <code className="bg-muted px-1.5 py-0.5 rounded text-3xs">
                 openagents workspace create
               </code>
             </p>
@@ -764,7 +764,7 @@ function SettingsDialog({
             </Button>
           )}
           {isOwnedByUser && (
-            <p className="text-[11px] text-emerald-600 flex items-center gap-1">
+            <p className="text-2xs text-emerald-600 flex items-center gap-1">
               <Shield className="size-3" /> You own this workspace
             </p>
           )}
@@ -773,7 +773,7 @@ function SettingsDialog({
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <Label>Monitor Mode</Label>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
+                <span className="text-3xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">
                   Experimental
                 </span>
               </div>

@@ -30,7 +30,7 @@ export interface TodoListProps {
 
 export function TodoList({
   items,
-  title = '执行计划',
+  title = 'Plan',
   collapseOnComplete = false,
   defaultExpanded = true,
   className,
@@ -65,7 +65,7 @@ export function TodoList({
         <div className="flex items-center gap-2 min-w-0">
           <ListChecks className="size-4 text-primary shrink-0" />
           <span className="font-semibold text-foreground truncate">{title}</span>
-          <span className="text-[11px] font-mono text-muted-foreground tabular-nums">
+          <span className="text-2xs font-mono text-muted-foreground tabular-nums">
             ({completedCount}/{totalCount})
           </span>
         </div>
@@ -134,7 +134,7 @@ export function TodoList({
                   {/* Title */}
                   <span
                     className={cn(
-                      'flex-1 text-[12px] truncate',
+                      'flex-1 text-xs truncate',
                       isCompleted && 'line-through opacity-70',
                       isCancelled && 'line-through opacity-40'
                     )}
@@ -144,8 +144,8 @@ export function TodoList({
 
                   {/* Tag */}
                   {isInProgress && (
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-primary/15 text-primary font-mono shrink-0">
-                      进行中
+                    <span className="text-3xs px-1.5 py-0.2 rounded-md bg-primary/15 text-primary font-mono shrink-0">
+                      In progress
                     </span>
                   )}
                 </div>

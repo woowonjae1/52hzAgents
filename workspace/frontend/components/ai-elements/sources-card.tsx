@@ -43,16 +43,16 @@ export function SourcesCard({ sources, onSelectSource, className }: SourcesCardP
 
   return (
     <div className={cn('my-2.5 space-y-1.5', className)}>
-      <div className="flex items-center gap-1.5 px-0.5 select-none text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted">
+      <div className="flex items-center gap-1.5 px-0.5 select-none text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted">
         <Link2 className="size-3" />
-        <span>参考来源</span>
+        <span>Sources</span>
         <span className="tabular-nums">({sources.length})</span>
       </div>
 
       {/* 紧凑引用条，随宽度自然换行 */}
       <div className="flex flex-wrap gap-1.5">
         {sources.map((src, idx) => {
-          const label = src.title || src.slug || '未命名文档';
+          const label = src.title || src.slug || 'Untitled document';
           const description = describeSource(src);
           return (
             <button
@@ -82,12 +82,12 @@ export function SourcesCard({ sources, onSelectSource, className }: SourcesCardP
               </span>
 
               <span className="flex flex-col min-w-0 leading-tight">
-                <span className="truncate text-[11.5px] font-medium text-foreground">
+                <span className="truncate text-2xs font-medium text-foreground">
                   <span className="text-foreground-extra-muted tabular-nums mr-1">{idx + 1}.</span>
                   {label}
                 </span>
                 {description && (
-                  <span className="truncate text-[10px] font-mono text-foreground-extra-muted">
+                  <span className="truncate text-3xs font-mono text-foreground-extra-muted">
                     {description}
                   </span>
                 )}

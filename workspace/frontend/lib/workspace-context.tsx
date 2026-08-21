@@ -698,7 +698,7 @@ export function WorkspaceProvider({
     try {
       const discovery = await workspaceApi.discover();
       const nextAgents = discovery.agents.map(networkAgentToWorkspaceAgent);
-      console.log('[52hzAgents Monitor] 🔄 [Discovery] Polled agents:', nextAgents.length, 'channels:', discovery.channels.length, 'at', new Date().toISOString());
+      console.log('[52hzAgents Monitor] [Discovery] Polled agents:', nextAgents.length, 'channels:', discovery.channels.length, 'at', new Date().toISOString());
       setAgents((prev) => reconcileList(prev, nextAgents, sameAgent));
 
       const updated = discovery.channels.map((ch) =>

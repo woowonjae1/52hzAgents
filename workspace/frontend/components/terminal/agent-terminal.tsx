@@ -28,7 +28,7 @@ function highlightCommand(cmd: string) {
       <span
         key={idx}
         className={cn(
-          isKeyword ? 'text-status-success font-semibold' : isOption ? 'text-foreground-muted' : 'text-foreground-extra-muted',
+          isKeyword ? 'text-status-success font-medium' : isOption ? 'text-foreground-muted' : 'text-foreground-extra-muted',
         )}
       >
         {part}
@@ -219,7 +219,7 @@ export function AgentTerminal() {
 
   return (
     <div
-      className="flex flex-col h-full bg-[#0b0d10] text-foreground-extra-muted font-mono text-[12px] leading-5 select-text relative overflow-hidden"
+      className="flex flex-col h-full bg-[#0b0d10] text-foreground-extra-muted font-mono text-xs leading-5 select-text relative overflow-hidden"
       onClick={() => inputRef.current?.focus()}
     >
       <style>{`
@@ -236,10 +236,10 @@ export function AgentTerminal() {
             <span className="size-2.5 rounded-full bg-[#28c840]" />
           </div>
           <TerminalSquare className="size-3.5 text-foreground-extra-muted ml-1" />
-          <span className="text-[11px] text-foreground-extra-muted font-medium truncate">
+          <span className="text-2xs text-foreground-extra-muted font-medium truncate">
             {activeSession?.title || currentSessionId || 'openagents-shell'}
           </span>
-          <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-border text-[10px]">
+          <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-border text-3xs">
             <Cpu className={cn('size-2.5', isAgentWorking ? 'text-status-warning animate-spin' : 'text-status-success')} />
             <span className={cn('font-semibold', isAgentWorking ? 'text-status-warning' : 'text-status-success')}>
               {activeOperator}
@@ -253,7 +253,7 @@ export function AgentTerminal() {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="filter"
-              className="bg-transparent border-0 outline-none text-[10px] w-16 focus:w-24 transition-all text-foreground-extra-muted placeholder:text-foreground-muted"
+              className="bg-transparent border-0 outline-none text-3xs w-16 focus:w-24 transition-all text-foreground-extra-muted placeholder:text-foreground-muted"
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -286,7 +286,7 @@ export function AgentTerminal() {
         {filteredLines.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center gap-2 text-foreground-muted select-none">
             <Terminal className="size-6 text-foreground" />
-            <span className="text-[11px]">
+            <span className="text-2xs">
               {currentSessionId ? 'Console ready — type a command below' : 'Select a thread to attach the shell'}
             </span>
           </div>
@@ -301,7 +301,7 @@ export function AgentTerminal() {
                 {/* gutter + time */}
                 <span className="flex items-center gap-2 shrink-0">
                   <span className={cn('w-[2px] self-stretch rounded-full', s.gutter)} />
-                  <span className="text-foreground-muted tabular-nums text-[10px]">{line.time}</span>
+                  <span className="text-foreground-muted tabular-nums text-3xs">{line.time}</span>
                 </span>
                 {/* sender + glyph */}
                 <span className={cn('shrink-0 font-semibold', s.sender)}>
@@ -314,7 +314,7 @@ export function AgentTerminal() {
                     {line.type === 'command' ? highlightCommand(line.content) : line.content}
                   </span>
                   {line.commandArgs && (
-                    <pre className="mt-1 mb-0.5 p-2 rounded-md bg-black/40 border border-border/70 text-[10px] text-foreground-muted overflow-x-auto max-h-40 whitespace-pre scrollbar-thin">
+                    <pre className="mt-1 mb-0.5 p-2 rounded-md bg-black/40 border border-border/70 text-3xs text-foreground-muted overflow-x-auto max-h-40 whitespace-pre scrollbar-thin">
                       {line.commandArgs}
                     </pre>
                   )}
@@ -328,7 +328,7 @@ export function AgentTerminal() {
 
       {/* Working banner */}
       {sending && (
-        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent/50 text-status-warning text-[10px] select-none">
+        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent/50 text-status-warning text-3xs select-none">
           <RefreshCw className="size-3 animate-spin" />
           <span>executing on workspace host…</span>
         </div>
@@ -337,7 +337,7 @@ export function AgentTerminal() {
       {/* Prompt */}
       <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-border/70 bg-primary/40 backdrop-blur-md">
         <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-primary/80 border border-border/70 focus-within:border-border-accent transition-colors">
-          <span className="shrink-0 select-none font-semibold text-[11px] text-status-success">
+          <span className="shrink-0 select-none font-medium text-2xs text-status-success">
             52hz@openagents
           </span>
           <span className="shrink-0 text-foreground-muted select-none">~$</span>

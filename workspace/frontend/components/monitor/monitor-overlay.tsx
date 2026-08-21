@@ -133,10 +133,18 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
         deliveryStatus: 'sending',
       };
 
+      const onlineAgents = agents.filter((a) => a.status === 'online');
+      const predictedAgentName =
+        (onlineAgents.length === 1 ? onlineAgents[0].agentName : null) ||
+        agents.find((a) => a.role === 'master')?.agentName ||
+        (onlineAgents.length > 0 ? onlineAgents[0].agentName : null) ||
+        agents[0]?.agentName ||
+        'Agent';
+
       const loadingOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-loading-${timestamp}`,
         sessionId,
-        senderName: agents.find((a) => a.role === 'master')?.agentName || agents[0]?.agentName || 'Agent',
+        senderName: predictedAgentName,
         senderType: 'agent',
         content: '',
         messageType: 'loading',
@@ -232,7 +240,7 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
               <button
                 onClick={() => stopAllAgents(sessionId)}
                 disabled={isStopping}
-                className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-surface2 text-status-danger hover:bg-surface3 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-medium bg-surface2 text-status-danger hover:bg-surface3 transition-colors shrink-0 disabled:opacity-60 disabled:pointer-events-none"
               >
                 <Square className="size-3 fill-current" />
                 {isStopping ? 'Stopping...' : 'Stop'}

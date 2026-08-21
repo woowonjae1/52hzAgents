@@ -453,10 +453,10 @@ export function ChatInput({ onSend, disabled, className, agents = [], humans = [
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{cand.label}</div>
                   {cand.subtitle && (
-                    <div className="text-[11px] text-muted-foreground truncate">{cand.subtitle}</div>
+                    <div className="text-2xs text-muted-foreground truncate">{cand.subtitle}</div>
                   )}
                 </div>
-                <span className="text-[11px] font-mono text-muted-foreground ml-auto">@{cand.token}</span>
+                <span className="text-2xs font-mono text-muted-foreground ml-auto">@{cand.token}</span>
               </button>
           ))}
         </div>
@@ -491,7 +491,7 @@ export function ChatInput({ onSend, disabled, className, agents = [], humans = [
                 ) : (
                   <div className="h-20 w-24 flex flex-col items-center justify-center gap-1 px-2">
                     <FileIcon className="size-5 text-muted-foreground" />
-                    <span className="text-[10px] text-muted-foreground truncate w-full text-center">
+                    <span className="text-3xs text-muted-foreground truncate w-full text-center">
                       {pf.file.name}
                     </span>
                   </div>

@@ -316,6 +316,17 @@ func ListEvents(c *gin.Context) {
 		}
 		response["next_cursor"] = nextCursor
 	}
+	if c.Query("compact") == "true" && c.Query("channel") != "" {
+		rawCh := strings.TrimPrefix(c.Query("channel"), "channel/")
+		var channelRec models.Channel
+		if db.DB.Where("workspace_id = ? AND name = ?", workspace.ID, rawCh).First(&channelRec).Error == nil {
+			var compactionRec models.ChannelCompactionRecord
+			if db.DB.Where("workspace_id = ? AND channel_id = ?", workspace.ID, channelRec.ID).Order("created_at desc").First(&compactionRec).Error == nil {
+				response["context_summary"] = compactionRec.Summary
+				response["compacted_to_event_id"] = compactionRec.ToEventID
+			}
+		}
+	}
 	c.JSON(http.StatusOK, response)
 }
 

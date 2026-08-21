@@ -36,7 +36,7 @@ const CARD =
 
 /** Micro-label: the one quiet metadata typography used across the app. */
 const MICRO =
-  'text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted';
+  'text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -185,10 +185,10 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               type="button"
               onClick={() => setViewMode('threads')}
               className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-              title="返回对话"
+              title="Back to chats"
             >
               <ArrowLeft className="size-3.5" />
-              <span>返回对话</span>
+              <span>Back</span>
             </button>
             <div className="h-3.5 w-px bg-border" />
             <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
@@ -198,7 +198,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               Knowledge
             </ScreenTitle>
             {knowledge.length > 0 && (
-              <span className="shrink-0 rounded-full bg-surface2 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-foreground-muted">
+              <span className="shrink-0 rounded-full bg-surface2 px-1.5 py-0.5 text-3xs font-medium tabular-nums text-foreground-muted">
                 {knowledge.length}
               </span>
             )}
@@ -335,7 +335,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                           </p>
                         )}
                         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span className="truncate font-mono text-[10px] tracking-tight text-foreground-muted">
+                          <span className="truncate font-mono text-3xs tracking-tight text-foreground-muted">
                             @knowledge:{entry.slug}
                           </span>
                           {when && (
@@ -411,7 +411,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               {selectedEntry.title}
             </ScreenTitle>
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="rounded-md bg-surface2 px-1.5 py-0.5 font-mono text-[10px] text-foreground-muted">
+              <span className="rounded-md bg-surface2 px-1.5 py-0.5 font-mono text-3xs text-foreground-muted">
                 @knowledge:{selectedEntry.slug}
               </span>
               {timeAgo(selectedEntry.updatedAt || selectedEntry.createdAt) && (

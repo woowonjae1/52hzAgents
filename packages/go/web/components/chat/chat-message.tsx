@@ -157,7 +157,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
-              <span className="text-[15px] font-bold text-foreground">{message.senderName || 'You'}</span>
+              <span className="text-base font-bold text-foreground">{message.senderName || 'You'}</span>
               {timestamp && (
                 <span className="text-xs text-muted-foreground">{timestamp}</span>
               )}
@@ -179,12 +179,12 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [] }: C
         <AgentAvatar name={message.senderName} size={36} square className="mt-0.5" />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
-            <span className="text-[15px] font-bold text-foreground truncate">
+            <span className="text-base font-bold text-foreground truncate">
               {message.senderName}
             </span>
             {agent && (
               <span className={cn(
-                'text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0',
+                'text-3xs px-1.5 py-0.5 rounded font-medium shrink-0',
                 agent.role === 'master'
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                   : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'

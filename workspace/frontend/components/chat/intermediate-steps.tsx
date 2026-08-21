@@ -17,6 +17,10 @@ import {
   ListTodo,
   Copy,
   Check,
+  CheckCircle2,
+  Circle,
+  Ban,
+  Loader2,
 } from 'lucide-react';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { WorkingIndicator } from './working-indicator';
@@ -183,12 +187,20 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         <div className="ml-[22px] space-y-0.5">
           {todos.map((t, i) => (
             <div key={i} className="flex items-center gap-1.5 text-xs">
-              <span className="shrink-0">{t.status === 'completed' ? '✅' : t.status === 'in_progress' ? '🔄' : t.status === 'cancelled' ? '⊘' : '⬜'}</span>
+              {t.status === 'completed' ? (
+                <CheckCircle2 className="size-3 shrink-0 text-status-success" />
+              ) : t.status === 'in_progress' ? (
+                <Loader2 className="size-3 shrink-0 text-primary animate-spin" />
+              ) : t.status === 'cancelled' ? (
+                <Ban className="size-3 shrink-0 text-muted-foreground" />
+              ) : (
+                <Circle className="size-3 shrink-0 text-foreground-extra-muted" />
+              )}
               <span className={cn(
                 (t.status === 'completed' || t.status === 'cancelled') && 'line-through text-muted-foreground'
               )}>{t.content}</span>
               {t.assignee && (
-                <span className="text-muted-foreground/50 text-[10px]">→ {t.assignee}</span>
+                <span className="text-muted-foreground/50 text-3xs">{t.assignee}</span>
               )}
             </div>
           ))}
@@ -211,7 +223,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
       <div className="py-0.5">
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <Icon className="size-3.5 shrink-0 mt-0.5 text-status-warning" />
-          <span className="italic text-[11px]">thinking</span>
+          <span className="italic text-2xs">thinking</span>
         </div>
         <div className="text-xs leading-relaxed text-foreground/60 ml-[22px] mt-0.5 mb-1 whitespace-pre-wrap">
           {parsed.text}
@@ -236,11 +248,11 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
           <span className="size-5 shrink-0 rounded-md bg-surface3 flex items-center justify-center">
             <Icon className="size-3 text-foreground-muted" />
           </span>
-          <span className="font-mono text-[11px] font-semibold text-foreground shrink-0">{parsed.toolDisplay}</span>
+          <span className="font-mono text-2xs font-medium text-foreground shrink-0">{parsed.toolDisplay}</span>
           {parsed.summary && (
             <>
               <span className="text-muted-foreground/40 shrink-0">›</span>
-              <span className="truncate font-mono text-[11px] text-foreground-muted min-w-0 flex-1">{parsed.summary}</span>
+              <span className="truncate font-mono text-2xs text-foreground-muted min-w-0 flex-1">{parsed.summary}</span>
             </>
           )}
           {hasDetail && (
@@ -249,7 +261,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         </button>
         {expanded && parsed.args && (
           <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-surface0 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 text-[11px] text-foreground font-mono">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 text-2xs text-foreground font-mono">
               <span className="flex items-center gap-1.5 font-medium">
                 <span className="size-2 rounded-full bg-status-success inline-block" />
                 <span>{parsed.toolDisplay || 'Terminal Output'}</span>
@@ -271,7 +283,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
-            <pre className="text-[11px] leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground font-mono whitespace-pre-wrap break-all selection:bg-surface4">
+            <pre className="text-2xs leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground font-mono whitespace-pre-wrap break-all selection:bg-surface4">
               {parsed.args}
             </pre>
           </div>
@@ -294,8 +306,8 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         {parsed.type === 'compacting' && (
           <span className="italic text-violet-500/80 animate-pulse">Vibing ...</span>
         )}
-        {parsed.type === 'status' && <span className="text-foreground-muted font-mono text-[11px]">{parsed.text}</span>}
-        {parsed.type === 'thinking' && <span className="italic text-[11px]">thinking</span>}
+        {parsed.type === 'status' && <span className="text-foreground-muted font-mono text-2xs">{parsed.text}</span>}
+        {parsed.type === 'thinking' && <span className="italic text-2xs">thinking</span>}
       </div>
     </div>
   );
@@ -357,7 +369,7 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="flex items-center gap-1.5 text-[11px] text-foreground-muted hover:text-foreground transition-colors rounded px-1.5 py-1 -ml-1.5 hover:bg-surface2/60"
+        className="flex items-center gap-1.5 text-2xs text-foreground-muted hover:text-foreground transition-colors rounded px-1.5 py-1 -ml-1.5 hover:bg-surface2/60"
       >
         <ChevronRight className={cn('size-3 shrink-0 transition-transform', open && 'rotate-90')} />
         <Wrench className="size-3 shrink-0" />
@@ -408,7 +420,7 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
             {hasMultipleAgents && (
               <div className="flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0">
                 <AgentAvatar name={group.sender} size={14} />
-                <span className="text-[10px] font-medium text-muted-foreground/70">
+                <span className="text-3xs font-medium text-muted-foreground/70">
                   {group.sender}
                 </span>
               </div>

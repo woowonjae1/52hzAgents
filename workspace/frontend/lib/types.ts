@@ -90,9 +90,30 @@ export interface ToolApprovalResponse {
   granted: boolean;
 }
 
+/**
+ * Links a posted `[Decision]` reply back to the agent message whose decision
+ * card produced it, so "already answered" survives a reload. Without the id
+ * the only correlation available is position or title text, and neither
+ * survives two cards asking similar questions in one channel.
+ */
+export interface DecisionResponse {
+  source_message_id: string;
+}
+
 export interface WorkspaceMessageMetadata extends Record<string, unknown> {
   tool_approval_request?: ToolApprovalRequest;
   tool_approval_response?: ToolApprovalResponse;
+  /** Present on the agent message that asks; rendered as an ApprovalCard. */
+  questions?: unknown[];
+  decision_questions?: unknown[];
+  /** Present on the human message that answers. */
+  decision_response?: DecisionResponse;
+  /**
+   * A dev server the agent reports as live, from a `preview` protocol block.
+   * Always loopback — the adapter rejects anything else before it gets here,
+   * and the receiving side re-checks rather than trusting that.
+   */
+  preview?: { url: string; label?: string };
   attachments?: Record<string, unknown>[];
   usage?: {
     prompt_tokens?: number;
@@ -327,7 +348,9 @@ export interface AgentApproval {
   requestedBy: string;
   action: string;
   details: Record<string, unknown> | null;
-  status: 'pending' | 'approved' | 'rejected';
+  // 'consumed' is set by the backend when a terminal-execution grant is spent;
+  // grants are single-use so a resolved approval cannot be replayed.
+  status: 'pending' | 'approved' | 'rejected' | 'consumed';
   resolvedBy: string | null;
   resolvedAt: string | null;
   createdAt: string | null;

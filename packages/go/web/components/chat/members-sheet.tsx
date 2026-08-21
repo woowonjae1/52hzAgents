@@ -57,7 +57,7 @@ export function MembersSheet({ open, onOpenChange, sessionId }: Props) {
           ) : (
             <>
               <section className="space-y-2">
-                <p className="text-[10px] font-semibold tracking-wider text-muted-foreground">
+                <p className="text-3xs font-medium tracking-wider text-muted-foreground">
                   IN THIS CHANNEL ({members.length})
                 </p>
                 {members.length === 0 ? (
@@ -75,7 +75,7 @@ export function MembersSheet({ open, onOpenChange, sessionId }: Props) {
                           <div className="flex-1 min-w-0">
                             <p className="text-sm truncate">{agent.agentName}</p>
                             {isMaster && (
-                              <p className="text-[10px] text-muted-foreground">
+                              <p className="text-3xs text-muted-foreground">
                                 master
                               </p>
                             )}
@@ -98,7 +98,7 @@ export function MembersSheet({ open, onOpenChange, sessionId }: Props) {
               </section>
 
               <section className="space-y-2">
-                <p className="text-[10px] font-semibold tracking-wider text-muted-foreground">
+                <p className="text-3xs font-medium tracking-wider text-muted-foreground">
                   ADD AGENTS
                 </p>
                 <Input
@@ -183,7 +183,7 @@ function RoutineLocked({
 }) {
   return (
     <section className="space-y-2">
-      <p className="text-[10px] font-semibold tracking-wider text-muted-foreground">
+      <p className="text-3xs font-medium tracking-wider text-muted-foreground">
         OWNER
       </p>
       {members.map((agent) => (
@@ -192,7 +192,7 @@ function RoutineLocked({
           <div className="flex-1 min-w-0">
             <p className="text-sm truncate">{agent.agentName}</p>
             {master === agent.agentName && (
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <p className="text-3xs text-muted-foreground flex items-center gap-1">
                 <Star className="size-2.5 fill-amber-400 text-amber-400" />
                 master
               </p>

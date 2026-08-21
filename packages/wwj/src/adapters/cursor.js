@@ -3,8 +3,11 @@
  *
  * Bridges the Cursor Agent CLI to an OpenAgents workspace via:
  * - Polling loop for incoming messages
- * - Cursor CLI subprocess (stream-json) for task execution
+ * - Cursor CLI subprocess (--print --stream-json --stream-partial-output)
  * - SKILL.md file for workspace tool access
+ *
+ * Follows official Cursor CLI documentation:
+ * https://cursor.com/docs/cli/reference/output-format
  */
 
 'use strict';
@@ -141,7 +144,7 @@ class CursorAdapter extends BaseAdapter {
       const who = m.senderType === 'human'
         ? (m.senderName || 'user')
         : (m.senderName || 'agent');
-      const truncated = text.length > 800 ? text.slice(0, 800) + '…' : text;
+      const truncated = text.length > 800 ? text.slice(0, 800) + '...' : text;
       lines.push(`[${who}] ${truncated}`);
     }
     if (lines.length === 0) return null;
@@ -167,7 +170,7 @@ class CursorAdapter extends BaseAdapter {
     }
   }
 
-  // ── Binary resolution ──
+  // -- Binary resolution --
 
   _findCursorBinary() {
     const home = os.homedir();
@@ -186,14 +189,7 @@ class CursorAdapter extends BaseAdapter {
       if (fs.existsSync(portableCandidate)) return portableCandidate;
     }
 
-    // Tier 1: PATH search. Use the ENRICHED env so the lookup sees the dirs the
-    // launcher adds — a freshly-run cursor installer updates the *user* PATH,
-    // which the daemon's already-running process won't see, so `where` against
-    // the daemon's own PATH comes up empty even though cursor-agent is installed.
-    // windowsHide stops a console window from flashing.
-    // Codepage-safe lookup (whereBinary forces UTF-8 output + verifies existence
-    // so a non-ASCII/Chinese username isn't mangled into an ENOENT). Tries both
-    // cursor-agent and the bare `agent` name across .cmd/.exe/no-ext.
+    // Tier 1: PATH search with enriched env and codepage-safe lookup.
     const viaWhere = whereBinary(names);
     if (viaWhere) return viaWhere;
 
@@ -207,18 +203,13 @@ class CursorAdapter extends BaseAdapter {
     // Tier 3: Common install locations
     const localAppData = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
     const candidates = IS_WINDOWS ? [
-      // The Windows installer (install?win32=true) drops cursor-agent under the
-      // user home's .local/bin — the same place the Unix installer uses. This
-      // was missing, so a successful install was invisible to the launcher.
       path.join(home, '.local', 'bin', 'cursor-agent.exe'),
       path.join(home, '.local', 'bin', 'cursor-agent.cmd'),
       path.join(home, '.local', 'bin', 'cursor-agent'),
       path.join(home, '.local', 'bin', 'agent.exe'),
       path.join(home, '.local', 'bin', 'agent.cmd'),
-      // Older/alternate layout: %LOCALAPPDATA%\Programs\cursor-agent\.
       path.join(localAppData, 'Programs', 'cursor-agent', 'cursor-agent.exe'),
       path.join(localAppData, 'Programs', 'cursor-agent', 'agent.exe'),
-      // Windows native installer (install?win32=true) drops the CLI here.
       path.join(localAppData, 'cursor-agent', 'cursor-agent.cmd'),
       path.join(localAppData, 'cursor-agent', 'cursor-agent.exe'),
       path.join(localAppData, 'cursor-agent', 'agent.cmd'),
@@ -247,7 +238,7 @@ class CursorAdapter extends BaseAdapter {
       if (fs.existsSync(c)) return c;
     }
 
-    // Tier 4: Deep scan of every known bin dir (nvm/fnm/volta, homebrew, …).
+    // Tier 4: Deep scan of every known bin dir.
     for (const name of names) {
       const viaWhich = whichBinary(name);
       if (viaWhich) return viaWhich;
@@ -265,8 +256,6 @@ class CursorAdapter extends BaseAdapter {
     for (const c of candidates) {
       if (fs.existsSync(c)) return c;
     }
-    // Fall back to the node already running this daemon (absolute, always valid).
-    // Bare 'node' can be off-PATH in a packaged daemon or CI runner.
     return process.execPath;
   }
 
@@ -279,9 +268,6 @@ class CursorAdapter extends BaseAdapter {
       if (jsMatch) {
         return [nodeBin, path.resolve(cmdDir, jsMatch[1])];
       }
-      // .cmd shims that forward to a native .exe — resolve to the exe and spawn
-      // it directly. Wrapping such a .cmd in `cmd.exe /c` caps the command line
-      // at cmd.exe's 8191-char limit, truncating long args (e.g. system prompts).
       const exeMatch = cmdContent.match(/%dp0%\\([^\s"*?]+\.exe)/i);
       if (exeMatch) {
         return [path.resolve(cmdDir, exeMatch[1])];
@@ -300,11 +286,9 @@ class CursorAdapter extends BaseAdapter {
     return null;
   }
 
-  // ── Skill file writing ──
+  // -- Skill file writing --
 
   _writeSkillFile(channelName) {
-    // Never fall back to process.cwd() (C:\WINDOWS\system32 on a packaged
-    // Windows daemon → EPERM); use a writable per-agent dir under ~/.wwj.
     const workDir = this.workingDir || defaultAgentWorkdir(this.agentName);
     const skillDir = path.join(workDir, '.cursor', 'skills');
     fs.mkdirSync(skillDir, { recursive: true });
@@ -322,7 +306,7 @@ class CursorAdapter extends BaseAdapter {
     this._log(`Wrote workspace skill to ${skillFile}`);
   }
 
-  // ── Command building ──
+  // -- Command building --
 
   _buildCursorCmd(prompt, channelName, { skipResume = false } = {}) {
     const agentBin = this._findCursorBinary();
@@ -330,7 +314,18 @@ class CursorAdapter extends BaseAdapter {
       throw new Error('Cursor CLI not found. Install with: curl https://cursor.com/install -fsSL | bash');
     }
 
-    const cmd = [agentBin, '-p', prompt, '--output-format', 'stream-json', '--trust', '--force'];
+    // Official best practice: --print for non-interactive mode,
+    // --output-format stream-json for NDJSON events,
+    // --stream-partial-output for real-time character-level text deltas.
+    const cmd = [
+      agentBin,
+      '--print',
+      '--output-format', 'stream-json',
+      '--stream-partial-output',
+      '-p', prompt,
+      '--trust',
+      '--force',
+    ];
 
     // Model selection
     const model = (this.agentEnv || process.env).CURSOR_MODEL;
@@ -352,7 +347,7 @@ class CursorAdapter extends BaseAdapter {
     return cmd;
   }
 
-  // ── Message handling ──
+  // -- Message handling --
 
   async _handleMessage(msg) {
     let content = (msg.content || '').trim();
@@ -441,10 +436,12 @@ class CursorAdapter extends BaseAdapter {
       });
       this._channelProcesses[msgChannel] = proc;
 
+      // State for NDJSON event stream processing
       const lastResponseText = [];
       let hasToolUseSinceLastText = false;
-      let postedThinking = false;
       let everPostedAnything = false;
+      let gotSuccessResult = false;
+      let resultText = '';
       let stderrBuf = '';
       let lineBuffer = '';
       let _pendingLines = Promise.resolve();
@@ -481,6 +478,8 @@ class CursorAdapter extends BaseAdapter {
         };
         startTimeoutMonitor();
 
+        // Official Cursor NDJSON event processing per:
+        // https://cursor.com/docs/cli/reference/output-format
         const processLine = async (line) => {
           line = line.trim();
           if (!line) return;
@@ -491,47 +490,75 @@ class CursorAdapter extends BaseAdapter {
 
           const eventType = event.type;
 
+          // system.init: persist session_id on first event
+          if (eventType === 'system') {
+            const sessionId = event.session_id;
+            if (sessionId && event.subtype === 'init') {
+              this._channelSessions[msgChannel] = sessionId;
+              this._saveSessions();
+              this._log(`Session init: ${sessionId}`);
+            }
+          }
+
+          // assistant events: filter per official docs
+          // - Forward ONLY events with timestamp_ms AND without model_call_id
+          //   (these are real-time text deltas)
+          // - Skip events with model_call_id (tool-call buffer flush)
+          // - Skip events without timestamp_ms (final duplicate flush)
           if (eventType === 'assistant') {
-            const blocks = (event.message || {}).content || [];
-            for (const block of blocks) {
-              if (block.type === 'text' && block.text && block.text.trim()) {
-                if (hasToolUseSinceLastText) {
-                  lastResponseText.length = 0;
-                  hasToolUseSinceLastText = false;
+            const hasTimestamp = typeof event.timestamp_ms === 'number';
+            const hasModelCallId = !!event.model_call_id;
+
+            if (hasTimestamp && !hasModelCallId) {
+              // Real incremental text delta
+              const blocks = (event.message || {}).content || [];
+              for (const block of blocks) {
+                if (block.type === 'text' && block.text && block.text.trim()) {
+                  if (hasToolUseSinceLastText) {
+                    lastResponseText.length = 0;
+                    hasToolUseSinceLastText = false;
+                  }
+                  lastResponseText.push(block.text.trim());
+                  everPostedAnything = true;
+                  try { await this.sendThinking(msgChannel, block.text.trim()); } catch {}
                 }
-                lastResponseText.push(block.text.trim());
-                postedThinking = true;
-                everPostedAnything = true;
-                try { await this.sendThinking(msgChannel, block.text.trim()); } catch {}
               }
             }
-          } else if (eventType === 'tool_call') {
+            // else: skip buffer flush / duplicate flush events
+          }
+
+          // tool_call events: map to sendStatus with call_id correlation
+          if (eventType === 'tool_call') {
             const subtype = event.subtype || '';
             if (subtype === 'started') {
               hasToolUseSinceLastText = true;
-              postedThinking = false;
               lastResponseText.length = 0;
               const tc = event.tool_call || {};
               const toolName = _extractToolName(tc);
               const toolDetail = _extractToolDetail(tc);
-              const label = toolDetail ? `${toolName} › ${toolDetail}` : toolName;
+              const label = toolDetail
+                ? `${toolName} > ${toolDetail}`
+                : toolName;
               await this.sendStatus(msgChannel, label);
               everPostedAnything = true;
             }
-          } else if (eventType === 'result') {
+            // completed events are informational; no action needed for v1
+          }
+
+          // result event: only mark complete on subtype "success"
+          if (eventType === 'result') {
             const sessionId = event.session_id;
             if (sessionId) {
               this._channelSessions[msgChannel] = sessionId;
               this._saveSessions();
             }
-            if (event.is_error) {
-              this._log(`Cursor error: ${String(event.result || '').slice(0, 200)}`);
-            }
-          } else if (eventType === 'system') {
-            const sessionId = event.session_id;
-            if (sessionId && !this._channelSessions[msgChannel]) {
-              this._channelSessions[msgChannel] = sessionId;
-              this._saveSessions();
+            if (event.subtype === 'success') {
+              gotSuccessResult = true;
+              if (event.result) {
+                resultText = String(event.result);
+              }
+            } else if (event.is_error) {
+              this._log(`Cursor error result: ${String(event.result || '').slice(0, 200)}`);
             }
           }
         };
@@ -541,6 +568,7 @@ class CursorAdapter extends BaseAdapter {
 
           try { await _pendingLines; } catch {}
 
+          // Process remaining buffered lines
           const lines = lineBuffer.split('\n');
           for (const line of lines) {
             try { await processLine(line); } catch {}
@@ -579,12 +607,22 @@ class CursorAdapter extends BaseAdapter {
             return;
           }
 
-          this._log(`CLI exited: code=${code}, lastResponseText=${lastResponseText.length} items, everPosted=${everPostedAnything}, hasSession=${!!this._channelSessions[msgChannel]}`);
+          this._log(`CLI exited: code=${code}, gotSuccess=${gotSuccessResult}, lastResponseText=${lastResponseText.length} items, everPosted=${everPostedAnything}`);
           if (code !== 0 && stderrBuf.trim()) {
             this._log(`stderr: ${stderrBuf.trim().slice(0, 500)}`);
           }
 
-          if (lastResponseText.length > 0) {
+          // Completion logic per official docs:
+          // Success = received result event with subtype "success"
+          // Failure = non-zero exit code with stderr
+          if (gotSuccessResult) {
+            // Use result text if available, otherwise use accumulated assistant text
+            const finalText = resultText || lastResponseText.join('\n').trim();
+            if (finalText) {
+              try { await this.sendResponse(msgChannel, finalText); } catch {}
+            }
+            resolve(false);
+          } else if (lastResponseText.length > 0) {
             const fullResponse = lastResponseText.join('\n').trim();
             if (/prompt is too long/i.test(fullResponse) && this._channelSessions[msgChannel]) {
               this._log(`Prompt too long with resumed session for ${msgChannel}, clearing and retrying`);
@@ -597,6 +635,11 @@ class CursorAdapter extends BaseAdapter {
             } else {
               resolve(false);
             }
+          } else if (code !== 0) {
+            // Non-zero exit without result event = failure
+            const errDetail = stderrBuf.trim().slice(0, 400) || `Cursor exited with code ${code}`;
+            try { await this.sendError(msgChannel, errDetail); } catch {}
+            resolve(false);
           } else if (this._channelSessions[msgChannel] && !everPostedAnything) {
             this._log(`Stale session detected for ${msgChannel}, clearing and retrying without resume`);
             delete this._channelSessions[msgChannel];

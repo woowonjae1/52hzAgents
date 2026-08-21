@@ -336,6 +336,43 @@
   --color-ring: var(--ring);
 
   /**
+   * Type families. `--font-inter` / `--font-jetbrains-mono` are injected by
+   * `app/fonts.ts` onto <html>; everything after them is fallback, ordered by
+   * how a browser actually resolves a missing glyph — per character, first
+   * family in the list that has it.
+   *
+   * The practical consequence of that ordering: Latin always comes from the
+   * self-hosted face, and Han/Kana/Hangul fall to the platform's own UI face
+   * instead of whatever `system-ui` happened to resolve to. Before this the
+   * stack was Tailwind's default, so a Chinese message rendered as SimSun on
+   * Windows next to Segoe UI Latin — two unrelated designs on one line.
+   *
+   * No CJK webfont is shipped on purpose. A subset-per-weight Han face costs
+   * 2-6MB, which this app cannot spend: it is a long-lived workspace tab and
+   * it also runs offline inside the desktop shell. The named system faces are
+   * present on effectively every target machine and cost nothing.
+   *
+   * `Microsoft YaHei UI` precedes `Microsoft YaHei` because Windows hints the
+   * UI cut for small sizes, which is where this app lives (10-13px).
+   * Emoji families sit last: they carry no ideographs, so they only ever win
+   * for codepoints nothing above them covers.
+   *
+   * Both stacks are kept on ONE line each. Tailwind v4 silently drops a
+   * multi-line value inside `@theme` — there is no build error and no type
+   * error, the utility just quietly emits the default stack instead. Wrapping
+   * these for readability will break them.
+   */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'HarmonyOS Sans SC', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
+  /**
+   * Mono carries agent logs, tool output, workspace slugs, timestamps and code
+   * blocks. The CJK families are repeated here rather than omitted: there is no
+   * true monospaced Han face, but Han glyphs are full-width in all of these, so
+   * a Chinese comment inside a log line still lands on the character grid.
+   */
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+
+  /**
    * Paseo breakpoints (styles/unistyles.ts). These replace Tailwind's defaults
    * (640/768/1024/1280) so a `md:` in a ported component fires at the same width
    * it does in Paseo. Note the blast radius: every existing responsive class in
@@ -345,6 +382,24 @@
   --breakpoint-md: 720px;
   --breakpoint-lg: 992px;
   --breakpoint-xl: 1200px;
+
+  /**
+   * Sub-`xs` steps. Tailwind stops at `xs` (12px), but this is a dense
+   * workspace and the two tiers below it carry real load — 268 sites before
+   * these existed, every one of them an inline `text-[10px]` / `text-[11px]`.
+   *
+   * Two steps rather than one: 32 components use both sizes together, so the
+   * pair encodes a deliberate (if quiet) badge-vs-label distinction that
+   * collapsing would flatten. The point of naming them is that the decision is
+   * now in one place — if 10 vs 11 later proves invisible, one value here
+   * moves all 121 sites at once.
+   *
+   * No matching `--text-*--line-height` is declared on purpose: the arbitrary
+   * values these replace set font-size only and inherited their leading, and
+   * declaring one here would silently reflow all 268 sites.
+   */
+  --text-3xs: 10px;
+  --text-2xs: 11px;
 
   /**
    * Paseo type scale (theme.ts `FONT_SIZE`). xs/sm/base/lg/xl already match
@@ -445,6 +500,46 @@
 
   *:focus-visible {
     @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
+  }
+
+  /**
+   * Grayscale antialiasing + OpenType legibility features.
+   * Enables Inter's cv02 (disambiguated lowercase l), cv03/cv04 (refined R/G),
+   * cv11 (single-story a/refined punctuation) and tabular numbers.
+   */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: 'cv02' 1, 'cv03' 1, 'cv04' 1, 'cv11' 1;
+  }
+
+  p, h1, h2, h3, h4, h5, h6, li, blockquote {
+    text-wrap: pretty;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
+  /**
+   * Monospace defaults, applied where the mono face is actually used.
+   *
+   * `tabular-nums` is the point of the rule: these sites are timestamps,
+   * counters, durations and token totals that update in place, and
+   * proportional digits make them jitter horizontally on every tick.
+   *
+   * Ligatures are switched off because JetBrains Mono ships code ligatures on
+   * by default — `!=` draws as `≠`, `->` as `→`. That is a preference in an
+   * editor and a hazard here, where the same face renders agent tool output,
+   * IDs and workspace slugs that have to be read literally.
+   */
+  .font-mono,
+  code,
+  kbd,
+  pre,
+  samp {
+    font-variant-numeric: tabular-nums;
+    font-variant-ligatures: none;
+    font-feature-settings: 'calt' 0;
   }
 
   /** Agent activity dot animation **/

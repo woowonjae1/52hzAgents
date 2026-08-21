@@ -413,7 +413,7 @@ export function ChatView() {
                 .join(', ');
               if (!names) return null;
               return (
-                <span className="text-[11px] text-muted-foreground truncate">
+                <span className="text-2xs text-muted-foreground truncate">
                   {names}
                 </span>
               );
@@ -559,7 +559,7 @@ function ChatHeaderTrailingButtons({
             </div>
           ))}
           {sessionAgents.length > shown.length && (
-            <div className="size-5 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[8px] font-medium text-zinc-600 dark:text-zinc-300 border-2 border-background">
+            <div className="size-5 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-3xs font-medium text-zinc-600 dark:text-zinc-300 border-2 border-background">
               +{sessionAgents.length - shown.length}
             </div>
           )}

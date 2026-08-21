@@ -255,6 +255,11 @@ func SendEvent(c *gin.Context) {
 		Payload:     string(fullEventBytes),
 	})
 
+	// Check if this event finishes an agent turn and should trigger the next pipeline step
+	if isAgentSource(req.Source) && messageType(req.Payload) == "chat" {
+		CheckAndTriggerNextPipelineStep(workspace.ID, req.Target, req.Source)
+	}
+
 	// 返回成功响应，包含已生成的 event_id。
 	c.JSON(http.StatusOK, fullEvent)
 }
@@ -306,11 +311,17 @@ func StreamEventsSSE(c *gin.Context) {
 	// 在全局 Hub 中进行注册。
 	hub.GlobalHub.Register(sseClient)
 
+	// 立刻写入一条注释帧并 Flush：Gin 在首次写入前不会发出响应头，
+	// 浏览器的 EventSource 因此一直停在 CONNECTING、onopen 永不触发，
+	// 前端会误判 SSE 失败并退回轮询 + 反复重连。
+	fmt.Fprintf(c.Writer, ": connected\n\n")
+	c.Writer.Flush()
+
 	// 使用 Context 监听客户端的主动关闭信号。
 	ctx := c.Request.Context()
 
-	// 开启一个心跳计时器，每 30 秒向流管道发送一次 keepalive，防止代理断连。
-	keepaliveTicker := time.NewTicker(30 * time.Second)
+	// 开启一个心跳计时器，每 15 秒向流管道发送一次 keepalive，防止代理断连。
+	keepaliveTicker := time.NewTicker(15 * time.Second)
 	defer func() {
 		keepaliveTicker.Stop()              // 关闭计时器释放资源。
 		hub.GlobalHub.Unregister(sseClient) // 发生断连时，立刻从 EventHub 中注销该客户端。

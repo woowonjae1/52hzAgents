@@ -82,14 +82,14 @@ export function RoutineList() {
             type="button"
             onClick={() => setViewMode('threads')}
             className="p-1 -ml-1 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
-            title="返回对话列表"
+            title="Back to chats"
           >
             <ArrowLeft className="size-3.5" />
-            <span className="text-xs font-medium">返回</span>
+            <span className="text-xs font-medium">Back</span>
           </button>
           <div className="h-3.5 w-px bg-border/60" />
           <CalendarClock className="size-3.5 text-violet-500" />
-          <ScreenTitle>定时任务</ScreenTitle>
+          <ScreenTitle>Scheduled tasks</ScreenTitle>
           {activeRoutines.length > 0 && (
             <span className="text-xs text-muted-foreground font-mono">({activeRoutines.length})</span>
           )}
@@ -99,7 +99,7 @@ export function RoutineList() {
             type="button"
             onClick={() => setShowCreateDialog(true)}
             className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
-            title="创建定时任务"
+            title="Create a scheduled task"
           >
             <Plus className="size-3.5" />
           </button>
@@ -107,7 +107,7 @@ export function RoutineList() {
             type="button"
             onClick={refreshRoutines}
             className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
-            title="刷新"
+            title="Refresh"
           >
             <RefreshCw className="size-3.5" />
           </button>
@@ -142,9 +142,9 @@ export function RoutineList() {
                   <AgentAvatar name={agentName} size={20} className="mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{routine.name}</div>
-                    <div className="text-[11px] text-muted-foreground mt-0.5">{formatSchedule(routine)}</div>
-                    <div className="text-[11px] text-muted-foreground truncate mt-0.5">{routine.message}</div>
-                    <div className="text-[10px] text-muted-foreground/60 mt-1">
+                    <div className="text-2xs text-muted-foreground mt-0.5">{formatSchedule(routine)}</div>
+                    <div className="text-2xs text-muted-foreground truncate mt-0.5">{routine.message}</div>
+                    <div className="text-3xs text-muted-foreground/60 mt-1">
                       next: {routine.nextFiresAt ? timeUntil(routine.nextFiresAt) : 'N/A'}
                     </div>
                   </div>

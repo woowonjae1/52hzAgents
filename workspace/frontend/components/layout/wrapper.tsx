@@ -11,6 +11,7 @@ import { FileList } from '@/components/files/file-list';
 import { FilePreview } from '@/components/files/file-preview';
 import { BrowserTabList } from '@/components/browser/browser-tab-list';
 import { BrowserView } from '@/components/browser/browser-view';
+import { LocalPreview } from '@/components/preview/local-preview';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
@@ -162,19 +163,21 @@ export function Wrapper() {
   }
 
   const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+  const isSettings = viewMode === 'settings';
+  const shouldShowSidebar = !isDetailExpanded && !isSettings;
 
   // ── Desktop layout: sidebar + center chat + collapsible right preview ──
   return (
     <div ref={desktopContainerRef} className={cn("flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5", isDesktop && "pt-7")}>
       {isDesktop && <div className="fixed top-0 left-0 right-0 h-7 [app-region:drag] z-40 select-none pointer-events-auto" />}
-      {!isDetailExpanded && <Sidebar />}
+      {shouldShowSidebar && <Sidebar />}
 
       <div className="flex flex-col flex-grow min-w-0 w-full">
         <div className="flex grow min-h-0 overflow-hidden">
           {/* Invisible spacer standing in for the fixed sidebar. Reads the same
               resizable width the sidebar itself does, so dragging the handle moves
               the main pane with it. */}
-          {!isDetailExpanded && (
+          {shouldShowSidebar && (
             <div
               className={cn('shrink-0', !isSidebarResizing && 'transition-all duration-300')}
               style={{ width: isSidebarOpen ? `${sidebarWidth}px` : '0px' }}
@@ -191,12 +194,12 @@ export function Wrapper() {
           ) : (
             <>
               {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
-              <div className="relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden border-l border-border/60 flex flex-col">
-                {!isSidebarOpen && (
+              <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", shouldShowSidebar && "border-l border-border/60")}>
+                {!isSidebarOpen && !isSettings && viewMode !== 'threads' && (
                   <button
                     onClick={sidebarToggle}
-                    className="absolute top-3 left-3 z-30 size-8 rounded-lg bg-background/90 backdrop-blur border border-border text-foreground-muted hover:text-foreground shadow-sm flex items-center justify-center transition-all hover:scale-105 cursor-pointer"
-                    title="Expand Sidebar"
+                    className="absolute top-4 left-3.5 z-30 size-8 rounded-lg bg-surface2/90 backdrop-blur border border-border text-foreground-muted hover:text-foreground shadow-sm flex items-center justify-center transition-all hover:scale-105 cursor-pointer"
+                    title="展开侧边栏 (Expand Sidebar)"
                   >
                     <PanelLeft className="size-4" />
                   </button>
@@ -241,7 +244,8 @@ export function Wrapper() {
                   >
                     <X className="size-4" />
                   </button>
-                  {activeRightTab === 'browser' && <BrowserView />}
+                  {activeRightTab === 'browser' && <LocalPreview />}
+                  {activeRightTab === 'preview' && <LocalPreview />}
                   {activeRightTab === 'file' && <FilePreview />}
                   {activeRightTab === 'tasks' && <TasksView />}
                   {activeRightTab === 'radar' && <RadarPanel />}

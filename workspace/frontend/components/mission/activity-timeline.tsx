@@ -36,7 +36,7 @@ interface ActivityTimelineProps {
 
 function stripMarkdown(text: string): string {
   return text
-    .replace(/```[\s\S]*?```/g, '[代码块]')
+    .replace(/```[\s\S]*?```/g, '[code block]')
     .replace(/\*\*/g, '')
     .replace(/`{1,3}/g, '')
     .replace(/\n+/g, ' ')
@@ -140,16 +140,16 @@ export function ActivityTimeline({
           <div className="flex items-center gap-2">
             <span className="size-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
             <span className="text-xs font-semibold tracking-tight text-foreground">
-              实时协同流
+              Live activity
             </span>
           </div>
-          <span className="text-[10.5px] font-mono text-muted-foreground tabular-nums">
-            {groupedTimeline.length} 组动态
+          <span className="text-3xs font-mono text-muted-foreground tabular-nums">
+            {groupedTimeline.length} groups
           </span>
         </div>
 
         {/* Filter Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] font-medium no-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto text-2xs font-medium no-scrollbar">
           <button
             type="button"
             onClick={() => setSelectedType('all')}
@@ -160,7 +160,7 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            全部
+            All
           </button>
           <button
             type="button"
@@ -172,7 +172,7 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            知识库
+            Knowledge
           </button>
           <button
             type="button"
@@ -184,7 +184,7 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            工具调用
+            Tool calls
           </button>
           <button
             type="button"
@@ -196,7 +196,7 @@ export function ActivityTimeline({
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
-            待批与异常
+            Blocked
           </button>
         </div>
       </div>
@@ -212,7 +212,7 @@ export function ActivityTimeline({
         ) : groupedTimeline.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground space-y-1">
             <MessageSquare className="size-5 opacity-30" />
-            <span className="text-xs">暂无活动记录</span>
+            <span className="text-xs">No activity yet</span>
           </div>
         ) : (
           groupedTimeline.map((group) => {
@@ -223,11 +223,11 @@ export function ActivityTimeline({
                 className="group p-2.5 rounded-xl bg-surface1/60 hover:bg-surface2/80 border border-border/20 hover:border-border/50 transition-all cursor-pointer shadow-2xs space-y-1.5"
               >
                 {/* Group Sender Header */}
-                <div className="flex items-center justify-between gap-1 text-[11px]">
+                <div className="flex items-center justify-between gap-1 text-2xs">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span
                       className={cn(
-                        'size-4 rounded-md flex items-center justify-center text-[10px] shrink-0',
+                        'size-4 rounded-md flex items-center justify-center text-3xs shrink-0',
                         group.isHuman
                           ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                           : 'bg-violet-500/10 text-violet-600 dark:text-violet-400'
@@ -238,18 +238,18 @@ export function ActivityTimeline({
                     <span className="font-semibold text-foreground truncate">
                       {group.sender}
                     </span>
-                    <span className="text-[10px] font-mono text-muted-foreground/80 truncate">
+                    <span className="text-3xs font-mono text-muted-foreground/80 truncate">
                       #{group.channel}
                     </span>
                   </div>
 
-                  <span className="font-mono text-muted-foreground/70 text-[9.5px] shrink-0">
+                  <span className="font-mono text-muted-foreground/70 text-3xs shrink-0">
                     {timeAgo(group.time.toISOString())}
                   </span>
                 </div>
 
                 {/* Sub-items in this conversation turn */}
-                <div className="space-y-1 pl-5 text-[11.5px]">
+                <div className="space-y-1 pl-5 text-2xs">
                   {group.items.map((item) => {
                     const isKnowledge = item.type === 'knowledge';
                     const isTool = item.type === 'command' || item.type === 'success';

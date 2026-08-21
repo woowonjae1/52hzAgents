@@ -97,6 +97,43 @@ func (ChannelMember) TableName() string {
 	return "channel_members"
 }
 
+// PipelineStep is one hop of a multi-agent relay chain. Steps are stored as
+// JSON inside ChannelPipeline.Steps rather than in their own table because a
+// chain is always read and written whole.
+type PipelineStep struct {
+	Agent       string  `json:"agent"`
+	Instruction string  `json:"instruction"`
+	Status      string  `json:"status"` // pending | running | done | failed | retrying
+	StartedAt   *int64  `json:"started_at,omitempty"`
+	FinishedAt  *int64  `json:"finished_at,omitempty"`
+	MaxRetries  int     `json:"max_retries,omitempty"` // Maximum self-correction retry attempts (default 3)
+	RetryCount  int     `json:"retry_count,omitempty"` // Number of retry attempts made so far
+	LastError   *string `json:"last_error,omitempty"`  // Diagnostic error string extracted on failure
+}
+
+// ChannelPipeline persists the relay chain a human starts with a multi-agent
+// message ("@a analyse @b refactor @c review"). It replaces an in-memory map
+// which lost every in-flight chain on restart and, more importantly, did not
+// record which agent the current step was waiting on -- so any agent's chat
+// message advanced the chain.
+type ChannelPipeline struct {
+	ID          string `gorm:"primaryKey;type:uuid" json:"id"`
+	WorkspaceID string `gorm:"type:uuid;not null;index:idx_channel_pipelines_workspace" json:"workspace_id"`
+	ChannelID   string `gorm:"type:uuid;not null;uniqueIndex:uq_channel_pipelines_channel" json:"channel_id"`
+	// Steps is a JSON-encoded []PipelineStep. Kept out of JSON responses so it
+	// is never emitted as base64; callers decode it and expose parsed steps.
+	Steps        []byte    `gorm:"type:jsonb" json:"-"`
+	CurrentIndex int       `gorm:"type:integer;not null;default:0" json:"current_index"`
+	Status       string    `gorm:"type:text;not null;default:running" json:"status"` // running | completed
+	StartedBy    string    `gorm:"type:text" json:"started_by"`
+	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (ChannelPipeline) TableName() string {
+	return "channel_pipelines"
+}
+
 type ChannelHumanMember struct {
 	ChannelID string    `gorm:"primaryKey;type:uuid"`
 	UserEmail string    `gorm:"primaryKey;type:text;index:idx_channel_human_members_email"`
@@ -105,6 +142,26 @@ type ChannelHumanMember struct {
 
 func (ChannelHumanMember) TableName() string {
 	return "channel_human_members"
+}
+
+// ChannelCompactionRecord stores a compressed summary checkpoint for a channel's
+// conversation history, allowing long-running multi-agent sessions without token exhaustion.
+type ChannelCompactionRecord struct {
+	ID                    string    `gorm:"primaryKey;type:uuid" json:"id"`
+	WorkspaceID           string    `gorm:"type:uuid;not null;index:idx_channel_compactions_ws" json:"workspace_id"`
+	ChannelID             string    `gorm:"type:uuid;not null;index:idx_channel_compactions_ch" json:"channel_id"`
+	ChannelName           string    `gorm:"type:text;not null" json:"channel_name"`
+	Summary               string    `gorm:"type:text;not null" json:"summary"`
+	FromEventID           string    `gorm:"type:text" json:"from_event_id"`
+	ToEventID             string    `gorm:"type:text" json:"to_event_id"`
+	CompactedCount        int       `gorm:"type:integer;not null" json:"compacted_count"`
+	EstimatedTokensBefore int       `gorm:"type:integer" json:"tokens_before"`
+	EstimatedTokensAfter  int       `gorm:"type:integer" json:"tokens_after"`
+	CreatedAt             time.Time `gorm:"autoCreateTime" json:"created_at"`
+}
+
+func (ChannelCompactionRecord) TableName() string {
+	return "channel_compactions"
 }
 
 type Invitation struct {

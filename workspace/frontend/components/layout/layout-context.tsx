@@ -3,6 +3,7 @@
 import {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -19,7 +20,12 @@ import {
 
 export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
 
-export type RightPanelTab = 'browser' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | null;
+export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' | 'knowledge' | 'routines';
+
+// 'browser' watches the browser an agent is driving (remote session, expires,
+// reconnects). 'preview' points at a dev server on this machine. They look
+// alike and share nothing.
+export type RightPanelTab = 'browser' | 'preview' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | null;
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -40,6 +46,9 @@ interface LayoutState {
   setSidebarResizing: (v: boolean) => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  settingsTab: SettingsTab;
+  setSettingsTab: (tab: SettingsTab) => void;
+  openSettings: (tab?: SettingsTab) => void;
   selectedAgentName: string | null;
   setSelectedAgentName: (name: string | null) => void;
   isAgentPanelOpen: boolean;
@@ -61,6 +70,14 @@ interface LayoutState {
   /** Active right-hand preview panel tab */
   activeRightTab: RightPanelTab;
   setActiveRightTab: (tab: RightPanelTab) => void;
+  /**
+   * Address the Local Preview panel is pointed at. Lives here rather than
+   * inside the panel so an agent reporting a dev server can push a target in
+   * without the panel needing to be mounted first.
+   */
+  previewUrl: string | null;
+  /** Point the Local Preview panel at a URL and bring it to the front. */
+  openPreview: (url: string) => void;
   /** Whether the New Thread dialog (agent picker) is open */
   newThreadOpen: boolean;
   setNewThreadOpen: (v: boolean) => void;
@@ -85,7 +102,33 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     storeSidebarWidth(clamped);
   };
   const [isSidebarResizing, setSidebarResizing] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('threads');
+  const [viewMode, setViewModeState] = useState<ViewMode>('threads');
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
+
+  const setViewMode = (mode: ViewMode) => {
+    if (mode === 'skills') {
+      setSettingsTab('skills');
+      setViewModeState('settings');
+      return;
+    }
+    if (mode === 'knowledge') {
+      setSettingsTab('knowledge');
+      setViewModeState('settings');
+      return;
+    }
+    if (mode === 'routines') {
+      setSettingsTab('routines');
+      setViewModeState('settings');
+      return;
+    }
+    setViewModeState(mode);
+  };
+
+  const openSettings = (tab: SettingsTab = 'general') => {
+    setSettingsTab(tab);
+    setViewModeState('settings');
+  };
+
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
   const [isDetailExpanded, setIsDetailExpanded] = useState(false);
@@ -100,6 +143,29 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   };
 
   const [activeRightTab, setActiveRightTab] = useState<RightPanelTab>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const openPreview = useCallback((url: string) => {
+    let ok = false;
+    let normalized = url.trim();
+    if (/^:?\d+$/.test(normalized)) {
+      normalized = `http://localhost:${normalized.replace(':', '')}`;
+    } else if (!/^https?:\/\//i.test(normalized)) {
+      normalized = `http://${normalized}`;
+    }
+    try {
+      const u = new URL(normalized);
+      ok = u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      console.warn(`[preview] ignored invalid preview target: ${url}`);
+      return;
+    }
+    setPreviewUrl(normalized);
+    setActiveRightTab('preview');
+  }, []);
   
   // Compatibility computed helper
   const showBrowserPreview = activeRightTab === 'browser';
@@ -154,6 +220,9 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setSidebarResizing,
       viewMode,
       setViewMode,
+      settingsTab,
+      setSettingsTab,
+      openSettings,
       selectedAgentName,
       setSelectedAgentName,
       isAgentPanelOpen,
@@ -168,6 +237,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setShowBrowserPreview,
       activeRightTab,
       setActiveRightTab,
+      previewUrl,
+      openPreview,
       newThreadOpen,
       setNewThreadOpen,
       openNewThread,

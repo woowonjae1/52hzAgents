@@ -117,7 +117,93 @@ function buildCollaborationPrompt(toolMode = 'mcp') {
     '— that wakes them up for nothing. Only @mention when you need them ' +
     'to do work. When the task is complete, report results to the user ' +
     'without @mentioning other agents.\n\n' +
-    discover
+    discover +
+    buildDecisionProtocolPrompt() +
+    buildPreviewProtocolPrompt()
+  );
+}
+
+/**
+ * Teach agents the preview-block protocol.
+ *
+ * Required for the same reason as the decision block: nothing else can supply
+ * this. The daemon spawns the agent CLI, not the dev server — the server is
+ * started by the agent's own shell tool, so its "ready on localhost:3000" line
+ * never reaches us. Scraping the reply text for `localhost:\d+` was the
+ * alternative and it fires on any sentence that mentions a port.
+ *
+ * The "only when actually running" rule is load-bearing: an agent that reports
+ * a port it merely intends to use points the user's preview panel at a dead
+ * address, which reads as the feature being broken.
+ */
+function buildPreviewProtocolPrompt() {
+  return (
+    '\n## Reporting a Local Preview URL\n' +
+    'When you start a dev server the user should look at, emit a `preview` ' +
+    'block. The workspace opens its Local Preview panel on that address, so ' +
+    'the user sees the running app without leaving the chat.\n\n' +
+    '```preview\n' +
+    '{ "url": "http://localhost:3000", "label": "Next.js dev" }\n' +
+    '```\n\n' +
+    '`{ "port": 3000 }` is accepted as shorthand.\n\n' +
+    'Rules:\n' +
+    '- Emit it ONLY after the server is actually listening. Reporting a port ' +
+    'you are about to use points the panel at nothing.\n' +
+    '- Loopback addresses only (localhost, 127.0.0.1, *.localhost). Anything ' +
+    'else is rejected and shown to the user as raw text.\n' +
+    '- Re-emit the block if you restart the server on a different port. The ' +
+    'most recent block in a reply wins.\n' +
+    '- Do NOT emit it just because a port appears in a config file or in ' +
+    'something you are describing. It means "this is live right now".\n'
+  );
+}
+
+/**
+ * Teach agents the decision-block protocol.
+ *
+ * Without this the parser in `decision-parser.js` has nothing to parse: the
+ * workspace only promotes a question to an interactive card when the agent
+ * opts in with this exact block, and no model emits it unprompted.
+ *
+ * The "ask in prose instead" instruction at the end is load-bearing. A model
+ * told about a nice interactive widget will reach for it to present
+ * information, not just to ask — and a card whose options are really just
+ * bullet points forces the user to click to dismiss something that was never
+ * a question.
+ */
+function buildDecisionProtocolPrompt() {
+  return (
+    '\n## Asking the User to Choose\n' +
+    'When you need a decision from the user before you can continue, emit a ' +
+    '`decision` block. The workspace renders it as clickable buttons and posts ' +
+    'the answer back to you as a `[Decision]` message. Write the block INSTEAD ' +
+    'of asking in prose — do not do both.\n\n' +
+    '```decision\n' +
+    '{\n' +
+    '  "questions": [\n' +
+    '    {\n' +
+    '      "title": "Which auth strategy should I use?",\n' +
+    '      "options": [\n' +
+    '        { "label": "JWT", "description": "Stateless, scales across instances" },\n' +
+    '        { "label": "Session", "description": "Revocable immediately" }\n' +
+    '      ],\n' +
+    '      "allowCustom": true\n' +
+    '    }\n' +
+    '  ]\n' +
+    '}\n' +
+    '```\n\n' +
+    'Rules:\n' +
+    '- Valid JSON, and the closing ``` is required. A block that fails to ' +
+    'parse is shown to the user as raw text.\n' +
+    '- `title` and at least one `option` are required. `description` and ' +
+    '`allowCustom` are optional. Write them in the user\'s language.\n' +
+    '- Use it ONLY for a real fork you cannot resolve yourself — a decision ' +
+    'that changes what you do next. Do not use it to summarise options, to ' +
+    'present findings, to confirm something obvious, or to ask permission for ' +
+    'work you were already asked to do. Prefer making a reasonable call and ' +
+    'saying what you assumed.\n' +
+    '- After emitting a block, stop and wait. Do not guess the answer and ' +
+    'carry on.\n'
   );
 }
 
@@ -736,6 +822,8 @@ module.exports = {
   buildWorkspaceIdentity,
   buildBrowserDirective,
   buildCollaborationPrompt,
+  buildDecisionProtocolPrompt,
+  buildPreviewProtocolPrompt,
   buildModePrompt,
   buildGuardrails,
   buildApiSkillsPrompt,

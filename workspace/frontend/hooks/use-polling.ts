@@ -274,11 +274,20 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   const sseRetryCountRef = useRef(0);
   const sseRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initial load + SSE with polling fallback and exponential backoff recovery
+  // History load — keyed on the session only. It used to live in the transport
+  // effect below, which also re-runs on every SSE reconnect: each reconnect
+  // therefore refetched 50 messages and bulk-replaced the transcript, bumping
+  // `generation` → `scrollKey` → a full scroll-to-bottom settle pass. With SSE
+  // flapping that fired every couple of seconds and made the thread visibly
+  // reload/jump instead of just receiving new messages.
   useEffect(() => {
     if (!sessionId || !enabled) return;
-
     loadHistory();
+  }, [sessionId, enabled, loadHistory]);
+
+  // Transport: SSE with polling fallback and exponential backoff recovery
+  useEffect(() => {
+    if (!sessionId || !enabled) return;
 
     // Try SSE first for instant updates, fall back to polling
     const isDM = sessionId.startsWith('dm:');
@@ -324,6 +333,10 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
         es.onopen = () => {
           sseRetryCountRef.current = 0;
           sseFailedRef.current = false;
+          // Catch up anything posted while the stream was down. This is the
+          // incremental `after=<newestId>` poll, not a history reload, so it
+          // appends instead of replacing the transcript.
+          poll();
         };
 
         es.onmessage = (ev) => {
@@ -372,7 +385,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       if (timeout) clearTimeout(timeout);
       if (sseRetryTimeoutRef.current) clearTimeout(sseRetryTimeoutRef.current);
     };
-  }, [sessionId, enabled, poll, loadHistory, reconnectNonce]);
+  }, [sessionId, enabled, poll, reconnectNonce]);
 
   // Recover after the tab is backgrounded or network comes back online.
   // On return to the foreground/online: immediately poll to catch up any messages

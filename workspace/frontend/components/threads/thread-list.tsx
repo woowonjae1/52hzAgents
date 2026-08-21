@@ -9,6 +9,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { AgentStatusStrip } from '@/components/agents/agent-status-strip';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { workspaceApi } from '@/lib/api';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
@@ -38,7 +39,7 @@ function AvatarStack({ agents, max = 2 }: { agents: WorkspaceAgent[]; max?: numb
         </div>
       ))}
       {extra > 0 && (
-        <div className="size-[18px] rounded-full bg-surface3 flex items-center justify-center text-[7px] font-medium text-foreground-muted ring-2 ring-white">
+        <div className="h-[18px] min-w-[18px] px-0.5 rounded-full bg-surface3 flex items-center justify-center text-[9px] font-mono font-medium tracking-tighter text-foreground-muted ring-2 ring-surface0 leading-none select-none">
           +{extra}
         </div>
       )}
@@ -247,7 +248,7 @@ export function ThreadList() {
       setViewMode('threads');
       if (isMobile) openMobileDetail();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '创建频道失败');
+      toast.error(e instanceof Error ? e.message : 'Could not create the channel');
     }
   };
 
@@ -264,8 +265,8 @@ export function ThreadList() {
     } catch (e) {
       toast.error(
         e instanceof Error
-          ? `无法连接本机的 wwj(${e.message})。请确认 \`wwj up\` 正在运行。`
-          : '打开文件夹选择框失败。',
+          ? `Could not reach the local wwj daemon (${e.message}). Make sure \`wwj up\` is running.`
+          : 'Could not open the folder picker.',
       );
     } finally {
       setBrowsingFolder(false);
@@ -328,121 +329,23 @@ export function ThreadList() {
         >
           <div className="flex items-center gap-2">
             <Plus className="size-4 group-hover:rotate-90 transition-transform duration-200" />
-            <span className="font-semibold">新对话 (New Chat)</span>
+            <span className="font-semibold">New chat</span>
           </div>
-          <kbd className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded bg-primary-foreground/15 text-primary-foreground font-semibold">
+          <kbd className="inline-flex items-center px-1.5 py-0.5 text-3xs font-mono rounded bg-primary-foreground/15 text-primary-foreground font-medium">
             Ctrl+N
           </kbd>
         </button>
 
-        {/* Quick Nav Segmented Tabs: Chats, Knowledge, Skills */}
-        <div className="flex items-center p-1 rounded-xl bg-surface2/90 border border-border/50 text-xs">
-          <button
-            onClick={() => setViewMode('threads')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
-              viewMode === 'threads'
-                ? 'bg-background text-foreground shadow-2xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            title="Chat Conversations"
-          >
-            <MessageSquare className="size-3.5" />
-            <span>对话</span>
-          </button>
-
-          <button
-            onClick={() => setViewMode(viewMode === 'knowledge' ? 'threads' : 'knowledge')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
-              viewMode === 'knowledge'
-                ? 'bg-background text-foreground shadow-2xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            title="Workspace Knowledge Base"
-          >
-            <BookOpen className="size-3.5" />
-            <span>知识库</span>
-          </button>
-          <button
-            onClick={() => setViewMode('skills')}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-medium transition-all cursor-pointer',
-              viewMode === 'skills'
-                ? 'bg-background text-foreground shadow-2xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            title="Skill Catalog & Extensions"
-          >
-            <Sparkles className="size-3.5" />
-            <span>技能</span>
-          </button>
-        </div>
-
-        <button
-          onClick={() => setViewMode(viewMode === 'routines' ? 'threads' : 'routines')}
-          className={cn(
-            'w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left',
-            viewMode === 'routines' ? 'bg-surface2 text-foreground font-semibold' : 'text-foreground-muted hover:text-foreground hover:bg-surface1/60'
-          )}
-        >
-          <CalendarClock className="size-3.5 text-foreground-extra-muted shrink-0" />
-          <span>Scheduled Tasks (定时任务)</span>
-        </button>
       </div>
 
-      {/* Agents Roster Section */}
-      <div className="px-3 pt-3 pb-2 shrink-0">
-        <div className="flex items-baseline justify-between px-1 mb-1.5">
-          <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wider">Agents</span>
-          <span className="text-[11px] font-mono tabular-nums text-foreground-extra-muted">
-            {onlineAgentCount} / {agents.length}
-          </span>
-        </div>
-        {agents.map((a) => {
-          const isOffline = a.status !== 'online';
-          return (
-            <button
-              key={a.agentName}
-              onClick={() => {
-                const s = activeSessions.find((session) => session.participants.includes(a.agentName));
-                if (s) {
-                  setCurrentSessionId(s.sessionId);
-                  setViewMode('threads');
-                }
-              }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
-              title={a.description || a.agentName}
-            >
-              <span
-                className="size-1.5 rounded-full shrink-0"
-                style={{ background: isOffline ? 'var(--surface4)' : deriveIdentityColor(a.agentName) }}
-              />
-              <span className={cn(
-                'text-[13px] flex-1 min-w-0 truncate',
-                isOffline ? 'text-foreground-extra-muted' : 'text-foreground'
-              )}>
-                {a.agentName}
-              </span>
-              {isOffline && (
-                <span className="text-[11px] text-foreground-extra-muted shrink-0">offline</span>
-              )}
-            </button>
-          );
-        })}
-        <button
-          onClick={() => setViewMode('mission')}
-          className="w-full flex items-center gap-2 px-2 py-1.5 mt-0.5 rounded-lg text-[12.5px] text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-          title="Open Agent Station & Connect Agents"
-        >
-          <Plus className="size-3.5 shrink-0 text-foreground-extra-muted" />
-          <span>Connect agent</span>
-        </button>
+      {/* Agent presence — one strip, not a roster. See AgentStatusStrip. */}
+      <div className="px-3 pt-2.5 pb-1 shrink-0">
+        <AgentStatusStrip />
       </div>
 
       {/* Projects Section Header & Create Dropdown (Antigravity 2.0 style) */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1 shrink-0 select-none">
-        <span className="text-[11px] font-semibold text-foreground-extra-muted uppercase tracking-wider">
+        <span className="text-2xs font-semibold text-foreground-extra-muted uppercase tracking-wider">
           Projects
         </span>
 
@@ -463,14 +366,14 @@ export function ThreadList() {
                 <FolderPlus className="size-4 text-foreground-muted shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-semibold text-foreground">New Project</span>
-                  <span className="text-[10px] text-muted-foreground">Select a folder</span>
+                  <span className="text-3xs text-muted-foreground">Select a folder</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => startChannel(null)} className="gap-2.5 py-2 px-2.5 text-xs cursor-pointer rounded-lg">
                 <MessageSquarePlus className="size-4 text-foreground-muted shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-semibold text-foreground">Quick Start</span>
-                  <span className="text-[10px] text-muted-foreground">Direct conversation</span>
+                  <span className="text-3xs text-muted-foreground">Direct conversation</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -486,17 +389,17 @@ export function ThreadList() {
             <div className="flex items-center gap-1.5 px-2 mt-1 mb-1">
               <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
               <span
-                className="text-[13px] font-semibold text-foreground truncate"
-                title={group.dir ?? '直接对话'}
+                className="text-sm font-semibold text-foreground truncate"
+                title={group.dir ?? 'Direct chats'}
               >
-                {group.dir ? basename(group.dir) : '直接对话'}
+                {group.dir ? basename(group.dir) : 'Direct chats'}
               </span>
-              <span className="text-[11px] font-mono tabular-nums text-foreground-extra-muted shrink-0">
+              <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
                 {group.sessions.length}
               </span>
               <button
                 onClick={() => startChannel(group.dir)}
-                title={group.dir ? `在 ${group.dir} 下新建频道` : '新建直接对话'}
+                title={group.dir ? `New channel in ${group.dir}` : 'New direct chat'}
                 className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
               >
                 <Plus className="size-3" />
@@ -581,7 +484,13 @@ export function ThreadList() {
                     // left rail would be a second, competing selection signal —
                     // and in a palette with no brand accent it reads as status
                     // ("this thread is healthy") rather than "this one is open".
-                    ? 'bg-surface3 text-foreground border border-border/70 shadow-xs font-semibold'
+                    // The weight that used to sit here applied to the whole row,
+                    // so selecting a thread also dragged the 11px timestamp and
+                    // preview line to 600 — worst on CJK previews, where dense
+                    // ideographs smear at that size. It was a second selection
+                    // signal on top of the surface step anyway, which the note
+                    // above already argues against.
+                    ? 'bg-surface3 text-foreground border border-border/70 shadow-xs'
                     : 'border border-transparent hover:bg-surface1/60 text-foreground-muted hover:text-foreground',
                   'has-data-[state=open]:bg-surface1/60',
                   isActive && 'thread-wip',
@@ -594,17 +503,17 @@ export function ThreadList() {
                     {session.starred && (
                       <Star className="size-3 shrink-0 fill-status-warning text-status-warning" />
                     )}
-                    <span className="text-[13.5px] font-medium flex-1 min-w-0 truncate text-foreground">
+                    <span className="text-sm font-medium flex-1 min-w-0 truncate text-foreground">
                       {isSearching
                         ? highlightMatch(session.title || 'Untitled', searchQuery)
                         : (session.title || 'Untitled')}
                     </span>
-                    <span className="text-[11px] text-foreground-extra-muted shrink-0 font-mono">
+                    <span className="text-2xs text-foreground-extra-muted shrink-0 font-mono">
                       {displayTime}
                     </span>
                   </div>
                   <p className={cn(
-                    'text-[11px] text-foreground-muted truncate leading-tight font-sans',
+                    'text-2xs text-foreground-muted truncate leading-tight font-sans',
                     previewIsStatus && 'italic'
                   )}>
                     {preview}
@@ -683,14 +592,14 @@ export function ThreadList() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm">还没有频道</p>
-                  <p className="text-xs mt-1">直接开始对话,或先选一个项目目录</p>
+                  <p className="text-sm">No channels yet</p>
+                  <p className="text-xs mt-1">Start chatting, or pick a project folder first</p>
                   <button
                     onClick={() => startChannel(null)}
                     className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors cursor-pointer"
                   >
                     <MessageCircle className="size-3.5" />
-                    直接对话
+                    Direct chats
                   </button>
                 </>
               )}

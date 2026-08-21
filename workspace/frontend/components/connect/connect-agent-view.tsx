@@ -231,7 +231,7 @@ export function ConnectAgentView() {
     <div className="flex flex-col h-full bg-card text-foreground">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 shrink-0">
-        <h2 className="text-[11px] font-semibold text-foreground-muted">Connect Agents</h2>
+        <h2 className="text-2xs font-medium text-foreground-muted">Connect Agents</h2>
         <button
           onClick={() => setViewMode('threads')}
           className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
@@ -356,8 +356,8 @@ function LocalAgentsTab({
                 <AgentIcon name={entry.name} size={32} />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium leading-tight truncate">{entry.label}</div>
-                <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                <div className="text-sm font-medium leading-tight truncate">{entry.label}</div>
+                <div className="text-3xs text-muted-foreground mt-0.5 truncate">
                   {entry.builtin ? 'Built-in' : entry.tags?.[0] || 'Open Source'}
                 </div>
               </div>
@@ -403,7 +403,7 @@ function LocalAgentsTab({
             </div>
 
             <div className="w-full bg-primary dark:bg-black border border-border rounded-xl p-4 relative group text-left">
-              <div className="text-[11px] text-foreground-muted font-mono mb-2">
+              <div className="text-2xs text-foreground-muted font-mono mb-2">
                 Run command to connect:
               </div>
               <pre className="text-primary-foreground text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
@@ -513,7 +513,7 @@ function CloudAgentsTab({
         {/* Back button */}
         <button
           onClick={() => onSelectProvider(null)}
-          className="flex items-center gap-1 text-[11px] font-semibold text-foreground-muted hover:text-foreground transition-colors mb-2"
+          className="flex items-center gap-1 text-2xs font-medium text-foreground-muted hover:text-foreground transition-colors mb-2"
         >
           <ChevronRight className="size-3.5 rotate-180" />
           All providers
@@ -527,7 +527,7 @@ function CloudAgentsTab({
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-foreground tracking-tight">{selectedProviderInfo.label}</h3>
-                <p className="text-[10px] text-muted-foreground mt-0.5">
+                <p className="text-3xs text-muted-foreground mt-0.5">
                   {isCustomProvider ? 'Connect any OpenAI-compatible endpoint' : 'Configure and add a cloud agent'}
                 </p>
               </div>
@@ -538,7 +538,7 @@ function CloudAgentsTab({
             {/* Custom endpoint: Base URL */}
             {isCustomProvider && (
               <div className="space-y-1.5">
-                <Label htmlFor="cloud-base-url" className="text-[11px] font-semibold text-foreground-extra-muted">Endpoint URL</Label>
+                <Label htmlFor="cloud-base-url" className="text-2xs font-medium text-foreground-extra-muted">Endpoint URL</Label>
                 <Input
                   id="cloud-base-url"
                   value={cfgBaseUrl}
@@ -546,14 +546,14 @@ function CloudAgentsTab({
                   placeholder="https://api.example.com"
                   className="text-xs h-9 border-border focus:border-border-accent dark:border-border dark:focus:border-border-accent focus:ring-0 focus-visible:ring-0"
                 />
-                <p className="text-[9px] text-muted-foreground">/v1 is appended automatically if needed</p>
+                <p className="text-3xs text-muted-foreground">/v1 is appended automatically if needed</p>
               </div>
             )}
 
             {/* Model selector — list for known providers, text input for custom */}
             {isCustomProvider ? (
               <div className="space-y-1.5">
-                <Label htmlFor="cloud-model" className="text-[11px] font-semibold text-foreground-extra-muted">Model Name</Label>
+                <Label htmlFor="cloud-model" className="text-2xs font-medium text-foreground-extra-muted">Model Name</Label>
                 <Input
                   id="cloud-model"
                   value={cfgModel}
@@ -564,7 +564,7 @@ function CloudAgentsTab({
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label className="text-[11px] font-semibold text-foreground-extra-muted">Model</Label>
+                <Label className="text-2xs font-medium text-foreground-extra-muted">Model</Label>
                 <div className="grid grid-cols-1 gap-1">
                   {selectedProviderInfo.models.map((m) => {
                     const modelId = m.id;
@@ -583,7 +583,7 @@ function CloudAgentsTab({
                       >
                         <CategoryIcon category={modelCat} className="size-3.5 shrink-0 opacity-70" />
                         <span className="flex-1 truncate">{modelLabel}</span>
-                        <span className="text-[11px] font-mono text-muted-foreground">
+                        <span className="text-2xs font-mono text-muted-foreground">
                           {modelCat}
                         </span>
                       </button>
@@ -599,7 +599,7 @@ function CloudAgentsTab({
                 <button
                   type="button"
                   disabled
-                  className="flex items-center justify-center gap-2.5 w-full px-3 py-2.5 rounded-lg border border-border bg-surface1 opacity-60 cursor-not-allowed text-xs font-semibold text-muted-foreground"
+                  className="flex items-center justify-center gap-2.5 w-full px-3 py-2.5 rounded-lg border border-border bg-surface1 opacity-60 cursor-not-allowed text-xs font-medium text-muted-foreground"
                 >
                   <svg viewBox="0 0 24 24" className="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg">
                     <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -608,11 +608,11 @@ function CloudAgentsTab({
                     <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                   </svg>
                   <span>Sign in with Google</span>
-                  <span className="ms-auto text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface3 text-foreground-muted">Coming Soon</span>
+                  <span className="ms-auto text-3xs font-mono px-1.5 py-0.5 rounded bg-surface3 text-foreground-muted">Coming Soon</span>
                 </button>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 border-t border-border/50" />
-                  <span className="text-[11px] font-mono font-semibold text-muted-foreground">or use API key</span>
+                  <span className="text-2xs font-mono font-medium text-muted-foreground">or use API key</span>
                   <div className="flex-1 border-t border-border/50" />
                 </div>
               </>
@@ -620,7 +620,7 @@ function CloudAgentsTab({
 
             {/* Agent name */}
             <div className="space-y-1.5">
-              <Label htmlFor="cloud-name" className="text-[11px] font-semibold text-foreground-extra-muted">Agent Name</Label>
+              <Label htmlFor="cloud-name" className="text-2xs font-medium text-foreground-extra-muted">Agent Name</Label>
               <Input
                 id="cloud-name"
                 value={cfgName}
@@ -628,12 +628,12 @@ function CloudAgentsTab({
                 placeholder="e.g. chatgpt"
                 className="text-xs h-9 border-border focus:border-border-accent dark:border-border dark:focus:border-border-accent focus:ring-0 focus-visible:ring-0"
               />
-              <p className="text-[9px] text-muted-foreground">Use this to @mention the agent in chat</p>
+              <p className="text-3xs text-muted-foreground">Use this to @mention the agent in chat</p>
             </div>
 
             {/* API Key */}
             <div className="space-y-1.5">
-              <Label htmlFor="cloud-key" className="text-[11px] font-semibold text-foreground-extra-muted">API Key</Label>
+              <Label htmlFor="cloud-key" className="text-2xs font-medium text-foreground-extra-muted">API Key</Label>
               <Input
                 id="cloud-key"
                 type="password"
@@ -648,13 +648,13 @@ function CloudAgentsTab({
             <div>
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="text-[11px] font-semibold text-foreground-extra-muted hover:text-foreground transition-colors"
+                className="text-2xs font-medium text-foreground-extra-muted hover:text-foreground transition-colors"
               >
                 {showAdvanced ? 'Hide' : 'Show'} advanced options
               </button>
               {showAdvanced && (
                 <div className="mt-2.5">
-                  <Label htmlFor="cloud-prompt" className="text-[11px] font-semibold text-foreground-extra-muted">System Prompt</Label>
+                  <Label htmlFor="cloud-prompt" className="text-2xs font-medium text-foreground-extra-muted">System Prompt</Label>
                   <Textarea
                     id="cloud-prompt"
                     value={cfgPrompt}
@@ -693,7 +693,7 @@ function CloudAgentsTab({
         return (
           <div key={group.label}>
             <div className="flex items-center gap-2 mb-1.5 px-0.5">
-              <span className="text-[9px] font-semibold text-foreground-extra-muted ">{group.label}</span>
+              <span className="text-3xs font-medium text-foreground-extra-muted ">{group.label}</span>
               <div className="flex-1 border-t border-border/50" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -709,7 +709,7 @@ function CloudAgentsTab({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-semibold leading-tight truncate text-foreground">{p.label || p.name}</div>
-                      <div className="text-[9px] text-foreground-extra-muted font-mono mt-0.5">{p.models.length} models</div>
+                      <div className="text-3xs text-foreground-extra-muted font-mono mt-0.5">{p.models.length} models</div>
                     </div>
                   </button>
                 );
@@ -723,7 +723,7 @@ function CloudAgentsTab({
       {cloudAgents.length > 0 && (
         <div className="space-y-2 mt-5">
           <div className="flex items-center gap-2 px-1">
-            <span className="text-[9px] font-semibold text-foreground-extra-muted ">Connected</span>
+            <span className="text-3xs font-medium text-foreground-extra-muted ">Connected</span>
             <div className="flex-1 border-t border-border/50" />
           </div>
           {cloudAgents.map((agent) => {
@@ -744,9 +744,9 @@ function CloudAgentsTab({
                     <span className="text-xs font-semibold text-foreground">@{name}</span>
                     <CategoryIcon category={category} className="size-3 opacity-60" />
                   </div>
-                  <div className="text-[9px] font-mono text-foreground-extra-muted mt-0.5">{agent.model}</div>
+                  <div className="text-3xs font-mono text-foreground-extra-muted mt-0.5">{agent.model}</div>
                 </div>
-                <span className="text-[10px] text-foreground-extra-muted font-mono pr-2">{apiKey}</span>
+                <span className="text-3xs text-foreground-extra-muted font-mono pr-2">{apiKey}</span>
                 <button
                   onClick={() => onRemove(name)}
                   className="size-6 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-foreground-extra-muted hover:text-status-danger transition-colors"

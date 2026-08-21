@@ -128,7 +128,7 @@ export function MermaidBlock({
 				<p className="mb-2 text-xs font-medium text-status-danger">
 					Unable to render Mermaid diagram: {error}
 				</p>
-				<pre className="overflow-x-auto text-[13px] leading-relaxed font-mono text-foreground">
+				<pre className="overflow-x-auto text-xs leading-relaxed font-mono text-foreground">
 					<code>{chart}</code>
 				</pre>
 			</div>

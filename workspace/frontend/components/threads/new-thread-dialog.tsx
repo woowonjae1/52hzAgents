@@ -129,12 +129,12 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
         <div className="mt-3">
           <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-1.5">
             <Folder className="size-3" />
-            项目目录(可选)
+            Project folder (optional)
           </label>
           <ProjectFolderPicker
             value={workingDir}
             onChange={setWorkingDir}
-            helperText="留空则是不接触文件系统的普通对话。"
+            helperText="Leave empty for a plain chat with no filesystem access."
           />
         </div>
 
@@ -165,7 +165,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
         )}
         {offlineAgentCount > 0 && (
           <p className={cn(
-            'px-3 text-[11px] text-muted-foreground/70',
+            'px-3 text-2xs text-muted-foreground/70',
             onlineAgents.length > 0 ? 'mt-1' : 'mt-3'
           )}>
             {offlineAgentCount} offline {offlineAgentCount === 1 ? 'agent' : 'agents'} not included

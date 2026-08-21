@@ -136,7 +136,7 @@ export function BrowserTabList() {
           {/* Persistent tabs — always on top */}
           {(persistentTabs.length > 0 || idleContexts.length > 0) && (
             <>
-              <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Persistent
               </div>
               {/* Active persistent tabs */}
@@ -155,10 +155,10 @@ export function BrowserTabList() {
                   >
                     <Lock className="size-4 text-green-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium truncate">
+                      <p className="text-sm font-medium truncate">
                         {ctx?.name || tab.title || truncateUrl(tab.url)}
                       </p>
-                      <p className="text-[11px] text-muted-foreground truncate">
+                      <p className="text-2xs text-muted-foreground truncate">
                         {truncateUrl(tab.url)}
                         {tab.lastActiveAt && ` · ${timeAgo(tab.lastActiveAt)}`}
                       </p>
@@ -181,8 +181,8 @@ export function BrowserTabList() {
                 >
                   <Lock className="size-4 text-zinc-400 dark:text-zinc-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate text-muted-foreground">{ctx.name}</p>
-                    <p className="text-[11px] text-muted-foreground/60 truncate">
+                    <p className="text-sm font-medium truncate text-muted-foreground">{ctx.name}</p>
+                    <p className="text-2xs text-muted-foreground/60 truncate">
                       {ctx.domain || 'no domain'}
                       {ctx.lastUsedAt && ` · ${timeAgo(ctx.lastUsedAt)}`}
                       {' · idle'}
@@ -214,7 +214,7 @@ export function BrowserTabList() {
           {regularTabs.length > 0 && (
             <>
               <div className={cn(
-                "px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground",
+                "px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground",
                 (persistentTabs.length > 0 || idleContexts.length > 0) && "mt-2"
               )}>
                 Active Tabs
@@ -232,10 +232,10 @@ export function BrowserTabList() {
                 >
                   <Globe className="size-4 text-blue-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-medium truncate">
+                    <p className="text-sm font-medium truncate">
                       {tab.title || truncateUrl(tab.url)}
                     </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
+                    <p className="text-2xs text-muted-foreground truncate">
                       {truncateUrl(tab.url)}
                       {' · '}
                       {(tab.createdBy || 'unknown').replace(/^(openagents:|human:)/, '')}

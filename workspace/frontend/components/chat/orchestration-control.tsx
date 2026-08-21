@@ -101,7 +101,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
                 <span className="text-xs font-medium">{m.label}</span>
                 {isActive && <Check className="size-3 text-primary" />}
               </div>
-              <p className="text-[11px] text-muted-foreground leading-snug">{m.description}</p>
+              <p className="text-2xs text-muted-foreground leading-snug">{m.description}</p>
             </div>
           </DropdownMenuItem>
         );

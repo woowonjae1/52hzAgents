@@ -44,7 +44,7 @@ const MAX_FILE_BYTES = 2 * 1024 * 1024;
 
 /** Micro-label typography shared with the rest of the knowledge surface. */
 const MICRO =
-  'text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted';
+  'text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted';
 
 type ImportAction = 'create' | 'overwrite' | 'skip';
 
@@ -184,7 +184,7 @@ export function KnowledgeDropOverlay({ visible }: { visible: boolean }) {
           {ACCEPTED_EXTENSIONS.map((ext) => (
             <span
               key={ext}
-              className="rounded-md bg-surface2 px-1.5 py-0.5 font-mono text-[10px] text-foreground-muted"
+              className="rounded-md bg-surface2 px-1.5 py-0.5 font-mono text-3xs text-foreground-muted"
             >
               {ext}
             </span>
@@ -197,7 +197,7 @@ export function KnowledgeDropOverlay({ visible }: { visible: boolean }) {
 
 /** Status chip describing what will happen to one row on import. */
 function StatusChip({ doc }: { doc: ParsedDoc }) {
-  const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium';
+  const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-medium';
   if (doc.error) {
     return (
       <span className={cn(base, 'bg-red-500/10 text-red-600 dark:bg-red-400/10 dark:text-red-400')}>
@@ -486,12 +486,12 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                   {importable.length} of {docs.length} will be imported
                 </span>
                 {conflictCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400 tabular-nums">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-3xs font-medium text-amber-600 dark:text-amber-400 tabular-nums">
                     {conflictCount} already exist
                   </span>
                 )}
                 {errorCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400 tabular-nums">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-3xs font-medium text-red-600 dark:text-red-400 tabular-nums">
                     {errorCount} unusable
                   </span>
                 )}

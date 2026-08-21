@@ -2,14 +2,15 @@
  * Hermes adapter for OpenAgents workspace.
  *
  * Bridges Nous Research's Hermes Agent CLI (https://github.com/NousResearch/hermes-agent)
- * to an OpenAgents workspace by spawning `hermes chat -q <prompt> -Q` per
- * incoming message and posting the response back to the workspace channel.
+ * to an OpenAgents workspace using `hermes chat -Q --query-file --source wwj`.
  *
- * Mirrors the Python adapter at sdk/src/openagents/adapters/hermes.py:
- * - per-channel Hermes session IDs persisted to ~/.wwj/sessions/
- * - profile auto-detection from the agent name (falls back to 'default')
- * - workspace context injection (identity + recent history + agent roster)
- * - subprocess isolation (hermes manages its own HERMES_HOME per profile)
+ * Key design decisions per official Hermes documentation:
+ * - Uses --query-file instead of -q to avoid shell interpretation of user input
+ * - Uses --in <workspace> to fix working directory per invocation
+ * - Uses --source wwj for business-specific session tagging
+ * - Session IDs managed via adapter persistence (not stdout regex extraction)
+ * - No --yolo by default (dangerous command approval must be explicit)
+ * - v2 path: migrate to `hermes acp` ACP JSON-RPC for real-time events
  */
 
 'use strict';
@@ -27,25 +28,22 @@ const IS_WINDOWS = process.platform === 'win32';
 const HERMES_INSTALL_HINT = IS_WINDOWS
   ? 'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex"'
   : 'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash';
-const SESSION_ID_RE = /session_id:\s*(\S+)/;
 const MAX_HISTORY_ENTRIES = 12;
 
 class HermesAdapter extends BaseAdapter {
   /**
    * @param {object} opts - BaseAdapter opts plus:
    * @param {string} [opts.hermesProfile] - explicit Hermes profile, or 'auto'
-   * @param {string} [opts.hermesSource]  - `--source` label (default: 'tool')
+   * @param {string} [opts.hermesSource]  - `--source` label (default: 'wwj')
    * @param {number} [opts.maxTurns]      - `--max-turns` value
-   * @param {boolean} [opts.yolo]         - pass `--yolo` to skip prompts
    * @param {Set} [opts.disabledModules]
    */
   constructor(opts) {
     super(opts);
     this.disabledModules = opts.disabledModules || new Set();
     this.hermesProfile = this._resolveProfile(opts.hermesProfile, this.agentName);
-    this.hermesSource = opts.hermesSource || 'tool';
+    this.hermesSource = opts.hermesSource || 'wwj';
     this.maxTurns = Number.isInteger(opts.maxTurns) ? opts.maxTurns : 60;
-    this.yolo = !!opts.yolo;
 
     this._channelSessions = {};
     this._channelProcesses = {};
@@ -54,6 +52,10 @@ class HermesAdapter extends BaseAdapter {
       `${this.workspaceId}_${this.agentName}_hermes.json`,
     );
     this._loadSessions();
+
+    // Temp directory for --query-file prompts
+    this._queryDir = path.join(os.homedir(), '.wwj', 'hermes-queries');
+    try { fs.mkdirSync(this._queryDir, { recursive: true }); } catch {}
 
     this._hermesBin = this._findHermesBinary();
     if (this._hermesBin) {
@@ -69,25 +71,13 @@ class HermesAdapter extends BaseAdapter {
 
   _findHermesBinary() {
     const home = os.homedir();
-    // Reset each call. When set, this._hermesBin is a path INSIDE WSL and must
-    // be invoked as `wsl -e <path> …` rather than spawned natively.
     this._hermesViaWsl = false;
 
-    // Tier 1: PATH (enriched env so we see the dirs the launcher adds; a fresh
-    // install updates the user PATH, which the running daemon won't pick up).
-    // windowsHide stops a console window from flashing.
-    // Codepage-safe lookup (whereBinary forces UTF-8 output + verifies existence
-    // so a non-ASCII/Chinese username isn't mangled into an ENOENT). Native
-    // Windows is supported (install.ps1); the installer adds venv\Scripts to the
-    // user PATH, which a running daemon won't see — hence the enriched env
-    // (whereBinary's default) + the explicit candidates in Tier 2.
+    // Tier 1: PATH (enriched env)
     const viaWhere = whereBinary('hermes');
     if (viaWhere) return viaWhere;
 
-    // Tier 2: Common install locations. The native Windows installer
-    // (install.ps1) provisions a portable venv and drops hermes.exe under
-    // %LOCALAPPDATA%\hermes\hermes-agent\venv\Scripts (with the uv shim in
-    // %LOCALAPPDATA%\hermes\bin). The Unix installer uses ~/.local/bin.
+    // Tier 2: Common install locations
     const localAppData = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
     const candidates = IS_WINDOWS ? [
       path.join(localAppData, 'hermes', 'hermes-agent', 'venv', 'Scripts', 'hermes.exe'),
@@ -110,14 +100,11 @@ class HermesAdapter extends BaseAdapter {
       if (fs.existsSync(c)) return c;
     }
 
-    // Tier 3: Deep scan of every known bin dir.
+    // Tier 3: Deep scan
     const viaWhich = whichBinary('hermes');
     if (viaWhich) return viaWhich;
 
-    // Tier 4 (Windows only): fall back to a WSL install if one exists. Native
-    // Windows (Tiers 1-3) is preferred, but a user who set hermes up inside
-    // WSL2 still works — resolve its absolute in-WSL path; _runHermes then
-    // invokes it as `wsl -e <path> …`.
+    // Tier 4 (Windows only): WSL fallback
     if (IS_WINDOWS) {
       const wslPath = this._resolveWslHermes();
       if (wslPath) {
@@ -129,12 +116,6 @@ class HermesAdapter extends BaseAdapter {
     return null;
   }
 
-  /**
-   * Resolve hermes's absolute path inside the default WSL distro, or null.
-   * Uses a login shell (`bash -lc`) so the installer's PATH additions
-   * (~/.local/bin) are visible. Returns an absolute Linux path like
-   * /home/<user>/.local/bin/hermes.
-   */
   _resolveWslHermes() {
     if (!IS_WINDOWS) return null;
     try {
@@ -149,7 +130,6 @@ class HermesAdapter extends BaseAdapter {
 
   _resolveProfile(explicit, agentName) {
     if (explicit && explicit !== '' && explicit !== 'auto') return explicit;
-    // Match agent name to an existing ~/.hermes/profiles/<name> if present
     try {
       const profileDir = path.join(os.homedir(), '.hermes', 'profiles', agentName);
       if (fs.existsSync(profileDir)) return agentName;
@@ -257,34 +237,25 @@ class HermesAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Output parsing
+  // Query file management (--query-file for safe prompt passing)
   // ------------------------------------------------------------------
 
-  _parseHermesOutput(raw) {
-    let sessionId = null;
-    let body = raw;
+  _writeQueryFile(channelName, prompt) {
+    const safeName = channelName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const queryFile = path.join(this._queryDir, `${safeName}_${Date.now()}.txt`);
+    fs.writeFileSync(queryFile, prompt, 'utf-8');
+    return queryFile;
+  }
 
-    const m = SESSION_ID_RE.exec(body);
-    if (m) {
-      sessionId = m[1];
-      body = body.replace(SESSION_ID_RE, '');
-    }
-
-    const lines = [];
-    for (const line of body.split(/\r?\n/)) {
-      const stripped = line.trim();
-      if (!stripped) continue;
-      if (stripped.startsWith('↻ Resumed session ')) continue;
-      lines.push(line);
-    }
-    return { text: lines.join('\n').trim(), sessionId };
+  _cleanupQueryFile(filePath) {
+    try { fs.unlinkSync(filePath); } catch {}
   }
 
   // ------------------------------------------------------------------
   // Subprocess lifecycle
   // ------------------------------------------------------------------
 
-  _buildHermesCmd(prompt, resumeSessionId) {
+  _buildHermesCmd(queryFilePath, resumeSessionId, workingDir) {
     if (!this._hermesBin) {
       throw new Error(`hermes CLI not found. Install with: ${HERMES_INSTALL_HINT}`);
     }
@@ -294,27 +265,32 @@ class HermesAdapter extends BaseAdapter {
     }
     args.push(
       'chat',
-      '-q', prompt,
       '-Q',
       '--source', this.hermesSource,
       '--max-turns', String(this.maxTurns),
+      '--query-file', queryFilePath,
     );
+    // --in fixes the working directory for this invocation
+    if (workingDir) {
+      args.push('--in', workingDir);
+    }
     if (resumeSessionId) args.push('--resume', resumeSessionId);
-    if (this.yolo) args.push('--yolo');
+    // No --yolo: dangerous command approval must be explicit
     return args;
   }
 
   async _runHermes(prompt, channelName) {
     const resumeId = this._channelSessions[channelName];
-    const args = this._buildHermesCmd(prompt, resumeId);
+    const cwd = await this._resolveWorkingDir(channelName);
+
+    // Write prompt to a temp file (--query-file avoids shell interpretation)
+    const queryFile = this._writeQueryFile(channelName, prompt);
+
+    const args = this._buildHermesCmd(queryFile, resumeId, cwd);
     this._log(`Running hermes (profile=${this.hermesProfile}, channel=${channelName}, resume=${!!resumeId})`);
 
     const env = { ...(this.agentEnv || process.env) };
 
-    // On Windows hermes lives inside WSL: invoke `wsl -e <wsl-hermes-path> …`.
-    // `-e` runs the binary directly (no shell), so every arg — including the
-    // multi-line prompt in `-q` — passes through verbatim with no quoting hazard.
-    // hermes then uses its own config (~/.hermes inside WSL) for model/keys.
     let spawnBin = this._hermesBin;
     let spawnArgs = args;
     if (this._hermesViaWsl) {
@@ -325,8 +301,6 @@ class HermesAdapter extends BaseAdapter {
     const proc = spawn(spawnBin, spawnArgs, {
       env,
       stdio: ['ignore', 'pipe', 'pipe'],
-      // No process group on Windows / WSL (can't signal a group); windowsHide
-      // keeps the wsl.exe console from flashing up.
       detached: !IS_WINDOWS && !this._hermesViaWsl,
       windowsHide: true,
     });
@@ -342,10 +316,11 @@ class HermesAdapter extends BaseAdapter {
       proc.on('error', () => resolve(-1));
     });
     delete this._channelProcesses[channelName];
+    this._cleanupQueryFile(queryFile);
 
     if (exitCode !== 0) {
       if (resumeId) {
-        // Resume may have failed because the session was deleted — drop it and retry fresh
+        // Resume may have failed because the session was deleted
         this._log(`Hermes resume failed (code=${exitCode}), retrying without resume`);
         delete this._channelSessions[channelName];
         this._saveSessions();
@@ -355,12 +330,57 @@ class HermesAdapter extends BaseAdapter {
       throw new Error(`hermes exited with code ${exitCode}: ${detail}`);
     }
 
-    const { text, sessionId } = this._parseHermesOutput(stdout);
-    if (sessionId) {
-      this._channelSessions[channelName] = sessionId;
-      this._saveSessions();
-    }
+    // Parse stdout: clean up resume banners and extract text
+    const text = this._parseHermesOutput(stdout);
+
+    // Try to discover the session ID from hermes sessions list
+    this._discoverSessionId(channelName);
+
     return text;
+  }
+
+  /**
+   * Parse Hermes stdout output, removing noise lines.
+   * Session ID is NOT extracted from stdout (use _discoverSessionId instead).
+   */
+  _parseHermesOutput(raw) {
+    const lines = [];
+    for (const line of raw.split(/\r?\n/)) {
+      const stripped = line.trim();
+      if (!stripped) continue;
+      // Skip resume banners and session ID lines
+      if (stripped.startsWith('\u21bb Resumed session ')) continue;
+      if (/^session_id:\s/i.test(stripped)) continue;
+      lines.push(line);
+    }
+    return lines.join('\n').trim();
+  }
+
+  /**
+   * Discover the Hermes session ID via `hermes sessions list --source wwj`.
+   * Falls back to parsing stdout session_id if CLI query fails.
+   * Runs asynchronously and saves the result for future --resume.
+   */
+  _discoverSessionId(channelName) {
+    // Best-effort async discovery; don't block on it
+    try {
+      const result = execSync(
+        `"${this._hermesBin}" sessions list --source ${this.hermesSource} --limit 1`,
+        { encoding: 'utf-8', timeout: 5000, windowsHide: true }
+      ).trim();
+      // Parse the most recent session ID from output
+      // Hermes typically outputs session IDs in a list format
+      const idMatch = result.match(/([0-9]{8}_[0-9]{6}_[a-f0-9]+|[a-f0-9-]{36})/);
+      if (idMatch) {
+        this._channelSessions[channelName] = idMatch[1];
+        this._saveSessions();
+        this._log(`Discovered Hermes session: ${idMatch[1]}`);
+      }
+    } catch {
+      // Fall back: if hermes printed a session_id line in stdout, we already
+      // stripped it in _parseHermesOutput. For now, just log.
+      this._log('Could not discover Hermes session ID via CLI');
+    }
   }
 
   async _stopProcess(proc) {

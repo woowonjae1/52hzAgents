@@ -92,6 +92,11 @@ func main() { // 服务程序运行主入口函数。
 		v1.DELETE("/workspaces/:workspace_id", handlers.DeleteWorkspace)                    // 软删除工作区。
 		v1.PATCH("/workspaces/:workspace_id/channels/:channel_name", handlers.PatchChannel) // 修改会话通道属性。
 		v1.GET("/workspaces/:workspace_id/channels/:channel_name", handlers.GetChannel)     // 获取单通道详情。
+		v1.POST("/workspaces/:workspace_id/channels/:channel_name/compact", handlers.CompactChannelHandler)          // 触发频道上下文压缩
+		v1.GET("/workspaces/:workspace_id/channels/:channel_name/summary", handlers.GetChannelSummaryHandler)        // 查询频道最新历史摘要
+		v1.GET("/workspaces/:workspace_id/channels/:channel_name/history/compacted", handlers.GetCompactedHistoryHandler) // 获取压缩摘要+近期对话
+		v1.GET("/workspaces/:workspace_id/policy/exec", handlers.GetWorkspaceExecPolicy)     // 获取命令执行安全策略
+		v1.PUT("/workspaces/:workspace_id/policy/exec", handlers.UpdateWorkspaceExecPolicy)  // 更新命令执行安全策略
 
 		// 注册 Agent 节点接入网络接口：
 		v1.POST("/join", handlers.JoinNetwork)                                 // Agent 登入工作区网络接口。

@@ -24,11 +24,11 @@ export function OnboardingGuide({ onQuickConnect, className }: OnboardingGuidePr
             <Sparkles className="size-4" />
           </span>
           <h2 className="text-base font-bold text-foreground tracking-tight">
-            添加你的第一个智能体
+            Add your first agent
           </h2>
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed max-w-xl">
-          选择内置智能体模板或配置自定义 ACP / MCP 适配器，开启多智能体协同：
+          Pick a built-in agent template, or configure a custom ACP / MCP adapter to start collaborating:
         </p>
       </div>
 
@@ -49,8 +49,8 @@ export function OnboardingGuide({ onQuickConnect, className }: OnboardingGuidePr
                 <div className="font-semibold text-xs text-foreground group-hover:text-primary transition-colors truncate">
                   {cat.name}
                 </div>
-                <div className="text-[10.5px] text-muted-foreground line-clamp-1 truncate mt-0.5">
-                  {cat.description || '智能体集成适配器'}
+                <div className="text-3xs text-muted-foreground line-clamp-1 truncate mt-0.5">
+                  {cat.description || 'Agent integration adapter'}
                 </div>
               </div>
             </div>

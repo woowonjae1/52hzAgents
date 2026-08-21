@@ -80,7 +80,7 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
                 </p>
               </div>
               <span className={cn(
-                'text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-full font-medium',
+                'text-3xs uppercase tracking-wider px-1.5 py-0.5 rounded-full font-medium',
                 isMaster
                   ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                   : 'text-muted-foreground'

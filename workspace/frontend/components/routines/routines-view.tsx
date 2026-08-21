@@ -149,11 +149,11 @@ export function RoutinesView() {
                         {routine.message}
                       </div>
                       {routine.context && (
-                        <div className="text-[11px] text-muted-foreground/60 mt-1 line-clamp-2">
+                        <div className="text-2xs text-muted-foreground/60 mt-1 line-clamp-2">
                           {routine.context}
                         </div>
                       )}
-                      <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground/70">
+                      <div className="flex items-center gap-3 mt-1.5 text-3xs text-muted-foreground/70">
                         <span>{agentName}</span>
                         <span>·</span>
                         <span className="truncate">{channelTitle}</span>

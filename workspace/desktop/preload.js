@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('electronBridge', {
   getAutostart: () => ipcRenderer.invoke('app-get-autostart'),
   setAutostart: (enabled) => ipcRenderer.invoke('app-set-autostart', enabled),
   browseFolder: (defaultPath) => ipcRenderer.invoke('dialog-open-folder', defaultPath),
+  openPath: (pathStr) => ipcRenderer.invoke('shell-open-path', pathStr),
+  showItemInFolder: (pathStr) => ipcRenderer.invoke('shell-show-item', pathStr),
 });
 

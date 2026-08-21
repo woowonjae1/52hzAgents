@@ -248,7 +248,7 @@ export function BrowserView() {
             {(tab.sharedWith || []).map((agent) => (
               <span
                 key={agent}
-                className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface3 text-foreground-muted"
+                className="text-3xs px-1.5 py-0.5 rounded-full bg-surface3 text-foreground-muted"
               >
                 {agent}
               </span>
@@ -256,14 +256,14 @@ export function BrowserView() {
           </div>
         )}
 
-        <span className="text-[10px] text-muted-foreground shrink-0">
+        <span className="text-3xs text-muted-foreground shrink-0">
           by {(tab.createdBy || 'unknown').replace(/^(openagents:|human:)/, '')}
         </span>
 
         {tab.contextId ? (
           <button
             onClick={handleUnpersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-status-success hover:bg-surface2 hover:text-status-warning transition-colors shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-status-success hover:bg-surface2 hover:text-status-warning transition-colors shrink-0"
             title="Remove persistent state — revert to temporal tab"
           >
             <Lock className="size-3" />
@@ -272,7 +272,7 @@ export function BrowserView() {
         ) : (
           <button
             onClick={handlePersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-surface2 hover:text-status-success transition-colors shrink-0"
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-muted-foreground hover:bg-surface2 hover:text-status-success transition-colors shrink-0"
             title="Make persistent — preserve login state for agents to reuse"
           >
             <Lock className="size-3" />

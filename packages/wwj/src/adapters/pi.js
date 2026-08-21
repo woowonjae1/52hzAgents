@@ -1,17 +1,18 @@
 /**
  * Pi adapter for OpenAgents workspace.
  *
- * Bridges the Pi coding agent CLI (D:\code\pi\pi_woowonjae, package
- * @earendil-works/pi-coding-agent, binary `pi`) to an OpenAgents workspace by
- * spawning `pi --session-id <key> -p <prompt>` per incoming message and
- * posting the response back to the workspace channel.
+ * Bridges the Pi coding agent CLI (@earendil-works/pi-coding-agent) to an
+ * OpenAgents workspace using `pi --mode json --session <path>` for real-time
+ * JSON Lines event streaming.
  *
- * Pi's own `--session-id <id>` flag creates-the-session-if-missing and
- * resumes it otherwise, so — unlike Hermes/Codex — this adapter does not
- * need to persist a separate session-id file: the id is derived
- * deterministically from workspaceId+channel and handed to Pi every call.
+ * Follows official Pi CLI documentation:
+ * https://pi.dev/docs/latest/usage
  *
- * Mirrors the Python adapter at sdk/src/openagents/adapters/pi.py.
+ * Key design decisions:
+ * - Uses --mode json for real-time JSON Lines event streaming (not buffered stdout)
+ * - Uses --session <path> with real session file paths (not --session-id)
+ * - Session files isolated per workspace under ~/.wwj/pi-sessions/<workspaceId>/
+ * - Same session file must never be written concurrently by two Pi processes
  */
 
 'use strict';
@@ -33,6 +34,7 @@ class PiAdapter extends BaseAdapter {
    * @param {object} opts - BaseAdapter opts plus:
    * @param {string} [opts.piModel]    - `--model` value (provider/id pattern)
    * @param {string} [opts.piProvider] - `--provider` value
+   * @param {boolean} [opts.piApprove] - pass `--approve` to trust local resources (default: true)
    * @param {Set} [opts.disabledModules]
    */
   constructor(opts) {
@@ -42,8 +44,15 @@ class PiAdapter extends BaseAdapter {
     const env = this.agentEnv || process.env;
     this.piModel = opts.piModel || env.PI_MODEL || '';
     this.piProvider = opts.piProvider || env.PI_PROVIDER || '';
+    this.piApprove = opts.piApprove !== false; // default true
 
     this._channelProcesses = {};
+
+    // Session directory: isolated per workspace under ~/.wwj/pi-sessions/<workspaceId>/
+    this._sessionDir = path.join(
+      os.homedir(), '.wwj', 'pi-sessions', this.workspaceId
+    );
+    try { fs.mkdirSync(this._sessionDir, { recursive: true }); } catch {}
 
     this._piBin = this._findPiBinary();
     if (this._piBin) {
@@ -122,11 +131,17 @@ class PiAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Session key (deterministic — Pi creates/resumes by --session-id itself)
+  // Session path mapping
   // ------------------------------------------------------------------
 
-  _sessionKeyFor(channelName) {
-    return `openagents-${this.workspaceId.slice(0, 8)}-${channelName.slice(-8)}`;
+  /**
+   * Map workspace + channel to a real Pi session file path.
+   * Pi's --session accepts a file path or session ID.
+   */
+  _sessionPathFor(channelName) {
+    // Sanitize channel name for filesystem use
+    const safeName = channelName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return path.join(this._sessionDir, `${safeName}.jsonl`);
   }
 
   // ------------------------------------------------------------------
@@ -207,15 +222,23 @@ class PiAdapter extends BaseAdapter {
   // Subprocess lifecycle
   // ------------------------------------------------------------------
 
-  _buildPiCmd(prompt, sessionKey) {
+  _buildPiCmd(prompt, channelName) {
     if (!this._piBin) {
       throw new Error('pi CLI not found. Install with: npm install -g @earendil-works/pi-coding-agent');
     }
+    const sessionPath = this._sessionPathFor(channelName);
     const args = [];
     if (this._piJsPath) {
       args.push(this._piJsPath);
     }
-    args.push('--session-id', sessionKey, '--no-context-files');
+    // Official CLI: --mode json for JSON Lines event streaming,
+    // --session <path> for session file, --session-dir for isolation
+    args.push(
+      '--mode', 'json',
+      '--session', sessionPath,
+      '--session-dir', this._sessionDir,
+    );
+    if (this.piApprove) args.push('--approve');
     if (this.piProvider) args.push('--provider', this.piProvider);
     if (this.piModel) args.push('--model', this.piModel);
     // -p consumes the very next token as the message, so it must come last.
@@ -224,9 +247,9 @@ class PiAdapter extends BaseAdapter {
   }
 
   async _runPi(prompt, channelName) {
-    const sessionKey = this._sessionKeyFor(channelName);
-    const args = this._buildPiCmd(prompt, sessionKey);
-    this._log(`Running pi (channel=${channelName}, session=${sessionKey})`);
+    const sessionPath = this._sessionPathFor(channelName);
+    const args = this._buildPiCmd(prompt, channelName);
+    this._log(`Running pi (channel=${channelName}, session=${sessionPath})`);
 
     const env = { ...(this.agentEnv || process.env) };
     const cwd = await this._resolveWorkingDir(channelName);
@@ -249,23 +272,90 @@ class PiAdapter extends BaseAdapter {
     });
     this._channelProcesses[channelName] = proc;
 
-    let stdout = '';
-    let stderr = '';
-    proc.stdout.on('data', (d) => { stdout += d.toString('utf-8'); });
-    proc.stderr.on('data', (d) => { stderr += d.toString('utf-8'); });
+    // Real-time JSON Lines event streaming (not buffered stdout)
+    const responseChunks = [];
+    let stderrBuf = '';
+    let lineBuffer = '';
+    let everPostedAnything = false;
+    let _pendingLines = Promise.resolve();
+
+    proc.stderr.on('data', (d) => { stderrBuf += d.toString('utf-8'); });
+
+    // Process JSON Lines events in real-time
+    const processLine = async (line) => {
+      line = line.trim();
+      if (!line) return;
+
+      let event;
+      try { event = JSON.parse(line); } catch {
+        // Not JSON — treat as plain text output (fallback)
+        if (line.trim()) responseChunks.push(line.trim());
+        return;
+      }
+
+      const eventType = event.type || '';
+
+      // Thinking / assistant incremental text
+      if (eventType === 'thinking' || eventType === 'assistant' || eventType === 'text_delta') {
+        const text = event.text || event.content || event.delta || '';
+        if (text.trim()) {
+          everPostedAnything = true;
+          try { await this.sendThinking(channelName, text.trim()); } catch {}
+        }
+      }
+
+      // Tool use / tool call activity
+      if (eventType === 'tool_use' || eventType === 'tool_call' || eventType === 'tool') {
+        const toolName = event.name || event.tool || event.tool_name || 'tool';
+        const detail = event.input?.command || event.input?.path || event.input?.query || '';
+        const label = detail ? `${toolName} > ${detail}` : toolName;
+        everPostedAnything = true;
+        try { await this.sendStatus(channelName, label); } catch {}
+      }
+
+      // Result / completion
+      if (eventType === 'result' || eventType === 'response' || eventType === 'message') {
+        const text = event.text || event.content || event.result || '';
+        if (text.trim()) {
+          responseChunks.push(text.trim());
+        }
+      }
+
+      // Error events
+      if (eventType === 'error') {
+        const errMsg = event.message || event.error || event.text || 'Unknown error';
+        this._log(`Pi error event: ${errMsg}`);
+      }
+    };
+
+    proc.stdout.on('data', (chunk) => {
+      lineBuffer += chunk.toString('utf-8');
+      const lines = lineBuffer.split('\n');
+      lineBuffer = lines.pop();
+      for (const line of lines) {
+        _pendingLines = _pendingLines.then(() => processLine(line)).catch(() => {});
+      }
+    });
 
     const exitCode = await new Promise((resolve) => {
       proc.on('exit', resolve);
       proc.on('error', () => resolve(-1));
     });
+
+    // Process remaining buffer
+    try { await _pendingLines; } catch {}
+    if (lineBuffer.trim()) {
+      try { await processLine(lineBuffer); } catch {}
+    }
+
     delete this._channelProcesses[channelName];
 
     if (exitCode !== 0) {
-      const detail = (stderr || stdout).trim().slice(0, 600);
+      const detail = (stderrBuf || responseChunks.join('\n')).trim().slice(0, 600);
       throw new Error(`pi exited with code ${exitCode}: ${detail}`);
     }
 
-    return stdout.trim();
+    return responseChunks.join('\n').trim();
   }
 
   async _stopProcess(proc) {

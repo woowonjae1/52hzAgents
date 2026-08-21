@@ -72,13 +72,13 @@ export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
     builtin: true,
   },
   {
-    name: 'custom',
-    label: 'Custom (Goose, Cline, Kilo, Aider...)',
-    description: 'Define and connect your own custom agent client (Goose, Cline, Kilo, Aider, etc.).',
-    install_command: 'wwj create my-agent --type custom',
+    name: 'cursor',
+    label: 'Cursor Agent',
+    description: 'Cursor AI code editor agent CLI bridge.',
+    install_command: 'wwj install cursor',
     homepage: 'https://openagents.org',
-    tags: ['custom'],
-    builtin: false,
+    tags: ['coding', 'ide'],
+    builtin: true,
   },
 ];
 

@@ -2,11 +2,12 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, User, FileIcon, Download, Eye, GitBranch, Sparkles } from 'lucide-react';
+import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { deriveIdentityColor } from '@/lib/identity-colors';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { MarkdownContent } from './markdown-content';
 import { ToolCallsDisclosure } from './intermediate-steps';
 import { Reasoning } from '@/components/ai-elements/reasoning';
@@ -128,6 +129,19 @@ interface ChatMessageProps {
   isRejected?: boolean;
   /** Tool calls / status this sender emitted before this message, if any. */
   steps?: WorkspaceMessage[];
+  /**
+   * Suppress the avatar + sender row. Set when a thinking/steps group for this
+   * same sender sits directly above and has already printed it — otherwise the
+   * identity line appears twice in a row.
+   */
+  hideHeader?: boolean;
+  /**
+   * A `[Decision]` reply for this message's card already exists in the channel.
+   * Derived from the message list by the parent — the same arrangement as
+   * `isApproved`/`isRejected` — because local state alone reverts to `pending`
+   * on reload and re-arms a card that has already been answered.
+   */
+  isDecisionAnswered?: boolean;
 }
 
 function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: string; name: string }): boolean {
@@ -140,11 +154,24 @@ function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: str
   return Boolean(currentUserName && senderName === currentUserName);
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected, steps }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected, steps, hideHeader = false, isDecisionAnswered = false }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
   const [localStatus, setLocalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+
+  // Submission state for the decision card. ApprovalCard implements
+  // pending/submitting/answered in full — spinner, confirmation banner, locked
+  // options — but it is a controlled component and nothing was driving it, so
+  // it sat on `pending` forever: clicking Confirm produced no feedback and left
+  // the card live, which let the same decision be posted to the agent twice.
+  const [localDecisionStatus, setDecisionStatus] =
+    useState<'pending' | 'submitting' | 'answered'>('pending');
+
+  // The durable flag wins: it comes from an actual `[Decision]` message in the
+  // channel, so it holds across reloads and remounts. Local state only covers
+  // the gap between clicking Confirm and that message coming back round.
+  const decisionStatus = isDecisionAnswered ? 'answered' : localDecisionStatus;
 
   const approvalRequest = message.metadata?.tool_approval_request;
   const currentApproved = isApproved || localStatus === 'approved';
@@ -221,13 +248,28 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
 
-  // Extract thinking content if any
+  // Extract thinking content from inline text, steps, or metadata
   const { thinking: inlineThinking, answer: cleanContent } = useMemo(
     () => extractThinking(message.content),
     [message.content]
   );
+  const stepsThinking = useMemo(() => {
+    if (!steps || steps.length === 0) return null;
+    const thinkMsgs = steps.filter((s) => s.messageType === 'thinking');
+    if (thinkMsgs.length === 0) return null;
+    const filtered = thinkMsgs
+      .map((m) => m.content.trim())
+      .filter((t) => t && t.toLowerCase() !== 'thinking...' && t.toLowerCase() !== 'thinking');
+    return filtered.length > 0 ? filtered.join('\n\n') : null;
+  }, [steps]);
+
+  const nonThinkingSteps = useMemo(() => {
+    if (!steps || steps.length === 0) return [];
+    return steps.filter((s) => s.messageType !== 'thinking');
+  }, [steps]);
+
   const explicitThinking = (message.metadata?.thinking || message.metadata?.reasoning) as string | undefined;
-  const activeThinking: string | null = inlineThinking || (typeof explicitThinking === 'string' ? explicitThinking : null);
+  const activeThinking: string | null = inlineThinking || stepsThinking || (typeof explicitThinking === 'string' ? explicitThinking : null);
 
   // Extract sources if any
   const sources = useMemo<SourceItem[]>(() => {
@@ -262,12 +304,26 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     return null;
   }, [message.metadata]);
 
+  // Detect system errors or daemon interruptions
+  const isErrorMessage = useMemo(() => {
+    if (!cleanContent) return false;
+    const lower = cleanContent.toLowerCase();
+    return (
+      lower.includes('authentication failed') ||
+      lower.includes('oauth session expired') ||
+      lower.includes('task interrupted — daemon restarting') ||
+      lower.includes('failed to authenticate') ||
+      lower.includes('invalid api key') ||
+      lower.includes('daemon restarting')
+    );
+  }, [cleanContent]);
+
   if (isSystem) {
     const isQueued = message.content.includes('queued');
     return (
-      <div className="flex justify-center py-1">
+      <div className="flex justify-center py-2">
         <span className={cn(
-          'text-xs italic',
+          'text-xs font-mono px-3 py-0.5 rounded-full border border-border/40 bg-surface1/60',
           isQueued
             ? 'text-foreground-muted'
             : 'text-muted-foreground'
@@ -278,106 +334,125 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── User Messages (Right Aligned) ──
+  // ── User Messages (OpenAI ChatGPT Native Style) ──
   if (isHuman) {
     const isCurrentUser = isCurrentHumanMessage(message, currentUser);
-    const displayName = isCurrentUser
-      ? 'You'
-      : (message.senderName && message.senderName !== 'user' ? message.senderName : 'User');
 
     return (
-      <div className="py-2.5 flex justify-end group/usermsg">
-        <div className="flex items-start gap-2.5 flex-row-reverse max-w-[85%] lg:max-w-[75%] relative">
-          {/* Avatar Icon */}
-          <div className="size-7 rounded-full shrink-0 flex items-center justify-center border border-border/60 overflow-hidden bg-surface2 shadow-xs mt-0.5">
-            <img src="/logo-icon.png" alt="You" className="size-4 object-contain" />
+      <div className="py-2.5 flex justify-end group/usermsg select-text">
+        <div className="flex items-center gap-2 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
+          {/* ChatGPT Style Refined Bubble */}
+          <div className="relative text-sm leading-relaxed text-foreground bg-surface2/90 dark:bg-[#2f2f2f] border border-border/40 dark:border-white/[0.06] px-4 py-2.5 rounded-2xl rounded-tr-xs shadow-2xs break-words inline-block max-w-full">
+            <MarkdownContent content={message.content} agentNames={agentNames} sessionId={message.sessionId} />
+            <Attachments items={attachments} />
+
+            {isCurrentUser && message.deliveryStatus && (
+              <div className="flex items-center justify-end gap-1 mt-1 text-3xs">
+                {message.deliveryStatus === 'sending' && (
+                  <span className="text-foreground-extra-muted">发送中...</span>
+                )}
+                {message.deliveryStatus === 'confirmed' && (
+                  <span className="text-status-success font-medium inline-flex items-center gap-0.5"><Check className="size-2.5" />已发送</span>
+                )}
+                {message.deliveryStatus === 'failed' && (
+                  <span className="text-status-danger font-medium inline-flex items-center gap-0.5"><X className="size-2.5" />发送失败</span>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col items-end min-w-0">
-            {/* Header: Name & Time */}
-            <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-foreground-extra-muted select-none">
-              {timestamp && <span className="font-mono opacity-80">{timestamp}</span>}
-              <span className="font-semibold text-foreground">{displayName}</span>
-            </div>
-
-            {/* Message Bubble */}
-            <div className="relative text-[13.5px] leading-relaxed text-foreground bg-surface2/90 border border-border/80 dark:bg-surface2/80 dark:border-border/60 px-4 py-2.5 rounded-2xl rounded-tr-xs shadow-xs text-left inline-block max-w-full break-words">
-              <MarkdownContent content={message.content} agentNames={agentNames} />
-              <Attachments items={attachments} />
-
-              {isCurrentUser && message.deliveryStatus && (
-                <div className="flex items-center justify-end gap-1 mt-1 text-[10px]">
-                  {message.deliveryStatus === 'sending' && (
-                    <span className="text-foreground-extra-muted">Sending...</span>
-                  )}
-                  {message.deliveryStatus === 'confirmed' && (
-                    <span className="text-status-success font-medium">✓ Sent</span>
-                  )}
-                  {message.deliveryStatus === 'failed' && (
-                    <span className="text-status-danger font-medium">✗ Failed to send</span>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Hover Message Actions */}
-            <div className="mt-1 flex justify-end">
-              <MessageActions content={message.content} senderType="user" />
-            </div>
-          </div>
+          {/* Minimalist Hover Copy Button */}
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(message.content);
+              toast.success('已复制');
+            }}
+            className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-center"
+            title="复制内容"
+            aria-label="复制内容"
+          >
+            <Copy className="size-3.5" />
+          </button>
         </div>
       </div>
     );
   }
 
-  // ── AI Agent Messages (Left Aligned) ──
-  const identityColour = deriveIdentityColor(message.senderName);
-
+  // ── AI Agent Messages (OpenAI ChatGPT Full-Width Native Style) ──
   return (
-    <div className="py-3 group/agentmsg">
-      <div
-        className="pl-3.5 border-l-2 relative"
-        style={{ borderColor: identityColour }}
-      >
-        {/* Header: Agent Identity */}
-        <div className="flex items-center gap-2 mb-1.5 select-none">
-          <span className="size-2 rounded-full shrink-0 animate-pulse" style={{ background: identityColour }} />
-          <span className="text-xs font-semibold truncate tracking-tight" style={{ color: identityColour }}>
-            {message.senderName}
-          </span>
-          {agent && (
-            <span className={cn(
-              'text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0 border',
-              agent.role === 'master'
-                ? 'bg-surface3 text-foreground border-border-accent shadow-2xs'
-                : 'bg-surface2 text-foreground-muted border-border/40'
-            )}>
-              {agent.role}
+    // Top padding is dropped when continuing: the trace group above already
+    // opened the block, and keeping it would put a full gap between a reply and
+    // the reasoning it belongs to.
+    <div className={cn('group/agentmsg', hideHeader ? 'pb-3.5' : 'py-3.5')}>
+      <div className="flex items-start gap-3">
+        {/* Agent Avatar Icon — replaced by a spacer of identical width when the
+            trace above already showed it, so the reply's text stays on the same
+            left edge instead of sliding under the avatar column. */}
+        {hideHeader ? (
+          <div className="size-6 shrink-0" aria-hidden />
+        ) : (
+          <AgentAvatar
+            name={message.senderName}
+            agentType={agent?.agentType}
+            size={24}
+            className="mt-0.5 shrink-0 rounded-full ring-1 ring-border/40"
+          />
+        )}
+
+        <div className="flex-1 min-w-0 space-y-2">
+          {/* Minimalist Identity Header */}
+          {!hideHeader && (
+          <div className="flex items-center gap-2 select-none">
+            <span className="text-sm font-semibold text-foreground tracking-tight">
+              {message.senderName}
             </span>
+            {agent?.agentType && (
+              <span className="text-2xs text-muted-foreground font-normal">
+                {agent.agentType}
+              </span>
+            )}
+            {agent?.role === 'master' && (
+              <span className="text-3xs px-1.5 py-0.2 rounded bg-surface2 text-muted-foreground border border-border/40 font-medium">
+                Leader
+              </span>
+            )}
+            {timestamp && (
+              <span className="text-2xs text-foreground-extra-muted font-mono ml-auto">
+                {timestamp}
+              </span>
+            )}
+          </div>
           )}
-          {timestamp && (
-            <span className="text-[11px] text-foreground-extra-muted ml-auto font-mono">{timestamp}</span>
-          )}
-        </div>
 
-        {/* Content Body */}
-        <div className="text-[13.5px] leading-[1.68] text-foreground font-normal space-y-2">
-          {/* Tool Calls & Intermediate Steps */}
-          {steps && steps.length > 0 && <ToolCallsDisclosure steps={steps} />}
-
-          {/* Vercel AI Elements Collapsible Reasoning */}
+          {/* 1. Collapsible Reasoning (o1 / o3 style - Top of message body) */}
           {activeThinking ? (
             <Reasoning content={activeThinking} defaultExpanded={false} />
           ) : null}
+
+          {/* 2. Tool Calls & Intermediate Steps */}
+          {nonThinkingSteps.length > 0 && <ToolCallsDisclosure steps={nonThinkingSteps} />}
 
           {/* Multi-step Plan / Todo List */}
           {planItems && planItems.length > 0 ? (
             <TodoList items={planItems} />
           ) : null}
 
-          {/* Main Answer Content */}
-          {cleanContent ? (
-            <MarkdownContent content={cleanContent} agentNames={agentNames} />
+          {/* Main Answer Content OR Formatted Error Callout */}
+          {isErrorMessage ? (
+            <div className="my-2 p-3.5 rounded-xl border border-destructive/25 bg-destructive/5 dark:bg-destructive/10 text-foreground flex items-start gap-3">
+              <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="text-xs font-semibold text-destructive">异常中断与鉴权提示</p>
+                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                  {cleanContent}
+                </div>
+              </div>
+            </div>
+          ) : cleanContent ? (
+            <div className="text-sm leading-7 text-foreground font-normal">
+              <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} />
+            </div>
           ) : null}
 
           {/* Interactive File Diff */}
@@ -393,16 +468,54 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
           {decisionQuestions && decisionQuestions.length > 0 ? (
             <ApprovalCard
               questions={decisionQuestions}
-              onSubmit={(answers) => {
-                const answerSummary = Object.entries(answers)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join('\n');
-                workspaceApi.sendMessage(
-                  message.sessionId,
-                  `【决策确认】\n${answerSummary}`,
-                  'User'
+              status={decisionStatus}
+              onSubmit={async (answers) => {
+                // Guard against a second post: the card locks itself once
+                // `status` leaves `pending`, but a remount resets its internal
+                // answers and would re-arm the button.
+                if (decisionStatus !== 'pending') return;
+
+                // Key the reply by the question's TITLE, not its id. The agent
+                // reads this text to learn what was decided, and an id it
+                // never chose ("q1", or a slug the parser derived) tells it
+                // nothing. Falls back to the id if a title is somehow missing.
+                const titleById = new Map(
+                  decisionQuestions.map((q) => [q.id, q.title])
                 );
-                toast.success('决策已提交');
+                const answerSummary = Object.entries(answers)
+                  .map(([k, v]) => `${titleById.get(k) || k}: ${v}`)
+                  .join('\n');
+
+                setDecisionStatus('submitting');
+                try {
+                  // Was fire-and-forget: a failed post looked identical to a
+                  // successful one, so the agent silently never received the
+                  // decision and the user had no reason to retry.
+                  //
+                  // Posted via sendEvent rather than sendMessage only because
+                  // sendMessage takes no metadata and this needs to carry the
+                  // back-reference. Every other field below is exactly what
+                  // sendMessage would have produced, so delivery and
+                  // attribution are unchanged.
+                  await workspaceApi.sendEvent({
+                    type: 'workspace.message.posted',
+                    source: 'human:User',
+                    target: `channel/${message.sessionId}`,
+                    payload: {
+                      content: `[Decision]\n${answerSummary}`,
+                      sender_type: 'human',
+                      sender_name: 'User',
+                    },
+                    metadata: {
+                      decision_response: { source_message_id: message.messageId },
+                    },
+                    visibility: 'channel',
+                  });
+                  setDecisionStatus('answered');
+                } catch {
+                  setDecisionStatus('pending');
+                  toast.error('Failed to send decision — try again');
+                }
               }}
             />
           ) : null}
@@ -427,32 +540,14 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             />
           )}
 
-          {/* Model Metadata Footer & Message Actions */}
-          <div className="flex items-center justify-between gap-2 pt-1 text-[11px] font-mono text-foreground-extra-muted border-t border-border/30">
-            <div className="flex items-center gap-1.5 truncate">
-              <span>
-                {typeof message.metadata?.model === 'string'
-                  ? message.metadata.model
-                  : agent?.agentType
-                  ? `${agent.agentType}-agent`
-                  : message.senderName}
-              </span>
-              <span>·</span>
-              <span>{typeof message.metadata?.mode === 'string' ? message.metadata.mode : (agent?.role || 'exec')}</span>
-              {typeof message.metadata?.elapsed === 'string' && (
-                <>
-                  <span>·</span>
-                  <span>{message.metadata.elapsed}</span>
-                </>
-              )}
-            </div>
-
-            {/* Hover Action Bar */}
+          {/* OpenAI ChatGPT Signature Bottom Action Toolbar */}
+          <div className="pt-0.5">
             <MessageActions
               content={cleanContent || message.content}
               senderType="agent"
+              variant="toolbar"
               onRegenerate={() => {
-                navigator.clipboard.writeText(`@${message.senderName} 请重新生成上一轮回答`);
+                navigator.clipboard.writeText(`@${message.senderName} please regenerate your last answer`);
                 toast.success('已复制重新生成指令');
               }}
             />

@@ -164,7 +164,7 @@ const StepItem = memo(function StepItem({ message }: { message: WorkspaceMessage
                 (t.status === 'completed' || t.status === 'cancelled') && 'line-through text-muted-foreground'
               )}>{t.content}</span>
               {t.assignee && (
-                <span className="text-muted-foreground/50 text-[10px]">→ {t.assignee}</span>
+                <span className="text-muted-foreground/50 text-3xs">→ {t.assignee}</span>
               )}
             </div>
           ))}
@@ -187,7 +187,7 @@ const StepItem = memo(function StepItem({ message }: { message: WorkspaceMessage
       <div className="py-0.5">
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <Icon className="size-3.5 shrink-0 mt-0.5 text-amber-500" />
-          <span className="italic text-[11px]">thinking</span>
+          <span className="italic text-2xs">thinking</span>
         </div>
         <div className="text-xs leading-relaxed text-foreground/60 ml-[22px] mt-0.5 mb-1 whitespace-pre-wrap">
           {parsed.text}
@@ -257,7 +257,7 @@ const StepItem = memo(function StepItem({ message }: { message: WorkspaceMessage
       </button>
 
       {expanded && parsed.args && (
-        <pre className="text-[11px] leading-relaxed bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-md p-2.5 ml-[22px] mt-1 mb-1.5 overflow-x-auto max-h-48 text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all">
+        <pre className="text-2xs leading-relaxed bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-md p-2.5 ml-[22px] mt-1 mb-1.5 overflow-x-auto max-h-48 text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all">
           {parsed.args}
         </pre>
       )}
@@ -344,7 +344,7 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
             {hasMultipleAgents && (
               <div className="flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0">
                 <AgentAvatar name={group.sender} size={14} />
-                <span className="text-[10px] font-medium text-muted-foreground/70">
+                <span className="text-3xs font-medium text-muted-foreground/70">
                   {group.sender}
                 </span>
               </div>

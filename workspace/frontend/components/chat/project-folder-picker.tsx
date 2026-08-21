@@ -101,8 +101,8 @@ export function ProjectFolderPicker({ value, onChange, placeholder, helperText }
     } catch (e) {
       setBrowseError(
         e instanceof Error
-          ? `无法连接本机的 wwj(${e.message})。请确认 \`wwj up\` 正在运行,或直接在上方输入路径。`
-          : '打开文件夹选择框失败。'
+          ? `Could not reach the local wwj daemon (${e.message}). Make sure \`wwj up\` is running, or type the path above.`
+          : 'Could not open the folder picker.'
       );
     } finally {
       setBrowsing(false);
@@ -134,18 +134,18 @@ export function ProjectFolderPicker({ value, onChange, placeholder, helperText }
               type="button"
               onClick={() => onChange(dir)}
               title={dir}
-              className="max-w-[12rem] truncate rounded-md border border-border/60 px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-border-accent hover:text-foreground"
+              className="max-w-[12rem] truncate rounded-md border border-border/60 px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:border-border-accent hover:text-foreground"
             >
               {basename(dir)}
             </button>
           ))}
         </div>
       )}
-      <p className="mt-1 px-0.5 text-[11px] text-muted-foreground/70">
-        {helperText || '运行 agent 的机器上的本地绝对路径。该会话里的 agent 会读写这里的文件。'}
+      <p className="mt-1 px-0.5 text-2xs text-muted-foreground/70">
+        {helperText || 'An absolute path on the machine running the agent. Agents in this thread read and write files here.'}
       </p>
       {browseError && (
-        <p className="mt-1 px-0.5 text-[11px] text-status-danger">{browseError}</p>
+        <p className="mt-1 px-0.5 text-2xs text-status-danger">{browseError}</p>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { ThemeProvider } from 'next-themes';
+import { fontMono, fontSans } from '@/app/fonts';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/lib/auth-context';
 import { OpenAgentsAuthProvider } from '@/lib/openagents-auth-context';
@@ -41,8 +42,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // The font variables ride on <html> rather than <body> so anything portalled
+  // outside the body tree — Radix popovers, the Sonner toaster — still resolves
+  // them. `font-sans` on <body> then picks up the composed stack (Latin face +
+  // CJK fallbacks) defined in globals.css.
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${fontSans.variable} ${fontMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         {POSTHOG_KEY && (
         <Script id="posthog-init" strategy="afterInteractive">{`

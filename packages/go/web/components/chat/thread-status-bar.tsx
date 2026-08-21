@@ -117,7 +117,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
   if (!hasContent) return null;
 
   return (
-    <div className="flex flex-col gap-0.5 px-1 py-1 text-[11px] text-muted-foreground">
+    <div className="flex flex-col gap-0.5 px-1 py-1 text-2xs text-muted-foreground">
       {/* Todos and timers row */}
       {(inProgressCount > 0 || pendingCount > 0 || activeTimers.length > 0) && (
         <div className="flex items-center gap-2.5">

@@ -11,21 +11,31 @@ import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
+import { useLayout } from '@/components/layout/layout-context';
 
 // ── Message Grouping ──
 
 type MessageGroup =
-  | { type: 'chat'; message: WorkspaceMessage; steps?: WorkspaceMessage[] }
-  | { type: 'thinking'; sender: string; messages: WorkspaceMessage[] }
-  | { type: 'steps'; messages: WorkspaceMessage[] };
+  // `continuesFrom` is set when this message is preceded by its own thinking or
+  // steps group. That group already printed the avatar and sender name, so this
+  // one suppresses its header instead of printing a second identical one.
+  | { type: 'chat'; message: WorkspaceMessage; steps?: WorkspaceMessage[]; continuesFrom?: boolean }
+  // `settled` means the agent has since posted its reply, so the trace below is
+  // history rather than live output.
+  | { type: 'thinking'; sender: string; messages: WorkspaceMessage[]; settled?: boolean }
+  | { type: 'steps'; messages: WorkspaceMessage[]; settled?: boolean };
 
 function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
-  // Steps are held PER SENDER: in a multi-agent channel several agents work at
-  // once, and a reply from one of them must not absorb another's tool calls.
-  // Each agent's pending steps attach to that agent's own next message, so the
-  // trace is rendered inside the bubble it explains instead of as a shared block
-  // above the conversation.
+  // Steps and thinking are held PER SENDER: in a multi-agent channel several agents work at
+  // once, and a reply from one of them must not absorb another's tool calls or reasoning.
+  //
+  // They are emitted as a group of their OWN, immediately above that agent's reply, rather
+  // than nested inside the reply's body. Nesting was why the trace appeared to move: while
+  // the agent worked it stood on its own above the (not yet existing) answer, and the moment
+  // the answer landed it migrated inside the bubble. Same content, two different slots, so
+  // everything below it shifted. Keeping one slot for both states means the answer simply
+  // appears underneath a trace that has not moved.
   const pendingSteps = new Map<string, WorkspaceMessage[]>();
 
   const takeSteps = (sender: string): WorkspaceMessage[] | undefined => {
@@ -35,11 +45,17 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
     return own;
   };
 
-  // Steps from an agent that never followed up with a message (it is still
-  // working, or it only ever emitted status) still have to be shown.
+  // Steps / thinking from an agent that never followed up with a message yet (it is still
+  // thinking/working) still have to be shown in real-time.
   const flushOrphanSteps = () => {
-    for (const [, own] of pendingSteps) {
-      if (own.length > 0) groups.push({ type: 'steps', messages: [...own] });
+    for (const [sender, own] of pendingSteps) {
+      if (own.length === 0) continue;
+      const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+      if (thinkingOnly) {
+        groups.push({ type: 'thinking', sender, messages: [...own] });
+      } else {
+        groups.push({ type: 'steps', messages: [...own] });
+      }
     }
     pendingSteps.clear();
   };
@@ -47,21 +63,21 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
   const visibleMessages = messages.filter((msg) => !msg.content.startsWith('__queue_cancel:'));
 
   visibleMessages.forEach((msg) => {
-    if (msg.messageType === 'thinking') {
-      // Thinking is a first-level block shown with its author. Consecutive
-      // thinking chunks from the same sender collapse into one block.
-      const last = groups[groups.length - 1];
-      if (last && last.type === 'thinking' && last.sender === msg.senderName) {
-        last.messages.push(msg);
-      } else {
-        groups.push({ type: 'thinking', sender: msg.senderName, messages: [msg] });
-      }
-    } else if (msg.messageType === 'status' || msg.messageType === 'todos') {
+    if (msg.messageType === 'thinking' || msg.messageType === 'status' || msg.messageType === 'todos') {
       const own = pendingSteps.get(msg.senderName);
       if (own) own.push(msg);
       else pendingSteps.set(msg.senderName, [msg]);
     } else {
-      groups.push({ type: 'chat', message: msg, steps: takeSteps(msg.senderName) });
+      const own = takeSteps(msg.senderName);
+      if (own) {
+        const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+        groups.push(
+          thinkingOnly
+            ? { type: 'thinking', sender: msg.senderName, messages: own, settled: true }
+            : { type: 'steps', messages: own, settled: true }
+        );
+      }
+      groups.push({ type: 'chat', message: msg, continuesFrom: Boolean(own) });
     }
   });
 
@@ -134,6 +150,28 @@ interface ChatMessagesProps {
 export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  const { openPreview } = useLayout();
+
+  // Auto-open the Local Preview panel when an agent reports a live dev server.
+  //
+  // Keyed on the reporting message's id, not on the URL: re-opening on every
+  // render would fight the user if they navigated the panel elsewhere, and
+  // keying on the URL alone would miss a restart that lands on the same port.
+  // Only the newest report acts, and only once — a channel scrolled back into
+  // view must not re-hijack the panel with an hours-old address.
+  const handledPreviewRef = useRef<string | null>(null);
+  useEffect(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const preview = messages[i].metadata?.preview;
+      if (!preview?.url) continue;
+      const id = messages[i].messageId;
+      if (!id || handledPreviewRef.current === id) return;
+      handledPreviewRef.current = id;
+      openPreview(preview.url);
+      return;
+    }
+  }, [messages, openPreview]);
 
   const prevLengthRef = useRef(0);
   // Track first/last message identity to distinguish prepend (older history
@@ -219,7 +257,12 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   // Group into chat messages and intermediate step clusters
   const groups = useMemo(() => groupMessages(filteredMessages), [filteredMessages]);
 
-  const hasTerminalStatus = realMessages.some(isTerminalStatus);
+  // Only the NEWEST message can mean "this run is over". Scanning the whole
+  // history meant one old "Execution stopped by user." (or any answer that
+  // merely contained the word "stopped") suppressed the working indicator in
+  // that thread forever, so every later send looked like nothing happened.
+  const hasTerminalStatus = realMessages.length > 0
+    && isTerminalStatus(realMessages[realMessages.length - 1]);
 
   // Loading indicator counts as a virtual row when present
   const hasLoading = loadingMessages.length > 0 && !hasTerminalStatus;
@@ -507,6 +550,26 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         isRejected = !isApproved;
                       }
                     }
+
+                    // Same idea for a decision card: if its `[Decision]` reply
+                    // is already in the channel, the card must render answered
+                    // rather than offering the buttons again. Keyed on the
+                    // asking message's id, so two similar cards in one channel
+                    // cannot claim each other's answer.
+                    const meta = group.message.metadata;
+                    const hasCard =
+                      (Array.isArray(meta?.questions) && meta.questions.length > 0) ||
+                      (Array.isArray(meta?.decision_questions) && meta.decision_questions.length > 0);
+                    const isDecisionAnswered = Boolean(
+                      hasCard &&
+                      group.message.messageId &&
+                      messages.some(
+                        (m) =>
+                          m.metadata?.decision_response?.source_message_id ===
+                          group.message.messageId
+                      )
+                    );
+
                     return (
                       <ChatMessage
                         message={group.message}
@@ -514,6 +577,8 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         isApproved={isApproved}
                         isRejected={isRejected}
                         steps={group.steps}
+                        hideHeader={group.continuesFrom}
+                        isDecisionAnswered={isDecisionAnswered}
                       />
                     );
                   })()
@@ -522,12 +587,13 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     sender={group.sender}
                     messages={group.messages}
                     agents={agents}
+                    settled={group.settled}
                   />
                 ) : (
                   <IntermediateSteps
                     steps={group.messages}
                     agents={agents}
-                    isActive={index === groups.length - 1}
+                    isActive={!group.settled && index === groups.length - 1}
                   />
                 )}
               </div>

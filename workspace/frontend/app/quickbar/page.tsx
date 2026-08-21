@@ -166,7 +166,7 @@ export default function QuickBarPage() {
               if (e.key === 'Enter') handleSend();
             }}
             placeholder="Command agents or ask anything... (Press Enter)"
-            className="flex-1 min-w-0 bg-transparent text-[14px] text-white placeholder:text-white/40 outline-none"
+            className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
             disabled={loading}
           />
 
@@ -175,7 +175,7 @@ export default function QuickBarPage() {
             {loading ? (
               <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-amber-400 bg-amber-400/10 rounded-lg">
                 <Loader2 className="size-3.5 animate-spin" />
-                <span className="text-[11px] font-medium">Working</span>
+                <span className="text-2xs font-medium">Working</span>
               </div>
             ) : (
               <button
@@ -210,7 +210,7 @@ export default function QuickBarPage() {
         {(statusText || latestResponse) && (
           <div className="px-3.5 pb-3 pt-1 border-t border-white/5 flex flex-col gap-1 text-xs [app-region:no-drag]">
             {statusText && (
-              <div className="flex items-center gap-2 text-white/60 text-[11.5px]">
+              <div className="flex items-center gap-2 text-white/60 text-2xs">
                 <span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
                 <span className="truncate">{statusText}</span>
               </div>
@@ -220,7 +220,7 @@ export default function QuickBarPage() {
                 <p className="whitespace-pre-wrap">{latestResponse}</p>
                 <button
                   onClick={handleOpenFull}
-                  className="mt-1.5 text-[10.5px] text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="mt-1.5 text-3xs text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <span>Continue in full workspace</span>
                   <ArrowRight className="size-3" />

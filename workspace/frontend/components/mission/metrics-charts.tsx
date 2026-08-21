@@ -150,7 +150,7 @@ export function RingProgress({
         />
       </svg>
       {label && (
-        <span className="absolute text-[10px] font-mono font-medium text-foreground">
+        <span className="absolute text-3xs font-mono font-medium text-foreground">
           {label}
         </span>
       )}
@@ -197,7 +197,7 @@ export function MetricCard({
               {icon}
             </span>
           )}
-          <span className="text-[11px] font-medium tracking-tight text-muted-foreground truncate">
+          <span className="text-2xs font-medium tracking-tight text-muted-foreground truncate">
             {title}
           </span>
         </div>
@@ -205,7 +205,7 @@ export function MetricCard({
         {badge && (
           <span
             className={cn(
-              'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium',
+              'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-3xs font-mono font-medium',
               badge.trend === 'up'
                 ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                 : badge.trend === 'down'
@@ -227,7 +227,7 @@ export function MetricCard({
             {value}
           </div>
           {subtitle && (
-            <div className="text-[11px] text-muted-foreground mt-0.5 truncate">
+            <div className="text-2xs text-muted-foreground mt-0.5 truncate">
               {subtitle}
             </div>
           )}

@@ -25,7 +25,7 @@ interface KnowledgeEditorProps {
 
 /** Micro-label typography shared with the rest of the knowledge surface. */
 const MICRO =
-  'text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted';
+  'text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted';
 
 export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEditorProps) {
   const { createKnowledge, updateKnowledge } = useWorkspace();

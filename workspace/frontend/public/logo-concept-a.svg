@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- 主渐变：电光青蓝 → 极光赛博紫 -->
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F5FF"/>
+      <stop offset="50%" stop-color="#0088CC"/>
+      <stop offset="100%" stop-color="#8A2BE2"/>
+    </linearGradient>
+    <!-- 声波渐变 -->
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F5FF" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#8A2BE2" stop-opacity="0.3"/>
+    </linearGradient>
+    <!-- 节点发光效果 -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowStrong">
+      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- 背景径向渐变 -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0F1729"/>
+      <stop offset="100%" stop-color="#060A14"/>
+    </radialGradient>
+    <!-- 电路板纹理图案 -->
+    <pattern id="circuitPattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <rect width="40" height="40" fill="none"/>
+      <line x1="0" y1="20" x2="40" y2="20" stroke="#0D1B2A" stroke-width="0.5"/>
+      <line x1="20" y1="0" x2="20" y2="40" stroke="#0D1B2A" stroke-width="0.5"/>
+      <circle cx="20" cy="20" r="1.5" fill="#0D1B2A"/>
+    </pattern>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="80" fill="url(#bgGrad)"/>
+  <rect width="512" height="512" rx="80" fill="url(#circuitPattern)" opacity="0.3"/>
+
+  <!-- 外圈 - 圆形数据环 -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#mainGrad)" stroke-width="1.5" stroke-dasharray="4,8" opacity="0.4"/>
+  <circle cx="256" cy="256" r="195" fill="none" stroke="url(#mainGrad)" stroke-width="0.8" stroke-dasharray="2,12" opacity="0.25"/>
+
+  <!-- 声波/频率环（52Hz概念） -->
+  <g opacity="0.5" filter="url(#glow)">
+    <!-- 声波弧线 - 从鲸鱼头部发出 -->
+    <path d="M 150 230 Q 120 256 150 282" fill="none" stroke="#00F5FF" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+    <path d="M 130 215 Q 90 256 130 297" fill="none" stroke="#00D4FF" stroke-width="1.8" stroke-linecap="round" opacity="0.5"/>
+    <path d="M 112 200 Q 65 256 112 312" fill="none" stroke="#00B4FF" stroke-width="1.5" stroke-linecap="round" opacity="0.35"/>
+  </g>
+
+  <!-- 鲸鱼主体 - 由电路线条构成 -->
+  <g filter="url(#glow)">
+    <!-- 鲸鱼轮廓 - 流线型 -->
+    <path d="M 170 250 
+             C 190 200, 240 175, 290 180 
+             C 330 183, 360 195, 380 215 
+             C 395 230, 400 250, 395 268
+             C 388 290, 365 305, 340 310
+             C 310 316, 275 315, 250 310
+             C 225 305, 200 295, 185 280
+             C 172 265, 168 258, 170 250Z" 
+          fill="none" stroke="url(#mainGrad)" stroke-width="2.5" opacity="0.9"/>
+
+    <!-- 鲸鱼内部电路线 -->
+    <path d="M 200 255 L 240 240 L 280 245 L 320 235 L 355 248" 
+          fill="none" stroke="#00D4FF" stroke-width="1.2" opacity="0.6"/>
+    <path d="M 210 270 L 250 265 L 290 270 L 330 262 L 360 268" 
+          fill="none" stroke="#00B4FF" stroke-width="1" opacity="0.5"/>
+    <path d="M 220 285 L 260 280 L 300 285 L 340 278" 
+          fill="none" stroke="#0094FF" stroke-width="0.8" opacity="0.4"/>
+
+    <!-- 鲸鱼尾鳍 -->
+    <path d="M 380 215 C 395 195, 420 180, 430 170 C 435 165, 438 168, 435 175 C 430 185, 420 200, 395 218" 
+          fill="none" stroke="url(#mainGrad)" stroke-width="2" opacity="0.8"/>
+    <path d="M 395 268 C 410 285, 425 300, 435 315 C 438 320, 435 322, 430 318 C 420 308, 405 290, 393 273" 
+          fill="none" stroke="url(#mainGrad)" stroke-width="2" opacity="0.8"/>
+
+    <!-- 鲸鱼眼睛 -->
+    <circle cx="195" cy="248" r="5" fill="#00F5FF" filter="url(#glowStrong)"/>
+    <circle cx="195" cy="248" r="2" fill="#FFFFFF"/>
+
+    <!-- 鲸鱼胸鳍 -->
+    <path d="M 260 310 C 265 330, 255 345, 245 350 C 240 352, 238 348, 242 340 C 248 328, 255 316, 258 308" 
+          fill="none" stroke="url(#mainGrad)" stroke-width="1.8" opacity="0.7"/>
+  </g>
+
+  <!-- 神经网络节点 - 分布在鲸鱼周围 -->
+  <g filter="url(#glow)">
+    <!-- 主要节点 -->
+    <circle cx="240" cy="240" r="3.5" fill="#00F5FF" opacity="0.9"/>
+    <circle cx="280" cy="245" r="3" fill="#00D4FF" opacity="0.85"/>
+    <circle cx="320" cy="235" r="3.5" fill="#00B4FF" opacity="0.8"/>
+    <circle cx="355" cy="248" r="3" fill="#7C3AED" opacity="0.85"/>
+    <circle cx="290" cy="270" r="2.5" fill="#00D4FF" opacity="0.7"/>
+    <circle cx="330" cy="262" r="2.5" fill="#5B21B6" opacity="0.75"/>
+    <circle cx="300" cy="285" r="2" fill="#00B4FF" opacity="0.6"/>
+
+    <!-- 外部漂浮节点 - 代表多个Agent -->
+    <circle cx="150" cy="170" r="4" fill="#00F5FF" opacity="0.6"/>
+    <circle cx="380" cy="150" r="3.5" fill="#8A2BE2" opacity="0.5"/>
+    <circle cx="420" cy="340" r="3" fill="#7C3AED" opacity="0.45"/>
+    <circle cx="130" cy="350" r="3.5" fill="#00D4FF" opacity="0.5"/>
+    <circle cx="300" cy="140" r="2.5" fill="#00F5FF" opacity="0.4"/>
+    <circle cx="440" cy="250" r="2" fill="#8A2BE2" opacity="0.35"/>
+
+    <!-- 节点之间的连线 - 神经网络效果 -->
+    <line x1="150" y1="170" x2="240" y2="240" stroke="#00F5FF" stroke-width="0.6" opacity="0.3"/>
+    <line x1="300" y1="140" x2="320" y2="235" stroke="#00D4FF" stroke-width="0.5" opacity="0.25"/>
+    <line x1="380" y1="150" x2="355" y2="248" stroke="#8A2BE2" stroke-width="0.6" opacity="0.3"/>
+    <line x1="420" y1="340" x2="330" y2="262" stroke="#7C3AED" stroke-width="0.5" opacity="0.25"/>
+    <line x1="130" y1="350" x2="200" y2="270" stroke="#00D4FF" stroke-width="0.5" opacity="0.25"/>
+    <line x1="440" y1="250" x2="355" y2="248" stroke="#8A2BE2" stroke-width="0.4" opacity="0.2"/>
+  </g>
+
+  <!-- 52Hz 文字 - 底部 -->
+  <text x="256" y="420" text-anchor="middle" font-family="'SF Pro Display', 'Inter', -apple-system, sans-serif" font-size="36" font-weight="700" letter-spacing="3" fill="url(#mainGrad)" filter="url(#glow)">52Hz</text>
+  <text x="256" y="450" text-anchor="middle" font-family="'SF Pro Display', 'Inter', -apple-system, sans-serif" font-size="14" font-weight="400" letter-spacing="6" fill="#64748B">A G E N T S</text>
+</svg>
