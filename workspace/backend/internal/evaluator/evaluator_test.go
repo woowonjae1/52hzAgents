@@ -108,3 +108,21 @@ func TestExtractErrorLines(t *testing.T) {
 		t.Errorf("Expected 2 error lines (syntax error and exit status), got %d: %v", len(lines), lines)
 	}
 }
+
+func TestEvaluateTurn_AnalyticalReviewWithBugs(t *testing.T) {
+	step := models.PipelineStep{
+		Agent:       "antigravity",
+		Instruction: "你只看前端 看看有什么能优化的",
+		MaxRetries:  3,
+		RetryCount:  0,
+	}
+
+	reviewMessages := []string{
+		"针对前端代码库进行了审查：\n1. React 列表渲染 Key 为 undefined\n2. JSX 语法标签开闭不匹配（导致 Build 报错）\n3. SyntaxError: unexpected token in legacy file",
+	}
+
+	res := EvaluateTurn("antigravity", step, reviewMessages)
+	if res.Status != EvalPass {
+		t.Fatalf("Expected EvalPass for code review containing bug descriptions, got %v (reason: %s)", res.Status, res.Reason)
+	}
+}

@@ -329,3 +329,51 @@ func TestPipelineHaltOnExhaustedRetries(t *testing.T) {
 		t.Fatalf("Expected current_index to stay on failed step 0, got %d", updatedRecord.CurrentIndex)
 	}
 }
+
+func TestPipelineAdvancesOnAnalyticalReviewWithReportedBugs(t *testing.T) {
+	workspace, channel := setupPipelineDB(t)
+
+	// Start pipeline: @codex-agent 你只看前端 看看有什么能优化的 @claude-agent 你看后端看看有什么能优化的
+	req := &SendEventRequest{
+		Type:   "workspace.message.posted",
+		Source: "human:user",
+		Target: "channel/general",
+		Payload: map[string]interface{}{
+			"content":      "@codex-agent 你只看前端 看看有什么能优化的 @claude-agent 你看后端看看有什么能优化的",
+			"message_type": "chat",
+		},
+	}
+	_, _, err := routeMessage(workspace.ID, &channel, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Codex-agent emits a long code review listing bugs, undefined keys, build errors
+	reviewPayload, _ := json.Marshal(map[string]interface{}{
+		"content":      "审查分析前端代码发现以下缺陷：\n1. React 列表 key 为 undefined\n2. JSX 语法标签开闭不匹配导致 Build 报错\n3. SyntaxError: unexpected token",
+		"message_type": "chat",
+	})
+	db.DB.Create(&models.EventRecord{
+		ID:        uuid.NewString(),
+		NetworkID: workspace.ID,
+		Type:      "workspace.message.posted",
+		Source:    "openagents:codex-agent",
+		Target:    "channel/general",
+		Payload:   reviewPayload,
+		Timestamp: time.Now().UnixMilli(),
+	})
+
+	CheckAndTriggerNextPipelineStep(workspace.ID, "channel/general", "openagents:codex-agent")
+
+	// Verify step 0 (codex-agent) is marked done and pipeline advances to step 1 (claude-agent)
+	record, steps := loadChain(t, channel.ID)
+	if record.CurrentIndex != 1 {
+		t.Fatalf("Expected pipeline to advance to step 1 (claude-agent), got index %d", record.CurrentIndex)
+	}
+	if steps[0].Status != "done" {
+		t.Fatalf("Expected step 0 to be done, got %s", steps[0].Status)
+	}
+	if steps[1].Status != "running" {
+		t.Fatalf("Expected step 1 (claude-agent) to be running, got %s", steps[1].Status)
+	}
+}

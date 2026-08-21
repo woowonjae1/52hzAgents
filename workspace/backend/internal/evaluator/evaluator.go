@@ -92,6 +92,22 @@ func ExtractErrorLines(text string, maxLines int) []string {
 	return extracted
 }
 
+// isAnalyticalInstruction checks if a step instruction is a review/analysis/audit task
+// where reporting bugs/errors is the expected deliverable, not a failure.
+func isAnalyticalInstruction(instruction string) bool {
+	lower := strings.ToLower(instruction)
+	cues := []string{
+		"review", "audit", "analyze", "analysis", "inspect", "check", "diagnose", "optimize", "find",
+		"审查", "分析", "看看", "找找", "评估", "诊断", "优化", "检查", "建议", "排查", "评审",
+	}
+	for _, cue := range cues {
+		if strings.Contains(lower, cue) {
+			return true
+		}
+	}
+	return false
+}
+
 // EvaluateTurn assesses the messages and tool outputs emitted by an agent during its current step turn.
 func EvaluateTurn(agentName string, step models.PipelineStep, turnMessages []string) EvaluationResult {
 	if len(turnMessages) == 0 {
@@ -103,7 +119,17 @@ func EvaluateTurn(agentName string, step models.PipelineStep, turnMessages []str
 
 	combinedText := strings.Join(turnMessages, "\n")
 
-	// 1. Scan for hard failure signals
+	// If this step is an analytical / review task (e.g. "看看有什么能优化的", "代码审查"),
+	// the agent's prose mentioning bugs / undefined / error patterns is an expected finding,
+	// not an execution failure.
+	if isAnalyticalInstruction(step.Instruction) {
+		return EvaluationResult{
+			Status: EvalPass,
+			Reason: "Analytical / review step completed successfully with reported findings",
+		}
+	}
+
+	// 1. Scan for hard failure signals (in execution / build / test / command outputs)
 	var allErrors []string
 	for _, msg := range turnMessages {
 		errs := ExtractErrorLines(msg, 3)
