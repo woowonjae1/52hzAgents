@@ -3,10 +3,10 @@ import { getApiBaseUrl } from '../config';
 export class BaseWorkspaceApi {
   protected token: string = '';
   protected bearerToken: string = '';
-  protected workspaceId: string = '';
+  protected workspaceId: string = '52hz';
 
   configure(workspaceId: string, token: string, bearerToken?: string) {
-    this.workspaceId = workspaceId;
+    this.workspaceId = workspaceId || '52hz';
     this.token = token;
     if (bearerToken !== undefined) this.bearerToken = bearerToken;
   }
