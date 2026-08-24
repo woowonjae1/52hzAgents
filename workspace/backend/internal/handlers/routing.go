@@ -78,7 +78,7 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 // startPipeline persists a freshly parsed relay chain for a channel, replacing
 // whatever chain that channel had. Step 0 starts out running because
 // routeMessage returns it as the target of the message that opened the chain.
-func startPipeline(workspaceID, channelID, startedBy string, steps []models.PipelineStep) {
+func startPipeline(workspaceID, channelID, startedBy string, steps []models.PipelineStep) string {
 	nowMs := time.Now().UnixMilli()
 	steps[0].Status = "running"
 	steps[0].StartedAt = &nowMs
@@ -89,7 +89,7 @@ func startPipeline(workspaceID, channelID, startedBy string, steps []models.Pipe
 	encoded, err := json.Marshal(steps)
 	if err != nil {
 		log.Printf("pipeline: failed to encode chain for channel %s: %v", channelID, err)
-		return
+		return ""
 	}
 
 	clearPipeline(channelID)
@@ -104,7 +104,9 @@ func startPipeline(workspaceID, channelID, startedBy string, steps []models.Pipe
 	}
 	if err := db.DB.Create(&record).Error; err != nil {
 		log.Printf("pipeline: failed to persist chain for channel %s: %v", channelID, err)
+		return ""
 	}
+	return record.ID
 }
 
 // clearPipeline drops the channel's chain. A plain human message ends any relay
@@ -169,15 +171,47 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 		}
 	}
 
-	// 2. Evaluate step execution quality
-	evalRes := evaluator.EvaluateTurn(actor, steps[idx], turnMessages)
+	// 2. Evaluate step execution quality using real verification command and delta regression check
+	dir := resolveTurnDir(workspaceID, &channel, actor)
+	var verificationCmd string
+	if channel.VerificationCmd != nil {
+		verificationCmd = *channel.VerificationCmd
+	}
+	baselineVerify := GetLatestTurnBaselineVerify(workspaceID, channel.ID, actor)
+	evalRes := evaluator.EvaluateTurnWithVerification(actor, steps[idx], turnMessages, dir, verificationCmd, baselineVerify)
 	nowMs := time.Now().UnixMilli()
 
-	// 3. Handle Failures with Bounded Self-Correction Loop
+	// 3. Handle Failures with Bounded Self-Correction Loop & Spend Budget Gate
 	if evalRes.Status == evaluator.EvalFail {
 		maxRetries := steps[idx].MaxRetries
 		if maxRetries <= 0 {
 			maxRetries = 3
+		}
+
+		maxPipelineRetries := record.MaxTotalRetries
+		if maxPipelineRetries <= 0 {
+			maxPipelineRetries = 6
+		}
+
+		if record.TotalRetries >= maxPipelineRetries {
+			// Pipeline-level retry budget exhausted to prevent run-away token burn
+			steps[idx].Status = "failed"
+			errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
+			steps[idx].LastError = &errDetailStr
+			steps[idx].FinishedAt = &nowMs
+
+			encoded, _ := json.Marshal(steps)
+			db.DB.Model(&models.ChannelPipeline{}).
+				Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
+				Updates(map[string]interface{}{
+					"steps":  encoded,
+					"status": "halted_budget",
+				})
+
+			haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted: Budget Exceeded] Total retries across pipeline reached limit (%d/%d). Halting to prevent infinite loop or token drain.\nLast error:\n> %s\nHuman intervention required.",
+				record.TotalRetries, maxPipelineRetries, strings.Join(evalRes.ErrorDetails, "\n> "))
+			RelayPipelineAlert(workspaceID, target, haltMsg)
+			return
 		}
 
 		if steps[idx].RetryCount < maxRetries {
@@ -190,9 +224,12 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 			encoded, _ := json.Marshal(steps)
 			db.DB.Model(&models.ChannelPipeline{}).
 				Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
-				Update("steps", encoded)
+				Updates(map[string]interface{}{
+					"steps":         encoded,
+					"total_retries": record.TotalRetries + 1,
+				})
 
-			relaySelfCorrection(workspaceID, target, actor, evalRes.FeedbackMessage)
+			relaySelfCorrection(workspaceID, target, actor, evalRes.FeedbackMessage, pipelineTaskID(record.ID, idx))
 			return
 		}
 
@@ -212,7 +249,7 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 
 		haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted] Step %d (@%s) failed after %d attempts.\nErrors:\n> %s\nHuman intervention required.",
 			idx+1, actor, steps[idx].RetryCount, strings.Join(evalRes.ErrorDetails, "\n> "))
-		relayPipelineAlert(workspaceID, target, haltMsg)
+		RelayPipelineAlert(workspaceID, target, haltMsg)
 		return
 	}
 
@@ -253,11 +290,11 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 		return
 	}
 
-	relayPipelineStep(workspaceID, target, steps[nextIdx])
+	relayPipelineStep(workspaceID, target, steps[nextIdx], pipelineTaskID(record.ID, nextIdx))
 }
 
 // relaySelfCorrection posts diagnostic feedback to the same agent to prompt self-repair.
-func relaySelfCorrection(workspaceID, target, agentName, feedbackMessage string) {
+func relaySelfCorrection(workspaceID, target, agentName, feedbackMessage, taskID string) {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 
@@ -275,6 +312,7 @@ func relaySelfCorrection(workspaceID, target, agentName, feedbackMessage string)
 			"target_agents": []string{agentName},
 			"pipeline_step": true,
 			"self_correct":  true,
+			"task_id":       taskID,
 		}
 
 		payloadBytes, _ := json.Marshal(payload)
@@ -293,6 +331,8 @@ func relaySelfCorrection(workspaceID, target, agentName, feedbackMessage string)
 		}
 		_ = db.DB.Create(&eventRec)
 
+		recordRelayTurn(workspaceID, target, agentName, taskID, eventID)
+
 		fullEvent, _ := json.Marshal(gin.H{
 			"id":        eventID,
 			"event_id":  eventID,
@@ -305,16 +345,18 @@ func relaySelfCorrection(workspaceID, target, agentName, feedbackMessage string)
 			"timestamp": nowUnixMs,
 			"status":    "confirmed",
 		})
-		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-			WorkspaceID: workspaceID,
-			ChannelName: target,
-			Payload:     string(fullEvent),
-		})
+		if hub.GlobalHub != nil {
+			hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+				WorkspaceID: workspaceID,
+				ChannelName: target,
+				Payload:     string(fullEvent),
+			})
+		}
 	}()
 }
 
-// relayPipelineAlert broadcasts a critical pipeline notification/error to the channel.
-func relayPipelineAlert(workspaceID, target, alertContent string) {
+// RelayPipelineAlert broadcasts a critical pipeline notification/error to the channel.
+func RelayPipelineAlert(workspaceID, target, alertContent string) {
 	go func() {
 		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
 		eventID := uuid.New().String()
@@ -357,17 +399,19 @@ func relayPipelineAlert(workspaceID, target, alertContent string) {
 			"timestamp": nowUnixMs,
 			"status":    "confirmed",
 		})
-		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-			WorkspaceID: workspaceID,
-			ChannelName: target,
-			Payload:     string(fullEvent),
-		})
+		if hub.GlobalHub != nil {
+			hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+				WorkspaceID: workspaceID,
+				ChannelName: target,
+				Payload:     string(fullEvent),
+			})
+		}
 	}()
 }
 
 // relayPipelineStep posts the next hop's instruction into the channel as if the
 // user had sent it, waking exactly that agent.
-func relayPipelineStep(workspaceID string, target string, nextSeg models.PipelineStep) {
+func relayPipelineStep(workspaceID string, target string, nextSeg models.PipelineStep, taskID string) {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 
@@ -388,6 +432,7 @@ func relayPipelineStep(workspaceID string, target string, nextSeg models.Pipelin
 			"target_agents": []string{nextSeg.Agent},
 			"pipeline_step": true,
 			"auto_relay":    true,
+			"task_id":       taskID,
 		}
 
 		payloadBytes, _ := json.Marshal(payload)
@@ -406,6 +451,8 @@ func relayPipelineStep(workspaceID string, target string, nextSeg models.Pipelin
 		}
 
 		if err := db.DB.Create(&eventRec).Error; err == nil {
+			recordRelayTurn(workspaceID, target, nextSeg.Agent, taskID, eventID)
+
 			fullEvent := gin.H{
 				"id":         eventRec.ID,
 				"event_id":   eventRec.ID,
@@ -497,7 +544,13 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	// If human message contains multi-agent pipeline (@agent1 ... @agent2 ... @agent3 ...)
 	if isHumanSource(req.Source) {
 		if segments := parseAgentPipeline(content, participants); len(segments) >= 2 {
-			startPipeline(workspaceID, channel.ID, req.Source, segments)
+			if pipelineID := startPipeline(workspaceID, channel.ID, req.Source, segments); pipelineID != "" && req.Metadata != nil {
+				// Turn attribution groups every retry of a step under that
+				// step's key. Step 0 is dispatched through the event handler
+				// rather than a relay, so its key travels in metadata to keep
+				// it grouped with the retries relaySelfCorrection will send.
+				req.Metadata["task_id"] = pipelineTaskID(pipelineID, 0)
+			}
 			return []string{segments[0].Agent}, true, nil
 		}
 		// Clear any previous pipeline if user sends a normal message

@@ -38,11 +38,22 @@ export class GitApi extends BaseWorkspaceApi {
     return this.request<{ output: string; branch: string }>(`/v1/git/push?${params}`, { method: 'POST' });
   }
 
-  async createGitCommit(channelId: string, message: string): Promise<void> {
+  async createGitCommit(channelId: string, message: string, autoStage: boolean = false): Promise<void> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
     await this.request<unknown>(`/v1/git/commit?${params}`, {
       method: 'POST',
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, auto_stage: autoStage }),
     });
+  }
+
+  async rollbackTurn(turnId: string): Promise<{ status: string; turn_id: string; reverted: string[]; failed?: Record<string, string> }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.request<{ status: string; turn_id: string; reverted: string[]; failed?: Record<string, string> }>(
+      `/v1/git/turn-rollback?${params}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ turn_id: turnId }),
+      },
+    );
   }
 }

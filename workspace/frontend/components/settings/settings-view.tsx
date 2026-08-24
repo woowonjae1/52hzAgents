@@ -36,6 +36,7 @@ import {
   Radio,
   Plug,
   MonitorPlay,
+  Power,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -177,6 +178,16 @@ export function SettingsView() {
       toast.success('Collaborator removed');
     } catch {
       toast.error('Failed to remove collaborator');
+    }
+  };
+
+  const handleToggleAgentAutostart = async (agentName: string, currentAutostart: boolean) => {
+    try {
+      await workspaceApi.updateMember(agentName, { autostart: !currentAutostart });
+      await refreshWorkspace();
+      toast.success(!currentAutostart ? `已开启 @${agentName} 启动自连` : `已关闭 @${agentName} 启动自连`);
+    } catch {
+      toast.error('更新自启动配置失败');
     }
   };
 
@@ -653,12 +664,29 @@ export function SettingsView() {
                                 </div>
                               </div>
 
-                              <span className={cn(
-                                'text-3xs px-2 py-0.5 rounded-full font-medium',
-                                isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-surface2 text-foreground-muted'
-                              )}>
-                                {isOnline ? '在线' : '离线'}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleAgentAutostart(agent.agentName, !!agent.autostart)}
+                                  className={cn(
+                                    'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer border',
+                                    agent.autostart
+                                      ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                      : 'bg-surface2/60 border-border/40 text-foreground-extra-muted hover:text-foreground-muted'
+                                  )}
+                                  title={agent.autostart ? '已开启应用启动时自动连接（点击关闭）' : '未开启应用启动时自动连接（点击开启）'}
+                                >
+                                  <Power className="size-2.5" />
+                                  <span>{agent.autostart ? '自启动' : '手动'}</span>
+                                </button>
+
+                                <span className={cn(
+                                  'text-3xs px-2 py-0.5 rounded-full font-medium',
+                                  isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-surface2 text-foreground-muted'
+                                )}>
+                                  {isOnline ? '在线' : '离线'}
+                                </span>
+                              </div>
                             </div>
 
                             <p className="text-xs text-foreground-muted line-clamp-2 leading-relaxed">

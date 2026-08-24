@@ -227,6 +227,17 @@ func SendEvent(c *gin.Context) {
 	}
 
 	// 将整条事件记录打包序列化为 JSON 字符串，以便广播。
+	// Baseline the working directory and perform concurrency queue gating
+	// before the event is marshaled and broadcast to agents.
+	recordTurnChanges(workspace.ID, &req, eventRec.ID)
+
+	// If metadata was modified during queue gating (e.g. target_agents set to __no_response__),
+	// persist the updated metadata to the database record.
+	if updatedMetaBytes, err := json.Marshal(req.Metadata); err == nil {
+		_ = db.DB.Model(&models.EventRecord{}).Where("id = ?", eventRec.ID).
+			Update("metadata", updatedMetaBytes)
+	}
+
 	fullEvent := gin.H{
 		"id":                eventRec.ID,
 		"event_id":          eventRec.ID,

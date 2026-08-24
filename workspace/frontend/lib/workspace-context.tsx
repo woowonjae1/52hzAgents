@@ -171,7 +171,7 @@ interface WorkspaceContextValue {
   addParticipant: (sessionId: string, agentName: string) => Promise<void>;
   removeParticipant: (sessionId: string, agentName: string) => Promise<void>;
   setSessionMaster: (sessionId: string, agentName: string) => Promise<void>;
-  setSessionOrchestration: (sessionId: string, updates: { mode?: string; instruction?: string | null }) => Promise<void>;
+  setSessionOrchestration: (sessionId: string, updates: { mode?: string; instruction?: string | null; verificationCmd?: string | null }) => Promise<void>;
   renameWorkspace: (name: string) => Promise<void>;
   refreshWorkspace: () => Promise<void>;
   refreshAgents: () => Promise<void>;
@@ -1362,9 +1362,9 @@ export function WorkspaceProvider({
 
   const setSessionOrchestration = useCallback(async (
     sessionId: string,
-    updates: { mode?: string; instruction?: string | null },
+    updates: { mode?: string; instruction?: string | null; verificationCmd?: string | null },
   ) => {
-    // Optimistic: apply the mode/instruction locally, roll back on failure.
+    // Optimistic: apply the mode/instruction/verificationCmd locally, roll back on failure.
     // Snapshot the pre-update session inside the state updater so we read
     // fresh state (this callback is memoized with no deps). Held on an
     // object property so the rollback branch narrows cleanly.
@@ -1378,6 +1378,8 @@ export function WorkspaceProvider({
           orchestrationMode: updates.mode ?? s.orchestrationMode,
           orchestrationInstruction:
             updates.instruction !== undefined ? updates.instruction : s.orchestrationInstruction,
+          verificationCmd:
+            updates.verificationCmd !== undefined ? updates.verificationCmd : s.verificationCmd,
         };
       })
     );
@@ -1385,6 +1387,7 @@ export function WorkspaceProvider({
       await workspaceApi.updateChannel(sessionId, {
         ...(updates.mode !== undefined && { orchestrationMode: updates.mode }),
         ...(updates.instruction !== undefined && { orchestrationInstruction: updates.instruction }),
+        ...(updates.verificationCmd !== undefined && { verificationCmd: updates.verificationCmd }),
       });
     } catch {
       if (rollback.prev) {

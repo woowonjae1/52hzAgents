@@ -4,6 +4,7 @@ package scheduler
 // 导入包依赖，处理 JSON、日志以及数据库操作。
 import (
 	"encoding/json" // 编码事件负载。
+	"fmt"
 	"log"           // 打印到期任务触发日志。
 	"time"          // 控制轮询间隔与到期比对。
 
@@ -36,6 +37,8 @@ func StartScheduler() {
 					}
 				}()
 				expireStaleAgents()
+				expirePendingApprovals()
+				expireStalePipelineSteps()
 				fireDueTimers()   // 执行到期 Timers 触发扫描。
 				fireDueRoutines() // 执行到期 Routines 触发扫描。
 
@@ -291,4 +294,81 @@ func compactActiveChannels() {
 			log.Printf("scheduler: auto-compacted channel %s (%d msgs, %d tokens saved)", ch.Name, res.CompactedCount, res.TokensSaved)
 		}
 	}
+}
+
+// expireStalePipelineSteps checks running pipeline chains and halts any whose current step
+// has exceeded AgentTimeoutSeconds (default 300s) without an agent reply.
+func expireStalePipelineSteps() {
+	if db.DB == nil {
+		return
+	}
+	timeoutSec := 300
+	if config.GlobalConfig != nil && config.GlobalConfig.AgentTimeoutSeconds > 0 {
+		timeoutSec = config.GlobalConfig.AgentTimeoutSeconds
+	}
+	nowMs := time.Now().UnixMilli()
+	var runningPipelines []models.ChannelPipeline
+	if err := db.DB.Where("status = ?", "running").Find(&runningPipelines).Error; err != nil || len(runningPipelines) == 0 {
+		return
+	}
+
+	for _, pipe := range runningPipelines {
+		var steps []models.PipelineStep
+		if err := json.Unmarshal(pipe.Steps, &steps); err != nil || len(steps) == 0 {
+			continue
+		}
+		idx := pipe.CurrentIndex
+		if idx < 0 || idx >= len(steps) {
+			continue
+		}
+		if steps[idx].Status != "running" || steps[idx].StartedAt == nil {
+			continue
+		}
+
+		elapsedSec := (nowMs - *steps[idx].StartedAt) / 1000
+		if elapsedSec >= int64(timeoutSec) {
+			// Mark this step and pipeline as failed
+			steps[idx].Status = "failed"
+			errStr := fmt.Sprintf("Step execution timed out after %d seconds without agent response", elapsedSec)
+			steps[idx].LastError = &errStr
+			steps[idx].FinishedAt = &nowMs
+
+			encoded, _ := json.Marshal(steps)
+			res := db.DB.Model(&models.ChannelPipeline{}).
+				Where("id = ? AND current_index = ? AND status = ?", pipe.ID, idx, "running").
+				Updates(map[string]interface{}{
+					"steps":  encoded,
+					"status": "failed",
+				})
+
+			if res.Error == nil && res.RowsAffected > 0 {
+				var ch models.Channel
+				if err := db.DB.Where("id = ?", pipe.ChannelID).First(&ch).Error; err == nil {
+					target := "channel/" + ch.Name
+					haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted: Timeout] Step %d (@%s) timed out after %d seconds without response.\nHuman intervention required.",
+						idx+1, steps[idx].Agent, elapsedSec)
+					handlers.RelayPipelineAlert(pipe.WorkspaceID, target, haltMsg)
+				}
+				log.Printf("scheduler: pipeline %s step %d (@%s) timed out after %ds and was halted", pipe.ID, idx+1, steps[idx].Agent, elapsedSec)
+			}
+		}
+	}
+}
+
+// expirePendingApprovals marks expired human review approvals as 'expired'.
+func expirePendingApprovals() {
+	if db.DB == nil {
+		return
+	}
+	now := time.Now().UTC()
+	// 1. Approvals with explicit ExpiresAt
+	db.DB.Model(&models.AgentApprovalRecord{}).
+		Where("status = ? AND expires_at IS NOT NULL AND expires_at < ?", "pending", now).
+		Updates(map[string]interface{}{"status": "expired"})
+
+	// 2. Legacy pending approvals created > 24 hours ago
+	cutoff24h := now.Add(-24 * time.Hour)
+	db.DB.Model(&models.AgentApprovalRecord{}).
+		Where("status = ? AND expires_at IS NULL AND created_at < ?", "pending", cutoff24h).
+		Updates(map[string]interface{}{"status": "expired"})
 }

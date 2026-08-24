@@ -43,6 +43,7 @@ export class EventsApi extends BaseWorkspaceApi {
       createdAt: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
       lastEventAt: null,
       workingDir: null,
+      verificationCmd: null,
     };
   }
 

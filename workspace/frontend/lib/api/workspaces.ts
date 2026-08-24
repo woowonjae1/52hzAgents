@@ -42,7 +42,7 @@ export class WorkspacesApi extends BaseWorkspaceApi {
     });
   }
 
-  async updateMember(agentName: string, updates: { description?: string; role?: string; enabled_skills?: Record<string, boolean> }): Promise<unknown> {
+  async updateMember(agentName: string, updates: { description?: string; role?: string; autostart?: boolean; enabled_skills?: Record<string, boolean> }): Promise<unknown> {
     return this.request(`/v1/workspaces/${this.workspaceId}/members/${agentName}`, {
       method: 'PATCH',
       body: JSON.stringify(updates),
@@ -120,13 +120,14 @@ export class WorkspacesApi extends BaseWorkspaceApi {
     });
   }
 
-  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; masterAgent?: string; orchestrationMode?: string; orchestrationInstruction?: string | null; workingDir?: string | null }): Promise<unknown> {
-    const { masterAgent, orchestrationMode, orchestrationInstruction, workingDir, ...rest } = updates;
+  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; masterAgent?: string; orchestrationMode?: string; orchestrationInstruction?: string | null; workingDir?: string | null; verificationCmd?: string | null }): Promise<unknown> {
+    const { masterAgent, orchestrationMode, orchestrationInstruction, workingDir, verificationCmd, ...rest } = updates;
     const body: Record<string, unknown> = { ...rest };
     if (masterAgent !== undefined) body.master_agent = masterAgent;
     if (orchestrationMode !== undefined) body.orchestration_mode = orchestrationMode;
     if (orchestrationInstruction !== undefined) body.orchestration_instruction = orchestrationInstruction;
     if (workingDir !== undefined) body.working_dir = workingDir ?? '';
+    if (verificationCmd !== undefined) body.verification_cmd = verificationCmd ?? '';
     return this.request(`/v1/workspaces/${this.workspaceId}/channels/${channelName}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

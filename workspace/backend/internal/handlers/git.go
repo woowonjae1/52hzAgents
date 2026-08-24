@@ -3,7 +3,9 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -150,7 +152,14 @@ func sanitizeGitFilePath(dir, p string) (string, error) {
 }
 
 func runGit(dir string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
+	return runGitTimeout(dir, gitCommandTimeout, args...)
+}
+
+// runGitTimeout is runGit with an explicit budget. Turn-change fingerprinting
+// runs on the request path that dispatches work to an agent, so it needs a much
+// tighter deadline than the interactive git endpoints.
+func runGitTimeout(dir string, timeout time.Duration, args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = dir
@@ -514,7 +523,8 @@ func UnstageGitFiles(c *gin.Context) {
 }
 
 type commitRequest struct {
-	Message string `json:"message" binding:"required"`
+	Message   string `json:"message" binding:"required"`
+	AutoStage bool   `json:"auto_stage"`
 }
 
 // CreateGitCommit handles POST /v1/git/commit
@@ -536,7 +546,20 @@ func CreateGitCommit(c *gin.Context) {
 		return
 	}
 
-	output, err := runGit(dir, "commit", "-m", message)
+	if req.AutoStage {
+		if _, err := runGit(dir, "add", "."); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to auto-stage files: " + err.Error()})
+			return
+		}
+	}
+
+	// Prepare commit args. If git user identity is not configured on the host, provide a clean fallback.
+	commitArgs := []string{"commit", "-m", message}
+	if _, err := runGit(dir, "config", "user.name"); err != nil {
+		commitArgs = []string{"-c", "user.name=52hzAgents", "-c", "user.email=bot@52hzagents.local", "commit", "-m", message}
+	}
+
+	output, err := runGit(dir, commitArgs...)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to commit: " + err.Error()})
 		return
@@ -739,5 +762,161 @@ func DiscardGitChanges(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",
 		"output": output,
+	})
+}
+
+type rollbackTurnRequest struct {
+	TurnID string `json:"turn_id" binding:"required"`
+	Force  bool   `json:"force"`
+}
+
+// RollbackTurnChanges handles POST /v1/git/turn-rollback
+// It selectively rolls back ONLY the files modified by this specific turn,
+// leaving all unrelated files and manual user uncommitted edits safe and intact.
+func RollbackTurnChanges(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+
+	var req rollbackTurnRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "turn_id is required"})
+		return
+	}
+
+	var turn models.AgentTurnChange
+	if err := db.DB.Where("id = ? AND workspace_id = ?", req.TurnID, workspace.ID).First(&turn).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Turn change record not found"})
+		return
+	}
+
+	// 1. Guard against double-rollback
+	if turn.Status == "rolled_back" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Turn has already been rolled back"})
+		return
+	}
+
+	if turn.WorkingDir == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Turn has no associated working directory"})
+		return
+	}
+
+	dir := turn.WorkingDir
+	if stat, err := os.Stat(dir); err != nil || !stat.IsDir() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Working directory no longer exists on disk"})
+		return
+	}
+
+	var files []turnFileChange
+	if len(turn.Changes) > 0 {
+		_ = json.Unmarshal(turn.Changes, &files)
+	}
+
+	if len(files) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"status":   "ok",
+			"message":  "No file changes recorded in this turn to rollback",
+			"reverted": []string{},
+		})
+		return
+	}
+
+	var baselineSnap turnSnapshot
+	if len(turn.Baseline) > 0 {
+		_ = json.Unmarshal(turn.Baseline, &baselineSnap)
+	}
+
+	baseCommit := turn.BaseCommit
+	revertedPaths := []string{}
+	failedPaths := map[string]string{}
+
+	for _, file := range files {
+		cleanRel, err := sanitizeGitFilePath(dir, file.Path)
+		if err != nil {
+			failedPaths[file.Path] = err.Error()
+			continue
+		}
+
+		fullPath := filepath.Join(dir, cleanRel)
+
+		// 2. Reject rollback if the agent already committed this change to git history
+		if file.Committed {
+			failedPaths[cleanRel] = "File change was already committed to git history by the agent; use git revert or reset instead"
+			continue
+		}
+
+		// 3. Staged addition (A status): remove file and unstage from index so no AD state remains
+		if file.Status == "A" {
+			_ = os.Remove(fullPath)
+			if _, rmErr := runGit(dir, "rm", "--cached", "-f", "--", cleanRel); rmErr == nil || os.IsNotExist(rmErr) {
+				revertedPaths = append(revertedPaths, cleanRel)
+			} else {
+				failedPaths[cleanRel] = fmt.Sprintf("failed to unstage from git index: %v", rmErr)
+			}
+			continue
+		}
+
+		// 4. Untracked file (? status): check for directory contention
+		if file.Status == "?" {
+			if turn.Contended && !req.Force {
+				failedPaths[cleanRel] = "Directory had concurrent agent contention during this turn; untracked file may belong to another agent. Pass force=true to delete."
+				continue
+			}
+			if err := os.Remove(fullPath); err == nil || os.IsNotExist(err) {
+				revertedPaths = append(revertedPaths, cleanRel)
+			} else {
+				failedPaths[cleanRel] = fmt.Sprintf("failed to delete untracked file: %v", err)
+			}
+			continue
+		}
+
+		// 5. PreExisting files: check snapshot availability and untracked status at baseline
+		if file.PreExisting {
+			if baseCommit == "" {
+				failedPaths[cleanRel] = "File contained pre-existing uncommitted human edits and no pre-turn snapshot commit is available; refusing to overwrite"
+				continue
+			}
+			// If file was untracked (?) at baseline, git stash create did not capture it
+			if baseFile, ok := baselineSnap.Files[file.Path]; ok && baseFile.Status == "?" {
+				failedPaths[cleanRel] = "File was untracked (not git added) before the task started; snapshot does not contain it, refusing to overwrite"
+				continue
+			}
+		}
+
+		// 6. Modified or Deleted files: restore from pre-turn snapshot (git stash create commit) or baseCommit
+		if baseCommit != "" {
+			if _, err := runGit(dir, "checkout", baseCommit, "--", cleanRel); err == nil {
+				revertedPaths = append(revertedPaths, cleanRel)
+			} else if _, err2 := runGit(dir, "restore", "--", cleanRel); err2 == nil {
+				revertedPaths = append(revertedPaths, cleanRel)
+			} else {
+				failedPaths[cleanRel] = fmt.Sprintf("git checkout: %v, git restore: %v", err, err2)
+			}
+		} else {
+			if _, err := runGit(dir, "restore", "--", cleanRel); err == nil {
+				revertedPaths = append(revertedPaths, cleanRel)
+			} else {
+				failedPaths[cleanRel] = fmt.Sprintf("git restore: %v", err)
+			}
+		}
+	}
+
+	// Update turn status in DB to indicate rollback
+	db.DB.Model(&turn).Updates(map[string]interface{}{
+		"status": "rolled_back",
+	})
+
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.git.turn.rolled_back", turn.AgentName, turn.ChannelName, gin.H{
+		"turn_id":  turn.ID,
+		"reverted": revertedPaths,
+		"failed":   failedPaths,
+	})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":   "ok",
+		"turn_id":  turn.ID,
+		"reverted": revertedPaths,
+		"failed":   failedPaths,
 	})
 }

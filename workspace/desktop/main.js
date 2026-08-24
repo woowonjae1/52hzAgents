@@ -163,7 +163,6 @@ async function startProductionStack() {
         ...process.env,
         ELECTRON_RUN_AS_NODE: '1',
         WWJ_WORKSPACE_ENDPOINT: `http://127.0.0.1:${serverPort}`,
-        WWJ_AUTOSTART_AGENTS: 'all',
       },
       stdio: 'ignore',
     });

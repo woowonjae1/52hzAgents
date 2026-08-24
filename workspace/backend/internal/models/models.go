@@ -58,6 +58,7 @@ type WorkspaceMember struct {
 	Status           string     `gorm:"type:text;default:offline" json:"status"`
 	LastHeartbeat    *time.Time `gorm:"" json:"last_heartbeat"`
 	JoinedAt         time.Time  `gorm:"autoCreateTime" json:"joined_at"`
+	Autostart        bool       `gorm:"type:boolean;default:false" json:"autostart"`
 	SessionID        *string    `gorm:"type:text" json:"session_id"`
 	SessionStartedAt *time.Time `gorm:"" json:"session_started_at"`
 }
@@ -81,6 +82,7 @@ type Channel struct {
 	Starred                  bool      `gorm:"type:boolean;default:false" json:"starred"`
 	LastEventAt              *int64    `gorm:"type:bigint;index:idx_channels_status_last_event" json:"last_event_at"`
 	WorkingDir               *string   `gorm:"type:text" json:"working_dir"`
+	VerificationCmd          *string   `gorm:"type:text" json:"verification_cmd"`
 	CreatedAt                time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
@@ -122,12 +124,14 @@ type ChannelPipeline struct {
 	ChannelID   string `gorm:"type:uuid;not null;uniqueIndex:uq_channel_pipelines_channel" json:"channel_id"`
 	// Steps is a JSON-encoded []PipelineStep. Kept out of JSON responses so it
 	// is never emitted as base64; callers decode it and expose parsed steps.
-	Steps        []byte    `gorm:"type:jsonb" json:"-"`
-	CurrentIndex int       `gorm:"type:integer;not null;default:0" json:"current_index"`
-	Status       string    `gorm:"type:text;not null;default:running" json:"status"` // running | completed
-	StartedBy    string    `gorm:"type:text" json:"started_by"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	Steps           []byte    `gorm:"type:jsonb" json:"-"`
+	CurrentIndex    int       `gorm:"type:integer;not null;default:0" json:"current_index"`
+	Status          string    `gorm:"type:text;not null;default:running" json:"status"` // running | completed | failed | halted_budget
+	TotalRetries    int       `gorm:"type:integer;not null;default:0" json:"total_retries"`
+	MaxTotalRetries int       `gorm:"type:integer;not null;default:6" json:"max_total_retries"`
+	StartedBy       string    `gorm:"type:text" json:"started_by"`
+	CreatedAt       time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (ChannelPipeline) TableName() string {
@@ -454,6 +458,7 @@ type AgentApprovalRecord struct {
 	Status      string     `gorm:"type:text;not null;default:pending;index:idx_agent_approvals_workspace_status" json:"status"`
 	ResolvedBy  *string    `gorm:"type:text" json:"resolved_by"`
 	ResolvedAt  *time.Time `gorm:"" json:"resolved_at"`
+	ExpiresAt   *time.Time `gorm:"index" json:"expires_at,omitempty"`
 	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
@@ -533,4 +538,69 @@ type Agent struct {
 
 func (Agent) TableName() string {
 	return "agents"
+}
+
+// ---------------------------------------------------------------------------
+// Agent Turn Change Attribution
+// ---------------------------------------------------------------------------
+
+// AgentTurnChange records which files an agent touched during one dispatch
+// ("turn") inside a channel's bound working directory. Git already reports what
+// the whole directory looks like right now; this record is the missing
+// attribution layer that says *who* changed *what*, and during *which* task.
+//
+// One row is opened when a turn is dispatched to an agent and closed when that
+// agent reports back. Baseline holds a fingerprint of every dirty path at
+// dispatch time so a file that was already modified before the turn is not
+// re-attributed to the agent, and a further edit to that same file still is.
+//
+// TaskID groups the turns that belong to one logical task: every self-correction
+// retry of a pipeline step shares its step's key, so consumers can roll up
+// "this task touched these files" without another table.
+type AgentTurnChange struct {
+	ID          string `gorm:"primaryKey;type:uuid" json:"id"`
+	WorkspaceID string `gorm:"type:uuid;not null;index:idx_turn_changes_ws" json:"workspace_id"`
+	ChannelID   string `gorm:"type:uuid;not null;index:idx_turn_changes_channel" json:"channel_id"`
+	ChannelName string `gorm:"type:text;not null" json:"channel_name"`
+	AgentName   string `gorm:"type:text;not null;index:idx_turn_changes_agent" json:"agent_name"`
+	// TaskID groups retries and pipeline steps. Never empty.
+	TaskID string `gorm:"type:text;not null;index:idx_turn_changes_task" json:"task_id"`
+	// TriggerEventID is the event that dispatched this turn.
+	TriggerEventID string `gorm:"type:text" json:"trigger_event_id"`
+	WorkingDir     string `gorm:"type:text;not null" json:"working_dir"`
+
+	// Status is the lifecycle of the attribution record itself, not of the
+	// agent's work: open | closed | unavailable. "unavailable" means the
+	// directory could not be fingerprinted (not a repo, git missing, timeout),
+	// which is reported rather than silently attributing an empty change set.
+	Status string `gorm:"type:text;not null;default:open" json:"status"`
+	Reason string `gorm:"type:text" json:"reason,omitempty"`
+
+	// Contended is set when another turn was already open against the same
+	// working directory, which makes per-agent attribution ambiguous. The
+	// change set is still recorded, but consumers must present it as shared.
+	Contended   bool   `gorm:"type:boolean;default:false" json:"contended"`
+	ContendedBy []byte `gorm:"type:jsonb" json:"-"`
+
+	// BaseCommit is HEAD at dispatch. A different HEAD at close means the agent
+	// committed during its turn, and the committed diff is folded into Changes.
+	BaseCommit string `gorm:"type:text" json:"base_commit"`
+
+	// Baseline is a JSON-encoded turnSnapshot taken at dispatch. Changes is a
+	// JSON-encoded []turnFileChange computed at close. Both are kept out of the
+	// JSON surface so they are never emitted as base64; handlers decode them.
+	Baseline       []byte `gorm:"type:jsonb" json:"-"`
+	BaselineVerify []byte `gorm:"type:jsonb" json:"-"`
+	Changes        []byte `gorm:"type:jsonb" json:"-"`
+
+	Additions int `gorm:"type:integer;not null;default:0" json:"additions"`
+	Deletions int `gorm:"type:integer;not null;default:0" json:"deletions"`
+	FileCount int `gorm:"type:integer;not null;default:0" json:"file_count"`
+
+	StartedAt  int64  `gorm:"type:bigint;not null;index:idx_turn_changes_started" json:"started_at"`
+	FinishedAt *int64 `gorm:"type:bigint" json:"finished_at,omitempty"`
+}
+
+func (AgentTurnChange) TableName() string {
+	return "agent_turn_changes"
 }

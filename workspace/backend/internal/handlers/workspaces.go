@@ -195,6 +195,7 @@ func mapWorkspaceMembers(members []models.WorkspaceMember) []gin.H {
 			"agentType": member.AgentType, "serverHost": member.ServerHost,
 			"workingDir": member.WorkingDir, "description": member.Description,
 			"enabledSkills": decodeJSONMap(member.EnabledSkills), "status": member.Status,
+			"autostart": member.Autostart,
 			"lastHeartbeatAt": member.LastHeartbeat, "joinedAt": member.JoinedAt,
 		})
 	}
@@ -234,6 +235,7 @@ type EditChannelRequest struct {
 	OrchestrationMode        *string `json:"orchestration_mode"`        // 编排模式: dynamic | master | workflow
 	OrchestrationInstruction *string `json:"orchestration_instruction"` // 编排指令内容
 	WorkingDir               *string `json:"working_dir"`               // 该线程绑定的本地项目目录（Open Folder 模式），空字符串表示解绑
+	VerificationCmd          *string `json:"verification_cmd"`          // 该线程质量门执行的真实验证命令（如 go test ./... 或 npm test）
 }
 
 // PatchChannel 处理 PATCH /v1/workspaces/:workspace_id/channels/:channel_name 路由，更新通道配置。
@@ -290,6 +292,13 @@ func PatchChannel(c *gin.Context) {
 			ch.WorkingDir = nil
 		} else {
 			ch.WorkingDir = req.WorkingDir
+		}
+	}
+	if req.VerificationCmd != nil {
+		if *req.VerificationCmd == "" {
+			ch.VerificationCmd = nil
+		} else {
+			ch.VerificationCmd = req.VerificationCmd
 		}
 	}
 

@@ -13,6 +13,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -68,9 +71,32 @@ func RemoveMember(c *gin.Context) {
 }
 
 type memberUpdateRequest struct {
-	Description   *string          `json:"description"`
-	Role          *string          `json:"role"`
-	EnabledSkills map[string]bool  `json:"enabled_skills"`
+	Description   *string         `json:"description"`
+	Role          *string         `json:"role"`
+	EnabledSkills map[string]bool `json:"enabled_skills"`
+	Autostart     *bool           `json:"autostart"`
+}
+
+func syncAgentAutostart(agentName, action string) {
+	home, _ := os.UserHomeDir()
+	wwjPkgBin := filepath.Join(home, "openagents", "packages", "wwj", "bin", "agent-connector.js")
+	var cmd *exec.Cmd
+	if _, err := exec.LookPath("wwj"); err == nil {
+		cmd = exec.Command("wwj", "autostart", agentName, action)
+	} else if _, statErr := os.Stat(wwjPkgBin); statErr == nil {
+		cmd = exec.Command("node", wwjPkgBin, "autostart", agentName, action)
+	} else {
+		localBin := filepath.Join("..", "..", "packages", "wwj", "bin", "agent-connector.js")
+		if _, statErr := os.Stat(localBin); statErr == nil {
+			cmd = exec.Command("node", localBin, "autostart", agentName, action)
+		} else {
+			cmd = exec.Command("node", "packages/wwj/bin/agent-connector.js", "autostart", agentName, action)
+		}
+	}
+	if cmd != nil {
+		setWindowsHidden(cmd)
+		_ = cmd.Run()
+	}
 }
 
 // UpdateMember handles PATCH /v1/workspaces/:workspace_id/members/:agent_name.
@@ -102,6 +128,16 @@ func UpdateMember(c *gin.Context) {
 		updates["enabled_skills"] = skillsBytes
 		member.EnabledSkills = skillsBytes
 	}
+	if req.Autostart != nil {
+		updates["autostart"] = *req.Autostart
+		member.Autostart = *req.Autostart
+
+		action := "disable"
+		if *req.Autostart {
+			action = "enable"
+		}
+		syncAgentAutostart(member.AgentName, action)
+	}
 	if len(updates) > 0 {
 		if err := db.DB.Model(member).Updates(updates).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update member"})
@@ -112,6 +148,7 @@ func UpdateMember(c *gin.Context) {
 		"agentName":     member.AgentName,
 		"description":   member.Description,
 		"role":          member.Role,
+		"autostart":     member.Autostart,
 		"enabledSkills": decodeJSONMap(member.EnabledSkills),
 	})
 }

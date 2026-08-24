@@ -253,7 +253,17 @@ func CreateAgentApproval(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid approval details"})
 		return
 	}
-	record := models.AgentApprovalRecord{ID: uuid.NewString(), WorkspaceID: workspace.ID, AgentName: req.AgentName, RequestedBy: req.RequestedBy, Action: strings.TrimSpace(req.Action), Details: details, Status: "pending"}
+	expiresAt := time.Now().UTC().Add(24 * time.Hour)
+	record := models.AgentApprovalRecord{
+		ID:          uuid.NewString(),
+		WorkspaceID: workspace.ID,
+		AgentName:   req.AgentName,
+		RequestedBy: req.RequestedBy,
+		Action:      strings.TrimSpace(req.Action),
+		Details:     details,
+		Status:      "pending",
+		ExpiresAt:   &expiresAt,
+	}
 	if err := db.DB.Create(&record).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create approval"})
 		return

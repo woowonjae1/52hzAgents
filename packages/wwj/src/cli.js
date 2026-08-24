@@ -470,14 +470,39 @@ async function cmdLogs(connector, flags, positional) {
   }
 }
 
-async function cmdAutostart(connector, flags) {
+async function cmdAutostart(connector, flags, positional) {
+  const first = positional && positional[0];
+  const second = positional && positional[1];
+
+  // Agent-specific autostart toggle: wwj autostart <agent-name> [enable|disable]
+  if (first && first !== 'system') {
+    const agent = connector.config.getAgent(first);
+    if (!agent) {
+      print(`Error: Agent '${first}' not found.`);
+      process.exitCode = 1;
+      return;
+    }
+    const action = second || (flags.disable ? 'disable' : (flags.enable ? 'enable' : ''));
+    if (!action) {
+      print(`Agent '${first}' autostart is ${agent.autostart ? 'enabled' : 'disabled'}`);
+      print(`Usage: wwj autostart ${first} <enable|disable>`);
+      return;
+    }
+    const enable = action === 'enable' || action === 'true' || action === 'on';
+    connector.config.updateAgent(first, { autostart: enable });
+    try { connector.sendDaemonCommand('reload'); } catch {}
+    print(`Autostart ${enable ? 'enabled' : 'disabled'} for agent '${first}'`);
+    return;
+  }
+
+  // System-level OS login autostart
   const autostart = require('./autostart');
-  if (flags.disable) {
+  if (flags.disable || second === 'disable') {
     autostart.disable();
-    print('Autostart disabled.');
+    print('System autostart disabled.');
   } else {
     const result = autostart.enable(connector._config ? connector._config.configDir : require('path').join(require('os').homedir(), '.wwj'));
-    print(`Autostart enabled.${result.path ? ` Config: ${result.path}` : ''}`);
+    print(`System autostart enabled.${result.path ? ` Config: ${result.path}` : ''}`);
   }
 }
 
@@ -803,7 +828,7 @@ Commands:
   env <type> [--set K=V]      View/set env vars for agent type
   skills [agent] [action]     Manage agent skills (enable/disable)
   tool-mode [agent] [mode]    View/set tool mode (mcp or skills)
-  autostart [--disable]       Enable/disable auto-start on login
+  autostart [agent] [action]  Toggle agent autostart (or system login with no agent)
   test-llm <type>             Test LLM connection
   logs [agent] [--lines N]    View daemon logs
   workspace create [name]     Create a new workspace
@@ -886,7 +911,7 @@ async function main() {
     connect: () => cmdConnect(connector, flags, positional),
     disconnect: () => cmdDisconnect(connector, flags, positional),
     logs: () => cmdLogs(connector, flags, positional),
-    autostart: () => cmdAutostart(connector, flags),
+    autostart: () => cmdAutostart(connector, flags, positional),
     workspace: () => cmdWorkspace(connector, flags, positional),
     env: () => cmdEnv(connector, flags, positional),
     skills: () => cmdSkills(connector, flags, positional),

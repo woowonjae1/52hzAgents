@@ -187,6 +187,7 @@ func ExecuteTerminalCommand(c *gin.Context) {
 		}
 		detailsBytes, _ := json.Marshal(approvalDetails)
 
+		expiresAt := time.Now().UTC().Add(24 * time.Hour)
 		record := models.AgentApprovalRecord{
 			ID:          uuid.NewString(),
 			WorkspaceID: workspace.ID,
@@ -195,6 +196,7 @@ func ExecuteTerminalCommand(c *gin.Context) {
 			Action:      "terminal.execute",
 			Details:     detailsBytes,
 			Status:      "pending",
+			ExpiresAt:   &expiresAt,
 		}
 
 		if err := db.DB.Create(&record).Error; err != nil {

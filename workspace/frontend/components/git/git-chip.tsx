@@ -72,11 +72,12 @@ export function GitChip({
   const unstaged = status.files.filter((f) => !f.staged);
 
   const commit = async () => {
-    if (!channelId || !message.trim() || staged.length === 0) return;
+    if (!channelId || !message.trim() || status.files.length === 0) return;
     setCommitting(true);
     try {
-      await workspaceApi.createGitCommit(channelId, message.trim());
-      toast.success('Changes committed');
+      const autoStage = staged.length === 0;
+      await workspaceApi.createGitCommit(channelId, message.trim(), autoStage);
+      toast.success(autoStage ? 'All changes staged & committed' : 'Changes committed');
       setMessage('');
       setOpen(false);
       await refresh();
@@ -239,19 +240,19 @@ export function GitChip({
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder={staged.length === 0 ? 'Stage files, then write a commit message…' : 'Write a commit message…'}
+              placeholder={status.files.length === 0 ? 'Working tree clean' : staged.length === 0 ? 'Commit message (auto-stages all changes)…' : 'Write a commit message…'}
               rows={2}
-              disabled={staged.length === 0}
+              disabled={status.files.length === 0}
               className="w-full resize-none rounded-lg bg-surface0 border border-border-accent px-2.5 py-2 text-xs text-foreground placeholder:text-foreground-extra-muted outline-none focus:border-accent disabled:opacity-50 transition-colors"
             />
 
             <button
               onClick={commit}
-              disabled={committing || staged.length === 0 || !message.trim()}
+              disabled={committing || status.files.length === 0 || !message.trim()}
               className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
             >
               {committing && <Loader2 className="size-3 animate-spin" />}
-              Commit
+              {staged.length === 0 && unstaged.length > 0 ? 'Commit (Auto-stage all)' : 'Commit'}
             </button>
 
             {/* Remote actions. Always available — ahead/behind can be stale until

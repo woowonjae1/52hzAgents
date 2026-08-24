@@ -82,6 +82,7 @@ func InitDB() {
 		&models.ShareSnapshot{},
 		&models.Agent{},
 		&models.ChannelCompactionRecord{},
+		&models.AgentTurnChange{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)

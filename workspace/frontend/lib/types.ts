@@ -20,6 +20,7 @@ export interface WorkspaceAgent {
   description: string | null;
   enabledSkills: Record<string, unknown> | null;
   status: string;
+  autostart?: boolean;
   lastHeartbeatAt: string | null;
   joinedAt: string | null;
 }
@@ -73,6 +74,8 @@ export interface WorkspaceSession {
   lastEventAt: number | null;
   /** Local project directory this thread is bound to ("Open Folder" mode). Null = plain chat, no filesystem access. */
   workingDir: string | null;
+  /** Verification command for pipeline quality gate (e.g. "go test ./..." or "npm test"). */
+  verificationCmd?: string | null;
 }
 
 export interface ToolApprovalRequest {
@@ -544,6 +547,7 @@ export function networkAgentToWorkspaceAgent(agent: Record<string, unknown> | Wo
   const status = (raw.status || raw.Status || 'online') as string;
   const hb = (raw.lastHeartbeatAt || raw.last_heartbeat_at || raw.LastHeartbeatAt || null) as string | null;
   const joined = (raw.joinedAt || raw.joined_at || raw.JoinedAt || null) as string | null;
+  const autostart = typeof raw.autostart === 'boolean' ? raw.autostart : (typeof raw.Autostart === 'boolean' ? raw.Autostart : false);
 
   return {
     agentName: name,
@@ -554,6 +558,7 @@ export function networkAgentToWorkspaceAgent(agent: Record<string, unknown> | Wo
     description: desc,
     enabledSkills: skills,
     status: status,
+    autostart: autostart,
     lastHeartbeatAt: hb,
     joinedAt: joined,
   };
@@ -579,8 +584,10 @@ export interface NetworkChannel {
   orchestration_instruction?: string;
   createdAt?: string;
   created_at?: string;
-  lastEventAt?: number;
-  last_event_at?: number;
+  workingDir?: string;
+  working_dir?: string;
+  verificationCmd?: string;
+  verification_cmd?: string;
 }
 
 export function networkChannelToSession(ch: Record<string, unknown> | NetworkChannel | WorkspaceSession, defaultWorkspaceId?: string): WorkspaceSession {
@@ -600,6 +607,7 @@ export function networkChannelToSession(ch: Record<string, unknown> | NetworkCha
   const created = (raw.createdAt || raw.created_at || null) as string | null;
   const lastEvent = (raw.lastEventAt ?? raw.last_event_at ?? null) as number | null;
   const workingDir = (raw.workingDir || raw.working_dir || null) as string | null;
+  const verificationCmd = (raw.verificationCmd || raw.verification_cmd || null) as string | null;
 
   return {
     sessionId: id,
@@ -615,5 +623,6 @@ export function networkChannelToSession(ch: Record<string, unknown> | NetworkCha
     createdAt: created,
     lastEventAt: lastEvent,
     workingDir: workingDir,
+    verificationCmd: verificationCmd,
   };
 }

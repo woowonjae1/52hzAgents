@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity } from 'lucide-react';
+import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -156,6 +156,23 @@ export function AgentProfilePanel() {
     }
   }, [agent]);
 
+  const [togglingAutostart, setTogglingAutostart] = useState(false);
+
+  const handleToggleAutostart = useCallback(async () => {
+    if (!agent) return;
+    const nextAutostart = !agent.autostart;
+    setTogglingAutostart(true);
+    try {
+      await workspaceApi.updateMember(agent.agentName, { autostart: nextAutostart });
+      await refreshWorkspace();
+      toast.success(nextAutostart ? `已开启 @${agent.agentName} 启动自连` : `已关闭 @${agent.agentName} 启动自连`);
+    } catch {
+      toast.error('更新自启动配置失败');
+    } finally {
+      setTogglingAutostart(false);
+    }
+  }, [agent, refreshWorkspace]);
+
   const handleStartThread = useCallback(async () => {
     if (!agent) return;
     await createSession({ master: agent.agentName, participants: [agent.agentName] });
@@ -306,6 +323,32 @@ export function AgentProfilePanel() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Autostart on Launch Toggle */}
+          <div className="rounded-lg border overflow-hidden">
+            <div className="px-3.5 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <Power className={cn('size-4 shrink-0', agent.autostart ? 'text-primary' : 'text-muted-foreground')} />
+                <div className="min-w-0">
+                  <div className="text-xs font-medium truncate">应用启动时自动连接</div>
+                  <div className="text-3xs text-muted-foreground mt-0.5">软件打开时自动拉起并连接此 Agent</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleAutostart}
+                disabled={togglingAutostart}
+                className="text-primary hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
+                title={agent.autostart ? '点击关闭自启动' : '点击开启自启动'}
+              >
+                {agent.autostart ? (
+                  <ToggleRight className="size-6 text-primary" />
+                ) : (
+                  <ToggleLeft className="size-6 text-foreground-muted" />
+                )}
+              </button>
             </div>
           </div>
 

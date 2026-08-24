@@ -216,6 +216,9 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/git/fetch", handlers.FetchGitRemote)
 		v1.POST("/git/pull", handlers.PullGitRemote)
 		v1.POST("/git/push", handlers.PushGitRemote)
+		// Which files did this agent touch during this task:
+		v1.GET("/git/turn-changes", handlers.ListTurnChanges)
+		v1.POST("/git/turn-rollback", handlers.RollbackTurnChanges)
 
 		// 补充：输入指示、DM 会话、心跳、成员移除、认领与令牌轮换：
 		v1.POST("/composing", handlers.ComposingSignal)

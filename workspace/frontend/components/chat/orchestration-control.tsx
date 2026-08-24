@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Waypoints, Crown, Sparkles, Check } from 'lucide-react';
+import { Waypoints, Crown, Sparkles, Check, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -51,7 +51,7 @@ const MODES: { value: Mode; label: string; icon: React.ElementType; description:
 interface Props {
   session: WorkspaceSession;
   agents: WorkspaceAgent[];
-  onChange: (updates: { mode?: Mode; instruction?: string | null }) => void;
+  onChange: (updates: { mode?: Mode; instruction?: string | null; verificationCmd?: string | null }) => void;
   /** 'submenu' nests this under a parent DropdownMenu (the thread header's
    * overflow menu) instead of rendering its own standalone trigger button. */
   variant?: 'standalone' | 'submenu';
@@ -66,6 +66,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
   const mode = (session.orchestrationMode || 'dynamic') as Mode;
   const active = MODES.find((m) => m.value === mode) || MODES[0];
   const [planOpen, setPlanOpen] = React.useState(false);
+  const [qualityGateOpen, setQualityGateOpen] = React.useState(false);
 
   const selectMode = (next: Mode) => {
     if (next === 'workflow') {
@@ -120,6 +121,29 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
           </DropdownMenuItem>
         </>
       )}
+      <DropdownMenuSeparator />
+      <DropdownMenuItem
+        onSelect={(e) => {
+          e.preventDefault();
+          setQualityGateOpen(true);
+        }}
+        className="flex items-start gap-2 py-2 cursor-pointer"
+      >
+        <ShieldCheck className="size-3.5 mt-0.5 shrink-0 text-primary" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium">质量门验证命令…</span>
+            {session.verificationCmd && (
+              <span className="text-3xs px-1.5 py-0.2 rounded bg-primary/10 text-primary font-mono truncate max-w-[100px]">
+                {session.verificationCmd}
+              </span>
+            )}
+          </div>
+          <p className="text-2xs text-muted-foreground leading-snug">
+            设置 Turn 结束时的真实验证命令（如 go test / npm test）
+          </p>
+        </div>
+      </DropdownMenuItem>
     </>
   );
 
@@ -160,6 +184,13 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
         agents={agents}
         initialValue={session.orchestrationInstruction || ''}
         onSave={(instruction) => onChange({ mode: 'workflow', instruction: instruction || null })}
+      />
+
+      <QualityGateDialog
+        open={qualityGateOpen}
+        onOpenChange={setQualityGateOpen}
+        initialValue={session.verificationCmd || ''}
+        onSave={(cmd) => onChange({ verificationCmd: cmd || null })}
       />
     </>
   );
@@ -310,6 +341,69 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
           </Button>
           <Button size="sm" onClick={save}>
             Save plan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quality Gate Verification Command Dialog
+export interface QualityGateDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialValue: string;
+  onSave: (command: string) => void;
+}
+
+export function QualityGateDialog({ open, onOpenChange, initialValue, onSave }: QualityGateDialogProps) {
+  const [value, setValue] = React.useState(initialValue);
+
+  React.useEffect(() => {
+    if (open) {
+      setValue(initialValue);
+    }
+  }, [open, initialValue]);
+
+  const save = () => {
+    onSave(value.trim());
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="size-4 text-primary" />
+            <DialogTitle>质量门真实验证命令</DialogTitle>
+          </div>
+          <DialogDescription>
+            显式配置此会话的真实编译与测试命令（如 <code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">go test ./...</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">npm test</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">pytest</code>）。
+            系统会在 Agent 开始前记录初始基线，结束时对比差集，仅当引入<strong>新错误或回归</strong>时才会触发自愈修复。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 py-2">
+          <label className="text-xs font-medium text-foreground">验证命令 (Verification Command)</label>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoFocus
+            placeholder="例如: go test ./... 或 npm test"
+            className="w-full rounded-md border bg-transparent px-3 py-2 text-sm font-mono outline-none focus:border-primary"
+          />
+          <p className="text-3xs text-muted-foreground">留空则表示关闭真实验证，回退至散文文本启发式检测。</p>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button size="sm" onClick={save}>
+            保存配置
           </Button>
         </DialogFooter>
       </DialogContent>
