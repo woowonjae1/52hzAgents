@@ -18,6 +18,7 @@ import { FileDiff, type DiffLine } from '@/components/ai-elements/file-diff';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { MessageActions } from '@/components/ai-elements/message-actions';
 import { SourcesCard, type SourceItem } from '@/components/ai-elements/sources-card';
+import { TurnChangesCapsule } from './turn-changes-capsule';
 import { workspaceApi } from '@/lib/api';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -537,6 +538,14 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               status={currentApproved ? 'approved' : currentRejected ? 'denied' : 'pending'}
               onApprove={handleApprove}
               onDeny={handleReject}
+            />
+          )}
+
+          {/* Agent Turn Code Changes Capsule & Rollback */}
+          {message.metadata?.turn_changes && (
+            <TurnChangesCapsule
+              channelId={message.sessionId}
+              turnChanges={message.metadata.turn_changes}
             />
           )}
 

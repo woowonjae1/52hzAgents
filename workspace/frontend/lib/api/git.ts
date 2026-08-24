@@ -46,13 +46,27 @@ export class GitApi extends BaseWorkspaceApi {
     });
   }
 
-  async rollbackTurn(turnId: string): Promise<{ status: string; turn_id: string; reverted: string[]; failed?: Record<string, string> }> {
+  async getGitDiff(channelId: string, filePath?: string): Promise<{ status: string; diff: string; path?: string }> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
+    if (filePath) params.set('path', filePath);
+    return this.request<{ status: string; diff: string; path?: string }>(`/v1/git/diff?${params}`);
+  }
+
+  async discardGitChanges(channelId: string, files: string[]): Promise<void> {
+    const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
+    await this.request<unknown>(`/v1/git/discard?${params}`, {
+      method: 'POST',
+      body: JSON.stringify({ files }),
+    });
+  }
+
+  async rollbackTurn(channelId: string, turnId: string, force: boolean = false): Promise<{ status: string; turn_id: string; reverted: string[]; failed?: Record<string, string> }> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.request<{ status: string; turn_id: string; reverted: string[]; failed?: Record<string, string> }>(
       `/v1/git/turn-rollback?${params}`,
       {
         method: 'POST',
-        body: JSON.stringify({ turn_id: turnId }),
+        body: JSON.stringify({ turn_id: turnId, force }),
       },
     );
   }

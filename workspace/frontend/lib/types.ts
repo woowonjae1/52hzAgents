@@ -118,11 +118,31 @@ export interface WorkspaceMessageMetadata extends Record<string, unknown> {
    */
   preview?: { url: string; label?: string };
   attachments?: Record<string, unknown>[];
+  turn_changes?: TurnChangesMetadata;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
   };
+}
+
+export interface TurnFileChange {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  pre_existing?: boolean;
+  committed?: boolean;
+  reverted?: boolean;
+}
+
+export interface TurnChangesMetadata {
+  turn_id: string;
+  file_count: number;
+  additions: number;
+  deletions: number;
+  status: string;
+  changes?: TurnFileChange[];
 }
 
 export interface WorkspaceMessage {

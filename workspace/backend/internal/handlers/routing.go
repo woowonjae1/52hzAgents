@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -115,6 +116,68 @@ func clearPipeline(channelID string) {
 	if err := db.DB.Where("channel_id = ?", channelID).Delete(&models.ChannelPipeline{}).Error; err != nil {
 		log.Printf("pipeline: failed to clear chain for channel %s: %v", channelID, err)
 	}
+}
+
+// GetChannelPipeline handles GET /v1/channels/:channel_id/pipeline
+func GetChannelPipeline(c *gin.Context) {
+	channelID := c.Param("channel_id")
+	if channelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "channel_id is required"})
+		return
+	}
+
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ?", channelID).First(&record).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"active": false})
+		return
+	}
+
+	var steps []models.PipelineStep
+	if len(record.Steps) > 0 {
+		_ = json.Unmarshal(record.Steps, &steps)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"active":            record.Status == "running" || record.Status == "retrying",
+		"id":                record.ID,
+		"status":            record.Status,
+		"current_index":     record.CurrentIndex,
+		"total_retries":     record.TotalRetries,
+		"max_total_retries": record.MaxTotalRetries,
+		"started_by":        record.StartedBy,
+		"steps":             steps,
+	})
+}
+
+// HaltChannelPipeline handles POST /v1/channels/:channel_id/pipeline/halt
+func HaltChannelPipeline(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+	channelID := c.Param("channel_id")
+	if channelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "channel_id is required"})
+		return
+	}
+
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying"}).First(&record).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "not_running"})
+		return
+	}
+
+	nowMs := time.Now().UnixMilli()
+	db.DB.Model(&record).Updates(map[string]interface{}{
+		"status": "halted_user",
+	})
+
+	var channel models.Channel
+	if err := db.DB.Where("id = ?", channelID).First(&channel).Error; err == nil {
+		RelayPipelineAlert(workspace.ID, "channel/"+channel.Name, "Pipeline execution was stopped by user.")
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "halted", "finished_at": nowMs})
 }
 
 // CheckAndTriggerNextPipelineStep evaluates the current step's execution quality

@@ -160,4 +160,16 @@ export class WorkspacesApi extends BaseWorkspaceApi {
   async listInvitations(_status?: string): Promise<WorkspaceInvitation[]> {
     return [];
   }
+
+  async getChannelPipeline(channelId: string): Promise<Record<string, unknown>> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.request<Record<string, unknown>>(`/v1/channels/${channelId}/pipeline?${params}`);
+  }
+
+  async haltChannelPipeline(channelId: string): Promise<Record<string, unknown>> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.request<Record<string, unknown>>(`/v1/channels/${channelId}/pipeline/halt?${params}`, {
+      method: 'POST',
+    });
+  }
 }

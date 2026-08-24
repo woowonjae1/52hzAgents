@@ -34,6 +34,7 @@ import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
 import { AgentModelSwitcher } from './agent-model-switcher';
+import { PipelineStepper } from './pipeline-stepper';
 import { eventToMessage } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
@@ -891,6 +892,9 @@ export function ChatView() {
           </div>
         );
       })()}
+
+      {/* Pipeline Stepper Widget */}
+      <PipelineStepper channelId={currentSessionId} />
 
       {/* Messages */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">

@@ -508,11 +508,11 @@ func GetLatestTurnBaselineVerify(workspaceID, channelID, agentName string) *eval
 }
 
 // closeAgentTurn settles the agent's open turn in this channel by
-// re-snapshotting and diffing against the baseline.
-func closeAgentTurn(workspaceID string, channel *models.Channel, agentName string) {
+// re-snapshotting and diffing against the baseline. Returns the closed turn record if files changed.
+func closeAgentTurn(workspaceID string, channel *models.Channel, agentName string) *models.AgentTurnChange {
 	agentName = strings.TrimSpace(agentName)
 	if workspaceID == "" || channel == nil || agentName == "" {
-		return
+		return nil
 	}
 
 	// Find rather than First: having no open turn is the common case on a first
@@ -521,7 +521,7 @@ func closeAgentTurn(workspaceID string, channel *models.Channel, agentName strin
 	if err := db.DB.Where("workspace_id = ? AND channel_id = ? AND agent_name = ? AND status = ?",
 		workspaceID, channel.ID, agentName, "open").
 		Order("started_at desc").Limit(1).Find(&records).Error; err != nil || len(records) == 0 {
-		return
+		return nil
 	}
 	record := records[0]
 
@@ -532,13 +532,13 @@ func closeAgentTurn(workspaceID string, channel *models.Channel, agentName strin
 	var base turnSnapshot
 	if err := json.Unmarshal(record.Baseline, &base); err != nil || base.Files == nil {
 		finishTurnUnavailable(record.ID, "baseline snapshot is unreadable", nowMs)
-		return
+		return nil
 	}
 
 	final, err := captureTurnSnapshot(record.WorkingDir)
 	if err != nil {
 		finishTurnUnavailable(record.ID, err.Error(), nowMs)
-		return
+		return nil
 	}
 
 	changes := diffTurnSnapshots(record.WorkingDir, &base, final)
@@ -551,8 +551,15 @@ func closeAgentTurn(workspaceID string, channel *models.Channel, agentName strin
 	encoded, err := json.Marshal(changes)
 	if err != nil {
 		finishTurnUnavailable(record.ID, "change set is unencodable", nowMs)
-		return
+		return nil
 	}
+
+	record.Status = "closed"
+	record.Changes = encoded
+	record.Additions = additions
+	record.Deletions = deletions
+	record.FileCount = len(changes)
+	record.FinishedAt = &nowMs
 
 	if err := db.DB.Model(&models.AgentTurnChange{}).Where("id = ?", record.ID).
 		Updates(map[string]interface{}{
@@ -576,6 +583,7 @@ func closeAgentTurn(workspaceID string, channel *models.Channel, agentName strin
 
 	// Drain any turn waiting in queue for this working directory
 	drainDirQueue(workspaceID, record.WorkingDir)
+	return &record
 }
 
 func finishTurnUnavailable(recordID, reason string, nowMs int64) {
@@ -757,7 +765,23 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 
 	if isAgentSource(req.Source) {
 		if actor := agentNameFromSource(req.Source); actor != "" {
-			closeAgentTurn(workspaceID, &channel, actor)
+			if turnRec := closeAgentTurn(workspaceID, &channel, actor); turnRec != nil && turnRec.FileCount > 0 {
+				if req.Metadata == nil {
+					req.Metadata = make(map[string]interface{})
+				}
+				var fileChanges []turnFileChange
+				if len(turnRec.Changes) > 0 {
+					_ = json.Unmarshal(turnRec.Changes, &fileChanges)
+				}
+				req.Metadata["turn_changes"] = map[string]interface{}{
+					"turn_id":    turnRec.ID,
+					"file_count": turnRec.FileCount,
+					"additions":  turnRec.Additions,
+					"deletions":  turnRec.Deletions,
+					"status":     turnRec.Status,
+					"changes":    fileChanges,
+				}
+			}
 		}
 	}
 

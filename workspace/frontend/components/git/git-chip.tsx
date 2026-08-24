@@ -1,11 +1,22 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { GitBranch, ChevronDown, Loader2, RefreshCw, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
+import {
+  GitBranch,
+  ChevronDown,
+  Loader2,
+  RefreshCw,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  FileDiff,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
 import { type GitStatus } from '@/lib/use-git-status';
 import { toast } from 'sonner';
+import { DiffBlock } from '../chat/diff-block';
 
 function StatusLetter({ letter }: { letter: string }) {
   const tone =
@@ -19,11 +30,24 @@ function StatusLetter({ letter }: { letter: string }) {
   );
 }
 
-function FileRow({ file }: { file: GitStatus['files'][number] }) {
+function FileRow({
+  file,
+  onViewDiff,
+  onDiscard,
+}: {
+  file: GitStatus['files'][number];
+  onViewDiff?: (path: string) => void;
+  onDiscard?: (path: string) => void;
+}) {
   return (
-    <div className="flex items-center gap-2 px-3 py-0.5 text-2xs">
+    <div className="group flex items-center gap-2 px-3 py-1 text-2xs hover:bg-surface3/60 transition-colors">
       <StatusLetter letter={file.status} />
-      <span className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono" dir="rtl" title={file.path}>
+      <span
+        className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono cursor-pointer hover:text-foreground hover:underline"
+        dir="rtl"
+        title={file.path}
+        onClick={() => onViewDiff?.(file.path)}
+      >
         {file.path}
       </span>
       <span className="shrink-0 font-mono tabular-nums text-3xs">
@@ -31,6 +55,28 @@ function FileRow({ file }: { file: GitStatus['files'][number] }) {
         {file.additions > 0 && file.deletions > 0 && ' '}
         {file.deletions > 0 && <span className="text-status-danger">−{file.deletions}</span>}
       </span>
+      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
+        {onViewDiff && (
+          <button
+            type="button"
+            onClick={() => onViewDiff(file.path)}
+            className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title="View Diff"
+          >
+            <FileDiff className="size-3" />
+          </button>
+        )}
+        {onDiscard && !file.staged && (
+          <button
+            type="button"
+            onClick={() => onDiscard(file.path)}
+            className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors cursor-pointer"
+            title="Discard Changes"
+          >
+            <Undo2 className="size-3" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -156,6 +202,35 @@ export function GitChip({
     }
   };
 
+  const [diffModalFile, setDiffModalFile] = useState<string | null>(null);
+  const [diffContent, setDiffContent] = useState<string>('');
+  const [loadingDiff, setLoadingDiff] = useState(false);
+
+  const handleViewDiff = async (filePath: string) => {
+    if (!channelId) return;
+    setDiffModalFile(filePath);
+    setLoadingDiff(true);
+    try {
+      const res = await workspaceApi.getGitDiff(channelId, filePath);
+      setDiffContent(res.diff || 'No changes detected in working tree against HEAD');
+    } catch (e) {
+      setDiffContent(`Error loading diff: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoadingDiff(false);
+    }
+  };
+
+  const handleDiscard = async (filePath: string) => {
+    if (!channelId) return;
+    try {
+      await workspaceApi.discardGitChanges(channelId, [filePath]);
+      await refresh();
+      toast.success(`Discarded changes in ${filePath}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Discard failed');
+    }
+  };
+
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
@@ -173,6 +248,42 @@ export function GitChip({
         )}
         <ChevronDown className={cn('size-2.5 text-foreground-muted transition-transform', open && 'rotate-180')} />
       </button>
+
+      {/* File Diff Modal */}
+      {diffModalFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-surface1 border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface2/60">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileDiff className="size-4 text-foreground-muted shrink-0" />
+                <span className="font-semibold text-xs text-foreground truncate">{diffModalFile}</span>
+                <span className="text-3xs text-foreground-extra-muted font-mono">Working Tree vs HEAD</span>
+              </div>
+              <button
+                onClick={() => setDiffModalFile(null)}
+                className="size-7 rounded-lg hover:bg-surface3 flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-4 max-h-[70vh]">
+              {loadingDiff ? (
+                <div className="flex items-center justify-center py-12 text-xs text-foreground-muted gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading diff...
+                </div>
+              ) : diffContent ? (
+                <DiffBlock code={diffContent} />
+              ) : (
+                <p className="text-center py-8 text-xs text-foreground-extra-muted">No changes found</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="absolute top-full right-0 mt-1.5 w-[320px] z-50 rounded-xl bg-surface2 border border-border-accent shadow-xl overflow-hidden">
@@ -215,7 +326,13 @@ export function GitChip({
                     Unstage
                   </button>
                 </div>
-                {staged.map((f) => <FileRow key={`s-${f.path}`} file={f} />)}
+                {staged.map((f) => (
+                  <FileRow
+                    key={`s-${f.path}`}
+                    file={f}
+                    onViewDiff={handleViewDiff}
+                  />
+                ))}
               </>
             )}
 
@@ -230,7 +347,14 @@ export function GitChip({
                     Stage all
                   </button>
                 </div>
-                {unstaged.map((f) => <FileRow key={`u-${f.path}`} file={f} />)}
+                {unstaged.map((f) => (
+                  <FileRow
+                    key={`u-${f.path}`}
+                    file={f}
+                    onViewDiff={handleViewDiff}
+                    onDiscard={handleDiscard}
+                  />
+                ))}
               </>
             )}
           </div>
