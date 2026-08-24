@@ -788,7 +788,8 @@ export function WorkspaceProvider({
               const latest = result.events[0];
               const latestPayload = latest.payload as Record<string, string>;
               const latestType = latestPayload?.message_type || 'chat';
-              const eventTime = latest.created_at ? new Date(latest.created_at).getTime() : 0;
+              const rawTs = Number(latest.timestamp) || 0;
+              const eventTime = rawTs > 1e11 ? rawTs : rawTs * 1000;
               const isFresh = eventTime > 0 && Date.now() - eventTime < 60000;
               const isAgentWorking = (latestType === 'status' || latestType === 'thinking') && isFresh;
               // Find the latest chat/thinking message (not status) for preview
