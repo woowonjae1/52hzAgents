@@ -103,7 +103,26 @@ export function ActionRequiredBanner({
   const handleForceStop = async (item: PendingActionItem) => {
     setProcessingId(item.id);
     try {
-      await workspaceApi.sendAgentControl(item.agentName, 'stop');
+      await workspaceApi.sendAgentControl(item.agentName, 'stop', { channel: item.channelId || undefined });
+      if (item.channelId) {
+        try {
+          await workspaceApi.haltChannelPipeline(item.channelId);
+        } catch {}
+        try {
+          await workspaceApi.sendEvent({
+            type: 'workspace.message.posted',
+            source: 'human:user',
+            target: `channel/${item.channelId}`,
+            payload: {
+              content: `[System] Agent @${item.agentName} was force-stopped.`,
+              sender_type: 'system',
+              sender_name: 'system',
+              message_type: 'chat',
+            },
+            visibility: 'channel',
+          });
+        } catch {}
+      }
       toast.success(`Force-stopped @${item.agentName}`);
       onResolved?.(item.id);
     } catch {

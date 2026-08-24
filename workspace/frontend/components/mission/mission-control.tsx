@@ -216,6 +216,13 @@ export function MissionControl() {
   }, [agents, allCatalogAgents]);
 
   // Stalled items for ActionRequiredBanner
+  const [dismissedActionIds, setDismissedActionIds] = useState<Set<string>>(new Set());
+
+  const handleActionResolved = useCallback((id: string) => {
+    setDismissedActionIds((prev) => new Set(prev).add(id));
+    fetchRecentData();
+  }, [fetchRecentData]);
+
   const stalledItems: PendingActionItem[] = useMemo(() => {
     return myStations
       .filter((s) => s.status === 'stalled')
@@ -231,8 +238,8 @@ export function MissionControl() {
   }, [myStations]);
 
   const allActionRequired = useMemo(() => {
-    return [...pendingApprovals, ...stalledItems];
-  }, [pendingApprovals, stalledItems]);
+    return [...pendingApprovals, ...stalledItems].filter((it) => !dismissedActionIds.has(it.id));
+  }, [pendingApprovals, stalledItems, dismissedActionIds]);
 
   // Swimlane events mapping
   const swimlaneEvents: SwimlaneEvent[] = useMemo(() => {
@@ -480,7 +487,7 @@ export function MissionControl() {
           <ActionRequiredBanner
             items={allActionRequired}
             onOpenThread={openThread}
-            onResolved={fetchRecentData}
+            onResolved={handleActionResolved}
           />
 
           {/* True 0 Configuration State */}

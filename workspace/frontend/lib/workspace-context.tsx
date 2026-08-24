@@ -788,7 +788,9 @@ export function WorkspaceProvider({
               const latest = result.events[0];
               const latestPayload = latest.payload as Record<string, string>;
               const latestType = latestPayload?.message_type || 'chat';
-              const isAgentWorking = latestType === 'status' || latestType === 'thinking';
+              const eventTime = latest.created_at ? new Date(latest.created_at).getTime() : 0;
+              const isFresh = eventTime > 0 && Date.now() - eventTime < 60000;
+              const isAgentWorking = (latestType === 'status' || latestType === 'thinking') && isFresh;
               // Find the latest chat/thinking message (not status) for preview
               const lastChat = result.events.find((e) => {
                 const mt = (e.payload as Record<string, string>)?.message_type || 'chat';
@@ -800,8 +802,8 @@ export function WorkspaceProvider({
               const sender = payload?.sender_name || pick.source.replace(/^(openagents:|human:)/, '');
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
-              const isStatus = msgType === 'status' || msgType === 'thinking';
-              return { sessionId: ch.sessionId, senderName: sender, content, isStatus };
+              const isStatus = (msgType === 'status' || msgType === 'thinking') && isFresh;
+              return { sessionId: ch.sessionId, senderName: sender, content, isStatus, timestamp: eventTime };
             } catch { /* ignore */ }
             return null;
           })

@@ -53,7 +53,6 @@ func StartScheduler() {
 	}()
 }
 
-// expireStaleAgents 自动将超过心跳宽限期的离线 Agent 状态更新为 offline。
 func expireStaleAgents() {
 	if db.DB == nil {
 		return
@@ -63,8 +62,9 @@ func expireStaleAgents() {
 		timeoutSec = config.GlobalConfig.AgentTimeoutSeconds
 	}
 	cutoff := time.Now().Add(-time.Duration(timeoutSec) * time.Second)
+	cutoffUTC := time.Now().UTC().Add(-time.Duration(timeoutSec) * time.Second)
 	db.DB.Model(&models.WorkspaceMember{}).
-		Where("status IN ? AND (last_heartbeat IS NULL OR last_heartbeat < ?)", []string{"online", "launching"}, cutoff).
+		Where("status IN ? AND (last_heartbeat IS NULL OR last_heartbeat < ? OR last_heartbeat < ?)", []string{"online", "launching"}, cutoff, cutoffUTC).
 		Updates(map[string]interface{}{"status": "offline", "session_id": nil})
 }
 
