@@ -97,6 +97,13 @@ export function GitChip({
   const [pulling, setPulling] = useState(false);
   const [pushing, setPushing] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  // These three belong above the `!status.available` early return below. Declared
+  // after it, they only ran on the renders that got past it, so the first render
+  // where git status arrived called more hooks than the one before it and React
+  // tore down the whole tree.
+  const [diffModalFile, setDiffModalFile] = useState<string | null>(null);
+  const [diffContent, setDiffContent] = useState<string>('');
+  const [loadingDiff, setLoadingDiff] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -201,10 +208,6 @@ export function GitChip({
       toast.error(e instanceof Error ? e.message : 'Unstage failed');
     }
   };
-
-  const [diffModalFile, setDiffModalFile] = useState<string | null>(null);
-  const [diffContent, setDiffContent] = useState<string>('');
-  const [loadingDiff, setLoadingDiff] = useState(false);
 
   const handleViewDiff = async (filePath: string) => {
     if (!channelId) return;
