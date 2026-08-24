@@ -5,8 +5,8 @@ package scheduler
 import (
 	"encoding/json" // 编码事件负载。
 	"fmt"
-	"log"           // 打印到期任务触发日志。
-	"time"          // 控制轮询间隔与到期比对。
+	"log"  // 打印到期任务触发日志。
+	"time" // 控制轮询间隔与到期比对。
 
 	"github.com/google/uuid" // 生成事件唯一 UUID 主键。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
@@ -298,13 +298,30 @@ func compactActiveChannels() {
 
 // expireStalePipelineSteps checks running pipeline chains and halts any whose current step
 // has exceeded AgentTimeoutSeconds (default 300s) without an agent reply.
+// lastAgentActivityMs returns when this agent last emitted anything into the
+// channel, which includes the status and thinking events a working agent streams
+// and not just its final reply. An agent that has been silent throughout the
+// step falls back to the step's start time.
+func lastAgentActivityMs(workspaceID, target, agentName string, since int64) int64 {
+	var rows []models.EventRecord
+	if err := db.DB.
+		Where("network_id = ? AND target = ? AND timestamp > ? AND source IN ?",
+			workspaceID, target, since, []string{agentName, "openagents:" + agentName}).
+		Order("timestamp desc").Limit(1).Find(&rows).Error; err != nil || len(rows) == 0 {
+		return since
+	}
+	return rows[0].Timestamp
+}
+
 func expireStalePipelineSteps() {
 	if db.DB == nil {
 		return
 	}
-	timeoutSec := 300
-	if config.GlobalConfig != nil && config.GlobalConfig.AgentTimeoutSeconds > 0 {
-		timeoutSec = config.GlobalConfig.AgentTimeoutSeconds
+	// Never AgentTimeoutSeconds: that is the heartbeat liveness threshold, on the
+	// order of a minute, and a coding step routinely runs far longer than that.
+	timeoutSec := 1800
+	if config.GlobalConfig != nil && config.GlobalConfig.PipelineStepTimeoutSeconds > 0 {
+		timeoutSec = config.GlobalConfig.PipelineStepTimeoutSeconds
 	}
 	nowMs := time.Now().UnixMilli()
 	var runningPipelines []models.ChannelPipeline
@@ -325,7 +342,22 @@ func expireStalePipelineSteps() {
 			continue
 		}
 
-		elapsedSec := (nowMs - *steps[idx].StartedAt) / 1000
+		if (nowMs-*steps[idx].StartedAt)/1000 < int64(timeoutSec) {
+			continue
+		}
+
+		var ch models.Channel
+		if err := db.DB.Where("id = ?", pipe.ChannelID).First(&ch).Error; err != nil {
+			continue
+		}
+		target := "channel/" + ch.Name
+
+		// The step has been open a long time, but that alone does not mean the
+		// agent is gone: a coding agent emits status and thinking events all the
+		// way through a long task. Reap on *silence*, not on duration, or the
+		// deadline kills work that is visibly in progress.
+		lastSeen := lastAgentActivityMs(pipe.WorkspaceID, target, steps[idx].Agent, *steps[idx].StartedAt)
+		elapsedSec := (nowMs - lastSeen) / 1000
 		if elapsedSec >= int64(timeoutSec) {
 			// Mark this step and pipeline as failed
 			steps[idx].Status = "failed"
@@ -342,14 +374,10 @@ func expireStalePipelineSteps() {
 				})
 
 			if res.Error == nil && res.RowsAffected > 0 {
-				var ch models.Channel
-				if err := db.DB.Where("id = ?", pipe.ChannelID).First(&ch).Error; err == nil {
-					target := "channel/" + ch.Name
-					haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted: Timeout] Step %d (@%s) timed out after %d seconds without response.\nHuman intervention required.",
-						idx+1, steps[idx].Agent, elapsedSec)
-					handlers.RelayPipelineAlert(pipe.WorkspaceID, target, haltMsg)
-				}
-				log.Printf("scheduler: pipeline %s step %d (@%s) timed out after %ds and was halted", pipe.ID, idx+1, steps[idx].Agent, elapsedSec)
+				haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted: Timeout] Step %d (@%s) went silent for %d seconds.\nHuman intervention required.",
+					idx+1, steps[idx].Agent, elapsedSec)
+				handlers.RelayPipelineAlert(pipe.WorkspaceID, target, haltMsg)
+				log.Printf("scheduler: pipeline %s step %d (@%s) silent for %ds and was halted", pipe.ID, idx+1, steps[idx].Agent, elapsedSec)
 			}
 		}
 	}

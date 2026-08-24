@@ -383,6 +383,16 @@ function createMainWindow() {
 
   Menu.setApplicationMenu(null);
 
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer Console] [${level}] ${message} (${sourceId}:${line})`);
+  });
+
   let isAppLoaded = false;
   let retryCount = 0;
   const maxRetries = 60;

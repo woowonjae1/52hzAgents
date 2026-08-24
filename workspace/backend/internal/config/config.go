@@ -14,13 +14,16 @@ type Config struct {
 	Host                string
 	Port                int
 	AgentTimeoutSeconds int
-	RequestsPerMinute   int
-	CORSOrigins         []string
-	RouterLLMEnabled    bool
-	RouterLLMProvider   string
-	RouterLLMModel      string
-	RouterLLMAPIKey     string
-	RouterLLMBaseURL    string
+	// PipelineStepTimeoutSeconds bounds how long one pipeline step may run before
+	// the scheduler halts it. Independent of AgentTimeoutSeconds on purpose.
+	PipelineStepTimeoutSeconds int
+	RequestsPerMinute          int
+	CORSOrigins                []string
+	RouterLLMEnabled           bool
+	RouterLLMProvider          string
+	RouterLLMModel             string
+	RouterLLMAPIKey            string
+	RouterLLMBaseURL           string
 }
 
 var GlobalConfig *Config
@@ -67,6 +70,20 @@ func LoadConfig() {
 		}
 	}
 
+	// A pipeline step's deadline is a different quantity from agent liveness by
+	// one to two orders of magnitude. AGENT_TIMEOUT_SECONDS answers "has this
+	// agent gone away?", which is a question about seconds; a step's deadline
+	// answers "how long may a coding task legitimately take?", which is a
+	// question about tens of minutes. Deriving the second from the first kills
+	// every real task at the one-minute mark.
+	stepTimeoutStr := os.Getenv("PIPELINE_STEP_TIMEOUT_SECONDS")
+	stepTimeout := 1800
+	if stepTimeoutStr != "" {
+		if t, err := strconv.Atoi(stepTimeoutStr); err == nil && t > 0 {
+			stepTimeout = t
+		}
+	}
+
 	rateLimitStr := os.Getenv("REQUESTS_PER_MINUTE")
 	// Budgeted against real steady-state load, because the limiter keys on client
 	// IP and every agent connector plus every browser tab on a machine shares one.
@@ -104,20 +121,21 @@ func LoadConfig() {
 	}
 
 	GlobalConfig = &Config{
-		DatabaseURL:         dbURL,
-		AuthMode:            authMode,
-		FileStorageBackend:  storageBackend,
-		FileStoragePath:     storagePath,
-		Host:                host,
-		Port:                port,
-		AgentTimeoutSeconds: timeout,
-		RequestsPerMinute:   rateLimit,
-		CORSOrigins:         allowedOrigins,
-		RouterLLMEnabled:    routerEnabled,
-		RouterLLMProvider:   routerProvider,
-		RouterLLMModel:      strings.TrimSpace(os.Getenv("ROUTER_LLM_MODEL")),
-		RouterLLMAPIKey:     routerKey,
-		RouterLLMBaseURL:    strings.TrimRight(strings.TrimSpace(os.Getenv("ROUTER_LLM_BASE_URL")), "/"),
+		DatabaseURL:                dbURL,
+		AuthMode:                   authMode,
+		FileStorageBackend:         storageBackend,
+		FileStoragePath:            storagePath,
+		Host:                       host,
+		Port:                       port,
+		AgentTimeoutSeconds:        timeout,
+		PipelineStepTimeoutSeconds: stepTimeout,
+		RequestsPerMinute:          rateLimit,
+		CORSOrigins:                allowedOrigins,
+		RouterLLMEnabled:           routerEnabled,
+		RouterLLMProvider:          routerProvider,
+		RouterLLMModel:             strings.TrimSpace(os.Getenv("ROUTER_LLM_MODEL")),
+		RouterLLMAPIKey:            routerKey,
+		RouterLLMBaseURL:           strings.TrimRight(strings.TrimSpace(os.Getenv("ROUTER_LLM_BASE_URL")), "/"),
 	}
 }
 

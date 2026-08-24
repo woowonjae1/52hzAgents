@@ -549,23 +549,39 @@
   }
 
   /** Option 3: Fluid Bouncing / Pulsing Indicator Dots **/
+  /**
+   * The "agent is working" dots. Three things matter here and the previous
+   * version got two of them wrong.
+   *
+   * No glow. The old peak frame carried `drop-shadow(0 0 3px rgba(255,255,255,
+   * .45))` — a hardcoded white halo. On a light background that is a grey
+   * smudge around a dark dot rather than a glow, so the effect only ever read
+   * correctly in dark mode. Dropping it fixes light mode, removes an animated
+   * `filter` (the one property here that forces a repaint rather than riding on
+   * the compositor), and keeps the indicator on the restrained side.
+   *
+   * A rest phase. Animating symmetrically for the whole cycle makes three dots
+   * jitter continuously. Holding from 70% to 100% turns the same motion into a
+   * wave that travels once and then breathes, which is calmer to sit next to
+   * while a task runs for minutes.
+   */
   @keyframes fluid-dot-bounce {
-    0%, 100% {
-      transform: translateY(0px) scale(0.85);
-      opacity: 0.35;
-      filter: drop-shadow(0 0 0px transparent);
+    0%, 70%, 100% {
+      transform: translateY(0) scale(0.9);
+      opacity: 0.3;
     }
-    50% {
-      transform: translateY(-3px) scale(1.15);
+    35% {
+      transform: translateY(-2.5px) scale(1.1);
       opacity: 1;
-      filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.45));
     }
   }
   .fluid-dot {
-    animation: fluid-dot-bounce 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    /* ease-in-out sine: no overshoot, so the dots settle instead of snapping. */
+    animation: fluid-dot-bounce 1.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+    will-change: transform, opacity;
   }
   @media (prefers-reduced-motion: reduce) {
-    .fluid-dot { animation: none; opacity: 0.8; transform: none; filter: none; }
+    .fluid-dot { animation: none; opacity: 0.8; transform: none; will-change: auto; }
   }
 }
 

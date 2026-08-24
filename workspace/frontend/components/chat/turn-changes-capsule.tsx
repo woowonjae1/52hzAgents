@@ -40,11 +40,11 @@ export function TurnChangesCapsule({
 }: TurnChangesCapsuleProps) {
   const [expanded, setExpanded] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
-  const [rolledBack, setRolledBack] = useState(turnChanges.status === 'rolled_back');
+  const [rolledBack, setRolledBack] = useState(turnChanges?.status === 'rolled_back');
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleRollback = async () => {
-    if (!channelId || !turnChanges.turn_id || rollingBack || rolledBack) return;
+    if (!channelId || !turnChanges?.turn_id || rollingBack || rolledBack) return;
     setRollingBack(true);
     try {
       const res = await workspaceApi.rollbackTurn(channelId, turnChanges.turn_id, false);
@@ -62,12 +62,12 @@ export function TurnChangesCapsule({
     }
   };
 
-  const files = turnChanges.changes || [];
-  const fileCount = turnChanges.file_count || files.length;
-  const additions = turnChanges.additions || 0;
-  const deletions = turnChanges.deletions || 0;
+  const files = turnChanges?.changes || [];
+  const fileCount = turnChanges?.file_count || files.length;
+  const additions = turnChanges?.additions || 0;
+  const deletions = turnChanges?.deletions || 0;
 
-  if (fileCount === 0) return null;
+  if (!turnChanges || fileCount === 0) return null;
 
   return (
     <div

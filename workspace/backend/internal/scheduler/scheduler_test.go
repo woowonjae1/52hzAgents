@@ -24,12 +24,16 @@ func setupTestDB(t *testing.T) {
 		&models.Channel{},
 		&models.AgentApprovalRecord{},
 		&models.WorkspaceMember{},
+		&models.EventRecord{},
 	)
 	if err != nil {
 		t.Fatalf("failed to auto migrate: %v", err)
 	}
 	config.GlobalConfig = &config.Config{
 		AgentTimeoutSeconds: 5,
+		// A step's deadline is deliberately a separate knob from agent liveness;
+		// the sweeper must never read AgentTimeoutSeconds.
+		PipelineStepTimeoutSeconds: 5,
 	}
 }
 
@@ -131,5 +135,50 @@ func TestExpirePendingApprovals(t *testing.T) {
 	}
 	if res2.Status != "pending" {
 		t.Errorf("Expected app2 status to remain 'pending', got '%s'", res2.Status)
+	}
+}
+
+// A long-running coding step is not a stalled one. The agent streams status and
+// thinking events the whole time it works, so the sweeper must reap on silence
+// rather than on how long the step has been open -- otherwise the deadline kills
+// work that is visibly in progress, which is exactly what a one-minute default
+// did to every real task.
+func TestExpireStalePipelineStepsSparesAnActiveAgent(t *testing.T) {
+	setupTestDB(t)
+
+	wsID := uuid.NewString()
+	chID := uuid.NewString()
+	db.DB.Create(&models.Channel{ID: chID, WorkspaceID: wsID, Name: "general", Status: "active"})
+
+	// The step opened well past the deadline...
+	startedAt := time.Now().Add(-60 * time.Second).UnixMilli()
+	stepsJSON, _ := json.Marshal([]models.PipelineStep{{
+		Agent:      "coder",
+		Status:     "running",
+		StartedAt:  &startedAt,
+		MaxRetries: 3,
+	}})
+	pipeline := models.ChannelPipeline{
+		ID: uuid.NewString(), WorkspaceID: wsID, ChannelID: chID,
+		Steps: stepsJSON, CurrentIndex: 0, Status: "running",
+	}
+	db.DB.Create(&pipeline)
+
+	// ...but the agent reported in one second ago.
+	db.DB.Create(&models.EventRecord{
+		ID:        uuid.NewString(),
+		NetworkID: wsID,
+		Type:      "workspace.message.posted",
+		Source:    "openagents:coder",
+		Target:    "channel/general",
+		Timestamp: time.Now().Add(-1 * time.Second).UnixMilli(),
+	})
+
+	expireStalePipelineSteps()
+
+	var updated models.ChannelPipeline
+	db.DB.Where("id = ?", pipeline.ID).First(&updated)
+	if updated.Status != "running" {
+		t.Fatalf("an agent active 1s ago must not be halted, got status %q", updated.Status)
 	}
 }

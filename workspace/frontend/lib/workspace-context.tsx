@@ -600,7 +600,17 @@ export function WorkspaceProvider({
         return workspaceApi.sendAgentControl(a.agentName, 'stop', { channel });
       })
     );
-    await sendStop();
+
+    // Stopping the agents is not the same as stopping the relay chain. A
+    // pipeline left in `running` resumes the moment the stopped agent's last
+    // message lands, because that is what advances it to the next step -- so
+    // pressing stop would visibly hand the work to another agent. Halt the
+    // chain for every session being stopped, alongside the agent controls.
+    const haltPipelines = () => Promise.allSettled(
+      sessionIds.map((sid) => workspaceApi.haltChannelPipeline(sid))
+    );
+
+    await Promise.allSettled([sendStop(), haltPipelines()]);
 
     window.setTimeout(() => {
       setStoppingSessionIds((prevStopping) => {

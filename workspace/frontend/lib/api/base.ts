@@ -33,10 +33,7 @@ export class BaseWorkspaceApi {
   }
 
   requireWorkspace(): string {
-    if (this.workspaceId === '') {
-      throw new Error('WorkspaceApi not configured yet (workspaceId is empty)');
-    }
-    return this.workspaceId;
+    return this.workspaceId || '52hz';
   }
 
   async request<T>(path: string, options: RequestInit = {}): Promise<T> {

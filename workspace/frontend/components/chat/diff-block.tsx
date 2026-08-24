@@ -18,8 +18,10 @@ interface DiffRow {
   text: string;
 }
 
-// Parse a unified diff into rows with reconstructed old/new line numbers.
 function parseDiff(code: string): { rows: DiffRow[]; file: string | null; adds: number; dels: number } {
+  if (!code || typeof code !== 'string') {
+    return { rows: [], file: null, adds: 0, dels: 0 };
+  }
   const lines = code.replace(/\n$/, '').split('\n');
   const rows: DiffRow[] = [];
   let oldNo = 0;
