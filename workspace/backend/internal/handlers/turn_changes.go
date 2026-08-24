@@ -215,6 +215,11 @@ func captureTurnSnapshot(dir string) (*turnSnapshot, error) {
 //
 // A clean tree produces no stash commit, and needs none: HEAD already describes
 // it exactly.
+//
+// Known gap: `stash create` captures tracked files only, so a path the human
+// created but never staged is absent from the snapshot. Rollback then fails that
+// path into `failedPaths` rather than restoring it -- safe, but the caller sees a
+// raw git pathspec error instead of an explanation.
 func captureBaseCommit(dir, turnID, head string) string {
 	stashCommit, err := runGit(dir, "stash", "create")
 	stashCommit = strings.TrimSpace(stashCommit)
