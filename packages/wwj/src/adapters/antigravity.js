@@ -340,8 +340,36 @@ class AntigravityAdapter extends BaseAdapter {
         }
       };
 
+      // `agy` gets no timeout of its own, and a single-agent turn has no
+      // pipeline sweeper behind it either, so a hung child left the channel
+      // sitting on "正在推理中..." forever with nothing to report and no way
+      // out. Reap on *silence* rather than total duration: a long task keeps
+      // emitting stream-json, so any real work resets this.
+      const IDLE_KILL_MS = Number(process.env.ANTIGRAVITY_IDLE_TIMEOUT_MS) || 5 * 60 * 1000;
+      let idleTimer = null;
+      let idleKilled = false;
+      const clearIdle = () => {
+        if (idleTimer) {
+          clearTimeout(idleTimer);
+          idleTimer = null;
+        }
+      };
+      const armIdle = () => {
+        clearIdle();
+        idleTimer = setTimeout(() => {
+          idleKilled = true;
+          this._log(`[spawn] idle timeout after ${IDLE_KILL_MS}ms, killing pid=${proc.pid}`);
+          // _stopProcess, not proc.kill(): on Windows the child is often
+          // cmd.exe wrapping agy, and killing the wrapper leaves the real
+          // process running. taskkill /F /T takes the whole tree.
+          this._stopProcess(proc).catch(() => {});
+        }, IDLE_KILL_MS);
+      };
+      armIdle();
+
       if (proc.stdout) {
         proc.stdout.on('data', (data) => {
+          armIdle();
           const str = data.toString('utf-8');
           rawStdout += str;
           lineBuffer += str;
@@ -355,11 +383,13 @@ class AntigravityAdapter extends BaseAdapter {
 
       if (proc.stderr) {
         proc.stderr.on('data', (data) => {
+          armIdle();
           rawStderr += data.toString('utf-8');
         });
       }
 
       proc.on('close', async (code) => {
+        clearIdle();
         if (lineBuffer.trim()) {
           pendingLines = pendingLines.then(() => processLine(lineBuffer)).catch(() => {});
         }
@@ -381,6 +411,20 @@ class AntigravityAdapter extends BaseAdapter {
           await this.sendResponse(channel, cleanOutput);
         } else if (lastErrorText) {
           await this.sendError(channel, `❌ Antigravity: ${lastErrorText}`);
+        } else if (idleKilled) {
+          // Say what was actually observed. "No output for N minutes" is a
+          // diagnosis the user can act on; an eternal "正在推理中..." is not.
+          const tail = stripAnsi(rawStderr).trim().split('\n').slice(-4).join('\n');
+          const mins = Math.round(IDLE_KILL_MS / 60000);
+          const detail = tail
+            ? `\n最后的 stderr:\n${tail}`
+            : '\n没有 stderr 输出 — agy 可能在等待登录或交互确认。';
+          await this.sendError(
+            channel,
+            `⏱️ Antigravity ${mins} 分钟内没有任何输出，已终止。`
+            + `\nstdout ${rawStdout.length}B / stderr ${rawStderr.length}B`
+            + detail
+          );
         } else if (code !== 0) {
           await this.sendResponse(channel, `⚠️ Antigravity 执行结束（退出码: ${code}），未产生输出。`);
         }
@@ -400,6 +444,7 @@ class AntigravityAdapter extends BaseAdapter {
       });
 
       proc.on('error', async (err) => {
+        clearIdle();
         delete this._channelProcesses[channel];
         await this.sendStatus(channel, 'idle');
         this._log(`[spawn] event=error channel=${channel} msg=${err.message}`);
