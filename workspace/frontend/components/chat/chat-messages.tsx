@@ -501,6 +501,15 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     const pending = loadingMessages[0];
                     const pendingName = pending?.senderName || 'Agent';
                     const pendingAgent = agents?.find((a) => a.agentName === pendingName);
+
+                    // An offline agent is not working on anything. Without this
+                    // check the row kept animating after the connector dropped,
+                    // so the header read "antigravity Working" at the same time
+                    // as the banner read "No agents are online" — and the user
+                    // had no way to tell which one was lying.
+                    if (pendingAgent && pendingAgent.status !== 'online') {
+                      return null;
+                    }
                     return (
                       <div className="flex items-start gap-3 py-1">
                         <AgentAvatar

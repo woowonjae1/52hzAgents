@@ -290,8 +290,13 @@ export function MissionControl() {
       toast.success(`${agentName} is online`);
       const updated = await workspaceApi.listAgents();
       setAgents(updated);
-    } catch {
-      toast.error(`Could not connect ${agentName}`);
+    } catch (e) {
+      // Never swallow this one. A bare `Could not connect` leaves the user (and
+      // anyone debugging with them) with no way to tell a missing runtime from a
+      // bad token from a daemon that is not running.
+      const reason = e instanceof Error ? e.message : String(e);
+      toast.error(`Could not connect ${agentName}: ${reason}`);
+      console.error(`[52hzAgents] launchAgent(${agentName}) failed:`, e);
     }
   };
 
