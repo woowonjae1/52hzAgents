@@ -31,6 +31,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { WorkingIndicator } from './working-indicator';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
+import { SubagentList } from '@/components/ai-elements/subagent-list';
 import { MarkdownContent } from './markdown-content';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
@@ -434,7 +435,24 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
   }
 
   if (parsed.type === 'subagents' && parsed.subagents && parsed.subagents.length > 0) {
-    return <SubagentTree subagents={parsed.subagents} />;
+    const agentItems = parsed.subagents.map((a) => ({
+      name: a.role || a.typeName || 'Subagent',
+      role: a.role,
+      model: a.model && a.model !== 'inherit' ? a.model : undefined,
+      workspace: a.workspace,
+      prompt: a.prompt,
+      status: a.status || 'running',
+      steps: a.steps,
+    }));
+    const completedCount = agentItems.filter((a) => a.status === 'completed').length;
+    return (
+      <SubagentList
+        agents={agentItems}
+        completedCount={completedCount}
+        showSummary={agentItems.length > 1}
+        summaryAgent={{ name: 'Synthesis Lead', model: 'Lead Orchestrator' }}
+      />
+    );
   }
 
   if (parsed.type === 'tool_call') {

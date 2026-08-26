@@ -336,8 +336,40 @@ class AntigravityAdapter extends BaseAdapter {
               try { await this.sendThinking(channel, su.text_delta || su.content); } catch {}
             }
           } else if (su.step_type === 'agent_response') {
-            if (su.text_delta) {
-              textDeltas.push(su.text_delta);
+            const delta = su.text_delta || '';
+            if (delta) {
+              textDeltas.push(delta);
+
+              // Detect if agent text announces launching subagents in real-time
+              const fullTextSoFar = textDeltas.join('');
+              if (!reportedSteps.has('text_subagent_detected') && (fullTextSoFar.includes('子代理') || fullTextSoFar.includes('子智能体') || fullTextSoFar.includes('subagent') || fullTextSoFar.includes('Subagent'))) {
+                const listMatches = fullTextSoFar.match(/(?:^|\n)\s*(?:\d+\.|\*|-)\s*([^—\n:：]+)[—\-:：]\s*([^\n]+)/g);
+                if (listMatches && listMatches.length > 0) {
+                  const detectedAgents = [];
+                  for (const line of listMatches) {
+                    const m = line.match(/(?:\d+\.|\*|-)\s*([^—\n:：]+)[—\-:：]\s*([^\n]+)/);
+                    if (m) {
+                      const role = m[1].replace(/^[·•\s]+|[·•\s]+$/g, '').trim();
+                      const prompt = m[2].trim();
+                      if (role && prompt && role.length < 40) {
+                        detectedAgents.push({
+                          role,
+                          prompt,
+                          typeName: 'research',
+                          workspace: 'inherit',
+                          status: fullTextSoFar.includes('已完成') || fullTextSoFar.includes('报告已完成') ? 'completed' : 'running',
+                        });
+                      }
+                    }
+                  }
+                  if (detectedAgents.length > 0) {
+                    reportedSteps.add('text_subagent_detected');
+                    try {
+                      await this.sendStatus(channel, `invoke_subagent › ${JSON.stringify(detectedAgents)}`);
+                    } catch {}
+                  }
+                }
+              }
             }
           } else if (su.step_type === 'checkpoint') {
             try { await this.sendStatus(channel, 'Checkpoint reached'); } catch {}
