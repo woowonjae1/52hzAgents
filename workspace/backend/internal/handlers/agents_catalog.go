@@ -131,7 +131,7 @@ func GetAgentCatalog(c *gin.Context) {
 		},
 		{
 			"name":            "deepseek",
-			"label":           "DeepSeek R1",
+			"label":           "DeepSeek",
 			"description":     "Deep reasoning and code architecture intelligence agent.",
 			"install_command": "wwj install deepseek",
 			"homepage":        "https://deepseek.com",
