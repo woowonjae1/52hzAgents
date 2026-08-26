@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, execFileSync, spawn } = require('child_process');
+const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
 const { formatAttachmentsForPrompt, logRawEvent } = require('./utils');
@@ -92,6 +92,10 @@ function resolveFlavor(agentType, agentName) {
 // window across channels.
 const VERSION_PROBE_TTL_MS = 60000;
 
+// How long `<cli> models` output is reused. The roster changes when a provider
+// or subscription changes, not between turns, and the probe costs seconds.
+const MODELS_CACHE_TTL_MS = 10 * 60 * 1000;
+
 // Short, de-identified, actionable user messages per failure category. These
 // must NEVER default to "run auth login": only credential_missing / auth_failed
 // mention authentication. Diagnostics (exit code, signal, redacted stdout/
@@ -111,7 +115,12 @@ function failureMessages(flavor) {
   cli_not_executable: `${name} CLI was found but could not be started. Reinstall it, then retry.`,
   unsupported_version: `This ${name} CLI version is not supported (requires >= ${f.minVersion}). Reinstall \`${install}\` and retry.`,
   unverified_version: `This ${name} CLI version is newer than the highest version this adapter has been verified against (${f.testedMaxVersion}). Execution was blocked rather than risk a run that produces no output. Install \`${install}\`, or set WWJ_ALLOW_UNVERIFIED_CLI_VERSION=1 to run anyway.`,
-  model_missing: `No model is configured for ${name}. Choose one in the ${name} TUI (or its config at ${f.configDir}), then retry — this workspace forwards the model you picked and never selects one for you.`,
+  // Names the path that actually works. The obvious advice — "pick one in the
+  // TUI" — is wrong on its own: the TUI persists its choice into an internal
+  // database, not into the config file, so a TUI-only selection is invisible
+  // here. Backticks around the path keep the chat renderer from eating the
+  // Windows backslashes.
+  model_missing: `No model is configured for ${name}. Pick one from the model selector above this thread — it offers exactly what \`${cli} models\` reports for your account — or add a "model" key to \`${path.join(f.configDir, f.configFiles[0])}\`. Choosing a model only inside ${name}'s TUI is not enough: it stores that in an internal database this workspace does not read.`,
   credential_missing: `${name} has no API key or sign-in configured. Add an API key (LLM_API_KEY) or run \`${cli} auth login\`, then retry.`,
   auth_failed: `${name}'s provider rejected the credentials (authentication failed). Check the API key or sign-in and retry.`,
   provider_not_configured: `${name} has no usable provider configured. Configure a provider and model, then retry.`,
@@ -792,10 +801,34 @@ class OpenCodeAdapter extends BaseAdapter {
    * the probe fails; an empty list must be reported as "unknown", never
    * substituted with a guess.
    */
-  _listModels() {
+  async _listModels() {
+    // `<cli> models` costs 2.1s (opencode) to 7.6s (kilo) — measured. This is
+    // called from the 30s heartbeat, so it must never block the event loop and
+    // must not re-probe every tick: a spawn (not execFileSync) behind a TTL
+    // cache. Everything downstream awaits.
+    const now = Date.now();
+    if (this._modelsCache && now - this._modelsCache.at < MODELS_CACHE_TTL_MS) {
+      return this._modelsCache.models;
+    }
+    if (this._modelsInFlight) return this._modelsInFlight;
+
     const binary = this._opencodeBinary || this._findOpencodeBinary();
     if (!binary) return [];
-    const out = this._runHiddenCliSync(binary, ['models']);
+
+    this._modelsInFlight = this._probeModels(binary)
+      .then((models) => {
+        // Only cache a non-empty answer: a failed probe must read as "unknown"
+        // and be retried, never harden into an empty list.
+        if (models.length) this._modelsCache = { at: Date.now(), models };
+        return models;
+      })
+      .finally(() => { this._modelsInFlight = null; });
+    return this._modelsInFlight;
+  }
+
+  /** Parse `<cli> models` output into {id, provider, label}. */
+  async _probeModels(binary) {
+    const out = await this._runHiddenCliAsync(binary, ['models']);
     if (!out) return [];
     const seen = new Set();
     const models = [];
@@ -825,7 +858,7 @@ class OpenCodeAdapter extends BaseAdapter {
         : fromConfig ? 'cli-config'
         : currentId ? 'agent-env'
         : 'unknown';
-      const models = this._listModels();
+      const models = await this._listModels();
       await this.client.reportAgentUsage(
         this.workspaceId,
         this.agentName,
@@ -844,23 +877,32 @@ class OpenCodeAdapter extends BaseAdapter {
   }
 
   /** Blocking `<cli> <args>` capture for short metadata probes. */
-  _runHiddenCliSync(binary, args, timeoutMs = 25000) {
-    try {
+  _runHiddenCliAsync(binary, args, timeoutMs = 30000) {
+    return new Promise((resolve) => {
       const isBatch = IS_WINDOWS && /\.(cmd|bat)$/i.test(binary);
       const cmd = isBatch ? (process.env.COMSPEC || 'cmd.exe') : binary;
       const argv = isBatch ? ['/c', binary, ...args] : args;
-      return execFileSync(cmd, argv, {
-        encoding: 'utf-8',
-        timeout: timeoutMs,
-        windowsHide: true,
-        maxBuffer: 8 * 1024 * 1024,
-        env: this.agentEnv || process.env,
-        stdio: ['ignore', 'pipe', 'ignore'],
-      });
-    } catch (e) {
+      let proc;
+      try {
+        proc = spawn(cmd, argv, {
+          windowsHide: true,
+          env: this.agentEnv || process.env,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+      } catch {
+        resolve('');
+        return;
+      }
+      let out = '';
+      const timer = setTimeout(() => {
+        try { proc.kill(); } catch {}
+        resolve(out);
+      }, timeoutMs);
+      proc.stdout.on('data', (d) => { out += d.toString('utf-8'); });
+      proc.on('error', () => { clearTimeout(timer); resolve(''); });
       // Non-zero exit still carries usable stdout for `models`.
-      return (e && e.stdout) ? String(e.stdout) : '';
-    }
+      proc.on('close', () => { clearTimeout(timer); resolve(out); });
+    });
   }
 
   async _onControlAction(action, payload) {
@@ -872,7 +914,7 @@ class OpenCodeAdapter extends BaseAdapter {
       // Only accept something the CLI itself declared. An id we cannot see in
       // `<cli> models` would be forwarded to `--model` and fail per-run with an
       // opaque provider error, so reject it here where we can say why.
-      const known = this._listModels();
+      const known = await this._listModels();
       if (known.length && !known.some((m) => m.id === requested)) {
         this._log(`set_model: '${requested}' is not in \`${this.flavor.binaryCandidates[0]} models\` — ignoring`);
         return;
