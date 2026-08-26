@@ -161,9 +161,13 @@ class AntigravityAdapter extends BaseAdapter {
     }
   }
 
-  getCurrentModel() {
+  _getModel() {
     const settings = this._getSettings();
-    return settings.model || 'Gemini 3.5 Flash (Medium)';
+    return settings.model || 'Gemini 3.7 Flash (High)';
+  }
+
+  getCurrentModel() {
+    return this._getModel();
   }
 
   async _onControlAction(action, payload) {
@@ -171,9 +175,13 @@ class AntigravityAdapter extends BaseAdapter {
       const modelIdOrName = payload && payload.model;
       if (modelIdOrName) {
         const found = ANTIGRAVITY_MODELS.find(
-          (m) => m.id === modelIdOrName || m.name.toLowerCase() === modelIdOrName.toLowerCase() || m.shortName.toLowerCase() === modelIdOrName.toLowerCase()
+          (m) =>
+            m.id === modelIdOrName ||
+            m.name.toLowerCase() === modelIdOrName.toLowerCase() ||
+            m.shortName.toLowerCase() === modelIdOrName.toLowerCase() ||
+            (m.agyName && m.agyName.toLowerCase() === modelIdOrName.toLowerCase())
         );
-        const targetModelName = found ? found.name : modelIdOrName;
+        const targetModelName = found ? (found.agyName || found.name) : modelIdOrName;
 
         const settings = this._getSettings();
         settings.model = targetModelName;
