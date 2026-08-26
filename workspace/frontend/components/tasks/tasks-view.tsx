@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, CheckCircle2, Circle, Loader2, Pencil, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, CheckCircle2, Circle, CircleDot, Pencil, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -30,9 +30,17 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+/**
+ * The status glyph. Quiet in every state.
+ *
+ * `in_progress` used to spin a `Loader2`. It is gone for the same reason the 57
+ * other spinners went: the row's TITLE now carries `.event-running`, the app's
+ * one "still going" signal, so a task in flight looks like a tool call in
+ * flight. A spinning icon next to shimmering text would be that signal twice.
+ */
 function StatusIcon({ status }: { status: TodoStatus }) {
   if (status === 'completed') return <CheckCircle2 className="size-4 text-foreground-muted shrink-0" />;
-  if (status === 'in_progress') return <Loader2 className="size-4 text-foreground-muted shrink-0 animate-spin" />;
+  if (status === 'in_progress') return <CircleDot className="size-4 text-foreground-muted shrink-0" />;
   if (status === 'cancelled') return <XCircle className="size-4 text-foreground-extra-muted shrink-0" />;
   return <Circle className="size-4 text-foreground-extra-muted shrink-0" />;
 }
@@ -179,9 +187,9 @@ export function TasksView() {
     return (
       <section key={sectionStatus}>
         <h3 className="mb-2 text-2xs font-medium text-muted-foreground">
-          {STATUS_LABEL[sectionStatus]} <span className="text-muted-foreground/60">{items.length}</span>
+          {STATUS_LABEL[sectionStatus]} <span className="font-mono tabular-nums text-foreground-extra-muted">{items.length}</span>
         </h3>
-        <div className="overflow-hidden rounded-lg border border-border bg-card divide-y divide-border">
+        <div className="overflow-hidden rounded-lg border border-border bg-card divide-y divide-border/60">
           {items.map((todo) => {
             const isManual = todo.createdBy === manualSource;
             return (
@@ -196,19 +204,23 @@ export function TasksView() {
                   <StatusIcon status={todo.status} />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <p className={cn('text-sm leading-snug', (todo.status === 'completed' || todo.status === 'cancelled') && 'line-through text-muted-foreground')}>
+                  <p className={cn(
+                    'text-sm leading-snug',
+                    todo.status === 'in_progress' && 'event-running',
+                    (todo.status === 'completed' || todo.status === 'cancelled') && 'line-through text-foreground-extra-muted'
+                  )}>
                     {todo.content}
                   </p>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-3xs text-muted-foreground">
-                    <span className={cn(
-                      'px-1.5 py-0.5 rounded text-2xs font-medium',
-                      todo.status === 'in_progress' && 'bg-surface3 text-foreground-muted border border-border-accent',
-                      todo.status === 'completed' && 'bg-status-success/10 text-status-success border border-border-accent',
-                      todo.status === 'pending' && 'bg-surface2 text-muted-foreground border border-border/50',
-                      todo.status === 'cancelled' && 'bg-status-danger/10 text-status-danger border border-border-accent'
-                    )}>
-                      {todo.status.replace('_', ' ')}
-                    </span>
+                  {/*
+                    Four filled, bordered, differently-coloured status chips
+                    became one word in the same muted face as the fields beside
+                    it. The status is already said three other ways on this
+                    screen — the section heading it sits under, the glyph on the
+                    left, and the strikethrough on a finished title — so a green
+                    pill was the fourth telling of it, and the loudest.
+                  */}
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-3xs text-foreground-extra-muted">
+                    <span>{STATUS_LABEL[todo.status].toLowerCase()}</span>
                     <span>{todo.channelName}</span>
                     <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>
                     {todo.assignee && <span>assigned to {todo.assignee}</span>}
@@ -226,7 +238,7 @@ export function TasksView() {
                     <button type="button" onClick={() => void reorderTask(todo, 1)} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground" title="Move task down">
                       <ArrowDown className="size-3.5" />
                     </button>
-                    <button type="button" onClick={() => void deleteTask(todo)} className="rounded p-1 text-muted-foreground hover:bg-surface3 hover:text-status-danger dark:hover:bg-red-950/30" title="Delete task">
+                    <button type="button" onClick={() => void deleteTask(todo)} className="rounded p-1 text-foreground-extra-muted hover:bg-surface3 hover:text-destructive" title="Delete task">
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
@@ -250,7 +262,7 @@ export function TasksView() {
           <Button variant="ghost" mode="icon" size="sm" onClick={() => void refreshTodos()} title="Refresh tasks"><RefreshCw className="size-4" /></Button>
           <button
             onClick={openCreate}
-            className="inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground border border-primary hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center justify-center whitespace-nowrap shrink-0 gap-1.5 h-8 px-3.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer"
           >
             <Plus className="size-3.5 shrink-0" />
             <span className="whitespace-nowrap">New task</span>
@@ -302,7 +314,7 @@ export function TasksView() {
                 {editing && !channels.some((item) => item.id === channel) && <option value={channel}>{channel}</option>}
               </select>
             </div>
-            {error && <p className="text-xs text-status-danger">{error}</p>}
+            {error && <p className="text-xs text-destructive">{error}</p>}
           </div>
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>

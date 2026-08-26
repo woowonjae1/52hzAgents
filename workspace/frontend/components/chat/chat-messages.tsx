@@ -145,9 +145,11 @@ interface ChatMessagesProps {
   hasOlder?: boolean;
   /** Whether older messages are currently being loaded. */
   loadingOlder?: boolean;
+  /** Current session working directory for resolving local path links */
+  workingDir?: string;
 }
 
-export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder }: ChatMessagesProps) {
+export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, workingDir }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
@@ -207,10 +209,13 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
         if (next.senderName !== msg.senderName) continue;
         if (next.messageType === 'status' || next.messageType === 'thinking') continue;
         // Found a chat message from the same agent — check content overlap.
-        // Thinking is truncated to 500 chars + "...", so check if chat
-        // starts with the thinking text (minus trailing "...").
         const thinkText = msg.content.replace(/\.\.\.$/,'').trim();
-        if (thinkText && next.content.startsWith(thinkText)) return false;
+        if (thinkText && (
+          next.content.startsWith(thinkText) ||
+          next.content.includes(thinkText) ||
+          thinkText.includes(next.content.trim()) ||
+          (thinkText.length >= 20 && next.content.includes(thinkText.slice(0, 20)))
+        )) return false;
         break;
       }
       return true;
@@ -510,6 +515,25 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     if (pendingAgent && pendingAgent.status !== 'online') {
                       return null;
                     }
+
+                    // ...and this agent is not ALREADY reporting for itself
+                    // further up. Once it starts emitting thinking or tool
+                    // steps, `IntermediateSteps` renders its own live-edge row
+                    // and `ThinkingMessage` shimmers its own label — so keeping
+                    // this acknowledgement alive meant one working agent
+                    // announced itself twice on adjacent lines (plus a third
+                    // time in the channel header). This row's job is to cover
+                    // the gap BEFORE the first step arrives; after that it is
+                    // someone else's turn to speak.
+                    const alreadyReporting = groups.some((g) =>
+                      g.type === 'thinking'
+                        ? !g.settled && g.sender === pendingName
+                        : g.type === 'steps'
+                          ? !g.settled && g.messages[0]?.senderName === pendingName
+                          : false
+                    );
+                    if (alreadyReporting) return null;
+
                     return (
                       <div className="flex items-start gap-3 py-1">
                         <AgentAvatar
@@ -519,9 +543,14 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                           square
                           className="mt-1 shrink-0"
                         />
-                        <div className="flex items-center gap-2 py-1.5 min-w-0">
+                        <div className="flex items-baseline gap-2 py-1.5 min-w-0">
                           <span className="text-xs font-semibold text-foreground truncate">{pendingName}</span>
-                          <WorkingIndicator />
+                          <WorkingIndicator
+                            label="Starting"
+                            startTime={
+                              pending?.createdAt ? new Date(pending.createdAt).getTime() : undefined
+                            }
+                          />
                         </div>
                       </div>
                     );
@@ -587,6 +616,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         steps={group.steps}
                         hideHeader={group.continuesFrom}
                         isDecisionAnswered={isDecisionAnswered}
+                        workingDir={workingDir}
                       />
                     );
                   })()

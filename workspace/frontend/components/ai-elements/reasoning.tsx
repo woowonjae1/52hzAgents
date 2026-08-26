@@ -1,11 +1,11 @@
 'use client';
 
-import { ChevronDown, Brain, Copy, Check } from 'lucide-react';
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { Brain, Copy, Check } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
-import { cn } from '@/lib/utils';
+import { EventLine, EventLineAction } from './event-line';
+import { formatElapsed } from '@/lib/use-elapsed';
 
 export interface ReasoningProps {
   content: string;
@@ -16,6 +16,20 @@ export interface ReasoningProps {
   className?: string;
 }
 
+/**
+ * The agent's thought process.
+ *
+ * This was a rounded-full capsule with its own indigo accent — an indigo ring,
+ * an indigo glow behind a pulsing brain icon, an indigo-tinted rail, and a
+ * bespoke indigo-to-foreground gradient shimmer driven by a `motion` animation
+ * loop. None of that indigo existed as a token, so it was a fifth accent colour
+ * that nothing in the theme could reach or change.
+ *
+ * It now draws through `EventLine` like every other event. Streaming is signalled
+ * by the shared shimmer, which is the same shimmer a running tool call uses, so
+ * "the agent is working on something with nothing to show yet" looks the same
+ * wherever it happens.
+ */
 export function Reasoning({
   content,
   isStreaming = false,
@@ -24,144 +38,67 @@ export function Reasoning({
   defaultExpanded = false,
   className,
 }: ReasoningProps) {
-  const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded || isStreaming);
   const [copied, setCopied] = useState(false);
-  const reduceMotion = useReducedMotion();
 
-  // Calculate thinking duration text
-  const durationText = useMemo(() => {
-    if (durationMs && durationMs > 0) {
-      const sec = (durationMs / 1000).toFixed(1);
-      return `${sec}s`;
-    }
-    if (startTime && startTime > 0) {
-      const sec = Math.max(0.1, (Date.now() - startTime) / 1000).toFixed(1);
-      return `${sec}s`;
-    }
-    return null;
-  }, [durationMs, startTime]);
-
-  // Collapsed capsule label: live shimmer while streaming, "思考了 x.xs" once settled
-  const label = isStreaming ? 'Thinking…' : durationText ? `Thought for ${durationText}` : 'Reasoning';
+  /**
+   * How long the thought took — ONLY from `durationMs`.
+   *
+   * This used to fall back to `Date.now() - startTime` when no duration was
+   * passed, which is not the thought's duration, it is the thought's AGE. On a
+   * settled block that is wrong by however long ago the message was sent: a
+   * reply from twenty minutes ago read "Thought 1367.1s". It stayed hidden while
+   * traces rendered as loose per-message rows and never reached this label at
+   * all. `startTime` is still accepted, but it now feeds only the LIVE clock in
+   * `EventLine` — where "now minus then" is exactly the right sum.
+   */
+  const durationText = useMemo(
+    () => (durationMs && durationMs > 0 ? formatElapsed(durationMs) : null),
+    [durationMs]
+  );
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!content) return;
     navigator.clipboard.writeText(content);
     setCopied(true);
-    toast.success('Reasoning copied');
+    toast.success('Reasoning process copied');
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (!content && !isStreaming) return null;
 
   return (
-    <div className={cn('group/reasoning my-2 w-full', className)}>
-      {/* Collapsed capsule / toggle */}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setIsExpanded((prev) => !prev)}
-          aria-expanded={isExpanded}
-          className={cn(
-            'inline-flex items-center gap-2 select-none cursor-pointer',
-            'rounded-full border border-border/70 bg-surface1/70 dark:bg-surface1/40',
-            'pl-2 pr-2.5 py-1 shadow-2xs backdrop-blur-xs',
-            'transition-all duration-200',
-            'hover:bg-surface2/70 hover:border-border-accent/80',
-            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
-          )}
-        >
-          <span
-            className={cn(
-              'size-4 rounded-full flex items-center justify-center shrink-0 transition-colors duration-200',
-              isStreaming
-                ? 'bg-primary/10 text-foreground'
-                : 'bg-surface2/80 text-foreground-muted group-hover/reasoning:text-foreground'
-            )}
-          >
-            <Brain className="size-2.5" />
-          </span>
-
-          {isStreaming && !reduceMotion ? (
-            // Gentle shimmer sweep across the label while reasoning streams in
-            <motion.span
-              className="text-2xs font-medium bg-clip-text text-transparent"
-              style={{
-                backgroundImage:
-                  'linear-gradient(90deg, var(--foreground-muted) 0%, var(--foreground) 50%, var(--foreground-muted) 100%)',
-                backgroundSize: '220% 100%',
-              }}
-              animate={{ backgroundPositionX: ['160%', '-60%'] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'linear' }}
-            >
-              {label}
-            </motion.span>
-          ) : (
-            <span
-              className={cn(
-                'text-2xs font-medium transition-colors duration-200',
-                'text-foreground-muted group-hover/reasoning:text-foreground'
-              )}
-            >
-              {label}
-            </span>
-          )}
-
-          <motion.span
-            animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-foreground-extra-muted"
-          >
-            <ChevronDown className="size-3" />
-          </motion.span>
-        </button>
-
-        {content && (
-          <button
-            type="button"
-            onClick={handleCopy}
-            className={cn(
-              'opacity-0 group-hover/reasoning:opacity-100 focus-visible:opacity-100',
-              'p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
-              'transition-all duration-200 cursor-pointer'
-            )}
-            title="Copy reasoning"
-          >
-            {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
-          </button>
-        )}
-      </div>
-
-      {/* Collapsible Content */}
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden"
-          >
-            {/* Soft left gradient rail keeps reasoning visually subordinate to the answer */}
-            <div className="relative mt-2 ml-2 pl-3.5 pr-1 pb-1">
-              <span
-                aria-hidden
-                className="absolute left-0 top-0.5 bottom-0.5 w-px rounded-full bg-gradient-to-b from-border-accent/80 via-border/60 to-transparent"
-              />
-              {content ? (
-                <div className="text-xs leading-[1.7] text-foreground-muted [&_*]:text-xs [&_p]:my-1 [&_pre]:text-2xs">
-                  <MarkdownContent content={content} />
-                </div>
-              ) : (
-                <span className="text-xs italic text-foreground-extra-muted animate-pulse">
-                  Working through the reasoning…
-                </span>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <EventLine
+      className={className}
+      icon={<Brain />}
+      label={isStreaming ? 'Thinking' : 'Thought'}
+      // Once settled the duration carries the information the old label spelled
+      // out ("Thought for 4.2s"), so the label stops repeating it. While
+      // streaming `meta` is left undefined on purpose: EventLine then fills the
+      // same slot with a live clock off `startTime`, so the number does not
+      // appear out of nowhere the instant the thought lands.
+      meta={!isStreaming && durationText ? durationText : undefined}
+      startTime={startTime}
+      state={isStreaming ? 'running' : 'idle'}
+      defaultOpen={defaultExpanded || isStreaming}
+      actions={
+        content ? (
+          <EventLineAction onClick={handleCopy} title="Copy reasoning text">
+            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+          </EventLineAction>
+        ) : undefined
+      }
+    >
+      {content ? (
+        <div className="py-0.5 text-xs leading-[1.75] text-foreground-muted [&_*]:text-xs [&_p]:my-1.5 [&_pre]:text-2xs">
+          <MarkdownContent content={content} />
+        </div>
+      ) : (
+        // Streaming with nothing buffered yet. The shimmer on the row above is
+        // already saying this, so the placeholder stays flat and quiet rather
+        // than adding a second animation.
+        <div className="py-1 text-xs text-foreground-extra-muted">Nothing yet.</div>
+      )}
+    </EventLine>
   );
 }

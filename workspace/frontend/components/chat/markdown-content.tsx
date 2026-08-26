@@ -11,6 +11,15 @@ import { MermaidBlock } from './mermaid-block';
 import { DiffBlock } from './diff-block';
 import { getMermaidSource, hasOpenMermaidFence } from './mermaid-utils';
 import { toast } from 'sonner';
+import { getApiBaseUrl } from '@/lib/config';
+
+/**
+ * `C:\` or `D:/` — an absolute Windows path, which needs no resolving against a
+ * working directory. Hoisted to one constant because it is tested in three
+ * places, and a character class holding both separators is exactly the kind of
+ * literal that gets mangled when this file is edited by a script.
+ */
+const WIN_DRIVE = /^[a-zA-Z]:[\\/]/;
 import { BookOpen } from 'lucide-react';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { workspaceApi } from '@/lib/api';
@@ -36,6 +45,7 @@ interface MarkdownContentProps {
   content: string;
   agentNames?: string[];
   sessionId?: string;
+  workingDir?: string;
 }
 
 /** Walk React children and colorize @agentname and @knowledge:slug tokens in text nodes. */
@@ -133,7 +143,7 @@ class MarkdownErrorBoundary extends React.Component<
   }
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ content, agentNames = [], sessionId }: MarkdownContentProps) {
+export const MarkdownContent = memo(function MarkdownContent({ content, agentNames = [], sessionId, workingDir }: MarkdownContentProps) {
   const hasStreamingMermaidFence = hasOpenMermaidFence(content);
 
   const components: Components = useMemo(() => ({
@@ -268,15 +278,18 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         }
       }
 
-      // Code blocks stay dark in BOTH themes so the syntax-highlight palette
-      // (tuned for a dark ground) keeps its contrast.
+      // Modern IDE-grade Code Block
       return (
-        <div className="my-3 overflow-hidden rounded-xl border border-[#2e2e2e] bg-[#1a1a1a] text-[#ececec] font-mono shadow-sm">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-[#2e2e2e]/80 bg-[#212121]/90 text-2xs font-medium text-[#b4b4b4]">
-            <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-[#4d4d4d] inline-block" />
-              <span>{language}</span>
-            </span>
+        <div className="my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-[#0c0c10] dark:bg-[#07070a] text-neutral-200 font-mono shadow-md dark:shadow-xl">
+          <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/60 dark:border-white/[0.06] bg-[#14141a] dark:bg-[#0e0e14] text-3xs font-medium text-neutral-400 select-none">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 mr-1">
+                <span className="size-2.5 rounded-full bg-[#ff5f56]/80 inline-block" />
+                <span className="size-2.5 rounded-full bg-[#ffbd2e]/80 inline-block" />
+                <span className="size-2.5 rounded-full bg-[#27c93f]/80 inline-block" />
+              </div>
+              <span className="font-mono uppercase tracking-wider text-neutral-400 font-semibold">{language}</span>
+            </div>
             <button
               onClick={() => {
                 const text = rawCodeText.trim();
@@ -285,12 +298,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="hover:text-[#ececec] text-[#b4b4b4] transition-colors cursor-pointer text-2xs"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 hover:text-white text-neutral-400 transition-colors cursor-pointer text-3xs font-sans font-medium"
             >
-              Copy
+              <span>Copy</span>
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.62] text-[#ececec] font-mono bg-[#1a1a1a] selection:bg-white/20">
+          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] text-neutral-200 font-mono bg-transparent selection:bg-blue-500/30">
             {children}
           </pre>
         </div>
@@ -299,31 +312,126 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
     // Links
     a: ({ href, children }) => {
-      const isFileLink = href && (href.startsWith('file://') || /^[a-zA-Z]:[\\/]/.test(href));
+      const isHttp = href && (href.startsWith('http://') || href.startsWith('https://'));
       const isEditorScheme = href && (href.startsWith('vscode:') || href.startsWith('cursor:'));
+      const isLocalPath = href && !isHttp && !isEditorScheme && (
+        href.startsWith('file://') ||
+        href.startsWith('file:') ||
+        WIN_DRIVE.test(href) ||
+        href.startsWith('/') ||
+        href.startsWith('./') ||
+        href.startsWith('../') ||
+        (!href.includes('://') && !href.startsWith('mailto:') && !href.startsWith('#'))
+      );
 
-      const handleClick = (e: React.MouseEvent) => {
-        if (isFileLink || isEditorScheme) {
-          e.preventDefault();
-          if (typeof window !== 'undefined' && (window as any).electronBridge?.openPath) {
-            (window as any).electronBridge.openPath(href).then((opened: boolean) => {
-              if (opened) {
-                toast.success(`已在本地编辑器中打开文件`);
-              } else {
-                toast.error(`未能打开本地文件路径`);
-              }
-            });
-          } else {
-            toast.info(`本地文件: ${href}`);
+      /**
+       * A LOCAL PATH IS A BUTTON, NOT AN ANCHOR.
+       *
+       * This is the fix for "clicking a path opens the app's own web page in a
+       * browser". Every link here used to render as `<a href={href}
+       * target="_blank">`, local paths included. For a relative href like
+       * `workspace/frontend` that is a relative URL: `window.open` resolves it
+       * against the page, producing `http://localhost:3005/workspace/frontend`,
+       * and the desktop shell's `setWindowOpenHandler` sees an `http:` URL and
+       * hands it to `shell.openExternal` — so the system browser opens this very
+       * app. `preventDefault` in the click handler cannot save it, because
+       * middle-click and ctrl-click never go through that path, and "copy link
+       * address" produces the same bogus URL.
+       *
+       * Rendering a `<button>` removes the navigation surface entirely rather
+       * than trying to suppress it: there is no href to resolve, so there is
+       * nothing for any modifier, any context menu, or any future window-open
+       * handler to get wrong.
+       */
+      if (isLocalPath || isEditorScheme) {
+        const openLocal = async () => {
+          let targetPath = href || '';
+
+          if (
+            workingDir &&
+            !targetPath.startsWith('file:') &&
+            !WIN_DRIVE.test(targetPath) &&
+            !isEditorScheme
+          ) {
+            const sep = workingDir.includes('\\') ? '\\' : '/';
+            const cleanRel = targetPath.replace(/^\.?[/\\]+/, '');
+            targetPath = `${workingDir}${sep}${cleanRel}`;
+          } else if (
+            !workingDir &&
+            !isEditorScheme &&
+            !targetPath.startsWith('file:') &&
+            !targetPath.startsWith('/') &&
+            !WIN_DRIVE.test(targetPath)
+          ) {
+            /*
+             * A bare relative path with no working directory to resolve it
+             * against cannot be opened by anything — `shell.openPath` would
+             * resolve it against the Electron process's cwd, which is not the
+             * project. Say so instead of firing a call that is guaranteed to
+             * fail and then reporting success.
+             */
+            toast.error(`Cannot resolve ${targetPath} — this conversation has no working directory set`);
+            return;
           }
-        }
-      };
 
+          const bridge =
+            typeof window !== 'undefined'
+              ? (window as unknown as { electronBridge?: { openPath?: (p: string) => Promise<boolean> } }).electronBridge
+              : undefined;
+
+          if (bridge?.openPath) {
+            const opened = await bridge.openPath(targetPath);
+            if (opened) toast.success('Opened locally');
+            else toast.error(`Could not open ${targetPath}`);
+            return;
+          }
+
+          /*
+           * Browser mode. The URL must be absolute: this was `fetch('/v1/…')`,
+           * which resolves against the FRONTEND origin (:3005) rather than the
+           * API (:8000), so the request never reached the handler that exists at
+           * `workspace/backend` — and any HTML the dev server returned came back
+           * `res.ok`, which the old code reported as "opened locally".
+           */
+          try {
+            const res = await fetch(`${getApiBaseUrl()}/v1/system/open-path`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ path: targetPath }),
+            });
+            if (res.ok) toast.success('Opened on the host machine');
+            else toast.error(`Could not open ${targetPath}`);
+          } catch {
+            toast.error(`Could not reach the workspace backend to open ${targetPath}`);
+          }
+        };
+
+        return (
+          <button
+            type="button"
+            onClick={() => void openLocal()}
+            title={href}
+            className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
+          >
+            {children}
+          </button>
+        );
+      }
+
+      // A real external URL. `target`/`rel` belong only here.
       return (
         <a
           href={href}
-          onClick={handleClick}
-          target={isFileLink ? undefined : '_blank'}
+          onClick={(e) => {
+            // Inside the desktop shell, hand external URLs to the OS browser
+            // rather than letting Electron open an app sub-window.
+            const bridge = (window as unknown as { electronBridge?: { openPath?: (p: string) => void } }).electronBridge;
+            if (isHttp && bridge?.openPath) {
+              e.preventDefault();
+              bridge.openPath(href!);
+            }
+          }}
+          target="_blank"
           rel="noopener noreferrer"
           className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer"
         >
@@ -336,7 +444,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
     del: ({ children }) => <del className="text-muted-foreground">{children}</del>,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [agentNames, hasStreamingMermaidFence, sessionId]);
+  }), [agentNames, hasStreamingMermaidFence, sessionId, workingDir]);
 
   return (
     <MarkdownErrorBoundary fallbackContent={content}>
@@ -365,6 +473,7 @@ function arePropsEqual(prev: MarkdownContentProps, next: MarkdownContentProps): 
   return (
     prev.content === next.content &&
     prev.sessionId === next.sessionId &&
+    prev.workingDir === next.workingDir &&
     prevNames.length === nextNames.length &&
     prevNames.every((name, i) => name === nextNames[i])
   );

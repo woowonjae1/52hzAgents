@@ -237,7 +237,7 @@ class AntigravityAdapter extends BaseAdapter {
 
     const workingDir = await this._resolveWorkingDir(channel);
     const conversationId = this._channelSessions[channel] || null;
-    await this.sendStatus(channel, 'Antigravity 正在推理中...');
+    await this.sendStatus(channel, 'Reasoning');
 
     return new Promise((resolve) => {
       const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
@@ -317,10 +317,13 @@ class AntigravityAdapter extends BaseAdapter {
                 this.registerProducedFile(channel, written).catch(() => {});
               }
             }
+          } else if (su.step_type === 'thought' || su.step_type === 'reasoning') {
+            if (su.text_delta || su.content) {
+              try { await this.sendThinking(channel, su.text_delta || su.content); } catch {}
+            }
           } else if (su.step_type === 'agent_response') {
             if (su.text_delta) {
               textDeltas.push(su.text_delta);
-              try { await this.sendThinking(channel, su.text_delta); } catch {}
             }
           } else if (su.step_type === 'checkpoint') {
             try { await this.sendStatus(channel, 'Checkpoint reached'); } catch {}
@@ -397,7 +400,6 @@ class AntigravityAdapter extends BaseAdapter {
 
         this._log(`[spawn] event=close channel=${channel} pid=${proc.pid} code=${code} stdout=${rawStdout.length}B stderr=${rawStderr.length}B`);
         delete this._channelProcesses[channel];
-        await this.sendStatus(channel, 'idle');
 
         if (this._stoppingChannels.has(channel)) {
           this._stoppingChannels.delete(channel);
@@ -426,7 +428,7 @@ class AntigravityAdapter extends BaseAdapter {
             + detail
           );
         } else if (code !== 0) {
-          await this.sendResponse(channel, `⚠️ Antigravity 执行结束（退出码: ${code}），未产生输出。`);
+          await this.sendResponse(channel, `Antigravity exited with code ${code} and produced no output.`);
         }
 
         // Auto-title session if needed
@@ -446,7 +448,6 @@ class AntigravityAdapter extends BaseAdapter {
       proc.on('error', async (err) => {
         clearIdle();
         delete this._channelProcesses[channel];
-        await this.sendStatus(channel, 'idle');
         this._log(`[spawn] event=error channel=${channel} msg=${err.message}`);
         await this.sendError(channel, `❌ 启动 Antigravity 失败: ${err.message}`);
         resolve();

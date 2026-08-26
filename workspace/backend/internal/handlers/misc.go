@@ -12,6 +12,10 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -265,4 +269,42 @@ func RotateWorkspaceToken(c *gin.Context) {
 		"token":        newToken,
 		"url":          "/" + workspace.Slug + "?token=" + newToken,
 	})
+}
+
+type openPathReq struct {
+	Path string `json:"path" binding:"required"`
+}
+
+// OpenLocalPath handles POST /v1/system/open-path to open a local folder or file directly in the host OS.
+func OpenLocalPath(c *gin.Context) {
+	var req openPathReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	clean := strings.TrimSpace(req.Path)
+	clean = strings.TrimPrefix(clean, "file:///")
+	clean = strings.TrimPrefix(clean, "file://")
+	clean = strings.TrimPrefix(clean, "file:")
+
+	if runtime.GOOS == "windows" {
+		if strings.HasPrefix(clean, "/") && len(clean) >= 3 && clean[2] == ':' {
+			clean = clean[1:]
+		}
+		clean = filepath.FromSlash(clean)
+		stat, err := os.Stat(clean)
+		if err == nil && stat.IsDir() {
+			exec.Command("explorer.exe", clean).Start()
+			c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "directory"})
+			return
+		}
+		exec.Command("rundll32", "url.dll,FileProtocolHandler", clean).Start()
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "file"})
+		return
+	} else if runtime.GOOS == "darwin" {
+		exec.Command("open", clean).Start()
+	} else {
+		exec.Command("xdg-open", clean).Start()
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true})
 }

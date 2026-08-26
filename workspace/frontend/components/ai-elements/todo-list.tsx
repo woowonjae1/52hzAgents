@@ -1,16 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import {
-  ListChecks,
-  CheckCircle2,
-  Circle,
-  Loader2,
-  XCircle,
-  ChevronDown,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { ListChecks, Check, Circle, Dot, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EventLine } from './event-line';
 
 export type TodoStatus = 'completed' | 'in-progress' | 'pending' | 'cancelled';
 
@@ -28,6 +21,17 @@ export interface TodoListProps {
   className?: string;
 }
 
+/**
+ * The agent's plan.
+ *
+ * The card, the `rounded-2xl`, the tinted header bar, the 16px progress bar and
+ * the spinning loader on the active item are all gone. The progress that bar was
+ * drawing is now the row's `meta` ("3/7"), which is the same information in a
+ * form that does not need its own colour, its own height, or a transition.
+ *
+ * The in-progress item gets the shared shimmer instead of a spinner, so a plan
+ * whose current step is running looks like a tool call that is running.
+ */
 export function TodoList({
   items,
   title = 'Plan',
@@ -35,8 +39,6 @@ export function TodoList({
   defaultExpanded = true,
   className,
 }: TodoListProps) {
-  const [isExpanded, setIsExpanded] = React.useState(defaultExpanded);
-
   const completedCount = React.useMemo(
     () => items.filter((i) => i.status === 'completed').length,
     [items]
@@ -44,116 +46,50 @@ export function TodoList({
   const totalCount = items.length;
   const isAllComplete = totalCount > 0 && completedCount === totalCount;
 
-  React.useEffect(() => {
-    if (isAllComplete && collapseOnComplete) {
-      setIsExpanded(false);
-    }
-  }, [isAllComplete, collapseOnComplete]);
-
   return (
-    <div
-      className={cn(
-        'w-full max-w-xl rounded-2xl border border-border/70 overflow-hidden bg-surface1/95 backdrop-blur-md shadow-2xs transition-all text-xs',
-        className
-      )}
+    <EventLine
+      className={className}
+      icon={<ListChecks />}
+      label={title}
+      meta={`${completedCount}/${totalCount}`}
+      state={isAllComplete ? 'ok' : 'idle'}
+      defaultOpen={defaultExpanded && !(isAllComplete && collapseOnComplete)}
     >
-      {/* Header with Title and Progress */}
-      <div
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-surface2/60 hover:bg-surface2 transition-colors cursor-pointer select-none border-b border-border/40"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <ListChecks className="size-4 text-primary shrink-0" />
-          <span className="font-semibold text-foreground truncate">{title}</span>
-          <span className="text-2xs font-mono text-muted-foreground tabular-nums">
-            ({completedCount}/{totalCount})
-          </span>
-        </div>
+      <div className="flex flex-col py-0.5">
+        {items.map((item, idx) => {
+          const isCompleted = item.status === 'completed';
+          const isInProgress = item.status === 'in-progress';
+          const isCancelled = item.status === 'cancelled';
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Progress Mini Bar */}
-          <div className="w-16 h-1.5 rounded-full bg-surface3 overflow-hidden">
+          return (
             <div
+              key={item.id || idx}
               className={cn(
-                'h-full transition-all duration-300 rounded-full',
-                isAllComplete ? 'bg-emerald-500' : 'bg-primary'
+                'flex min-w-0 items-baseline gap-2 py-0.5 text-xs',
+                isInProgress && 'event-running text-foreground',
+                isCompleted && 'text-foreground-extra-muted',
+                isCancelled && 'text-foreground-extra-muted',
+                !isCompleted && !isInProgress && !isCancelled && 'text-foreground-muted'
               )}
-              style={{
-                width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
-              }}
-            />
-          </div>
-
-          <ChevronDown
-            className={cn(
-              'size-3.5 text-muted-foreground transition-transform duration-200',
-              !isExpanded && '-rotate-90'
-            )}
-          />
-        </div>
+            >
+              <span className="shrink-0 translate-y-px [&>svg]:size-3">
+                {isCompleted ? (
+                  <Check />
+                ) : isInProgress ? (
+                  <Dot />
+                ) : isCancelled ? (
+                  <X />
+                ) : (
+                  <Circle className="opacity-50" />
+                )}
+              </span>
+              <span className={cn('min-w-0 flex-1 truncate', isCancelled && 'line-through')}>
+                {item.title}
+              </span>
+            </div>
+          );
+        })}
       </div>
-
-      {/* Todo Items List */}
-      <AnimatePresence initial={false}>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="divide-y divide-border/20 p-1.5 space-y-0.5"
-          >
-            {items.map((item, idx) => {
-              const isCompleted = item.status === 'completed';
-              const isInProgress = item.status === 'in-progress';
-              const isCancelled = item.status === 'cancelled';
-
-              return (
-                <div
-                  key={item.id || idx}
-                  className={cn(
-                    'flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl transition-colors',
-                    isInProgress && 'bg-primary/[0.06] text-foreground font-medium',
-                    isCompleted && 'text-muted-foreground',
-                    !isCompleted && !isInProgress && 'text-foreground/90'
-                  )}
-                >
-                  {/* Status Icon */}
-                  <div className="shrink-0">
-                    {isCompleted ? (
-                      <CheckCircle2 className="size-3.5 text-emerald-500" />
-                    ) : isInProgress ? (
-                      <Loader2 className="size-3.5 text-primary animate-spin" />
-                    ) : isCancelled ? (
-                      <XCircle className="size-3.5 text-muted-foreground opacity-50" />
-                    ) : (
-                      <Circle className="size-3.5 text-muted-foreground/60" />
-                    )}
-                  </div>
-
-                  {/* Title */}
-                  <span
-                    className={cn(
-                      'flex-1 text-xs truncate',
-                      isCompleted && 'line-through opacity-70',
-                      isCancelled && 'line-through opacity-40'
-                    )}
-                  >
-                    {item.title}
-                  </span>
-
-                  {/* Tag */}
-                  {isInProgress && (
-                    <span className="text-3xs px-1.5 py-0.2 rounded-md bg-primary/15 text-primary font-mono shrink-0">
-                      In progress
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </EventLine>
   );
 }

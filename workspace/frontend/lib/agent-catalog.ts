@@ -106,8 +106,8 @@ export const EXTRA_AGENT_RUNTIMES: { name: string; label: string }[] = [
  */
 export const AGENT_ICON_ALIASES: Record<string, string> = {
   chatgpt: 'openai',
-  antigravity: 'gemini',
-  agy: 'gemini',
+  antigravity: 'antigravity',
+  agy: 'antigravity',
 };
 
 /** Icon file base name for an agent/provider name. */

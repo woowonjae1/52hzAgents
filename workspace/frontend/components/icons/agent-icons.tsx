@@ -13,12 +13,12 @@ interface IconProps {
 const ICON_BASE = '/icons/agents';
 
 const NEEDS_BG = new Set([
-  'claude', 'codex', 'cline', 'amp', 'goose', 'openclaw', 'copilot',
-  'nanoclaw', 'opencode', 'cursor', 'hermes', 'kimi', 'default',
-  'xai', 'replicate', 'elevenlabs', 'manus', 'kilo', 'pi',
+  'codex', 'cline', 'amp', 'goose',
+  'nanoclaw', 'opencode', 'kimi', 'default',
+  'replicate', 'elevenlabs', 'manus', 'kilo',
 ]);
 
-const PNG_AGENTS = new Set(['cline', 'hermes', 'kilo', 'pi']);
+const PNG_AGENTS = new Set(['cline', 'kilo']);
 
 function IconWrapper({ name: rawName, size = 20, className }: { name: string } & IconProps) {
   const name = resolveAgentIconName(rawName);

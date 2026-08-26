@@ -89,7 +89,7 @@ export function EmptyState() {
   };
 
   const agentPicker = (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {onlineAgents.map((agent) => {
         const isSelected = participants.has(agent.agentName);
         return (
@@ -97,15 +97,15 @@ export function EmptyState() {
             key={agent.agentName}
             onClick={() => toggleParticipant(agent.agentName)}
             className={cn(
-              'flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-xs font-medium transition-colors cursor-pointer',
+              'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs',
               isSelected
-                ? 'border-primary bg-surface1/60 text-foreground'
-                : 'border-border/60 text-muted-foreground hover:bg-surface1/30'
+                ? 'border-blue-500/50 bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/30 shadow-xs'
+                : 'border-border/70 bg-surface2/60 text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
-            <AgentAvatar name={agent.agentName} size={18} />
-            {agent.agentName}
-            {isSelected && <Check className="size-3" strokeWidth={3} />}
+            <AgentAvatar name={agent.agentName} size={20} />
+            <span>@{agent.agentName}</span>
+            {isSelected && <Check className="size-3 text-blue-500" strokeWidth={2.5} />}
           </button>
         );
       })}
@@ -116,21 +116,33 @@ export function EmptyState() {
     <button
       disabled={starting || (hasAgents && participants.size === 0)}
       onClick={handleStartChat}
-      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer"
+      className={cn(
+        'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-md',
+        !hasAgents || participants.size === 0
+          ? 'bg-surface3 text-muted-foreground opacity-50 cursor-not-allowed'
+          : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white hover:opacity-95 hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]'
+      )}
     >
       {starting ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
-      {!hasAgents ? 'Connect an agent to start' : 'Start conversation'}
-      {participants.size > 0 && <span className="opacity-70">({participants.size})</span>}
+      <span>{!hasAgents ? 'Connect an agent to start' : 'Start Workspace Channel'}</span>
+      {participants.size > 0 && <span className="opacity-80">({participants.size})</span>}
     </button>
   );
 
   return (
     <div className="h-full flex flex-col items-center justify-center bg-surface0 overflow-y-auto p-6">
-      <div className="w-full max-w-md space-y-5">
+      {/*
+        Was `.glass-panel` + `shadow-xl` — a frosted, 40px-blurred, drop-shadowed
+        card. Both were wasted here: this panel is not floating over anything,
+        it IS the content of an otherwise empty pane, so there is nothing behind
+        it to blur and nothing for it to cast onto. A plain raised surface with
+        one hairline reads as more solid, not less.
+      */}
+      <div className="w-full max-w-md rounded-xl border border-border bg-surface1 p-6 sm:p-8 space-y-6">
         <div>
-          <h2 className="text-base font-semibold tracking-tight text-foreground">Get started</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Pick a project folder and the agents to include, and a new channel is created.
+          <h2 className="text-lg font-bold tracking-tight text-foreground">Launch Workspace Channel</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Pick a project folder and select the agents to collaborate with.
           </p>
         </div>
 

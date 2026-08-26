@@ -4,13 +4,13 @@ import { deriveIdentityColor } from '@/lib/identity-colors';
 import { resolveAgentIconName } from '@/lib/agent-catalog';
 
 const KNOWN_AGENTS = [
-  'aider', 'amp', 'anthropic', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
-  'custom', 'deepseek', 'elevenlabs', 'fal', 'fireworks', 'gemini', 'google', 'goose', 'groq',
-  'hermes', 'kilo', 'kimi', 'manus', 'mistral', 'nanoclaw', 'openai', 'openclaw', 'opencode', 'openrouter',
+  'aider', 'amp', 'anthropic', 'antigravity', 'agy', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
+  'custom', 'deepseek', 'elevenlabs', 'fal', 'fireworks', 'gemini', 'google', 'goose', 'grok', 'groq',
+  'hermes', 'kilo', 'kimi', 'manus', 'mistral', 'nanoclaw', 'openai', 'openclaw', 'opencode', 'openhands', 'openrouter',
   'perplexity', 'pi', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
 ];
 
-const PNG_AGENTS = ['cline', 'hermes', 'kilo', 'pi'];
+const PNG_AGENTS = ['cline', 'kilo'];
 
 interface AgentAvatarProps {
   name: string;
@@ -59,9 +59,9 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
     >
       <div
         className={cn(
-          square ? 'rounded-lg' : 'rounded-full',
-          'overflow-hidden border border-border dark:border-surface4 bg-white dark:bg-foreground flex items-center justify-center shrink-0 shadow-xs',
-          status === 'online' && 'border-status-success shadow-xs shadow-status-success/20'
+          square ? 'rounded-xl' : 'rounded-full',
+          'overflow-hidden border border-border/80 dark:border-white/[0.1] bg-surface2/90 dark:bg-surface2/80 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-2xs transition-all duration-200',
+          status === 'online' && 'border-status-success/60 shadow-xs shadow-status-success/20 ring-1 ring-status-success/30'
         )}
         style={{ width: size, height: size }}
       >
@@ -70,12 +70,15 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
             src={`/icons/agents/${matchedAgent}.${isPng ? 'png' : 'svg'}`}
             alt={cleanName}
             onError={() => setImgError(true)}
-            className="w-full h-full object-contain p-1"
+            className="w-full h-full object-contain p-1 drop-shadow-xs"
           />
         ) : (
           <span
-            className="flex h-full w-full items-center justify-center font-semibold text-white uppercase"
-            style={{ backgroundColor: identityFill, fontSize: Math.max(9, Math.round(size * 0.42)) }}
+            className="flex h-full w-full items-center justify-center font-bold text-white uppercase tracking-wider"
+            style={{
+              background: `linear-gradient(135deg, ${identityFill} 0%, color-mix(in srgb, ${identityFill} 75%, black) 100%)`,
+              fontSize: Math.max(9, Math.round(size * 0.42))
+            }}
             aria-label={cleanName}
           >
             {initial}
@@ -84,9 +87,11 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
       </div>
       {showStatus && size >= 20 && (
         <span className={cn(
-          'absolute -bottom-0.5 -right-0.5 rounded-full border-[1.5px] border-background',
-          size >= 28 ? 'size-2.5' : 'size-2',
-          status === 'online' ? 'bg-status-success animate-pulse' : 'bg-foreground-extra-muted dark:bg-surface4'
+          'absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-surface0',
+          size >= 28 ? 'size-3' : 'size-2.5',
+          status === 'online'
+            ? 'bg-status-success'
+            : 'bg-foreground-extra-muted/60 dark:bg-surface4'
         )} />
       )}
     </div>

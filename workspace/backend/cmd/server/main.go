@@ -231,6 +231,7 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/remove", handlers.RemoveAgentFromNetwork)
 		v1.POST("/workspaces/:workspace_id/claim", handlers.ClaimWorkspace)
 		v1.POST("/workspaces/:workspace_id/rotate-token", handlers.RotateWorkspaceToken)
+		v1.POST("/system/open-path", handlers.OpenLocalPath)
 	} // 结束路由组作用域。
 
 	// Legacy /health endpoint matching the health checks

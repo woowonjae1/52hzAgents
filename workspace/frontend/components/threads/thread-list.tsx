@@ -478,43 +478,33 @@ export function ThreadList() {
                   if (isMobile) openMobileDetail();
                 }}
                 className={cn(
-                  'w-full flex items-center gap-2.5 p-2 rounded-md text-left transition-all relative group cursor-pointer select-none',
+                  'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all relative group cursor-pointer select-none',
                   isSelected
-                    // Selection is carried by the surface step alone. A coloured
-                    // left rail would be a second, competing selection signal —
-                    // and in a palette with no brand accent it reads as status
-                    // ("this thread is healthy") rather than "this one is open".
-                    // The weight that used to sit here applied to the whole row,
-                    // so selecting a thread also dragged the 11px timestamp and
-                    // preview line to 600 — worst on CJK previews, where dense
-                    // ideographs smear at that size. It was a second selection
-                    // signal on top of the surface step anyway, which the note
-                    // above already argues against.
-                    ? 'bg-surface3 text-foreground border border-border/70 shadow-xs'
-                    : 'border border-transparent hover:bg-surface1/60 text-foreground-muted hover:text-foreground',
-                  'has-data-[state=open]:bg-surface1/60',
+                    ? 'bg-surface2/90 dark:bg-surface2/80 text-foreground border border-border/80 dark:border-white/[0.1] shadow-xs before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:rounded-r-full before:bg-blue-500'
+                    : 'border border-transparent hover:bg-surface2/40 text-foreground-muted hover:text-foreground',
+                  'has-data-[state=open]:bg-surface2/40',
                   isActive && 'thread-wip',
-                  isCompleted && !isSelected && 'bg-surface2 border border-border-accent'
+                  isCompleted && !isSelected && 'bg-surface2/50 border border-border/60'
                 )}
               >
                 {/* Content */}
-                <div className="flex-1 min-w-0 space-y-0.5">
+                <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center justify-between gap-1.5">
                     {session.starred && (
-                      <Star className="size-3 shrink-0 fill-status-warning text-status-warning" />
+                      <Star className="size-3 shrink-0 fill-amber-500 text-amber-500" />
                     )}
-                    <span className="text-sm font-medium flex-1 min-w-0 truncate text-foreground">
+                    <span className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight">
                       {isSearching
-                        ? highlightMatch(session.title || 'Untitled', searchQuery)
-                        : (session.title || 'Untitled')}
+                        ? highlightMatch(session.title || 'Untitled Channel', searchQuery)
+                        : (session.title || 'Untitled Channel')}
                     </span>
-                    <span className="text-2xs text-foreground-extra-muted shrink-0 font-mono">
+                    <span className="text-3xs text-foreground-extra-muted shrink-0 font-mono tabular-nums">
                       {displayTime}
                     </span>
                   </div>
                   <p className={cn(
-                    'text-2xs text-foreground-muted truncate leading-tight font-sans',
-                    previewIsStatus && 'italic'
+                    'text-3xs text-foreground-muted truncate leading-relaxed font-sans',
+                    previewIsStatus && 'italic text-indigo-400 dark:text-indigo-300'
                   )}>
                     {preview}
                   </p>

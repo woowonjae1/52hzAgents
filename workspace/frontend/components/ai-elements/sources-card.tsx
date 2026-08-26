@@ -2,6 +2,7 @@
 
 import { BookOpen, ExternalLink, FileText, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EventLine } from './event-line';
 
 export interface SourceItem {
   title: string;
@@ -38,19 +39,25 @@ function SourceIcon({ type }: { type?: SourceItem['type'] }) {
   return <BookOpen className="size-3" />;
 }
 
+/**
+ * What the answer was drawn from.
+ *
+ * `alwaysOpen`: a citation the reader has to go looking for is not a citation.
+ * The row is a heading here, not a disclosure — the difference from a tool call
+ * is deliberate and is the reason `EventLine` has the flag.
+ */
 export function SourcesCard({ sources, onSelectSource, className }: SourcesCardProps) {
   if (!sources || sources.length === 0) return null;
 
   return (
-    <div className={cn('my-2.5 space-y-1.5', className)}>
-      <div className="flex items-center gap-1.5 px-0.5 select-none text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted">
-        <Link2 className="size-3" />
-        <span>Sources</span>
-        <span className="tabular-nums">({sources.length})</span>
-      </div>
-
-      {/* 紧凑引用条，随宽度自然换行 */}
-      <div className="flex flex-wrap gap-1.5">
+    <EventLine
+      className={className}
+      icon={<Link2 />}
+      label="Sources"
+      meta={sources.length}
+      alwaysOpen
+    >
+      <div className="flex flex-col py-0.5">
         {sources.map((src, idx) => {
           const label = src.title || src.slug || 'Untitled document';
           const description = describeSource(src);
@@ -61,41 +68,30 @@ export function SourcesCard({ sources, onSelectSource, className }: SourcesCardP
               onClick={() => onSelectSource?.(src)}
               title={src.snippet || label}
               className={cn(
-                'group/source flex items-center gap-2 min-w-0 max-w-full sm:max-w-[19rem] cursor-pointer text-left',
-                'pl-1.5 pr-2.5 py-1 rounded-xl',
-                'border border-border/70 bg-surface1/80 dark:bg-surface1/40 shadow-2xs',
-                'transition-all duration-200',
-                'hover:bg-surface2/70 hover:border-border-accent/80 hover:shadow-sm',
-                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
+                // No chip, no border, no shadow: these are list rows in a body
+                // that already has a rail. A bordered pill inside a bordered
+                // rail is two frames doing one frame's job.
+                'group/source -mx-1 flex min-w-0 cursor-pointer items-baseline gap-2 rounded-base px-1 py-1 text-left',
+                'transition-colors hover:bg-surface2',
+                'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2'
               )}
             >
-              {/* 序号 + 图标 */}
-              <span
-                className={cn(
-                  'relative size-5 rounded-lg shrink-0 flex items-center justify-center',
-                  'bg-surface2 text-foreground-extra-muted',
-                  'group-hover/source:bg-primary/10 group-hover/source:text-foreground',
-                  'transition-colors duration-200'
-                )}
-              >
+              <span className="shrink-0 translate-y-px text-foreground-extra-muted group-hover/source:text-foreground-muted">
                 <SourceIcon type={src.type} />
               </span>
-
-              <span className="flex flex-col min-w-0 leading-tight">
-                <span className="truncate text-2xs font-medium text-foreground">
-                  <span className="text-foreground-extra-muted tabular-nums mr-1">{idx + 1}.</span>
-                  {label}
-                </span>
-                {description && (
-                  <span className="truncate text-3xs font-mono text-foreground-extra-muted">
-                    {description}
-                  </span>
-                )}
+              <span className="shrink-0 font-mono text-3xs tabular-nums text-foreground-extra-muted">
+                {idx + 1}
               </span>
+              <span className="truncate text-xs text-foreground">{label}</span>
+              {description && (
+                <span className="truncate font-mono text-3xs text-foreground-extra-muted">
+                  {description}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
-    </div>
+    </EventLine>
   );
 }

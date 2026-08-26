@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle } from 'lucide-react';
+import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
@@ -143,6 +143,8 @@ interface ChatMessageProps {
    * on reload and re-arms a card that has already been answered.
    */
   isDecisionAnswered?: boolean;
+  /** Current session working directory for resolving local path links */
+  workingDir?: string;
 }
 
 function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: string; name: string }): boolean {
@@ -155,7 +157,7 @@ function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: str
   return Boolean(currentUserName && senderName === currentUserName);
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected, steps, hideHeader = false, isDecisionAnswered = false }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected, steps, hideHeader = false, isDecisionAnswered = false, workingDir }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
@@ -335,28 +337,47 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── User Messages (OpenAI ChatGPT Native Style) ──
+  // ── User Messages (Modern AI Floating Bubble) ──
   if (isHuman) {
     const isCurrentUser = isCurrentHumanMessage(message, currentUser);
 
     return (
       <div className="py-2.5 flex justify-end group/usermsg select-text">
         <div className="flex items-center gap-2 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
-          {/* ChatGPT Style Refined Bubble */}
-          <div className="relative text-sm leading-relaxed text-foreground bg-surface2/90 dark:bg-[#2f2f2f] border border-border/40 dark:border-white/[0.06] px-4 py-2.5 rounded-2xl rounded-tr-xs shadow-2xs break-words inline-block max-w-full">
-            <MarkdownContent content={message.content} agentNames={agentNames} sessionId={message.sessionId} />
+          {/* Refined AI User Bubble */}
+          {/*
+            The bubble sits directly on the transcript, not above it, so the drop
+            shadow and the 12px backdrop blur it carried were both drawing depth
+            that is not there. An opaque surface and one hairline is what actually
+            reads as a solid object.
+          */}
+          <div className="relative text-sm leading-relaxed text-foreground bg-surface2 border border-border px-4 py-2.5 rounded-2xl rounded-tr-sm break-words inline-block max-w-full">
+            <MarkdownContent content={message.content} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
             <Attachments items={attachments} />
 
             {isCurrentUser && message.deliveryStatus && (
-              <div className="flex items-center justify-end gap-1 mt-1 text-3xs">
+              /*
+                Delivery state, in words. "Sending" lost its `animate-ping` blue
+                dot — an expanding ring is how a map pin announces itself, and
+                blue was a hue no token defines. "Sent" keeps no colour either;
+                it is the expected outcome. Only a failure is coloured, because
+                only a failure asks the reader to do something.
+              */
+              <div className="flex items-baseline justify-end gap-1.5 mt-1.5 text-3xs font-mono">
                 {message.deliveryStatus === 'sending' && (
-                  <span className="text-foreground-extra-muted">发送中...</span>
+                  <span className="event-running text-foreground-extra-muted">Sending…</span>
                 )}
                 {message.deliveryStatus === 'confirmed' && (
-                  <span className="text-status-success font-medium inline-flex items-center gap-0.5"><Check className="size-2.5" />已发送</span>
+                  <span className="text-foreground-extra-muted inline-flex items-baseline gap-1">
+                    <Check className="size-2.5 translate-y-px" />
+                    <span>Sent</span>
+                  </span>
                 )}
                 {message.deliveryStatus === 'failed' && (
-                  <span className="text-status-danger font-medium inline-flex items-center gap-0.5"><X className="size-2.5" />发送失败</span>
+                  <span className="text-destructive font-medium inline-flex items-baseline gap-1">
+                    <X className="size-2.5 translate-y-px" />
+                    <span>Failed</span>
+                  </span>
                 )}
               </div>
             )}
@@ -367,11 +388,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             type="button"
             onClick={() => {
               navigator.clipboard.writeText(message.content);
-              toast.success('已复制');
+              toast.success('Message copied');
             }}
             className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-center"
-            title="复制内容"
-            aria-label="复制内容"
+            title="Copy message"
+            aria-label="Copy message"
           >
             <Copy className="size-3.5" />
           </button>
@@ -380,46 +401,54 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
-  // ── AI Agent Messages (OpenAI ChatGPT Full-Width Native Style) ──
+  // ── AI Agent Messages (Modern Clean AI Layout) ──
   return (
-    // Top padding is dropped when continuing: the trace group above already
-    // opened the block, and keeping it would put a full gap between a reply and
-    // the reasoning it belongs to.
     <div className={cn('group/agentmsg', hideHeader ? 'pb-3.5' : 'py-3.5')}>
       <div className="flex items-start gap-3">
-        {/* Agent Avatar Icon — replaced by a spacer of identical width when the
-            trace above already showed it, so the reply's text stays on the same
-            left edge instead of sliding under the avatar column. */}
         {hideHeader ? (
-          <div className="size-6 shrink-0" aria-hidden />
+          <div className="size-7 shrink-0" aria-hidden />
         ) : (
           <AgentAvatar
             name={message.senderName}
             agentType={agent?.agentType}
-            size={24}
-            className="mt-0.5 shrink-0 rounded-full ring-1 ring-border/40"
+            size={28}
+            className="mt-0.5 shrink-0"
           />
         )}
 
         <div className="flex-1 min-w-0 space-y-2">
-          {/* Minimalist Identity Header */}
+          {/* Identity Header */}
           {!hideHeader && (
-          <div className="flex items-center gap-2 select-none">
+          /*
+            `items-baseline`: the name, the type chip and the timestamp are three
+            different sizes on one line, and centring each of their boxes
+            independently is what made this row read as loosely stacked rather
+            than set. One baseline, three sizes.
+          */
+          <div className="flex items-baseline gap-2 select-none">
             <span className="text-sm font-semibold text-foreground tracking-tight">
               {message.senderName}
             </span>
             {agent?.agentType && (
-              <span className="text-2xs text-muted-foreground font-normal">
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono border border-border">
                 {agent.agentType}
               </span>
             )}
+            {/*
+              "Lead" is a role, not a state — it says who this agent is, not that
+              something needs attention. It was amber (a hue no token defines),
+              which put it in the same visual register as a warning while sitting
+              directly beside a neutral chip carrying the same kind of fact. Both
+              chips are the same chip now.
+            */}
             {agent?.role === 'master' && (
-              <span className="text-3xs px-1.5 py-0.2 rounded bg-surface2 text-muted-foreground border border-border/40 font-medium">
-                Leader
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border inline-flex items-baseline gap-1">
+                <Crown className="size-2.5 translate-y-px" />
+                <span>Lead</span>
               </span>
             )}
             {timestamp && (
-              <span className="text-2xs text-foreground-extra-muted font-mono ml-auto">
+              <span className="text-3xs text-foreground-extra-muted font-mono ml-auto tabular-nums">
                 {timestamp}
               </span>
             )}
@@ -452,7 +481,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             </div>
           ) : cleanContent ? (
             <div className="text-sm leading-7 text-foreground font-normal">
-              <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} />
+              <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
             </div>
           ) : null}
 

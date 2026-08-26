@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { HelpCircle, Check, ArrowRight, Loader2, Send } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { HelpCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EventLine } from './event-line';
 
 export type ApprovalCardStatus = 'pending' | 'submitting' | 'answered';
 
@@ -29,6 +29,17 @@ export interface ApprovalCardProps {
   className?: string;
 }
 
+/**
+ * A question the agent is waiting on an answer to.
+ *
+ * `alwaysOpen` while pending, for the same reason as the tool-approval prompt: a
+ * question the reader has to expand is a question that does not get answered.
+ * Once answered it collapses to one line like everything else, because there is
+ * nothing left to do with it.
+ *
+ * The emerald "answered" wash is gone. Success here is reported by the sentence
+ * the agent gets back, which is already in `result`.
+ */
 export function ApprovalCard({
   questions,
   status = 'pending',
@@ -64,29 +75,33 @@ export function ApprovalCard({
     return a && a.trim().length > 0;
   });
 
+  const label =
+    status === 'answered' ? 'Answered' : status === 'submitting' ? 'Sending your answer' : 'Needs your input';
+
   return (
-    <div
-      className={cn(
-        'w-full max-w-xl rounded-2xl border border-border/80 bg-surface1/95 backdrop-blur-md p-4 shadow-sm transition-all',
-        status === 'answered' && 'border-emerald-500/30 bg-emerald-500/[0.03]',
-        className
-      )}
+    <EventLine
+      className={className}
+      icon={<HelpCircle />}
+      label={label}
+      detail={status === 'answered' ? result || 'Decision sent to the agent' : undefined}
+      // The only `detail` in the app that is a sentence rather than a command,
+      // so it is the only one that must not be set in the mono face.
+      detailMono={false}
+      state={status === 'submitting' ? 'running' : 'idle'}
+      meta={questions.length > 1 ? questions.length : undefined}
+      alwaysOpen={status !== 'answered'}
+      defaultOpen={false}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="max-w-xl space-y-3 py-0.5">
         {questions.map((q) => {
           const selectedVal = answers[q.id];
           const isCustomActive = selectedCustom[q.id];
 
           return (
-            <div key={q.id} className="space-y-2.5">
-              {/* Question Title Header */}
-              <div className="flex items-center gap-2 text-foreground font-medium text-xs">
-                <HelpCircle className="size-4 text-primary shrink-0" />
-                <span>{q.title}</span>
-              </div>
+            <div key={q.id} className="space-y-1.5">
+              <div className="text-xs font-medium text-foreground">{q.title}</div>
 
-              {/* Option Pills / Radio Cards */}
-              <div className="grid grid-cols-1 gap-1.5">
+              <div className="flex flex-col gap-1">
                 {q.options.map((opt) => {
                   const isSelected = selectedVal === opt.value && !isCustomActive;
                   return (
@@ -96,94 +111,74 @@ export function ApprovalCard({
                       disabled={status !== 'pending'}
                       onClick={() => handleSelectOption(q.id, opt.value)}
                       className={cn(
-                        'w-full text-left px-3 py-2 rounded-xl border text-xs transition-all flex items-center justify-between gap-2',
+                        'flex w-full items-baseline justify-between gap-2 rounded-base border px-2.5 py-1.5 text-left text-xs transition-colors',
                         isSelected
-                          ? 'border-primary bg-primary/10 text-foreground font-semibold shadow-2xs'
-                          : 'border-border/60 bg-surface2/60 hover:bg-surface2 text-muted-foreground hover:text-foreground cursor-pointer',
-                        status !== 'pending' && 'cursor-default opacity-85'
+                          ? 'border-border-accent bg-surface2 text-foreground'
+                          : 'cursor-pointer border-border bg-transparent text-foreground-muted hover:bg-surface2 hover:text-foreground',
+                        status !== 'pending' && 'cursor-default opacity-70'
                       )}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate">{opt.label}</div>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{opt.label}</span>
                         {opt.description && (
-                          <div className="text-3xs text-muted-foreground font-normal mt-0.5">
+                          <span className="mt-0.5 block text-3xs text-foreground-extra-muted">
                             {opt.description}
-                          </div>
+                          </span>
                         )}
-                      </div>
-                      <div
-                        className={cn(
-                          'size-4 rounded-full border flex items-center justify-center shrink-0 transition-colors',
-                          isSelected
-                            ? 'border-primary bg-primary text-primary-foreground'
-                            : 'border-border/80 bg-background'
-                        )}
-                      >
-                        {isSelected && <Check className="size-2.5" />}
-                      </div>
+                      </span>
+                      {/*
+                       * The selected mark is a glyph, not a filled radio dot.
+                       * A 16px circle that is only ever empty or ticked is a
+                       * checkmark with extra steps, and the empty state of it
+                       * put a second border on every row.
+                       */}
+                      <span className="w-3 shrink-0 translate-y-px text-foreground">
+                        {isSelected && <Check className="size-3" />}
+                      </span>
                     </button>
                   );
                 })}
 
-                {/* Custom write-in option if allowed */}
                 {q.allowCustom && (
-                  <div
+                  <input
+                    type="text"
+                    disabled={status !== 'pending'}
+                    value={customInputs[q.id] || ''}
+                    onChange={(e) => handleCustomChange(q.id, e.target.value)}
+                    placeholder={q.customPlaceholder || 'Describe another option…'}
                     className={cn(
-                      'px-3 py-1.5 rounded-xl border transition-all text-xs flex items-center gap-2',
-                      isCustomActive
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border/60 bg-surface2/40'
+                      'w-full rounded-base border px-2.5 py-1.5 text-xs transition-colors',
+                      'bg-transparent text-foreground placeholder:text-foreground-extra-muted',
+                      'focus:outline-hidden',
+                      isCustomActive ? 'border-border-accent bg-surface2' : 'border-border'
                     )}
-                  >
-                    <input
-                      type="text"
-                      disabled={status !== 'pending'}
-                      value={customInputs[q.id] || ''}
-                      onChange={(e) => handleCustomChange(q.id, e.target.value)}
-                      placeholder={q.customPlaceholder || 'Describe another option…'}
-                      className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden"
-                    />
-                  </div>
+                  />
                 )}
               </div>
             </div>
           );
         })}
 
-        {/* Footer actions / result banner */}
-        <div className="flex items-center justify-between pt-1 border-t border-border/40 text-xs">
-          {status === 'answered' ? (
-            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-medium text-xs">
-              <Check className="size-3.5" />
-              <span>{result || 'Decision sent to the agent'}</span>
-            </div>
-          ) : status === 'submitting' ? (
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <Loader2 className="size-3.5 animate-spin text-primary" />
-              <span>Submitting…</span>
-            </div>
-          ) : (
-            <>
-              <span className="text-2xs text-muted-foreground">
-                Choose an option, or write your own
-              </span>
-              <button
-                type="submit"
-                disabled={!isComplete}
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-all',
-                  isComplete
-                    ? 'bg-primary text-primary-foreground hover:opacity-90 cursor-pointer'
-                    : 'bg-surface3 text-muted-foreground opacity-50 cursor-not-allowed'
-                )}
-              >
-                <span>Confirm and continue</span>
-                <ArrowRight className="size-3" />
-              </button>
-            </>
-          )}
-        </div>
+        {status === 'pending' && (
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              type="submit"
+              disabled={!isComplete}
+              className={cn(
+                'rounded-base px-2.5 py-1 text-xs font-medium transition-opacity',
+                isComplete
+                  ? 'cursor-pointer bg-primary text-primary-foreground hover:opacity-90'
+                  : 'cursor-not-allowed bg-surface3 text-foreground-extra-muted'
+              )}
+            >
+              Confirm and continue
+            </button>
+            <span className="text-3xs text-foreground-extra-muted">
+              Choose an option, or write your own
+            </span>
+          </div>
+        )}
       </form>
-    </div>
+    </EventLine>
   );
 }

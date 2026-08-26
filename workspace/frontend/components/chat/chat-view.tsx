@@ -463,17 +463,6 @@ export function ChatView() {
     // Check if a real agent message has arrived AFTER the user message — clear loading indicator
     const optimisticLoading = sessionOptimisticMessages.find((m) => m.messageId.startsWith('optimistic-loading-'));
     if (optimisticLoading) {
-      // Find the index of the real user message that replaced the optimistic one
-      const userMsgIdx = sessionMessages.findIndex(
-        (m) => m.senderType !== 'agent' && m.content === optimisticLoading.metadata?._userContent
-      );
-      // Clear only once a real ANSWER arrives. Step events (thinking/status/
-      // todos) are hidden from the transcript unless "show all steps" is on, so
-      // treating them as "the agent replied" tore the pending row down and left
-      // the thread visibly empty for the entire time the agent was working —
-
-      // while the sidebar, which reads the raw last message, correctly showed
-      // "thinking...". That mismatch is exactly what made sends look ignored.
       const isStepMessage = (m: WorkspaceMessage) =>
         m.messageType === 'status'
         || m.messageType === 'thinking'
@@ -481,18 +470,19 @@ export function ChatView() {
         || m.messageType === 'loading';
       const isAgentAnswer = (m: WorkspaceMessage) => m.senderType === 'agent' && !isStepMessage(m);
 
+      const userMsgIdx = sessionMessages.findIndex(
+        (m) => m.senderType !== 'agent' && (
+          m.content === optimisticLoading.metadata?._userContent
+          || (!!optimisticLoading.createdAt && !!m.createdAt && m.createdAt >= optimisticLoading.createdAt)
+        )
+      );
+
+      // If any real agent answer arrived after the user message, or if the latest message in sessionMessages is an agent answer
       const hasAgentAfterUser = userMsgIdx >= 0
         ? sessionMessages.slice(userMsgIdx + 1).some(isAgentAnswer)
-        // The user message is matched by exact content, which fails if the
-        // backend normalises it at all. Fall back to wall-clock so a pending row
-        // can never get stuck forever when that match misses.
-        : sessionMessages.some(
-            (m) => isAgentAnswer(m)
-              && !!m.createdAt
-              && !!optimisticLoading.createdAt
-              && m.createdAt > optimisticLoading.createdAt,
-          );
-      if (hasAgentAfterUser) {
+        : sessionMessages.some(isAgentAnswer);
+
+      if (hasAgentAfterUser || (sessionMessages.length > 0 && isAgentAnswer(sessionMessages[sessionMessages.length - 1]))) {
         removeIds.add(optimisticLoading.messageId);
       }
     }
@@ -522,13 +512,17 @@ export function ChatView() {
     }
   };
 
+  const isTerminalStatus = useCallback((content: string) => {
+    return /stopped|stopping failed|execution stopped|idle|done|completed|finished|ready|success/i.test(content.trim());
+  }, []);
+
   // Update last message cache for thread list preview
   useEffect(() => {
     if (!currentSessionId) return;
     const lastMsg = displayMessages[displayMessages.length - 1];
     if (lastMsg) {
-      const isTerminalStatus = /stopped|stopping failed|execution stopped/i.test(lastMsg.content);
-      const isWorking = !isTerminalStatus && (
+      const isTerm = isTerminalStatus(lastMsg.content);
+      const isWorking = !isTerm && (
         lastMsg.messageType === 'status' ||
         lastMsg.messageType === 'thinking' ||
         lastMsg.messageType === 'loading'
@@ -537,7 +531,7 @@ export function ChatView() {
     } else {
       updateLastMessage(currentSessionId, '', '');
     }
-  }, [currentSessionId, displayMessages, updateLastMessage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentSessionId, displayMessages, updateLastMessage, isTerminalStatus]);
 
   // Track whether the agent is actively working in this session
   const prevActiveSessionRef = useRef<string | null>(null);
@@ -548,22 +542,24 @@ export function ChatView() {
       return;
     }
     const lastMsg = displayMessages[displayMessages.length - 1];
-    // A user message can replace the optimistic loading indicator before the
-    // local CLI has emitted its first status update. Keep the session active in
-    // that gap so the Stop button stays available for the whole request.
-    if (lastMsg.senderType !== 'agent') return;
-    const isTerminalStatus = /stopped|stopping failed|execution stopped/i.test(lastMsg.content);
-    const isAgentWorking = lastMsg.senderType === 'agent' && !isTerminalStatus && (
+    if (lastMsg.senderType !== 'agent') {
+      // If the latest message in this thread is not an agent message and there is no pending loading row,
+      // the agent is not working.
+      const hasOptimisticLoading = displayMessages.some((m) => m.messageType === 'loading');
+      if (!hasOptimisticLoading) {
+        setSessionActive(currentSessionId, false, null);
+      }
+      return;
+    }
+    const isTerm = isTerminalStatus(lastMsg.content);
+    const isAgentWorking = !isTerm && (
       lastMsg.messageType === 'status' ||
       lastMsg.messageType === 'thinking' ||
       lastMsg.messageType === 'loading'
     );
-    // Name the agent behind the status only when it is a real event. The
-    // optimistic loading row guesses the recipient (the server decides the
-    // actual target), so it must not put a name on the roster.
     const isOptimistic = Boolean(lastMsg.messageId?.startsWith('optimistic-'));
-    setSessionActive(currentSessionId, isAgentWorking, isOptimistic ? null : lastMsg.senderName);
-  }, [currentSessionId, displayMessages, setSessionActive]); // eslint-disable-line react-hooks/exhaustive-deps
+    setSessionActive(currentSessionId, isAgentWorking, isOptimistic ? null : (isAgentWorking ? lastMsg.senderName : null));
+  }, [currentSessionId, displayMessages, setSessionActive, isTerminalStatus]);
 
   // Extract agent mode from status message metadata
   useEffect(() => {
@@ -729,23 +725,23 @@ export function ChatView() {
   return (
     <div className="flex flex-col h-full bg-surface0">
       {/* Thread header */}
-      <div className={`flex items-center gap-2 px-5 lg:px-8 py-3.5 shrink-0 bg-surface0/90 backdrop-blur-md sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
+      <div className={`flex items-center gap-2 px-5 lg:px-8 py-3 shrink-0 bg-surface0/90 dark:bg-surface0/75 backdrop-blur-xl border-b border-border/40 dark:border-white/[0.04] sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0 [app-region:no-drag]">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
             <button
               onClick={sidebarToggle}
-              className="size-7 flex items-center justify-center rounded-lg hover:bg-surface-sidebar-hover text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1 cursor-pointer"
+              className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1 cursor-pointer"
               title="Expand Sidebar"
             >
               <PanelLeft className="size-4" />
             </button>
           )}
           {isDM ? (
-            <h2 className="text-sm font-semibold tracking-tight truncate flex items-center gap-1.5 text-foreground">
-              <MessageSquare className="size-3.5 text-muted-foreground" />
-              {currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}
-              <span className="text-3xs px-1.5 py-0.2 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-normal">
+            <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
+              <MessageSquare className="size-4 text-muted-foreground" />
+              <span>{currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}</span>
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-mono">
                 read-only
               </span>
             </h2>
@@ -759,44 +755,40 @@ export function ChatView() {
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}
-              className="text-sm font-normal tracking-tight bg-transparent border-b border-border outline-none min-w-0 max-w-[300px] text-foreground h-6"
+              className="text-sm font-semibold tracking-tight bg-surface2/50 border-b-2 border-blue-500 px-2 py-0.5 rounded-t outline-none min-w-0 max-w-[300px] text-foreground h-7"
               autoFocus
             />
           ) : (
             <h2
-              className="text-sm font-semibold tracking-tight truncate cursor-pointer hover:text-muted-foreground transition-colors text-foreground"
+              className="text-sm font-bold tracking-tight truncate cursor-pointer hover:text-blue-500 transition-colors text-foreground flex items-center gap-1.5"
               onClick={startEditingTitle}
               title="Click to rename"
             >
-              {currentSession?.title || 'Channel'}
+              <span>{currentSession?.title || 'Channel'}</span>
             </h2>
           )}
 
-          {/* Agent status for this channel — moved here from the sidebar roster.
-              Working is a property of a conversation, not of the workspace
-              list. */}
+          {/*
+            Who is in this channel, and whether any of them is mid-task.
+            "Working" used to be an amber pill wrapping a three-bar audio
+            equalizer, each bar carrying its own amber glow — five moving parts
+            and a fourth accent hue to say one thing. It now says it the same way
+            a running tool call and a streaming reasoning block do: the shimmer
+            (`.event-running`), on the words themselves. One signal for "still
+            going", everywhere in the app.
+          */}
           {!isDM && channelAgentNames.length > 0 && (
-            <div className="hidden sm:flex items-center gap-2 shrink min-w-0 max-w-[45%]">
-              <span className="h-3.5 w-px bg-border/70 shrink-0" />
+            <div className="hidden sm:flex items-baseline gap-2 shrink min-w-0 max-w-[45%]">
+              <span className="h-3.5 w-px bg-border shrink-0 self-center" />
               {workingHere.length > 0 ? (
-                <span className="flex items-center gap-1.5 min-w-0 text-xs">
-                  <span className="flex items-end gap-[2px] h-3 shrink-0">
-                    {[0, 1, 2].map((i) => (
-                      <span
-                        key={i}
-                        className="working-bar w-[2px] h-3 rounded-full bg-status-warning"
-                        style={{ animationDelay: `${i * 0.2}s` }}
-                      />
-                    ))}
-                  </span>
-                  <span className="font-medium text-foreground truncate">{workingHere.join('、')}</span>
-                  <span className="text-foreground-muted shrink-0">Working</span>
+                <span className="event-running inline-flex items-baseline gap-1.5 text-xs min-w-0 text-foreground-muted">
+                  <span className="truncate text-foreground">{workingHere.join(', ')}</span>
+                  <span className="shrink-0">working</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-1.5 min-w-0 text-xs text-foreground-muted">
-                  <span className="size-1.5 rounded-full bg-surface4 shrink-0" />
-                  <span className="truncate">{channelAgentNames.join('、')}</span>
-                  <span className="shrink-0">Idle</span>
+                <span className="flex items-baseline gap-1.5 min-w-0 text-xs text-foreground-muted">
+                  <span className="truncate">{channelAgentNames.join(', ')}</span>
+                  <span className="shrink-0 text-3xs font-mono text-foreground-extra-muted">idle</span>
                 </span>
               )}
             </div>
@@ -806,38 +798,36 @@ export function ChatView() {
           {/* Agent Quota & Usage Capsule (Claude) */}
           <AgentQuotaCapsule agentName={activeModelAgentName} />
 
-          {/* Git — a compose surface (stage/commit/sync), not a settings
-              toggle, so it keeps its own always-visible trigger rather than
-              nesting a commit textarea inside the overflow menu below. */}
+          {/* Git chip */}
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
           {/* Quick Share button */}
           <button
             onClick={() => setShareDialogOpen(true)}
-            className="size-8 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title="分享对话 (Share conversation)"
+            className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title="Share conversation"
           >
-            <Share2 className="size-4" />
+            <Share2 className="size-3.5" />
           </button>
 
           {/* Quick Export Markdown button */}
           <button
             onClick={() => void handleExportMarkdown()}
             disabled={exporting || !currentSessionId}
-            className="size-8 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30"
-            title="导出为 Markdown (Export as Markdown)"
+            className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30"
+            title="Export as Markdown"
           >
-            {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+            {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
           </button>
 
           {/* Quick Panels toggle */}
           <button
             onClick={() => setActiveRightTab(activeRightTab ? null : 'preview')}
             className={cn(
-              'size-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+              'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
               activeRightTab ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
             )}
-            title="切换内置浏览器预览面板 (Toggle Browser Preview)"
+            title="Toggle Preview Panel"
           >
             <PanelRight className="size-4" />
           </button>
@@ -923,7 +913,7 @@ export function ChatView() {
               {!hasOnlineAgents ? (
                 <div className="w-full max-w-md p-5 rounded-2xl bg-surface1/95 border border-border/80 shadow-sm flex flex-col items-center text-center space-y-3.5 mt-2">
                   <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-                    <Radio className="size-5 animate-pulse" />
+                    <Radio className="size-5" />
                   </div>
                   <div className="space-y-1">
                     <h2 className="text-sm font-semibold text-foreground">No agents online</h2>
@@ -987,6 +977,7 @@ export function ChatView() {
             loadOlder={loadOlder}
             hasOlder={hasOlder}
             loadingOlder={loadingOlder}
+            workingDir={currentSessionWorkingDir}
             className="flex-1 overflow-y-auto px-4 lg:px-8 py-4"
           />
         )}

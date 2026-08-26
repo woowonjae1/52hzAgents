@@ -1,10 +1,39 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { ThemeProvider } from 'next-themes';
-import { fontMono, fontSans } from '@/app/fonts';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider } from '@/lib/auth-context';
 import { OpenAgentsAuthProvider } from '@/lib/openagents-auth-context';
+
+/*
+ * Type faces. These are the ONLY thing that puts `Inter Variable` and
+ * `JetBrains Mono Variable` — the first entry of `--font-sans` / `--font-mono`
+ * in globals.css — on the page. Delete an import and that family silently stops
+ * resolving; the stack falls through to the system face with no error anywhere.
+ *
+ * Self-hosted rather than `next/font/google` on purpose: `output: 'export'`
+ * plus the offline desktop shell means there is no request to fonts.gstatic.com
+ * to make. Webpack emits the .woff2 files into the static output, so a build
+ * needs no network and neither does a run. (This is what the previous
+ * `next/font` setup was removed for — the removal just took the faces with it
+ * instead of replacing them.)
+ *
+ * `opsz` rather than the default `index.css` (`wght` only): see the
+ * `font-optical-sizing` note in globals.css. The `-italic` halves are separate
+ * files that the browser fetches only when italic text is actually rendered —
+ * markdown emphasis in an agent reply — so they cost build size, not load time.
+ * Without them Chrome synthesises a slanted oblique, which on a mono face in
+ * particular looks like a rendering bug.
+ *
+ * Every face is subsetted by `unicode-range` (latin, latin-ext, greek,
+ * cyrillic, vietnamese). Only the subsets a page actually uses are downloaded.
+ * No CJK face is imported at all — Han comes from the platform's UI font, per
+ * the `--font-sans` comment.
+ */
+import '@fontsource-variable/inter/opsz.css';
+import '@fontsource-variable/inter/opsz-italic.css';
+import '@fontsource-variable/jetbrains-mono/wght.css';
+import '@fontsource-variable/jetbrains-mono/wght-italic.css';
 import '@/styles/globals.css';
 
 // Analytics identifiers are injected via Vercel env vars (Project → Settings →
@@ -42,16 +71,13 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // The font variables ride on <html> rather than <body> so anything portalled
-  // outside the body tree — Radix popovers, the Sonner toaster — still resolves
-  // them. `font-sans` on <body> then picks up the composed stack (Latin face +
-  // CJK fallbacks) defined in globals.css.
+  // No font class on <html>: the families are plain `@font-face` names now, so
+  // `font-sans` / `font-mono` resolve them from anywhere in the document —
+  // including Radix popovers and the Sonner toaster, which portal outside the
+  // body tree. The two classes that used to sit here (`font-sans-fallback`,
+  // `font-mono-fallback`) matched no rule in any stylesheet.
   return (
-    <html
-      lang="en"
-      className={`${fontSans.variable} ${fontMono.variable}`}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <head>
         {POSTHOG_KEY && (
         <Script id="posthog-init" strategy="afterInteractive">{`

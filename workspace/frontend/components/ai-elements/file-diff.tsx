@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { FileCode, ChevronDown, Copy, Check, Plus, Minus } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { FileCode, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { EventLine, EventLineAction } from './event-line';
 
 export interface DiffLine {
   id: string;
@@ -66,6 +66,17 @@ function parseUnifiedDiff(raw: string): DiffLine[] {
   return result;
 }
 
+/**
+ * A file the agent changed.
+ *
+ * This is the one event whose BODY is allowed two more colours, because added
+ * and removed are not decoration here — they are the content, and a diff drawn
+ * in one colour cannot be read. What changed is that they now come from
+ * `--diff-addition` / `--diff-deletion` instead of hardcoded `emerald-500` and
+ * `rose-500`, so they track the theme and are reachable from one place. Rose in
+ * particular was a fifth hue that appeared only here and in the old approval
+ * card, unrelated to `--destructive`.
+ */
 export function FileDiff({
   file,
   lines,
@@ -74,7 +85,6 @@ export function FileDiff({
   defaultOpen = true,
   className,
 }: FileDiffProps) {
-  const [isOpen, setIsOpen] = React.useState(defaultOpen);
   const [copied, setCopied] = React.useState(false);
 
   const parsedLines = React.useMemo<DiffLine[]>(() => {
@@ -107,105 +117,68 @@ export function FileDiff({
   };
 
   return (
-    <div
-      className={cn(
-        'w-full rounded-xl border border-border/70 overflow-hidden bg-surface1/95 backdrop-blur-md shadow-2xs font-mono text-xs',
-        className
-      )}
+    <EventLine
+      className={className}
+      icon={<FileCode />}
+      label="Edited"
+      detail={file}
+      state={status === 'in-progress' ? 'running' : 'idle'}
+      meta={
+        <>
+          {addedCount > 0 && <span className="text-diff-addition">+{addedCount}</span>}
+          {addedCount > 0 && removedCount > 0 && ' '}
+          {removedCount > 0 && <span className="text-diff-deletion">-{removedCount}</span>}
+        </>
+      }
+      actions={
+        parsedLines.length > 0 ? (
+          <EventLineAction onClick={handleCopy} title="Copy diff">
+            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+          </EventLineAction>
+        ) : undefined
+      }
+      defaultOpen={defaultOpen}
     >
-      {/* File Header Bar */}
-      <div
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center justify-between gap-2 px-3 py-2 bg-surface2/70 hover:bg-surface2 transition-colors cursor-pointer select-none border-b border-border/50"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <ChevronDown
-            className={cn(
-              'size-3.5 text-muted-foreground transition-transform duration-200 shrink-0',
-              !isOpen && '-rotate-90'
-            )}
-          />
-          <FileCode className="size-3.5 text-primary shrink-0" />
-          <span className="font-semibold text-foreground truncate">{file}</span>
-        </div>
+      <div className="overflow-x-auto rounded-base border border-border bg-surface-diff-empty">
+        <div className="min-w-full font-mono text-2xs leading-relaxed">
+          {parsedLines.map((line) => {
+            const isAdded = line.type === 'added';
+            const isRemoved = line.type === 'removed';
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Stats Badge */}
-          <div className="flex items-center gap-1 text-2xs font-medium">
-            {addedCount > 0 && (
-              <span className="text-emerald-600 dark:text-emerald-400 flex items-center">
-                +{addedCount}
-              </span>
-            )}
-            {removedCount > 0 && (
-              <span className="text-rose-600 dark:text-rose-400 flex items-center">
-                -{removedCount}
-              </span>
-            )}
-          </div>
+            return (
+              <div
+                key={line.id}
+                className={cn(
+                  'flex items-stretch',
+                  // `color-mix` against the token rather than a second
+                  // hardcoded tint, so the row wash and the glyph colour cannot
+                  // drift apart when the token changes.
+                  isAdded && 'bg-[color-mix(in_oklab,var(--diff-addition)_12%,transparent)] text-diff-addition',
+                  isRemoved && 'bg-[color-mix(in_oklab,var(--diff-deletion)_12%,transparent)] text-diff-deletion',
+                  !isAdded && !isRemoved && 'text-foreground-muted'
+                )}
+              >
+                <div className="flex shrink-0 select-none border-r border-border text-3xs text-foreground-extra-muted">
+                  <span className="w-9 px-1.5 py-0.5 text-right tabular-nums">
+                    {line.oldLine ?? ''}
+                  </span>
+                  <span className="w-9 border-l border-border px-1.5 py-0.5 text-right tabular-nums">
+                    {line.newLine ?? ''}
+                  </span>
+                </div>
 
-          {/* Copy Action */}
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
-            title="Copy diff"
-          >
-            {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
-          </button>
+                <div className="w-4 shrink-0 select-none py-0.5 text-center opacity-70">
+                  {isAdded ? '+' : isRemoved ? '-' : ' '}
+                </div>
+
+                <div className="flex-1 whitespace-pre px-1.5 py-0.5">
+                  {line.content || ' '}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
-
-      {/* Diff Table Lines */}
-      <AnimatePresence initial={false}>
-        {isOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="overflow-x-auto overflow-y-hidden"
-          >
-            <div className="min-w-full divide-y divide-border/20 text-2xs leading-relaxed">
-              {parsedLines.map((line) => {
-                const isAdded = line.type === 'added';
-                const isRemoved = line.type === 'removed';
-
-                return (
-                  <div
-                    key={line.id}
-                    className={cn(
-                      'flex items-stretch font-mono hover:bg-surface2/50 transition-colors',
-                      isAdded && 'bg-emerald-500/10 dark:bg-emerald-500/[0.12] text-emerald-800 dark:text-emerald-200',
-                      isRemoved && 'bg-rose-500/10 dark:bg-rose-500/[0.12] text-rose-800 dark:text-rose-200'
-                    )}
-                  >
-                    {/* Line Numbers Gutter */}
-                    <div className="flex select-none shrink-0 text-3xs text-muted-foreground/60 border-r border-border/40 bg-surface1/60">
-                      <span className="w-9 px-1.5 py-0.5 text-right tabular-nums">
-                        {line.oldLine ?? ''}
-                      </span>
-                      <span className="w-9 px-1.5 py-0.5 text-right tabular-nums border-l border-border/30">
-                        {line.newLine ?? ''}
-                      </span>
-                    </div>
-
-                    {/* Diff Marker (+ / -) */}
-                    <div className="w-5 py-0.5 text-center font-bold shrink-0 select-none opacity-75">
-                      {isAdded ? '+' : isRemoved ? '-' : ' '}
-                    </div>
-
-                    {/* Code Content */}
-                    <div className="flex-1 px-1.5 py-0.5 whitespace-pre overflow-x-auto">
-                      {line.content || ' '}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    </EventLine>
   );
 }

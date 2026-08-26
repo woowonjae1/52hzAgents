@@ -18,234 +18,192 @@
  * `.dark` changes, mirror the change here rather than drifting the two apart.
  */
 :root {
-  /* Surfaces (layers) */
-  --surface0: #ffffff;
-  --surface1: #f7f7f8;
-  --surface2: #ececec;
-  --surface3: #e3e3e3;
-  --surface4: #d9d9d9;
-  --surface-diff-empty: #f2f2f2;
-  --surface-sidebar: #f9f9f9;
-  --surface-sidebar-hover: #ececec;
-  --surface-workspace: #f7f7f8; /* = surface1 in light */
+  /* Surfaces (layers) - Clean Porcelain */
+  --surface0: #fafafa;
+  --surface1: #f4f4f6;
+  --surface2: #ffffff;
+  --surface3: #e8e8ed;
+  --surface4: #dcdee4;
+  --surface-diff-empty: #f1f2f5;
+  --surface-sidebar: #f4f4f6;
+  --surface-sidebar-hover: #eaecef;
+  --surface-workspace: #fafafa;
 
   /* Text */
-  --foreground: #0d0d0d;
-  --foreground-muted: #5d5d5d;
-  --foreground-extra-muted: #8e8e93;
+  --foreground: #09090b;
+  --foreground-muted: #64748b;
+  --foreground-extra-muted: #94a3b8;
 
   /* Controls */
-  --scrollbar-handle: #d4d4d4;
+  --scrollbar-handle: #d4d4d8;
 
-  /* Borders */
-  --border: #e5e5e5;
-  --border-accent: #d4d4d4;
+  /* Borders - Hairline translucent */
+  --border: rgba(0, 0, 0, 0.08);
+  --border-accent: rgba(0, 0, 0, 0.14);
 
-  /* Brand — achromatic. Dark fill + light text (inverted-button pattern,
-     flipped from dark mode's light-fill/dark-text). */
-  --accent: #0d0d0d;
+  /* Brand — Modern Indigo/Monochrome */
+  --accent: #09090b;
   --accent-bright: #000000;
   --accent-foreground: #ffffff;
 
-  /* Semantic — unchanged from dark; these already read fine on a light
-     ground so the two themes share one set. */
-  --destructive: #c77b74;
+  /* Semantic */
+  --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --success: #6fa97f;
+  --success: #10b981;
   --success-foreground: #ffffff;
 
   /* Diff */
-  --diff-addition: #2f9e44;
-  --diff-deletion: #c0392b;
+  --diff-addition: #10b981;
+  --diff-deletion: #ef4444;
 
   /* Status, full tier */
-  --status-success: #2f9e44;
-  --status-danger: #c0392b;
-  --status-warning: #a3790f;
-  --status-merged: #7c3aed;
+  --status-success: #10b981;
+  --status-danger: #ef4444;
+  --status-warning: #f59e0b;
+  --status-merged: #8b5cf6;
 
   /* Status, muted tier */
-  --status-muted-success: #bfe6c8;
-  --status-muted-danger: #f3c6c0;
-  --status-muted-warning: #f2ddac;
-  --status-muted-merged: #ded0f9;
+  --status-muted-success: #d1fae5;
+  --status-muted-danger: #fee2e2;
+  --status-muted-warning: #fef3c7;
+  --status-muted-merged: #ede9fe;
 
-  /* Terminal — background/foreground follow the neutral ramp; the ANSI
-     hues are darkened relative to dark mode so they stay legible on white. */
+  /* Terminal */
   --terminal-background: #ffffff;
-  --terminal-foreground: #0d0d0d;
-  --terminal-cursor: #0d0d0d;
+  --terminal-foreground: #09090b;
+  --terminal-cursor: #09090b;
   --terminal-cursor-accent: #ffffff;
-  --terminal-selection-background: rgba(0, 0, 0, 0.1);
-  --terminal-selection-foreground: #0d0d0d;
-  --terminal-black: #1a1a1a;
-  --terminal-red: #c0392b;
-  --terminal-green: #15803d;
-  --terminal-yellow: #a3790f;
-  --terminal-blue: #1d4ed8;
-  --terminal-magenta: #7c3aed;
-  --terminal-cyan: #0e7490;
-  --terminal-white: #5d5d5d;
-  --terminal-bright-black: #8e8e93;
-  --terminal-bright-red: #d64545;
-  --terminal-bright-green: #16a34a;
-  --terminal-bright-yellow: #ca8a04;
-  --terminal-bright-blue: #2563eb;
-  --terminal-bright-magenta: #9333ea;
-  --terminal-bright-cyan: #0891b2;
-  --terminal-bright-white: #0d0d0d;
+  --terminal-selection-background: rgba(0, 0, 0, 0.08);
+  --terminal-selection-foreground: #09090b;
+  --terminal-black: #18181b;
+  --terminal-red: #dc2626;
+  --terminal-green: #16a34a;
+  --terminal-yellow: #d97706;
+  --terminal-blue: #2563eb;
+  --terminal-magenta: #9333ea;
+  --terminal-cyan: #0891b2;
+  --terminal-white: #71717a;
+  --terminal-bright-black: #a1a1aa;
+  --terminal-bright-red: #ef4444;
+  --terminal-bright-green: #22c55e;
+  --terminal-bright-yellow: #f59e0b;
+  --terminal-bright-blue: #3b82f6;
+  --terminal-bright-magenta: #a855f7;
+  --terminal-bright-cyan: #06b6d4;
+  --terminal-bright-white: #09090b;
 
   /* Legacy aliases */
-  --background: #ffffff;
-  --card: #f7f7f8;
-  --card-foreground: #0d0d0d;
+  --background: #fafafa;
+  --card: #ffffff;
+  --card-foreground: #09090b;
   --popover: #ffffff;
-  --popover-foreground: #0d0d0d;
-  --primary: #0d0d0d;
+  --popover-foreground: #09090b;
+  --primary: #09090b;
   --primary-foreground: #ffffff;
-  --secondary: #ececec;
-  --secondary-foreground: #0d0d0d;
-  --muted: #ececec;
-  --muted-foreground: #5d5d5d;
-  --input: #ececec;
-  --ring: #0d0d0d;
-  /* 12px, up from 8px. Larger radii read as "consumer product" rather than
-     "instrument panel" — the genre signal the ChatGPT direction asks for. */
+  --secondary: #f4f4f6;
+  --secondary-foreground: #09090b;
+  --muted: #f4f4f6;
+  --muted-foreground: #64748b;
+  --input: #f4f4f6;
+  --ring: #09090b;
   --radius: 0.75rem;
 
-  /*
-   * Shared width of the conversation column. The message list and the composer
-   * BOTH read this, so they sit on one axis by construction — carrying the
-   * number separately (a `48rem` style and a `max-w-3xl` class) made it easy
-   * for the two to drift.
-   *
-   * Was 900px with wide margins either side, on the theory that a capped read
-   * length is the point of the ChatGPT direction. On an actual wide pane that
-   * read as the conversation being squeezed into the middle of dead space
-   * rather than "generous margins" — widened so the column fills most of the
-   * pane. `min()` still keeps it from overflowing a panel narrower than 1100px
-   * — sidebar open, preview panel open, or just a small window.
-   */
   --chat-column: min(1380px, 100%);
 }
 
 /**
- * Dark = the signature theme: a ZERO-HUE-BIAS neutral ramp, in the vein of
- * ChatGPT's dark mode.
- *
- * Two deliberate departures from the previous Paseo teal-green tint:
- *
- *   1. The ground is achromatic. A tinted ground forces every accent to either
- *      harmonize with it or fight it — the old coral-on-teal pairing sat near
- *      complementary and pulled the eye off the content. Removing the ground's
- *      hue removes the conflict at the source.
- *   2. There is no brand accent. `--accent` is a near-white fill paired with a
- *      dark `--accent-foreground` (the inverted-button pattern), so color is
- *      spent only where it carries meaning: agent identity, diff, and status.
- *
- * Values sit noticeably LIGHTER than the old near-black; ChatGPT's dark mode is
- * a mid-dark neutral, not a black. The four other dark tints below are separate
- * selectable themes, not variants of this one.
+ * Dark = Modern Obsidian AI Theme (Cursor / Claude / OpenBot inspired)
+ * Deep obsidian blacks, subtle zinc layers, translucent luminous micro-borders.
  */
 .dark {
-  /* Surfaces (layers) */
-  --surface0: #212121;
-  --surface1: #2a2a2a;
-  --surface2: #333333;
-  --surface3: #414141;
-  --surface4: #4d4d4d;
-  --surface-diff-empty: #262626;
-  --surface-sidebar: #181818;
-  --surface-sidebar-hover: #212121;
-  --surface-workspace: #2a2a2a; /* = surface1 in dark */
+  /* Surfaces (layers) - Obsidian & Zinc depth */
+  --surface0: #09090b;
+  --surface1: #111115;
+  --surface2: #18181e;
+  --surface3: #22222c;
+  --surface4: #2e2e3a;
+  --surface-diff-empty: #131317;
+  --surface-sidebar: #0d0d10;
+  --surface-sidebar-hover: #17171e;
+  --surface-workspace: #09090b;
 
   /* Text */
-  --foreground: #ececec;
-  --foreground-muted: #b4b4b4;
-  --foreground-extra-muted: #8a8a8a;
+  --foreground: #f4f4f6;
+  --foreground-muted: #a1a1aa;
+  --foreground-extra-muted: #71717a;
 
   /* Controls */
-  --scrollbar-handle: #4d4d4d;
+  --scrollbar-handle: #3f3f46;
 
-  /* Borders */
-  --border: #2e2e2e;
-  --border-accent: #3d3d3d;
+  /* Borders - Fine translucent micro-borders with light spill */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-accent: rgba(255, 255, 255, 0.14);
 
-  /* Brand — achromatic. Light fill + dark text (inverted-button pattern). */
-  --accent: #ececec;
+  /* Brand — Luminous Monochrome + Subtle Violet Accent */
+  --accent: #f4f4f6;
   --accent-bright: #ffffff;
-  --accent-foreground: #1a1a1a;
+  --accent-foreground: #09090b;
 
-  /* Semantic — desaturated so they stay legible without jumping off a pure
-     neutral ground (a saturated red/green reads as a siren here). */
-  --destructive: #c77b74;
+  /* Semantic */
+  --destructive: #f87171;
   --destructive-foreground: #ffffff;
-  --success: #6fa97f;
+  --success: #34d399;
   --success-foreground: #ffffff;
 
   /* Diff */
-  --diff-addition: #6fa97f;
-  --diff-deletion: #c77b74;
+  --diff-addition: #34d399;
+  --diff-deletion: #f87171;
 
   /* Status, full tier */
-  --status-success: #6fa97f;
-  --status-danger: #c77b74;
-  --status-warning: #b99a5c;
-  --status-merged: #9b8bc4;
+  --status-success: #34d399;
+  --status-danger: #f87171;
+  --status-warning: #fbbf24;
+  --status-merged: #a78bfa;
 
   /* Status, muted tier */
-  --status-muted-success: #62806a;
-  --status-muted-danger: #9c6a66;
-  --status-muted-warning: #8d7a54;
-  --status-muted-merged: #7a7194;
+  --status-muted-success: rgba(52, 211, 153, 0.18);
+  --status-muted-danger: rgba(248, 113, 113, 0.18);
+  --status-muted-warning: rgba(251, 191, 36, 0.18);
+  --status-muted-merged: rgba(167, 139, 250, 0.18);
 
-  /* Terminal — ground follows the neutral ramp; the ANSI hues stay
-     distinguishable because a terminal needs red to read as red. */
-  --terminal-background: #212121;
-  --terminal-foreground: #ececec;
-  --terminal-cursor: #ececec;
-  --terminal-cursor-accent: #212121;
-  --terminal-selection-background: rgba(255, 255, 255, 0.2);
-  --terminal-selection-foreground: #ececec;
-  --terminal-black: #181818;
-  --terminal-red: #d98078;
-  --terminal-green: #6fa97f;
-  --terminal-yellow: #c2a464;
-  --terminal-blue: #6d9bbf;
-  --terminal-magenta: #9b8bc4;
-  --terminal-cyan: #5fa3ab;
-  --terminal-white: #b4b4b4;
-  --terminal-bright-black: #4d4d4d;
-  --terminal-bright-red: #e5948c;
-  --terminal-bright-green: #86bd94;
-  --terminal-bright-yellow: #d4b878;
-  --terminal-bright-blue: #86b0d1;
-  --terminal-bright-magenta: #b0a2d4;
-  --terminal-bright-cyan: #75b8bf;
-  --terminal-bright-white: #ececec;
+  /* Terminal */
+  --terminal-background: #09090b;
+  --terminal-foreground: #f4f4f6;
+  --terminal-cursor: #f4f4f6;
+  --terminal-cursor-accent: #09090b;
+  --terminal-selection-background: rgba(255, 255, 255, 0.16);
+  --terminal-selection-foreground: #ffffff;
+  --terminal-black: #111115;
+  --terminal-red: #f87171;
+  --terminal-green: #34d399;
+  --terminal-yellow: #fbbf24;
+  --terminal-blue: #60a5fa;
+  --terminal-magenta: #c084fc;
+  --terminal-cyan: #22d3ee;
+  --terminal-white: #a1a1aa;
+  --terminal-bright-black: #52525b;
+  --terminal-bright-red: #fca5a5;
+  --terminal-bright-green: #6ee7b7;
+  --terminal-bright-yellow: #fde68a;
+  --terminal-bright-blue: #93c5fd;
+  --terminal-bright-magenta: #e9d5ff;
+  --terminal-bright-cyan: #67e8f9;
+  --terminal-bright-white: #ffffff;
 
   /* Legacy aliases */
-  --background: #212121;
-  --card: #2a2a2a;
-  --card-foreground: #ececec;
-  --popover: #2a2a2a;
-  --popover-foreground: #ececec;
-  --primary: #ececec;
-  --primary-foreground: #1a1a1a;
-  --secondary: #333333;
-  --secondary-foreground: #ececec;
-  --muted: #333333;
-  /* = --foreground-muted, NOT --foreground-extra-muted. These two names are
-     used interchangeably across the app (`text-muted-foreground` vs
-     `text-foreground-muted`), so letting them hold different values meant
-     identical-looking code produced two different contrast levels — the
-     dimmer one failed AA on every surface in the ramp. Light mode already
-     pairs them; dark now matches. */
-  --muted-foreground: #b4b4b4;
-  --input: #2a2a2a;
-  /* Focus ring: needs to clear AA against surface0-surface2, so it rides the
-     foreground rather than a muted tier. */
-  --ring: #ececec;
+  --background: #09090b;
+  --card: #111115;
+  --card-foreground: #f4f4f6;
+  --popover: #18181e;
+  --popover-foreground: #f4f4f6;
+  --primary: #f4f4f6;
+  --primary-foreground: #09090b;
+  --secondary: #18181e;
+  --secondary-foreground: #f4f4f6;
+  --muted: #18181e;
+  --muted-foreground: #a1a1aa;
+  --input: #18181e;
+  --ring: #f4f4f6;
 }
 
 /** Theme Setup **/
@@ -336,10 +294,21 @@
   --color-ring: var(--ring);
 
   /**
-   * Type families. `--font-inter` / `--font-jetbrains-mono` are injected by
-   * `app/fonts.ts` onto <html>; everything after them is fallback, ordered by
-   * how a browser actually resolves a missing glyph — per character, first
-   * family in the list that has it.
+   * Type families. The first entry is the self-hosted variable face
+   * (`@fontsource-variable/*`, imported in `app/layout.tsx`); everything after
+   * it is fallback, ordered by how a browser actually resolves a missing glyph
+   * — per character, first family in the list that has it.
+   *
+   * THE FAMILY NAMES ARE WRITTEN LITERALLY, NOT THROUGH A `var()`. These read
+   * `var(--font-inter)` / `var(--font-jetbrains-mono)` for a while, on the
+   * assumption that `app/fonts.ts` defined them via `next/font`. It stopped
+   * doing that — the file was reduced to two inert class names — and nothing
+   * anywhere defined the two variables again. An undefined `var()` with no
+   * fallback is invalid at computed-value time, which voids the WHOLE
+   * declaration rather than just that one entry, so `font-sans` AND `font-mono`
+   * both silently collapsed to Tailwind's default sans stack: no webfont, no
+   * CJK ordering, and `font-mono` not even monospaced. Keep the names literal
+   * so a broken font pipeline can never take the fallback chain with it.
    *
    * The practical consequence of that ordering: Latin always comes from the
    * self-hosted face, and Han/Kana/Hangul fall to the platform's own UI face
@@ -362,7 +331,7 @@
    * error, the utility just quietly emits the default stack instead. Wrapping
    * these for readability will break them.
    */
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'HarmonyOS Sans SC', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'HarmonyOS Sans SC', 'MiSans', 'Source Han Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei UI', 'Microsoft YaHei', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 
   /**
    * Mono carries agent logs, tool output, workspace slugs, timestamps and code
@@ -370,7 +339,7 @@
    * true monospaced Han face, but Han glyphs are full-width in all of these, so
    * a Chinese comment inside a log line still lands on the character grid.
    */
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 
   /**
    * Paseo breakpoints (styles/unistyles.ts). These replace Tailwind's defaults
@@ -506,11 +475,21 @@
    * Grayscale antialiasing + OpenType legibility features.
    * Enables Inter's cv02 (disambiguated lowercase l), cv03/cv04 (refined R/G),
    * cv11 (single-story a/refined punctuation) and tabular numbers.
+   *
+   * `font-optical-sizing: auto` is the reason the `opsz` build of Inter is the
+   * one imported rather than the plain `wght` build. Inter's optical-size axis
+   * tracks the rendered size: it opens up spacing and thickens hairlines below
+   * ~14px and tightens them above ~24px. This app lives at 10-13px, which is
+   * exactly where the Display cut of a static face looks spindly and cheap.
+   * `auto` is the CSS default — it is written out because dropping it (or a
+   * component setting `none`) silently loses the axis with nothing to see in
+   * the diff.
    */
   body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    font-optical-sizing: auto;
     font-feature-settings: 'cv02' 1, 'cv03' 1, 'cv04' 1, 'cv11' 1;
   }
 
@@ -565,23 +544,28 @@
    * wave that travels once and then breathes, which is calmer to sit next to
    * while a task runs for minutes.
    */
-  @keyframes fluid-dot-bounce {
-    0%, 70%, 100% {
-      transform: translateY(0) scale(0.9);
-      opacity: 0.3;
-    }
-    35% {
-      transform: translateY(-2.5px) scale(1.1);
-      opacity: 1;
-    }
+  /*
+   * The live edge of the transcript: a 3×3 grid of 4px cells with a wavefront
+   * travelling across it. Replaces `.fluid-dot` — three dots bouncing on a
+   * stagger — and appears in exactly ONE place per channel, the row where work
+   * is currently happening. It is deliberately not available per event line:
+   * inside an event the shimmer plus the elapsed clock already say "running",
+   * and a grid on every row would be the same signal five times over.
+   *
+   * Only `opacity` animates, so this is a compositor-only job: no layout, no
+   * paint, and no `will-change` needed to make it cheap.
+   */
+  @keyframes pixel-on {
+    0%, 100% { opacity: 0.14; }
+    50% { opacity: 1; }
   }
-  .fluid-dot {
-    /* ease-in-out sine: no overshoot, so the dots settle instead of snapping. */
-    animation: fluid-dot-bounce 1.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
-    will-change: transform, opacity;
+  .pixel-cell {
+    animation: pixel-on 650ms ease-in-out infinite;
   }
   @media (prefers-reduced-motion: reduce) {
-    .fluid-dot { animation: none; opacity: 0.8; transform: none; will-change: auto; }
+    /* Frozen to the dim state. The elapsed clock beside it still ticks, so the
+       row has not stopped reporting — it has stopped moving. */
+    .pixel-cell { animation: none; }
   }
 }
 
@@ -710,10 +694,19 @@ html {
 }
 
 /*
- * `.glass-panel`, `.glow-emerald` and `.glow-indigo` used to live here. All
- * three were unreferenced, and all three belonged to the glassmorphism/neon
- * vocabulary this direction drops — keeping them around is an invitation to
- * reach for a coloured glow the palette has no room for.
+ * `.glass-panel`, `.glass-surface`, `.glow-emerald`, `.glow-indigo`,
+ * `.ambient-glow-primary` and `.ambient-glow-subtle` used to live here, were
+ * deleted for belonging to a glassmorphism/neon vocabulary this direction does
+ * not have room for, and were then re-added ELEVEN LINES BELOW THIS COMMENT
+ * under a new heading — so the file simultaneously argued against them and
+ * shipped them. Four of the six had zero references at the time, which is the
+ * same condition that got the first set deleted.
+ *
+ * They are gone again. If a future direction wants depth, the way in is a token
+ * (an elevation scale on `--surface*`) that every surface reads, not a set of
+ * opt-in effect classes that each component decides for itself whether to
+ * reach for — that path is what produced 182 hand-picked `shadow-*` and 38
+ * hand-picked `backdrop-blur-*` sites across 65 files, none of which agree.
  */
 
 /* Hide Next.js Dev Indicator badge (the 'N' circle icon at bottom-right corner) */
@@ -723,3 +716,139 @@ nextjs-portal,
 #nextjs-toast-errors-parent {
   display: none !important;
 }
+
+/*
+ * ── The one "something is happening" signal ──
+ *
+ * A light band sweeps left to right across the words themselves.
+ * `background-clip: text` against a transparent fill is what confines the
+ * gradient to the glyphs, and the band is mixed out of the line's OWN
+ * `currentColor`, so one rule reads correctly on every surface and in both
+ * themes without a second colour being chosen anywhere.
+ *
+ * This replaces, rather than joins, the previous vocabulary: a spinning
+ * `Loader2`, a pulsing status badge, a glowing amber border, and a five-bar
+ * audio equalizer, which between them meant one running tool call could be
+ * announced four different ways at once in the same row. 57 `animate-spin` and
+ * 32 `animate-pulse` sites is not 89 decisions, it is 89 improvisations.
+ *
+ * Only `background-position` animates, so this is a compositor-only job — no
+ * layout, no paint of the text on any frame. A spinner, by contrast, is a
+ * transform on a element that sits inside a flex row and drags its neighbours'
+ * baselines around while it turns.
+ */
+.event-running {
+  background-image: linear-gradient(
+    100deg,
+    currentColor 40%,
+    color-mix(in oklab, currentColor 25%, transparent) 50%,
+    currentColor 60%
+  );
+  background-size: 250% 100%;
+  background-position: 100% 0;
+  background-clip: text;
+  -webkit-background-clip: text;
+  /*
+   * THE GLYPH FILL, NOT `color`. Setting `color: transparent` here would blank
+   * the gradient along with the text, because the gradient above is built from
+   * `currentColor` — which resolves against this element's own `color`.
+   */
+  -webkit-text-fill-color: transparent;
+  animation: event-line-sweep 1.6s linear infinite;
+}
+
+@keyframes event-line-sweep {
+  to { background-position: -150% 0; }
+}
+
+/* Running text stays readable, just still, when motion is unwelcome. */
+@media (prefers-reduced-motion: reduce) {
+  .event-running {
+    animation: none;
+    background-image: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+/*
+ * Disclosure for `EventLine`. Both rules are CSS rather than JS because the
+ * component uses a native `<details>` — see the note in `event-line.tsx`.
+ *
+ * `::details-content` + `interpolate-size` is what lets `height: auto` be
+ * animated at all; where the engine does not support it the disclosure simply
+ * opens instantly, which is the correct degradation. Chromium (so the Electron
+ * shell) has both.
+ */
+/*
+ * The icon and the chevron share one 16px slot and crossfade.
+ *
+ * At rest the row shows what KIND of event it is (a terminal, a brain, a file);
+ * reach for it and that turns into the affordance for opening it. The previous
+ * arrangement kept a `▸` visible on every row forever, next to the icon — a
+ * permanent glyph spent on a control almost never used, on every one of
+ * potentially two hundred rows.
+ *
+ * `:focus-visible` is in the selector list on purpose. Hover-only reveals are a
+ * mouse-only affordance, and `<summary>` is natively keyboard-focusable, so a
+ * keyboard user tabbing onto the row must see the same thing a pointer user
+ * does. `[open]` holds the chevron regardless, which is what makes an expanded
+ * row still look expanded once the pointer leaves.
+ */
+.event-line .event-chevron {
+  opacity: 0;
+}
+
+.event-line > summary:hover .event-chevron,
+.event-line > summary:focus-visible .event-chevron,
+.event-line[open] .event-chevron {
+  opacity: 1;
+}
+
+.event-line > summary:hover .event-glyph,
+.event-line > summary:focus-visible .event-glyph,
+.event-line[open] .event-glyph {
+  opacity: 0;
+}
+
+/* No icon to crossfade with: the arrow is the slot's only occupant, so hiding
+   it until hover would leave the row with no visible affordance at all. */
+.event-line .event-glyph-empty .event-chevron {
+  opacity: 1;
+}
+
+.event-line[open] .event-chevron {
+  transform: rotate(90deg);
+}
+
+@supports selector(::details-content) {
+  .event-line {
+    interpolate-size: allow-keywords;
+  }
+
+  .event-line::details-content {
+    height: 0;
+    overflow: clip;
+    transition: height 0.18s cubic-bezier(0.16, 1, 0.3, 1), content-visibility 0.18s allow-discrete;
+  }
+
+  .event-line[open]::details-content {
+    height: auto;
+  }
+}
+
+/* Streaming cursor blink */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  vertical-align: text-bottom;
+  background-color: var(--foreground);
+  margin-left: 2px;
+  animation: cursor-blink 0.8s infinite;
+}
+

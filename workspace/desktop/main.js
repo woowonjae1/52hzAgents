@@ -427,19 +427,27 @@ function createMainWindow() {
   loadAppUrl();
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://127.0.0.1') || url.startsWith('http://localhost')) {
-      return { action: 'allow' };
-    }
     if (url.startsWith('file:') || url.startsWith('vscode:') || url.startsWith('cursor:')) {
       try {
         if (url.startsWith('file:')) {
-          let filePath = decodeURIComponent(url.replace(/^file:\/\/\/?/, '')).split('#')[0];
+          let filePath = decodeURIComponent(url.replace(/^file:\/\/\/?/i, '')).split('#')[0];
           if (process.platform === 'win32') {
-            if (filePath.startsWith('/') && /^[a-zA-Z]:/.test(filePath.slice(1))) {
+            if (filePath.startsWith('/') && /^[a-zA-Z]:/i.test(filePath.slice(1))) {
               filePath = filePath.slice(1);
             }
+            filePath = filePath.replace(/\//g, '\\');
           }
-          shell.openPath(filePath);
+          const fs = require('fs');
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+            if (process.platform === 'win32') {
+              const { exec } = require('child_process');
+              exec(`explorer.exe "${filePath}"`);
+            } else {
+              shell.openPath(filePath);
+            }
+          } else {
+            shell.openPath(filePath);
+          }
         } else {
           shell.openExternal(url);
         }
@@ -590,14 +598,58 @@ ipcMain.handle('dialog-open-folder', async (event, defaultPath) => {
 ipcMain.handle('shell-open-path', async (event, pathStr) => {
   if (!pathStr) return false;
   try {
-    let cleanPath = decodeURIComponent(pathStr.replace(/^file:\/\/\/?/, '')).split('#')[0];
+    if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
+      shell.openExternal(pathStr);
+      return true;
+    }
+    if (pathStr.startsWith('vscode:') || pathStr.startsWith('cursor:')) {
+      shell.openExternal(pathStr);
+      return true;
+    }
+    let cleanPath = decodeURIComponent(pathStr.replace(/^file:\/\/\/?/i, '')).split('#')[0];
     if (process.platform === 'win32') {
-      if (cleanPath.startsWith('/') && /^[a-zA-Z]:/.test(cleanPath.slice(1))) {
+      if (cleanPath.startsWith('/') && /^[a-zA-Z]:/i.test(cleanPath.slice(1))) {
         cleanPath = cleanPath.slice(1);
       }
+      cleanPath = cleanPath.replace(/\//g, '\\');
     }
+    const fs = require('fs');
+    if (fs.existsSync(cleanPath)) {
+      const stat = fs.statSync(cleanPath);
+      if (stat.isDirectory()) {
+        if (process.platform === 'win32') {
+          const { exec } = require('child_process');
+          exec(`explorer.exe "${cleanPath}"`);
+          return true;
+        } else if (process.platform === 'darwin') {
+          const { exec } = require('child_process');
+          exec(`open "${cleanPath}"`);
+          return true;
+        }
+      }
+    }
+    // Nothing exists at that path. Reporting `true` here is how a click on an
+    // unresolvable path came to raise a "Opened locally" toast: `openPath` fails,
+    // `showItemInFolder` silently does nothing for a path that is not there, and
+    // the handler said it worked anyway.
+    if (!fs.existsSync(cleanPath)) {
+      console.warn('[52hzAgents] shell-open-path: no such path:', cleanPath);
+      return false;
+    }
+
     const err = await shell.openPath(cleanPath);
-    return !err;
+    if (!err) return true;
+
+    // `openPath` refuses files it has no handler for. Revealing the file in the
+    // OS file manager is a real outcome, so it still counts as success — but
+    // only if that call itself does not throw.
+    try {
+      shell.showItemInFolder(cleanPath);
+      return true;
+    } catch {
+      console.error('[52hzAgents] shell-open-path failed:', cleanPath, err);
+      return false;
+    }
   } catch (e) {
     console.error('[52hzAgents] shell-open-path error:', e);
     return false;

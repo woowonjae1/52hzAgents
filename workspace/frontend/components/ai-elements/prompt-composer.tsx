@@ -453,29 +453,29 @@ export function PromptComposer({
         onDrop={handleDrop}
         className={cn(
           'relative rounded-2xl overflow-hidden',
-          'bg-surface1/95 dark:bg-surface1/60 backdrop-blur-xl',
-          'border border-border/60 shadow-sm transition-all duration-200',
-          'hover:border-border/90 focus-within:ring-2 focus-within:ring-primary/25 focus-within:border-primary/40',
-          isDragging && 'border-primary/60 ring-4 ring-primary/20 bg-primary/[0.03]'
+          'bg-surface1/95 dark:bg-surface1/80 backdrop-blur-2xl',
+          'border border-border/80 dark:border-white/[0.1] shadow-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.5)] transition-all duration-200',
+          'hover:border-border-accent/90 focus-within:ring-4 focus-within:ring-blue-500/15 focus-within:border-blue-500/50',
+          isDragging && 'border-blue-500/60 ring-4 ring-blue-500/25 bg-blue-500/[0.04]'
         )}
       >
         {/* Top Orchestration Strip: Channel Collaboration Modes */}
-        <div className="flex items-center justify-between gap-2 px-3 pt-2.5 pb-2 border-b border-border/25 text-xs select-none">
+        <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5 pb-2 border-b border-border/40 dark:border-white/[0.06] text-xs select-none bg-surface2/30">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             {/* Real Collaboration Mode Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-surface2 text-2xs font-medium text-muted-foreground shrink-0 shadow-2xs">
+            <div className="flex items-center p-0.5 rounded-lg bg-surface2/90 border border-border/60 text-2xs font-medium text-muted-foreground shrink-0 shadow-2xs">
               <button
                 type="button"
                 onClick={() => onOrchestrationChange?.({ mode: 'dynamic' })}
                 className={cn(
-                  'px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1',
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
                   currentMode === 'dynamic'
-                    ? 'bg-surface1 text-foreground shadow-xs font-medium'
-                    : 'hover:text-foreground'
+                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    : 'hover:text-foreground hover:bg-surface3/50'
                 )}
                 title="Dynamic routing — pick the best agent for each message from context"
               >
-                <Sparkles className="size-3 text-primary" />
+                <Sparkles className="size-3 text-blue-500" />
                 <span>Dynamic</span>
               </button>
 
@@ -483,10 +483,10 @@ export function PromptComposer({
                 type="button"
                 onClick={() => onOrchestrationChange?.({ mode: 'master' })}
                 className={cn(
-                  'px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1',
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
                   currentMode === 'master'
-                    ? 'bg-surface1 text-foreground shadow-xs font-medium'
-                    : 'hover:text-foreground'
+                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    : 'hover:text-foreground hover:bg-surface3/50'
                 )}
                 title="Master / sub — one lead agent schedules and delegates subtasks"
               >
@@ -503,10 +503,10 @@ export function PromptComposer({
                   }
                 }}
                 className={cn(
-                  'px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1',
+                  'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
                   currentMode === 'workflow'
-                    ? 'bg-surface1 text-foreground shadow-xs font-medium'
-                    : 'hover:text-foreground'
+                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    : 'hover:text-foreground hover:bg-surface3/50'
                 )}
                 title="Workflow — write an explicit execution plan"
               >
@@ -523,15 +523,15 @@ export function PromptComposer({
                   <button
                     type="button"
                     onClick={() => setMasterDropdownOpen((v) => !v)}
-                    className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-3xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors"
+                    className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-3xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors shadow-2xs"
                   >
-                    <Crown className="size-2.5" />
+                    <Crown className="size-3" />
                     <span>Master: @{masterAgentName}</span>
                     <ChevronDown className="size-2.5" />
                   </button>
 
                   {masterDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-30 min-w-[140px] rounded-xl bg-surface1 border border-border/80 p-1 shadow-lg space-y-0.5">
+                    <div className="absolute top-full left-0 mt-1.5 z-30 min-w-[150px] rounded-xl bg-surface1 border border-border/80 p-1 shadow-xl space-y-0.5 backdrop-blur-xl">
                       {agents.map((a) => (
                         <button
                           key={a.agentName}
@@ -541,13 +541,13 @@ export function PromptComposer({
                             setMasterDropdownOpen(false);
                           }}
                           className={cn(
-                            'w-full text-left px-2 py-1 rounded-lg text-xs flex items-center gap-1.5 cursor-pointer',
+                            'w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer transition-colors',
                             masterAgentName === a.agentName
                               ? 'bg-primary text-primary-foreground font-semibold'
                               : 'hover:bg-surface2 text-foreground'
                           )}
                         >
-                          <AgentAvatar name={a.agentName} size={16} />
+                          <AgentAvatar name={a.agentName} size={18} />
                           <span>@{a.agentName}</span>
                         </button>
                       ))}
@@ -566,9 +566,9 @@ export function PromptComposer({
                 <button
                   type="button"
                   onClick={() => setWorkflowPlanOpen(true)}
-                  className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 text-3xs font-medium cursor-pointer hover:bg-violet-500/20 transition-colors"
+                  className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 text-3xs font-medium cursor-pointer hover:bg-violet-500/20 transition-colors shadow-2xs"
                 >
-                  <FileEdit className="size-2.5" />
+                  <FileEdit className="size-3" />
                   <span>Edit workflow plan…</span>
                 </button>
               </div>
@@ -576,7 +576,7 @@ export function PromptComposer({
 
             {currentMode === 'dynamic' && (
               <span className="text-3xs text-muted-foreground/80 hidden md:inline pl-1">
-                Agents are picked automatically from intent
+                Agents are routed automatically based on intent
               </span>
             )}
           </div>
@@ -589,12 +589,12 @@ export function PromptComposer({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="px-3 pt-2.5 pb-1 flex flex-wrap gap-2"
+              className="px-3.5 pt-2.5 pb-1 flex flex-wrap gap-2"
             >
               {pendingFiles.map((pf, idx) => (
                 <div
                   key={idx}
-                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/70 border border-border/50 shadow-2xs"
+                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/80 border border-border/60 shadow-2xs backdrop-blur-xs"
                 >
                   {pf.preview ? (
                     <img
@@ -639,17 +639,17 @@ export function PromptComposer({
           }}
           placeholder={
             disabled
-              ? 'Connect an agent first…'
-              : 'Message 52hzAgents — type @ or / to call an agent or the knowledge base…'
+              ? 'Connect an agent to start chatting…'
+              : 'Message 52hzAgents — type @ to mention an agent or / for knowledge base…'
           }
           disabled={disabled}
           rows={1}
-          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[46px]"
+          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[48px]"
         />
 
         {/* Bottom Control Row */}
-        <div className="flex items-center justify-between gap-2 px-2.5 pb-2 pt-1">
-          <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
+          <div className="flex items-center gap-1.5 min-w-0">
             <AgentModelSwitcher agentName={masterAgentName} sessionId={session?.sessionId} />
 
             <button
@@ -662,7 +662,7 @@ export function PromptComposer({
               title="Mention an agent or knowledge doc (@)"
             >
               <AtSign className="size-3.5" />
-              <span className="text-2xs font-medium hidden sm:inline">Agent / Knowledge</span>
+              <span className="text-2xs font-medium hidden sm:inline">Context (@)</span>
             </button>
 
             <button
@@ -699,7 +699,7 @@ export function PromptComposer({
             )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <AnimatePresence initial={false}>
               {showHint && (
                 <motion.span
@@ -708,7 +708,7 @@ export function PromptComposer({
                   exit={{ opacity: 0, x: 4 }}
                   className="hidden sm:inline select-none text-3xs font-mono text-muted-foreground/70"
                 >
-                  Enter to send · Shift+Enter for a new line
+                  Enter to send · Shift+Enter for new line
                 </motion.span>
               )}
             </AnimatePresence>
@@ -719,11 +719,11 @@ export function PromptComposer({
               disabled={isWorking ? stopping : !canSend}
               className={cn(
                 'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                'shadow-sm transition-all duration-200 cursor-pointer',
+                'transition-all duration-200 cursor-pointer shadow-sm',
                 isWorking
-                  ? 'bg-status-danger text-white hover:opacity-90'
+                  ? 'bg-status-danger text-white hover:opacity-90 shadow-red-500/30'
                   : canSend
-                  ? 'bg-primary text-primary-foreground hover:opacity-90 hover:scale-105 active:scale-95'
+                  ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white hover:opacity-95 hover:scale-105 active:scale-95 shadow-md shadow-blue-500/25'
                   : 'bg-surface3 text-muted-foreground opacity-40 cursor-not-allowed'
               )}
             >

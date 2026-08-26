@@ -82,7 +82,6 @@ export function AgentStatusStrip() {
                   'rounded-full ring-2 bg-surface0 transition-colors',
                   RING[state],
                   state === 'offline' && 'opacity-50',
-                  state === 'working' && 'animate-pulse',
                 )}
               >
                 <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={20} />
