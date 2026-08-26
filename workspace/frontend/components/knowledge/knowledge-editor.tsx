@@ -141,7 +141,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden border-border/80 shadow-2xl">
         {/* Header */}
-        <DialogHeader className="shrink-0 mb-0 border-b border-border/70 px-6 py-3.5 bg-surface1/80 backdrop-blur-md">
+        <DialogHeader className="shrink-0 mb-0 border-b border-border/70 pl-6 pr-14 py-3.5 bg-surface1/80 backdrop-blur-md">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <span
