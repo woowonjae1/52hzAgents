@@ -77,9 +77,9 @@ class AntigravityAdapter extends BaseAdapter {
     this.disabledModules = opts.disabledModules || new Set();
     this._channelSessions = {};
     this._channelProcesses = {};
+    this._channelModels = {};
     this._stoppingChannels = new Set();
 
-    this._settingsPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
     this._historyPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'history.jsonl');
     this._sessionsFile = path.join(
       os.homedir(), '.wwj', 'sessions',
@@ -105,90 +105,99 @@ class AntigravityAdapter extends BaseAdapter {
         }
       }
     } catch {
-      this._log('Could not load sessions file, starting fresh');
+      this._log('Could not load Antigravity sessions file, starting fresh');
     }
   }
 
   _saveSessions() {
     try {
-      const dir = path.dirname(this._sessionsFile);
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(path.dirname(this._sessionsFile), { recursive: true });
       fs.writeFileSync(this._sessionsFile, JSON.stringify(this._channelSessions));
     } catch {}
   }
 
   _findAntigravityBinary() {
-    const home = os.homedir();
+    const viaWhich = whichBinary('agy') || whichBinary('antigravity');
+    if (viaWhich) return viaWhich;
+
     const candidates = IS_WINDOWS ? [
-      path.join(process.env.LOCALAPPDATA || '', 'agy', 'bin', 'agy.exe'),
-      path.join(home, 'AppData', 'Local', 'agy', 'bin', 'agy.exe'),
-      path.join(process.env.LOCALAPPDATA || '', 'antigravity', 'antigravity.exe'),
-      path.join(home, 'AppData', 'Local', 'antigravity', 'antigravity.exe'),
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Antigravity', 'bin', 'agy.cmd'),
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Antigravity', 'bin', 'agy.exe'),
+      path.join(process.env.ProgramFiles || '', 'Antigravity', 'bin', 'agy.cmd'),
+      path.join(process.env.ProgramFiles || '', 'Antigravity', 'bin', 'agy.exe'),
+      path.join(process.env.APPDATA || '', 'npm', 'agy.cmd'),
+      path.join(process.env.USERPROFILE || '', '.local', 'bin', 'agy.cmd'),
+      path.join(process.env.USERPROFILE || '', '.local', 'bin', 'agy.exe'),
     ] : [
-      path.join(home, '.local', 'bin', 'agy'),
       '/usr/local/bin/agy',
       '/opt/homebrew/bin/agy',
+      path.join(os.homedir(), '.local', 'bin', 'agy'),
     ];
 
     for (const c of candidates) {
       if (fs.existsSync(c)) return c;
     }
-
-    const viaWhere = whereBinary('agy') || whereBinary('antigravity');
-    if (viaWhere) return viaWhere;
-
     return null;
   }
 
-  _getSettings() {
-    try {
-      if (fs.existsSync(this._settingsPath)) {
-        return JSON.parse(fs.readFileSync(this._settingsPath, 'utf-8'));
+  _resolveModel(channel, msg) {
+    if (msg) {
+      const explicit =
+        msg.metadata?.agent_models?.antigravity ||
+        msg.metadata?.selected_model ||
+        msg.metadata?.model ||
+        msg.model;
+      if (explicit) {
+        const found = ANTIGRAVITY_MODELS.find(
+          (m) =>
+            m.id === explicit ||
+            m.name.toLowerCase() === explicit.toLowerCase() ||
+            m.shortName.toLowerCase() === explicit.toLowerCase() ||
+            (m.agyName && m.agyName.toLowerCase() === explicit.toLowerCase())
+        );
+        return found ? (found.agyName || found.name) : explicit;
       }
-    } catch {}
-    return {};
-  }
-
-  _saveSettings(newSettings) {
-    try {
-      const dir = path.dirname(this._settingsPath);
-      fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this._settingsPath, JSON.stringify(newSettings, null, 2), 'utf-8');
-      return true;
-    } catch (e) {
-      this._log(`Failed to save settings to ${this._settingsPath}: ${e.message}`);
-      return false;
     }
+    if (channel && this._channelModels && this._channelModels[channel]) {
+      return this._channelModels[channel];
+    }
+    if (this._channelModels && this._channelModels['*']) {
+      return this._channelModels['*'];
+    }
+    return this.model || (this.agentEnv.ANTIGRAVITY_MODEL || '').trim() || 'Gemini 3.7 Flash (High)';
   }
 
-  _getModel() {
-    const settings = this._getSettings();
-    return settings.model || 'Gemini 3.7 Flash (High)';
+  _getModel(channel) {
+    return this._resolveModel(channel);
   }
 
-  getCurrentModel() {
-    return this._getModel();
+  getCurrentModel(channel) {
+    return this._resolveModel(channel);
   }
 
   async _onControlAction(action, payload) {
     if (action === 'set_model') {
-      const modelIdOrName = payload && payload.model;
-      if (modelIdOrName) {
-        const found = ANTIGRAVITY_MODELS.find(
-          (m) =>
-            m.id === modelIdOrName ||
-            m.name.toLowerCase() === modelIdOrName.toLowerCase() ||
-            m.shortName.toLowerCase() === modelIdOrName.toLowerCase() ||
-            (m.agyName && m.agyName.toLowerCase() === modelIdOrName.toLowerCase())
-        );
-        const targetModelName = found ? (found.agyName || found.name) : modelIdOrName;
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
 
-        const settings = this._getSettings();
-        settings.model = targetModelName;
-        this._saveSettings(settings);
-        this.model = targetModelName;
-        this._log(`Switched Antigravity model to: ${targetModelName}`);
+      const found = ANTIGRAVITY_MODELS.find(
+        (m) =>
+          m.id === requested ||
+          m.name.toLowerCase() === requested.toLowerCase() ||
+          m.shortName.toLowerCase() === requested.toLowerCase() ||
+          (m.agyName && m.agyName.toLowerCase() === requested.toLowerCase())
+      );
+      const targetModelName = found ? (found.agyName || found.name) : requested;
+
+      if (channel) {
+        this._channelModels[channel] = targetModelName;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = targetModelName;
+        this._channelModels['*'] = targetModelName;
       }
+      this.model = targetModelName;
+      this._log(`Model override for channel=${channel || 'all'} set to '${targetModelName}' (this session only)`);
       return;
     }
 
@@ -262,37 +271,7 @@ class AntigravityAdapter extends BaseAdapter {
     await this.sendStatus(channel, 'Reasoning');
 
     return new Promise((resolve) => {
-      // Check if message metadata carries explicit model selection from UI
-      const explicitModel =
-        msg.metadata?.agent_models?.antigravity ||
-        msg.metadata?.selected_model ||
-        msg.metadata?.model ||
-        msg.model;
-      if (explicitModel) {
-        const found = ANTIGRAVITY_MODELS.find(
-          (m) =>
-            m.id === explicitModel ||
-            m.name.toLowerCase() === explicitModel.toLowerCase() ||
-            m.shortName.toLowerCase() === explicitModel.toLowerCase() ||
-            (m.agyName && m.agyName.toLowerCase() === explicitModel.toLowerCase())
-        );
-        const targetModelName = found ? (found.agyName || found.name) : explicitModel;
-        const settings = this._getSettings();
-        settings.model = targetModelName;
-        this._saveSettings(settings);
-        this.model = targetModelName;
-        this._log(`Applied explicit model from message metadata: ${targetModelName}`);
-      }
-
-      const currentModelName = this._getModel();
-      const matched = ANTIGRAVITY_MODELS.find(
-        (m) =>
-          m.id === currentModelName ||
-          m.name.toLowerCase() === currentModelName.toLowerCase() ||
-          m.shortName.toLowerCase() === currentModelName.toLowerCase() ||
-          (m.agyName && m.agyName.toLowerCase() === currentModelName.toLowerCase())
-      );
-      const agyModelFlag = matched ? (matched.agyName || matched.name) : currentModelName;
+      const agyModelFlag = this._resolveModel(channel, msg);
 
       const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
       if (agyModelFlag) {

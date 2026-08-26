@@ -13,8 +13,13 @@ const AGENT_TYPE_ALIASES = {
   chatgpt: 'codex',
   openai: 'codex',
   agy: 'antigravity',
-  kilo: 'opencode',
-  kilocode: 'opencode',
+  // `kilo` is shorthand for the kilocode type, NOT for opencode. Kilo Code's
+  // CLI is served by the same adapter as OpenCode but is its own agent type:
+  // separate binary, install command, config directory, credentials and version
+  // line. Folding it into `opencode` at creation time erased the distinction
+  // before the adapter could see it, leaving `agentName.includes('kilo')` as the
+  // only surviving signal.
+  kilo: 'kilocode',
 };
 
 /**

@@ -78,6 +78,7 @@ class ClineAdapter extends BaseAdapter {
     this._channelSessions = {};
     // channel → child process (the in-flight `cline` run)
     this._channelProcesses = {};
+    this._channelModels = {};
     this._stoppingChannels = new Set();
     this._sessionsFile = path.join(
       os.homedir(), '.wwj', 'sessions',
@@ -127,11 +128,43 @@ class ClineAdapter extends BaseAdapter {
     }
   }
 
+  _resolveModel(channel, msg) {
+    if (msg) {
+      const explicit =
+        msg.metadata?.agent_models?.cline ||
+        msg.metadata?.selected_model ||
+        msg.metadata?.model ||
+        msg.model;
+      if (explicit) return explicit;
+    }
+    if (channel && this._channelModels && this._channelModels[channel]) {
+      return this._channelModels[channel];
+    }
+    if (this._channelModels && this._channelModels['*']) {
+      return this._channelModels['*'];
+    }
+    return (this.agentEnv.CLINE_MODEL || '').trim() || this.model || undefined;
+  }
+
   // ------------------------------------------------------------------
-  // Control actions (stop / restart)
+  // Control actions (stop / restart / set_model)
   // ------------------------------------------------------------------
 
   async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+      }
+      this.model = requested;
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}' (this session only)`);
+      return;
+    }
     if (action === 'stop') {
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
       if (channel && this._channelProcesses[channel]) {
@@ -554,7 +587,7 @@ class ClineAdapter extends BaseAdapter {
         sessionId: resumeId || undefined,
         planMode: this._mode === 'plan',
         provider: (this.agentEnv.CLINE_PROVIDER || '').trim() || undefined,
-        model: (this.agentEnv.CLINE_MODEL || '').trim() || undefined,
+        model: this._resolveModel(channel, msg),
         apiKey: (this.agentEnv.CLINE_API_KEY || '').trim() || undefined,
         thinking: (this.agentEnv.CLINE_THINKING || '').trim() || undefined,
       });

@@ -33,7 +33,7 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
-import { AgentModelSwitcher, getAgentKind } from './agent-model-switcher';
+import { AgentModelSwitcher } from './agent-model-switcher';
 import { PipelineStepper } from './pipeline-stepper';
 import { eventToMessage } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
@@ -649,18 +649,17 @@ export function ChatView() {
           }));
         }
 
-        // Per-agent-kind model hint, keyed the way the adapters read it
-        // (`metadata.agent_models.<kind>`). The switcher stores its choice under
-        // the *agent name*, so resolve name → kind here; reading the kind
-        // straight out of localStorage matched nothing unless an agent happened
-        // to be named "claude"/"antigravity"/"openclaw".
+        // Per-agent model hints, keyed by agent name and agent type
         const agentModelsMeta: Record<string, string> = {};
         try {
           for (const agent of agents) {
-            const kind = getAgentKind(agent.agentName, agent.agentType);
-            if (kind === 'generic' || agentModelsMeta[kind]) continue;
             const saved = localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName}`);
-            if (saved) agentModelsMeta[kind] = saved;
+            if (saved) {
+              agentModelsMeta[agent.agentName.toLowerCase()] = saved;
+              if (agent.agentType) {
+                agentModelsMeta[agent.agentType.toLowerCase()] = saved;
+              }
+            }
           }
         } catch {}
 

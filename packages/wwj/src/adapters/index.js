@@ -28,6 +28,7 @@ const ADAPTER_MAP = {
   claude: ClaudeAdapter,
   codex: CodexAdapter,
   opencode: OpenCodeAdapter,
+  kilocode: OpenCodeAdapter,
   nanoclaw: NanoClawAdapter,
   cursor: CursorAdapter,
   hermes: HermesAdapter,

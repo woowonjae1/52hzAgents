@@ -13,7 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execSync, spawn } = require('child_process');
+const { execSync, execFileSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
 const { formatAttachmentsForPrompt, logRawEvent } = require('./utils');
@@ -26,18 +26,66 @@ const IS_WINDOWS = process.platform === 'win32';
 // child with SIGTERM, the 'close' handler sees signal='SIGTERM' / code=null.
 const TIMEOUT_MS = 300000; // 5 minutes
 
-// Pinned OpenCode CLI version. Do NOT use @latest anywhere (registry.json /
-// opencode.yaml install commands, install hints below). This adapter parses
-// opencode's `--format json` stream, so an unbounded version floats the event
-// schema (text / tool / error / step events) out from under us and makes the
-// same workspace behave differently per machine.
-const OPENCODE_PINNED_VERSION = '1.17.11';
-// Supported floor — below this we block the run with `unsupported_version`.
-// The 1.17.x line is the stream-json shape this adapter targets.
-const OPENCODE_MIN_VERSION = '1.17.0';
-// Highest version whose JSON behavior is treated as verified. Newer is allowed
-// but flagged 'degraded' (the run still proceeds; any failure is classified).
-const OPENCODE_TESTED_MAX_VERSION = '1.17.11';
+/**
+ * Kilo Code's CLI is a fork of opencode — same `run` subcommand, same
+ * `--format json` stream, same `-m/--model provider/model`, same `models`
+ * subcommand (its own logs even identify the service as "opencode"). One
+ * adapter therefore serves both, but they are NOT one agent type: the version
+ * lines (1.18.x vs 7.4.x) are not on the same scale, and the binaries, install
+ * commands, config directories and credentials are all separate.
+ *
+ * Everything that differs between them lives here and nowhere else. Do NOT use
+ * @latest in any install command — this adapter parses the CLI's stream-json,
+ * so an unbounded version floats the event schema out from under us.
+ */
+const FLAVORS = {
+  opencode: {
+    id: 'opencode',
+    displayName: 'OpenCode',
+    // Ordered: the first name that resolves wins.
+    binaryCandidates: ['opencode'],
+    packageName: 'opencode-ai',
+    // `run` is verified against 1.18.23 on 2026-08-26: the emitted stream
+    // (`step_start` / `text` / `step_finish`, part carried at the TOP level
+    // rather than under `properties`) was captured and replayed through
+    // _extractTextFromEvent, which assembled the reply correctly.
+    pinnedVersion: '1.18.23',
+    minVersion: '1.17.0',
+    testedMaxVersion: '1.18.23',
+    configDir: path.join(os.homedir(), '.config', 'opencode'),
+    // Where the CLI keeps the model the *user* chose. Read-only to us.
+    configFiles: ['opencode.jsonc', 'opencode.json', 'config.json'],
+    modelEnvVars: ['OPENCODE_MODEL', 'LLM_MODEL'],
+  },
+  kilocode: {
+    id: 'kilocode',
+    displayName: 'Kilo Code',
+    binaryCandidates: ['kilocode', 'kilo'],
+    packageName: '@kilocode/cli',
+    // 7.4.23 verified 2026-08-26 only as far as CLI behaviour: it accepted the
+    // headless run and returned a well-formed `{"type":"error"}` event (the
+    // stored provider key was 401). A successful assistant turn has NOT yet
+    // been captured on this line — see scripts/diagnose-opencode.js.
+    pinnedVersion: '7.4.23',
+    minVersion: '7.0.0',
+    testedMaxVersion: '7.4.23',
+    configDir: path.join(os.homedir(), '.config', 'kilo'),
+    configFiles: ['kilo.jsonc', 'kilo.json', 'config.json'],
+    modelEnvVars: ['KILO_MODEL', 'KILOCODE_MODEL', 'LLM_MODEL'],
+  },
+};
+
+/** Resolve an agent type / name to a flavor, defaulting to opencode. */
+function resolveFlavor(agentType, agentName) {
+  const t = String(agentType || '').toLowerCase();
+  if (FLAVORS[t]) return FLAVORS[t];
+  if (t === 'kilo') return FLAVORS.kilocode;
+  // Legacy fallback: before kilocode was its own agent type the only surviving
+  // signal was the agent's name. Kept so existing installs keep working.
+  const n = String(agentName || '').toLowerCase();
+  if (n.includes('kilo')) return FLAVORS.kilocode;
+  return FLAVORS.opencode;
+}
 
 // How long a detected CLI version / executability probe is cached on the
 // adapter instance, so preflight never spawns `--version` more than once per
@@ -48,25 +96,37 @@ const VERSION_PROBE_TTL_MS = 60000;
 // must NEVER default to "run auth login": only credential_missing / auth_failed
 // mention authentication. Diagnostics (exit code, signal, redacted stdout/
 // stderr) go to the daemon log, not to these.
-const FAILURE_MESSAGES = {
-  cli_not_found: `OpenCode CLI not found. Install it (\`npm install -g opencode-ai@${OPENCODE_PINNED_VERSION}\`) and try again.`,
-  cli_not_executable: 'OpenCode CLI was found but could not be started. Reinstall it, then retry.',
-  unsupported_version: `This OpenCode CLI version is not supported (requires >= ${OPENCODE_MIN_VERSION}). Reinstall \`opencode-ai@${OPENCODE_PINNED_VERSION}\` and retry.`,
-  model_missing: "No model is configured for OpenCode. Set a model (LLM_MODEL, e.g. `gpt-4o`) in this agent's configuration, then retry.",
-  credential_missing: 'OpenCode has no API key or sign-in configured. Add an API key (LLM_API_KEY) or run `opencode auth login`, then retry.',
-  auth_failed: "OpenCode's provider rejected the credentials (authentication failed). Check the API key or sign-in and retry.",
-  provider_not_configured: 'OpenCode has no usable provider configured. Configure a provider and model, then retry.',
+/**
+ * Per-flavor user-facing messages. Built from the flavor so a Kilo user is
+ * never told to `npm install -g opencode-ai` — the old hardcoded hint sent them
+ * to the wrong package entirely.
+ */
+function failureMessages(flavor) {
+  const f = flavor || FLAVORS.opencode;
+  const name = f.displayName;
+  const install = `npm install -g ${f.packageName}@${f.pinnedVersion}`;
+  const cli = f.binaryCandidates[0];
+  return {
+  cli_not_found: `${name} CLI not found. Install it (\`${install}\`) and try again.`,
+  cli_not_executable: `${name} CLI was found but could not be started. Reinstall it, then retry.`,
+  unsupported_version: `This ${name} CLI version is not supported (requires >= ${f.minVersion}). Reinstall \`${install}\` and retry.`,
+  unverified_version: `This ${name} CLI version is newer than the highest version this adapter has been verified against (${f.testedMaxVersion}). Execution was blocked rather than risk a run that produces no output. Install \`${install}\`, or set WWJ_ALLOW_UNVERIFIED_CLI_VERSION=1 to run anyway.`,
+  model_missing: `No model is configured for ${name}. Choose one in the ${name} TUI (or its config at ${f.configDir}), then retry — this workspace forwards the model you picked and never selects one for you.`,
+  credential_missing: `${name} has no API key or sign-in configured. Add an API key (LLM_API_KEY) or run \`${cli} auth login\`, then retry.`,
+  auth_failed: `${name}'s provider rejected the credentials (authentication failed). Check the API key or sign-in and retry.`,
+  provider_not_configured: `${name} has no usable provider configured. Configure a provider and model, then retry.`,
   model_not_found: 'The configured model was not found or is not accessible. Check the model name and your access, then retry.',
   rate_limited: 'The provider is rate-limiting requests. Wait a moment and retry.',
-  network_error: 'OpenCode could not reach the provider (network or service error). Retry shortly.',
+  network_error: `${name} could not reach the provider (network or service error). Retry shortly.`,
   provider_server_error: 'The provider returned a server error. Retry shortly.',
-  timeout: 'OpenCode timed out before producing a reply. Retry; if it persists, check the model and provider configuration.',
-  stream_parse_error: 'OpenCode produced output this version could not parse. Update to a supported OpenCode version, or open diagnostics.',
-  empty_response: 'OpenCode finished without producing a final reply. Retry; if it persists, open diagnostics.',
-  process_crashed: 'OpenCode exited unexpectedly. Open diagnostics or retry.',
-  cwd_unavailable: "OpenCode's working directory is not accessible. Check the agent home directory's permissions.",
-  unknown_error: 'OpenCode failed for an undetermined reason. Open diagnostics or retry.',
-};
+  timeout: `${name} timed out before producing a reply. Retry; if it persists, check the model and provider configuration.`,
+  stream_parse_error: `${name} produced output this version could not parse. Update to a supported ${name} version, or open diagnostics.`,
+  empty_response: `${name} finished without producing a final reply. Retry; if it persists, open diagnostics.`,
+  process_crashed: `${name} exited unexpectedly. Open diagnostics or retry.`,
+  cwd_unavailable: `${name}'s working directory is not accessible. Check the agent home directory's permissions.`,
+  unknown_error: `${name} failed for an undetermined reason. Open diagnostics or retry.`,
+  };
+}
 
 class OpenCodeAdapter extends BaseAdapter {
   /**
@@ -77,6 +137,16 @@ class OpenCodeAdapter extends BaseAdapter {
   constructor(opts) {
     super(opts);
     this.disabledModules = opts.disabledModules || new Set();
+
+    // Which CLI this instance drives. Everything version-, binary-, config- and
+    // message-related reads off this, so opencode and kilo never share a
+    // version scale or an install hint again.
+    this.flavor = resolveFlavor(opts.agentType, this.agentName);
+    this._messages = failureMessages(this.flavor);
+    // Per-run model overrides from the UI: channel → model id. Deliberately
+    // NOT persisted and never written into the CLI's own config — the CLI
+    // remains the owner of the default, this only applies to the next turn.
+    this._channelModels = {};
 
     // Agent home directory: ~/.wwj/agents/{agentName}/
     this.agentHome = path.join(os.homedir(), '.wwj', 'agents', this.agentName);
@@ -93,9 +163,12 @@ class OpenCodeAdapter extends BaseAdapter {
 
     this._opencodeBinary = this._findOpencodeBinary();
     if (this._opencodeBinary) {
-      this._log(`Using OpenCode subprocess mode: ${this._opencodeBinary}`);
+      this._log(`Using ${this.flavor.displayName} subprocess mode: ${this._opencodeBinary}`);
     } else {
-      this._log(`OpenCode binary not found. Install with: npm install -g opencode-ai@${OPENCODE_PINNED_VERSION}`);
+      this._log(
+        `${this.flavor.displayName} binary not found. Install with: ` +
+        `npm install -g ${this.flavor.packageName}@${this.flavor.pinnedVersion}`
+      );
     }
   }
 
@@ -203,9 +276,10 @@ class OpenCodeAdapter extends BaseAdapter {
     const home = os.homedir();
     const ext = IS_WINDOWS ? '.cmd' : '';
 
-    const binNames = this.agentName?.toLowerCase().includes('kilo')
-      ? ['kilocode', 'kilo', 'opencode']
-      : ['opencode', 'kilocode', 'kilo'];
+    // Only this flavor's binaries. The old code sniffed the agent *name* for
+    // "kilo" and fell back across flavors, so a kilocode agent named anything
+    // else silently ran the opencode binary against kilo's config.
+    const binNames = this.flavor.binaryCandidates;
 
     for (const name of binNames) {
       const nativeExe = path.join(home, '.wwj', 'runtimes', name, 'node_modules', `${name}-ai`, 'bin', `${name}.exe`);
@@ -646,9 +720,31 @@ class OpenCodeAdapter extends BaseAdapter {
    * kills it with SIGTERM (surfaced as the misleading "exited with code null").
    * Passing `--model` explicitly is what makes headless runs actually work.
    */
-  _resolveModel() {
+  /**
+   * The model to forward on `--model`, in priority order:
+   *   1. a per-run override the user picked in the workspace for this channel
+   *   2. what the *CLI's own config* says the user selected
+   *   3. this agent's env (legacy configuration path)
+   *
+   * This is forwarding, not selection: there is no fallback model and no
+   * "pick something that looks usable". If all three are empty, preflight
+   * blocks the run and tells the user to choose a model in the CLI. `--model`
+   * is passed only because a headless run cannot complete the CLI's own
+   * interactive picker.
+   */
+  _resolveModel(channel) {
+    const override = channel && this._channelModels[channel];
+    if (override) return override;
+
+    const fromConfig = this._modelFromCliConfig();
+    if (fromConfig) return fromConfig;
+
     const env = this.agentEnv || process.env;
-    const model = (env.OPENCODE_MODEL || env.LLM_MODEL || '').trim();
+    let model = '';
+    for (const key of this.flavor.modelEnvVars) {
+      const v = (env[key] || '').trim();
+      if (v) { model = v; break; }
+    }
     if (!model) return '';
     // Already provider-qualified (e.g. "openai/gpt-4o", "anthropic/claude-…").
     if (model.includes('/')) return model;
@@ -660,6 +756,141 @@ class OpenCodeAdapter extends BaseAdapter {
       ? 'anthropic'
       : 'openai';
     return `${provider}/${model}`;
+  }
+
+  /**
+   * The model the user selected inside the CLI, read out of the CLI's own
+   * config. Strictly read-only — this adapter never writes these files.
+   *
+   * opencode/kilo store it as a bare `"model": "provider/id"` at the config
+   * root; a `provider` block may also declare models but does not say which one
+   * is active, so it is not consulted here.
+   */
+  _modelFromCliConfig() {
+    for (const name of this.flavor.configFiles) {
+      const file = path.join(this.flavor.configDir, name);
+      try {
+        if (!fs.existsSync(file)) continue;
+        // .jsonc — strip line comments and trailing commas before parsing.
+        const raw = fs.readFileSync(file, 'utf-8')
+          .replace(/^\s*\/\/.*$/gm, '')
+          .replace(/,(\s*[}\]])/g, '$1');
+        const cfg = JSON.parse(raw);
+        const m = cfg && typeof cfg.model === 'string' ? cfg.model.trim() : '';
+        if (m) return m;
+      } catch {
+        // A malformed config is the CLI's problem to report, not ours to guess
+        // around. Fall through to the next candidate.
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Every model this install can actually reach, from `<cli> models` — the
+   * CLI's own answer, so there is no hardcoded list to drift. Returns [] when
+   * the probe fails; an empty list must be reported as "unknown", never
+   * substituted with a guess.
+   */
+  _listModels() {
+    const binary = this._opencodeBinary || this._findOpencodeBinary();
+    if (!binary) return [];
+    const out = this._runHiddenCliSync(binary, ['models']);
+    if (!out) return [];
+    const seen = new Set();
+    const models = [];
+    for (const line of out.split(/\r?\n/)) {
+      const id = line.trim();
+      // One `provider/model` per line. Skip banner art and stray log lines.
+      if (!/^[\w.@-]+\/[\w.:@-]+$/.test(id) || seen.has(id)) continue;
+      seen.add(id);
+      const slash = id.indexOf('/');
+      models.push({ id, provider: id.slice(0, slash), label: id.slice(slash + 1) });
+    }
+    return models;
+  }
+
+  /**
+   * Read-only runtime snapshot for the workspace UI: what the CLI is set to and
+   * what it can reach. Carries `source` so the UI can never present an inferred
+   * value as configuration truth, and omits the model list entirely rather than
+   * inventing one when the probe came back empty.
+   */
+  async fetchAndReportUsage() {
+    try {
+      const override = Object.values(this._channelModels)[0] || '';
+      const fromConfig = this._modelFromCliConfig();
+      const currentId = override || fromConfig || this._resolveModel();
+      const source = override ? 'workspace-override'
+        : fromConfig ? 'cli-config'
+        : currentId ? 'agent-env'
+        : 'unknown';
+      const models = this._listModels();
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: currentId || null,
+          available_models: models.length ? JSON.stringify(models) : null,
+          raw_text: `flavor=${this.flavor.id} model_source=${source}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
+  /** Blocking `<cli> <args>` capture for short metadata probes. */
+  _runHiddenCliSync(binary, args, timeoutMs = 25000) {
+    try {
+      const isBatch = IS_WINDOWS && /\.(cmd|bat)$/i.test(binary);
+      const cmd = isBatch ? (process.env.COMSPEC || 'cmd.exe') : binary;
+      const argv = isBatch ? ['/c', binary, ...args] : args;
+      return execFileSync(cmd, argv, {
+        encoding: 'utf-8',
+        timeout: timeoutMs,
+        windowsHide: true,
+        maxBuffer: 8 * 1024 * 1024,
+        env: this.agentEnv || process.env,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+    } catch (e) {
+      // Non-zero exit still carries usable stdout for `models`.
+      return (e && e.stdout) ? String(e.stdout) : '';
+    }
+  }
+
+  async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+
+      // Only accept something the CLI itself declared. An id we cannot see in
+      // `<cli> models` would be forwarded to `--model` and fail per-run with an
+      // opaque provider error, so reject it here where we can say why.
+      const known = this._listModels();
+      if (known.length && !known.some((m) => m.id === requested)) {
+        this._log(`set_model: '${requested}' is not in \`${this.flavor.binaryCandidates[0]} models\` — ignoring`);
+        return;
+      }
+
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+      }
+      // Deliberately no disk write and no edit to the CLI's config: this is a
+      // per-run forward, and the CLI stays the owner of the default.
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}' (this session only)`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
+    await super._onControlAction(action, payload);
   }
 
   _runOpencode(content, msgChannel) {
@@ -677,7 +908,7 @@ class OpenCodeAdapter extends BaseAdapter {
 
     // Preflight guarantees a resolvable model; pin it explicitly — without it
     // opencode hangs waiting for interactive provider/model selection.
-    const model = this._resolveModel();
+    const model = this._resolveModel(msgChannel);
     cmd.push('--model', model);
 
     const sessionId = this._channelSessions[msgChannel];
@@ -830,7 +1061,7 @@ class OpenCodeAdapter extends BaseAdapter {
    * problems (no binary, unsupported version, no model, no credential at all,
    * unusable cwd) and lets anything ambiguous through to a real run.
    */
-  _preflight() {
+  _preflight(channel) {
     const binary = this._opencodeBinary || this._findOpencodeBinary();
     if (binary) this._opencodeBinary = binary;
     if (!binary) return { ok: false, category: 'cli_not_found' };
@@ -839,18 +1070,29 @@ class OpenCodeAdapter extends BaseAdapter {
     if (!probe.executable) {
       return { ok: false, category: 'cli_not_executable', diagnostic: 'opencode --version did not run' };
     }
-    const vclass = OpenCodeAdapter._classifyVersion(probe.version);
+    const vclass = OpenCodeAdapter._classifyVersion(probe.version, this.flavor);
     if (vclass === 'unsupported') {
       return {
         ok: false,
         category: 'unsupported_version',
         detail: `detected ${probe.version || 'unknown'}`,
-        diagnostic: `detected ${probe.version}, requires >= ${OPENCODE_MIN_VERSION}`,
+        diagnostic: `detected ${probe.version}, requires >= ${this.flavor.minVersion}`,
       };
     }
-    // 'unknown' (unparseable) and 'degraded' (newer than tested) still run.
+    if (vclass === 'unverified' && !OpenCodeAdapter._allowUnverifiedVersion(this.agentEnv)) {
+      return {
+        ok: false,
+        category: 'unverified_version',
+        detail: `detected ${probe.version}, verified up to ${this.flavor.testedMaxVersion}`,
+        diagnostic:
+          `detected ${probe.version} > testedMax ${this.flavor.testedMaxVersion} for flavor ` +
+          `${this.flavor.id}; blocked (set WWJ_ALLOW_UNVERIFIED_CLI_VERSION=1 to override)`,
+      };
+    }
+    // 'unknown' (unparseable version string) still runs — never block on a
+    // failure to read a version number.
 
-    const model = this._resolveModel();
+    const model = this._resolveModel(channel);
     if (!model) return { ok: false, category: 'model_missing' };
 
     const cred = this._credentialState();
@@ -960,7 +1202,7 @@ class OpenCodeAdapter extends BaseAdapter {
    * normal reply. Carries `error_category` in metadata so the UI can route it.
    */
   async _sendClassifiedError(channel, category, detail) {
-    const base = FAILURE_MESSAGES[category] || FAILURE_MESSAGES.unknown_error;
+    const base = this._messages[category] || this._messages.unknown_error;
     const safe = detail ? OpenCodeAdapter._redact(detail).trim() : '';
     const body = safe ? `${base}\n\n> ${safe}` : base;
     const content = `⚠️ **OpenCode couldn't run** — ${body}`;
@@ -1096,13 +1338,25 @@ class OpenCodeAdapter extends BaseAdapter {
     return 'empty_response';
   }
 
-  /** 'ok' | 'degraded' (newer than tested) | 'unsupported' (too old) | 'unknown'. */
-  static _classifyVersion(version) {
+  /** 'ok' | 'unverified' (newer than tested) | 'unsupported' (too old) | 'unknown'. */
+  static _classifyVersion(version, flavor) {
+    const f = flavor || FLAVORS.opencode;
     // Non-semver (or unreadable) → 'unknown': allow the run, never block on it.
     if (!version || !/^\d+\.\d+/.test(String(version))) return 'unknown';
-    if (OpenCodeAdapter._cmpVer(version, OPENCODE_MIN_VERSION) < 0) return 'unsupported';
-    if (OPENCODE_TESTED_MAX_VERSION && OpenCodeAdapter._cmpVer(version, OPENCODE_TESTED_MAX_VERSION) > 0) return 'degraded';
+    if (OpenCodeAdapter._cmpVer(version, f.minVersion) < 0) return 'unsupported';
+    if (f.testedMaxVersion && OpenCodeAdapter._cmpVer(version, f.testedMaxVersion) > 0) return 'unverified';
     return 'ok';
+  }
+
+  /**
+   * Newer-than-verified used to be 'degraded': logged, then run anyway. The
+   * observed failure mode of an unparseable stream is not a loud error but five
+   * minutes of zero output followed by `empty_response`, which tells the user
+   * nothing. Fail closed instead, with an explicit escape hatch.
+   */
+  static _allowUnverifiedVersion(env) {
+    const v = String((env || process.env).WWJ_ALLOW_UNVERIFIED_CLI_VERSION || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
   }
 
   /** Numeric-segment semver compare. Returns -1 / 0 / 1. */
