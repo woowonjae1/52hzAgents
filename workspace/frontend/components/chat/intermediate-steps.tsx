@@ -20,6 +20,12 @@ import {
   Circle,
   Ban,
   Dot,
+  GitFork,
+  Bot,
+  Cpu,
+  Layers,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { WorkingIndicator } from './working-indicator';
@@ -30,13 +36,74 @@ import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
 // ── Content Parsing ──
 
+export interface SubagentInfo {
+  index: number;
+  role: string;
+  typeName: string;
+  prompt: string;
+  workspace: string;
+  model: string;
+  subagentId?: string;
+  status?: 'running' | 'completed' | 'failed';
+  steps?: { tool: string; summary: string }[];
+}
+
 interface ParsedStep {
-  type: 'thinking' | 'tool_call' | 'status' | 'compacting';
+  type: 'thinking' | 'tool_call' | 'status' | 'compacting' | 'subagents';
   tool?: string;
   toolDisplay?: string;
   args?: string;
   summary?: string;
   text?: string;
+  subagents?: SubagentInfo[];
+}
+
+function parseSubagentsPayload(raw: string): SubagentInfo[] | null {
+  try {
+    const data = JSON.parse(raw);
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map((item, idx) => ({
+        index: item.index ?? idx,
+        role: item.role ?? item.Role ?? item.TypeName ?? item.typeName ?? 'Subagent',
+        typeName: item.typeName ?? item.TypeName ?? 'research',
+        prompt: item.prompt ?? item.Prompt ?? '',
+        workspace: item.workspace ?? item.Workspace ?? 'inherit',
+        model: item.model ?? item.Model ?? 'inherit',
+        subagentId: item.subagentId ?? item.SubagentId ?? item.id ?? item.Id,
+        status: item.status ?? 'running',
+        steps: item.steps || [],
+      }));
+    }
+    const subagentsList = data.Subagents || data.subagents;
+    if (Array.isArray(subagentsList) && subagentsList.length > 0) {
+      return subagentsList.map((item: any, idx: number) => ({
+        index: idx,
+        role: item.Role ?? item.role ?? item.TypeName ?? item.typeName ?? 'Subagent',
+        typeName: item.TypeName ?? item.typeName ?? 'research',
+        prompt: item.Prompt ?? item.prompt ?? '',
+        workspace: item.Workspace ?? item.workspace ?? 'inherit',
+        model: item.Model ?? item.model ?? 'inherit',
+        subagentId: item.SubagentId ?? item.subagentId ?? item.Id ?? item.id,
+        status: 'running',
+        steps: [],
+      }));
+    }
+  } catch {
+    // If not JSON, check if text has role or subagent mention
+    const m = raw.match(/([A-Za-z0-9 _-]+):\s*([\s\S]+)/);
+    if (m) {
+      return [{
+        index: 0,
+        role: m[1].trim(),
+        typeName: 'research',
+        prompt: m[2].trim(),
+        workspace: 'inherit',
+        model: 'inherit',
+        status: 'running',
+      }];
+    }
+  }
+  return null;
 }
 
 function parseStepContent(content: string): ParsedStep {
@@ -56,6 +123,12 @@ function parseStepContent(content: string): ParsedStep {
     const rawTool = toolMatch[1];
     const args = toolMatch[2].trim();
     const toolDisplay = cleanToolName(rawTool);
+    if (toolDisplay.toLowerCase() === 'invoke_subagent' || toolDisplay.toLowerCase() === 'subagent') {
+      const subagents = parseSubagentsPayload(args);
+      if (subagents && subagents.length > 0) {
+        return { type: 'subagents', tool: rawTool, toolDisplay: 'Subagents', args, subagents };
+      }
+    }
     const summary = extractToolSummary(toolDisplay, args);
     return { type: 'tool_call', tool: rawTool, toolDisplay, args, summary };
   }
@@ -80,16 +153,17 @@ function parseStepContent(content: string): ParsedStep {
     };
   }
 
-  // Adapters post tool activity as a plain "Name > args" status line (see the
-  // claude adapter's sendStatus on tool_use). Without this branch it fell
-  // through to a generic `status` step, losing the tool's identity, its icon and
-  // the expandable detail — which is why long arguments appeared truncated with
-  // no way to read them. Checked before the /compact/ test so a command that
-  // merely contains the word "compact" is not misread as a compaction notice.
+  // Adapters post tool activity as a plain "Name > args" status line
   const inlineToolMatch = content.match(/^([A-Za-z][\w.-]*)\s*›\s*([\s\S]+)$/);
   if (inlineToolMatch) {
     const toolDisplay = cleanToolName(inlineToolMatch[1].trim());
     const args = inlineToolMatch[2].trim();
+    if (toolDisplay.toLowerCase() === 'invoke_subagent' || toolDisplay.toLowerCase() === 'subagent') {
+      const subagents = parseSubagentsPayload(args);
+      if (subagents && subagents.length > 0) {
+        return { type: 'subagents', tool: toolDisplay, toolDisplay: 'Subagents', args, subagents };
+      }
+    }
     const oneLine = args.replace(/\s+/g, ' ').trim();
     return {
       type: 'tool_call',
@@ -171,6 +245,125 @@ function isPlaceholderThinking(message: WorkspaceMessage): boolean {
   return t === '' || t === 'thinking...' || t === 'thinking';
 }
 
+function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
+  const [open, setOpen] = useState(true);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+
+  if (!subagents || subagents.length === 0) return null;
+
+  return (
+    <div className="my-2 rounded-xl border border-border/80 bg-surface1/70 backdrop-blur-md p-3 shadow-2xs">
+      {/* Root Header */}
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-2 text-left cursor-pointer group"
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <GitFork className="size-3.5" />
+          </span>
+          <span className="text-xs font-semibold text-foreground tracking-tight">
+            Subagents Pool ({subagents.length} Concurrent Worker{subagents.length > 1 ? 's' : ''})
+          </span>
+          <span className="text-3xs font-mono px-1.5 py-0.5 rounded bg-surface2 text-foreground-muted border border-border/60">
+            Parallel Delegations
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 text-foreground-extra-muted">
+          {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+        </div>
+      </button>
+
+      {/* Subagents Nested Tree */}
+      {open && (
+        <div className="mt-2.5 space-y-2 border-l-2 border-primary/30 pl-3 ml-2.5">
+          {subagents.map((agent, i) => {
+            const isRunning = agent.status === 'running';
+            return (
+              <div key={agent.index ?? i} className="rounded-lg border border-border/60 bg-surface2/60 p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="flex size-5 items-center justify-center rounded-md bg-surface3 text-foreground-muted">
+                      <Bot className="size-3" />
+                    </span>
+                    <span className="text-xs font-semibold text-foreground truncate">
+                      {agent.role}
+                    </span>
+                    <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-surface3 text-foreground-muted">
+                      {agent.typeName}
+                    </span>
+                    {agent.workspace && agent.workspace !== 'inherit' && (
+                      <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        ws:{agent.workspace}
+                      </span>
+                    )}
+                    {agent.model && agent.model !== 'inherit' && (
+                      <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        {agent.model}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isRunning ? (
+                      <span className="inline-flex items-center gap-1 text-3xs font-medium text-emerald-600 dark:text-emerald-400">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Working</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-3xs font-medium text-foreground-muted">
+                        <Check className="size-3 text-status-success" />
+                        <span>Ready</span>
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(agent.prompt);
+                        setCopiedId(agent.index ?? i);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
+                      className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+                      title="Copy subagent prompt"
+                    >
+                      {copiedId === (agent.index ?? i) ? (
+                        <Check className="size-3 text-status-success" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {agent.prompt && (
+                  <div className="text-2xs font-mono text-foreground-muted bg-surface1/80 border border-border/40 p-2 rounded-md whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                    {agent.prompt}
+                  </div>
+                )}
+
+                {/* Subagent Internal Steps Trace */}
+                {agent.steps && agent.steps.length > 0 && (
+                  <div className="mt-1 space-y-1 pl-2 border-l border-border/60">
+                    {agent.steps.map((st, sIdx) => (
+                      <div key={sIdx} className="flex items-center gap-1.5 text-3xs font-mono text-foreground-extra-muted">
+                        <span>└──</span>
+                        <span className="font-semibold text-foreground-muted">{st.tool}:</span>
+                        <span className="truncate">{st.summary}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Step Item ──
 
 const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMessage }) {
@@ -238,6 +431,10 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         </div>
       </EventLine>
     );
+  }
+
+  if (parsed.type === 'subagents' && parsed.subagents && parsed.subagents.length > 0) {
+    return <SubagentTree subagents={parsed.subagents} />;
   }
 
   if (parsed.type === 'tool_call') {

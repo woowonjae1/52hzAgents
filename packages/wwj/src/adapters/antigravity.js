@@ -44,6 +44,20 @@ const FILE_WRITING_TOOLS = new Set([
 
 function formatToolPreview(toolName, params) {
   if (!params || typeof params !== 'object') return '';
+  if (toolName === 'invoke_subagent' || toolName === 'subagent') {
+    const subagents = params.Subagents || params.subagents || [];
+    if (Array.isArray(subagents) && subagents.length > 0) {
+      const first = subagents[0];
+      const role = first.Role || first.role || first.TypeName || 'Researcher';
+      const prompt = first.Prompt || first.prompt || '';
+      return `${role}: ${prompt.slice(0, 120)}`;
+    }
+    if (params.Role || params.role || params.TypeName) {
+      const role = params.Role || params.role || params.TypeName;
+      const prompt = params.Prompt || params.prompt || '';
+      return `${role}: ${prompt.slice(0, 120)}`;
+    }
+  }
   if (params.CommandLine) return params.CommandLine;
   if (params.TargetFile) return params.TargetFile;
   if (params.AbsolutePath) return params.AbsolutePath;
