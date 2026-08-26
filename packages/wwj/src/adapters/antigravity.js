@@ -453,15 +453,20 @@ class AntigravityAdapter extends BaseAdapter {
           return;
         }
 
-        const cleanOutput = stripAnsi(finalResponse || (textDeltas.length ? textDeltas.join('') : rawStdout)).trim();
+        let outputText = finalResponse || (textDeltas.length ? textDeltas.join('') : '');
 
-        if (cleanOutput) {
+        // Never dump raw NDJSON stream lines to chat
+        if (!outputText && rawStdout && !rawStdout.trim().startsWith('{"event":')) {
+          outputText = rawStdout;
+        }
+
+        const cleanOutput = stripAnsi(outputText).trim();
+
+        if (lastErrorText) {
+          await this.sendError(channel, `⚠️ Antigravity 调用异常提示:\n${lastErrorText}`);
+        } else if (cleanOutput) {
           await this.sendResponse(channel, cleanOutput);
-        } else if (lastErrorText) {
-          await this.sendError(channel, `❌ Antigravity: ${lastErrorText}`);
         } else if (idleKilled) {
-          // Say what was actually observed. "No output for N minutes" is a
-          // diagnosis the user can act on; an eternal "正在推理中..." is not.
           const tail = stripAnsi(rawStderr).trim().split('\n').slice(-4).join('\n');
           const mins = Math.round(IDLE_KILL_MS / 60000);
           const detail = tail

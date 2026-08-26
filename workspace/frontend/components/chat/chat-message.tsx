@@ -317,7 +317,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
       lower.includes('task interrupted — daemon restarting') ||
       lower.includes('failed to authenticate') ||
       lower.includes('invalid api key') ||
-      lower.includes('daemon restarting')
+      lower.includes('daemon restarting') ||
+      lower.includes('quota reached') ||
+      lower.includes('调用异常') ||
+      lower.includes('rate limit') ||
+      lower.includes('individual quota')
     );
   }, [cleanContent]);
 
