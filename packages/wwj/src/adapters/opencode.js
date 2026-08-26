@@ -16,7 +16,7 @@ const os = require('os');
 const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
-const { formatAttachmentsForPrompt } = require('./utils');
+const { formatAttachmentsForPrompt, logRawEvent } = require('./utils');
 const { buildOpenCodeSkillMd, buildOpenCodeSystemPrompt } = require('./workspace-prompt');
 const { whichBinary, whereBinary, getEnhancedEnv } = require('../paths');
 
@@ -352,6 +352,7 @@ class OpenCodeAdapter extends BaseAdapter {
           if (depth === 0) {
             try {
               const obj = JSON.parse(raw.slice(start, i + 1));
+              logRawEvent('opencode', obj);
               if (typeof obj === 'object' && obj !== null) objects.push(obj);
             } catch {}
             pos = i + 1;
@@ -368,8 +369,51 @@ class OpenCodeAdapter extends BaseAdapter {
   /**
    * Extract user-visible text from a single opencode JSON event.
    */
+  /**
+   * The part carried by an event, and its incremental text, across both event
+   * shapes this CLI has shipped.
+   *
+   * Current opencode nests it as `event.properties.part` under
+   * `type: 'message.part.updated'`, with the increment in
+   * `event.properties.delta`. Older output put the part flat on `event.part`.
+   * Reading only one of the two is how a whole event class goes missing after a
+   * CLI upgrade with nothing in the logs to say so.
+   */
+  static _partOf(event) {
+    const props = (event && event.properties) || {};
+    const part = props.part || event.part || null;
+    if (!part || typeof part !== 'object') return null;
+    const delta = typeof props.delta === 'string' ? props.delta : (typeof event.delta === 'string' ? event.delta : '');
+    return { part, type: String(part.type || ''), text: delta || part.text || part.content || '' };
+  }
+
+  /**
+   * The model's reasoning, if this event carries any.
+   *
+   * opencode's part union includes a `reasoning` type alongside `text`, and
+   * nothing here used to look at `part.type` at all — `_extractTextFromEvent`
+   * pulled `part.text` out of BOTH and the caller sent the result on as a reply
+   * preview. So reasoning was not merely dropped, it was labelled as the answer:
+   * once the real answer arrived, the workspace's de-duplication removed it as a
+   * duplicate. Reasoning has to be identified here or it is actively destroyed
+   * further down.
+   */
+  static _extractReasoningFromEvent(event) {
+    const info = OpenCodeAdapter._partOf(event);
+    if (!info || info.type !== 'reasoning') return null;
+    return info.text || null;
+  }
+
   static _extractTextFromEvent(event) {
     if (!event || typeof event !== 'object') return null;
+    // Reasoning is not answer text. Claimed here first so it cannot fall through
+    // to the generic `part.text` read below and be mistaken for the reply.
+    const info = OpenCodeAdapter._partOf(event);
+    if (info && info.type && info.type !== 'text') return null;
+    // A nested `message.part.updated` keeps its increment in
+    // `properties.delta`, which the flat `event.part` read below cannot see —
+    // so a text part in the current event shape would come back empty.
+    if (info && info.text) return info.text;
     // Control / tool / error events carry no user-visible assistant text. Match
     // both underscore and hyphen spellings (`step_finish` vs `step-finish`) and
     // detect tool events by shape, since opencode's exact top-level `type`
@@ -449,6 +493,14 @@ class OpenCodeAdapter extends BaseAdapter {
       // as an empty response (see _finalTextFromStdout).
       if (responseState) responseState.finalText = '';
       await this.sendStatus(msgChannel, status);
+      return;
+    }
+
+    // Reasoning first, and unflagged: it belongs in the Thought disclosure, and
+    // it must NOT be added to `finalText` — it is not part of the answer.
+    const reasoning = OpenCodeAdapter._extractReasoningFromEvent(event);
+    if (reasoning && reasoning.trim()) {
+      try { await this.sendThinking(msgChannel, reasoning.trim()); } catch {}
       return;
     }
 

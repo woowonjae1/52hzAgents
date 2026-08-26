@@ -22,6 +22,7 @@ const https = require('https');
 const { whereBinary } = require('../paths');
 const BaseAdapter = require('./base');
 const { buildOpenclawSystemPrompt } = require('./workspace-prompt');
+const { logRawEvent } = require('./utils');
 
 const IS_WINDOWS = process.platform === 'win32';
 const MAX_HISTORY_ENTRIES = 50;
@@ -504,6 +505,13 @@ class CodexAdapter extends BaseAdapter {
 
         let event;
         try { event = JSON.parse(line); } catch { return; }
+        logRawEvent('codex', event);
+        // Printed separately as well: `item.completed` is the envelope that
+        // carries reasoning, and in a busy run it is otherwise lost among the
+        // token-level events.
+        if (event && event.type === 'item.completed') {
+          logRawEvent('codex.item.completed', event.item || event);
+        }
 
         const eventType = event.type;
 
@@ -526,21 +534,33 @@ class CodexAdapter extends BaseAdapter {
             try { await this.sendThinking(msgChannel, item.text, { isReplyPreview: true }); } catch {}
           } else if (item.type === 'reasoning') {
             /*
-             * o-series reasoning summaries — the genuine chain-of-thought, which
-             * this adapter previously ignored entirely (the word "reasoning" did
-             * not appear in this file). So the reply was shown inside a "Thought"
+             * o-series reasoning — the genuine chain-of-thought, which this
+             * adapter previously ignored entirely (the word "reasoning" did not
+             * appear in this file). So the reply was shown inside a "Thought"
              * disclosure while the actual thought was dropped.
              *
-             * The field is read defensively because the CLI's shape for this
-             * item is not pinned down here: a plain `text`, or OpenAI's
-             * `summary` array of `{ type: 'summary_text', text }` parts. Both
-             * are handled, and an unrecognised shape yields nothing rather than
-             * throwing inside the event loop.
+             * `item.text` IS THE EXPECTED FIELD HERE. Codex's exec JSONL layer
+             * aggregates the model's reasoning summary into a string before
+             * emitting it, so the CLI's `ReasoningItem` is `{ id, type, text }`
+             * — there is no `summary` array at this boundary.
+             *
+             * The `summary` branch is a cross-interface fallback, not a guess at
+             * this one: that array shape belongs to the raw Responses API
+             * reasoning output item, which only carries visible text when the
+             * caller explicitly requests `reasoning.summary` (the underlying
+             * chain-of-thought is never exposed). Kept so a future direct-API
+             * path lands here rather than silently yielding nothing.
+             *
+             * BOTH BEING EMPTY IS NOT EVIDENCE THE FIELDS ARE WRONG. It equally
+             * means the model produced no reasoning, or none was requested.
              */
-            const parts = Array.isArray(item.summary)
-              ? item.summary.map((s) => (typeof s === 'string' ? s : (s && s.text) || '')).filter(Boolean)
-              : [];
-            const text = String(item.text || parts.join('\n\n') || '').trim();
+            const summaryText = Array.isArray(item.summary)
+              ? item.summary
+                  .filter((x) => x && x.type === 'summary_text' && typeof x.text === 'string')
+                  .map((x) => x.text)
+                  .join('\n\n')
+              : '';
+            const text = String(item.text || summaryText || '').trim();
             if (text) {
               try { await this.sendThinking(msgChannel, text); } catch {}
             }

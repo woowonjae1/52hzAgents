@@ -14,7 +14,6 @@ const CursorAdapter = require('./cursor');
 const HermesAdapter = require('./hermes');
 const GeminiAdapter = require('./gemini');
 const KimiAdapter = require('./kimi');
-const AiderAdapter = require('./aider');
 const GooseAdapter = require('./goose');
 const CopilotAdapter = require('./copilot');
 const ClineAdapter = require('./cline');
@@ -36,7 +35,6 @@ const ADAPTER_MAP = {
   antigravity: AntigravityAdapter,
   agy: AntigravityAdapter,
   kimi: KimiAdapter,
-  aider: AiderAdapter,
   goose: GooseAdapter,
   copilot: CopilotAdapter,
   cline: ClineAdapter,
@@ -79,7 +77,6 @@ module.exports = {
   GeminiAdapter,
   AntigravityAdapter,
   KimiAdapter,
-  AiderAdapter,
   GooseAdapter,
   CopilotAdapter,
   ClineAdapter,

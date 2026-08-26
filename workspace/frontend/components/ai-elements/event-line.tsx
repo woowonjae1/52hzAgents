@@ -207,7 +207,17 @@ export function EventLine({
          */
         <span
           className={cn(
-            'min-w-0 truncate rounded-base border border-border bg-surface2 px-1.5',
+            // NO BORDER, AND A WIDTH CAP. With a border it stops reading as a
+            // chip and starts reading as a card — which is exactly what the row
+            // was before all this, a bordered box per tool call. A fill alone is
+            // enough separation next to plain text.
+            //
+            // `max-w-[46ch]` because without it a long argument (a glob like
+            // `workspace/frontend/components/mission/*.tsx`) stretches the chip
+            // across the full width of a ~1000px transcript, and a 900px-wide
+            // rounded rectangle is a card no matter what it is called. Capped, it
+            // truncates and the row keeps its compact shape.
+            'min-w-0 max-w-[46ch] truncate rounded-base bg-surface2 px-1.5',
             'text-foreground-muted',
             detailMono && 'font-mono'
           )}

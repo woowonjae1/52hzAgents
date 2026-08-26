@@ -12,7 +12,6 @@ import {
   Search,
   Clock,
   Users,
-  ChevronRight,
   RefreshCw,
   ListTodo,
   Copy,
@@ -25,7 +24,7 @@ import {
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { WorkingIndicator } from './working-indicator';
 import { Reasoning } from '@/components/ai-elements/reasoning';
-import { EventLine } from '@/components/ai-elements/event-line';
+import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
 import { MarkdownContent } from './markdown-content';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
@@ -175,7 +174,8 @@ function isPlaceholderThinking(message: WorkspaceMessage): boolean {
 // ── Step Item ──
 
 const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMessage }) {
-  const [expanded, setExpanded] = useState(false);
+  // No `expanded` state: the disclosure is a native `<details>` inside
+  // `EventLine` now, so nothing here owns open/closed.
   const [copied, setCopied] = useState(false);
 
   if (message.messageType === 'todos') {
@@ -227,75 +227,65 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
   const isThinkingWithContent = parsed.type === 'thinking' && !!parsed.text && parsed.text !== 'thinking...' && parsed.text.toLowerCase() !== 'thinking';
 
   if (isThinkingWithContent) {
+    // A `**Thinking:**` prefix inside a status message -- the shape a couple of
+    // connectors use instead of a real thinking event. Collapsed by default like
+    // any other thought, and indented off the shared rail rather than the
+    // hand-measured `ml-[22px]` that used to approximate it.
     return (
-      <div className="py-0.5">
-        <div className="flex items-baseline gap-2 text-xs text-foreground-extra-muted">
-          <Icon className="size-3.5 shrink-0 translate-y-px" />
-          <span className="text-2xs">thinking</span>
-        </div>
-        <div className="text-xs leading-relaxed text-foreground/60 ml-[22px] mt-0.5 mb-1 whitespace-pre-wrap">
+      <EventLine icon={<Icon />} label="Thought">
+        <div className="whitespace-pre-wrap py-0.5 text-xs leading-relaxed text-foreground-muted">
           {parsed.text}
         </div>
-      </div>
+      </EventLine>
     );
   }
 
   if (parsed.type === 'tool_call') {
+    /*
+     * The last block in the transcript that still drew its own frame.
+     *
+     * It was a full-width `rounded-lg border px-2.5 py-1.5` row holding a 20px
+     * `bg-surface3` icon TILE, a `ChevronRight` pinned to the far right by
+     * `ml-auto`, and — once expanded — a second bordered, shadowed card with its
+     * own header bar. Three frames for one event. Since every tool call draws
+     * through here, it was also the most-seen block in the app, so P0 unifying
+     * `ai-elements/*` while leaving this alone meant the thing people look at
+     * most was the thing still shaped differently from everything else.
+     *
+     * Now it is an `EventLine` like a plan, a diff or an approval prompt: the
+     * icon and the chevron share one 16px slot at the head of the row, the
+     * argument sits in a chip, and the expanded body uses the shared rail and
+     * the shared `<pre>` instead of a card.
+     */
     return (
-      <div className="my-1">
-        <button
-          type="button"
-          onClick={() => hasDetail && setExpanded(!expanded)}
-          disabled={!hasDetail}
-          className={cn(
-            'group/tool flex items-center gap-2 w-full text-left rounded-lg border px-2.5 py-1.5 transition-colors',
-            'border-border/70 dark:border-border/70 bg-surface1/60',
-            hasDetail && 'cursor-pointer hover:border-border-accent hover:bg-surface2',
-          )}
-        >
-          <span className="size-5 shrink-0 rounded-md bg-surface3 flex items-center justify-center">
-            <Icon className="size-3 text-foreground-muted" />
-          </span>
-          <span className="font-mono text-2xs font-medium text-foreground shrink-0">{parsed.toolDisplay}</span>
-          {parsed.summary && (
-            <>
-              <span className="text-muted-foreground/40 shrink-0">›</span>
-              <span className="truncate font-mono text-2xs text-foreground-muted min-w-0 flex-1">{parsed.summary}</span>
-            </>
-          )}
-          {hasDetail && (
-            <ChevronRight className={cn('size-3.5 shrink-0 ml-auto text-muted-foreground/60 transition-transform', expanded && 'rotate-90')} />
-          )}
-        </button>
-        {expanded && parsed.args && (
-          <div className="relative group/args ml-1 mt-1 mb-1.5 rounded-lg border border-border bg-surface0 overflow-hidden shadow-sm">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 text-2xs text-foreground font-mono">
-              <span className="flex items-baseline gap-1.5 font-medium">
-                <span>{parsed.toolDisplay || 'Terminal Output'}</span>
-              </span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (parsed.args) {
-                    navigator.clipboard.writeText(parsed.args);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }
-                }}
-                className="flex items-center gap-1 text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
-                title="Copy parameters"
-              >
-                {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-            </div>
-            <pre className="text-2xs leading-relaxed p-3 overflow-x-auto max-h-60 text-foreground font-mono whitespace-pre-wrap break-all selection:bg-surface4">
-              {parsed.args}
-            </pre>
-          </div>
-        )}
-      </div>
+      <EventLine
+        icon={<Icon />}
+        label={parsed.toolDisplay || 'Tool'}
+        detail={parsed.summary || undefined}
+        actions={
+          hasDetail ? (
+            <EventLineAction
+              onClick={(e) => {
+                e.stopPropagation();
+                // `preventDefault` as well: this button lives inside a
+                // `<summary>`, and without it a click would toggle the
+                // disclosure on its way to copying.
+                e.preventDefault();
+                if (parsed.args) {
+                  navigator.clipboard.writeText(parsed.args);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }
+              }}
+              title="Copy parameters"
+            >
+              {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+            </EventLineAction>
+          ) : undefined
+        }
+      >
+        {hasDetail && parsed.args ? <EventLinePre>{parsed.args}</EventLinePre> : undefined}
+      </EventLine>
     );
   }
 

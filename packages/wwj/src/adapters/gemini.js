@@ -15,10 +15,75 @@ const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
 const { whereBinary } = require('../paths');
-const { formatAttachmentsForPrompt, SESSION_DEFAULT_RE, generateSessionTitle } = require('./utils');
+const { formatAttachmentsForPrompt, SESSION_DEFAULT_RE, generateSessionTitle, logRawEvent } = require('./utils');
 const { buildClaudeSystemPrompt } = require('./workspace-prompt');
 
 const IS_WINDOWS = process.platform === 'win32';
+
+/**
+ * The model's reasoning, from whichever of Gemini's three shapes this event is in.
+ *
+ * Ordered by what this adapter actually reads. It parses the Gemini CLI's own
+ * envelope (`{type:'init'|'message'|'tool_use'|'result', role, content}`), NOT
+ * the native `GenerateContent` response — so the documented
+ * `candidates[].content.parts[].thought` test, applied on its own, would never
+ * fire here. All three are tried because which one arrives depends on the CLI
+ * version and whether it forwards raw responses.
+ *
+ * 1. CLI envelope. INFERRED, not confirmed: the CLI's marker for a thought is
+ *    not documented, so a `thought`/`thinking` flag and a `role`/`type` of
+ *    `thought` are all accepted. If reasoning still does not appear, capture the
+ *    raw events (`WWJ_RAW_EVENTS=1`, look for `[raw-agent-event] gemini`) and
+ *    the real marker will be visible.
+ * 2. Native `GenerateContent`: `parts[].thought === true`, per Google's schema —
+ *    "whether the part represents the model's thought process". Note
+ *    `thoughtSignature` is an opaque continuity token, NOT displayable text, so
+ *    it is never read for content.
+ * 3. Interactions API, which does not use `candidates[].content.parts[]` at all
+ *    — reasoning arrives as `thought`/`thought_summary` steps. Kept a separate
+ *    branch on purpose: forcing it through the `parts[]` test silently yields
+ *    nothing.
+ */
+/** Blank line between thought fragments — they are markdown, so a single
+ *  newline lets one fragment's unterminated list swallow the next one. */
+const THOUGHT_SEP = '\n\n';
+
+function extractGeminiThought(event) {
+  if (!event || typeof event !== 'object') return '';
+
+  // (1) CLI envelope.
+  const role = String(event.role || '');
+  const type = String(event.type || '');
+  if (event.thought === true || event.thinking === true || role === 'thought' || type === 'thought' || type === 'thinking') {
+    return String(event.content || event.text || event.thought_summary || '').trim();
+  }
+
+  // (2) Native GenerateContent parts.
+  const parts = event.candidates && event.candidates[0] && event.candidates[0].content
+    ? event.candidates[0].content.parts
+    : null;
+  if (Array.isArray(parts)) {
+    const thoughts = parts
+      .filter((p) => p && p.thought === true && typeof p.text === 'string')
+      .map((p) => p.text.trim())
+      .filter(Boolean);
+    if (thoughts.length) return thoughts.join(THOUGHT_SEP);
+  }
+
+  // (3) Interactions API steps.
+  if (Array.isArray(event.steps)) {
+    const thoughts = event.steps
+      .filter((st) => st && (st.type === 'thought' || st.type === 'thought_summary'))
+      .map((st) => String(st.text || st.thought_summary || st.content || '').trim())
+      .filter(Boolean);
+    if (thoughts.length) return thoughts.join(THOUGHT_SEP);
+  }
+  if (type === 'thought_summary') {
+    return String(event.delta || event.text || event.content || '').trim();
+  }
+
+  return '';
+}
 
 class GeminiAdapter extends BaseAdapter {
   /**
@@ -364,8 +429,19 @@ class GeminiAdapter extends BaseAdapter {
 
             let event;
             try { event = JSON.parse(line); } catch { return; }
+            logRawEvent('gemini', event);
 
             const eventType = event.type;
+
+            // Reasoning is checked before anything else, and sent UNFLAGGED so
+            // it lands in the Thought disclosure rather than being treated as
+            // the answer arriving early. It is deliberately kept out of
+            // `lastResponseText`: reasoning is not part of the reply.
+            const thought = extractGeminiThought(event);
+            if (thought) {
+              try { await this.sendThinking(msgChannel, thought); } catch {}
+              return;
+            }
 
             if (eventType === 'init' && event.session_id) {
               this._channelSessions[msgChannel] = event.session_id;

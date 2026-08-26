@@ -959,6 +959,12 @@ class ClaudeAdapter extends BaseAdapter {
       watchdogTimer: null,
       awaitingToolResult: false,
       userStopped: false,
+      // Partial-message streaming state. `thinkingDeltas` accumulates a thinking
+      // block's `thinking_delta` fragments keyed by block index; `streamedThinking`
+      // records that this run delivered reasoning that way, so the complete
+      // `assistant` event that follows does not post the same reasoning again.
+      thinkingDeltas: new Map(),
+      streamedThinking: false,
     };
 
     if (proc.stderr) {
@@ -971,6 +977,59 @@ class ClaudeAdapter extends BaseAdapter {
       let event;
       try { event = JSON.parse(line); } catch { return; }
       const eventType = event.type;
+
+      /*
+       * Partial-message streaming.
+       *
+       * `claude -p --output-format stream-json` currently runs WITHOUT
+       * `--include-partial-messages`, so complete `assistant` events arrive and
+       * the `block.type === 'thinking'` branch below handles reasoning. Add that
+       * flag, though, and Claude Code stops sending whole blocks: reasoning then
+       * arrives only as Anthropic's SSE deltas, nested inside a `stream_event`
+       * wrapper —
+       *
+       *   stream_event -> content_block_delta -> delta.thinking_delta -> .thinking
+       *
+       * and a handler that only knows about complete blocks silently stops
+       * showing any reasoning at all. Handled here so enabling that flag for
+       * smoother output cannot quietly cost the Thought disclosure.
+       *
+       * Only `thinking_delta` is consumed. `text_delta` is left alone because the
+       * reply already reaches the workspace through the complete `assistant`
+       * event, and taking it from both places would post it twice.
+       *
+       * `signature_delta` is deliberately ignored for display: it is an opaque
+       * continuity token for later turns, not text, and concatenating it into the
+       * Thought box would render base64 as reasoning.
+       */
+      if (eventType === 'stream_event') {
+        const inner = event.event || event.data || {};
+        const innerType = inner.type;
+        const idx = typeof inner.index === 'number' ? inner.index : 0;
+
+        if (innerType === 'content_block_delta' && inner.delta && inner.delta.type === 'thinking_delta') {
+          const prev = pp.thinkingDeltas.get(idx) || '';
+          pp.thinkingDeltas.set(idx, prev + String(inner.delta.thinking || ''));
+          return;
+        }
+
+        // Flush on block close rather than per delta: one Thought per block, not
+        // one per token. A token-per-message stream would also be indexed and
+        // stored as hundreds of rows for a single thought.
+        if (innerType === 'content_block_stop') {
+          const buffered = (pp.thinkingDeltas.get(idx) || '').trim();
+          pp.thinkingDeltas.delete(idx);
+          if (buffered) {
+            pp.streamedThinking = true;
+            try { await this.sendThinking(pp.msgChannel, buffered); } catch {}
+          }
+          return;
+        }
+
+        // Any other partial event is a duplicate of information the complete
+        // `assistant` event carries; dropped rather than double-reported.
+        return;
+      }
 
       if (eventType === 'assistant') {
         pp.awaitingToolResult = false;
@@ -1005,8 +1064,13 @@ class ClaudeAdapter extends BaseAdapter {
              * machine, and reasoning is not a reply. A turn that produced only
              * reasoning must still be reported as having produced no answer.
              */
+            // Skipped when the same reasoning already went out as
+            // `thinking_delta` fragments this run: with
+            // `--include-partial-messages` on, Claude Code sends BOTH the deltas
+            // and the assembled block, and posting both means every thought
+            // appears twice.
             const thought = String(block.thinking || '').trim();
-            if (thought) {
+            if (thought && !pp.streamedThinking) {
               try { await this.sendThinking(pp.msgChannel, thought); } catch {}
             }
           } else if (block.type === 'tool_use') {
@@ -1144,6 +1208,18 @@ class ClaudeAdapter extends BaseAdapter {
     pp.postedThinking = false;
     pp.everPostedAnything = false;
     pp.awaitingToolResult = false;
+    /*
+     * Per-turn reset. `pp` is keyed by CHANNEL and outlives a single message
+     * (`this._persistentProcs[channel]`), so partial-message state left set here
+     * leaks into every later turn: one turn that streamed its reasoning as
+     * `thinking_delta` would suppress the complete-block reasoning of every turn
+     * after it, for the lifetime of the process. Anything scoped to one turn has
+     * to be cleared at the point the turn starts, which is here.
+     */
+    pp.streamedThinking = false;
+    // Replaced rather than `.clear()`ed: a process object created before this
+    // field existed has no Map to clear, and assignment is correct either way.
+    pp.thinkingDeltas = new Map();
 
     const stdinMsg = JSON.stringify({
       type: 'user',

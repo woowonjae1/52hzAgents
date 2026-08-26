@@ -319,10 +319,39 @@ function leadingMentions(content) {
   return names;
 }
 
+/**
+ * Print a stream event exactly as the CLI emitted it, before any field picking.
+ *
+ * OFF UNLESS `WWJ_RAW_EVENTS` IS SET. These adapters are long-lived daemons
+ * handling one event per token in some modes, so unconditional logging would
+ * both bury the real log and write whatever the agent happened to be reading —
+ * file contents, command output — into it.
+ *
+ * Exists because several adapters were written against an event shape nobody
+ * recorded, so the branches that never fired could not be told apart from the
+ * branches that fire on a field that does not exist. Capturing the raw event is
+ * the only way to settle which.
+ *
+ * Usage: `WWJ_RAW_EVENTS=1` in the agent's environment, then run a task that
+ * exercises the missing path and read the lines tagged `[raw-agent-event]`.
+ */
+function logRawEvent(tag, event) {
+  if (!process.env.WWJ_RAW_EVENTS) return;
+  try {
+    // eslint-disable-next-line no-console
+    console.log(`[raw-agent-event] ${tag} ${JSON.stringify(event)}`);
+  } catch {
+    // A circular or un-serialisable event must not take the stream down.
+    // eslint-disable-next-line no-console
+    console.log(`[raw-agent-event] ${tag} <unserialisable>`);
+  }
+}
+
 module.exports = {
   SESSION_DEFAULT_RE,
   generateSessionTitle,
   formatAttachmentsForPrompt,
   stripSelfMention,
   leadingMentions,
+  logRawEvent,
 };

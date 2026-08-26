@@ -713,7 +713,7 @@ class Daemon {
     if (!binary) {
       const knownBinaries = {
         openclaw: 'openclaw', claude: 'claude', codex: 'codex',
-        aider: 'aider', goose: 'goose', gemini: 'gemini',
+        goose: 'goose', gemini: 'gemini',
       };
       binary = knownBinaries[agentCfg.type];
     }
