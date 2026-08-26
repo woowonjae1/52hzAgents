@@ -56,6 +56,10 @@ const FLAVORS = {
     // Where the CLI keeps the model the *user* chose. Read-only to us.
     configFiles: ['opencode.jsonc', 'opencode.json', 'config.json'],
     modelEnvVars: ['OPENCODE_MODEL', 'LLM_MODEL'],
+    // The CLI's own log directory. A stream failure (rate limit, provider
+    // outage) is written here and NOT to stdout, so this is the only place the
+    // real reason exists when the CLI hangs instead of exiting.
+    stateDir: path.join(os.homedir(), '.local', 'share', 'opencode'),
   },
   kilocode: {
     id: 'kilocode',
@@ -72,6 +76,7 @@ const FLAVORS = {
     configDir: path.join(os.homedir(), '.config', 'kilo'),
     configFiles: ['kilo.jsonc', 'kilo.json', 'config.json'],
     modelEnvVars: ['KILO_MODEL', 'KILOCODE_MODEL', 'LLM_MODEL'],
+    stateDir: path.join(os.homedir(), '.local', 'share', 'kilo'),
   },
 };
 
@@ -660,6 +665,59 @@ class OpenCodeAdapter extends BaseAdapter {
     super.stop();
   }
 
+  /**
+   * Kill the whole process tree, hard, right now.
+   *
+   * On Windows the direct child is `cmd.exe` wrapping the CLI, so signalling
+   * only the child orphans the real process. Node's own `spawn({timeout})` does
+   * exactly that — observed in the wild as `opencode.exe` still running ~4h
+   * after this adapter's 5-minute timeout had "killed" the run, holding its
+   * session state open. Every abandonment path must go through here.
+   */
+  _killTree(pid) {
+    if (!pid) return;
+    try {
+      if (IS_WINDOWS) {
+        execSync(`taskkill /F /T /PID ${pid}`, { timeout: 8000, stdio: 'ignore', windowsHide: true });
+      } else {
+        try { process.kill(-pid, 'SIGKILL'); } catch { process.kill(pid, 'SIGKILL'); }
+      }
+    } catch {}
+  }
+
+  /**
+   * The CLI's own most recent error, from its log directory.
+   *
+   * The CLI writes stream failures (rate limit, provider outage) to its log and
+   * NOT to stdout, then keeps the process alive instead of exiting. Our timeout
+   * is therefore the only signal we get, and without reading this the user is
+   * told "finished without producing a final reply" while the actual reason —
+   * e.g. `AI_APICallError: Rate limit exceeded` — sits on disk.
+   */
+  _recentCliError(withinMs = 15 * 60 * 1000) {
+    try {
+      const dir = path.join(this.flavor.stateDir, 'log');
+      const newest = fs.readdirSync(dir)
+        .map((n) => path.join(dir, n))
+        .map((p) => { try { return { p, m: fs.statSync(p).mtimeMs, f: fs.statSync(p).isFile() }; } catch { return null; } })
+        .filter((e) => e && e.f)
+        .sort((a, b) => b.m - a.m)[0];
+      if (!newest) return '';
+      const lines = fs.readFileSync(newest.p, 'utf-8').split(/\r?\n/);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i];
+        if (!line.includes('level=ERROR')) continue;
+        const ts = (line.match(/timestamp=(\S+)/) || [])[1];
+        // Stop at the first error older than the window — anything before it is
+        // from a previous run and would misattribute the failure.
+        if (ts && Date.now() - Date.parse(ts) > withinMs) return '';
+        const detail = (line.match(/error\.error="([^"]+)"/) || [])[1];
+        if (detail) return detail;
+      }
+    } catch {}
+    return '';
+  }
+
   async _stopProcess(proc) {
     if (!proc || proc.exitCode !== null) return;
     try {
@@ -982,7 +1040,9 @@ class OpenCodeAdapter extends BaseAdapter {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: spawnEnv,
         cwd: this.agentHome,
-        timeout: TIMEOUT_MS,
+        // No `timeout:` here on purpose. Node's implementation signals only the
+        // direct child — cmd.exe on Windows — and orphans the CLI underneath it.
+        // The explicit timer below tree-kills instead.
         detached: !IS_WINDOWS,
         // Never let a console window appear. Besides being ugly, an attached
         // console makes opencode start its interactive TUI and hang instead of
@@ -991,6 +1051,17 @@ class OpenCodeAdapter extends BaseAdapter {
       });
 
       this._channelProcesses[msgChannel] = proc;
+
+      // Our own wall-clock reaper, replacing spawn's `timeout`. Tree-kills so
+      // nothing survives, and marks the run so the close handler knows the
+      // signal came from us rather than from the CLI dying on its own.
+      let reapedByUs = false;
+      const reaper = setTimeout(() => {
+        reapedByUs = true;
+        this._log(`opencode run exceeded ${TIMEOUT_MS / 1000}s — tree-killing pid=${proc.pid}`);
+        this._killTree(proc.pid);
+      }, TIMEOUT_MS);
+      proc.once('close', () => clearTimeout(reaper));
 
       let stdout = '';
       let stderr = '';
@@ -1056,14 +1127,22 @@ class OpenCodeAdapter extends BaseAdapter {
         // because stderr happened to be empty.
         const stdoutErr = OpenCodeAdapter._extractErrorFromStdout(stdout);
 
-        if (signal) {
+        if (signal || reapedByUs) {
           this._log(`opencode killed by signal ${signal} after ${TIMEOUT_MS / 1000}s (output: ${!!stdout})`);
-          const cls = OpenCodeAdapter._classifyFailure({ code, signal, stdout, stderr, stdoutErr });
+          // A hang with no stdout is exactly the case where the CLI logged the
+          // real cause to its own file and never echoed it. Feed that text into
+          // the classifier so a rate limit lands as `rate_limited` with the
+          // provider's own wording instead of a bare `timeout`.
+          const cliErr = stdout ? '' : this._recentCliError();
+          if (cliErr) this._log(`CLI log reports: ${OpenCodeAdapter._redact(cliErr).slice(0, 200)}`);
+          const cls = OpenCodeAdapter._classifyFailure({
+            code, signal, stdout, stderr: [stderr, cliErr].filter(Boolean).join('\n'), stdoutErr,
+          });
           // A signal almost always means our own timeout fired; only override to
           // a more specific provider error if stdout/stderr clearly show one.
           const category = (cls.category === 'unknown_error' || cls.category === 'process_crashed')
             ? 'timeout' : cls.category;
-          return finish(reject, this._failure(category, cls.diagnostic || `signal=${signal}`, cls.detail));
+          return finish(reject, this._failure(category, cls.diagnostic || `signal=${signal}`, cls.detail || cliErr));
         }
 
         if (code !== 0) {
