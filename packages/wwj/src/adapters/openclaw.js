@@ -349,7 +349,155 @@ class OpenClawAdapter extends BaseAdapter {
     this._gatewayConnected = false;
   }
 
+  // ------------------------------------------------------------------
+  // Model selection — openclaw.json is the single source of truth
+  // ------------------------------------------------------------------
+
+  get _configPath() {
+    return path.join(OPENCLAW_STATE_DIR, 'openclaw.json');
+  }
+
+  _readConfig() {
+    try {
+      return JSON.parse(fs.readFileSync(this._configPath, 'utf-8')) || {};
+    } catch {
+      return {};
+    }
+  }
+
+  _writeConfig(config) {
+    try {
+      fs.mkdirSync(OPENCLAW_STATE_DIR, { recursive: true });
+      fs.writeFileSync(this._configPath, JSON.stringify(config, null, 2), 'utf-8');
+      return true;
+    } catch (e) {
+      this._log(`Failed to write ${this._configPath}: ${e.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * The model OpenClaw will actually use, as `<provider>/<modelId>`.
+   * Mirrors what configureNativeAuth writes.
+   */
+  _getCurrentModel() {
+    const config = this._readConfig();
+    const primary = config?.agents?.defaults?.model?.primary;
+    return typeof primary === 'string' && primary ? primary : null;
+  }
+
+  /**
+   * Every model openclaw.json actually declares, as `{ id, name }` where the
+   * id is the `<provider>/<modelId>` string OpenClaw expects. Two sources:
+   * `models.providers.*.models` (custom endpoints — the list the user
+   * configured) and the current `agents.defaults.model.primary` (standard
+   * providers write only this, with no provider block to enumerate).
+   *
+   * The UI renders exactly this, so an unconfigured provider shows nothing
+   * rather than a menu of models the account cannot reach.
+   */
+  _listModels() {
+    const config = this._readConfig();
+    const out = [];
+    const seen = new Set();
+
+    const push = (id, name) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      out.push({ id, name: name || id });
+    };
+
+    const providers = config?.models?.providers;
+    if (providers && typeof providers === 'object') {
+      for (const [providerName, provider] of Object.entries(providers)) {
+        const models = Array.isArray(provider?.models) ? provider.models : [];
+        for (const m of models) {
+          const modelId = typeof m === 'string' ? m : m?.id;
+          if (!modelId) continue;
+          const label = (typeof m === 'object' && m?.name) || modelId;
+          push(`${providerName}/${modelId}`, label);
+        }
+      }
+    }
+
+    // A standard provider (openai/anthropic) has no provider block — the only
+    // evidence it exists is the primary itself.
+    const primary = this._getCurrentModel();
+    if (primary) push(primary, primary.split('/').slice(1).join('/') || primary);
+
+    return out;
+  }
+
+  /**
+   * Publish the openclaw.json model state so the UI's model switcher can offer
+   * the models this install actually has, instead of a hardcoded guess. Called
+   * off BaseAdapter's heartbeat. Percentages stay 0 — OpenClaw exposes no quota
+   * figures, and the quota capsule excludes this agent kind for that reason.
+   */
+  async fetchAndReportUsage() {
+    try {
+      const models = this._listModels();
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: this._getCurrentModel(),
+          available_models: JSON.stringify(models),
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
   async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      if (!requested) return;
+
+      // Accept the full `<provider>/<modelId>` id (what the UI sends), or a
+      // bare model id when exactly one provider declares it — the same bare id
+      // can legitimately exist under two providers, and guessing which one
+      // would silently route to the wrong endpoint.
+      const known = this._listModels();
+      const bare = known.filter((m) => m.id.split('/').slice(1).join('/') === requested);
+      const match = known.find((m) => m.id === requested) || (bare.length === 1 ? bare[0] : null);
+      if (!match) {
+        const why = bare.length > 1
+          ? `is ambiguous (declared by ${bare.length} providers — send the full <provider>/<model> id)`
+          : `is not declared in ${this._configPath}`;
+        this._log(`set_model: '${requested}' ${why} — ignoring`);
+        return;
+      }
+
+      const config = this._readConfig();
+      config.agents = config.agents || {};
+      config.agents.defaults = config.agents.defaults || {};
+      config.agents.defaults.model = { ...(config.agents.defaults.model || {}), primary: match.id };
+      if (!this._writeConfig(config)) return;
+      this.model = match.id;
+      this._log(`Switched OpenClaw model to: ${match.id}`);
+
+      // openclaw reads its config at process start, so an in-flight process
+      // keeps the old model. Kill the channel's process (or all of them) so the
+      // next turn spawns against the new config.
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      const targets = channel
+        ? Object.entries(this._channelProcesses).filter(([c]) => c === channel)
+        : Object.entries(this._channelProcesses);
+      for (const [c, proc] of targets) {
+        this._stoppingChannels.add(c);
+        await this._stopProcess(proc);
+        delete this._channelProcesses[c];
+      }
+
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
+
     if (action === 'stop') {
       const requestedChannel = (payload && typeof payload === 'object') ? payload.channel : null;
       const processes = requestedChannel
@@ -360,7 +508,9 @@ class OpenClawAdapter extends BaseAdapter {
         this._stoppingChannels.add(channel);
         await this._stopProcess(proc);
         delete this._channelProcesses[channel];
-        delete this._channelQueues[channel];
+        // No _channelQueues here — this adapter never had one, and the delete
+        // that used to sit on this line threw on `undefined[channel]`, aborting
+        // the loop before the status below (and before any later channel).
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
       }
       return;

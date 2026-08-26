@@ -33,7 +33,7 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
-import { AgentModelSwitcher } from './agent-model-switcher';
+import { AgentModelSwitcher, getAgentKind } from './agent-model-switcher';
 import { PipelineStepper } from './pipeline-stepper';
 import { eventToMessage } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
@@ -649,14 +649,19 @@ export function ChatView() {
           }));
         }
 
-        let agentModelsMeta: Record<string, string> = {};
+        // Per-agent-kind model hint, keyed the way the adapters read it
+        // (`metadata.agent_models.<kind>`). The switcher stores its choice under
+        // the *agent name*, so resolve name → kind here; reading the kind
+        // straight out of localStorage matched nothing unless an agent happened
+        // to be named "claude"/"antigravity"/"openclaw".
+        const agentModelsMeta: Record<string, string> = {};
         try {
-          const antigravityModel = localStorage.getItem(`52hz_model_${currentSessionId}_antigravity`) || localStorage.getItem(`52hz_model_default_antigravity`);
-          const claudeModel = localStorage.getItem(`52hz_model_${currentSessionId}_claude`) || localStorage.getItem(`52hz_model_default_claude`);
-          const openclawModel = localStorage.getItem(`52hz_model_${currentSessionId}_openclaw`) || localStorage.getItem(`52hz_model_default_openclaw`);
-          if (antigravityModel) agentModelsMeta['antigravity'] = antigravityModel;
-          if (claudeModel) agentModelsMeta['claude'] = claudeModel;
-          if (openclawModel) agentModelsMeta['openclaw'] = openclawModel;
+          for (const agent of agents) {
+            const kind = getAgentKind(agent.agentName, agent.agentType);
+            if (kind === 'generic' || agentModelsMeta[kind]) continue;
+            const saved = localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName}`);
+            if (saved) agentModelsMeta[kind] = saved;
+          }
         } catch {}
 
         const confirmation = await workspaceApi.sendMessage(

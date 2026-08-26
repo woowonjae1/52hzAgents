@@ -203,62 +203,41 @@ class OpenCodeAdapter extends BaseAdapter {
     const home = os.homedir();
     const ext = IS_WINDOWS ? '.cmd' : '';
 
-    // Tier 0: the actual native binary the opencode-ai package ships, NOT the
-    // npm `.cmd`/`.bin` shim. opencode-ai's `bin` is a single self-contained
-    // executable named `opencode.exe` on every platform (on macOS/Linux it's
-    // the native Mach-O/ELF binary — the .exe suffix is just how the package
-    // names it). Returning it directly lets us spawn it without going through
-    // `cmd.exe /C opencode.cmd`, which on Windows is what flashed a console
-    // window — and an attached console makes opencode drop into its interactive
-    // TUI instead of non-interactive `run`, so it hung waiting for keypresses.
-    const nativeExe = path.join(home, '.wwj', 'runtimes', 'opencode', 'node_modules', 'opencode-ai', 'bin', 'opencode.exe');
-    if (fs.existsSync(nativeExe)) return nativeExe;
+    const binNames = this.agentName?.toLowerCase().includes('kilo')
+      ? ['kilocode', 'kilo', 'opencode']
+      : ['opencode', 'kilocode', 'kilo'];
 
-    // Tier 0b: Isolated runtime prefix shim — where the launcher installs agents
-    // (~/.wwj/runtimes/opencode/node_modules/.bin). Every other adapter
-    // checks this first; opencode was the lone exception, so a launcher-managed
-    // install was invisible unless its .bin happened to be on PATH — which is
-    // exactly why the workspace failed with "opencode CLI not found" even though
-    // the marketplace showed it installed.
-    const runtimeBin = path.join(home, '.wwj', 'runtimes', 'opencode', 'node_modules', '.bin', `opencode${ext}`);
-    if (fs.existsSync(runtimeBin)) return runtimeBin;
+    for (const name of binNames) {
+      const nativeExe = path.join(home, '.wwj', 'runtimes', name, 'node_modules', `${name}-ai`, 'bin', `${name}.exe`);
+      if (fs.existsSync(nativeExe)) return nativeExe;
 
-    // Tier 0b: Legacy shared portable prefix.
-    const legacyBin = path.join(home, '.wwj', 'nodejs', 'node_modules', '.bin', `opencode${ext}`);
-    if (fs.existsSync(legacyBin)) return legacyBin;
+      const runtimeBin = path.join(home, '.wwj', 'runtimes', name, 'node_modules', '.bin', `${name}${ext}`);
+      if (fs.existsSync(runtimeBin)) return runtimeBin;
 
-    // Tier 1: PATH. Use the ENRICHED env (node-version-manager/homebrew/npm
-    // dirs the launcher adds) so the lookup matches a packaged daemon's real
-    // reach; windowsHide stops a console window from flashing on Windows.
-    // Codepage-safe lookup (whereBinary forces UTF-8 output + verifies existence
-    // so a non-ASCII/Chinese username isn't mangled into an ENOENT). Uses the
-    // ENRICHED env so a packaged daemon's minimal PATH still reaches nvm/fnm/
-    // volta/homebrew/npm dirs.
-    const viaWhere = whereBinary('opencode');
-    if (viaWhere) return viaWhere;
+      const legacyBin = path.join(home, '.wwj', 'nodejs', 'node_modules', '.bin', `${name}${ext}`);
+      if (fs.existsSync(legacyBin)) return legacyBin;
 
-    // Tier 2: Next to Node.js
-    const nearNode = path.join(path.dirname(process.execPath), `opencode${ext}`);
-    if (fs.existsSync(nearNode)) return nearNode;
+      const viaWhere = whereBinary(name);
+      if (viaWhere) return viaWhere;
 
-    // Tier 3: Common locations
-    const candidates = IS_WINDOWS ? [
-      path.join(process.env.APPDATA || '', 'npm', 'opencode.cmd'),
-    ] : [
-      path.join(home, '.wwj', 'npm-global', 'bin', 'opencode'),
-      path.join(home, '.npm-global', 'bin', 'opencode'),
-      path.join(home, '.local', 'bin', 'opencode'),
-      '/usr/local/bin/opencode',
-    ];
-    for (const c of candidates) {
-      if (fs.existsSync(c)) return c;
+      const nearNode = path.join(path.dirname(process.execPath), `${name}${ext}`);
+      if (fs.existsSync(nearNode)) return nearNode;
+
+      const candidates = IS_WINDOWS ? [
+        path.join(process.env.APPDATA || '', 'npm', `${name}.cmd`),
+      ] : [
+        path.join(home, '.wwj', 'npm-global', 'bin', name),
+        path.join(home, '.npm-global', 'bin', name),
+        path.join(home, '.local', 'bin', name),
+        `/usr/local/bin/${name}`,
+      ];
+      for (const c of candidates) {
+        if (fs.existsSync(c)) return c;
+      }
+
+      const viaWhich = whichBinary(name);
+      if (viaWhich) return viaWhich;
     }
-
-    // Tier 4: Deep scan of every known bin dir (nvm/fnm/volta node-global,
-    // homebrew, …) — catches an `opencode` installed as a global npm package
-    // under a version-managed Node, which the fixed-PATH tiers above miss.
-    const viaWhich = whichBinary('opencode');
-    if (viaWhich) return viaWhich;
 
     return null;
   }

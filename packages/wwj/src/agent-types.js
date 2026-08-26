@@ -13,6 +13,8 @@ const AGENT_TYPE_ALIASES = {
   chatgpt: 'codex',
   openai: 'codex',
   agy: 'antigravity',
+  kilo: 'opencode',
+  kilocode: 'opencode',
 };
 
 /**

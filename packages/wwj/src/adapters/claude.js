@@ -64,7 +64,37 @@ class ClaudeAdapter extends BaseAdapter {
       os.homedir(), '.wwj', 'sessions',
       `${this.workspaceId}_${this.agentName}.json`
     );
+    // Per-channel model overrides set from the UI. Persisted in their own file
+    // rather than folded into the sessions file, which is a bare channel→id map
+    // that older builds read with Object.assign.
+    this._modelsFile = path.join(
+      os.homedir(), '.wwj', 'sessions',
+      `${this.workspaceId}_${this.agentName}.models.json`
+    );
+    this._channelModels = {};
     this._loadSessions();
+    this._loadChannelModels();
+  }
+
+  _loadChannelModels() {
+    try {
+      if (fs.existsSync(this._modelsFile)) {
+        const data = JSON.parse(fs.readFileSync(this._modelsFile, 'utf-8'));
+        if (data && typeof data === 'object') {
+          Object.assign(this._channelModels, data);
+          this._log(`Loaded ${Object.keys(data).length} channel model override(s)`);
+        }
+      }
+    } catch {
+      this._log('Could not load channel models file, starting fresh');
+    }
+  }
+
+  _saveChannelModels() {
+    try {
+      fs.mkdirSync(path.dirname(this._modelsFile), { recursive: true });
+      fs.writeFileSync(this._modelsFile, JSON.stringify(this._channelModels));
+    } catch {}
   }
 
   _loadSessions() {
@@ -225,8 +255,12 @@ class ClaudeAdapter extends BaseAdapter {
       const channel = payload && payload.channel;
       if (model) {
         if (channel) {
-          this._channelModels = this._channelModels || {};
           this._channelModels[channel] = model;
+          // Must survive an adapter restart (daemon bounce, `restart` control,
+          // watchdog kill). Without this the choice evaporated on the agent side
+          // while the UI chip — backed by localStorage — kept showing it, so the
+          // next turn silently ran on the old model.
+          this._saveChannelModels();
           if (this._persistentProcs[channel]) {
             const pp = this._persistentProcs[channel];
             if (pp.proc) {
@@ -657,7 +691,7 @@ class ClaudeAdapter extends BaseAdapter {
     }
 
     // Model selection (sonnet, haiku, opus, etc.)
-    const selectedModel = (this._channelModels && this._channelModels[channelName]) || this.model;
+    const selectedModel = this._channelModels[channelName] || this.model;
     if (selectedModel) {
       cmd.push('--model', selectedModel);
     }

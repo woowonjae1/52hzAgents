@@ -18,6 +18,15 @@ import type { AgentCatalogEntry, WorkspaceAgent } from './types';
  */
 export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
   {
+    name: 'chatgpt',
+    label: 'ChatGPT / Codex',
+    description: 'OpenAI GPT-4o & Codex terminal assistant for intelligent software development.',
+    install_command: 'wwj install chatgpt',
+    homepage: 'https://chatgpt.com',
+    tags: ['coding', 'cli'],
+    builtin: true,
+  },
+  {
     name: 'claude',
     label: 'Claude Code',
     description: "Anthropic's official terminal agent for code generation and shell execution.",
@@ -122,15 +131,6 @@ export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
     description: 'Multi-provider coding agent CLI with read/bash/edit/write tools.',
     install_command: 'wwj install pi',
     homepage: 'https://pi.ai',
-    tags: ['coding', 'cli'],
-    builtin: true,
-  },
-  {
-    name: 'chatgpt',
-    label: 'ChatGPT / Codex',
-    description: 'OpenAI GPT-4o & Codex terminal assistant for intelligent software development.',
-    install_command: 'wwj install chatgpt',
-    homepage: 'https://chatgpt.com',
     tags: ['coding', 'cli'],
     builtin: true,
   },

@@ -31,9 +31,9 @@ func GetAgentCatalog(c *gin.Context) {
 	openclawDetected, openclawPath := detectLocalBinary("openclaw")
 	hermesDetected, hermesPath := detectLocalBinary("hermes")
 	piDetected, piPath := detectLocalBinary("pi")
-	codexDetected, codexPath := detectLocalBinary("codex", "chatgpt")
+	codexDetected, codexPath := detectLocalBinary("codex", "chatgpt", "openai")
 	cursorDetected, cursorPath := detectLocalBinary("cursor")
-	kiloDetected, kiloPath := detectLocalBinary("kilo")
+	kiloDetected, kiloPath := detectLocalBinary("kilocode", "kilo")
 	clineDetected, clinePath := detectLocalBinary("cline")
 	opencodeDetected, opencodePath := detectLocalBinary("opencode")
 	ampDetected, ampPath := detectLocalBinary("amp")
@@ -41,6 +41,17 @@ func GetAgentCatalog(c *gin.Context) {
 	openhandsDetected, openhandsPath := detectLocalBinary("openhands")
 
 	c.JSON(http.StatusOK, []gin.H{
+		{
+			"name":            "chatgpt",
+			"label":           "ChatGPT / Codex",
+			"description":     "OpenAI GPT-4o & Codex terminal assistant for intelligent software development.",
+			"install_command": "wwj install chatgpt",
+			"homepage":        "https://chatgpt.com",
+			"tags":            []string{"coding", "cli"},
+			"builtin":         true,
+			"detected":        codexDetected,
+			"binary_path":     codexPath,
+		},
 		{
 			"name":            "claude",
 			"label":           "Claude Code",
@@ -172,17 +183,6 @@ func GetAgentCatalog(c *gin.Context) {
 			"builtin":         true,
 			"detected":        piDetected,
 			"binary_path":     piPath,
-		},
-		{
-			"name":            "chatgpt",
-			"label":           "ChatGPT / Codex",
-			"description":     "OpenAI GPT-4o & Codex terminal assistant for intelligent software development.",
-			"install_command": "wwj install chatgpt",
-			"homepage":        "https://chatgpt.com",
-			"tags":            []string{"coding", "cli"},
-			"builtin":         true,
-			"detected":        codexDetected,
-			"binary_path":     codexPath,
 		},
 	})
 }
