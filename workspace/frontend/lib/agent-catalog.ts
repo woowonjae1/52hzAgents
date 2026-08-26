@@ -90,7 +90,6 @@ export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
 export const EXTRA_AGENT_RUNTIMES: { name: string; label: string }[] = [
   { name: 'goose', label: 'Goose' },
   { name: 'cline', label: 'Cline' },
-  { name: 'aider', label: 'Aider' },
   { name: 'cursor', label: 'Cursor' },
   { name: 'opencode', label: 'OpenCode' },
   { name: 'copilot', label: 'GitHub Copilot' },

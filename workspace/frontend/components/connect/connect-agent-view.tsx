@@ -38,7 +38,6 @@ const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
   gemini:      { bg: 'bg-blue-500',    text: 'text-white' },
   openclaw:  { bg: 'bg-violet-600',  text: 'text-white' },
   amp:       { bg: 'bg-rose-500',    text: 'text-white' },
-  aider:     { bg: 'bg-status-success', text: 'text-white' },
   goose:     { bg: 'bg-status-warning',   text: 'text-white' },
   cline:     { bg: 'bg-cyan-500',    text: 'text-white' },
   copilot:   { bg: 'bg-indigo-500',  text: 'text-white' },

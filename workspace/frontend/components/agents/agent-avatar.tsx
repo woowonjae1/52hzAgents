@@ -4,7 +4,7 @@ import { deriveIdentityColor } from '@/lib/identity-colors';
 import { resolveAgentIconName } from '@/lib/agent-catalog';
 
 const KNOWN_AGENTS = [
-  'aider', 'amp', 'anthropic', 'antigravity', 'agy', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
+  'amp', 'anthropic', 'antigravity', 'agy', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
   'custom', 'deepseek', 'elevenlabs', 'fal', 'fireworks', 'gemini', 'google', 'goose', 'grok', 'groq',
   'hermes', 'kilo', 'kimi', 'manus', 'mistral', 'nanoclaw', 'openai', 'openclaw', 'opencode', 'openhands', 'openrouter',
   'perplexity', 'pi', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
@@ -70,7 +70,10 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
             src={`/icons/agents/${matchedAgent}.${isPng ? 'png' : 'svg'}`}
             alt={cleanName}
             onError={() => setImgError(true)}
-            className="w-full h-full object-contain p-1 drop-shadow-xs"
+            className={cn(
+              "w-full h-full object-contain p-1 drop-shadow-xs",
+              ['cursor', 'openai', 'codex', 'grok', 'xai', 'pi'].includes(matchedAgent) && "dark:invert"
+            )}
           />
         ) : (
           <span

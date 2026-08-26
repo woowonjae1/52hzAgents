@@ -33,7 +33,6 @@ func GetAgentCatalog(c *gin.Context) {
 	piDetected, piPath := detectLocalBinary("pi")
 	codexDetected, codexPath := detectLocalBinary("codex", "chatgpt")
 	cursorDetected, cursorPath := detectLocalBinary("cursor")
-	aiderDetected, aiderPath := detectLocalBinary("aider")
 
 	c.JSON(http.StatusOK, []gin.H{
 		{
@@ -112,17 +111,6 @@ func GetAgentCatalog(c *gin.Context) {
 			"builtin":         true,
 			"detected":        cursorDetected,
 			"binary_path":     cursorPath,
-		},
-		{
-			"name":            "aider",
-			"label":           "Aider",
-			"description":     "AI pair programming in your terminal.",
-			"install_command": "wwj install aider",
-			"homepage":        "https://openagents.org",
-			"tags":            []string{"coding", "cli"},
-			"builtin":         true,
-			"detected":        aiderDetected,
-			"binary_path":     aiderPath,
 		},
 	})
 }
