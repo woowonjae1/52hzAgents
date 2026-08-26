@@ -422,7 +422,7 @@ class AmpAdapter extends BaseAdapter {
                 hasToolUseSinceText = false;
               }
               lastTurnText.push(text);
-              try { await this.sendThinking(msgChannel, text); } catch {}
+              try { await this.sendThinking(msgChannel, text, { isReplyPreview: true }); } catch {}
             } else if (block.type === 'tool_use') {
               hasToolUseSinceText = true;
               lastTurnText = [];

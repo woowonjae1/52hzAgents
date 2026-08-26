@@ -13,16 +13,20 @@ interface IconProps {
 const ICON_BASE = '/icons/agents';
 
 const NEEDS_BG = new Set([
-  'codex', 'cline', 'amp', 'goose',
-  'nanoclaw', 'opencode', 'kimi', 'default',
-  'replicate', 'elevenlabs', 'manus', 'kilo',
+  'goose', 'nanoclaw', 'kimi', 'default',
+  'replicate', 'elevenlabs', 'manus',
 ]);
 
-const PNG_AGENTS = new Set(['cline', 'kilo']);
+const MONOCHROME_AGENTS = new Set([
+  'cursor', 'openai', 'codex', 'grok', 'xai', 'pi', 'cline', 'kilo', 'opencode', 'copilot'
+]);
+
+const PNG_AGENTS = new Set<string>([]);
 
 function IconWrapper({ name: rawName, size = 20, className }: { name: string } & IconProps) {
   const name = resolveAgentIconName(rawName);
   const needsBg = NEEDS_BG.has(name);
+  const isMonochrome = MONOCHROME_AGENTS.has(name);
   const isPng = PNG_AGENTS.has(name);
   const ext = isPng ? 'png' : 'svg';
 
@@ -40,6 +44,7 @@ function IconWrapper({ name: rawName, size = 20, className }: { name: string } &
         alt={name}
         width={needsBg ? size - 4 : size}
         height={needsBg ? size - 4 : size}
+        className={cn(isMonochrome && 'dark:invert')}
         onError={(e) => {
           const img = e.target as HTMLImageElement;
           if (img.src.includes('.png')) {

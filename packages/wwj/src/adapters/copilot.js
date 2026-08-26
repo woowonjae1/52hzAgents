@@ -603,10 +603,13 @@ class CopilotAdapter extends BaseAdapter {
             }
             break;
           case 'text_delta':
-            // Streamed interim text is shown live as `thinking`; the final
-            // `text` event (if any) is the authoritative answer.
+            // Streamed interim text is shown live; the final `text` event (if
+            // any) is the authoritative answer. Flagged as a reply preview so
+            // the workspace does not present it as reasoning and can drop it
+            // once that authoritative answer arrives — the `reasoning` case
+            // below is the one that is genuinely chain-of-thought.
             if (sawToolSinceText) { finalParts.length = 0; deltaBuf = ''; sawToolSinceText = false; }
-            if (ev.text) { deltaBuf += ev.text; try { await this.sendThinking(channel, ev.text); } catch {} }
+            if (ev.text) { deltaBuf += ev.text; try { await this.sendThinking(channel, ev.text, { isReplyPreview: true }); } catch {} }
             break;
           case 'text':
             // A complete message supersedes the deltas streamed for this block.

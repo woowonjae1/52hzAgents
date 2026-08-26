@@ -117,6 +117,16 @@ export interface WorkspaceMessageMetadata extends Record<string, unknown> {
    * and the receiving side re-checks rather than trusting that.
    */
   preview?: { url: string; label?: string };
+  /**
+   * On a `thinking` message: this is the model's REPLY streamed early, not
+   * chain-of-thought. Set by `sendThinking(…, { isReplyPreview: true })` in the
+   * nine adapters that stream the answer before posting it.
+   *
+   * Absent means "unknown", not "this is real reasoning" — messages predating the
+   * flag, and any adapter yet to be updated, carry nothing. Consumers therefore
+   * treat it as a fast path and keep the content-based fallback for the rest.
+   */
+  reply_preview?: boolean;
   attachments?: Record<string, unknown>[];
   turn_changes?: TurnChangesMetadata;
   usage?: {

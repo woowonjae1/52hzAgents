@@ -48,6 +48,8 @@ const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
   kimi:      { bg: 'bg-sky-500',     text: 'text-white' },
   pi:        { bg: 'bg-emerald-600', text: 'text-white' },
   kilo:      { bg: 'bg-indigo-600',  text: 'text-white' },
+  openhands: { bg: 'bg-amber-600',   text: 'text-white' },
+  deepseek:  { bg: 'bg-blue-700',    text: 'text-white' },
 };
 
 const PROVIDER_BRANDS: Record<string, { bg: string; text: string; accent: string }> = {

@@ -10,7 +10,7 @@ const KNOWN_AGENTS = [
   'perplexity', 'pi', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
 ];
 
-const PNG_AGENTS = ['cline', 'kilo'];
+const PNG_AGENTS: string[] = [];
 
 interface AgentAvatarProps {
   name: string;
@@ -72,7 +72,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
             onError={() => setImgError(true)}
             className={cn(
               "w-full h-full object-contain p-1 drop-shadow-xs",
-              ['cursor', 'openai', 'codex', 'grok', 'xai', 'pi'].includes(matchedAgent) && "dark:invert"
+              ['cursor', 'openai', 'codex', 'grok', 'xai', 'pi', 'cline', 'kilo', 'opencode', 'copilot'].includes(matchedAgent) && "dark:invert"
             )}
           />
         ) : (

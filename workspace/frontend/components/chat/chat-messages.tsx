@@ -97,6 +97,74 @@ function groupKey(group: MessageGroup, index: number): string {
   return firstId ? `steps-${firstId}-${index}` : `steps-idx-${index}`;
 }
 
+/**
+ * Strip a string down to the characters that survive being re-emitted.
+ *
+ * The old comparison was raw `includes()`, and that is why the filter leaked: a
+ * reply does NOT arrive byte-identical to the chunks streamed as thinking.
+ * `sendResponse` in the adapter base runs the text through
+ * `extractDecisionQuestions` and `extractPreview` first, which cut whole fenced
+ * blocks out of it; the streamed chunks also break at arbitrary offsets, so
+ * whitespace and list markers land differently once reassembled. One changed
+ * space and `includes()` returns false, the filter silently passes, and the
+ * reader gets the answer twice.
+ *
+ * Markdown decoration goes too. It is the part most likely to differ between a
+ * partial chunk and the finished document — a chunk can end mid-emphasis, and a
+ * renderer-bound reply often gains or loses a `**` pair or a list bullet in
+ * reassembly — while contributing nothing to whether these are the same words.
+ */
+function normalizeForDedup(text: string): string {
+  return text
+    // Fenced blocks: `extractPreview` / `extractDecisionQuestions` remove these
+    // from the reply but not from what was streamed, so they can only ever
+    // create a false mismatch.
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    // Links and images -> their visible text.
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    // Emphasis, headings, quotes, list markers, table pipes, trailing ellipsis.
+    .replace(/[*_~]+/g, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}>\s?/gm, '')
+    .replace(/^\s{0,3}(?:[-+*]|\d{1,3}[.)])\s+/gm, '')
+    .replace(/\|/g, ' ')
+    .replace(/\.{3,}$/, '')
+    // Everything down to single spaces last, so the rules above can rely on
+    // line starts.
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Is this `thinking` text just the reply again?
+ *
+ * Containment is tested in both directions because the streamed copy can be
+ * either shorter than the reply (one chunk of it) or longer (it still holds a
+ * fenced block the reply had stripped).
+ *
+ * `MIN_ECHO` is the guard against eating real reasoning. A genuine
+ * chain-of-thought is a different text from the answer, so a verbatim overlap of
+ * this length between the two is not something a model produces by accident —
+ * whereas a very short thought ("Let me check.") could coincidentally appear
+ * inside a long reply, and dropping that would delete real content to fix a
+ * cosmetic problem. Erring toward showing a duplicate beats erring toward
+ * hiding the model's actual reasoning.
+ */
+const MIN_ECHO = 24;
+
+function isEchoOfReply(thinking: string, reply: string): boolean {
+  const t = normalizeForDedup(thinking);
+  const r = normalizeForDedup(reply);
+  if (!t || !r) return false;
+  if (t.length >= MIN_ECHO && r.includes(t)) return true;
+  if (r.length >= MIN_ECHO && t.includes(r)) return true;
+  // Neither contains the other outright — the usual cause is a chunk that
+  // straddles an edit made during reassembly. A shared opening of this length is
+  // still conclusive: the reply begins with the words this "thought" began with.
+  return t.length >= MIN_ECHO && r.startsWith(t.slice(0, MIN_ECHO));
+}
+
 function isTerminalStatus(msg: WorkspaceMessage) {
   // Match terminal signals regardless of messageType — some connectors send
   // the stop notice as a 'chat' message rather than 'status', which previously
@@ -198,26 +266,45 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   const filteredMessages = useMemo(() => {
     const isStep = (msg: WorkspaceMessage) => msg.messageType === 'status' || msg.messageType === 'thinking' || msg.messageType === 'todos';
 
-    // Deduplicate: if a chat message follows thinking from the same agent
-    // with matching content, hide the thinking (it was the final answer
-    // streamed early as "thinking" before being posted as "chat").
+    /*
+     * Drop a `thinking` message that is really the answer, streamed early.
+     *
+     * NINE OF THE ELEVEN ADAPTERS DO THIS ON PURPOSE. `amp`, `claude`, `cline`,
+     * `codex`, `copilot`, `cursor`, `gemini`, `opencode` and `pi` all push each
+     * chunk of the model's REPLY through `sendThinking` while it generates, keep
+     * a copy, and then post the assembled text again as the real message —
+     * `codex` even comments "Stream as thinking (like Claude adapter)". So the
+     * same answer arrives twice: once live inside a "Thought" disclosure, once
+     * as the reply underneath. This filter is the only thing standing between
+     * the reader and that duplication on every one of those agents.
+     *
+     * It cannot be done by sequence alone. Genuine chain-of-thought arrives
+     * through the SAME `messageType: 'thinking'` — `cline` and `copilot` each
+     * have one branch doing it correctly (`reasoning`) and one doing it wrongly
+     * (`text`), a few lines apart — so position in the stream does not
+     * distinguish the two. Only the content does.
+     */
     const deduped = realMessages.filter((msg, i) => {
       if (msg.messageType !== 'thinking') return true;
+      const flagged = msg.metadata?.reply_preview === true;
       // Look ahead for a chat message from the same agent
       for (let j = i + 1; j < realMessages.length; j++) {
         const next = realMessages[j];
         if (next.senderName !== msg.senderName) continue;
         if (next.messageType === 'status' || next.messageType === 'thinking') continue;
-        // Found a chat message from the same agent — check content overlap.
-        const thinkText = msg.content.replace(/\.\.\.$/,'').trim();
-        if (thinkText && (
-          next.content.startsWith(thinkText) ||
-          next.content.includes(thinkText) ||
-          thinkText.includes(next.content.trim()) ||
-          (thinkText.length >= 20 && next.content.includes(thinkText.slice(0, 20)))
-        )) return false;
+        /*
+         * The reply has landed. A flagged preview goes without asking any
+         * questions — the adapter said what it was, so there is nothing to
+         * infer. Everything else falls back to comparing normalised text, which
+         * is all that can be done for messages written before the flag existed
+         * and for any adapter still to be updated.
+         */
+        if (flagged || isEchoOfReply(msg.content, next.content)) return false;
         break;
       }
+      // No reply yet: this is the live edge. A flagged preview is kept, because
+      // it is the answer being typed out and the only thing to look at — but it
+      // renders as prose rather than as reasoning. See `StepRuns`.
       return true;
     });
 

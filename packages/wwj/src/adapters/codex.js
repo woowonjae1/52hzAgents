@@ -522,7 +522,7 @@ class CodexAdapter extends BaseAdapter {
             }
             responseTexts.push(item.text);
             // Stream as thinking (like Claude adapter)
-            try { await this.sendThinking(msgChannel, item.text); } catch {}
+            try { await this.sendThinking(msgChannel, item.text, { isReplyPreview: true }); } catch {}
           } else if (item.type === 'command_execution') {
             hasToolUseSinceLastText = true;
             const cmdText = (item.command || '').slice(0, 200);

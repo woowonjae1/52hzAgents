@@ -706,8 +706,12 @@ class ClineAdapter extends BaseAdapter {
             case 'text':
               state.anyOutput = true;
               if (state.hadToolSinceText) { state.pendingText = []; state.hadToolSinceText = false; }
+              // Pushed to `pendingText` AND streamed: this is the reply arriving
+              // early, not reasoning. The `reasoning` case above is the one that
+              // carries actual chain-of-thought, which is why only this one is
+              // flagged.
               state.pendingText.push(e.text);
-              try { await this.sendThinking(channel, e.text); } catch {}
+              try { await this.sendThinking(channel, e.text, { isReplyPreview: true }); } catch {}
               break;
             case 'tool_start':
               state.anyOutput = true;

@@ -379,7 +379,7 @@ class GeminiAdapter extends BaseAdapter {
                 }
                 lastResponseText.push(text);
                 postedThinking = true;
-                try { await this.sendThinking(msgChannel, text); } catch {}
+                try { await this.sendThinking(msgChannel, text, { isReplyPreview: true }); } catch {}
               }
             } else if (eventType === 'tool_use') {
               hasToolUseSinceLastText = true;

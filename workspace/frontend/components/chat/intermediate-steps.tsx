@@ -26,6 +26,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { WorkingIndicator } from './working-indicator';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine } from '@/components/ai-elements/event-line';
+import { MarkdownContent } from './markdown-content';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
 // ── Content Parsing ──
@@ -352,7 +353,16 @@ function ActivityIndicator({ startTime }: { startTime?: number | null }) {
  * keeps the blast radius to how a run is drawn.
  */
 type StepRun =
+  /** Chain-of-thought. Collapsed behind a "Thought" disclosure. */
   | { kind: 'thinking'; messages: WorkspaceMessage[] }
+  /**
+   * The reply itself, streamed early (`reply_preview`). Rendered as prose — it
+   * IS the answer, so putting it inside a disclosure labelled "Thought" is what
+   * made the same text appear twice under two different headings. It only
+   * reaches here while it is still the live edge; once the real message lands,
+   * `chat-messages.tsx` drops it outright.
+   */
+  | { kind: 'reply'; messages: WorkspaceMessage[] }
   | { kind: 'step'; message: WorkspaceMessage };
 
 /**
@@ -395,6 +405,22 @@ function StepRuns({ steps, live }: { steps: WorkspaceMessage[]; live?: boolean }
             isStreaming={Boolean(live) && runIdx === runs.length - 1}
             defaultExpanded={false}
           />
+        ) : run.kind === 'reply' ? (
+          /*
+           * The answer, typing itself out. No disclosure, no "Thought" heading,
+           * no icon — it is the reply, so it looks like the reply. A blinking
+           * cursor while it is the live edge is the whole affordance; the row
+           * simply gets replaced by the real message when that arrives.
+           */
+          <div
+            key={`reply-${run.messages[0]?.messageId || runIdx}`}
+            className="py-0.5 text-sm leading-relaxed text-foreground"
+          >
+            <MarkdownContent content={joinThoughts(run.messages)} />
+            {Boolean(live) && runIdx === runs.length - 1 && (
+              <span className="streaming-cursor" aria-hidden />
+            )}
+          </div>
         ) : (
           <SingleStep
             key={`${run.message.messageId || 'step'}-${runIdx}`}
@@ -431,9 +457,14 @@ function coalesceThinking(steps: WorkspaceMessage[]): StepRun[] {
       runs.push({ kind: 'step', message: step });
       continue;
     }
+    // A reply preview and real reasoning never merge into one run, even when
+    // they arrive back to back — they are different kinds of text and are drawn
+    // differently. Absent flag means "unknown", which is treated as reasoning:
+    // showing a duplicate beats hiding the model's actual thinking.
+    const kind: 'thinking' | 'reply' = step.metadata?.reply_preview === true ? 'reply' : 'thinking';
     const last = runs[runs.length - 1];
-    if (last && last.kind === 'thinking') last.messages.push(step);
-    else runs.push({ kind: 'thinking', messages: [step] });
+    if (last && last.kind === kind) last.messages.push(step);
+    else runs.push({ kind, messages: [step] });
   }
   return runs;
 }

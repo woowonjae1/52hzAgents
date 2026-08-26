@@ -984,7 +984,7 @@ class ClaudeAdapter extends BaseAdapter {
             pp.lastResponseText.push(block.text.trim());
             pp.postedThinking = true;
             pp.everPostedAnything = true;
-            try { await this.sendThinking(pp.msgChannel, block.text.trim()); } catch {}
+            try { await this.sendThinking(pp.msgChannel, block.text.trim(), { isReplyPreview: true }); } catch {}
           } else if (block.type === 'tool_use') {
             pp.hasToolUseSinceLastText = true;
             pp.postedThinking = false;

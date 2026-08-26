@@ -459,7 +459,7 @@ class OpenCodeAdapter extends BaseAdapter {
         responseState.finalText += text;
         responseState.allText = (responseState.allText || '') + text;
       }
-      if (text.trim()) await this.sendThinking(msgChannel, text.trim());
+      if (text.trim()) await this.sendThinking(msgChannel, text.trim(), { isReplyPreview: true });
     }
   }
 

@@ -1120,15 +1120,41 @@ class BaseAdapter {
     }
   }
 
-  async sendThinking(channel, content) {
+  /**
+   * @param {object} [opts]
+   * @param {boolean} [opts.isReplyPreview]
+   *   This chunk is part of the model's REPLY, streamed early so the user sees
+   *   progress — not chain-of-thought.
+   *
+   *   Most adapters here stream the reply through this method and then post the
+   *   assembled text again through `sendResponse`, so the same answer reaches
+   *   the workspace twice. The receiving end used to have to guess which of the
+   *   two it was looking at, by normalising both texts and testing for overlap;
+   *   that guess silently failed whenever `sendResponse` rewrote the text on its
+   *   way out (it strips ```decision and ```preview blocks), and the reader got
+   *   the answer twice inside a "Thought" disclosure.
+   *
+   *   Pass `true` and the guess is not needed: the workspace can drop the
+   *   preview the moment the real reply lands, and can render what is left as
+   *   prose rather than as reasoning. Genuine `reasoning`/`thought` events must
+   *   NOT pass it — that is the whole distinction.
+   */
+  async sendThinking(channel, content, opts) {
     // Skip empty thinking traces entirely.
     if (!content || !content.trim()) return;
+    const isReplyPreview = Boolean(opts && opts.isReplyPreview);
     try {
       await this.client.sendMessage(this.workspaceId, channel, this.token, content, {
         senderType: 'agent',
         senderName: this.agentName,
         messageType: 'thinking',
-        metadata: { agent_mode: this._mode },
+        metadata: {
+          agent_mode: this._mode,
+          // Omitted rather than set false when absent, so an adapter that has
+          // not been updated is distinguishable from one asserting "this really
+          // is reasoning".
+          ...(isReplyPreview ? { reply_preview: true } : {}),
+        },
         sessionId: this._sessionId,
       });
     } catch (e) {

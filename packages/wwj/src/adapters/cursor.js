@@ -520,7 +520,7 @@ class CursorAdapter extends BaseAdapter {
                   }
                   lastResponseText.push(block.text.trim());
                   everPostedAnything = true;
-                  try { await this.sendThinking(msgChannel, block.text.trim()); } catch {}
+                  try { await this.sendThinking(msgChannel, block.text.trim(), { isReplyPreview: true }); } catch {}
                 }
               }
             }

@@ -295,12 +295,25 @@ class PiAdapter extends BaseAdapter {
 
       const eventType = event.type || '';
 
-      // Thinking / assistant incremental text
-      if (eventType === 'thinking' || eventType === 'assistant' || eventType === 'text_delta') {
+      /*
+       * `thinking` and `assistant`/`text_delta` used to share one branch, so
+       * they were indistinguishable downstream. They are not the same thing:
+       * `thinking` is the model reasoning, the other two are its reply arriving
+       * a piece at a time. Only the latter is flagged as a reply preview — with
+       * them merged, tagging the branch would have mislabelled real reasoning as
+       * the answer, and not tagging it would have left the answer duplicated.
+       */
+      if (eventType === 'thinking') {
         const text = event.text || event.content || event.delta || '';
         if (text.trim()) {
           everPostedAnything = true;
           try { await this.sendThinking(channelName, text.trim()); } catch {}
+        }
+      } else if (eventType === 'assistant' || eventType === 'text_delta') {
+        const text = event.text || event.content || event.delta || '';
+        if (text.trim()) {
+          everPostedAnything = true;
+          try { await this.sendThinking(channelName, text.trim(), { isReplyPreview: true }); } catch {}
         }
       }
 

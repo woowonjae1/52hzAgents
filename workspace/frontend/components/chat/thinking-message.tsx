@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { MarkdownContent } from './markdown-content';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
 interface ThinkingMessageProps {
@@ -27,6 +28,7 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
   if (texts.length === 0) return null;
 
   const combinedContent = texts.join('\n\n');
+  const isReplyPreview = messages.every((m) => m.metadata?.reply_preview === true);
   const startTime = messages[0]?.createdAt ? new Date(messages[0].createdAt).getTime() : undefined;
   // Both ends of the run, so the settled block can report how long the thought
   // took rather than how long ago it happened. `Reasoning` cannot work this out
@@ -59,13 +61,31 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
               </span>
             )}
           </div>
-          <Reasoning
-            content={combinedContent}
-            startTime={startTime}
-            durationMs={durationMs}
-            isStreaming={!settled}
-            defaultExpanded={false}
-          />
+          {/*
+            A run that is entirely `reply_preview` is the answer arriving early,
+            not reasoning — so it renders as prose, with no "Thought" heading and
+            no disclosure. This path is only reachable while the run is still
+            live: once the real message lands, `chat-messages.tsx` drops these
+            outright, which is what stops the same text appearing twice.
+
+            `every`, not `some`: a run holding any genuine reasoning stays in the
+            disclosure. Showing a duplicate is a lesser fault than hiding the
+            model's actual thinking, so the ambiguous case errs that way.
+          */}
+          {isReplyPreview ? (
+            <div className="text-sm leading-relaxed text-foreground">
+              <MarkdownContent content={combinedContent} />
+              {!settled && <span className="streaming-cursor" aria-hidden />}
+            </div>
+          ) : (
+            <Reasoning
+              content={combinedContent}
+              startTime={startTime}
+              durationMs={durationMs}
+              isStreaming={!settled}
+              defaultExpanded={false}
+            />
+          )}
         </div>
       </div>
     </div>

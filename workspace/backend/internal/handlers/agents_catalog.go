@@ -33,6 +33,12 @@ func GetAgentCatalog(c *gin.Context) {
 	piDetected, piPath := detectLocalBinary("pi")
 	codexDetected, codexPath := detectLocalBinary("codex", "chatgpt")
 	cursorDetected, cursorPath := detectLocalBinary("cursor")
+	kiloDetected, kiloPath := detectLocalBinary("kilo")
+	clineDetected, clinePath := detectLocalBinary("cline")
+	opencodeDetected, opencodePath := detectLocalBinary("opencode")
+	ampDetected, ampPath := detectLocalBinary("amp")
+	deepseekDetected, deepseekPath := detectLocalBinary("deepseek")
+	openhandsDetected, openhandsPath := detectLocalBinary("openhands")
 
 	c.JSON(http.StatusOK, []gin.H{
 		{
@@ -69,6 +75,83 @@ func GetAgentCatalog(c *gin.Context) {
 			"binary_path":     openclawPath,
 		},
 		{
+			"name":            "kilo",
+			"label":           "Kilo Code",
+			"description":     "Agentic engineering CLI platform with multi-model support and specialized modes.",
+			"install_command": "wwj install kilo",
+			"homepage":        "https://kilo.ai",
+			"tags":            []string{"coding", "cli", "architect"},
+			"builtin":         true,
+			"detected":        kiloDetected,
+			"binary_path":     kiloPath,
+		},
+		{
+			"name":            "cline",
+			"label":           "Cline",
+			"description":     "Autonomous coding agent extension and CLI with file edit and terminal tools.",
+			"install_command": "wwj install cline",
+			"homepage":        "https://github.com/cline/cline",
+			"tags":            []string{"coding", "cli"},
+			"builtin":         true,
+			"detected":        clineDetected,
+			"binary_path":     clinePath,
+		},
+		{
+			"name":            "opencode",
+			"label":           "OpenCode",
+			"description":     "Open-source terminal coding assistant for agile software development.",
+			"install_command": "wwj install opencode",
+			"homepage":        "https://openagents.org",
+			"tags":            []string{"coding", "cli"},
+			"builtin":         true,
+			"detected":        opencodeDetected,
+			"binary_path":     opencodePath,
+		},
+		{
+			"name":            "amp",
+			"label":           "Amp Agent",
+			"description":     "High-velocity AI software engineering agent with deep contextual tools.",
+			"install_command": "wwj install amp",
+			"homepage":        "https://openagents.org",
+			"tags":            []string{"coding", "cli"},
+			"builtin":         true,
+			"detected":        ampDetected,
+			"binary_path":     ampPath,
+		},
+		{
+			"name":            "cursor",
+			"label":           "Cursor Agent",
+			"description":     "Cursor AI code editor agent CLI bridge.",
+			"install_command": "wwj install cursor",
+			"homepage":        "https://openagents.org",
+			"tags":            []string{"coding", "ide"},
+			"builtin":         true,
+			"detected":        cursorDetected,
+			"binary_path":     cursorPath,
+		},
+		{
+			"name":            "deepseek",
+			"label":           "DeepSeek R1",
+			"description":     "Deep reasoning and code architecture intelligence agent.",
+			"install_command": "wwj install deepseek",
+			"homepage":        "https://deepseek.com",
+			"tags":            []string{"coding", "reasoning"},
+			"builtin":         true,
+			"detected":        deepseekDetected,
+			"binary_path":     deepseekPath,
+		},
+		{
+			"name":            "openhands",
+			"label":           "OpenHands",
+			"description":     "Autonomous AI software developer powered by OpenHands runtime.",
+			"install_command": "wwj install openhands",
+			"homepage":        "https://openhands.ai",
+			"tags":            []string{"coding", "autonomous"},
+			"builtin":         true,
+			"detected":        openhandsDetected,
+			"binary_path":     openhandsPath,
+		},
+		{
 			"name":            "hermes",
 			"label":           "Hermes",
 			"description":     "A fast and lightweight agent built for rapid software maintenance.",
@@ -100,17 +183,6 @@ func GetAgentCatalog(c *gin.Context) {
 			"builtin":         true,
 			"detected":        codexDetected,
 			"binary_path":     codexPath,
-		},
-		{
-			"name":            "cursor",
-			"label":           "Cursor Agent",
-			"description":     "Cursor AI code editor agent CLI bridge.",
-			"install_command": "wwj install cursor",
-			"homepage":        "https://openagents.org",
-			"tags":            []string{"coding", "ide"},
-			"builtin":         true,
-			"detected":        cursorDetected,
-			"binary_path":     cursorPath,
 		},
 	})
 }
