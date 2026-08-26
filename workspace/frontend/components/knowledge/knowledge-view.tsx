@@ -40,6 +40,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { KnowledgeEditor } from './knowledge-editor';
 import {
@@ -50,7 +51,7 @@ import {
 } from './knowledge-import';
 
 const CARD =
-  'rounded-2xl border border-border/70 bg-surface1/80 backdrop-blur-md shadow-2xs transition-all duration-200';
+  'rounded-xl border border-border bg-surface1 transition-colors duration-150';
 
 const MICRO =
   'text-3xs font-medium uppercase tracking-wider text-foreground-extra-muted';
@@ -82,14 +83,30 @@ interface CategoryItem {
 }
 
 const CATEGORIES: CategoryItem[] = [
-  { id: 'all', label: '全部知识', icon: BookOpen },
-  { id: 'rules', label: '规范与准则', icon: ShieldCheck },
-  { id: 'architecture', label: '系统架构', icon: Layers },
-  { id: 'api', label: 'API 与接口', icon: Hash },
-  { id: 'docs', label: '业务文档', icon: FileText },
+  { id: 'all', label: 'All', icon: BookOpen },
+  { id: 'rules', label: 'Standards', icon: ShieldCheck },
+  { id: 'architecture', label: 'Architecture', icon: Layers },
+  { id: 'api', label: 'API', icon: Hash },
+  { id: 'docs', label: 'Docs', icon: FileText },
 ];
 
+const CATEGORY_IDS: KnowledgeCategory[] = ['rules', 'architecture', 'api', 'docs'];
+
+/**
+ * The stored category wins; the keyword guess is only for entries nobody has
+ * classified.
+ *
+ * The guess used to be the ONLY answer, and it is wrong often enough to matter:
+ * the tests below run in order over `title + slug + description`, so "API design
+ * standards" matches /spec|standard/ first and files as `rules`, never reaching
+ * the `api` test. Worse, there was no way to correct it — the category was
+ * computed, never stored, so a misfiled entry stayed misfiled. It is a field on
+ * the entry now, and this runs only when that field is null.
+ */
 function classifyEntry(entry: KnowledgeEntry): KnowledgeCategory {
+  const stored = (entry.category || '').toLowerCase() as KnowledgeCategory;
+  if (CATEGORY_IDS.includes(stored)) return stored;
+
   const text = `${entry.title} ${entry.slug} ${entry.description || ''}`.toLowerCase();
   if (text.match(/rule|standard|guideline|convention|spec|规范|准则|守则/)) return 'rules';
   if (text.match(/arch|design|system|structure|module|架构|设计|模型/)) return 'architecture';
@@ -144,6 +161,8 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const [sortBy, setSortBy] = useState<'updated' | 'title' | 'size'>('updated');
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [copiedContent, setCopiedContent] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<KnowledgeEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -166,26 +185,47 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     [knowledge, selectedId]
   );
 
-  // Auto-select first item if on desktop split and none is selected
-  useEffect(() => {
-    if (!isMobile && !selectedId && knowledge.length > 0 && viewLayout === 'split') {
-      handleSelect(knowledge[0]);
-    }
-  }, [isMobile, selectedId, knowledge, viewLayout]);
+  /**
+   * Which fetch is allowed to write to the pane.
+   *
+   * `setSelectedId` lands synchronously but the content arrives later, and the
+   * two were not tied together: click entry A then B, have A's (larger) response
+   * come back last, and the list highlights B while the pane shows A. Bumping a
+   * token per click and comparing before every state write drops the answer to a
+   * superseded request instead of painting it.
+   */
+  const selectionTokenRef = useRef(0);
 
   const handleSelect = useCallback(async (entry: KnowledgeEntry) => {
+    const token = ++selectionTokenRef.current;
     setSelectedId(entry.id);
+    setSelectedContent('');
     setLoadingContent(true);
     setMobileDetail(true);
     try {
       const full = await workspaceApi.getKnowledgeEntry(entry.id);
+      if (selectionTokenRef.current !== token) return;
       setSelectedContent(full.content);
     } catch {
+      if (selectionTokenRef.current !== token) return;
       setSelectedContent('Failed to load content.');
     } finally {
-      setLoadingContent(false);
+      // Guarded too: an early request clearing the flag would hide the spinner
+      // while a later one is still in flight.
+      if (selectionTokenRef.current === token) setLoadingContent(false);
     }
   }, []);
+
+  // Declared AFTER `handleSelect` on purpose: it used to sit above it and call
+  // it, which works at runtime (effects run post-render) but left `handleSelect`
+  // out of the dependency array with nothing to remind anyone. Moved so the
+  // dependency can be listed honestly.
+  useEffect(() => {
+    if (!isMobile && !selectedId && knowledge.length > 0 && viewLayout === 'split') {
+      void handleSelect(knowledge[0]);
+    }
+  }, [isMobile, selectedId, knowledge, viewLayout, handleSelect]);
+
 
   const handleEdit = useCallback(async (entry: KnowledgeEntry) => {
     try {
@@ -197,21 +237,40 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     }
   }, []);
 
-  const handleDelete = useCallback(async (entry: KnowledgeEntry) => {
-    if (!window.confirm(`确定要删除知识库条目「${entry.title}」吗？所有 Agent 将无法再读取该条目。`)) {
-      return;
-    }
+  /*
+   * Deleting asks in a `Dialog`, not `window.confirm`.
+   *
+   * A native confirm is an OS-chrome modal dropped into the middle of a desktop
+   * app: it cannot show the entry it is about to remove in the app's own type,
+   * it blocks the renderer thread, and it is unstyleable — so the one
+   * irreversible action here looked less considered than the reversible ones
+   * around it. Every other confirmation in this app (tool approval, decision
+   * cards) already goes through `Dialog`.
+   */
+  const handleDelete = useCallback((entry: KnowledgeEntry) => {
+    setPendingDelete(entry);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    const entry = pendingDelete;
+    if (!entry) return;
+    setDeleting(true);
     try {
       await deleteKnowledge(entry.id);
-      toast.success(`已删除: ${entry.title}`);
+      toast.success(`Deleted ${entry.title}`);
       if (selectedId === entry.id) {
         setSelectedId(null);
         setSelectedContent('');
       }
+      setPendingDelete(null);
     } catch {
-      toast.error('删除失败');
+      // The dialog stays open on failure: closing it would leave the user with a
+      // toast and no way to retry the thing they just asked for.
+      toast.error('Could not delete that entry');
+    } finally {
+      setDeleting(false);
     }
-  }, [deleteKnowledge, selectedId]);
+  }, [deleteKnowledge, pendingDelete, selectedId]);
 
   const handleEditorClose = useCallback(() => {
     setEditorOpen(false);
@@ -234,7 +293,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     setRefreshing(true);
     Promise.resolve(refreshKnowledge()).finally(() => {
       setRefreshing(false);
-      toast.success('知识库已刷新');
+      toast.success('Knowledge base refreshed');
     });
   }, [refreshKnowledge]);
 
@@ -247,7 +306,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     const directive = `@knowledge:${slug}`;
     navigator.clipboard.writeText(directive);
     setCopiedSlug(slug);
-    toast.success(`已复制指令 ${directive}，可在对话中直接 @ 引用`);
+    toast.success(`Copied ${directive} — paste it into a message to cite this entry`);
     setTimeout(() => setCopiedSlug(null), 2000);
   }, []);
 
@@ -255,7 +314,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     if (!selectedContent) return;
     navigator.clipboard.writeText(selectedContent);
     setCopiedContent(true);
-    toast.success('已复制 Markdown 全文内容');
+    toast.success('Markdown copied');
     setTimeout(() => setCopiedContent(false), 2000);
   }, [selectedContent]);
 
@@ -269,7 +328,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(`已导出 ${entry.slug}.md`);
+    toast.success(`Exported ${entry.slug}.md`);
   }, []);
 
   // Filter and sort entries
@@ -349,11 +408,11 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             </button>
             <div className="h-3.5 w-px bg-border/80" />
             <div className="flex items-center gap-2">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400 shadow-2xs">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface2 text-foreground-muted">
                 <BookOpen className="size-4" />
               </span>
               <ScreenTitle className="text-sm font-semibold tracking-tight text-foreground">
-                知识库 (Knowledge)
+                Knowledge
               </ScreenTitle>
             </div>
             {knowledge.length > 0 && (
@@ -370,7 +429,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   <Plus className="size-4 text-primary" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">新建知识库条目</TooltipContent>
+              <TooltipContent side="bottom">New entry</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -383,7 +442,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   <Upload className="size-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">导入 Markdown 文件</TooltipContent>
+              <TooltipContent side="bottom">Import Markdown files</TooltipContent>
             </Tooltip>
 
             <Tooltip>
@@ -392,7 +451,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">刷新知识库</TooltipContent>
+              <TooltipContent side="bottom">Refresh</TooltipContent>
             </Tooltip>
           </div>
         </div>
@@ -400,9 +459,9 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
         {/* Global Agent Broadcast Strip */}
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface2/60 border border-border/50 text-3xs text-foreground-muted">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span className="font-medium text-foreground truncate">全局智能体共享广播</span>
-            <span className="text-foreground-extra-muted hidden sm:inline">· 全部 Agent 实时生效</span>
+            <span className="size-1.5 rounded-full bg-status-success shrink-0" aria-hidden />
+            <span className="font-medium text-foreground truncate">Shared with every agent</span>
+            <span className="text-foreground-extra-muted hidden sm:inline">· applies immediately</span>
           </div>
           <div className="flex -space-x-1 shrink-0 pl-2">
             {onlineAgents.slice(0, 4).map((a) => (
@@ -420,7 +479,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索规范、架构、接口文档..."
+            placeholder="Search knowledge…"
             className="h-8.5 w-full rounded-xl border border-border/70 bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted shadow-2xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           />
           {query && (
@@ -475,9 +534,9 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             <div className="flex size-12 items-center justify-center rounded-2xl bg-surface2 text-foreground-extra-muted">
               <Search className="size-5" />
             </div>
-            <p className="text-xs font-semibold text-foreground">没有找到匹配的知识库条目</p>
+            <p className="text-xs font-semibold text-foreground">No matching entries</p>
             <p className="max-w-[15rem] text-3xs text-foreground-extra-muted">
-              {query ? `未搜索到关于 “${query}” 的内容` : '当前分类下暂无文档'}
+              {query ? `Nothing matches “${query}”` : 'This category is empty'}
             </p>
           </div>
         ) : (
@@ -554,7 +613,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                       copySlugDirective(entry.slug);
                     }}
                     className="p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
-                    title="复制 @knowledge 引用指令"
+                    title="Copy the @knowledge citation"
                   >
                     {copiedSlug === entry.slug ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
                   </button>
@@ -565,7 +624,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                       handleEdit(entry);
                     }}
                     className="p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
-                    title="编辑文档"
+                    title="Edit"
                   >
                     <Pencil className="size-3" />
                   </button>
@@ -575,8 +634,8 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                       e.stopPropagation();
                       handleDelete(entry);
                     }}
-                    className="p-1 rounded-md text-foreground-extra-muted hover:text-rose-600 hover:bg-rose-500/10 transition-colors"
-                    title="删除文档"
+                    className="p-1 rounded-md text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    title="Delete"
                   >
                     <Trash2 className="size-3" />
                   </button>
@@ -617,20 +676,20 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 type="button"
                 onClick={() => copySlugDirective(selectedEntry.slug)}
                 className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors cursor-pointer"
-                title="点击复制 @ 引用"
+                title="Copy the @ citation"
               >
                 <span>@knowledge:{selectedEntry.slug}</span>
                 {copiedSlug === selectedEntry.slug ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5 text-foreground-extra-muted" />}
               </button>
               <MetaDot />
-              <span className="text-3xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+              <span className="text-3xs text-foreground-muted font-medium flex items-baseline gap-1">
                 <Bot className="size-3" />
-                <span>全智能体共享</span>
+                <span>Shared with all agents</span>
               </span>
               {timeAgo(selectedEntry.updatedAt || selectedEntry.createdAt) && (
                 <>
                   <MetaDot />
-                  <span className={MICRO}>更新于 {timeAgo(selectedEntry.updatedAt || selectedEntry.createdAt)}</span>
+                  <span className={MICRO}>Updated {timeAgo(selectedEntry.updatedAt || selectedEntry.createdAt)}</span>
                 </>
               )}
               {formatSize(selectedEntry.contentSize) && (
@@ -653,10 +712,10 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border/70 bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
               >
                 {copiedContent ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5 text-foreground-muted" />}
-                <span className="hidden sm:inline">复制全文</span>
+                <span className="hidden sm:inline">Copy</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">复制 Markdown 正文</TooltipContent>
+            <TooltipContent side="bottom">Copy the Markdown body</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -667,10 +726,10 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border/70 bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
               >
                 <Download className="size-3.5 text-foreground-muted" />
-                <span className="hidden sm:inline">导出</span>
+                <span className="hidden sm:inline">Export</span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">导出为本地 .md 文件</TooltipContent>
+            <TooltipContent side="bottom">Save as a local .md file</TooltipContent>
           </Tooltip>
 
           <button
@@ -679,7 +738,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
           >
             <Pencil className="size-3.5" />
-            <span>编辑</span>
+            <span>Edit</span>
           </button>
         </div>
       </div>
@@ -699,7 +758,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             <div className="mx-auto w-full max-w-3xl">
               {selectedEntry.description && (
                 <div className="mb-6 p-4 rounded-xl bg-surface2/60 border border-border/60 text-xs text-foreground-muted leading-relaxed">
-                  <p className="font-semibold text-foreground mb-1">文档摘要</p>
+                  <p className="font-semibold text-foreground mb-1">Summary</p>
                   {selectedEntry.description}
                 </div>
               )}
@@ -715,7 +774,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           <div className="hidden lg:block w-56 shrink-0 border-l border-border/60 p-4 overflow-y-auto bg-surface1/30 select-none">
             <div className="flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wider text-foreground-extra-muted mb-3">
               <AlignLeft className="size-3" />
-              <span>目录大纲 (TOC)</span>
+              <span>Contents</span>
             </div>
             <div className="space-y-1">
               {tocItems.map((item, idx) => (
@@ -736,12 +795,12 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     </div>
   ) : (
     <div className="h-full flex flex-col items-center justify-center gap-3 px-6 text-center bg-background text-foreground-muted select-none">
-      <div className="flex size-14 items-center justify-center rounded-3xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+      <div className="flex size-14 items-center justify-center rounded-2xl bg-surface2 text-foreground-muted">
         <BookOpen className="size-7" />
       </div>
-      <p className="text-sm font-semibold text-foreground">未选择任何知识库文档</p>
+      <p className="text-sm font-semibold text-foreground">No entry selected</p>
       <p className="max-w-xs text-xs text-foreground-extra-muted">
-        请在左侧点击任一条目进行阅读，或点击「新建」为所有智能体录入统一的业务规范。
+        Pick an entry on the left to read it, or create one to give every agent the same reference.
       </p>
       <button
         type="button"
@@ -749,7 +808,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
         className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
       >
         <Plus className="size-3.5" />
-        <span>新建第一条知识</span>
+        <span>Create the first entry</span>
       </button>
     </div>
   );
@@ -801,6 +860,37 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
         onClose={() => setImportFiles([])}
         onImported={refreshKnowledge}
       />
+
+      <Dialog open={!!pendingDelete} onOpenChange={(open) => { if (!open && !deleting) setPendingDelete(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Delete this entry?</DialogTitle>
+          <DialogDescription>
+            {/* The title is quoted back rather than described, because "are you
+                sure" without the name is how the wrong thing gets deleted. */}
+            <span className="font-medium text-foreground">{pendingDelete?.title}</span>
+            {' '}will be removed for everyone. No agent will be able to read it again,
+            and this cannot be undone.
+          </DialogDescription>
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPendingDelete(null)}
+              disabled={deleting}
+              className="cursor-pointer rounded-base border border-border px-2.5 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface2 hover:text-foreground disabled:cursor-default disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void confirmDelete()}
+              disabled={deleting}
+              className="cursor-pointer rounded-base bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -226,8 +226,8 @@ interface WorkspaceContextValue {
   }) => Promise<void>;
   knowledge: KnowledgeEntry[];
   refreshKnowledge: () => Promise<void>;
-  createKnowledge: (params: { title: string; content: string; description?: string }) => Promise<KnowledgeEntry>;
-  updateKnowledge: (entryId: string, params: { title?: string; content?: string; description?: string }) => Promise<KnowledgeEntry>;
+  createKnowledge: (params: { title: string; content: string; description?: string; category?: string }) => Promise<KnowledgeEntry>;
+  updateKnowledge: (entryId: string, params: { title?: string; content?: string; description?: string; category?: string }) => Promise<KnowledgeEntry>;
   deleteKnowledge: (entryId: string) => Promise<void>;
   notifications: NotificationItem[];
   unreadNotificationCount: number;
@@ -1045,13 +1045,13 @@ export function WorkspaceProvider({
     }
   }, []);
 
-  const createKnowledge = useCallback(async (params: { title: string; content: string; description?: string }) => {
+  const createKnowledge = useCallback(async (params: { title: string; content: string; description?: string; category?: string }) => {
     const entry = await workspaceApi.createKnowledge(params);
     await refreshKnowledge();
     return entry;
   }, [refreshKnowledge]);
 
-  const updateKnowledge = useCallback(async (entryId: string, params: { title?: string; content?: string; description?: string }) => {
+  const updateKnowledge = useCallback(async (entryId: string, params: { title?: string; content?: string; description?: string; category?: string }) => {
     const entry = await workspaceApi.updateKnowledge(entryId, params);
     await refreshKnowledge();
     return entry;

@@ -558,9 +558,34 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
     }
   }
 
+  // Whose steps these are. `senderGroups` is ordered, so the first group is the
+  // agent that opened the run.
+  const primarySender = senderGroups[0]?.sender || '';
+  const primaryAgent = agents?.find((a) => a.agentName === primarySender);
+
   return (
     <div className="flex items-start gap-3 py-1">
-      <div className="size-8 shrink-0" />
+      {/*
+        THE AVATAR, which used to be an empty 32px spacer.
+
+        That spacer was harmless while a separate "Starting" row above carried
+        the avatar — but that row is now suppressed whenever an agent has begun
+        reporting for itself (otherwise one working agent announced its identity
+        twice on adjacent lines). With the row gone and this slot empty, a turn
+        that emitted any `status` event showed tool calls and thoughts with no
+        indication of who was doing them.
+
+        It only looked intermittent: a run of pure `thinking` groups as
+        `ThinkingMessage`, which draws its own avatar, so the identity appeared.
+        One interleaved status demoted the run to this component and the avatar
+        vanished.
+      */}
+      <AgentAvatar
+        name={primarySender}
+        agentType={primaryAgent?.agentType}
+        size={28}
+        className="mt-0.5 shrink-0"
+      />
       {/* One rail width for the whole app: a centred 1px column in a 1rem
           track, matching `EventLineBody`. This was `border-l-2 … pl-3` — a 2px
           line at a different indent from the one every expanded event draws. */}
@@ -569,10 +594,16 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
         <div className="min-w-0">
         {senderGroups.map((group, gi) => (
           <div key={`${group.sender}-${gi}`}>
-            {hasMultipleAgents && (
-              <div className="flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0">
-                <AgentAvatar name={group.sender} size={14} />
-                <span className="text-3xs font-medium text-muted-foreground/70">
+            {/*
+              A sub-label only for HANDOVERS — a second agent picking up inside
+              the same run. `gi > 0` because the 28px avatar beside the rail
+              already names the agent that opened it; labelling the first group
+              as well printed the same identity twice, half an inch apart.
+            */}
+            {hasMultipleAgents && gi > 0 && (
+              <div className="flex items-baseline gap-1.5 mb-0.5 mt-1.5">
+                <AgentAvatar name={group.sender} size={14} className="translate-y-px" />
+                <span className="text-3xs font-medium text-foreground-muted">
                   {group.sender}
                 </span>
               </div>

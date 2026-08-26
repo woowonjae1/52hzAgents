@@ -218,6 +218,12 @@ export interface KnowledgeEntry {
   slug: string;
   title: string;
   description: string | null;
+  /**
+   * Chosen by whoever wrote the entry: 'rules' | 'architecture' | 'api' | 'docs'.
+   * `null` means nobody has classified it, and only then does the client fall
+   * back to guessing from the title — see `classifyEntry`.
+   */
+  category: string | null;
   contentSize: number | null;
   createdBy: string;
   updatedBy: string | null;

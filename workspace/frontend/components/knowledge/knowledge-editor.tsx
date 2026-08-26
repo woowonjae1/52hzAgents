@@ -51,6 +51,10 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
   const { createKnowledge, updateKnowledge, agents } = useWorkspace();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // '' means "let the app guess from the title" — the same thing an entry that
+  // has never been classified means, so the control has an honest empty state
+  // rather than defaulting to a category nobody picked.
+  const [category, setCategory] = useState('');
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<EditorViewMode>('split');
@@ -63,6 +67,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
       if (entry) {
         setTitle(entry.title);
         setDescription(entry.description || '');
+        setCategory(entry.category || '');
         setContent(entry.content || '');
       } else {
         setTitle('');
@@ -77,11 +82,12 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
       return (
         title !== entry.title ||
         description !== (entry.description || '') ||
+        category !== (entry.category || '') ||
         content !== (entry.content || '')
       );
     }
     return title.length > 0 || description.length > 0 || content.length > 0;
-  }, [entry, title, description, content]);
+  }, [entry, title, description, content, category]);
 
   const canSave = !!title.trim() && !!content.trim();
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
@@ -113,6 +119,9 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
           title: title.trim(),
           content: content.trim(),
           description: description.trim() || undefined,
+          // Always sent on update, including as '' — omitting it would leave a
+          // stale category behind when the user deliberately clears it.
+          category,
         });
         toast.success(`Knowledge updated: ${title.trim()}`);
       } else {
@@ -120,6 +129,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
           title: title.trim(),
           content: content.trim(),
           description: description.trim() || undefined,
+          category: category || undefined,
         });
         toast.success(`Knowledge created: ${title.trim()}`);
       }
@@ -157,9 +167,9 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
                   {isEditing ? `Edit: ${entry.title}` : 'Create Knowledge Base Entry'}
                 </DialogTitle>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="flex items-center gap-1 text-3xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="flex items-baseline gap-1 text-3xs text-foreground-muted font-medium">
                     <Bot className="size-3" />
-                    <span>Global Agent Sync · 对全量智能体自动共享生效</span>
+                    <span>Shared automatically with every agent</span>
                   </span>
                 </div>
               </div>
@@ -237,6 +247,31 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
                 placeholder="e.g. Core architectural principles for all agents"
                 className={fieldClass}
               />
+            </div>
+
+            {/*
+              The category, chosen rather than guessed.
+              It used to be derived from the title by a list of keyword tests run
+              in order, so "API design standards" filed itself under Standards
+              (matching /standard/ first) and never reached the API test — with no
+              way to correct it, because the value was computed at render and
+              never stored. Leaving this on "Detect from title" keeps the old
+              behaviour, which is what every existing entry gets.
+            */}
+            <div className="space-y-1.5">
+              <Label htmlFor="kb-category" className={MICRO}>Category</Label>
+              <select
+                id="kb-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={cn(fieldClass, 'w-full cursor-pointer px-2')}
+              >
+                <option value="">Detect from title</option>
+                <option value="rules">Standards</option>
+                <option value="architecture">Architecture</option>
+                <option value="api">API</option>
+                <option value="docs">Docs</option>
+              </select>
             </div>
           </div>
 
@@ -393,7 +428,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
           <div className="flex items-center gap-2 text-start">
             {isDirty ? (
               <>
-                <span className="size-2 rounded-full bg-amber-500 animate-pulse" aria-hidden />
+                <span className="size-2 rounded-full bg-foreground-extra-muted" aria-hidden />
                 <span className={MICRO}>Unsaved modifications</span>
               </>
             ) : (

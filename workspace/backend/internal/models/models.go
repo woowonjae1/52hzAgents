@@ -206,6 +206,10 @@ type KnowledgeEntry struct {
 	Slug        string    `gorm:"type:text;not null;uniqueIndex:uq_knowledge_workspace_slug"`
 	Title       string    `gorm:"type:text;not null"`
 	Description *string   `gorm:"type:text"`
+	// Set explicitly by whoever wrote the entry. NULL means unclassified, which
+	// the client falls back to guessing from the title — a guess it must not
+	// make once someone has actually chosen.
+	Category    *string   `gorm:"type:text"`
 	StorageKey  *string   `gorm:"type:text"`
 	ContentSize *int      `gorm:"type:integer"`
 	CreatedBy   string    `gorm:"type:text;not null"`

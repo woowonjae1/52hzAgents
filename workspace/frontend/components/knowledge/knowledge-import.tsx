@@ -210,13 +210,13 @@ function StatusChip({ doc }: { doc: ParsedDoc }) {
   }
   if (doc.action === 'overwrite') {
     return (
-      <span className={cn(base, 'bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400')}>
+      <span className={cn(base, 'bg-status-muted-warning text-status-warning')}>
         <RefreshCw className="size-3" /> Replaces
       </span>
     );
   }
   return (
-    <span className={cn(base, 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400')}>
+    <span className={cn(base, 'bg-status-muted-success text-status-success')}>
       <Check className="size-3" /> New
     </span>
   );
@@ -372,7 +372,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
       <DialogContent className="sm:max-w-2xl gap-0 p-0 overflow-hidden">
         <DialogHeader className="mb-0 border-b border-border/70 px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface2 text-foreground-muted">
               <BookOpen className="size-4" />
             </span>
             <div className="min-w-0 text-start">
@@ -443,7 +443,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                           </p>
                         )}
                         {!doc.error && doc.conflict && (
-                          <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                          <p className="mt-1.5 text-xs text-status-warning">
                             Already exists as{' '}
                             <span className="font-mono">@knowledge:{doc.conflict.slug}</span>
                           </p>
@@ -486,7 +486,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                   {importable.length} of {docs.length} will be imported
                 </span>
                 {conflictCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-3xs font-medium text-amber-600 dark:text-amber-400 tabular-nums">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-status-muted-warning px-2 py-0.5 text-3xs font-medium text-status-warning tabular-nums">
                     {conflictCount} already exist
                   </span>
                 )}

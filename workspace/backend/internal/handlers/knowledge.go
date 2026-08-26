@@ -44,6 +44,7 @@ type createKnowledgeRequest struct {
 	Title       string  `json:"title" binding:"required"`
 	Content     string  `json:"content"`
 	Description *string `json:"description"`
+	Category    *string `json:"category"`
 	Source      string  `json:"source"`
 }
 
@@ -52,6 +53,7 @@ type updateKnowledgeRequest struct {
 	Title       *string `json:"title"`
 	Content     *string `json:"content"`
 	Description *string `json:"description"`
+	Category    *string `json:"category"`
 	Source      string  `json:"source"`
 }
 
@@ -89,12 +91,31 @@ func knowledgeUniqueSlug(workspaceID, baseSlug, excludeID string) string {
 	}
 }
 
+// knowledgeCategories is the closed set the UI can filter by. An unrecognised
+// value is stored as NULL rather than kept, because a category no tab matches
+// would hide the entry from every filter except "All" with nothing to explain it.
+var knowledgeCategories = map[string]bool{
+	"rules": true, "architecture": true, "api": true, "docs": true,
+}
+
+func normalizeKnowledgeCategory(in *string) *string {
+	if in == nil {
+		return nil
+	}
+	v := strings.ToLower(strings.TrimSpace(*in))
+	if v == "" || !knowledgeCategories[v] {
+		return nil
+	}
+	return &v
+}
+
 func serializeKnowledge(entry *models.KnowledgeEntry) gin.H {
 	return gin.H{
 		"id":           entry.ID,
 		"slug":         entry.Slug,
 		"title":        entry.Title,
 		"description":  entry.Description,
+		"category":     entry.Category,
 		"content_size": entry.ContentSize,
 		"storage_key":  entry.StorageKey,
 		"created_by":   entry.CreatedBy,
@@ -164,6 +185,7 @@ func CreateKnowledge(c *gin.Context) {
 		Slug:        slug,
 		Title:       req.Title,
 		Description: req.Description,
+		Category:    normalizeKnowledgeCategory(req.Category),
 		StorageKey:  &storageKey,
 		ContentSize: &contentSize,
 		CreatedBy:   source,
@@ -295,6 +317,12 @@ func UpdateKnowledge(c *gin.Context) {
 	}
 	if req.Description != nil {
 		entry.Description = req.Description
+	}
+	if req.Category != nil {
+		// An empty string clears the choice and hands classification back to the
+		// client's heuristic; that is different from omitting the field, which
+		// leaves whatever was there alone.
+		entry.Category = normalizeKnowledgeCategory(req.Category)
 	}
 	if req.Content != nil {
 		contentBytes := []byte(*req.Content)
