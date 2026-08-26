@@ -423,6 +423,16 @@ class AmpAdapter extends BaseAdapter {
               }
               lastTurnText.push(text);
               try { await this.sendThinking(msgChannel, text, { isReplyPreview: true }); } catch {}
+            } else if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+              // Extended thinking, on `block.thinking` rather than `block.text`.
+              // Unflagged: this is the real chain-of-thought, so it belongs in
+              // the Thought disclosure. Kept out of `lastTurnText` — reasoning is
+              // not part of the reply. `redacted_thinking` is matched only to be
+              // skipped; its payload is encrypted with nothing readable in it.
+              const thought = String(block.thinking || '').trim();
+              if (thought) {
+                try { await this.sendThinking(msgChannel, thought); } catch {}
+              }
             } else if (block.type === 'tool_use') {
               hasToolUseSinceText = true;
               lastTurnText = [];

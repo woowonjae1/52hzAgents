@@ -161,6 +161,10 @@ export const AGENT_ICON_ALIASES: Record<string, string> = {
   chatgpt: 'openai',
   antigravity: 'antigravity',
   agy: 'antigravity',
+  claude: 'claude',
+  anthropic: 'claude',
+  'claude-code': 'claude',
+  'claude-api': 'claude',
 };
 
 /** Icon file base name for an agent/provider name. */

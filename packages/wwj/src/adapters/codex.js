@@ -521,8 +521,29 @@ class CodexAdapter extends BaseAdapter {
               hasToolUseSinceLastText = false;
             }
             responseTexts.push(item.text);
-            // Stream as thinking (like Claude adapter)
+            // The reply arriving early, not reasoning — see the `reasoning`
+            // branch below for the real thing.
             try { await this.sendThinking(msgChannel, item.text, { isReplyPreview: true }); } catch {}
+          } else if (item.type === 'reasoning') {
+            /*
+             * o-series reasoning summaries — the genuine chain-of-thought, which
+             * this adapter previously ignored entirely (the word "reasoning" did
+             * not appear in this file). So the reply was shown inside a "Thought"
+             * disclosure while the actual thought was dropped.
+             *
+             * The field is read defensively because the CLI's shape for this
+             * item is not pinned down here: a plain `text`, or OpenAI's
+             * `summary` array of `{ type: 'summary_text', text }` parts. Both
+             * are handled, and an unrecognised shape yields nothing rather than
+             * throwing inside the event loop.
+             */
+            const parts = Array.isArray(item.summary)
+              ? item.summary.map((s) => (typeof s === 'string' ? s : (s && s.text) || '')).filter(Boolean)
+              : [];
+            const text = String(item.text || parts.join('\n\n') || '').trim();
+            if (text) {
+              try { await this.sendThinking(msgChannel, text); } catch {}
+            }
           } else if (item.type === 'command_execution') {
             hasToolUseSinceLastText = true;
             const cmdText = (item.command || '').slice(0, 200);

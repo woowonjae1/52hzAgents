@@ -52,7 +52,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
     <div
       className={cn(
         'relative shrink-0 transition-all duration-200 select-none',
-        isOffline && 'opacity-70 grayscale-[20%]',
+        isOffline && 'opacity-80',
         className
       )}
       style={{ width: size, height: size }}

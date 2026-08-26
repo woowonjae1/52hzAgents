@@ -521,6 +521,16 @@ class CursorAdapter extends BaseAdapter {
                   lastResponseText.push(block.text.trim());
                   everPostedAnything = true;
                   try { await this.sendThinking(msgChannel, block.text.trim(), { isReplyPreview: true }); } catch {}
+                } else if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+                  // Extended thinking, on `block.thinking` rather than
+                  // `block.text`. Unflagged, because this is the genuine
+                  // chain-of-thought and belongs in the Thought disclosure. Kept
+                  // out of `lastResponseText`, and `everPostedAnything` is left
+                  // alone: reasoning without an answer is still no answer.
+                  const thought = String(block.thinking || '').trim();
+                  if (thought) {
+                    try { await this.sendThinking(msgChannel, thought); } catch {}
+                  }
                 }
               }
             }

@@ -985,6 +985,30 @@ class ClaudeAdapter extends BaseAdapter {
             pp.postedThinking = true;
             pp.everPostedAnything = true;
             try { await this.sendThinking(pp.msgChannel, block.text.trim(), { isReplyPreview: true }); } catch {}
+          } else if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+            /*
+             * Claude's extended thinking. THIS IS THE ONLY GENUINE
+             * CHAIN-OF-THOUGHT THIS ADAPTER RECEIVES, and it used to fall
+             * through this if/else chain and be discarded — so the model with
+             * the strongest reasoning trace showed no reasoning at all, while
+             * its reply was being displayed under a "Thought" heading instead.
+             *
+             * The text is on `block.thinking`, not `block.text`. Reaching for
+             * `.text` here is how this silently yields nothing.
+             *
+             * `redacted_thinking` carries only an encrypted `data` field with
+             * nothing readable, so it is matched to be skipped deliberately
+             * rather than left to fall through to the generic branch.
+             *
+             * Deliberately does NOT touch `postedThinking`, `lastResponseText`
+             * or `everPostedAnything`: those drive the reply-finalisation state
+             * machine, and reasoning is not a reply. A turn that produced only
+             * reasoning must still be reported as having produced no answer.
+             */
+            const thought = String(block.thinking || '').trim();
+            if (thought) {
+              try { await this.sendThinking(pp.msgChannel, thought); } catch {}
+            }
           } else if (block.type === 'tool_use') {
             pp.hasToolUseSinceLastText = true;
             pp.postedThinking = false;
