@@ -21,15 +21,15 @@ const { buildClaudeSystemPrompt } = require('./workspace-prompt');
 
 const IS_WINDOWS = process.platform === 'win32';
 
-// Standard Antigravity Model Catalog (Exact matching from Antigravity client)
+// Standard Antigravity Model Catalog (Exact matching from Antigravity CLI)
 const ANTIGRAVITY_MODELS = [
-  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', shortName: 'Gemini 3.7 Flash' },
-  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', shortName: 'Gemini 3.6 Flash' },
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', shortName: 'Gemini 3.5 Flash' },
-  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', shortName: 'Gemini 3.1 Pro' },
-  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6 (Thinking)', shortName: 'Sonnet 4.6' },
-  { id: 'claude-opus-4.6', name: 'Claude Opus 4.6 (Thinking)', shortName: 'Opus 4.6' },
-  { id: 'gpt-oss-120b', name: 'GPT-OSS 120B (Medium)', shortName: 'GPT-OSS 120B' },
+  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', shortName: 'Gemini 3.7 Flash', agyName: 'Gemini 3.7 Flash (Medium)' },
+  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', shortName: 'Gemini 3.6 Flash', agyName: 'Gemini 3.6 Flash (Medium)' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', shortName: 'Gemini 3.5 Flash', agyName: 'Gemini 3.5 Flash (Medium)' },
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', shortName: 'Gemini 3.1 Pro', agyName: 'Gemini 3.1 Pro (High)' },
+  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6 (Thinking)', shortName: 'Sonnet 4.6', agyName: 'Claude Sonnet 4.6 (Thinking)' },
+  { id: 'claude-opus-4.6', name: 'Claude Opus 4.6 (Thinking)', shortName: 'Opus 4.6', agyName: 'Claude Opus 4.6 (Thinking)' },
+  { id: 'gpt-oss-120b', name: 'GPT-OSS 120B (Medium)', shortName: 'GPT-OSS 120B', agyName: 'GPT-OSS 120B (Medium)' },
 ];
 
 function stripAnsi(str) {
@@ -254,7 +254,20 @@ class AntigravityAdapter extends BaseAdapter {
     await this.sendStatus(channel, 'Reasoning');
 
     return new Promise((resolve) => {
+      const currentModelName = this._getModel();
+      const matched = ANTIGRAVITY_MODELS.find(
+        (m) =>
+          m.id === currentModelName ||
+          m.name.toLowerCase() === currentModelName.toLowerCase() ||
+          m.shortName.toLowerCase() === currentModelName.toLowerCase() ||
+          (m.agyName && m.agyName.toLowerCase() === currentModelName.toLowerCase())
+      );
+      const agyModelFlag = matched ? (matched.agyName || matched.name) : currentModelName;
+
       const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
+      if (agyModelFlag) {
+        args.push('--model', agyModelFlag);
+      }
       if (conversationId) {
         args.push('--conversation', conversationId);
       }
