@@ -40,7 +40,7 @@ function IconWrapper({ name: rawName, size = 20, className }: { name: string } &
       style={{ width: size, height: size }}
     >
       <img
-        src={`${ICON_BASE}/${name}.${ext}`}
+        src={`${ICON_BASE}/${name}.${ext}?v=52hz-1`}
         alt={name}
         width={needsBg ? size - 4 : size}
         height={needsBg ? size - 4 : size}
@@ -48,9 +48,9 @@ function IconWrapper({ name: rawName, size = 20, className }: { name: string } &
         onError={(e) => {
           const img = e.target as HTMLImageElement;
           if (img.src.includes('.png')) {
-            img.src = `${ICON_BASE}/${name}.svg`;
+            img.src = `${ICON_BASE}/${name}.svg?v=52hz-1`;
           } else if (img.src.includes('.svg')) {
-            img.src = `${ICON_BASE}/default.svg`;
+            img.src = `${ICON_BASE}/default.svg?v=52hz-1`;
           }
         }}
       />

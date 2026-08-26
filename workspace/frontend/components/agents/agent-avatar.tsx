@@ -67,7 +67,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
       >
         {matchedAgent && !imgError ? (
           <img
-            src={`/icons/agents/${matchedAgent}.${isPng ? 'png' : 'svg'}`}
+            src={`/icons/agents/${matchedAgent}.${isPng ? 'png' : 'svg'}?v=52hz-1`}
             alt={cleanName}
             onError={() => setImgError(true)}
             className={cn(
