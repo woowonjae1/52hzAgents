@@ -88,7 +88,7 @@ export function RoutineList() {
             <span className="text-xs font-medium">Back</span>
           </button>
           <div className="h-3.5 w-px bg-border/60" />
-          <CalendarClock className="size-3.5 text-violet-500" />
+          <CalendarClock className="size-3.5 text-status-merged" />
           <ScreenTitle>Scheduled tasks</ScreenTitle>
           {activeRoutines.length > 0 && (
             <span className="text-xs text-muted-foreground font-mono">({activeRoutines.length})</span>

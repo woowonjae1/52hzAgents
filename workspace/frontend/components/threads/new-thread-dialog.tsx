@@ -148,7 +148,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             <div className={cn(
               'size-4 rounded shrink-0 flex items-center justify-center border transition-colors',
               isAllSelected || isPartiallySelected
-                ? 'bg-foreground-extra-muted border-blue-500 text-white'
+                ? 'bg-foreground-extra-muted border-border-accent text-white'
                 : 'border-border-accent'
             )}>
               {isAllSelected && <Check className="size-3" strokeWidth={3} />}
@@ -198,7 +198,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
                 <div className={cn(
                   'size-4 rounded shrink-0 flex items-center justify-center border transition-colors',
                   isSelected
-                    ? 'bg-foreground-extra-muted border-blue-500 text-white'
+                    ? 'bg-foreground-extra-muted border-border-accent text-white'
                     : 'border-border-accent'
                 )}>
                   {isSelected && <Check className="size-3" strokeWidth={3} />}
@@ -226,7 +226,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             <select
               value={resumeFrom}
               onChange={(e) => setResumeFrom(e.target.value)}
-              className="w-full text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="">New conversation (no context)</option>
               {resumableSessions.map((s) => (

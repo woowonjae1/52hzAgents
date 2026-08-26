@@ -12,7 +12,7 @@ export function SidebarHeader() {
     <div className="flex items-center justify-between shrink-0 px-4 pt-3.5 pb-2.5 bg-surface-sidebar [app-region:drag] select-none border-b border-border/40 dark:border-white/[0.04]">
       {/* Left: Brand logo with status dot */}
       <div className="flex items-center gap-2.5 [app-region:no-drag] min-w-0">
-        <div className="size-6 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs shadow-blue-500/20 shrink-0">
+        <div className="size-6 rounded-lg bg-gradient-to-tr from-surface2 to-surface2 flex items-center justify-center text-white shadow-xs shadow-blue-500/20 shrink-0">
           <Sparkles className="size-3.5" />
         </div>
         <div className="flex items-center gap-1.5 min-w-0">

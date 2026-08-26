@@ -119,7 +119,7 @@ export function ProjectFolderPicker({ value, onChange, placeholder, helperText }
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder || 'D:\\code\\my-project'}
-          className="flex-1 text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring/40 focus:ring-ring"
         />
         <Button variant="outline" size="sm" onClick={handleBrowse} disabled={browsing}>
           {browsing ? 'Waiting…' : 'Browse…'}

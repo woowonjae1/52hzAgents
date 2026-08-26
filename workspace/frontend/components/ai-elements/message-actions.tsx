@@ -70,7 +70,7 @@ export function MessageActions({
         <Tooltip>
           <TooltipTrigger asChild>
             <button type="button" onClick={handleCopy} className={ghostButton} aria-label="复制内容">
-              {copied ? <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" /> : <Copy className="size-3.5" />}
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>
@@ -153,7 +153,7 @@ export function MessageActions({
         'focus-within:opacity-100 transition-opacity duration-200',
         'inline-flex items-center gap-0.5 p-0.5 rounded-lg',
         'bg-surface1/90 dark:bg-surface1/70 backdrop-blur-md',
-        'border border-border/70 shadow-sm',
+        'border border-border',
         className
       )}
     >
@@ -161,7 +161,7 @@ export function MessageActions({
         <TooltipTrigger asChild>
           <button type="button" onClick={handleCopy} className={ghostButton} aria-label="Copy message">
             {copied ? (
-              <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              <Check className="size-3.5" />
             ) : (
               <Copy className="size-3.5" />
             )}

@@ -198,12 +198,12 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
                       parsed.type === 'thinking' && 'text-status-warning',
                       parsed.type === 'tool_call' && 'text-foreground-muted',
                       parsed.type === 'status' && 'text-status-success',
-                      parsed.type === 'compacting' && 'text-violet-500 animate-spin',
+                      parsed.type === 'compacting' && 'text-status-merged animate-spin',
                     )} />
                     <span className={cn(
                       'text-2xs truncate min-w-0 text-muted-foreground',
                       parsed.type === 'thinking' && 'italic',
-                      parsed.type === 'compacting' && 'italic text-violet-500/80',
+                      parsed.type === 'compacting' && 'italic text-status-merged/80',
                     )}>
                       {parsed.label}
                     </span>

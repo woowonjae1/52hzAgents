@@ -480,7 +480,7 @@ export function ThreadList() {
                 className={cn(
                   'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all relative group cursor-pointer select-none',
                   isSelected
-                    ? 'bg-surface2/90 dark:bg-surface2/80 text-foreground border border-border/80 dark:border-white/[0.1] shadow-xs before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:rounded-r-full before:bg-blue-500'
+                    ? 'bg-surface2/90 dark:bg-surface2/80 text-foreground border border-border/80 dark:border-white/[0.1] shadow-xs before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:rounded-r-full before:bg-surface2'
                     : 'border border-transparent hover:bg-surface2/40 text-foreground-muted hover:text-foreground',
                   'has-data-[state=open]:bg-surface2/40',
                   isActive && 'thread-wip',
@@ -491,7 +491,7 @@ export function ThreadList() {
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center justify-between gap-1.5">
                     {session.starred && (
-                      <Star className="size-3 shrink-0 fill-amber-500 text-amber-500" />
+                      <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
                     )}
                     <span className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight">
                       {isSearching
@@ -504,7 +504,7 @@ export function ThreadList() {
                   </div>
                   <p className={cn(
                     'text-3xs text-foreground-muted truncate leading-relaxed font-sans',
-                    previewIsStatus && 'italic text-indigo-400 dark:text-indigo-300'
+                    previewIsStatus && 'italic text-foreground-muted'
                   )}>
                     {preview}
                   </p>

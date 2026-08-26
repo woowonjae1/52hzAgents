@@ -103,43 +103,43 @@ export function AgentStation({
     if (isBlocked) {
       return {
         label: 'Awaiting approval',
-        dot: 'bg-amber-500',
-        ring: 'ring-amber-500/25',
-        badge: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 font-medium',
+        dot: 'bg-status-warning',
+        ring: 'ring-status-warning/25',
+        badge: 'bg-status-warning/15 text-status-warning font-medium',
       };
     }
     if (isStalled) {
       const sec = stalledMs ? Math.round(stalledMs / 1000) : 30;
       return {
         label: `Stalled · ${sec}s`,
-        dot: 'bg-rose-500',
-        ring: 'ring-rose-500/25',
-        badge: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 font-medium',
+        dot: 'bg-status-danger',
+        ring: 'ring-status-danger/25',
+        badge: 'bg-status-danger/10 text-status-danger font-medium',
       };
     }
     if (isHeartbeatTimeout) {
       const hbTime = typeof lastHeartbeatAt === 'string' ? lastHeartbeatAt : new Date(lastHeartbeatAt!).toISOString();
       return {
         label: `Heartbeat lost · ${timeAgo(hbTime)}`,
-        dot: 'bg-amber-500',
-        ring: 'ring-amber-500/25',
-        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
+        dot: 'bg-status-warning',
+        ring: 'ring-status-warning/25',
+        badge: 'bg-status-warning/10 text-status-warning font-medium',
       };
     }
     if (isWorking) {
       return {
         label: 'Running',
-        dot: 'bg-amber-500',
-        ring: 'ring-amber-500/25',
-        badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 font-medium',
+        dot: 'bg-status-warning',
+        ring: 'ring-status-warning/25',
+        badge: 'bg-status-warning/10 text-status-warning font-medium',
       };
     }
     if (status === 'ready') {
       return {
         label: 'Ready',
-        dot: 'bg-emerald-500',
-        ring: 'ring-emerald-500/25',
-        badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium',
+        dot: 'bg-status-success',
+        ring: 'ring-status-success/25',
+        badge: 'bg-status-success/10 text-status-success font-medium',
       };
     }
     if (isCatalogPlaceholder) {
@@ -226,9 +226,9 @@ export function AgentStation({
         'group relative flex flex-col justify-between rounded-2xl p-3.5',
         'bg-surface1/70 dark:bg-surface1/40 backdrop-blur-md shadow-2xs transition-all duration-150',
         'border border-border/30 hover:border-border/60 hover:shadow-xs',
-        isBlocked && 'ring-2 ring-amber-500/20 bg-amber-500/[0.02]',
-        isStalled && 'ring-2 ring-rose-500/20 bg-rose-500/[0.02]',
-        isHeartbeatTimeout && 'border-amber-500/30',
+        isBlocked && 'ring-2 ring-status-warning/20 bg-status-warning/[0.02]',
+        isStalled && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
+        isHeartbeatTimeout && 'border-status-warning/30',
         status === 'offline' && !isCatalogPlaceholder && 'opacity-85',
         isCatalogPlaceholder && 'bg-surface1/30'
       )}
@@ -285,8 +285,8 @@ export function AgentStation({
 
       {/* Inline Blocked Approval */}
       {isBlocked && pendingApproval ? (
-        <div className="my-2 p-2 rounded-xl bg-amber-500/10 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
-          <div className="flex items-center justify-between text-3xs font-medium text-amber-700 dark:text-amber-300">
+        <div className="my-2 p-2 rounded-xl bg-status-warning/10 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
+          <div className="flex items-center justify-between text-3xs font-medium text-status-warning">
             <span className="flex items-center gap-1">
               <ShieldAlert className="size-3" />
               <span>Awaiting approval · {pendingApproval.tool}</span>
@@ -302,7 +302,7 @@ export function AgentStation({
               type="button"
               onClick={handleDeny}
               disabled={busy}
-              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium text-rose-600 hover:bg-rose-500/10 cursor-pointer"
+              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium text-status-danger hover:bg-status-danger/10 cursor-pointer"
             >
               <X className="size-2.5" />
               <span>Deny</span>
@@ -346,7 +346,7 @@ export function AgentStation({
 
           <div className="flex items-center gap-1 text-2xs text-muted-foreground px-1 truncate">
             {isWorking ? (
-              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium truncate animate-pulse">
+              <span className="inline-flex items-center gap-1 text-status-warning font-medium truncate animate-pulse">
                 <Wrench className="size-3 shrink-0" />
                 <span className="truncate">{stripMarkdown(activity?.content || 'Working…')}</span>
               </span>
@@ -400,9 +400,9 @@ export function AgentStation({
           className={cn(
             'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all shadow-2xs',
             status === 'ready' && !isHeartbeatTimeout
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 cursor-default'
+              ? 'bg-status-success/10 text-status-success cursor-default'
               : isHeartbeatTimeout
-              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 cursor-pointer font-semibold'
+              ? 'bg-status-warning/15 text-status-warning hover:bg-status-warning/25 cursor-pointer font-semibold'
               : 'bg-surface2/80 hover:bg-surface3 text-foreground cursor-pointer'
           )}
         >

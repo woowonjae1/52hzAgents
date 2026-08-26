@@ -71,7 +71,7 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`knowledge-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 font-mono text-2xs font-medium align-baseline shadow-2xs"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-base bg-surface2 border border-border text-status-success font-mono text-2xs font-medium align-baseline shadow-2xs"
             >
               <BookOpen className="size-3 shrink-0" />
               <span>{slug}</span>
@@ -280,7 +280,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
       // Modern IDE-grade Code Block
       return (
-        <div className="my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-[#0c0c10] dark:bg-[#07070a] text-neutral-200 font-mono shadow-md dark:shadow-xl">
+        <div className="my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-surface-diff-empty text-neutral-200 font-mono shadow-md dark:shadow-xl">
           <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/60 dark:border-white/[0.06] bg-[#14141a] dark:bg-[#0e0e14] text-3xs font-medium text-neutral-400 select-none">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 mr-1">
@@ -303,7 +303,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
               <span>Copy</span>
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] text-neutral-200 font-mono bg-transparent selection:bg-blue-500/30">
+          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] text-foreground font-mono bg-transparent selection:bg-surface4/70 selection:bg-surface2/30">
             {children}
           </pre>
         </div>

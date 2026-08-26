@@ -31,32 +31,32 @@ function reportLoadFailure(what: string, reason: unknown) {
 // ---------------------------------------------------------------------------
 
 const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
-  claude:      { bg: 'bg-orange-500',  text: 'text-white' },
-  antigravity: { bg: 'bg-blue-600',    text: 'text-white' },
-  agy:         { bg: 'bg-blue-600',    text: 'text-white' },
-  codex:       { bg: 'bg-green-600',   text: 'text-white' },
-  gemini:      { bg: 'bg-blue-500',    text: 'text-white' },
-  openclaw:  { bg: 'bg-violet-600',  text: 'text-white' },
-  amp:       { bg: 'bg-rose-500',    text: 'text-white' },
+  claude:      { bg: 'bg-surface2',  text: 'text-white' },
+  antigravity: { bg: 'bg-surface2',    text: 'text-white' },
+  agy:         { bg: 'bg-surface2',    text: 'text-white' },
+  codex:       { bg: 'bg-status-success',   text: 'text-white' },
+  gemini:      { bg: 'bg-surface2',    text: 'text-white' },
+  openclaw:  { bg: 'bg-status-merged',  text: 'text-white' },
+  amp:       { bg: 'bg-status-danger',    text: 'text-white' },
   goose:     { bg: 'bg-status-warning',   text: 'text-white' },
-  cline:     { bg: 'bg-cyan-500',    text: 'text-white' },
-  copilot:   { bg: 'bg-indigo-500',  text: 'text-white' },
-  opencode:  { bg: 'bg-teal-500',    text: 'text-white' },
+  cline:     { bg: 'bg-surface2',    text: 'text-white' },
+  copilot:   { bg: 'bg-surface2',  text: 'text-white' },
+  opencode:  { bg: 'bg-surface2',    text: 'text-white' },
   nanoclaw:  { bg: 'bg-pink-500',    text: 'text-white' },
   cursor:    { bg: 'bg-primary',    text: 'text-white' },
   hermes:    { bg: 'bg-yellow-500',  text: 'text-white' },
-  kimi:      { bg: 'bg-sky-500',     text: 'text-white' },
-  pi:        { bg: 'bg-emerald-600', text: 'text-white' },
-  kilo:      { bg: 'bg-indigo-600',  text: 'text-white' },
-  openhands: { bg: 'bg-amber-600',   text: 'text-white' },
-  deepseek:  { bg: 'bg-blue-700',    text: 'text-white' },
+  kimi:      { bg: 'bg-surface2',     text: 'text-white' },
+  pi:        { bg: 'bg-status-success', text: 'text-white' },
+  kilo:      { bg: 'bg-surface2',  text: 'text-white' },
+  openhands: { bg: 'bg-status-warning',   text: 'text-white' },
+  deepseek:  { bg: 'bg-surface2',    text: 'text-white' },
 };
 
 const PROVIDER_BRANDS: Record<string, { bg: string; text: string; accent: string }> = {
   openai:    { bg: 'bg-primary', text: 'text-primary-foreground', accent: 'border-border-accent' },
-  google:    { bg: 'bg-blue-500',    text: 'text-white', accent: 'border-blue-300 dark:border-blue-700' },
+  google:    { bg: 'bg-surface2',    text: 'text-white', accent: 'border-border-accent' },
   xai:       { bg: 'bg-primary', text: 'text-primary-foreground', accent: 'border-border-accent' },
-  deepseek:  { bg: 'bg-blue-700',    text: 'text-white', accent: 'border-blue-300 dark:border-blue-700' },
+  deepseek:  { bg: 'bg-surface2',    text: 'text-white', accent: 'border-border-accent' },
 };
 
 function getAgentBrand(name: string) {
@@ -68,7 +68,7 @@ function getProviderBrand(name: string) {
 }
 
 function CategoryIcon({ category, className }: { category: string; className?: string }) {
-  if (category === 'image') return <ImageIcon className={cn('text-violet-500', className)} />;
+  if (category === 'image') return <ImageIcon className={cn('text-status-merged', className)} />;
   if (category === 'audio') return <Volume2 className={cn('text-status-warning', className)} />;
   return <MessageSquare className={cn('text-foreground-muted', className)} />;
 }
@@ -750,7 +750,7 @@ function CloudAgentsTab({
                 <span className="text-3xs text-foreground-extra-muted font-mono pr-2">{apiKey}</span>
                 <button
                   onClick={() => onRemove(name)}
-                  className="size-6 flex items-center justify-center rounded-lg hover:bg-red-500/10 text-foreground-extra-muted hover:text-status-danger transition-colors"
+                  className="size-6 flex items-center justify-center rounded-lg hover:bg-status-danger/10 text-foreground-extra-muted hover:text-status-danger transition-colors"
                   title="Remove"
                 >
                   <Trash2 className="size-3.5" />

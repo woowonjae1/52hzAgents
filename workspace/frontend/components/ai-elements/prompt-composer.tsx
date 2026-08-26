@@ -377,7 +377,7 @@ export function PromptComposer({
                         className={cn(
                           'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group',
                           isSelected
-                            ? 'bg-primary text-primary-foreground font-medium shadow-xs'
+                            ? 'bg-primary text-primary-foreground font-medium'
                             : 'hover:bg-surface2 text-foreground'
                         )}
                       >
@@ -409,7 +409,7 @@ export function PromptComposer({
 
             {mentionGroups.knowledge.length > 0 && (
               <div className={cn(mentionGroups.agents.length > 0 && 'border-t border-border/50 pt-1.5')}>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                <div className="flex items-center gap-1.5 px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-status-warning">
                   <BookOpen className="size-3" />
                   <span>Knowledge ({mentionGroups.knowledge.length})</span>
                 </div>
@@ -425,11 +425,11 @@ export function PromptComposer({
                         className={cn(
                           'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group',
                           isSelected
-                            ? 'bg-amber-600 text-white font-medium shadow-xs'
-                            : 'hover:bg-amber-500/10 text-foreground'
+                            ? 'bg-surface3 text-foreground font-medium'
+                            : 'hover:bg-surface2 text-foreground'
                         )}
                       >
-                        <BookOpen className="size-3.5 text-amber-500 shrink-0" />
+                        <BookOpen className="size-3.5 text-foreground-extra-muted shrink-0" />
                         <div className="flex-1 min-w-0">
                           <span className="truncate font-medium">
                             {item.knowledge.title || item.knowledge.slug}
@@ -452,30 +452,41 @@ export function PromptComposer({
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         className={cn(
+          /*
+           * The shell sits over scrolling transcript, so it has to read as
+           * solid. It was trying to do that three ways at once: a 95% fill, a
+           * `backdrop-blur-2xl` behind that fill (which almost nothing shows
+           * through), an `shadow-xl`, AND a second hand-rolled 40px black shadow
+           * for dark mode. An opaque surface with one hairline is more solid
+           * than any of it, and costs no compositing.
+           *
+           * The focus ring drops from `ring-4` blue to a 1px accent border: a
+           * 4px halo on a control that is focused most of the time is a
+           * permanent glow, and blue was not a token.
+           */
           'relative rounded-2xl overflow-hidden',
-          'bg-surface1/95 dark:bg-surface1/80 backdrop-blur-2xl',
-          'border border-border/80 dark:border-white/[0.1] shadow-xl dark:shadow-[0_16px_40px_rgba(0,0,0,0.5)] transition-all duration-200',
-          'hover:border-border-accent/90 focus-within:ring-4 focus-within:ring-blue-500/15 focus-within:border-blue-500/50',
-          isDragging && 'border-blue-500/60 ring-4 ring-blue-500/25 bg-blue-500/[0.04]'
+          'bg-surface1 border border-border transition-colors duration-150',
+          'hover:border-border-accent focus-within:border-border-accent',
+          isDragging && 'border-border-accent bg-surface2'
         )}
       >
         {/* Top Orchestration Strip: Channel Collaboration Modes */}
         <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5 pb-2 border-b border-border/40 dark:border-white/[0.06] text-xs select-none bg-surface2/30">
           <div className="flex items-center gap-2 min-w-0 flex-wrap">
             {/* Real Collaboration Mode Switcher */}
-            <div className="flex items-center p-0.5 rounded-lg bg-surface2/90 border border-border/60 text-2xs font-medium text-muted-foreground shrink-0 shadow-2xs">
+            <div className="flex items-center p-0.5 rounded-base bg-surface2 border border-border text-2xs font-medium text-muted-foreground shrink-0 shadow-2xs">
               <button
                 type="button"
                 onClick={() => onOrchestrationChange?.({ mode: 'dynamic' })}
                 className={cn(
                   'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
                   currentMode === 'dynamic'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    ? 'bg-surface1 text-foreground border border-border-accent font-medium'
                     : 'hover:text-foreground hover:bg-surface3/50'
                 )}
                 title="Dynamic routing — pick the best agent for each message from context"
               >
-                <Sparkles className="size-3 text-blue-500" />
+                <Sparkles className="size-3" />
                 <span>Dynamic</span>
               </button>
 
@@ -485,12 +496,12 @@ export function PromptComposer({
                 className={cn(
                   'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
                   currentMode === 'master'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    ? 'bg-surface1 text-foreground border border-border-accent font-medium'
                     : 'hover:text-foreground hover:bg-surface3/50'
                 )}
                 title="Master / sub — one lead agent schedules and delegates subtasks"
               >
-                <Crown className="size-3 text-amber-500" />
+                <Crown className="size-3" />
                 <span>Master / Sub</span>
               </button>
 
@@ -505,12 +516,12 @@ export function PromptComposer({
                 className={cn(
                   'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
                   currentMode === 'workflow'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                    ? 'bg-surface1 text-foreground border border-border-accent font-medium'
                     : 'hover:text-foreground hover:bg-surface3/50'
                 )}
                 title="Workflow — write an explicit execution plan"
               >
-                <Waypoints className="size-3 text-violet-500" />
+                <Waypoints className="size-3" />
                 <span>Workflow</span>
               </button>
             </div>
@@ -523,7 +534,7 @@ export function PromptComposer({
                   <button
                     type="button"
                     onClick={() => setMasterDropdownOpen((v) => !v)}
-                    className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 text-3xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors shadow-2xs"
+                    className="inline-flex items-baseline gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
                   >
                     <Crown className="size-3" />
                     <span>Master: @{masterAgentName}</span>
@@ -566,7 +577,7 @@ export function PromptComposer({
                 <button
                   type="button"
                   onClick={() => setWorkflowPlanOpen(true)}
-                  className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-lg bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/20 text-3xs font-medium cursor-pointer hover:bg-violet-500/20 transition-colors shadow-2xs"
+                  className="inline-flex items-baseline gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
                 >
                   <FileEdit className="size-3" />
                   <span>Edit workflow plan…</span>
@@ -718,13 +729,26 @@ export function PromptComposer({
               onClick={isWorking ? onStop : handleSend}
               disabled={isWorking ? stopping : !canSend}
               className={cn(
+                /*
+                 * Send was a blue-to-indigo GRADIENT with a coloured drop
+                 * shadow, a 5% hover scale and a 5% active squash. Four effects
+                 * on the single most-used control in the app, in two hues no
+                 * token defines. It is the primary action, so it uses the
+                 * primary accent — which on this theme is already the highest
+                 * contrast pairing available (light fill, dark glyph). Nothing
+                 * needs to be added to make it the obvious target.
+                 *
+                 * `hover:scale` in particular: a control that grows under the
+                 * cursor is a control whose hit area moved while you were aiming
+                 * at it.
+                 */
                 'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                'transition-all duration-200 cursor-pointer shadow-sm',
+                'transition-opacity duration-150 cursor-pointer',
                 isWorking
-                  ? 'bg-status-danger text-white hover:opacity-90 shadow-red-500/30'
+                  ? 'bg-destructive text-destructive-foreground hover:opacity-90'
                   : canSend
-                  ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white hover:opacity-95 hover:scale-105 active:scale-95 shadow-md shadow-blue-500/25'
-                  : 'bg-surface3 text-muted-foreground opacity-40 cursor-not-allowed'
+                  ? 'bg-primary text-primary-foreground hover:opacity-90'
+                  : 'bg-surface3 text-foreground-extra-muted cursor-not-allowed'
               )}
             >
               <AnimatePresence mode="wait" initial={false}>

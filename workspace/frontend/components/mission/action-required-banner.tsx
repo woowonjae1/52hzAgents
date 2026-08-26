@@ -135,27 +135,27 @@ export function ActionRequiredBanner({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-amber-500/30 bg-amber-500/[0.04] dark:bg-amber-500/[0.06] p-3.5 space-y-2.5 shadow-xs animate-in fade-in slide-in-from-top-2 duration-200',
+        'rounded-2xl border border-status-warning/30 bg-status-warning/[0.04] p-3.5 space-y-2.5 shadow-xs animate-in fade-in slide-in-from-top-2 duration-200',
         className
       )}
     >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex size-6 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400">
+          <span className="flex size-6 items-center justify-center rounded-lg bg-status-warning/15 text-status-warning">
             <ShieldAlert className="size-3.5 animate-pulse" />
           </span>
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+            <span className="text-xs font-semibold text-status-warning">
               Needs attention
             </span>
-            <span className="px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 text-3xs font-mono font-bold">
+            <span className="px-1.5 py-0.2 rounded-full bg-status-warning/20 text-status-warning text-3xs font-mono font-bold">
               {items.length}
             </span>
           </div>
         </div>
 
-        <span className="text-2xs text-amber-700/80 dark:text-amber-400/80 hidden sm:inline">
+        <span className="text-2xs text-status-warning/80 hidden sm:inline">
           Agents are waiting on human approval, or have stalled past their timeout
         </span>
       </div>
@@ -170,12 +170,12 @@ export function ActionRequiredBanner({
           return (
             <div
               key={item.id}
-              className="flex flex-col justify-between p-3 rounded-xl bg-surface1/95 border border-amber-500/25 shadow-2xs space-y-2"
+              className="flex flex-col justify-between p-3 rounded-xl bg-surface1/95 border border-status-warning/25 shadow-2xs space-y-2"
             >
               {/* Top info */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="size-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                  <span className="size-1.5 rounded-full bg-status-warning animate-pulse shrink-0" />
                   <span className="font-semibold text-xs text-foreground truncate">
                     @{item.agentName}
                   </span>
@@ -188,9 +188,9 @@ export function ActionRequiredBanner({
                   className={cn(
                     'text-3xs px-1.5 py-0.5 rounded font-mono font-medium shrink-0',
                     isApproval
-                      ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                      ? 'bg-status-warning/10 text-status-warning border border-status-warning/20'
                       : isStalled
-                      ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                      ? 'bg-status-danger/10 text-status-danger border border-status-danger/20'
                       : 'bg-surface2 text-muted-foreground'
                   )}
                 >
@@ -202,7 +202,7 @@ export function ActionRequiredBanner({
               <div className="p-2 rounded-lg bg-surface2 font-mono text-2xs text-foreground-muted space-y-1">
                 {item.toolName && (
                   <div className="flex items-center gap-1 text-3xs text-foreground font-medium">
-                    <Terminal className="size-3 text-amber-500" />
+                    <Terminal className="size-3 text-status-warning" />
                     <span>Tool: {item.toolName}</span>
                   </div>
                 )}
@@ -211,7 +211,7 @@ export function ActionRequiredBanner({
                 )}
                 {item.path && <div className="truncate">File: {item.path}</div>}
                 {isStalled && (
-                  <div className="flex items-center gap-1 text-rose-600 dark:text-rose-400 font-medium">
+                  <div className="flex items-center gap-1 text-status-danger font-medium">
                     <Clock className="size-3" />
                     <span>
                       Stalled for over {item.stalledMs ? `${Math.round(item.stalledMs / 1000)}s` : '30s'}
@@ -238,7 +238,7 @@ export function ActionRequiredBanner({
                         type="button"
                         onClick={() => handleDeny(item)}
                         disabled={isBusy}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-500/10 border border-rose-500/20 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-status-danger hover:bg-status-danger/10 border border-status-danger/20 transition-colors cursor-pointer"
                       >
                         <X className="size-3" />
                         <span>Deny</span>
@@ -258,7 +258,7 @@ export function ActionRequiredBanner({
                       type="button"
                       onClick={() => handleForceStop(item)}
                       disabled={isBusy}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-600 text-white hover:bg-rose-700 transition-colors cursor-pointer shadow-xs"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-status-danger text-white hover:bg-status-danger transition-colors cursor-pointer shadow-xs"
                     >
                       <Square className="size-3 fill-current" />
                       <span>Force stop</span>

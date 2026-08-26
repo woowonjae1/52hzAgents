@@ -99,13 +99,13 @@ export function EmptyState() {
             className={cn(
               'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs',
               isSelected
-                ? 'border-blue-500/50 bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/30 shadow-xs'
+                ? 'border-border-accent bg-surface2 text-foreground'
                 : 'border-border/70 bg-surface2/60 text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
             <AgentAvatar name={agent.agentName} size={20} />
             <span>@{agent.agentName}</span>
-            {isSelected && <Check className="size-3 text-blue-500" strokeWidth={2.5} />}
+            {isSelected && <Check className="size-3" strokeWidth={2.5} />}
           </button>
         );
       })}
@@ -117,10 +117,10 @@ export function EmptyState() {
       disabled={starting || (hasAgents && participants.size === 0)}
       onClick={handleStartChat}
       className={cn(
-        'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs transition-all cursor-pointer shadow-md',
+        'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-xs transition-opacity cursor-pointer',
         !hasAgents || participants.size === 0
           ? 'bg-surface3 text-muted-foreground opacity-50 cursor-not-allowed'
-          : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white hover:opacity-95 hover:shadow-lg hover:shadow-blue-500/25 hover:scale-[1.01] active:scale-[0.99]'
+          : 'bg-primary text-primary-foreground hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]'
       )}
     >
       {starting ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}

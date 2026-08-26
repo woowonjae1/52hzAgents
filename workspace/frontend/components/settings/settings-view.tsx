@@ -400,7 +400,7 @@ export function SettingsView() {
                               onClick={() => copyUrl(workspace?.workspaceId || '52hz')}
                               className="h-9 px-3 shrink-0 cursor-pointer"
                             >
-                              {urlCopied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                              {urlCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                             </Button>
                           </div>
                           <p className="text-3xs text-foreground-extra-muted">用于 CLI、API 或外部 Agent 连接时的路由标识</p>
@@ -426,7 +426,7 @@ export function SettingsView() {
                               }}
                               className="h-9 px-3 shrink-0 cursor-pointer"
                             >
-                              {tokenCopied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                              {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                             </Button>
                           </div>
                           <p className="text-3xs text-foreground-extra-muted">用于保护工作区管理权限的高权限安全密钥</p>
@@ -558,7 +558,7 @@ export function SettingsView() {
                           </div>
                           <button
                             onClick={() => handleRemoveCollaborator(c.email)}
-                            className="text-xs text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                            className="text-xs text-status-danger hover:text-status-danger transition-colors cursor-pointer"
                           >
                             移除
                           </button>
@@ -646,14 +646,14 @@ export function SettingsView() {
                                   <AgentAvatar name={agent.agentName} size={36} />
                                   <span className={cn(
                                     'absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-surface1',
-                                    isOnline ? 'bg-emerald-500' : 'bg-foreground-extra-muted'
+                                    isOnline ? 'bg-status-success' : 'bg-foreground-extra-muted'
                                   )} />
                                 </div>
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-semibold text-foreground truncate">{agent.agentName}</span>
                                     {isMaster && (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-3xs font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-3xs font-medium bg-status-warning/10 text-status-warning border border-status-warning/20">
                                         <Crown className="size-2.5" /> Leader
                                       </span>
                                     )}
@@ -682,7 +682,7 @@ export function SettingsView() {
 
                                 <span className={cn(
                                   'text-3xs px-2 py-0.5 rounded-full font-medium',
-                                  isOnline ? 'bg-emerald-500/10 text-emerald-500' : 'bg-surface2 text-foreground-muted'
+                                  isOnline ? 'bg-status-success/10 text-status-success' : 'bg-surface2 text-foreground-muted'
                                 )}>
                                   {isOnline ? '在线' : '离线'}
                                 </span>
@@ -700,7 +700,7 @@ export function SettingsView() {
                                     onClick={() => setSessionMaster(currentSessionId, agent.agentName)}
                                     className={cn(
                                       'px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1',
-                                      isMaster ? 'bg-amber-500/15 text-amber-500 font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
+                                      isMaster ? 'bg-status-warning/15 text-status-warning font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
                                     )}
                                     title="设为此对话的 Leader 主导智能体"
                                   >
@@ -713,7 +713,7 @@ export function SettingsView() {
                                   inCurrentSession ? (
                                     <button
                                       onClick={() => removeParticipant(currentSessionId, agent.agentName)}
-                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-status-danger hover:bg-status-danger/10 transition-colors cursor-pointer"
                                     >
                                       移出会话
                                     </button>
@@ -884,7 +884,7 @@ export function SettingsView() {
                 {/* Public Share Link */}
                 <div className="p-5 rounded-2xl bg-surface1 border border-border/40 shadow-xs space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="size-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                    <div className="size-10 rounded-xl bg-status-success/10 text-status-success flex items-center justify-center">
                       <Share2 className="size-5" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground">工作区公开只读分享</h3>
@@ -909,7 +909,7 @@ export function SettingsView() {
                         }}
                         className="h-9 px-3 shrink-0 cursor-pointer"
                       >
-                        {shareCopied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                        {shareCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                       </Button>
                     </div>
                   </div>

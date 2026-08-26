@@ -89,7 +89,7 @@ export function RoutinesView() {
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 text-violet-500" />
+          <CalendarClock className="size-4 text-status-merged" />
           <ScreenTitle>Routines</ScreenTitle>
           {activeRoutines.length > 0 && (
             <span className="text-xs text-muted-foreground">

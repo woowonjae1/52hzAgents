@@ -138,7 +138,7 @@ export function ActivityTimeline({
       <div className="p-3.5 space-y-2.5 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-emerald-500 ring-2 ring-emerald-500/20 animate-pulse" />
+            <span className="size-1.5 rounded-full bg-status-success ring-2 ring-status-success/20 animate-pulse" />
             <span className="text-xs font-semibold tracking-tight text-foreground">
               Live activity
             </span>
@@ -168,7 +168,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'knowledge'
-                ? 'bg-amber-600 text-white'
+                ? 'bg-status-warning text-white'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -180,7 +180,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'tools'
-                ? 'bg-emerald-600 text-white'
+                ? 'bg-status-success text-white'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -192,7 +192,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'issues'
-                ? 'bg-rose-600 text-white'
+                ? 'bg-status-danger text-white'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -229,8 +229,8 @@ export function ActivityTimeline({
                       className={cn(
                         'size-4 rounded-md flex items-center justify-center text-3xs shrink-0',
                         group.isHuman
-                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
-                          : 'bg-violet-500/10 text-violet-600 dark:text-violet-400'
+                          ? 'bg-surface2/10 text-foreground-muted'
+                          : 'bg-status-merged/10 text-status-merged'
                       )}
                     >
                       {group.isHuman ? <User className="size-2.5" /> : <Bot className="size-2.5" />}
@@ -260,15 +260,15 @@ export function ActivityTimeline({
                       <div key={item.id} className="flex items-start gap-1.5 leading-snug text-foreground/85">
                         <span className="mt-0.5 shrink-0">
                           {isKnowledge ? (
-                            <BookOpen className="size-3 text-amber-500" />
+                            <BookOpen className="size-3 text-status-warning" />
                           ) : isTool ? (
-                            <Terminal className="size-3 text-emerald-500" />
+                            <Terminal className="size-3 text-status-success" />
                           ) : isApproval ? (
-                            <ShieldAlert className="size-3 text-amber-500 animate-pulse" />
+                            <ShieldAlert className="size-3 text-status-warning animate-pulse" />
                           ) : isError ? (
-                            <AlertCircle className="size-3 text-rose-500" />
+                            <AlertCircle className="size-3 text-status-danger" />
                           ) : (
-                            <MessageSquare className="size-3 text-blue-500/70" />
+                            <MessageSquare className="size-3 text-foreground-muted/70" />
                           )}
                         </span>
                         <p className="min-w-0 flex-1 line-clamp-3">

@@ -200,7 +200,7 @@ function StatusChip({ doc }: { doc: ParsedDoc }) {
   const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-3xs font-medium';
   if (doc.error) {
     return (
-      <span className={cn(base, 'bg-red-500/10 text-red-600 dark:bg-red-400/10 dark:text-red-400')}>
+      <span className={cn(base, 'bg-status-danger/10 text-status-danger')}>
         <AlertCircle className="size-3" /> Unusable
       </span>
     );
@@ -404,7 +404,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                       className={cn(
                         'flex items-start gap-3 rounded-xl border bg-surface1 p-4 shadow-sm transition-all duration-200 hover:shadow-md',
                         doc.error
-                          ? 'border-red-500/25 dark:border-red-400/25'
+                          ? 'border-status-danger/25'
                           : 'border-border/70',
                       )}
                     >
@@ -412,7 +412,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                         className={cn(
                           'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg',
                           doc.error
-                            ? 'bg-red-500/10 text-red-500/70 dark:bg-red-400/10 dark:text-red-400/70'
+                            ? 'bg-status-danger/10 text-status-danger/70'
                             : 'bg-surface2 text-foreground-muted',
                         )}
                       >
@@ -437,7 +437,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                           {doc.fileName} · {formatBytes(doc.bytes)}
                         </p>
                         {doc.error && (
-                          <p className="mt-1.5 flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
+                          <p className="mt-1.5 flex items-center gap-1 text-xs text-status-danger">
                             <AlertCircle className="size-3 shrink-0" />
                             {doc.error}
                           </p>
@@ -491,7 +491,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                   </span>
                 )}
                 {errorCount > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-3xs font-medium text-red-600 dark:text-red-400 tabular-nums">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-status-danger/10 px-2 py-0.5 text-3xs font-medium text-status-danger tabular-nums">
                     {errorCount} unusable
                   </span>
                 )}

@@ -141,7 +141,7 @@ export default function QuickBarPage() {
         <div className="flex items-center gap-2.5 px-3.5 py-3.5 [app-region:no-drag]">
           {/* Agent Picker Pill */}
           <div className="relative shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-white/80 font-medium">
-            <Sparkles className="size-3.5 text-amber-400 shrink-0" />
+            <Sparkles className="size-3.5 text-status-warning shrink-0" />
             <select
               value={selectedAgent}
               onChange={(e) => setSelectedAgent(e.target.value)}
@@ -173,7 +173,7 @@ export default function QuickBarPage() {
           {/* Actions on right */}
           <div className="flex items-center gap-1 shrink-0">
             {loading ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-amber-400 bg-amber-400/10 rounded-lg">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-status-warning bg-status-warning/10 rounded-lg">
                 <Loader2 className="size-3.5 animate-spin" />
                 <span className="text-2xs font-medium">Working</span>
               </div>
@@ -211,7 +211,7 @@ export default function QuickBarPage() {
           <div className="px-3.5 pb-3 pt-1 border-t border-white/5 flex flex-col gap-1 text-xs [app-region:no-drag]">
             {statusText && (
               <div className="flex items-center gap-2 text-white/60 text-2xs">
-                <span className="size-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                <span className="size-1.5 rounded-full bg-status-warning animate-pulse shrink-0" />
                 <span className="truncate">{statusText}</span>
               </div>
             )}
@@ -220,7 +220,7 @@ export default function QuickBarPage() {
                 <p className="whitespace-pre-wrap">{latestResponse}</p>
                 <button
                   onClick={handleOpenFull}
-                  className="mt-1.5 text-3xs text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  className="mt-1.5 text-3xs text-status-warning hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <span>Continue in full workspace</span>
                   <ArrowRight className="size-3" />

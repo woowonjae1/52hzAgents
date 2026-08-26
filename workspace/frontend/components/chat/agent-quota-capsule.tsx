@@ -117,9 +117,9 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
   const isEstimated = Boolean((usage as any)?.is_estimated);
 
   const getBarColor = (pct: number) => {
-    if (pct >= 85) return 'bg-rose-500';
-    if (pct >= 60) return 'bg-amber-500';
-    return 'bg-emerald-500';
+    if (pct >= 85) return 'bg-status-danger';
+    if (pct >= 60) return 'bg-status-warning';
+    return 'bg-status-success';
   };
 
   const agentLabel = 'Claude';
@@ -139,7 +139,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           className={cn(
             'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
             'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
-            isUnparsed && 'border-amber-500/50 bg-amber-500/10 text-amber-500',
+            isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
             className
           )}
           title={`View ${agentLabel} usage and refresh state`}
@@ -147,26 +147,26 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <span className="relative flex size-2 shrink-0 items-center justify-center">
             <span
               className={cn(
-                'absolute inline-flex size-full rounded-full opacity-75 animate-ping',
+                'absolute inline-flex size-full rounded-full opacity-0',
                 isUnparsed
-                  ? 'bg-amber-400'
+                  ? 'bg-status-warning'
                   : sessionPercent >= 85
-                  ? 'bg-rose-400'
+                  ? 'bg-status-danger'
                   : sessionPercent >= 60
-                  ? 'bg-amber-400'
-                  : 'bg-emerald-400'
+                  ? 'bg-status-warning'
+                  : 'bg-status-success'
               )}
             />
             <span
               className={cn(
                 'relative inline-flex size-1.5 rounded-full',
                 isUnparsed
-                  ? 'bg-amber-500'
+                  ? 'bg-status-warning'
                   : sessionPercent >= 85
-                  ? 'bg-rose-500'
+                  ? 'bg-status-danger'
                   : sessionPercent >= 60
-                  ? 'bg-amber-500'
-                  : 'bg-emerald-500'
+                  ? 'bg-status-warning'
+                  : 'bg-status-success'
               )}
             />
           </span>
@@ -174,7 +174,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <span
             className={cn(
               'font-semibold tabular-nums',
-              isUnparsed ? 'text-amber-500' : sessionPercent >= 85 ? 'text-rose-500' : sessionPercent >= 60 ? 'text-amber-500' : 'text-foreground'
+              isUnparsed ? 'text-status-warning' : sessionPercent >= 85 ? 'text-status-danger' : sessionPercent >= 60 ? 'text-status-warning' : 'text-foreground'
             )}
           >
             {sessionPercent}%
@@ -197,7 +197,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                 {agentLabel} usage
                 <span className={cn(
                   'text-3xs font-normal px-1.5 py-0.2 rounded border',
-                  isUnparsed ? 'bg-amber-500/10 border-amber-500/30 text-amber-500' : 'bg-surface3 border-border/60 text-foreground-muted'
+                  isUnparsed ? 'bg-status-muted-warning border-status-warning/30 text-status-warning' : 'bg-surface3 border-border text-foreground-muted'
                 )}>
                   {badgeLabel}
                 </span>
@@ -248,7 +248,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                     <span
                       className={cn(
                         'size-1.5 rounded-full shrink-0',
-                        a.online ? 'bg-emerald-500' : 'bg-foreground-extra-muted'
+                        a.online ? 'bg-status-success' : 'bg-foreground-extra-muted'
                       )}
                     />
                     <span className="truncate">{a.name}</span>
@@ -261,11 +261,11 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
         {/* Unparsed warning alert */}
         {isUnparsed && (
-          <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-500 text-2xs">
+          <div className="flex items-start gap-2 p-2.5 rounded-base bg-status-muted-warning border border-status-warning/30 text-status-warning text-2xs">
             <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <div className="font-medium">Could not parse a percentage from the CLI output</div>
-              <div className="text-3xs text-amber-500/80">Raw /usage output below — expand to check.</div>
+              <div className="text-3xs text-status-warning/80">Raw /usage output below — expand to check.</div>
             </div>
           </div>
         )}
@@ -277,7 +277,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               <Clock className="size-3.5 text-primary" />
               <span>5-hour session limit</span>
             </div>
-            <span className={cn('font-semibold tabular-nums text-xs', sessionPercent >= 85 ? 'text-rose-500' : sessionPercent >= 60 ? 'text-amber-500' : 'text-emerald-500')}>
+            <span className={cn('font-semibold tabular-nums text-xs', sessionPercent >= 85 ? 'text-status-danger' : sessionPercent >= 60 ? 'text-status-warning' : 'text-status-success')}>
               {sessionPercent}% {isEstimated ? 'active' : 'used'}
             </span>
           </div>

@@ -295,12 +295,12 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
                       {agent.typeName}
                     </span>
                     {agent.workspace && agent.workspace !== 'inherit' && (
-                      <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-surface2/10 text-foreground-muted">
                         ws:{agent.workspace}
                       </span>
                     )}
                     {agent.model && agent.model !== 'inherit' && (
-                      <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                      <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-status-warning/10 text-status-warning">
                         {agent.model}
                       </span>
                     )}
@@ -308,8 +308,8 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     {isRunning ? (
-                      <span className="inline-flex items-center gap-1 text-3xs font-medium text-emerald-600 dark:text-emerald-400">
-                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="inline-flex items-center gap-1 text-3xs font-medium text-status-success">
+                        <span className="size-1.5 rounded-full bg-status-success animate-pulse" />
                         <span>Working</span>
                       </span>
                     ) : (
@@ -550,7 +550,49 @@ type StepRun =
    * `chat-messages.tsx` drops it outright.
    */
   | { kind: 'reply'; messages: WorkspaceMessage[] }
+  /**
+   * Tool calls the model issued AT THE SAME TIME, folded into one row.
+   *
+   * A model that asks for four files at once emits four `tool_use` blocks in a
+   * single assistant turn; the adapters flatten those into four separate status
+   * messages, so the transcript printed four rows for what was one decision.
+   * With three agents working, a screen could be most of the way full of tool
+   * lines that all happened in the same instant.
+   *
+   * Concurrency is inferred from arrival time, because that is the only signal
+   * that survives the adapters — none of them mark which blocks shared a turn.
+   * See `PARALLEL_WINDOW_MS`.
+   */
+  | { kind: 'tools'; messages: WorkspaceMessage[] }
   | { kind: 'step'; message: WorkspaceMessage };
+
+/**
+ * How close together tool calls must arrive to count as one batch.
+ *
+ * The adapters emit a turn's tool blocks in a tight `for` loop — consecutive
+ * `await sendStatus` calls with nothing between them — so a genuine batch lands
+ * inside a few hundred milliseconds even over a slow local socket. A second is
+ * comfortably above that and comfortably below the gap left by a tool that
+ * actually ran: no real command finishes, gets reported, and is followed by the
+ * next request inside a second.
+ *
+ * Getting this wrong is not symmetrical. Too wide and sequential calls collapse
+ * into a batch, which LIES about what the agent did; too narrow and a batch
+ * shows as separate rows, which is merely the old behaviour. So it is set to err
+ * narrow.
+ */
+const PARALLEL_WINDOW_MS = 1000;
+
+function stepTime(msg: WorkspaceMessage): number | null {
+  if (!msg.createdAt) return null;
+  const t = new Date(msg.createdAt).getTime();
+  return Number.isNaN(t) ? null : t;
+}
+
+function isToolCallStep(msg: WorkspaceMessage): boolean {
+  if (msg.messageType === 'thinking' || msg.messageType === 'todos') return false;
+  return parseStepContent(msg.content).type === 'tool_call';
+}
 
 /**
  * Fragments of one thought, rejoined as paragraphs. A blank line rather than a
@@ -571,6 +613,43 @@ function joinThoughts(messages: WorkspaceMessage[]): string {
  * the live trace was repaired while the disclosure kept splitting a single
  * thought across four rows.
  */
+/**
+ * One row for a batch of tool calls issued together.
+ *
+ * Names the tools instead of counting them: "3 tools" tells the reader nothing
+ * they can act on, whereas "Read, Read, Grep" says what the agent reached for
+ * without opening anything. Repeats are kept rather than deduplicated — four
+ * reads of four different files is four reads, and collapsing that to "Read"
+ * would hide the scale of what happened.
+ */
+const ParallelTools = memo(function ParallelTools({ messages }: { messages: WorkspaceMessage[] }) {
+  const names = messages.map((m) => parseStepContent(m.content).toolDisplay || 'Tool');
+  // The batch's own icon is whichever tool it led with; a wrench for a batch of
+  // four reads would be less informative than the read glyph.
+  const Icon = getStepIcon(parseStepContent(messages[0].content));
+
+  return (
+    <EventLine
+      icon={<Icon />}
+      label={`${messages.length} tools`}
+      detail={names.join(', ')}
+      meta={`×${messages.length}`}
+    >
+      {/*
+        The individual calls, each still its own `SingleStep` — so a batch member
+        expands to its arguments exactly like a lone tool call does. Nesting a
+        disclosure inside a disclosure is acceptable here because the outer one
+        is a summary of a moment and the inner one is the detail of one action.
+      */}
+      <div className="py-0.5">
+        {messages.map((m, i) => (
+          <SingleStep key={`${m.messageId || 'batch'}-${i}`} message={m} />
+        ))}
+      </div>
+    </EventLine>
+  );
+});
+
 function StepRuns({ steps, live }: { steps: WorkspaceMessage[]; live?: boolean }) {
   const runs = coalesceThinking(steps);
   return (
@@ -608,6 +687,11 @@ function StepRuns({ steps, live }: { steps: WorkspaceMessage[]; live?: boolean }
               <span className="streaming-cursor" aria-hidden />
             )}
           </div>
+        ) : run.kind === 'tools' ? (
+          <ParallelTools
+            key={`tools-${run.messages[0]?.messageId || runIdx}`}
+            messages={run.messages}
+          />
         ) : (
           <SingleStep
             key={`${run.message.messageId || 'step'}-${runIdx}`}
@@ -653,7 +737,51 @@ function coalesceThinking(steps: WorkspaceMessage[]): StepRun[] {
     if (last && last.kind === kind) last.messages.push(step);
     else runs.push({ kind, messages: [step] });
   }
-  return runs;
+  return foldParallelTools(runs);
+}
+
+/**
+ * Fold adjacent tool-call steps that arrived together into one `tools` run.
+ *
+ * Runs as a second pass over the output rather than inside the loop above: the
+ * decision needs the PREVIOUS tool call's timestamp, and threading that through
+ * the thinking/reply branching made both harder to read than either is alone.
+ *
+ * A batch of one is left as a plain step. A single tool call is not a batch, and
+ * wrapping it in a "1 tool" disclosure would bury the thing it did behind a
+ * click.
+ */
+function foldParallelTools(runs: StepRun[]): StepRun[] {
+  const out: StepRun[] = [];
+  let batch: WorkspaceMessage[] = [];
+
+  const flush = () => {
+    if (batch.length === 0) return;
+    if (batch.length === 1) out.push({ kind: 'step', message: batch[0] });
+    else out.push({ kind: 'tools', messages: batch });
+    batch = [];
+  };
+
+  for (const run of runs) {
+    if (run.kind !== 'step' || !isToolCallStep(run.message)) {
+      // Anything that is not a tool call ends the batch — a thought or a status
+      // between two calls means the agent did something in between, so they were
+      // not issued together.
+      flush();
+      out.push(run);
+      continue;
+    }
+    const prev = batch[batch.length - 1];
+    const t = stepTime(run.message);
+    const prevT = prev ? stepTime(prev) : null;
+    // An unknown timestamp never joins a batch: guessing would be the one
+    // failure mode that misreports what happened.
+    const together = prev !== undefined && t !== null && prevT !== null && t - prevT <= PARALLEL_WINDOW_MS;
+    if (prev && !together) flush();
+    batch.push(run.message);
+  }
+  flush();
+  return out;
 }
 
 function isTerminalStatus(step: WorkspaceMessage) {

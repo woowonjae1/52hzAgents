@@ -61,19 +61,19 @@ export function SwimlaneTimeline({
         {/* Legend */}
         <div className="flex items-center gap-3 text-3xs font-mono text-muted-foreground">
           <span className="flex items-center gap-1">
-            <span className="size-2 rounded bg-emerald-500" />
+            <span className="size-2 rounded bg-status-success" />
             <span>Tool run</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-2 rounded bg-violet-500" />
+            <span className="size-2 rounded bg-status-merged" />
             <span>Reasoning</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-2 rounded bg-amber-500 animate-pulse" />
+            <span className="size-2 rounded bg-status-warning animate-pulse" />
             <span>Awaiting approval</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-2 rounded bg-rose-500" />
+            <span className="size-2 rounded bg-status-danger" />
             <span>Stalled</span>
           </span>
         </div>
@@ -132,12 +132,12 @@ export function SwimlaneTimeline({
 
                       const bgClass =
                         ev.type === 'blocked'
-                          ? 'bg-amber-500/80 text-white animate-pulse border-amber-300'
+                          ? 'bg-status-warning/80 text-white animate-pulse border-status-warning'
                           : ev.type === 'stalled'
-                          ? 'bg-rose-500/80 text-white border-rose-300'
+                          ? 'bg-status-danger/80 text-white border-status-danger'
                           : ev.type === 'thinking'
-                          ? 'bg-violet-500/80 text-white border-violet-300'
-                          : 'bg-emerald-500/80 text-white border-emerald-300';
+                          ? 'bg-status-merged/80 text-white border-status-merged'
+                          : 'bg-status-success/80 text-white border-status-success';
 
                       return (
                         <button

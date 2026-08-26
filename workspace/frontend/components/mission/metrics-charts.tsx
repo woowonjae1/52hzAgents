@@ -207,9 +207,9 @@ export function MetricCard({
             className={cn(
               'inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-3xs font-mono font-medium',
               badge.trend === 'up'
-                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                ? 'bg-status-success/10 text-status-success'
                 : badge.trend === 'down'
-                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                ? 'bg-status-danger/10 text-status-danger'
                 : 'bg-surface2 text-muted-foreground'
             )}
           >

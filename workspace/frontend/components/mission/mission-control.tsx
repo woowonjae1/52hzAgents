@@ -412,11 +412,11 @@ export function MissionControl() {
               title="Needs attention"
               value={blockedCount}
               subtitle={blockedCount > 0 ? 'Human confirmation required' : 'Running clean, nothing blocked'}
-              icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-amber-500 animate-pulse' : 'text-muted-foreground')} />}
+              icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-status-warning animate-pulse' : 'text-muted-foreground')} />}
               badge={blockedCount > 0 ? { text: 'Blocked', trend: 'down' } : undefined}
               className={cn(
                 filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
-                blockedCount > 0 && 'bg-amber-500/[0.04]'
+                blockedCount > 0 && 'bg-status-warning/[0.04]'
               )}
             />
           </div>
@@ -430,7 +430,7 @@ export function MissionControl() {
               title="Running"
               value={workingCount}
               subtitle={workingCount > 0 ? `${workingCount} working on a task` : 'All agents standing by'}
-              icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-amber-500 animate-spin' : 'text-muted-foreground')} />}
+              icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-status-warning animate-spin' : 'text-muted-foreground')} />}
               badge={workingCount > 0 ? { text: `${workingCount} active`, trend: 'neutral' } : undefined}
               chart={workingCount > 0 ? <SparklineBar data={[12, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} /> : undefined}
               className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
@@ -446,7 +446,7 @@ export function MissionControl() {
               title="Agents online"
               value={`${onlineCount} / ${agents.length}`}
               subtitle={onlineCount > 0 ? 'Heartbeat healthy' : 'All agents offline'}
-              icon={<Users className="size-3.5 text-emerald-500" />}
+              icon={<Users className="size-3.5 text-status-success" />}
               chart={
                 onlineCount > 0 ? (
                   <RingProgress
@@ -468,7 +468,7 @@ export function MissionControl() {
               title="Token usage"
               value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
               subtitle={totalTokens > 0 ? 'Cumulative across sessions' : 'Nothing recorded yet'}
-              icon={<Zap className="size-3.5 text-violet-500" />}
+              icon={<Zap className="size-3.5 text-status-merged" />}
               chart={totalTokens > 0 ? <SparklineArea data={[10, 18, 14, 26, 22, 34, 30]} color="#8b5cf6" height={30} width={72} /> : undefined}
             />
           </div>

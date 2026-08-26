@@ -53,7 +53,7 @@ interface TerminalLine {
 const LINE_STYLE: Record<TerminalLine['type'], { glyph: string; sender: string; text: string; gutter: string; bg: string }> = {
   command: { glyph: '$', sender: 'text-foreground-extra-muted', text: 'text-primary-foreground', gutter: 'bg-foreground-muted/60', bg: 'bg-white/[0.02]' },
   success: { glyph: '✓', sender: 'text-status-success', text: 'text-foreground-extra-muted', gutter: 'bg-status-success/50', bg: '' },
-  error: { glyph: '✕', sender: 'text-red-400', text: 'text-red-300', gutter: 'bg-status-danger/70', bg: 'bg-status-danger/[0.05]' },
+  error: { glyph: '✕', sender: 'text-status-danger', text: 'text-status-danger', gutter: 'bg-status-danger/70', bg: 'bg-status-danger/[0.05]' },
   thinking: { glyph: '◦', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted italic', gutter: 'bg-foreground-muted/40', bg: '' },
   info: { glyph: '›', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted', gutter: 'bg-transparent', bg: '' },
 };

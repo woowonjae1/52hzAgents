@@ -10,10 +10,10 @@ const avatarStatusVariants = cva(
   {
     variants: {
       variant: {
-        online: 'bg-green-600',
+        online: 'bg-status-success',
         offline: 'bg-foreground-extra-muted',
         busy: 'bg-yellow-600',
-        away: 'bg-blue-600',
+        away: 'bg-surface2',
       },
     },
     defaultVariants: {

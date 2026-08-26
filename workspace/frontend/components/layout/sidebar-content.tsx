@@ -124,7 +124,7 @@ export function SidebarContent() {
                   aria-label="Copy management token"
                   className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
                 >
-                  {tokenCopied ? <Check className="size-3.5 text-emerald-500" /> : <KeyRound className="size-3.5" />}
+                  {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <KeyRound className="size-3.5" />}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">Copy management token</TooltipContent>

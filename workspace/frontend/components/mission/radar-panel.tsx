@@ -22,20 +22,20 @@ interface PanelAgent {
 
 const STATUS_COLOR: Record<Status, { dot: string; ring: string; text: string; label: string; pill: string; icon: string }> = {
   working: {
-    dot: 'bg-amber-500 dark:bg-amber-400',
-    ring: 'ring-amber-500/25 dark:ring-amber-400/25',
-    text: 'text-amber-700 dark:text-amber-400',
+    dot: 'bg-status-warning',
+    ring: 'ring-status-warning/25',
+    text: 'text-status-warning',
     label: 'Working',
-    pill: 'border-amber-500/25 bg-amber-500/10 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-400',
-    icon: 'text-amber-600 dark:text-amber-400',
+    pill: 'border-status-warning/25 bg-status-warning/10 text-status-warning',
+    icon: 'text-status-warning',
   },
   ready: {
-    dot: 'bg-emerald-500 dark:bg-emerald-400',
-    ring: 'ring-emerald-500/25 dark:ring-emerald-400/25',
-    text: 'text-emerald-700 dark:text-emerald-400',
+    dot: 'bg-status-success',
+    ring: 'ring-status-success/25',
+    text: 'text-status-success',
     label: 'Online',
-    pill: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-400',
-    icon: 'text-emerald-600 dark:text-emerald-400',
+    pill: 'border-status-success/25 bg-status-success/10 text-status-success',
+    icon: 'text-status-success',
   },
   offline: {
     dot: 'bg-foreground-extra-muted',
@@ -206,7 +206,7 @@ export function RadarPanel() {
               className={cn(
                 'rounded-xl border p-3 transition-colors duration-200',
                 current.status === 'working'
-                  ? 'border-amber-500/20 bg-amber-500/[0.06] dark:border-amber-400/20 dark:bg-amber-400/[0.08]'
+                  ? 'border-status-warning/20 bg-status-warning/[0.06]'
                   : 'border-border/70 bg-surface2/50',
               )}
             >
@@ -218,7 +218,7 @@ export function RadarPanel() {
                 ) : (
                   <Cpu className={cn('size-3 shrink-0', STATUS_COLOR[current.status].icon)} />
                 )}
-                <p className={cn(MICRO_LABEL, current.status === 'working' && 'text-amber-700 dark:text-amber-400')}>
+                <p className={cn(MICRO_LABEL, current.status === 'working' && 'text-status-warning')}>
                   {current.status === 'working' ? 'Current activity' : current.status === 'ready' ? 'Standby' : 'Not connected'}
                 </p>
               </div>
@@ -227,7 +227,7 @@ export function RadarPanel() {
                   className={cn(
                     'mt-1.5 line-clamp-3 min-w-0 text-sm leading-relaxed',
                     current.status === 'working'
-                      ? 'font-medium text-amber-800 dark:text-amber-300'
+                      ? 'font-medium text-status-warning'
                       : 'text-foreground-muted',
                   )}
                 >

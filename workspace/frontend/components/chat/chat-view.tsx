@@ -755,12 +755,12 @@ export function ChatView() {
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}
-              className="text-sm font-semibold tracking-tight bg-surface2/50 border-b-2 border-blue-500 px-2 py-0.5 rounded-t outline-none min-w-0 max-w-[300px] text-foreground h-7"
+              className="text-sm font-semibold tracking-tight bg-surface2/50 border-b-2 border-border-accent px-2 py-0.5 rounded-t outline-none min-w-0 max-w-[300px] text-foreground h-7"
               autoFocus
             />
           ) : (
             <h2
-              className="text-sm font-bold tracking-tight truncate cursor-pointer hover:text-blue-500 transition-colors text-foreground flex items-center gap-1.5"
+              className="text-sm font-bold tracking-tight truncate cursor-pointer hover:text-foreground-muted transition-colors text-foreground flex items-center gap-1.5"
               onClick={startEditingTitle}
               title="Click to rename"
             >
@@ -912,7 +912,7 @@ export function ChatView() {
 
               {!hasOnlineAgents ? (
                 <div className="w-full max-w-md p-5 rounded-2xl bg-surface1/95 border border-border/80 shadow-sm flex flex-col items-center text-center space-y-3.5 mt-2">
-                  <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+                  <div className="size-10 rounded-xl bg-status-warning/10 border border-status-warning/20 flex items-center justify-center text-status-warning">
                     <Radio className="size-5" />
                   </div>
                   <div className="space-y-1">
@@ -989,24 +989,24 @@ export function ChatView() {
             <div className="mx-auto w-full max-w-(--chat-column)">
               {/* Offline Warning Banner / Agent Selector */}
               {!hasOnlineAgents ? (
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs">
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-warning/10 border border-status-warning/25 text-status-warning text-xs">
                   <div className="flex items-center gap-2 min-w-0">
-                    <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                    <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
                     <span className="truncate">No agents are online — connect one before starting a conversation</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setViewMode('mission')}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-2xs font-medium transition-colors cursor-pointer"
+                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors cursor-pointer"
                   >
                     <span>Go to connect</span>
                     <ArrowRight className="size-3" />
                   </button>
                 </div>
               ) : isMissingParticipant ? (
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-xs">
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-warning/10 border border-status-warning/25 text-status-warning text-xs">
                   <div className="flex items-center gap-2 min-w-0">
-                    <AlertTriangle className="size-3.5 shrink-0 text-amber-500" />
+                    <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
                     <span className="truncate">
                       The agents assigned to this thread ({sessionParticipants.map(p => `@${p}`).join(', ')}) are offline
                     </span>
@@ -1017,7 +1017,7 @@ export function ChatView() {
                         key={a.agentName}
                         type="button"
                         onClick={() => currentSessionId && addParticipant(currentSessionId, a.agentName)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-2xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors cursor-pointer"
                       >
                         <Plus className="size-3" />
                         <span>Add @{a.agentName}</span>
@@ -1026,7 +1026,7 @@ export function ChatView() {
                     <button
                       type="button"
                       onClick={() => setViewMode('mission')}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 text-2xs font-medium transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors cursor-pointer"
                     >
                       <span>Connect</span>
                     </button>

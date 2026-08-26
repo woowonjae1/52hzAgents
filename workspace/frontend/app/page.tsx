@@ -57,7 +57,7 @@ function LandingPage() {
   // cards that aren't there.
   const AGENT_COLORS: Record<string, string> = {
     claude: 'bg-status-warning',
-    openclaw: 'bg-violet-500',
+    openclaw: 'bg-status-merged',
     hermes: 'bg-status-warning',
     pi: 'bg-status-success',
     chatgpt: 'bg-foreground-extra-muted',

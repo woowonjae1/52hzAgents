@@ -391,7 +391,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                   }
                   if (state === 'failed') {
                     return (
-                      <div key={agent.agentName} className="flex items-center gap-2 rounded-md bg-background border border-red-500/30 px-3 py-2">
+                      <div key={agent.agentName} className="flex items-center gap-2 rounded-md bg-background border border-status-danger/30 px-3 py-2">
                         <AgentAvatar name={agent.agentName} size={20} status={agent.status} showStatus />
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
@@ -797,7 +797,7 @@ function UploadSkillDialog({
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-status-danger/5 px-3 py-2">
+            <div className="flex items-start gap-2 rounded-lg border border-status-danger/30 bg-status-danger/5 px-3 py-2">
               <AlertCircle className="size-3.5 text-status-danger shrink-0 mt-0.5" />
               <p className="text-2xs text-status-danger">{error}</p>
             </div>
