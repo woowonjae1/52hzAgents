@@ -262,6 +262,28 @@ class AntigravityAdapter extends BaseAdapter {
     await this.sendStatus(channel, 'Reasoning');
 
     return new Promise((resolve) => {
+      // Check if message metadata carries explicit model selection from UI
+      const explicitModel =
+        msg.metadata?.agent_models?.antigravity ||
+        msg.metadata?.selected_model ||
+        msg.metadata?.model ||
+        msg.model;
+      if (explicitModel) {
+        const found = ANTIGRAVITY_MODELS.find(
+          (m) =>
+            m.id === explicitModel ||
+            m.name.toLowerCase() === explicitModel.toLowerCase() ||
+            m.shortName.toLowerCase() === explicitModel.toLowerCase() ||
+            (m.agyName && m.agyName.toLowerCase() === explicitModel.toLowerCase())
+        );
+        const targetModelName = found ? (found.agyName || found.name) : explicitModel;
+        const settings = this._getSettings();
+        settings.model = targetModelName;
+        this._saveSettings(settings);
+        this.model = targetModelName;
+        this._log(`Applied explicit model from message metadata: ${targetModelName}`);
+      }
+
       const currentModelName = this._getModel();
       const matched = ANTIGRAVITY_MODELS.find(
         (m) =>

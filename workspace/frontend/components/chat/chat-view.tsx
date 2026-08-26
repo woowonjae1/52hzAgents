@@ -649,6 +649,16 @@ export function ChatView() {
           }));
         }
 
+        let agentModelsMeta: Record<string, string> = {};
+        try {
+          const antigravityModel = localStorage.getItem(`52hz_model_${currentSessionId}_antigravity`) || localStorage.getItem(`52hz_model_default_antigravity`);
+          const claudeModel = localStorage.getItem(`52hz_model_${currentSessionId}_claude`) || localStorage.getItem(`52hz_model_default_claude`);
+          const openclawModel = localStorage.getItem(`52hz_model_${currentSessionId}_openclaw`) || localStorage.getItem(`52hz_model_default_openclaw`);
+          if (antigravityModel) agentModelsMeta['antigravity'] = antigravityModel;
+          if (claudeModel) agentModelsMeta['claude'] = claudeModel;
+          if (openclawModel) agentModelsMeta['openclaw'] = openclawModel;
+        } catch {}
+
         const confirmation = await workspaceApi.sendMessage(
           currentSessionId,
           content || (attachments ? attachments.map((a) => a.filename).join(', ') : ''),
@@ -657,6 +667,7 @@ export function ChatView() {
           attachments,
           currentUser.id,
           clientMessageId,
+          Object.keys(agentModelsMeta).length > 0 ? { agent_models: agentModelsMeta } : undefined,
         );
         if (confirmation.status !== 'confirmed' || !confirmation.event_id) {
           throw new Error('Message was not confirmed by the workspace');

@@ -73,6 +73,7 @@ export class EventsApi extends BaseWorkspaceApi {
     attachments?: { fileId: string; filename: string; contentType: string; url: string }[],
     senderId?: string,
     clientMessageId?: string,
+    metadata?: Record<string, unknown>,
   ): Promise<EventConfirmation> {
     return this.sendEvent({
       type: 'workspace.message.posted',
@@ -86,6 +87,7 @@ export class EventsApi extends BaseWorkspaceApi {
         ...(mentions && mentions.length > 0 ? { mentions } : {}),
         ...(attachments && attachments.length > 0 ? { attachments } : {}),
       },
+      metadata: metadata || {},
       visibility: 'channel',
       client_message_id: clientMessageId,
     });
