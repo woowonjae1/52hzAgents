@@ -50,7 +50,7 @@ const (
 
 	// A turn whose agent never reports back would otherwise stay open forever
 	// and make every later turn on that directory look contended.
-	turnStaleAfter = 6 * time.Hour
+	turnStaleAfter = 3 * time.Minute
 
 	// checkpointRetention bounds how long a pre-turn snapshot stays restorable.
 	// Every dispatch pins one commit, so without a window the refs -- and the
@@ -746,6 +746,28 @@ func expireStaleTurns(workspaceID string) {
 	}
 }
 
+// ResetAllDanglingTurns cleans up all old open or queued turns on startup so no zombie locks persist.
+func ResetAllDanglingTurns() {
+	if db.DB == nil {
+		return
+	}
+	nowMs := time.Now().UnixMilli()
+	var openRows []models.AgentTurnChange
+	_ = db.DB.Where("status IN ?", []string{"open", "queued"}).Find(&openRows).Error
+
+	if err := db.DB.Model(&models.AgentTurnChange{}).
+		Where("status IN ?", []string{"open", "queued"}).
+		Updates(map[string]interface{}{
+			"status":      "unavailable",
+			"reason":      "daemon restarted; previous turn settled",
+			"finished_at": nowMs,
+		}).Error; err != nil {
+		log.Printf("turn-changes: failed to reset dangling turns on startup: %v", err)
+	} else if len(openRows) > 0 {
+		log.Printf("turn-changes: cleared %d dangling turn(s) on startup", len(openRows))
+	}
+}
+
 // recordTurnChanges is the single hook from the event path. One agent chat
 // message can both end that agent's turn and begin the next agent's, and the
 // order matters: settle first, then open, so the next baseline includes
@@ -757,9 +779,6 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 	if !strings.HasPrefix(req.Target, "channel/") {
 		return
 	}
-	if messageType(req.Payload) != "chat" {
-		return
-	}
 
 	channelName := strings.TrimPrefix(req.Target, "channel/")
 	var channel models.Channel
@@ -768,6 +787,7 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 		return
 	}
 
+	// Always close open turn when the agent posts ANY event (chat, error, status, response)
 	if isAgentSource(req.Source) {
 		if actor := agentNameFromSource(req.Source); actor != "" {
 			if turnRec := closeAgentTurn(workspaceID, &channel, actor); turnRec != nil && turnRec.FileCount > 0 {
@@ -788,6 +808,11 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 				}
 			}
 		}
+	}
+
+	// Only human or orchestration chat messages open new agent turns
+	if messageType(req.Payload) != "chat" {
+		return
 	}
 
 	taskID := metadataString(req.Metadata, "task_id")

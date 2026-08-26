@@ -31,6 +31,7 @@ func main() { // 服务程序运行主入口函数。
 
 	// Initialize Database (SQLite/Postgres) and run migrations
 	db.InitDB() // 执行数据库建立连接并自动映射表结构。
+	handlers.ResetAllDanglingTurns() // 清理历史遗留的悬挂锁，防止排队死锁。
 
 	// Initialize Event Hub
 	hub.InitHub() // 初始化并运行高并发的实时消息分发 Hub 中心。
