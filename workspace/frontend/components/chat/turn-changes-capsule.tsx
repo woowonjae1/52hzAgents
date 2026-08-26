@@ -111,7 +111,7 @@ export function TurnChangesCapsule({
       meta={rolledBack ? undefined : counts}
       actions={
         rolledBack ? undefined : showConfirm ? (
-          <span className="inline-flex shrink-0 items-baseline gap-1">
+          <span className="inline-flex shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={handleRollback}
@@ -139,10 +139,10 @@ export function TurnChangesCapsule({
           <button
             type="button"
             onClick={() => setShowConfirm(true)}
-            className="inline-flex shrink-0 cursor-pointer items-baseline gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
             title="Roll back this agent turn's changes without affecting manual user edits"
           >
-            <Undo2 className="size-2.5 translate-y-px" />
+            <Undo2 className="size-2.5" />
             <span>Roll back</span>
           </button>
         )

@@ -167,7 +167,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
                   {isEditing ? `Edit: ${entry.title}` : 'Create Knowledge Base Entry'}
                 </DialogTitle>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="flex items-baseline gap-1 text-3xs text-foreground-muted font-medium">
+                  <span className="flex items-center gap-1 text-3xs text-foreground-muted font-medium">
                     <Bot className="size-3" />
                     <span>Shared automatically with every agent</span>
                   </span>

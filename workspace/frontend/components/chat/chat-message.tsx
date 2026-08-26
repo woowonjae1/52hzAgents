@@ -442,8 +442,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               chips are the same chip now.
             */}
             {agent?.role === 'master' && (
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border inline-flex items-baseline gap-1">
-                <Crown className="size-2.5 translate-y-px" />
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border inline-flex items-center gap-1">
+                <Crown className="size-2.5" />
                 <span>Lead</span>
               </span>
             )}

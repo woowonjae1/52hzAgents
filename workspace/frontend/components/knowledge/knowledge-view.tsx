@@ -682,7 +682,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 {copiedSlug === selectedEntry.slug ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5 text-foreground-extra-muted" />}
               </button>
               <MetaDot />
-              <span className="text-3xs text-foreground-muted font-medium flex items-baseline gap-1">
+              <span className="text-3xs text-foreground-muted font-medium flex items-center gap-1">
                 <Bot className="size-3" />
                 <span>Shared with all agents</span>
               </span>

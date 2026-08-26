@@ -534,7 +534,7 @@ export function PromptComposer({
                   <button
                     type="button"
                     onClick={() => setMasterDropdownOpen((v) => !v)}
-                    className="inline-flex items-baseline gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
+                    className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
                   >
                     <Crown className="size-3" />
                     <span>Master: @{masterAgentName}</span>
@@ -577,7 +577,7 @@ export function PromptComposer({
                 <button
                   type="button"
                   onClick={() => setWorkflowPlanOpen(true)}
-                  className="inline-flex items-baseline gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
+                  className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
                 >
                   <FileEdit className="size-3" />
                   <span>Edit workflow plan…</span>
