@@ -20,6 +20,7 @@ const ClineAdapter = require('./cline');
 const AmpAdapter = require('./amp');
 const PiAdapter = require('./pi');
 const AntigravityAdapter = require('./antigravity');
+const DeepSeekAdapter = require('./deepseek');
 const CustomAdapter = require('./custom');
 const { AGENT_TYPE_ALIASES, resolveAgentType } = require('../agent-types');
 
@@ -29,12 +30,14 @@ const ADAPTER_MAP = {
   codex: CodexAdapter,
   opencode: OpenCodeAdapter,
   kilocode: OpenCodeAdapter,
+  kilo: OpenCodeAdapter,
   nanoclaw: NanoClawAdapter,
   cursor: CursorAdapter,
   hermes: HermesAdapter,
   gemini: GeminiAdapter,
   antigravity: AntigravityAdapter,
   agy: AntigravityAdapter,
+  deepseek: DeepSeekAdapter,
   kimi: KimiAdapter,
   goose: GooseAdapter,
   copilot: CopilotAdapter,
@@ -77,6 +80,7 @@ module.exports = {
   HermesAdapter,
   GeminiAdapter,
   AntigravityAdapter,
+  DeepSeekAdapter,
   KimiAdapter,
   GooseAdapter,
   CopilotAdapter,

@@ -118,6 +118,8 @@ type ReportAgentUsageRequest struct {
 	Last7dSummary      *string `json:"last_7d_summary"`
 	CurrentModel       *string `json:"current_model"`
 	AvailableModels    *string `json:"available_models"`
+	CurrentEffort      *string `json:"current_effort"`
+	AvailableEfforts   *string `json:"available_efforts"`
 	RawText            *string `json:"raw_text"`
 }
 
@@ -143,6 +145,8 @@ func ReportAgentUsage(c *gin.Context) {
 		Last7dSummary:      req.Last7dSummary,
 		CurrentModel:       req.CurrentModel,
 		AvailableModels:    req.AvailableModels,
+		CurrentEffort:      req.CurrentEffort,
+		AvailableEfforts:   req.AvailableEfforts,
 		RawText:            req.RawText,
 	}
 	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).

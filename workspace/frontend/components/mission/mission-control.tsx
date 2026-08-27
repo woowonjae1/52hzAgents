@@ -6,7 +6,6 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentStation, type StationData, type StationStatus } from './agent-station';
 import { ActionRequiredBanner, type PendingActionItem } from './action-required-banner';
-import { SwimlaneTimeline, type SwimlaneEvent } from './swimlane-timeline';
 import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
 import { OnboardingGuide } from './onboarding-guide';
 import { ConnectAgentModal } from './connect-agent-modal';
@@ -15,8 +14,6 @@ import {
   Users,
   Activity,
   Zap,
-  LayoutGrid,
-  Clock,
   ShieldAlert,
   Layers,
   ChevronDown,
@@ -45,8 +42,6 @@ export function MissionControl() {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [showIntegrations, setShowIntegrations] = useState(true);
 
-  // View state: 'grid' | 'swimlane'
-  const [viewTab, setViewTab] = useState<'grid' | 'swimlane'>('grid');
   // Filter state: 'all' | 'working' | 'blocked' | 'online'
   const [filterTab, setFilterTab] = useState<'all' | 'working' | 'blocked' | 'online'>('all');
 
@@ -241,28 +236,6 @@ export function MissionControl() {
     return [...pendingApprovals, ...stalledItems].filter((it) => !dismissedActionIds.has(it.id));
   }, [pendingApprovals, stalledItems, dismissedActionIds]);
 
-  // Swimlane events mapping
-  const swimlaneEvents: SwimlaneEvent[] = useMemo(() => {
-    return myStations
-      .filter((s) => s.status !== 'offline')
-      .map((s): SwimlaneEvent => {
-        const isBlock = s.status === 'blocked';
-        const isStall = s.status === 'stalled';
-        const isWork = s.status === 'working';
-
-        return {
-          id: `swim-${s.agent.agentName}`,
-          agentName: s.agent.agentName,
-          type: isBlock ? 'blocked' : isStall ? 'stalled' : isWork ? 'tool' : 'message',
-          title: s.pendingApproval?.command ? `$ ${s.pendingApproval.command}` : s.activity?.content || 'Task running',
-          startOffsetSec: isWork || isBlock ? 60 : 15,
-          durationSec: isWork || isBlock ? 45 : 15,
-          channelTitle: s.focusThread?.title || 'Channel',
-          sessionId: s.focusThread?.sessionId || '',
-          status: isBlock ? 'blocked' : isStall ? 'error' : isWork ? 'running' : 'success',
-        };
-      });
-  }, [myStations]);
 
   // Filtered station cards
   const filteredMyStations = useMemo(() => {
@@ -368,36 +341,6 @@ export function MissionControl() {
                 Multi-agent scheduling, load monitoring, and live activity
               </p>
             </div>
-          </div>
-
-          {/* View Mode Switcher */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-surface2 text-xs shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setViewTab('grid')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer',
-                viewTab === 'grid'
-                  ? 'bg-surface1 text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <LayoutGrid className="size-3.5" />
-              <span>Stations</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewTab('swimlane')}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg font-medium transition-colors cursor-pointer',
-                viewTab === 'swimlane'
-                  ? 'bg-surface1 text-foreground shadow-xs'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Clock className="size-3.5" />
-              <span>Swimlanes</span>
-            </button>
           </div>
         </div>
 
@@ -530,91 +473,83 @@ export function MissionControl() {
             </div>
           )}
 
-          {/* View Tab 1: Grid Cards */}
-          {viewTab === 'grid' && (
-            <div className="space-y-7">
-              {/* Section 1: My Configured Agents */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                    <Users className="size-3.5 text-primary" />
-                    <span>My agents ({filteredMyStations.length})</span>
-                    {filterTab !== 'all' && (
-                      <button
-                        type="button"
-                        onClick={() => setFilterTab('all')}
-                        className="ml-2 text-2xs text-primary hover:underline cursor-pointer"
-                      >
-                        (clear filter: {filterTab})
-                      </button>
-                    )}
-                  </div>
+          <div className="space-y-7">
+            {/* Section 1: My Configured Agents */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
+                  <Users className="size-3.5 text-primary" />
+                  <span>My agents ({filteredMyStations.length})</span>
+                  {filterTab !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterTab('all')}
+                      className="ml-2 text-2xs text-primary hover:underline cursor-pointer"
+                    >
+                      (clear filter: {filterTab})
+                    </button>
+                  )}
                 </div>
+              </div>
 
-                {filteredMyStations.length === 0 ? (
-                  <div className="p-8 text-center rounded-2xl bg-surface1/40 text-xs text-muted-foreground">
-                    No agents match this filter
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-                    {filteredMyStations.map((s, idx) => (
-                      <motion.div
+              {filteredMyStations.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-surface1/40 text-xs text-muted-foreground">
+                  No agents match this filter
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-stretch">
+                  {filteredMyStations.map((s, idx) => (
+                    <motion.div
+                      key={s.agent.agentName}
+                      className="h-full"
+                      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.15, ease: 'easeOut', delay: Math.min(idx, 8) * 0.02 }}
+                    >
+                      <AgentStation
+                        className="h-full"
+                        data={s}
+                        onOpenAgent={() => openAgent(s.agent.agentName, s.focusThread?.sessionId ?? null)}
+                        onOpenThread={openThread}
+                        onPairAgent={() => handlePairAgent(s.agent.agentName)}
+                        onApprovalResolved={fetchRecentData}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Section 2: Available Integrations */}
+            {integrationStations.length > 0 && filterTab === 'all' && (
+              <div className="space-y-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowIntegrations((prev) => !prev)}
+                  className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer select-none"
+                >
+                  <span>Available integrations ({integrationStations.length})</span>
+                  {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                </button>
+
+                {showIntegrations && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-stretch">
+                    {integrationStations.map((s) => (
+                      <AgentStation
                         key={s.agent.agentName}
-                        initial={reduceMotion ? false : { opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.15, ease: 'easeOut', delay: Math.min(idx, 8) * 0.02 }}
-                      >
-                        <AgentStation
-                          data={s}
-                          onOpenAgent={() => openAgent(s.agent.agentName, s.focusThread?.sessionId ?? null)}
-                          onOpenThread={openThread}
-                          onPairAgent={() => handlePairAgent(s.agent.agentName)}
-                          onApprovalResolved={fetchRecentData}
-                        />
-                      </motion.div>
+                        className="h-full"
+                        data={s}
+                        onOpenAgent={() => openAgent(s.agent.agentName, null)}
+                        onOpenThread={openThread}
+                        onPairAgent={() => handlePairAgent(s.agent.agentName)}
+                      />
                     ))}
                   </div>
                 )}
               </div>
+            )}
+          </div>
 
-              {/* Section 2: Available Integrations */}
-              {integrationStations.length > 0 && filterTab === 'all' && (
-                <div className="space-y-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowIntegrations((prev) => !prev)}
-                    className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer select-none"
-                  >
-                    <span>Available integrations ({integrationStations.length})</span>
-                    {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                  </button>
-
-                  {showIntegrations && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-                      {integrationStations.map((s) => (
-                        <AgentStation
-                          key={s.agent.agentName}
-                          data={s}
-                          onOpenAgent={() => openAgent(s.agent.agentName, null)}
-                          onOpenThread={openThread}
-                          onPairAgent={() => handlePairAgent(s.agent.agentName)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* View Tab 2: Swimlane Timeline */}
-          {viewTab === 'swimlane' && (
-            <SwimlaneTimeline
-              agents={agents}
-              events={swimlaneEvents}
-              onOpenThread={openThread}
-            />
-          )}
         </div>
 
         {/* Right Activity Timeline */}

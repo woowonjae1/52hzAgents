@@ -4,9 +4,12 @@
   "description": "52hzAgents Local-First Multi-Agent Orchestration Desktop Client",
   "main": "main.js",
   "scripts": {
+    "sync-wwj": "node -e \"const fs=require('fs'),path=require('path');function cp(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){if(e.name==='node_modules'||e.name==='.git')continue;const sp=path.join(s,e.name),dp=path.join(d,e.name);if(e.isDirectory())cp(sp,dp);else fs.copyFileSync(sp,dp);}}const destSrc='resources/wwj/src';if(fs.existsSync(destSrc))fs.rmSync(destSrc,{recursive:true,force:true});cp('../../packages/wwj/src',destSrc);fs.copyFileSync('../../packages/wwj/registry.json','resources/wwj/registry.json');fs.copyFileSync('../../packages/wwj/package.json','resources/wwj/package.json');console.log('WWJ resources cleanly synced!');\"",
     "start": "electron .",
     "dev": "electron .",
+    "prepack": "npm run sync-wwj",
     "pack": "electron-builder --dir",
+    "predist": "npm run sync-wwj",
     "dist": "electron-builder --win"
   },
   "devDependencies": {

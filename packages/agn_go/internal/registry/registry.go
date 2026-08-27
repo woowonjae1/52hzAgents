@@ -6,6 +6,7 @@ import (
 	_ "embed"       // 引入 Go 内置的静态文件嵌入机制。
 	"encoding/json" // 解析 JSON。
 	"log"           // 打印异常。
+	"sort"          // 对切片进行排序。
 )
 
 // RegistryEntry 代表单个 Agent 在注册表中的属性。
@@ -51,4 +52,14 @@ func GetEntry(agentType string) *RegistryEntry {
 // GetAllEntries 获取所有已注册的智能体运行时列表副本。
 func GetAllEntries() []RegistryEntry {
 	return catalog
+}
+
+// GetSupportedTypes 获取所有已注册的智能体类型名称列表（按字母序排序）。
+func GetSupportedTypes() []string {
+	names := make([]string, 0, len(catalog))
+	for _, entry := range catalog {
+		names = append(names, entry.Name)
+	}
+	sort.Strings(names)
+	return names
 }

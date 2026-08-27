@@ -1,15 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight, Cpu, ChevronDown } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
+import { parseReportedModels, type AgentModelOption } from '@/components/chat/agent-model-switcher';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { workspaceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import type { AgentApproval, AgentLogEntry, AgentRuntime, CloudAgentConfig } from '@/lib/types';
+import type { AgentApproval, AgentLogEntry, AgentRuntime, CloudAgentConfig, AgentUsage } from '@/lib/types';
 
 export function AgentProfilePanel() {
   const { selectedAgentName, setSelectedAgentName, isMobile, setViewMode } = useLayout();
@@ -23,25 +30,71 @@ export function AgentProfilePanel() {
   const [logs, setLogs] = useState<AgentLogEntry[]>([]);
   const [approvals, setApprovals] = useState<AgentApproval[]>([]);
   const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
+  const [currentModel, setCurrentModel] = useState<string | null>(null);
+  const [availableModels, setAvailableModels] = useState<AgentModelOption[]>([]);
+  // Separate axis from the model; only runtimes that reported levels get a control.
+  const [currentEffort, setCurrentEffort] = useState<string | null>(null);
+  const [availableEfforts, setAvailableEfforts] = useState<AgentModelOption[]>([]);
+  const [switchingModel, setSwitchingModel] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState('');
+  const [isEnteringCustom, setIsEnteringCustom] = useState(false);
 
   const refreshDiagnostics = useCallback(async () => {
     if (!agent) return;
     setLoadingDiagnostics(true);
     try {
-      const [nextRuntime, nextLogs, nextApprovals] = await Promise.all([
+      const [nextRuntime, nextLogs, nextApprovals, nextUsage] = await Promise.all([
         workspaceApi.getAgentRuntime(agent.agentName),
         workspaceApi.listAgentLogs(agent.agentName, 20),
         workspaceApi.listAgentApprovals('pending'),
+        workspaceApi.getAgentUsage(agent.agentName).catch(() => null),
       ]);
       setRuntime(nextRuntime);
       setLogs(nextLogs);
       setApprovals(nextApprovals.filter((approval) => approval.agentName === agent.agentName));
+      if (nextUsage) {
+        setCurrentModel(nextUsage.current_model || null);
+        setAvailableModels(parseReportedModels(nextUsage.available_models));
+        setCurrentEffort(nextUsage.current_effort || null);
+        setAvailableEfforts(parseReportedModels(nextUsage.available_efforts));
+      }
     } catch {
       // A local/cloud agent may not expose bridge diagnostics.
     } finally {
       setLoadingDiagnostics(false);
     }
   }, [agent]);
+
+  // set_model / set_effort reach the adapter over the control channel, which an
+  // offline agent is not polling - the change would look accepted and go
+  // nowhere, so the controls are disabled rather than failing silently.
+  const canConfigure = !!agent && agent.status === 'online';
+  const offlineHint = 'Agent 未连接 - 连接后才能切换';
+
+  const handleSwitchEffort = async (level: string) => {
+    if (!agent || !canConfigure) return;
+    try {
+      await workspaceApi.sendAgentControl(agent.agentName, 'set_effort', { effort: level });
+      setCurrentEffort(level);
+      toast.success(`@${agent.agentName} 推理强度已设为 ${level}`);
+    } catch (e) {
+      toast.error(`切换推理强度失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  const handleSwitchModel = async (newModelId: string) => {
+    if (!agent || switchingModel || !canConfigure) return;
+    setSwitchingModel(true);
+    try {
+      await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
+      setCurrentModel(newModelId);
+      toast.success(`@${agent.agentName} 模型已切换为 ${newModelId}`);
+    } catch (e) {
+      toast.error(`切换模型失败: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSwitchingModel(false);
+    }
+  };
 
   useEffect(() => { void refreshDiagnostics(); }, [refreshDiagnostics]);
 
@@ -349,6 +402,160 @@ export function AgentProfilePanel() {
                   <ToggleLeft className="size-6 text-foreground-muted" />
                 )}
               </button>
+            </div>
+          </div>
+
+          {/* Model Configuration Card */}
+          <div className="rounded-lg border overflow-hidden">
+            <div className="px-3.5 py-2.5 border-b flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Cpu className="size-3 text-primary" />
+                <span className="text-xs font-medium">Model Configuration</span>
+              </div>
+              {switchingModel && <RefreshCw className="size-3 animate-spin text-muted-foreground" />}
+            </div>
+            <div className="p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-2xs text-muted-foreground">当前运行模型</span>
+                <span className="text-xs font-mono font-medium text-foreground truncate max-w-[180px]">
+                  {currentModel || '默认环境配置'}
+                </span>
+              </div>
+
+              <div className="pt-1">
+                <DropdownMenu onOpenChange={(open) => { if (!open) { setIsEnteringCustom(false); setCustomModelInput(''); } }}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      disabled={switchingModel || !canConfigure}
+                      title={canConfigure ? undefined : offlineHint}
+                      className={cn(
+                        'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors',
+                        canConfigure
+                          ? 'bg-surface2/60 hover:bg-surface2 text-foreground cursor-pointer'
+                          : 'bg-surface2/30 text-muted-foreground/60 cursor-not-allowed',
+                        'disabled:opacity-50'
+                      )}
+                    >
+                      <span className="truncate">
+                        {availableModels.find((m) => m.id === currentModel)?.name || currentModel || '选择或修改模型…'}
+                      </span>
+                      <ChevronDown className="size-3 text-muted-foreground ml-1 shrink-0" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64 p-1 bg-surface1/95 backdrop-blur-xl max-h-[320px] overflow-y-auto">
+                    {availableModels.map((m) => (
+                      <DropdownMenuItem
+                        key={m.id}
+                        onClick={() => handleSwitchModel(m.id)}
+                        className={cn(
+                          'flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer',
+                          currentModel === m.id && 'font-bold text-primary bg-surface3'
+                        )}
+                      >
+                        <span className="truncate">{m.name}</span>
+                        {currentModel === m.id && <Check className="size-3 text-primary ml-1" />}
+                      </DropdownMenuItem>
+                    ))}
+
+                    {isEnteringCustom ? (
+                      <div
+                        className="p-1.5 space-y-1.5 border-t border-border/30 mt-1"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="text"
+                          value={customModelInput}
+                          onChange={(e) => setCustomModelInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter' && customModelInput.trim()) {
+                              handleSwitchModel(customModelInput.trim());
+                              setIsEnteringCustom(false);
+                              setCustomModelInput('');
+                            } else if (e.key === 'Escape') {
+                              setIsEnteringCustom(false);
+                              setCustomModelInput('');
+                            }
+                          }}
+                          placeholder="输入模型 ID (如 gpt-4o)..."
+                          className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
+                          autoFocus
+                        />
+                        <div className="flex gap-1 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => { setIsEnteringCustom(false); setCustomModelInput(''); }}
+                            className="px-2 py-0.5 text-3xs rounded border hover:bg-surface2 text-muted-foreground"
+                          >
+                            取消
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!customModelInput.trim()}
+                            onClick={() => {
+                              if (customModelInput.trim()) {
+                                handleSwitchModel(customModelInput.trim());
+                                setIsEnteringCustom(false);
+                                setCustomModelInput('');
+                              }
+                            }}
+                            className="px-2 py-0.5 text-3xs rounded bg-primary text-primary-foreground font-medium disabled:opacity-50"
+                          >
+                            确定
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <DropdownMenuItem
+                        onSelect={(e) => {
+                          e.preventDefault();
+                          setIsEnteringCustom(true);
+                          setCustomModelInput(currentModel || '');
+                        }}
+                        className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/30 mt-1"
+                      >
+                        <span>输入自定义模型…</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Reasoning effort - only for runtimes that reported their own
+                  levels, so nothing is invented for the ones without the concept. */}
+              {availableEfforts.length > 0 && (
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-2xs text-muted-foreground">推理强度</span>
+                    <span className="text-xs font-mono font-medium text-foreground">
+                      {currentEffort || '未配置'}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {availableEfforts.map((lv) => (
+                      <button
+                        key={lv.id}
+                        type="button"
+                        disabled={!canConfigure}
+                        title={canConfigure ? undefined : offlineHint}
+                        onClick={() => handleSwitchEffort(lv.id)}
+                        className={cn(
+                          'px-2 py-0.5 text-2xs rounded border font-mono transition-colors',
+                          !canConfigure
+                            ? 'bg-surface2/30 text-muted-foreground/60 cursor-not-allowed'
+                            : currentEffort === lv.id
+                              ? 'bg-primary text-primary-foreground border-primary font-semibold cursor-pointer'
+                              : 'bg-surface2/60 hover:bg-surface2 text-muted-foreground hover:text-foreground cursor-pointer'
+                        )}
+                      >
+                        {lv.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

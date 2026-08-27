@@ -60,7 +60,43 @@ class CursorAdapter extends BaseAdapter {
     } catch {}
   }
 
+  async fetchAndReportUsage() {
+    try {
+      const env = this.agentEnv || process.env;
+      const current = this._resolveModel() || env.CURSOR_MODEL || null;
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: current,
+          available_models: current ? JSON.stringify([{ id: current, provider: 'Cursor', label: current }]) : null,
+          raw_text: `cursor model=${current || 'default'}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
   async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+        this.model = requested;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'stop') {
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
       if (channel && this._channelProcesses[channel]) {
@@ -328,7 +364,7 @@ class CursorAdapter extends BaseAdapter {
     ];
 
     // Model selection
-    const model = (this.agentEnv || process.env).CURSOR_MODEL;
+    const model = this._resolveModel(channelName) || (this.agentEnv || process.env).CURSOR_MODEL;
     if (model) {
       cmd.push('--model', model);
     }

@@ -29,6 +29,11 @@ const { whereBinary, getRuntimePrefix } = require('../paths');
 const IS_WINDOWS = process.platform === 'win32';
 const MAX_HISTORY_ENTRIES = 12;
 
+// Pi's own configuration directory. `models.json` declares the providers and
+// models this install can reach; `settings.json` names the active one. Both are
+// read-only here - the workspace never writes Pi's config.
+const DEFAULT_PI_CONFIG_DIR = path.join(os.homedir(), '.pi', 'agent');
+
 class PiAdapter extends BaseAdapter {
   /**
    * @param {object} opts - BaseAdapter opts plus:
@@ -239,8 +244,8 @@ class PiAdapter extends BaseAdapter {
       '--session-dir', this._sessionDir,
     );
     if (this.piApprove) args.push('--approve');
-    if (this.piProvider) args.push('--provider', this.piProvider);
-    if (this.piModel) args.push('--model', this.piModel);
+    const activeModel = this._resolveModel(channelName) || this.piModel;
+    if (activeModel) args.push('--model', activeModel);
     // -p consumes the very next token as the message, so it must come last.
     args.push('-p', prompt);
     return args;
@@ -393,14 +398,155 @@ class PiAdapter extends BaseAdapter {
     } catch {}
   }
 
-  async _onControlAction(action, _payload) {
+  /**
+   * Read one of Pi's own config files. Strictly read-only — this adapter never
+   * writes them. Returns null when the file is absent or unparsable, which must
+   * read as "unknown", never as an empty configuration.
+   */
+  /** Pi's config dir - PI_AGENT_DIR when set, else ~/.pi/agent. */
+  _piConfigDir() {
+    const env = this.agentEnv || process.env;
+    return (env.PI_AGENT_DIR && env.PI_AGENT_DIR.trim()) || DEFAULT_PI_CONFIG_DIR;
+  }
+
+  _readPiConfig(name) {
+    try {
+      const file = path.join(this._piConfigDir(), name);
+      if (!fs.existsSync(file)) return null;
+      return JSON.parse(fs.readFileSync(file, 'utf-8'));
+    } catch {
+      // A malformed config is Pi's problem to report, not ours to guess around.
+      return null;
+    }
+  }
+
+  /**
+   * The model the user selected inside Pi, from `~/.pi/agent/settings.json`.
+   * Returned as the canonical `<provider>/<modelId>` reference Pi's own
+   * `findExactModelReferenceMatch` accepts (it takes either that or a bare id).
+   */
+  _modelFromPiSettings() {
+    const settings = this._readPiConfig('settings.json');
+    const model = settings && typeof settings.defaultModel === 'string' ? settings.defaultModel.trim() : '';
+    if (!model) return '';
+    if (model.includes('/')) return model;
+    const provider = settings && typeof settings.defaultProvider === 'string' ? settings.defaultProvider.trim() : '';
+    return provider ? `${provider}/${model}` : model;
+  }
+
+  /**
+   * Every model this install can actually reach, from `~/.pi/agent/models.json`
+   * — the providers the user configured in Pi itself. There is no hardcoded
+   * catalog: an install with no configured provider reports nothing, and the UI
+   * must show that as "not configured" rather than offering a guess.
+   */
+  _listModels() {
+    const config = this._readPiConfig('models.json');
+    const out = [];
+    const seen = new Set();
+
+    const push = (id, provider, label) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      out.push({ id, provider, label: label || id });
+    };
+
+    const providers = config && config.providers;
+    if (providers && typeof providers === 'object') {
+      for (const [providerName, provider] of Object.entries(providers)) {
+        const models = Array.isArray(provider && provider.models) ? provider.models : [];
+        for (const m of models) {
+          const modelId = typeof m === 'string' ? m : (m && m.id);
+          if (!modelId) continue;
+          const label = (typeof m === 'object' && m && m.name) || modelId;
+          push(`${providerName}/${modelId}`, providerName, label);
+        }
+      }
+    }
+
+    // A provider block only lists models it declares; the active default is the
+    // one piece of evidence that a model exists even when no block declares it.
+    const current = this._modelFromPiSettings();
+    if (current) {
+      const slash = current.indexOf('/');
+      push(current, slash > 0 ? current.slice(0, slash) : 'pi', slash > 0 ? current.slice(slash + 1) : current);
+    }
+
+    return out;
+  }
+
+  /**
+   * Model forwarded on `--model`, in priority order:
+   *   1. a workspace override (per-message, per-channel, or global set_model)
+   *   2. what Pi's own settings.json says the user selected
+   *   3. this agent's env (legacy configuration path)
+   * No fallback model: if all three are empty, `--model` is simply not passed
+   * and Pi uses whatever it resolves itself.
+   */
+  _resolveModel(channel, msg) {
+    const override = super._resolveModel(channel, msg);
+    if (override) return override;
+    return this._modelFromPiSettings() || this.piModel || undefined;
+  }
+
+  /**
+   * Read-only runtime snapshot for the workspace UI. `source` says where the
+   * current model came from so the UI can never present an inferred value as
+   * configuration truth, and `available_models` is omitted entirely — not
+   * padded with the current model — when Pi has no configured providers.
+   */
+  async fetchAndReportUsage() {
+    try {
+      const fromSettings = this._modelFromPiSettings();
+      const current = this._resolveModel() || null;
+      const source = !current ? 'unconfigured'
+        : (current !== fromSettings && current !== this.piModel) ? 'workspace-override'
+        : current === fromSettings ? 'pi-settings'
+        : 'agent-env';
+      const models = this._listModels();
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: current,
+          available_models: models.length ? JSON.stringify(models) : null,
+          raw_text: `pi model_source=${source} config=${this._piConfigDir()}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
+  async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+        this.model = requested;
+        this.piModel = requested;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'stop') {
       for (const [channel, proc] of Object.entries(this._channelProcesses)) {
         await this._stopProcess(proc);
         delete this._channelProcesses[channel];
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
       }
+      return;
     }
+    await super._onControlAction(action, payload);
   }
 
   // ------------------------------------------------------------------

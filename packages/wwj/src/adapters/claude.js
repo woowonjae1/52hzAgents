@@ -31,6 +31,29 @@ const FILE_WRITING_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit'
 // Max transcript lines in a channel-context prefix.
 const RECAP_TAIL_LINES = 20;
 
+// The env keys Claude Code uses to pin which model runs. Read from
+// ~/.claude/settings.json's `env` block; nothing else in that block is touched
+// (it also carries credentials).
+const MODEL_ENV_KEYS = [
+  'ANTHROPIC_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+];
+
+// `claude --help` is cheap but not free, and the answer only changes when the
+// CLI is upgraded, so it is cached well past the heartbeat interval.
+const EFFORT_CACHE_TTL_MS = 30 * 60 * 1000;
+
+// The account's model catalog changes rarely, and this is a network call off
+// the heartbeat, so it is cached hard.
+const API_MODELS_CACHE_TTL_MS = 15 * 60 * 1000;
+
+// Treat an OAuth token that is about to lapse as absent: refreshing it belongs
+// to Claude Code, and a probe fired into the gap returns a 401 that reads like
+// a broken account.
+const OAUTH_EXPIRY_SKEW_MS = 60 * 1000;
+
 class ClaudeAdapter extends BaseAdapter {
   /**
    * @param {object} opts - BaseAdapter opts plus:
@@ -72,8 +95,23 @@ class ClaudeAdapter extends BaseAdapter {
       `${this.workspaceId}_${this.agentName}.models.json`
     );
     this._channelModels = {};
+    // Per-channel reasoning-effort overrides, alongside the model ones and
+    // persisted the same way so a daemon bounce cannot silently revert them.
+    this._effortsFile = path.join(
+      os.homedir(), '.wwj', 'sessions',
+      `${this.workspaceId}_${this.agentName}.efforts.json`
+    );
+    this._channelEfforts = {};
+    this._effortCache = null;
+    this._effortInFlight = null;
+    this._apiModelsCache = null;
+    this._apiModelsInFlight = null;
+    this._apiModelsInFlightFor = '';
+    this._helpCache = null;
+    this._apiModelsError = '';
     this._loadSessions();
     this._loadChannelModels();
+    this._loadChannelEfforts();
   }
 
   _loadChannelModels() {
@@ -94,6 +132,27 @@ class ClaudeAdapter extends BaseAdapter {
     try {
       fs.mkdirSync(path.dirname(this._modelsFile), { recursive: true });
       fs.writeFileSync(this._modelsFile, JSON.stringify(this._channelModels));
+    } catch {}
+  }
+
+  _loadChannelEfforts() {
+    try {
+      if (fs.existsSync(this._effortsFile)) {
+        const data = JSON.parse(fs.readFileSync(this._effortsFile, 'utf-8'));
+        if (data && typeof data === 'object') {
+          Object.assign(this._channelEfforts, data);
+          this._log(`Loaded ${Object.keys(data).length} channel effort override(s)`);
+        }
+      }
+    } catch {
+      this._log('Could not load channel efforts file, starting fresh');
+    }
+  }
+
+  _saveChannelEfforts() {
+    try {
+      fs.mkdirSync(path.dirname(this._effortsFile), { recursive: true });
+      fs.writeFileSync(this._effortsFile, JSON.stringify(this._channelEfforts));
     } catch {}
   }
 
@@ -164,6 +223,446 @@ class ClaudeAdapter extends BaseAdapter {
     });
   }
 
+  /**
+   * Claude Code's own on-disk state. `~/.claude.json` is where the CLI caches
+   * the model picker's options and the account's model access; `~/.claude/
+   * settings.json` holds the env block that pins which model actually runs.
+   * Strictly read-only, and no value from the settings `env` block other than
+   * the model names is ever read or reported (it also holds credentials).
+   */
+  /**
+   * Claude Code's config locations, honouring its own CLAUDE_CONFIG_DIR: when
+   * that is set the CLI keeps both files under it, otherwise they are
+   * ~/.claude.json and ~/.claude/settings.json.
+   */
+  _claudeConfigPaths() {
+    const env = this.agentEnv || process.env;
+    const dir = (env.CLAUDE_CONFIG_DIR && env.CLAUDE_CONFIG_DIR.trim()) || '';
+    if (dir) {
+      return {
+        json: path.join(dir, '.claude.json'),
+        settings: path.join(dir, 'settings.json'),
+        credentials: path.join(dir, '.credentials.json'),
+      };
+    }
+    return {
+      json: path.join(os.homedir(), '.claude.json'),
+      settings: path.join(os.homedir(), '.claude', 'settings.json'),
+      credentials: path.join(os.homedir(), '.claude', '.credentials.json'),
+    };
+  }
+
+  _readClaudeJson() {
+    try {
+      const file = this._claudeConfigPaths().json;
+      if (!fs.existsSync(file)) return null;
+      return JSON.parse(fs.readFileSync(file, 'utf-8'));
+    } catch {
+      return null;
+    }
+  }
+
+  _readClaudeSettingsEnv() {
+    try {
+      const file = this._claudeConfigPaths().settings;
+      if (!fs.existsSync(file)) return {};
+      const cfg = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      const env = (cfg && cfg.env) || {};
+      // Only the model pins and the endpoint. The auth token in this same block
+      // is read solely to call the endpoint below and is never logged, reported,
+      // or written anywhere.
+      const picked = {};
+      for (const key of [...MODEL_ENV_KEYS, 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY']) {
+        if (typeof env[key] === 'string' && env[key].trim()) picked[key] = env[key].trim();
+      }
+      return picked;
+    } catch {
+      return {};
+    }
+  }
+
+  /**
+   * The model this install will actually run, in the CLI's own precedence:
+   * process env pin first, then the settings.json env pin. Returns '' when
+   * neither is set - that means "Claude Code picks its own default", which is
+   * reported as unknown rather than guessed at.
+   */
+  _currentModelFromConfig() {
+    const env = this.agentEnv || process.env;
+    if (env.ANTHROPIC_MODEL && env.ANTHROPIC_MODEL.trim()) return env.ANTHROPIC_MODEL.trim();
+    const pinned = this._readClaudeSettingsEnv();
+    return pinned.ANTHROPIC_MODEL || '';
+  }
+
+  /**
+   * Every model this install can actually pick, from Claude Code's own caches:
+   *   - `additionalModelOptionsCache` is the model picker's entries (what
+   *     `/model` lists), cached by the CLI itself
+   *   - `modelAccessCache` is what the account is entitled to
+   *   - the `ANTHROPIC_*_MODEL` pins in settings.json name models this install
+   *     is configured against even when no cache mentions them
+   * There is no hardcoded catalog: an install the CLI has not populated yet
+   * reports nothing, and the UI shows that as "not configured".
+   */
+  async _listModels() {
+    const out = [];
+    const seen = new Set();
+    const push = (id, label) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      out.push({ id, provider: 'anthropic', label: label || id });
+    };
+
+    const cfg = this._readClaudeJson();
+    for (const key of ['additionalModelOptionsCache', 'modelAccessCache']) {
+      const entries = cfg && Array.isArray(cfg[key]) ? cfg[key] : [];
+      for (const e of entries) {
+        if (typeof e === 'string') push(e);
+        else if (e) push(e.value || e.model || e.id, e.label || e.name);
+      }
+    }
+
+    // Tier aliases first: this is what the `/model` picker leads with, and what
+    // a user means when they say "switch to Opus". Each is labelled with what it
+    // resolves to on THIS install, because ANTHROPIC_DEFAULT_<TIER>_MODEL can
+    // repoint it (all three point at one model on a relay-backed setup, and the
+    // label is the only thing that makes that visible).
+    const pins = this._readClaudeSettingsEnv();
+    const envAll = this.agentEnv || process.env;
+    for (const tier of await this._listAliasTiers()) {
+      const pinKey = `ANTHROPIC_DEFAULT_${tier.toUpperCase()}_MODEL`;
+      const target = (envAll[pinKey] || pins[pinKey] || '').trim();
+      const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+      push(tier, target ? `${name} → ${target}` : name);
+    }
+
+    // The account's real catalog, straight from the endpoint this install is
+    // pointed at. `additionalModelOptionsCache` is only the EXTRA options the
+    // CLI cached on top of its built-in tiers, so on its own it under-reports
+    // badly - one entry on an account with a dozen models.
+    for (const m of await this._listApiModels()) {
+      push(m.id, m.label);
+    }
+
+    const pinned = this._readClaudeSettingsEnv();
+    for (const key of MODEL_ENV_KEYS) {
+      if (pinned[key]) push(pinned[key]);
+    }
+    const current = this._currentModelFromConfig();
+    if (current) push(current);
+
+    return out;
+  }
+
+  /**
+   * The tier aliases this build accepts for `--model` - `opus`, `sonnet`,
+   * `haiku`, `fable`. These are what the interactive `/model` picker offers and
+   * what most people actually choose, and they are NOT in any config file: the
+   * picker's list lives inside the native binary.
+   *
+   * They are still not hardcoded here. Two live sources on this install declare
+   * them, and the union is taken:
+   *   - `claude --help` quotes them on its own `--model` line
+   *   - Claude Code defines ANTHROPIC_DEFAULT_<TIER>_MODEL env vars; those key
+   *     names are the CLI stating which tiers exist
+   * An alias is a stable indirection - it keeps meaning "the latest model of
+   * that tier" when Anthropic ships a new one - so unlike a list of concrete
+   * ids, this cannot go stale into something the CLI rejects.
+   */
+  async _listAliasTiers() {
+    const tiers = new Set();
+
+    // Source 1: the tier names Claude Code itself declares via its env vars.
+    for (const key of MODEL_ENV_KEYS) {
+      const m = key.match(/^ANTHROPIC_DEFAULT_(.+)_MODEL$/);
+      if (m) tiers.add(m[1].toLowerCase());
+    }
+
+    // Source 2: the aliases quoted on this build's own --help --model line.
+    const help = await this._helpText();
+    if (help) {
+      const flat = help.replace(/\s+/g, ' ');
+      const at = flat.indexOf('--model <model>');
+      if (at >= 0) {
+        let seg = flat.slice(at);
+        const next = seg.search(/\s-[a-zA-Z-]+[,\s]+--/);
+        if (next > 0) seg = seg.slice(0, next);
+        for (const q of seg.match(/'([^']+)'/g) || []) {
+          const value = q.slice(1, -1).trim();
+          // The same sentence also quotes a full model name as an example of
+          // the OTHER accepted form; aliases are bare words.
+          if (/^[a-z]+$/.test(value)) tiers.add(value);
+        }
+      }
+    }
+
+    return [...tiers].sort();
+  }
+
+  /** `claude --help`, cached alongside the effort levels it also feeds. */
+  async _helpText() {
+    if (this._helpCache && Date.now() - this._helpCache.at < EFFORT_CACHE_TTL_MS) {
+      return this._helpCache.text;
+    }
+    const bin = this._findClaudeBinary();
+    if (!bin) return '';
+    const text = await this._runHelpText(bin);
+    if (text) this._helpCache = { at: Date.now(), text };
+    return text;
+  }
+
+  /**
+   * `GET {ANTHROPIC_BASE_URL}/v1/models` - the authoritative list of what this
+   * account can actually run, and the only source that stays correct when
+   * Anthropic ships a new model. Follows the documented `has_more`/`last_id`
+   * pagination.
+   *
+   * Returns [] on any failure and records why in `_apiModelsError`, which the
+   * usage report surfaces: a relay that 500s on this endpoint (or an offline
+   * machine) must read as "could not ask", never as "this account has one
+   * model".
+   */
+  async _listApiModels() {
+    const now = Date.now();
+    // Keyed by endpoint, not just by time. Provider switchers (cc-switch and
+    // friends) rewrite settings.json's env block underneath a running adapter,
+    // and a purely time-based cache would keep serving the previous provider's
+    // catalog for the rest of the TTL - offering models the account it is now
+    // pointed at cannot run.
+    const endpoint = this._resolveApiEndpoint().base;
+    if (this._apiModelsCache
+      && this._apiModelsCache.endpoint === endpoint
+      && now - this._apiModelsCache.at < API_MODELS_CACHE_TTL_MS) {
+      return this._apiModelsCache.models;
+    }
+    if (this._apiModelsInFlight && this._apiModelsInFlightFor === endpoint) {
+      return this._apiModelsInFlight;
+    }
+
+    this._apiModelsInFlightFor = endpoint;
+    this._apiModelsInFlight = this._fetchApiModels()
+      .then((models) => {
+        if (models.length) this._apiModelsCache = { at: Date.now(), endpoint, models };
+        return models;
+      })
+      .catch(() => [])
+      .finally(() => { this._apiModelsInFlight = null; });
+    return this._apiModelsInFlight;
+  }
+
+  /**
+   * Endpoint and credential, resolved as a PAIR from the same source. Mixing
+   * them - a relay URL from settings.json with an unrelated ANTHROPIC_API_KEY
+   * that happens to be in the process env - sends the wrong token to the right
+   * host, comes back 401, and reads as "this account has no models".
+   */
+  _resolveApiEndpoint() {
+    const env = this.agentEnv || process.env;
+    const pinned = this._readClaudeSettingsEnv();
+    const explicit = [
+      { key: env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY, base: env.ANTHROPIC_BASE_URL },
+      { key: pinned.ANTHROPIC_AUTH_TOKEN || pinned.ANTHROPIC_API_KEY, base: pinned.ANTHROPIC_BASE_URL },
+    ].find((c) => c.key && String(c.key).trim());
+
+    if (explicit) {
+      const rawBase = (explicit.base || 'https://api.anthropic.com').trim();
+      return {
+        base: rawBase.endsWith('/') ? rawBase.slice(0, rawBase.length - 1) : rawBase,
+        key: String(explicit.key).trim(),
+        kind: 'key',
+      };
+    }
+
+    // Last resort: the OAuth session Claude Code itself holds, which is the
+    // only credential a plain `claude login` install has. Its base URL is FIXED
+    // to Anthropic and deliberately ignores ANTHROPIC_BASE_URL - a provider
+    // switcher can leave a third-party relay URL in settings.json with no key
+    // of its own, and pairing that host with the user's Anthropic session token
+    // would hand their credential to a third party.
+    const oauth = this._readOAuthCredential();
+    if (oauth) return { base: 'https://api.anthropic.com', key: oauth, kind: 'oauth' };
+
+    return { base: '', key: '', kind: '' };
+  }
+
+  /**
+   * The access token from Claude Code's own OAuth session, or '' when there is
+   * none or it has expired. Read solely to call `/v1/models` below; it is never
+   * logged, reported, cached to disk, or sent anywhere but api.anthropic.com.
+   * Refreshing is Claude Code's job - an expired token is treated as absent so
+   * the probe reports "no-credential" instead of a confusing 401.
+   */
+  _readOAuthCredential() {
+    try {
+      const file = this._claudeConfigPaths().credentials;
+      if (!fs.existsSync(file)) return '';
+      const cfg = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      const oauth = cfg && cfg.claudeAiOauth;
+      const token = oauth && typeof oauth.accessToken === 'string' ? oauth.accessToken.trim() : '';
+      if (!token) return '';
+      const expiresAt = Number(oauth.expiresAt) || 0;
+      if (expiresAt && expiresAt <= Date.now() + OAUTH_EXPIRY_SKEW_MS) return '';
+      return token;
+    } catch {
+      return '';
+    }
+  }
+
+  async _fetchApiModels() {
+    const { base, key, kind } = this._resolveApiEndpoint();
+    if (!key) {
+      this._apiModelsError = 'no-credential';
+      return [];
+    }
+
+    const collected = [];
+    let after = '';
+    // Bounded: the endpoint pages at 1000, so a handful of rounds covers any
+    // real account and a broken `has_more` cannot spin forever.
+    for (let page = 0; page < 5; page++) {
+      const res = await this._getJson(`${base}/v1/models?limit=1000${after ? `&after_id=${encodeURIComponent(after)}` : ''}`, key, kind);
+      if (!res.ok) {
+        this._apiModelsError = `http-${res.status}`;
+        return [];
+      }
+      const list = Array.isArray(res.body && res.body.data) ? res.body.data : [];
+      for (const m of list) {
+        const id = typeof m === 'string' ? m : (m && m.id);
+        if (id) collected.push({ id, label: (m && m.display_name) || id });
+      }
+      if (!res.body || !res.body.has_more || !list.length) break;
+      after = res.body.last_id || (list[list.length - 1] && list[list.length - 1].id) || '';
+      if (!after) break;
+    }
+    this._apiModelsError = collected.length ? '' : 'empty';
+    return collected;
+  }
+
+  /**
+   * One authenticated GET, resolved as {ok, status, body}. Never rejects.
+   *
+   * The header set depends on the credential kind, and this is not cosmetic:
+   * api.anthropic.com prefers `x-api-key` when both are present, so sending
+   * both alongside an OAuth token is rejected 401 ("API key is invalid") even
+   * though the same token succeeds on `Authorization` alone. Verified against
+   * the live endpoint.
+   */
+  _getJson(url, key, kind) {
+    return new Promise((resolve) => {
+      let u;
+      try { u = new URL(url); } catch { resolve({ ok: false, status: 0 }); return; }
+      const lib = u.protocol === 'http:' ? require('http') : require('https');
+      const req = lib.request(
+        {
+          hostname: u.hostname,
+          port: u.port || (u.protocol === 'http:' ? 80 : 443),
+          path: u.pathname + u.search,
+          method: 'GET',
+          headers: kind === 'oauth'
+            ? {
+              'Authorization': `Bearer ${key}`,
+              'anthropic-version': '2023-06-01',
+              'anthropic-beta': 'oauth-2025-04-20',
+            }
+            : {
+              // API keys and relay tokens: both headers, since relays differ on
+              // which one they read.
+              'Authorization': `Bearer ${key}`,
+              'x-api-key': key,
+              'anthropic-version': '2023-06-01',
+            },
+          timeout: 15000,
+        },
+        (res) => {
+          let body = '';
+          res.on('data', (d) => { body += d.toString('utf-8'); });
+          res.on('end', () => {
+            const ok = res.statusCode >= 200 && res.statusCode < 300;
+            let parsed = null;
+            try { parsed = JSON.parse(body); } catch {}
+            resolve({ ok, status: res.statusCode, body: parsed });
+          });
+        }
+      );
+      req.on('error', () => resolve({ ok: false, status: 0 }));
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, status: 0 }); });
+      req.end();
+    });
+  }
+
+  /**
+   * The reasoning-effort levels this build accepts, read out of `claude --help`
+   * - the CLI states them itself on the `--effort <level>` line, so the list
+   * tracks the installed version instead of a table that drifts. Costs no API
+   * call. Cached because it is called off the heartbeat; [] means "could not
+   * ask", never "this build has no effort levels".
+   */
+  async _listEffortLevels() {
+    const now = Date.now();
+    if (this._effortCache && now - this._effortCache.at < EFFORT_CACHE_TTL_MS) {
+      return this._effortCache.levels;
+    }
+    if (this._effortInFlight) return this._effortInFlight;
+
+    this._effortInFlight = (async () => {
+      try {
+        const bin = this._findClaudeBinary();
+        if (!bin) return [];
+        const help = await this._runHelpText(bin);
+        if (!help) return [];
+        // The option and its parenthesised value list can wrap across lines, so
+        // the whole help text is flattened before matching.
+        const flat = help.replace(/\s+/g, ' ');
+        const m = flat.match(/--effort <level>\s*([^(]*)\(([^)]*)\)/);
+        if (!m) return [];
+        const levels = m[2].split(',').map((v) => v.trim()).filter(Boolean);
+        return levels.map((id) => ({ id, label: id }));
+      } catch {
+        return [];
+      }
+    })()
+      .then((levels) => {
+        if (levels.length) this._effortCache = { at: Date.now(), levels };
+        return levels;
+      })
+      .finally(() => { this._effortInFlight = null; });
+
+    return this._effortInFlight;
+  }
+
+  /** `claude --help` captured as text. No API call, no session. */
+  _runHelpText(binary) {
+    return new Promise((resolve) => {
+      const isBatch = IS_WINDOWS && /\.(cmd|bat)$/i.test(binary);
+      const cmd = isBatch ? (process.env.COMSPEC || 'cmd.exe') : binary;
+      const argv = isBatch ? ['/c', binary, '--help'] : ['--help'];
+      let proc;
+      try {
+        proc = spawn(cmd, argv, {
+          windowsHide: true,
+          env: this.agentEnv || process.env,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+      } catch {
+        resolve('');
+        return;
+      }
+      let out = '';
+      const timer = setTimeout(() => { try { proc.kill(); } catch {} resolve(out); }, 20000);
+      proc.stdout.on('data', (d) => { out += d.toString('utf-8'); });
+      proc.on('error', () => { clearTimeout(timer); resolve(''); });
+      proc.on('close', () => { clearTimeout(timer); resolve(out); });
+    });
+  }
+
+  /** Effort in force: a workspace override first, then the CLI's own env. */
+  _currentEffort(channel) {
+    if (channel && this._channelEfforts[channel]) return this._channelEfforts[channel];
+    if (this._channelEfforts['*']) return this._channelEfforts['*'];
+    const env = this.agentEnv || process.env;
+    return (env.CLAUDE_EFFORT || '').trim() || '';
+  }
+
   async fetchAndReportUsage(force = false) {
     if (!this.workspaceId || !this.client) return null;
     if (!force && this._cachedUsage && (Date.now() - (this._cachedUsageTime || 0) < 30_000)) {
@@ -213,16 +712,17 @@ class ClaudeAdapter extends BaseAdapter {
         this._log(`Warning: Claude /usage output format did not match expected regex: ${text.slice(0, 160)}`);
       }
 
-      let currentModel = null;
-      let availableModels = null;
-      try {
-        const modelData = await this._runHiddenCli(claudeBin, ['-p', '/model', '--output-format', 'json']);
-        const modelText = (modelData && modelData.result) || '';
-        const curMatch = modelText.match(/Current model:\s*([^\n]+)/i);
-        if (curMatch) currentModel = curMatch[1].trim();
-        const availMatch = modelText.match(/Available:\s*([^\n\.]+)/i);
-        if (availMatch) availableModels = availMatch[1].trim();
-      } catch {}
+      // Models and effort come from what Claude Code itself records, not from a
+      // second `-p /model` round trip: that costs an API call per refresh and
+      // returns the model's own error text when the configured model is
+      // unreachable, so the regexes below it silently produced null.
+      const models = await this._listModels();
+      const currentModel = this._resolveModel() || this._currentModelFromConfig() || null;
+      const availableModels = models.length ? JSON.stringify(models) : null;
+
+      const efforts = await this._listEffortLevels();
+      const currentEffort = this._currentEffort() || null;
+      const availableEfforts = efforts.length ? JSON.stringify(efforts) : null;
 
       const usagePayload = {
         session_used_percent: sessionPercent !== null ? sessionPercent : 0,
@@ -233,7 +733,12 @@ class ClaudeAdapter extends BaseAdapter {
         last_7d_summary: d7Match ? d7Match[1].trim() : null,
         current_model: currentModel,
         available_models: availableModels,
+        current_effort: currentEffort,
+        available_efforts: availableEfforts,
         raw_text: text,
+        // Surfaces WHY the catalog is short (relay 500, no credential, offline)
+        // instead of leaving a one-item picker looking like the real answer.
+        models_source: this._apiModelsError ? `api:${this._apiModelsError}` : 'api',
         parse_status: parseStatus,
       };
 
@@ -250,6 +755,31 @@ class ClaudeAdapter extends BaseAdapter {
   }
 
   async _onControlAction(action, payload) {
+    if (action === 'set_effort') {
+      const requested = payload && (payload.effort || payload.model);
+      const channel = payload && payload.channel;
+      if (!requested) return;
+      // Validated against what this build itself says it accepts, so a stale UI
+      // cannot push a level that makes every subsequent run fail to launch.
+      const levels = await this._listEffortLevels();
+      if (levels.length && !levels.some((l) => l.id.toLowerCase() === String(requested).toLowerCase())) {
+        this._log(`set_effort: '${requested}' is not one of ${levels.map((l) => l.id).join(', ')} - ignoring`);
+        return;
+      }
+      if (channel) this._channelEfforts[channel] = requested;
+      else this._channelEfforts['*'] = requested;
+      this._saveChannelEfforts();
+      // claude reads --effort at launch, so an in-flight persistent process
+      // keeps the old level until it is replaced.
+      if (channel && this._persistentProcs[channel]) {
+        const pp = this._persistentProcs[channel];
+        if (pp.proc) { try { pp.proc.kill(); } catch {} }
+        delete this._persistentProcs[channel];
+      }
+      this._log(`Effort updated to '${requested}' for channel=${channel || 'all'}`);
+      this.fetchAndReportUsage(true).catch(() => {});
+      return;
+    }
     if (action === 'set_model') {
       const model = payload && payload.model;
       const channel = payload && payload.channel;
@@ -694,6 +1224,13 @@ class ClaudeAdapter extends BaseAdapter {
     const selectedModel = this._channelModels[channelName] || this.model;
     if (selectedModel) {
       cmd.push('--model', selectedModel);
+    }
+
+    // Reasoning effort, forwarded only when the workspace actually set one -
+    // otherwise the CLI keeps whatever the user configured for themselves.
+    const selectedEffort = this._channelEfforts[channelName] || this._channelEfforts['*'];
+    if (selectedEffort) {
+      cmd.push('--effort', selectedEffort);
     }
 
     // ── Skills mode: write SKILL.md, no MCP server ──

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronDown, Bot, Sparkles } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,21 +24,6 @@ export function getAgentKind(agentName?: string | null, agentType?: string | nul
   return (agentType || agentName || '').toLowerCase();
 }
 
-export const CLAUDE_MODELS: AgentModelOption[] = [
-  { id: 'sonnet', name: 'Claude Sonnet 5', shortName: 'Sonnet 5' },
-  { id: 'opus', name: 'Claude Opus 5', shortName: 'Opus 5' },
-  { id: 'haiku', name: 'Claude Haiku 4.5', shortName: 'Haiku 4.5' },
-];
-
-export const ANTIGRAVITY_MODELS: AgentModelOption[] = [
-  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', shortName: 'Gemini 3.7 Flash' },
-  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', shortName: 'Gemini 3.6 Flash' },
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', shortName: 'Gemini 3.5 Flash' },
-  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', shortName: 'Gemini 3.1 Pro' },
-  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6 (Thinking)', shortName: 'Sonnet 4.6' },
-  { id: 'claude-opus-4.6', name: 'Claude Opus 4.6 (Thinking)', shortName: 'Opus 4.6' },
-  { id: 'gpt-oss-120b', name: 'GPT-OSS 120B (Medium)', shortName: 'GPT-OSS 120B' },
-];
 
 /**
  * Dynamic Model Switcher:
@@ -46,7 +31,7 @@ export const ANTIGRAVITY_MODELS: AgentModelOption[] = [
  * CLI (`<cli> models` or config) via `usage.available_models`.
  * For Antigravity and Claude, their dedicated model lists are preserved.
  */
-function parseReportedModels(raw?: string | null): AgentModelOption[] {
+export function parseReportedModels(raw?: string | null): AgentModelOption[] {
   if (!raw) return [];
   const toOption = (id: string, name?: string): AgentModelOption => {
     const trimmed = id.trim();
@@ -65,7 +50,7 @@ function parseReportedModels(raw?: string | null): AgentModelOption[] {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       return parsed
-        .map((m) => (typeof m === 'string' ? toOption(m) : toOption(String(m?.id ?? ''), m?.name)))
+        .map((m) => (typeof m === 'string' ? toOption(m) : toOption(String(m?.id ?? m?.name ?? ''), m?.name || m?.label)))
         .filter((m) => m.id.length > 0);
     }
   } catch {
@@ -100,11 +85,20 @@ export function AgentModelSwitcher({
     if (agentName) {
       const match = onlineAgents.find((a) => a.agentName.toLowerCase() === agentName.toLowerCase());
       if (match) return match;
+      // Named but not online: fall through to null rather than retargeting onto
+      // whichever agent happens to be up - silently switching a different
+      // agent's model is worse than doing nothing.
+      return null;
     }
     return onlineAgents[0] || null;
   }, [agentName, onlineAgents]);
 
   const activeTargetName = activeAgent?.agentName || agentName || 'agent';
+  // set_model reaches the adapter over the control channel, which only a
+  // connected agent polls. With nothing online the chip stays visible (so the
+  // composer's layout does not jump) but is inert.
+  const canConfigure = !!activeAgent;
+  const offlineHint = 'Agent 未连接 - 连接后才能切换模型';
 
   // Dynamic model selections per agent name
   const [agentSelectedModels, setAgentSelectedModels] = React.useState<Record<string, string>>({});
@@ -164,21 +158,14 @@ export function AgentModelSwitcher({
     };
   }, [agentNamesKey, workspaceId]);
 
+  /**
+   * Only what the agent's own adapter reported. There is deliberately no
+   * per-agent fallback table here: a list the frontend made up would show
+   * models the CLI may not have, and picking one would fail at run time. An
+   * agent that reports nothing shows as unconfigured, with free-text entry.
+   */
   const modelsForAgent = React.useCallback(
-    (name: string, agentType?: string | null): AgentModelOption[] => {
-      const dynamic = reportedModels[name];
-      if (dynamic && dynamic.length > 0) return dynamic;
-
-      const lowerName = name.toLowerCase();
-      const lowerType = (agentType || '').toLowerCase();
-      if (lowerName.includes('antigravity') || lowerName.includes('agy') || lowerType === 'antigravity' || lowerType === 'agy') {
-        return ANTIGRAVITY_MODELS;
-      }
-      if (lowerName.includes('claude') || lowerType === 'claude') {
-        return CLAUDE_MODELS;
-      }
-      return reportedModels[name] || [];
-    },
+    (name: string): AgentModelOption[] => reportedModels[name] || [],
     [reportedModels]
   );
 
@@ -206,7 +193,7 @@ export function AgentModelSwitcher({
   };
 
   const selectedForActive = agentSelectedModels[activeTargetName];
-  const activeAvailableModels = modelsForAgent(activeTargetName, activeAgent?.agentType);
+  const activeAvailableModels = modelsForAgent(activeTargetName);
 
   // Compute current display model option purely from actual state / reported models
   const currentModelOption: AgentModelOption = (() => {
@@ -219,9 +206,6 @@ export function AgentModelSwitcher({
         shortName: selectedForActive.includes('/') ? selectedForActive.split('/')[1] : selectedForActive,
       };
     }
-    if (activeAvailableModels.length > 0) {
-      return activeAvailableModels[0];
-    }
     return genericOption;
   })();
 
@@ -230,6 +214,7 @@ export function AgentModelSwitcher({
     modelId: string,
     modelName: string
   ) => {
+    if (!canConfigure) return;
     const previousId = agentSelectedModels[targetAgentName];
 
     setAgentSelectedModels((prev) => ({
@@ -268,32 +253,39 @@ export function AgentModelSwitcher({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          disabled={!canConfigure}
           className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
-            'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
+            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 select-none shadow-2xs',
+            canConfigure
+              ? 'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground cursor-pointer'
+              : 'bg-surface2/40 border-border/40 text-muted-foreground/60 cursor-not-allowed',
             className
           )}
-          title={`当前模型: ${currentModelOption.name} (@${activeTargetName})`}
+          title={canConfigure ? `当前模型: ${currentModelOption.name} (@${activeTargetName})` : offlineHint}
         >
           {/* No weight of its own — the chip is already `font-medium`, and the
               600 that used to sit here rendered at the chip's 11px, where the
               weight axis stops separating and only thickens. */}
-          <span className="text-foreground truncate max-w-[140px]">
-            {currentModelOption.shortName}
+          <span className="truncate max-w-[140px]">
+            {canConfigure ? currentModelOption.shortName : '未连接'}
           </span>
-          <ChevronDown className="size-3 text-foreground-extra-muted shrink-0" />
+          <ChevronDown className={cn('size-3 shrink-0', canConfigure ? 'text-foreground-extra-muted' : 'text-muted-foreground/40')} />
         </button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="start" className="w-60 p-1.5 shadow-xl border-border/80 bg-surface1/95 backdrop-blur-xl max-h-[420px] overflow-y-auto">
-        {onlineAgents.map((agentItem, idx) => {
-          const models = modelsForAgent(agentItem.agentName, agentItem.agentType);
+      <DropdownMenuContent align="start" className="w-64 p-1.5 shadow-xl border-border/80 bg-surface1/95 backdrop-blur-xl max-h-[420px] overflow-y-auto">
+        {/* Sort to put active target agent at the top */}
+        {[...onlineAgents]
+          .sort((a, b) => (a.agentName.toLowerCase() === activeTargetName.toLowerCase() ? -1 : b.agentName.toLowerCase() === activeTargetName.toLowerCase() ? 1 : 0))
+          .map((agentItem, idx) => {
+          const models = modelsForAgent(agentItem.agentName);
           const currentSelectedId = agentSelectedModels[agentItem.agentName];
+          const isCurrentActiveAgent = agentItem.agentName.toLowerCase() === activeTargetName.toLowerCase();
 
           return (
             <div key={agentItem.agentName} className={cn('space-y-0.5', idx > 0 && 'pt-2 border-t border-border/40 mt-1.5')}>
               <div className="px-2 py-1 text-3xs font-semibold tracking-wider text-muted-foreground uppercase flex items-center justify-between">
-                <span>@{agentItem.agentName}</span>
+                <span className={cn(isCurrentActiveAgent && 'text-primary font-bold')}>@{agentItem.agentName}</span>
                 <span className="text-3xs font-normal text-muted-foreground/80 font-mono">
                   {agentItem.agentType || 'agent'}
                 </span>
@@ -302,9 +294,8 @@ export function AgentModelSwitcher({
               {models.length > 0 ? (
                 models.map((m) => {
                   const isSelected =
-                    currentSelectedId === m.id ||
-                    currentSelectedId === m.shortName ||
-                    (!currentSelectedId && models[0]?.id === m.id);
+                    !!currentSelectedId &&
+                    (currentSelectedId === m.id || currentSelectedId === m.shortName);
 
                   return (
                     <DropdownMenuItem
@@ -330,8 +321,8 @@ export function AgentModelSwitcher({
                   );
                 })
               ) : (
-                <div className="px-2.5 py-1 text-xs text-muted-foreground italic">
-                  默认环境模型 (Default)
+                <div className="px-2.5 py-1 text-xs text-muted-foreground italic flex items-center justify-between">
+                  <span>{currentSelectedId || '默认环境模型 (Default)'}</span>
                 </div>
               )}
             </div>
