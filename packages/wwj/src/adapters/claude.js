@@ -101,6 +101,7 @@ class ClaudeAdapter extends BaseAdapter {
     this._effortInFlight = null;
     this._apiModelsCache = null;
     this._apiModelsInFlight = null;
+    this._helpCache = null;
     this._apiModelsError = '';
     this._loadSessions();
     this._loadChannelModels();
@@ -310,6 +311,20 @@ class ClaudeAdapter extends BaseAdapter {
       }
     }
 
+    // Tier aliases first: this is what the `/model` picker leads with, and what
+    // a user means when they say "switch to Opus". Each is labelled with what it
+    // resolves to on THIS install, because ANTHROPIC_DEFAULT_<TIER>_MODEL can
+    // repoint it (all three point at one model on a relay-backed setup, and the
+    // label is the only thing that makes that visible).
+    const pins = this._readClaudeSettingsEnv();
+    const envAll = this.agentEnv || process.env;
+    for (const tier of await this._listAliasTiers()) {
+      const pinKey = `ANTHROPIC_DEFAULT_${tier.toUpperCase()}_MODEL`;
+      const target = (envAll[pinKey] || pins[pinKey] || '').trim();
+      const name = tier.charAt(0).toUpperCase() + tier.slice(1);
+      push(tier, target ? `${name} → ${target}` : name);
+    }
+
     // The account's real catalog, straight from the endpoint this install is
     // pointed at. `additionalModelOptionsCache` is only the EXTRA options the
     // CLI cached on top of its built-in tiers, so on its own it under-reports
@@ -326,6 +341,63 @@ class ClaudeAdapter extends BaseAdapter {
     if (current) push(current);
 
     return out;
+  }
+
+  /**
+   * The tier aliases this build accepts for `--model` - `opus`, `sonnet`,
+   * `haiku`, `fable`. These are what the interactive `/model` picker offers and
+   * what most people actually choose, and they are NOT in any config file: the
+   * picker's list lives inside the native binary.
+   *
+   * They are still not hardcoded here. Two live sources on this install declare
+   * them, and the union is taken:
+   *   - `claude --help` quotes them on its own `--model` line
+   *   - Claude Code defines ANTHROPIC_DEFAULT_<TIER>_MODEL env vars; those key
+   *     names are the CLI stating which tiers exist
+   * An alias is a stable indirection - it keeps meaning "the latest model of
+   * that tier" when Anthropic ships a new one - so unlike a list of concrete
+   * ids, this cannot go stale into something the CLI rejects.
+   */
+  async _listAliasTiers() {
+    const tiers = new Set();
+
+    // Source 1: the tier names Claude Code itself declares via its env vars.
+    for (const key of MODEL_ENV_KEYS) {
+      const m = key.match(/^ANTHROPIC_DEFAULT_(.+)_MODEL$/);
+      if (m) tiers.add(m[1].toLowerCase());
+    }
+
+    // Source 2: the aliases quoted on this build's own --help --model line.
+    const help = await this._helpText();
+    if (help) {
+      const flat = help.replace(/\s+/g, ' ');
+      const at = flat.indexOf('--model <model>');
+      if (at >= 0) {
+        let seg = flat.slice(at);
+        const next = seg.search(/\s-[a-zA-Z-]+[,\s]+--/);
+        if (next > 0) seg = seg.slice(0, next);
+        for (const q of seg.match(/'([^']+)'/g) || []) {
+          const value = q.slice(1, -1).trim();
+          // The same sentence also quotes a full model name as an example of
+          // the OTHER accepted form; aliases are bare words.
+          if (/^[a-z]+$/.test(value)) tiers.add(value);
+        }
+      }
+    }
+
+    return [...tiers].sort();
+  }
+
+  /** `claude --help`, cached alongside the effort levels it also feeds. */
+  async _helpText() {
+    if (this._helpCache && Date.now() - this._helpCache.at < EFFORT_CACHE_TTL_MS) {
+      return this._helpCache.text;
+    }
+    const bin = this._findClaudeBinary();
+    if (!bin) return '';
+    const text = await this._runHelpText(bin);
+    if (text) this._helpCache = { at: Date.now(), text };
+    return text;
   }
 
   /**

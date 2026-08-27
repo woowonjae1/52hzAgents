@@ -399,6 +399,9 @@ test('ClaudeAdapter reports the model picker cache and env pin from Claude Code 
   });
 
   assert.equal(adapter._currentModelFromConfig(), 'claude-opus-9-thinking');
+  // Tier aliases come from the local `claude --help`; stubbed so these assert
+  // the catalog sources under test rather than whether claude is installed here.
+  adapter._listAliasTiers = async () => [];
   // No credential in this fixture, so the API probe is skipped and the caches
   // and env pins are the whole answer.
   const models = await adapter._listModels();
@@ -422,6 +425,9 @@ test('ClaudeAdapter reports nothing rather than a catalog when Claude Code has n
   });
 
   assert.equal(adapter._currentModelFromConfig(), '');
+  // Tier aliases come from the local `claude --help`; stubbed so these assert
+  // the catalog sources under test rather than whether claude is installed here.
+  adapter._listAliasTiers = async () => [];
   assert.deepEqual(await adapter._listModels(), [], 'must not fall back to a hardcoded model list');
 
   fs.rmSync(dir, { recursive: true, force: true });
@@ -607,6 +613,9 @@ test('ClaudeAdapter takes its catalog from GET /v1/models, paging through the re
       token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
     });
 
+    // Tier aliases come from the local `claude --help`; stubbed so these assert
+    // the catalog sources under test rather than whether claude is installed here.
+      adapter._listAliasTiers = async () => [];
     const models = await adapter._listModels();
     // The API answer leads; the CLI's "additional" cache and the env pin are
     // unioned on top. additionalModelOptionsCache alone reported ONE model on a
@@ -651,6 +660,9 @@ test('ClaudeAdapter records why the catalog is short when the endpoint fails', a
       token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
     });
 
+    // Tier aliases come from the local `claude --help`; stubbed so these assert
+    // the catalog sources under test rather than whether claude is installed here.
+      adapter._listAliasTiers = async () => [];
     const models = await adapter._listModels();
     assert.deepEqual(models.map((m) => m.id), ['claude-extra'], 'falls back to the local caches');
     assert.equal(adapter._apiModelsError, 'http-500', 'and records why, so the UI can say so');
@@ -704,4 +716,60 @@ test('ClaudeAdapter pairs the endpoint with the credential from the same source'
   } finally {
     server.close();
   }
+});
+
+test('ClaudeAdapter derives its tier aliases from the CLI own help and env contract', async () => {
+  const { ClaudeAdapter } = require('../src/adapters');
+  const dir = makeFixtureDir('wwj-claude-tiers-', {});
+  const adapter = new ClaudeAdapter({
+    agentName: 'claude-tiers', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+    token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
+  });
+
+  // Verbatim from `claude --help`. The same sentence quotes a full model name
+  // as an example of the other accepted form; only bare words are aliases.
+  adapter._findClaudeBinary = () => 'claude';
+  adapter._runHelpText = async () => [
+    '  --model <model>                       Model for the current session. Provide',
+    "                                        an alias for the latest model (e.g.",
+    "                                        'fable', 'opus', or 'sonnet') or a",
+    "                                        model's full name (e.g.",
+    "                                        'claude-fable-5').",
+    '  -n, --name <name>                     Set a display name for this session',
+  ].join('\n');
+
+  const tiers = await adapter._listAliasTiers();
+  // fable/opus/sonnet from the help text; haiku from the
+  // ANTHROPIC_DEFAULT_HAIKU_MODEL key the CLI itself defines.
+  assert.deepEqual(tiers, ['fable', 'haiku', 'opus', 'sonnet']);
+  assert.ok(!tiers.includes('claude-fable-5'), 'a full model name is not an alias');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('ClaudeAdapter labels each tier with what it resolves to on this install', async () => {
+  const { ClaudeAdapter } = require('../src/adapters');
+  const dir = makeFixtureDir('wwj-claude-tierlabel-', {
+    'settings.json': JSON.stringify({
+      env: {
+        ANTHROPIC_DEFAULT_OPUS_MODEL: 'claude-opus-9',
+        ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-opus-9',
+      },
+    }),
+  });
+  const adapter = new ClaudeAdapter({
+    agentName: 'claude-tierlabel', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+    token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
+  });
+  adapter._listAliasTiers = async () => ['opus', 'sonnet', 'haiku'];
+
+  const models = await adapter._listModels();
+  const byId = Object.fromEntries(models.map((m) => [m.id, m.label]));
+  // A relay that repoints every tier at one model is invisible unless the label
+  // says so - that is the whole point of showing the resolved target.
+  assert.equal(byId.opus, 'Opus → claude-opus-9');
+  assert.equal(byId.sonnet, 'Sonnet → claude-opus-9');
+  assert.equal(byId.haiku, 'Haiku', 'an unpinned tier shows no arrow');
+
+  fs.rmSync(dir, { recursive: true, force: true });
 });
