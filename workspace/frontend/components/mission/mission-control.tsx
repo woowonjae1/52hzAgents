@@ -497,15 +497,17 @@ export function MissionControl() {
                   No agents match this filter
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-stretch">
                   {filteredMyStations.map((s, idx) => (
                     <motion.div
                       key={s.agent.agentName}
+                      className="h-full"
                       initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15, ease: 'easeOut', delay: Math.min(idx, 8) * 0.02 }}
                     >
                       <AgentStation
+                        className="h-full"
                         data={s}
                         onOpenAgent={() => openAgent(s.agent.agentName, s.focusThread?.sessionId ?? null)}
                         onOpenThread={openThread}
@@ -531,10 +533,11 @@ export function MissionControl() {
                 </button>
 
                 {showIntegrations && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 items-stretch">
                     {integrationStations.map((s) => (
                       <AgentStation
                         key={s.agent.agentName}
+                        className="h-full"
                         data={s}
                         onOpenAgent={() => openAgent(s.agent.agentName, null)}
                         onOpenThread={openThread}

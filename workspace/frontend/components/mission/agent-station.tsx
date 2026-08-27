@@ -69,6 +69,7 @@ interface AgentStationProps {
   onOpenThread: (sessionId: string) => void;
   onPairAgent?: () => void;
   onApprovalResolved?: () => void;
+  className?: string;
 }
 
 export function AgentStation({
@@ -77,6 +78,7 @@ export function AgentStation({
   onOpenThread,
   onPairAgent,
   onApprovalResolved,
+  className,
 }: AgentStationProps) {
   const {
     agent,
@@ -299,14 +301,15 @@ export function AgentStation({
   return (
     <div
       className={cn(
-        'group relative flex flex-col justify-between rounded-2xl p-3.5',
+        'group relative flex flex-col justify-between rounded-2xl p-3.5 h-full min-h-[220px]',
         'bg-surface1/70 dark:bg-surface1/40 backdrop-blur-md shadow-2xs transition-all duration-150',
         'border border-border/30 hover:border-border/60 hover:shadow-xs',
         isBlocked && 'ring-2 ring-status-warning/20 bg-status-warning/[0.02]',
         isStalled && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
         isHeartbeatTimeout && 'border-status-warning/30',
         status === 'offline' && !isCatalogPlaceholder && 'opacity-85',
-        isCatalogPlaceholder && 'bg-surface1/30'
+        isCatalogPlaceholder && 'bg-surface1/30',
+        className
       )}
     >
       {/* Top Header */}
@@ -325,16 +328,16 @@ export function AgentStation({
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-xs text-foreground truncate group-hover/title:text-primary transition-colors">
+              <span className="font-semibold text-xs text-foreground truncate group-hover/title:text-primary transition-colors max-w-[110px]">
                 {agent.agentName}
               </span>
               {agent.role === 'master' && (
-                <span className="text-3xs px-1 rounded bg-surface3 text-foreground font-mono font-medium">
+                <span className="text-3xs px-1 rounded bg-surface3 text-foreground font-mono font-medium shrink-0">
                   Master
                 </span>
               )}
             </div>
-            <div className="text-3xs text-muted-foreground truncate font-mono mt-0.5">
+            <div className="text-3xs text-muted-foreground truncate font-mono mt-0.5 max-w-[120px]">
               {agent.agentType || 'agent'}
             </div>
           </div>
@@ -355,13 +358,13 @@ export function AgentStation({
               (isWorking || isBlocked) && 'animate-pulse'
             )}
           />
-          <span>{statusBadge.label}</span>
+          <span className="truncate max-w-[130px]">{statusBadge.label}</span>
         </span>
       </div>
 
       {/* Inline Blocked Approval */}
       {isBlocked && pendingApproval ? (
-        <div className="my-2 p-2 rounded-xl bg-status-warning/10 space-y-1.5 text-xs animate-in zoom-in-95 duration-150">
+        <div className="my-2 p-2 rounded-xl bg-status-warning/10 space-y-1.5 text-xs animate-in zoom-in-95 duration-150 flex-1 flex flex-col justify-between">
           <div className="flex items-center justify-between text-3xs font-medium text-status-warning">
             <span className="flex items-center gap-1">
               <ShieldAlert className="size-3" />
@@ -396,7 +399,7 @@ export function AgentStation({
         </div>
       ) : !isCatalogPlaceholder ? (
         /* Configured Agent: 3 Micro Metrics Grid + Activity */
-        <div className="my-2 space-y-1.5">
+        <div className="my-2 space-y-1.5 flex-1 flex flex-col justify-start">
           <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-3xs">
             <div className="flex flex-col min-w-0 px-1 text-center">
               <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Tokens</span>
@@ -604,7 +607,7 @@ export function AgentStation({
       )}
 
       {/* Footer Controls */}
-      <div className="flex items-center gap-1.5 pt-2">
+      <div className="flex items-center gap-1.5 pt-2 mt-auto">
         {!isCatalogPlaceholder && (
           <button
             type="button"
