@@ -117,6 +117,17 @@ function buildCollaborationPrompt(toolMode = 'mcp') {
     '— that wakes them up for nothing. Only @mention when you need them ' +
     'to do work. When the task is complete, report results to the user ' +
     'without @mentioning other agents.\n\n' +
+    // Agents whose own runtime ships a sub-agent feature (Antigravity's
+    // define_subagent/invoke_subagent, Claude Code's Task tool, …) will happily
+    // spin up a local helper NAMED after a workspace peer and then report
+    // "handed off to @peer". The peer never ran, the user believes two agents
+    // collaborated, and the answer carries one runtime's blind spots twice.
+    'These agents are separate processes, not sub-agents of yours. If the user ' +
+    'names another workspace agent, hand that step to THAT agent by @mentioning ' +
+    'it and stopping — do not do its step yourself, and do not create a local ' +
+    'sub-agent named after it. Your own sub-agent / Task tools are for splitting ' +
+    'up YOUR OWN step, never for standing in for a named workspace agent. If you ' +
+    'cannot reach it, say so plainly rather than simulating the hand-off.\n\n' +
     discover +
     buildDecisionProtocolPrompt() +
     buildPreviewProtocolPrompt()

@@ -921,3 +921,121 @@ test('ClaudeAdapter sends OAuth tokens on Authorization alone, never alongside x
     server.close();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Agent-to-agent hand-off. The server decides who a relayed message is for and
+// says so in metadata.target_agents; the adapter must honour that decision.
+// ---------------------------------------------------------------------------
+
+function relayMessage(content) {
+  // Shaped exactly like _eventToMessage builds it: target_agents lives in
+  // `metadata`, and there is no top-level `targetAgents` field.
+  return {
+    id: 'evt-' + Math.abs(content.length),
+    messageId: 'evt-' + Math.abs(content.length),
+    sessionId: 'thread-1',
+    senderType: 'agent',
+    senderName: 'antigravity',
+    senderId: 'openagents:antigravity',
+    content,
+    mentions: [],
+    messageType: 'chat',
+    metadata: { target_agents: ['claude'] },
+  };
+}
+
+test('BaseAdapter acts on a relayed hand-off the server addressed to it', async () => {
+  const adapter = new BaseAdapter({
+    agentName: 'claude', agentType: 'claude', workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000', token: 't',
+  });
+
+  const dispatched = [];
+  adapter._dispatchMessage = async (m) => { dispatched.push(m.content); };
+  adapter.client = {
+    pollPending: async () => ({
+      // Verbatim shape of the hand-off that was silently dropped in production:
+      // a prose report, no leading @mention, no Chinese action verb.
+      messages: [relayMessage('Here are the results of the time calculation. Please continue.')],
+      cursor: 'c1',
+      composing: false,
+    }),
+    heartbeat: async () => {},
+    pollControl: async () => [],
+  };
+
+  adapter._running = true;
+  const loop = adapter._pollLoop();
+  await new Promise((r) => setTimeout(r, 120));
+  adapter._running = false;
+  await loop.catch(() => {});
+
+  assert.equal(dispatched.length, 1, 'a message the server routed to us must not be dropped');
+});
+
+test('BaseAdapter still ignores an agent message that is not addressed to it', async () => {
+  const adapter = new BaseAdapter({
+    agentName: 'claude', agentType: 'claude', workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000', token: 't',
+  });
+
+  const dispatched = [];
+  adapter._dispatchMessage = async (m) => { dispatched.push(m.content); };
+  const msg = relayMessage('Here are the results.');
+  msg.metadata = { target_agents: ['opencode'] };
+  adapter.client = {
+    pollPending: async () => ({ messages: [msg], cursor: 'c1', composing: false }),
+    heartbeat: async () => {},
+    pollControl: async () => [],
+  };
+
+  adapter._running = true;
+  const loop = adapter._pollLoop();
+  await new Promise((r) => setTimeout(r, 120));
+  adapter._running = false;
+  await loop.catch(() => {});
+
+  assert.equal(dispatched.length, 0, 'chatter aimed at another agent must stay ignored');
+});
+
+test('AntigravityAdapter strips its sub-agent framing out of the reply', () => {
+  const { stripSubagentFraming } = require('../src/adapters/antigravity');
+
+  // Verbatim from a real reply: the framework's wait/receive bookkeeping, which
+  // also made an internal helper look like the workspace's own @claude.
+  const leaked = [
+    "Condition met: 'any' (received message from 'f972d272-6586-4b30-884b-6ea643842cf5')",
+    '**Message from f972d272-6586-4b30-884b-6ea643842cf5 (Claude Assistant)**:',
+    'Hello! I have completed the calculation.',
+  ].join('\n');
+  assert.equal(stripSubagentFraming(leaked), 'Hello! I have completed the calculation.');
+
+  // Prose that merely uses those words is not framing and must survive intact.
+  const prose = 'The condition met our expectations. Message from the team: all good.';
+  assert.equal(stripSubagentFraming(prose), prose);
+
+  // Framing with nothing after it: better to show the odd line than an empty bubble.
+  const bare = "Condition met: 'any' (received message from 'abc12345')";
+  assert.equal(stripSubagentFraming(bare), bare);
+
+  // Wiring, not just the helper. Testing the function alone left the call site
+  // free to regress silently - reverting it to stripAnsi() broke nothing, which
+  // is how the leak reached the UI in the first place. The reply path spawns the
+  // agy CLI, so the composition is asserted against the source instead.
+  const src = fs.readFileSync(require.resolve('../src/adapters/antigravity'), 'utf-8');
+  assert.match(
+    src,
+    /stripSubagentFraming\(stripAnsi\(outputText\)\)/,
+    'the final reply must be piped through stripSubagentFraming, not just stripAnsi',
+  );
+});
+
+test('the workspace prompt tells agents a named peer is a real process, not a sub-agent to fake', () => {
+  const { buildOpenclawSystemPrompt } = require('../src/adapters/workspace-prompt');
+  const prompt = buildOpenclawSystemPrompt({
+    agentName: 'antigravity', workspaceId: 'ws-1', channelName: 'c',
+    endpoint: 'http://localhost:3000', token: 't', mode: 'execute', disabledModules: new Set(),
+  });
+  assert.match(prompt, /separate processes, not sub-agents of yours/);
+  assert.match(prompt, /do not create a local sub-agent named after it/);
+});

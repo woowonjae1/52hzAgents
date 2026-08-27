@@ -907,13 +907,28 @@ class BaseAdapter {
 
           const contentStr = typeof msg.content === 'string' ? msg.content : '';
 
-          // 1. Action directive guard: check if message explicitly requests action from this.agentName
-          const actionRegex = new RegExp(`(?:请|步骤|step|让|由|交给|分派)\\s*@?${this.agentName}|@?${this.agentName}\\s*(?:请|处理|负责|编写|实现)`, 'i');
-          const hasDirectAction = actionRegex.test(contentStr) || (Array.isArray(msg.targetAgents) && msg.targetAgents.includes(this.agentName));
+          // 1. Action directive guard: check if message explicitly requests action
+          //    from this.agentName.
+          //
+          //    `targetedMe` is the authoritative signal here — the server already
+          //    decided this message is for us and put us in metadata.target_agents.
+          //    This used to read `msg.targetAgents`, a field _eventToMessage never
+          //    builds (it exposes the raw `metadata`), so that half of the check was
+          //    dead and a relayed hand-off survived only if its prose happened to
+          //    match the regex below. An agent handing over with "here are the
+          //    results" never did, so the relay reached the adapter and was dropped
+          //    one line later.
+          const actionRegex = new RegExp(`(?:请|步骤|step|让|由|交给|分派)\s*@?${this.agentName}|@?${this.agentName}\s*(?:请|处理|负责|编写|实现)`, 'i');
+          const hasDirectAction = targetedMe || actionRegex.test(contentStr);
 
           // 2. Completion / wrap-up guard: if no direct action requested or if general wrap-up without explicit delegation, ignore
           const isFinished = /(任务|流程|工作|审查)(已|全|全部)?(完成|结束|完毕)|确认——报告已完成|所有三步协作|任务已全部完成|还有什么要做的吗|不需要再次|不存在/i.test(contentStr);
-          if (!hasDirectAction || (isFinished && !actionRegex.test(contentStr))) {
+          //    The wrap-up test is a heuristic over prose, so it must not overrule
+          //    an explicit server routing decision: a hand-off legitimately reads
+          //    like a summary ("here are the results, @next take it from here").
+          //    Loop protection is the hop limit below, which does not depend on
+          //    wording.
+          if (!hasDirectAction || (isFinished && !targetedMe && !actionRegex.test(contentStr))) {
             this._log(`Ignoring agent message from ${msg.senderName}: no direct action for ${this.agentName} or completion wrap-up message`);
             continue;
           }

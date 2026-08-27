@@ -40,6 +40,45 @@ function stripAnsi(str) {
   return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
 }
 
+// Antigravity's own sub-agent framework narrates its wait/receive bookkeeping
+// into the reply text:
+//
+//   Condition met: 'any' (received message from '<uuid>')
+//   **Message from <uuid> (Claude Assistant)**:
+//   Hello! I have completed …
+//
+// That is plumbing, not an answer. Left in, the bubble opens with an opaque UUID
+// and a framework's internal vocabulary — and worse, a reader sees "Message from
+// … (Claude Assistant)" and reasonably concludes the workspace's @claude
+// answered, when it was an internal sub-agent of Antigravity's own.
+//
+// Matched structurally (literal keyword plus a UUID) and only at the START of
+// the reply, so ordinary prose that merely mentions a condition or a message
+// cannot be eaten. Repeats are peeled one at a time; anything unrecognised stops
+// the loop and is left exactly as written.
+const SUBAGENT_FRAMING_PATTERNS = [
+  // "Condition met: 'any' (received message from '<uuid>')"
+  /^\s*Condition met:\s*'[^']*'\s*\(received message from\s*'[0-9a-fA-F-]{8,}'\)\s*/,
+  // "**Message from <uuid> (Some Name)**:" — asterisks and the name optional
+  /^\s*\*{0,2}Message from\s+[0-9a-fA-F-]{8,}\s*(?:\([^)]*\))?\*{0,2}\s*:?\s*/,
+];
+
+function stripSubagentFraming(text) {
+  if (!text) return '';
+  let out = String(text);
+  for (let guard = 0; guard < 8; guard++) {
+    const before = out;
+    for (const re of SUBAGENT_FRAMING_PATTERNS) {
+      out = out.replace(re, '');
+    }
+    if (out === before) break;
+  }
+  const trimmed = out.trim();
+  // If the framing was the entire message there is nothing left to show; keep
+  // the original rather than posting an empty bubble.
+  return trimmed || String(text).trim();
+}
+
 const FILE_WRITING_TOOLS = new Set([
   'Write', 'Edit', 'NotebookEdit', 'write_to_file', 'replace_file_content',
   'multi_replace_file_content', 'sed_file', 'notebook_edit'
@@ -643,7 +682,7 @@ class AntigravityAdapter extends BaseAdapter {
           outputText = rawStdout;
         }
 
-        const cleanOutput = stripAnsi(outputText).trim();
+        const cleanOutput = stripSubagentFraming(stripAnsi(outputText));
 
         if (lastErrorText) {
           await this.sendError(channel, `⚠️ Antigravity 调用异常提示:\n${lastErrorText}`);
@@ -691,3 +730,4 @@ class AntigravityAdapter extends BaseAdapter {
 }
 
 module.exports = AntigravityAdapter;
+module.exports.stripSubagentFraming = stripSubagentFraming;
