@@ -773,3 +773,54 @@ test('ClaudeAdapter labels each tier with what it resolves to on this install', 
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('ClaudeAdapter re-probes when a provider switcher repoints the endpoint', async () => {
+  const http = require('node:http');
+  const { ClaudeAdapter } = require('../src/adapters');
+
+  const serve = (id) => http.createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ data: [{ id }], has_more: false }));
+  });
+  const a = serve('provider-a-model');
+  const b = serve('provider-b-model');
+  await new Promise((r) => a.listen(0, '127.0.0.1', r));
+  await new Promise((r) => b.listen(0, '127.0.0.1', r));
+
+  try {
+    const dir = makeFixtureDir('wwj-claude-switch-', {
+      'settings.json': JSON.stringify({
+        env: { ANTHROPIC_BASE_URL: `http://127.0.0.1:${a.address().port}`, ANTHROPIC_AUTH_TOKEN: 't' },
+      }),
+    });
+    const adapter = new ClaudeAdapter({
+      agentName: 'claude-switch', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+      token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
+    });
+    adapter._listAliasTiers = async () => [];
+
+    assert.deepEqual((await adapter._listModels()).map((m) => m.id), ['provider-a-model']);
+
+    // cc-switch and friends rewrite this file underneath a running adapter. The
+    // cached catalog is still inside its TTL, so only an endpoint-keyed cache
+    // notices; a time-keyed one would keep serving provider A's models.
+    fs.writeFileSync(
+      path.join(dir, 'settings.json'),
+      JSON.stringify({
+        env: { ANTHROPIC_BASE_URL: `http://127.0.0.1:${b.address().port}`, ANTHROPIC_AUTH_TOKEN: 't' },
+      }),
+      'utf-8',
+    );
+
+    assert.deepEqual(
+      (await adapter._listModels()).map((m) => m.id),
+      ['provider-b-model'],
+      'a provider switch must invalidate the cached catalog immediately',
+    );
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  } finally {
+    a.close();
+    b.close();
+  }
+});

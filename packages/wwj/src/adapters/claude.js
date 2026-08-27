@@ -101,6 +101,7 @@ class ClaudeAdapter extends BaseAdapter {
     this._effortInFlight = null;
     this._apiModelsCache = null;
     this._apiModelsInFlight = null;
+    this._apiModelsInFlightFor = '';
     this._helpCache = null;
     this._apiModelsError = '';
     this._loadSessions();
@@ -413,14 +414,25 @@ class ClaudeAdapter extends BaseAdapter {
    */
   async _listApiModels() {
     const now = Date.now();
-    if (this._apiModelsCache && now - this._apiModelsCache.at < API_MODELS_CACHE_TTL_MS) {
+    // Keyed by endpoint, not just by time. Provider switchers (cc-switch and
+    // friends) rewrite settings.json's env block underneath a running adapter,
+    // and a purely time-based cache would keep serving the previous provider's
+    // catalog for the rest of the TTL - offering models the account it is now
+    // pointed at cannot run.
+    const endpoint = this._resolveApiEndpoint().base;
+    if (this._apiModelsCache
+      && this._apiModelsCache.endpoint === endpoint
+      && now - this._apiModelsCache.at < API_MODELS_CACHE_TTL_MS) {
       return this._apiModelsCache.models;
     }
-    if (this._apiModelsInFlight) return this._apiModelsInFlight;
+    if (this._apiModelsInFlight && this._apiModelsInFlightFor === endpoint) {
+      return this._apiModelsInFlight;
+    }
 
+    this._apiModelsInFlightFor = endpoint;
     this._apiModelsInFlight = this._fetchApiModels()
       .then((models) => {
-        if (models.length) this._apiModelsCache = { at: Date.now(), models };
+        if (models.length) this._apiModelsCache = { at: Date.now(), endpoint, models };
         return models;
       })
       .catch(() => [])
@@ -428,13 +440,13 @@ class ClaudeAdapter extends BaseAdapter {
     return this._apiModelsInFlight;
   }
 
-  async _fetchApiModels() {
-    // Endpoint and credential are resolved as a PAIR from the same source.
-    // Mixing them - a relay URL from settings.json with an unrelated
-    // ANTHROPIC_API_KEY that happens to be in the process env - sends the wrong
-    // token to the right host and comes back 401, which then reads as "this
-    // account has no models". Whichever source supplies a credential supplies
-    // the base URL that goes with it.
+  /**
+   * Endpoint and credential, resolved as a PAIR from the same source. Mixing
+   * them - a relay URL from settings.json with an unrelated ANTHROPIC_API_KEY
+   * that happens to be in the process env - sends the wrong token to the right
+   * host, comes back 401, and reads as "this account has no models".
+   */
+  _resolveApiEndpoint() {
     const env = this.agentEnv || process.env;
     const pinned = this._readClaudeSettingsEnv();
     const sources = [
@@ -442,12 +454,20 @@ class ClaudeAdapter extends BaseAdapter {
       { key: pinned.ANTHROPIC_AUTH_TOKEN || pinned.ANTHROPIC_API_KEY, base: pinned.ANTHROPIC_BASE_URL },
     ];
     const chosen = sources.find((c) => c.key && String(c.key).trim());
-    if (!chosen) {
+    if (!chosen) return { base: '', key: '' };
+    const rawBase = (chosen.base || 'https://api.anthropic.com').trim();
+    return {
+      base: rawBase.endsWith('/') ? rawBase.slice(0, rawBase.length - 1) : rawBase,
+      key: String(chosen.key).trim(),
+    };
+  }
+
+  async _fetchApiModels() {
+    const { base, key } = this._resolveApiEndpoint();
+    if (!key) {
       this._apiModelsError = 'no-credential';
       return [];
     }
-    const key = String(chosen.key).trim();
-    const base = (chosen.base || 'https://api.anthropic.com').trim().replace(/\/+$/, '');
 
     const collected = [];
     let after = '';
