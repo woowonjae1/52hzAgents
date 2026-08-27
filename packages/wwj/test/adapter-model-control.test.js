@@ -824,3 +824,100 @@ test('ClaudeAdapter re-probes when a provider switcher repoints the endpoint', a
     b.close();
   }
 });
+
+test('ClaudeAdapter falls back to the Claude Code OAuth session when no key is configured', async () => {
+  const { ClaudeAdapter } = require('../src/adapters');
+  const dir = makeFixtureDir('wwj-claude-oauth-', {
+    // A provider switcher can leave a relay URL behind with no key of its own.
+    'settings.json': JSON.stringify({ env: { ANTHROPIC_BASE_URL: 'https://relay.example' } }),
+    '.credentials.json': JSON.stringify({
+      claudeAiOauth: { accessToken: 'oauth-token', expiresAt: Date.now() + 3600_000 },
+    }),
+  });
+  const adapter = new ClaudeAdapter({
+    agentName: 'claude-oauth', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+    token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
+  });
+
+  const resolved = adapter._resolveApiEndpoint();
+  assert.equal(resolved.kind, 'oauth');
+  assert.ok(resolved.key, 'the session token is used as the credential');
+  // The security property: an Anthropic session token must never be sent to a
+  // third-party relay just because its URL is still sitting in settings.json.
+  assert.equal(resolved.base, 'https://api.anthropic.com');
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('ClaudeAdapter prefers an explicit key over the OAuth session, and treats an expired one as absent', async () => {
+  const { ClaudeAdapter } = require('../src/adapters');
+
+  const withKey = makeFixtureDir('wwj-claude-oauth-pref-', {
+    'settings.json': JSON.stringify({
+      env: { ANTHROPIC_BASE_URL: 'https://relay.example', ANTHROPIC_AUTH_TOKEN: 'relay-token' },
+    }),
+    '.credentials.json': JSON.stringify({
+      claudeAiOauth: { accessToken: 'oauth-token', expiresAt: Date.now() + 3600_000 },
+    }),
+  });
+  let adapter = new ClaudeAdapter({
+    agentName: 'claude-pref', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+    token: 't', agentEnv: { CLAUDE_CONFIG_DIR: withKey },
+  });
+  let resolved = adapter._resolveApiEndpoint();
+  assert.equal(resolved.kind, 'key', 'a configured relay key still wins');
+  assert.equal(resolved.base, 'https://relay.example');
+  fs.rmSync(withKey, { recursive: true, force: true });
+
+  // Refreshing is Claude Code's job; a lapsed token must read as "no
+  // credential" rather than firing a probe that comes back 401.
+  const expired = makeFixtureDir('wwj-claude-oauth-exp-', {
+    '.credentials.json': JSON.stringify({
+      claudeAiOauth: { accessToken: 'oauth-token', expiresAt: Date.now() - 1000 },
+    }),
+  });
+  adapter = new ClaudeAdapter({
+    agentName: 'claude-exp', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+    token: 't', agentEnv: { CLAUDE_CONFIG_DIR: expired },
+  });
+  assert.equal(adapter._readOAuthCredential(), '');
+  assert.equal(adapter._resolveApiEndpoint().key, '');
+  adapter._listAliasTiers = async () => [];
+  await adapter._listModels();
+  assert.equal(adapter._apiModelsError, 'no-credential');
+  fs.rmSync(expired, { recursive: true, force: true });
+});
+
+test('ClaudeAdapter sends OAuth tokens on Authorization alone, never alongside x-api-key', async () => {
+  const http = require('node:http');
+  const { ClaudeAdapter } = require('../src/adapters');
+
+  let got = null;
+  const server = http.createServer((req, res) => {
+    got = req.headers;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ data: [], has_more: false }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${server.address().port}/v1/models`;
+
+  try {
+    const adapter = new ClaudeAdapter({
+      agentName: 'claude-hdr', workspaceId: 'ws-1', endpoint: 'http://localhost:3000', token: 't', agentEnv: {},
+    });
+
+    // api.anthropic.com prefers x-api-key when both are present, so sending both
+    // with a session token is rejected 401 even though Authorization alone works.
+    await adapter._getJson(url, 'tok', 'oauth');
+    assert.ok(got.authorization, 'Authorization must carry the session token');
+    assert.equal(got['x-api-key'], undefined, 'x-api-key must not accompany an OAuth token');
+    assert.equal(got['anthropic-beta'], 'oauth-2025-04-20');
+
+    // API keys and relay tokens keep both, since relays differ on which they read.
+    await adapter._getJson(url, 'tok', 'key');
+    assert.ok(got.authorization);
+    assert.ok(got['x-api-key'], 'an API key is also sent on x-api-key');
+  } finally {
+    server.close();
+  }
+});

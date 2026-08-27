@@ -49,6 +49,11 @@ const EFFORT_CACHE_TTL_MS = 30 * 60 * 1000;
 // the heartbeat, so it is cached hard.
 const API_MODELS_CACHE_TTL_MS = 15 * 60 * 1000;
 
+// Treat an OAuth token that is about to lapse as absent: refreshing it belongs
+// to Claude Code, and a probe fired into the gap returns a 401 that reads like
+// a broken account.
+const OAUTH_EXPIRY_SKEW_MS = 60 * 1000;
+
 class ClaudeAdapter extends BaseAdapter {
   /**
    * @param {object} opts - BaseAdapter opts plus:
@@ -234,11 +239,16 @@ class ClaudeAdapter extends BaseAdapter {
     const env = this.agentEnv || process.env;
     const dir = (env.CLAUDE_CONFIG_DIR && env.CLAUDE_CONFIG_DIR.trim()) || '';
     if (dir) {
-      return { json: path.join(dir, '.claude.json'), settings: path.join(dir, 'settings.json') };
+      return {
+        json: path.join(dir, '.claude.json'),
+        settings: path.join(dir, 'settings.json'),
+        credentials: path.join(dir, '.credentials.json'),
+      };
     }
     return {
       json: path.join(os.homedir(), '.claude.json'),
       settings: path.join(os.homedir(), '.claude', 'settings.json'),
+      credentials: path.join(os.homedir(), '.claude', '.credentials.json'),
     };
   }
 
@@ -449,21 +459,57 @@ class ClaudeAdapter extends BaseAdapter {
   _resolveApiEndpoint() {
     const env = this.agentEnv || process.env;
     const pinned = this._readClaudeSettingsEnv();
-    const sources = [
+    const explicit = [
       { key: env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY, base: env.ANTHROPIC_BASE_URL },
       { key: pinned.ANTHROPIC_AUTH_TOKEN || pinned.ANTHROPIC_API_KEY, base: pinned.ANTHROPIC_BASE_URL },
-    ];
-    const chosen = sources.find((c) => c.key && String(c.key).trim());
-    if (!chosen) return { base: '', key: '' };
-    const rawBase = (chosen.base || 'https://api.anthropic.com').trim();
-    return {
-      base: rawBase.endsWith('/') ? rawBase.slice(0, rawBase.length - 1) : rawBase,
-      key: String(chosen.key).trim(),
-    };
+    ].find((c) => c.key && String(c.key).trim());
+
+    if (explicit) {
+      const rawBase = (explicit.base || 'https://api.anthropic.com').trim();
+      return {
+        base: rawBase.endsWith('/') ? rawBase.slice(0, rawBase.length - 1) : rawBase,
+        key: String(explicit.key).trim(),
+        kind: 'key',
+      };
+    }
+
+    // Last resort: the OAuth session Claude Code itself holds, which is the
+    // only credential a plain `claude login` install has. Its base URL is FIXED
+    // to Anthropic and deliberately ignores ANTHROPIC_BASE_URL - a provider
+    // switcher can leave a third-party relay URL in settings.json with no key
+    // of its own, and pairing that host with the user's Anthropic session token
+    // would hand their credential to a third party.
+    const oauth = this._readOAuthCredential();
+    if (oauth) return { base: 'https://api.anthropic.com', key: oauth, kind: 'oauth' };
+
+    return { base: '', key: '', kind: '' };
+  }
+
+  /**
+   * The access token from Claude Code's own OAuth session, or '' when there is
+   * none or it has expired. Read solely to call `/v1/models` below; it is never
+   * logged, reported, cached to disk, or sent anywhere but api.anthropic.com.
+   * Refreshing is Claude Code's job - an expired token is treated as absent so
+   * the probe reports "no-credential" instead of a confusing 401.
+   */
+  _readOAuthCredential() {
+    try {
+      const file = this._claudeConfigPaths().credentials;
+      if (!fs.existsSync(file)) return '';
+      const cfg = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      const oauth = cfg && cfg.claudeAiOauth;
+      const token = oauth && typeof oauth.accessToken === 'string' ? oauth.accessToken.trim() : '';
+      if (!token) return '';
+      const expiresAt = Number(oauth.expiresAt) || 0;
+      if (expiresAt && expiresAt <= Date.now() + OAUTH_EXPIRY_SKEW_MS) return '';
+      return token;
+    } catch {
+      return '';
+    }
   }
 
   async _fetchApiModels() {
-    const { base, key } = this._resolveApiEndpoint();
+    const { base, key, kind } = this._resolveApiEndpoint();
     if (!key) {
       this._apiModelsError = 'no-credential';
       return [];
@@ -474,7 +520,7 @@ class ClaudeAdapter extends BaseAdapter {
     // Bounded: the endpoint pages at 1000, so a handful of rounds covers any
     // real account and a broken `has_more` cannot spin forever.
     for (let page = 0; page < 5; page++) {
-      const res = await this._getJson(`${base}/v1/models?limit=1000${after ? `&after_id=${encodeURIComponent(after)}` : ''}`, key);
+      const res = await this._getJson(`${base}/v1/models?limit=1000${after ? `&after_id=${encodeURIComponent(after)}` : ''}`, key, kind);
       if (!res.ok) {
         this._apiModelsError = `http-${res.status}`;
         return [];
@@ -492,8 +538,16 @@ class ClaudeAdapter extends BaseAdapter {
     return collected;
   }
 
-  /** One authenticated GET, resolved as {ok, status, body}. Never rejects. */
-  _getJson(url, key) {
+  /**
+   * One authenticated GET, resolved as {ok, status, body}. Never rejects.
+   *
+   * The header set depends on the credential kind, and this is not cosmetic:
+   * api.anthropic.com prefers `x-api-key` when both are present, so sending
+   * both alongside an OAuth token is rejected 401 ("API key is invalid") even
+   * though the same token succeeds on `Authorization` alone. Verified against
+   * the live endpoint.
+   */
+  _getJson(url, key, kind) {
     return new Promise((resolve) => {
       let u;
       try { u = new URL(url); } catch { resolve({ ok: false, status: 0 }); return; }
@@ -504,11 +558,19 @@ class ClaudeAdapter extends BaseAdapter {
           port: u.port || (u.protocol === 'http:' ? 80 : 443),
           path: u.pathname + u.search,
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${key}`,
-            'x-api-key': key,
-            'anthropic-version': '2023-06-01',
-          },
+          headers: kind === 'oauth'
+            ? {
+              'Authorization': `Bearer ${key}`,
+              'anthropic-version': '2023-06-01',
+              'anthropic-beta': 'oauth-2025-04-20',
+            }
+            : {
+              // API keys and relay tokens: both headers, since relays differ on
+              // which one they read.
+              'Authorization': `Bearer ${key}`,
+              'x-api-key': key,
+              'anthropic-version': '2023-06-01',
+            },
           timeout: 15000,
         },
         (res) => {
