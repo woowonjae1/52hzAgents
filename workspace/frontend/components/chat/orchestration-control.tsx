@@ -212,6 +212,17 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
   const [mentionFilter, setMentionFilter] = React.useState('');
   const [mentionIndex, setMentionIndex] = React.useState(0);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const mentionListRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-scroll selected mention into view
+  React.useEffect(() => {
+    if (!showMentions || !mentionListRef.current) return;
+    const container = mentionListRef.current;
+    const selectedEl = container.querySelector('[data-selected="true"]') as HTMLElement | null;
+    if (selectedEl) {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [mentionIndex, showMentions]);
 
   // Reset the draft whenever the dialog is (re)opened.
   React.useEffect(() => {
@@ -310,14 +321,18 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
             className="w-full resize-none rounded-md border bg-transparent p-3 text-sm outline-none focus:border-primary"
           />
           {showMentions && filteredAgents.length > 0 && (
-            <div className="absolute left-3 right-3 z-50 mt-1 max-h-44 overflow-auto rounded-md border bg-popover shadow-md">
+            <div
+              ref={mentionListRef}
+              className="absolute left-3 right-3 z-50 mt-1 max-h-44 overflow-auto rounded-md border bg-popover shadow-md"
+            >
               {filteredAgents.map((a, i) => (
                 <button
                   key={a.agentName}
                   type="button"
+                  data-selected={i === mentionIndex ? 'true' : undefined}
                   onClick={() => insertMention(a.agentName)}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface2',
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface2 cursor-pointer',
                     i === mentionIndex && 'bg-surface2',
                   )}
                 >

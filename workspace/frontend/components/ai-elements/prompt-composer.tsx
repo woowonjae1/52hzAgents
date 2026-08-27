@@ -105,8 +105,19 @@ export function PromptComposer({
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const mentionListRef = React.useRef<HTMLDivElement>(null);
   const dragCountRef = React.useRef(0);
   const reduceMotion = useReducedMotion();
+
+  // Scroll active mention into view automatically
+  React.useEffect(() => {
+    if (!showMentions || !mentionListRef.current) return;
+    const container = mentionListRef.current;
+    const selectedEl = container.querySelector('[data-selected="true"]') as HTMLElement | null;
+    if (selectedEl) {
+      selectedEl.scrollIntoView({ block: 'nearest' });
+    }
+  }, [mentionIndex, showMentions]);
 
   const resizeTextarea = React.useCallback(() => {
     const ta = textareaRef.current;
@@ -353,6 +364,7 @@ export function PromptComposer({
       <AnimatePresence>
         {showMentions && filteredMentions.length > 0 && (
           <motion.div
+            ref={mentionListRef}
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
@@ -367,12 +379,13 @@ export function PromptComposer({
                 </div>
                 <div className="space-y-0.5">
                   {mentionGroups.agents.map((item) => {
-                    const globalIdx = mentionItems.indexOf(item);
+                    const globalIdx = filteredMentions.indexOf(item);
                     const isSelected = globalIdx === mentionIndex;
                     return (
                       <button
                         key={`${item.type}-${item.name}`}
                         type="button"
+                        data-selected={isSelected ? 'true' : undefined}
                         onClick={() => insertMention(item)}
                         className={cn(
                           'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group',
@@ -415,12 +428,13 @@ export function PromptComposer({
                 </div>
                 <div className="space-y-0.5">
                   {mentionGroups.knowledge.map((item) => {
-                    const globalIdx = mentionItems.indexOf(item);
+                    const globalIdx = filteredMentions.indexOf(item);
                     const isSelected = globalIdx === mentionIndex;
                     return (
                       <button
                         key={`${item.type}-${item.name}`}
                         type="button"
+                        data-selected={isSelected ? 'true' : undefined}
                         onClick={() => insertMention(item)}
                         className={cn(
                           'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group',
