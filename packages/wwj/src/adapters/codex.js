@@ -39,7 +39,9 @@ class CodexAdapter extends BaseAdapter {
     const env = this.agentEnv || process.env;
     this._directApiKey = env.OPENAI_API_KEY || '';
     this._directBaseUrl = (env.OPENAI_BASE_URL || '').replace(/\/+$/, '');
-    this._directModel = env.CODEX_MODEL || env.OPENCLAW_MODEL || '';
+    this._channelEfforts = {};
+    this._directModel = env.CODEX_MODEL || env.OPENAI_MODEL || env.OPENCLAW_MODEL || '';
+    this.model = this._directModel || opts.model || '';
 
     // Per-channel thread tracking (like Claude's session IDs)
     this._channelThreads = {};
@@ -320,7 +322,204 @@ class CodexAdapter extends BaseAdapter {
     } catch {}
   }
 
+  /** Codex's own config directory — CODEX_HOME when set, else ~/.codex. */
+  _codexHome() {
+    const env = this.agentEnv || process.env;
+    return (env.CODEX_HOME && env.CODEX_HOME.trim()) || path.join(os.homedir(), '.codex');
+  }
+
+  /**
+   * The model and provider the user selected inside Codex, from the top-level
+   * keys of `~/.codex/config.toml`. Only the keys above the first `[section]`
+   * are read — those are the document-level ones — so a `model = ` inside a
+   * `[model_providers.x]` table can never be mistaken for the active model.
+   * Strictly read-only; this adapter never writes Codex's config.
+   */
+  _configFromCodexToml() {
+    const file = path.join(this._codexHome(), 'config.toml');
+    const out = { model: '', provider: '', effort: '' };
+    try {
+      if (!fs.existsSync(file)) return out;
+      for (const raw of fs.readFileSync(file, 'utf-8').split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('#')) continue;
+        if (line.startsWith('[')) break; // first table header ends the document-level keys
+        const m = line.match(/^(model|model_provider|model_reasoning_effort)\s*=\s*(.+)$/);
+        if (!m) continue;
+        const value = m[2].trim().replace(/^['"]|['"]$/g, '').trim();
+        if (!value) continue;
+        if (m[1] === 'model') out.model = value;
+        else if (m[1] === 'model_reasoning_effort') out.effort = value;
+        else out.provider = value;
+      }
+    } catch {
+      // A malformed config is Codex's problem to report, not ours to guess around.
+    }
+    return out;
+  }
+
+  /**
+   * Every model this install can actually reach, from Codex's own
+   * `models_cache.json` — the catalog the CLI fetched for this account. Returns
+   * [] when the cache is absent; an empty list must read as "unknown" and is
+   * never substituted with a hardcoded guess.
+   */
+  _listModels() {
+    const file = path.join(this._codexHome(), 'models_cache.json');
+    const out = [];
+    const seen = new Set();
+    try {
+      if (fs.existsSync(file)) {
+        const cache = JSON.parse(fs.readFileSync(file, 'utf-8'));
+        const models = Array.isArray(cache && cache.models) ? cache.models : [];
+        for (const m of models) {
+          const id = typeof m === 'string' ? m : (m && (m.slug || m.id));
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          out.push({ id, provider: 'codex', label: (m && m.display_name) || id });
+        }
+      }
+    } catch {
+      // Unparsable cache → report nothing rather than a half-read list.
+    }
+    const current = this._configFromCodexToml().model;
+    if (current && !seen.has(current)) {
+      seen.add(current);
+      out.push({ id: current, provider: 'codex', label: current });
+    }
+    return out;
+  }
+
+  /**
+   * Reasoning-effort levels Codex accepts for the active model, read out of its
+   * own `models_cache.json`: each entry carries `supported_reasoning_levels`
+   * and a `default_reasoning_level`. Scoped to the model actually in use - a
+   * union across every cached model would advertise levels the selected one
+   * rejects - and [] when that model is not in the cache.
+   */
+  _listEffortLevels() {
+    const entry = this._activeModelCacheEntry();
+    const levels = entry && Array.isArray(entry.supported_reasoning_levels)
+      ? entry.supported_reasoning_levels
+      : [];
+    const out = [];
+    const seen = new Set();
+    for (const lv of levels) {
+      const id = typeof lv === 'string' ? lv : (lv && lv.effort);
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, label: id });
+    }
+    return out;
+  }
+
+  /** The models_cache.json entry for the model currently in use, or null. */
+  _activeModelCacheEntry() {
+    const file = path.join(this._codexHome(), 'models_cache.json');
+    try {
+      if (!fs.existsSync(file)) return null;
+      const cache = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      const models = Array.isArray(cache && cache.models) ? cache.models : [];
+      const current = (this._resolveModel() || '').toLowerCase();
+      if (!current) return null;
+      return models.find((m) => m && String(m.slug || m.id || '').toLowerCase() === current) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Effort in force: a workspace override first, then what config.toml pins,
+   * then the active model's own default from the cache.
+   */
+  _currentEffort(channel) {
+    if (channel && this._channelEfforts[channel]) return this._channelEfforts[channel];
+    if (this._channelEfforts['*']) return this._channelEfforts['*'];
+    const fromConfig = this._configFromCodexToml().effort;
+    if (fromConfig) return fromConfig;
+    const entry = this._activeModelCacheEntry();
+    return (entry && entry.default_reasoning_level) || '';
+  }
+
+  /**
+   * Model forwarded to Codex, in priority order:
+   *   1. a workspace override (per-message, per-channel, or global set_model)
+   *   2. what Codex's own config.toml says the user selected
+   *   3. this agent's env (legacy configuration path)
+   */
+  _resolveModel(channel, msg) {
+    const override = super._resolveModel(channel, msg);
+    if (override) return override;
+    return this._configFromCodexToml().model || this._directModel || undefined;
+  }
+
+  /**
+   * Read-only runtime snapshot for the workspace UI. `available_models` is
+   * omitted entirely — not padded with the current model — when Codex has no
+   * model cache to read, so the UI shows "not configured" instead of a guess.
+   */
+  async fetchAndReportUsage() {
+    try {
+      const fromConfig = this._configFromCodexToml();
+      const current = this._resolveModel() || null;
+      const source = !current ? 'unconfigured'
+        : (current !== fromConfig.model && current !== this._directModel) ? 'workspace-override'
+        : current === fromConfig.model ? 'codex-config'
+        : 'agent-env';
+      const models = this._listModels();
+      const efforts = this._listEffortLevels();
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: current,
+          available_models: models.length ? JSON.stringify(models) : null,
+          current_effort: this._currentEffort() || null,
+          available_efforts: efforts.length ? JSON.stringify(efforts) : null,
+          raw_text: `codex mode=${this._useCliMode ? 'cli' : 'direct'} model_source=${source}`
+            + (fromConfig.provider ? ` provider=${fromConfig.provider}` : ''),
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
   async _onControlAction(action, payload) {
+    if (action === 'set_effort') {
+      const requested = payload && (payload.effort || payload.model);
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      const levels = this._listEffortLevels();
+      if (levels.length && !levels.some((l) => l.id.toLowerCase() === String(requested).toLowerCase())) {
+        this._log(`set_effort: '${requested}' is not supported by the active model (${levels.map((l) => l.id).join(', ')}) - ignoring`);
+        return;
+      }
+      if (channel) this._channelEfforts[channel] = requested;
+      else this._channelEfforts['*'] = requested;
+      this._log(`Reasoning effort for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+        this.model = requested;
+        this._directModel = requested;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'stop') {
       const requestedChannel = (payload && typeof payload === 'object') ? payload.channel : null;
       const processes = requestedChannel
@@ -355,9 +554,9 @@ class CodexAdapter extends BaseAdapter {
     await this.sendStatus(msgChannel, 'thinking...');
 
     if (this._useCliMode) {
-      await this._handleViaSubprocess(content, msgChannel);
+      await this._handleViaSubprocess(content, msgChannel, msg);
     } else if (this._directMode) {
-      await this._handleViaDirectApi(content, msgChannel);
+      await this._handleViaDirectApi(content, msgChannel, msg);
     } else {
       await this.sendError(msgChannel, this._unavailableReason());
     }
@@ -367,21 +566,14 @@ class CodexAdapter extends BaseAdapter {
   // CLI subprocess mode (primary)
   // ------------------------------------------------------------------
 
-  async _handleViaSubprocess(content, msgChannel) {
+  async _handleViaSubprocess(content, msgChannel, msg) {
     const env = { ...(this.agentEnv || process.env) };
+    const activeModel = this._resolveModel(msgChannel, msg) || this._directModel;
 
     // Set model via env if configured
-    if (this._directModel) env.CODEX_MODEL = this._directModel;
+    if (activeModel) env.CODEX_MODEL = activeModel;
     if (this._directApiKey) env.OPENAI_API_KEY = this._directApiKey;
     if (this._directBaseUrl) env.OPENAI_BASE_URL = this._directBaseUrl;
-    // A native `codex login` session must not be silently overridden by an
-    // inherited API key. This commonly happens when the launcher daemon was
-    // started from a shell configured for a different OpenAI-compatible proxy.
-    if (!this._directApiKey) delete env.OPENAI_API_KEY;
-    if (!this._directBaseUrl) delete env.OPENAI_BASE_URL;
-    // A native `codex login` session must not be silently overridden by an
-    // inherited API key. This commonly happens when the launcher daemon was
-    // started from a shell configured for a different OpenAI-compatible proxy.
     if (!this._directApiKey) delete env.OPENAI_API_KEY;
     if (!this._directBaseUrl) delete env.OPENAI_BASE_URL;
 
@@ -401,11 +593,16 @@ class CodexAdapter extends BaseAdapter {
       cmd.push('--json', '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check');
 
       // Model override
-      if (this._directModel) {
-        cmd.push('-m', this._directModel);
+      if (activeModel) {
+        cmd.push('-m', activeModel);
+      }
+      const activeEffort = this._currentEffort(msgChannel);
+      if (activeEffort) {
+        // Codex exposes no --effort flag; its documented route is the -c override.
+        cmd.push('-c', `model_reasoning_effort="${activeEffort}"`);
       }
 
-      this._log(`Spawning: codex exec ${threadId && attempt === 0 ? `resume ${threadId} ` : ''}--json --full-auto -m ${this._directModel || 'default'}`);
+      this._log(`Spawning: codex exec ${threadId && attempt === 0 ? `resume ${threadId} ` : ''}--json --full-auto -m ${activeModel || 'default'}`);
 
       try {
         const result = await this._spawnCodex(cmd, env, msgChannel, fullPrompt);
@@ -635,9 +832,10 @@ class CodexAdapter extends BaseAdapter {
   // Direct HTTP mode (fallback when CLI not available)
   // ------------------------------------------------------------------
 
-  async _handleViaDirectApi(content, msgChannel) {
+  async _handleViaDirectApi(content, msgChannel, msg) {
     try {
-      const responseText = await this._callCompletionApi(content, msgChannel);
+      const activeModel = this._resolveModel(msgChannel, msg) || this._directModel || 'gpt-4o';
+      const responseText = await this._callCompletionApi(content, msgChannel, msg);
       if (responseText) {
         this._conversationHistory.push({ role: 'user', content });
         this._conversationHistory.push({ role: 'assistant', content: responseText });
@@ -650,7 +848,7 @@ class CodexAdapter extends BaseAdapter {
         // hid the usual causes here — wrong model id, or a proxy that answers
         // 200 with no choices — neither of which a retry fixes.
         await this.sendError(msgChannel, 'codex produced no response — the API returned an empty completion'
-          + ` (endpoint: ${this._directBaseUrl || 'default'}, model: ${this._directModel || 'gpt-4o'})`);
+          + ` (endpoint: ${this._directBaseUrl || 'default'}, model: ${activeModel})`);
       }
     } catch (e) {
       const reason = this._describeThrown(e);
@@ -659,15 +857,16 @@ class CodexAdapter extends BaseAdapter {
     }
   }
 
-  async _callCompletionApi(userMessage, channel) {
+  async _callCompletionApi(userMessage, channel, msg) {
     const systemPrompt = this._buildSystemContext(channel);
     const messages = [{ role: 'system', content: systemPrompt }];
     messages.push(...this._conversationHistory);
     messages.push({ role: 'user', content: userMessage });
 
+    const activeModel = this._resolveModel(channel, msg) || this._directModel || 'gpt-4o';
     const url = `${this._directBaseUrl}/chat/completions`;
     const payload = JSON.stringify({
-      model: this._directModel || 'gpt-4o',
+      model: activeModel,
       messages,
       stream: true,
     });

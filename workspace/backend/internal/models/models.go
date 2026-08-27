@@ -444,6 +444,11 @@ type AgentUsageRecord struct {
 	Last7dSummary      *string   `gorm:"type:text" json:"last_7d_summary"`
 	CurrentModel       *string   `gorm:"type:text" json:"current_model"`
 	AvailableModels    *string   `gorm:"type:text" json:"available_models"`
+	// Reasoning-effort level the agent's CLI is set to, and the levels that CLI
+	// actually accepts (JSON array). Both come from the CLI itself; a nil value
+	// means "this runtime has no effort concept", not "default".
+	CurrentEffort      *string   `gorm:"type:text" json:"current_effort"`
+	AvailableEfforts   *string   `gorm:"type:text" json:"available_efforts"`
 	RawText            *string   `gorm:"type:text" json:"raw_text"`
 	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

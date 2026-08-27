@@ -319,8 +319,15 @@ function buildClineArgs(o) {
   } else {
     args.push('--auto-approve', 'true');
   }
-  if (o.provider) args.push('-P', o.provider);
-  if (o.model) args.push('-m', o.model);
+  let provider = o.provider;
+  let model = o.model;
+  if (model && model.includes('/')) {
+    const slash = model.indexOf('/');
+    provider = model.slice(0, slash);
+    model = model.slice(slash + 1);
+  }
+  if (provider) args.push('-P', provider);
+  if (model) args.push('-m', model);
   if (o.apiKey) args.push('-k', o.apiKey);
   if (o.thinking) args.push('--thinking', o.thinking);
   if (o.timeoutSec && Number(o.timeoutSec) > 0) args.push('-t', String(Math.floor(Number(o.timeoutSec))));

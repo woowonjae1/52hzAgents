@@ -28,11 +28,16 @@ const path = require('path');
 const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
+const { captureCli, parseHelpChoices, sliceSection, parseParenLabelledList, toOptions } = require('./model-introspection');
 const { buildOpenclawSystemPrompt } = require('./workspace-prompt');
 const { whichBinary, getEnhancedEnv } = require('../paths');
 const { REASON, classifySpawnError, redactDiagnostic, shouldUseShellForBinary } = require('./health-status');
 
 const IS_WINDOWS = process.platform === 'win32';
+
+// `amp plugin show-agent-options` and `amp --help` run off the 30s heartbeat,
+// so both are cached.
+const INTROSPECT_CACHE_TTL_MS = 5 * 60 * 1000;
 // Terminate the subprocess if it produces no output for this long (a wedged
 // turn) — guards the daemon against a hung Amp process without arbitrary sleeps.
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
@@ -62,6 +67,11 @@ class AmpAdapter extends BaseAdapter {
     );
     this._loadSessions();
 
+    this._channelEfforts = {};
+    this._modelsCache = null;
+    this._modelsInFlight = null;
+    this._effortCache = null;
+    this._effortInFlight = null;
     this._ampBin = this._findAmpBinary();
     if (this._ampBin) {
       this._log(`Using Amp CLI: ${this._ampBin}`);
@@ -186,27 +196,156 @@ class AmpAdapter extends BaseAdapter {
 
   _buildAmpCmd(channelName, resume) {
     const threadId = resume ? this._channelThreads[channelName] : null;
-    if (threadId) {
-      return [this._ampBin, 'threads', 'continue', threadId, '-x', '--stream-json'];
+    const args = threadId
+      ? [this._ampBin, 'threads', 'continue', threadId, '-x', '--stream-json']
+      : [this._ampBin, '-x', '--stream-json'];
+    const activeModel = this._resolveModel(channelName) || (this.agentEnv || process.env).AMP_MODEL;
+    if (activeModel) {
+      // NOTE: `--model` is entitlement-gated on Amp - accounts without it get
+      // "Error: The --model flag is not enabled for your account." So it is
+      // passed only when a model was actually chosen, never on the default
+      // path, and the run error is surfaced verbatim rather than swallowed.
+      args.push('--model', activeModel);
     }
-    return [this._ampBin, '-x', '--stream-json'];
+    const activeMode = this._currentEffort(channelName);
+    if (activeMode) {
+      args.push('--mode', activeMode);
+    }
+    return args;
   }
 
   // ------------------------------------------------------------------
-  // Control actions (stop)
+  // Control actions (stop / set_model)
   // ------------------------------------------------------------------
 
+  /**
+   * Every model this account can actually reach, from
+   * `amp plugin show-agent-options` - Amp's own answer, printed as
+   * `  <provider/model> (<Label>)` under a "Models" heading. Scoped to that
+   * section so the "Built-in tools" block below it can never be read as models.
+   */
+  async _listModels() {
+    const now = Date.now();
+    if (this._modelsCache && now - this._modelsCache.at < INTROSPECT_CACHE_TTL_MS) {
+      return this._modelsCache.models;
+    }
+    if (this._modelsInFlight) return this._modelsInFlight;
+
+    const bin = this._ampBin || this._findAmpBinary();
+    if (!bin) return [];
+
+    this._modelsInFlight = captureCli(bin, ['plugin', 'show-agent-options'], { env: this.agentEnv || process.env })
+      .then((out) => {
+        const section = sliceSection(out, 'Models');
+        const models = toOptions(parseParenLabelledList(section), 'amp');
+        if (models.length) this._modelsCache = { at: Date.now(), models };
+        return models;
+      })
+      .catch(() => [])
+      .finally(() => { this._modelsInFlight = null; });
+    return this._modelsInFlight;
+  }
+
+  /**
+   * Amp's effort analogue is `--mode`, which its own help describes as
+   * controlling "the model, system prompt, and tool selection". The accepted
+   * values are read out of `amp --help` rather than listed here.
+   */
+  async _listEffortLevels() {
+    const now = Date.now();
+    if (this._effortCache && now - this._effortCache.at < INTROSPECT_CACHE_TTL_MS) {
+      return this._effortCache.levels;
+    }
+    if (this._effortInFlight) return this._effortInFlight;
+
+    const bin = this._ampBin || this._findAmpBinary();
+    if (!bin) return [];
+
+    this._effortInFlight = captureCli(bin, ['--help'], { env: this.agentEnv || process.env, timeoutMs: 20000, includeStderr: true })
+      .then((help) => {
+        const levels = parseHelpChoices(help, '--mode').map((id) => ({ id, label: id }));
+        if (levels.length) this._effortCache = { at: Date.now(), levels };
+        return levels;
+      })
+      .catch(() => [])
+      .finally(() => { this._effortInFlight = null; });
+    return this._effortInFlight;
+  }
+
+  _currentEffort(channel) {
+    if (channel && this._channelEfforts[channel]) return this._channelEfforts[channel];
+    return this._channelEfforts['*'] || '';
+  }
+
+  async fetchAndReportUsage() {
+    try {
+      const env = this.agentEnv || process.env;
+      const current = this._resolveModel() || env.AMP_MODEL || null;
+      const models = await this._listModels();
+      const efforts = await this._listEffortLevels();
+      const effort = this._currentEffort() || null;
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: current,
+          available_models: models.length ? JSON.stringify(models) : null,
+          current_effort: effort,
+          available_efforts: efforts.length ? JSON.stringify(efforts) : null,
+          raw_text: `amp model=${current || 'account-default'} mode=${effort || 'account-default'}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
   async _onControlAction(action, payload) {
+    if (action === 'set_effort') {
+      const requested = payload && (payload.effort || payload.model);
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      const levels = await this._listEffortLevels();
+      if (levels.length && !levels.some((l) => l.id.toLowerCase() === String(requested).toLowerCase())) {
+        this._log(`set_effort: '${requested}' is not one of ${levels.map((l) => l.id).join(', ')} - ignoring`);
+        return;
+      }
+      if (channel) this._channelEfforts[channel] = requested;
+      else this._channelEfforts['*'] = requested;
+      this._log(`Mode override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+        this.model = requested;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'stop') {
-      for (const [channel, proc] of Object.entries(this._channelProcesses)) {
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (channel && this._channelProcesses[channel]) {
         this._stoppingChannels.add(channel);
-        await this._stopProcess(proc);
+        await this._stopProcess(this._channelProcesses[channel]);
         delete this._channelProcesses[channel];
-        try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
+        try { await this.sendResponse(channel, 'Execution stopped by user.'); } catch {}
+      } else {
+        await this._stopAllProcesses('Execution stopped by user.');
       }
       return;
     }
-    // Shared actions (status, routines, skill.install/uninstall).
     await super._onControlAction(action, payload);
   }
 

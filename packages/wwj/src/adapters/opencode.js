@@ -225,6 +225,31 @@ class OpenCodeAdapter extends BaseAdapter {
   }
 
   async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+
+      const known = await this._listModels();
+      let targetModel = requested;
+      if (known && known.length) {
+        const exact = known.find((m) => m.id === requested || m.id.toLowerCase() === requested.toLowerCase());
+        const suffix = known.find((m) => m.id.endsWith('/' + requested) || requested.endsWith('/' + m.id));
+        if (exact) targetModel = exact.id;
+        else if (suffix) targetModel = suffix.id;
+      }
+
+      if (channel) {
+        this._channelModels[channel] = targetModel;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = targetModel;
+        this._channelModels['*'] = targetModel;
+        this.model = targetModel;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${targetModel}' (this session only)`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'stop') {
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
       if (channel) {
@@ -800,7 +825,7 @@ class OpenCodeAdapter extends BaseAdapter {
    * interactive picker.
    */
   _resolveModel(channel) {
-    const override = channel && this._channelModels[channel];
+    const override = (channel && this._channelModels[channel]) || this._channelModels['*'];
     if (override) return override;
 
     const fromConfig = this._modelFromCliConfig();
@@ -909,14 +934,24 @@ class OpenCodeAdapter extends BaseAdapter {
    */
   async fetchAndReportUsage() {
     try {
-      const override = Object.values(this._channelModels)[0] || '';
+      const override = (this._channelModels && this._channelModels['*']) || this.model || '';
       const fromConfig = this._modelFromCliConfig();
       const currentId = override || fromConfig || this._resolveModel();
       const source = override ? 'workspace-override'
         : fromConfig ? 'cli-config'
         : currentId ? 'agent-env'
         : 'unknown';
-      const models = await this._listModels();
+      let models = await this._listModels();
+      if (!models || models.length === 0) {
+        if (currentId) {
+          const slash = currentId.indexOf('/');
+          models = [{
+            id: currentId,
+            provider: slash > 0 ? currentId.slice(0, slash) : this.flavor.id,
+            label: slash > 0 ? currentId.slice(slash + 1) : currentId,
+          }];
+        }
+      }
       await this.client.reportAgentUsage(
         this.workspaceId,
         this.agentName,
@@ -924,7 +959,7 @@ class OpenCodeAdapter extends BaseAdapter {
           session_used_percent: 0,
           week_used_percent: 0,
           current_model: currentId || null,
-          available_models: models.length ? JSON.stringify(models) : null,
+          available_models: models && models.length ? JSON.stringify(models) : null,
           raw_text: `flavor=${this.flavor.id} model_source=${source}`,
         },
         this.token
@@ -961,36 +996,6 @@ class OpenCodeAdapter extends BaseAdapter {
       // Non-zero exit still carries usable stdout for `models`.
       proc.on('close', () => { clearTimeout(timer); resolve(out); });
     });
-  }
-
-  async _onControlAction(action, payload) {
-    if (action === 'set_model') {
-      const requested = payload && payload.model;
-      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
-      if (!requested) return;
-
-      // Only accept something the CLI itself declared. An id we cannot see in
-      // `<cli> models` would be forwarded to `--model` and fail per-run with an
-      // opaque provider error, so reject it here where we can say why.
-      const known = await this._listModels();
-      if (known.length && !known.some((m) => m.id === requested)) {
-        this._log(`set_model: '${requested}' is not in \`${this.flavor.binaryCandidates[0]} models\` — ignoring`);
-        return;
-      }
-
-      if (channel) {
-        this._channelModels[channel] = requested;
-      } else {
-        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
-        this._channelModels['*'] = requested;
-      }
-      // Deliberately no disk write and no edit to the CLI's config: this is a
-      // per-run forward, and the CLI stays the owner of the default.
-      this._log(`Model override for channel=${channel || 'all'} set to '${requested}' (this session only)`);
-      this.fetchAndReportUsage().catch(() => {});
-      return;
-    }
-    await super._onControlAction(action, payload);
   }
 
   _runOpencode(content, msgChannel) {

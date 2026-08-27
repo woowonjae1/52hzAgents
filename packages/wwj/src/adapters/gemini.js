@@ -125,10 +125,48 @@ class GeminiAdapter extends BaseAdapter {
     } catch {}
   }
 
-  async _onControlAction(action, _payload) {
+  async fetchAndReportUsage() {
+    try {
+      const env = this.agentEnv || process.env;
+      const current = this._resolveModel() || env.GEMINI_MODEL || env.GOOGLE_GEMINI_MODEL || null;
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: current,
+          available_models: current ? JSON.stringify([{ id: current, provider: 'Google', label: current }]) : null,
+          raw_text: `gemini model=${current || 'default'}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
+  async _onControlAction(action, payload) {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+        this.model = requested;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'stop') {
       await this._stopAllProcesses();
+      return;
     }
+    await super._onControlAction(action, payload);
   }
 
   async _stopProcess(proc) {
@@ -299,10 +337,9 @@ class GeminiAdapter extends BaseAdapter {
 
     const cmd = [geminiBin, '-p', fullPrompt, '-y', '-o', 'stream-json'];
 
-    // Honor a user-configured model (e.g. when pointing at a relay/proxy whose
-    // channels don't match the CLI default). Set via GEMINI_MODEL in env_config.
+    // Honor a user-configured model
     const env = this.agentEnv || process.env;
-    const model = (env.GEMINI_MODEL || env.GOOGLE_GEMINI_MODEL || '').trim();
+    const model = (this._resolveModel(channelName) || env.GEMINI_MODEL || env.GOOGLE_GEMINI_MODEL || '').trim();
     if (model) cmd.push('-m', model);
 
     const sessionId = this._channelSessions[channelName];

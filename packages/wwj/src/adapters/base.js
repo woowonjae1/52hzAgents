@@ -132,6 +132,8 @@ class BaseAdapter {
     // path|size|mtime of files already registered into the workspace Files space,
     // so an unchanged file is not re-uploaded on every turn that touches it.
     this._registeredFiles = new Set();
+    this.model = undefined;
+    this._channelModels = {};
     // Adapter logs must reach ~/.wwj/daemon.log the same way Daemon._log does:
     // by appending to the file directly. Relying on console.log only works when
     // the daemon's stdout is redirected into the log file (the `wwj up` path,
@@ -470,6 +472,44 @@ class BaseAdapter {
     } catch {}
   }
 
+  _resolveModel(channel, msg) {
+    if (msg) {
+      let explicit = null;
+      if (msg.metadata?.agent_models && typeof msg.metadata.agent_models === 'object') {
+        const models = msg.metadata.agent_models;
+        const nameLower = (this.agentName || '').toLowerCase();
+        const typeLower = (this.agentType || '').toLowerCase();
+        explicit =
+          models[this.agentName] ||
+          models[nameLower] ||
+          (this.agentType && models[this.agentType]) ||
+          (typeLower && models[typeLower]);
+        if (!explicit) {
+          for (const k of Object.keys(models)) {
+            const kLower = k.toLowerCase();
+            if (kLower === nameLower || (typeLower && kLower === typeLower)) {
+              explicit = models[k];
+              break;
+            }
+          }
+        }
+      }
+      explicit =
+        explicit ||
+        msg.metadata?.selected_model ||
+        msg.metadata?.model ||
+        msg.model;
+      if (explicit) return explicit;
+    }
+    if (channel && this._channelModels && this._channelModels[channel]) {
+      return this._channelModels[channel];
+    }
+    if (this._channelModels && this._channelModels['*']) {
+      return this._channelModels['*'];
+    }
+    return this.model || undefined;
+  }
+
   /**
    * Handle adapter-specific control actions. Override in subclasses to add
    * per-adapter actions (`stop`, `restart`, …); always call
@@ -478,7 +518,23 @@ class BaseAdapter {
    * working uniformly across adapter types.
    */
   async _onControlAction(action, payload) {
-    if (action === 'status') {
+    if (action === 'set_model') {
+      const requested = payload && payload.model;
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      if (channel) {
+        this._channelModels[channel] = requested;
+      } else {
+        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
+        this._channelModels['*'] = requested;
+        this.model = requested;
+      }
+      this._log(`Model override for channel=${channel || 'all'} set to '${requested}'`);
+      if (typeof this.fetchAndReportUsage === 'function') {
+        this.fetchAndReportUsage().catch(() => {});
+      }
+      return;
+    } else if (action === 'status') {
       await this._postStatusReport(payload);
     } else if (action === 'routines') {
       await this._postRoutinesReport(payload);

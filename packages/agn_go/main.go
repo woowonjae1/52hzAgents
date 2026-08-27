@@ -325,11 +325,10 @@ func runCreate() {
 		os.Exit(1)
 	}
 
-	// 校验该类型是否在注册表中受支持。
 	entry := registry.GetEntry(agentType)
 	if entry == nil {
 		fmt.Printf("Error: unknown agent type '%s'.\n", agentType)
-		fmt.Println("Supported types: aider, amp, claude, cline, codex, copilot, cursor, gemini, goose, hermes, kimi, mini-swe-agent, nanoclaw, openclaw, opencode")
+		fmt.Printf("Supported types: %s\n", strings.Join(registry.GetSupportedTypes(), ", "))
 		os.Exit(1)
 	}
 

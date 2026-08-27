@@ -425,6 +425,10 @@ export interface AgentUsage {
   last_7d_summary: string | null;
   current_model?: string | null;
   available_models?: string | null;
+  /** Reasoning-effort level the agent's CLI is set to, and the levels it accepts
+   *  (JSON array). Null means the runtime has no effort concept, not "default". */
+  current_effort?: string | null;
+  available_efforts?: string | null;
   raw_text: string | null;
   updated_at: string;
 }

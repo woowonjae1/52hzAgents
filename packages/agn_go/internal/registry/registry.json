@@ -10,7 +10,11 @@
       "open-source"
     ],
     "builtin": true,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "install": {
       "binary": "aider",
       "macos": "curl -LsSf https://aider.chat/install.sh | sh",
@@ -75,7 +79,11 @@
       "vscode"
     ],
     "builtin": true,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "install": {
       "binary": "amp",
       "macos": "curl -fsSL https://ampcode.com/install.sh | bash",
@@ -119,7 +127,11 @@
     ],
     "featured": true,
     "order": 1,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "builtin": true,
     "install": {
       "binary": "claude",
@@ -155,6 +167,37 @@
     "env_config": []
   },
   {
+    "name": "antigravity",
+    "label": "Google Antigravity (AGY)",
+    "description": "Google Antigravity agentic coding platform with Gemini 3.5 models",
+    "homepage": "https://antigravity.google",
+    "tags": [
+      "coding",
+      "cli",
+      "gemini",
+      "google"
+    ],
+    "featured": true,
+    "order": 2,
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
+    "builtin": true,
+    "install": {
+      "binary": "agy"
+    },
+    "adapter": {
+      "module": "openagents.adapters.antigravity",
+      "class": "AntigravityAdapter"
+    },
+    "launch": {
+      "args": []
+    },
+    "env_config": []
+  },
+  {
     "name": "cline",
     "label": "Cline",
     "description": "Autonomous coding agent CLI by Cline Bot",
@@ -165,7 +208,11 @@
       "autonomous"
     ],
     "builtin": true,
-    "support": { "install": true, "workspace": true, "collaboration": false },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": false
+    },
     "install": {
       "binary": "cline",
       "requires": [
@@ -229,7 +276,11 @@
     ],
     "featured": true,
     "order": 3,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "builtin": true,
     "install": {
       "binary": "codex",
@@ -304,7 +355,11 @@
       "cli"
     ],
     "order": 9,
-    "support": { "install": true, "workspace": true, "collaboration": false },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": false
+    },
     "builtin": true,
     "install": {
       "binary": "copilot",
@@ -399,7 +454,7 @@
     ],
     "check_ready": {
       "binary": "agent",
-      "not_ready_message": "Cursor CLI not found \u2014 install with: curl https://cursor.com/install -fsSL | bash"
+      "not_ready_message": "Cursor CLI not found — install with: curl https://cursor.com/install -fsSL | bash"
     },
     "resolve_env": {
       "rules": [
@@ -426,7 +481,11 @@
       "cli"
     ],
     "builtin": true,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "install": {
       "binary": "gemini",
       "requires": [
@@ -538,7 +597,7 @@
   {
     "name": "nanoclaw",
     "label": "NanoClaw",
-    "description": "Containerized agent runtime \u2014 each Agent Group runs in its own Docker container (Claude Agent SDK). Bridged to the Workspace via a native OpenAgents channel.",
+    "description": "Containerized agent runtime — each Agent Group runs in its own Docker container (Claude Agent SDK). Bridged to the Workspace via a native OpenAgents channel.",
     "homepage": "https://github.com/nanocoai/nanoclaw",
     "tags": [
       "coding",
@@ -548,7 +607,11 @@
       "open-source"
     ],
     "builtin": true,
-    "support": { "install": true, "workspace": true, "collaboration": false },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": false
+    },
     "install": {
       "binary": "ncl",
       "requires": [
@@ -584,7 +647,7 @@
         "NANOCLAW_AGENT_GROUP"
       ],
       "saved_env_key": "NANOCLAW_AGENT_GROUP",
-      "not_ready_message": "Set NANOCLAW_AGENT_GROUP (and NANOCLAW_HOME) \u2014 press e to configure"
+      "not_ready_message": "Set NANOCLAW_AGENT_GROUP (and NANOCLAW_HOME) — press e to configure"
     }
   },
   {
@@ -598,7 +661,11 @@
     ],
     "featured": true,
     "order": 2,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "builtin": true,
     "install": {
       "binary": "openclaw",
@@ -668,7 +735,7 @@
         "OPENAI_API_KEY"
       ],
       "saved_env_key": "LLM_API_KEY",
-      "not_ready_message": "Not configured \u2014 press e to configure"
+      "not_ready_message": "Not configured — press e to configure"
     }
   },
   {
@@ -742,7 +809,7 @@
       ],
       "saved_env_key": "LLM_API_KEY",
       "min_version": "1.17.0",
-      "not_ready_message": "Not configured \u2014 press e to configure"
+      "not_ready_message": "Not configured — press e to configure"
     }
   },
   {
@@ -757,7 +824,11 @@
     ],
     "featured": true,
     "order": 7,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "builtin": true,
     "install": {
       "binary": "kimi",
@@ -817,11 +888,17 @@
     ],
     "featured": true,
     "order": 6,
-    "support": { "install": true, "workspace": true, "collaboration": true },
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
     "builtin": true,
     "install": {
       "binary": "hermes",
-      "requires": ["python3"],
+      "requires": [
+        "python3"
+      ],
       "macos": "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
       "linux": "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-setup",
       "windows": "\"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -ExecutionPolicy Bypass -Command \"Invoke-RestMethod -UseBasicParsing 'https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1' | Invoke-Expression\""
@@ -834,6 +911,160 @@
       "status_command": "hermes status",
       "login_command": "hermes setup",
       "not_ready_message": "Hermes not configured — run: hermes setup"
+    }
+  },
+  {
+    "name": "pi",
+    "label": "Pi Agent",
+    "description": "Multi-provider coding agent CLI with read/bash/edit/write tools (@earendil-works/pi-coding-agent).",
+    "homepage": "https://openagents.org",
+    "tags": [
+      "coding",
+      "cli"
+    ],
+    "builtin": true,
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
+    "install": {
+      "binary": "pi",
+      "npm_package": "@earendil-works/pi-coding-agent",
+      "api_only": true
+    },
+    "adapter": {
+      "module": "openagents.adapters.pi",
+      "class": "PiAdapter"
+    },
+    "launch": {
+      "args": []
+    }
+  },
+  {
+    "name": "kilocode",
+    "label": "Kilo Code",
+    "description": "Open-source agent for full-stack engineering and coding",
+    "homepage": "https://kilo.ai",
+    "tags": [
+      "coding",
+      "open-source",
+      "cli",
+      "terminal"
+    ],
+    "featured": true,
+    "order": 6,
+    "builtin": true,
+    "install": {
+      "binary": "kilo",
+      "requires": [
+        "nodejs"
+      ],
+      "macos": "npm install -g @kilocode/cli",
+      "linux": "npm install -g @kilocode/cli",
+      "windows": "npm install -g @kilocode/cli"
+    },
+    "adapter": {
+      "module": "openagents.adapters.opencode",
+      "class": "OpenCodeAdapter"
+    },
+    "env_config": [
+      {
+        "name": "LLM_API_KEY",
+        "description": "API key",
+        "required": true,
+        "password": true
+      },
+      {
+        "name": "LLM_BASE_URL",
+        "description": "API base URL (OpenAI-compatible endpoint)",
+        "required": false,
+        "default": "https://api.openai.com/v1",
+        "placeholder": "https://api.openai.com/v1"
+      },
+      {
+        "name": "LLM_MODEL",
+        "description": "Model name",
+        "required": true,
+        "placeholder": "gpt-4o, claude-3-7-sonnet, deepseek-chat, etc."
+      }
+    ],
+    "resolve_env": {
+      "rules": [
+        {
+          "from": "LLM_API_KEY",
+          "to": "OPENAI_API_KEY"
+        },
+        {
+          "from": "LLM_BASE_URL",
+          "to": "OPENAI_BASE_URL"
+        },
+        {
+          "from": "LLM_MODEL",
+          "to": "KILO_MODEL"
+        }
+      ]
+    },
+    "check_ready": {
+      "env_vars": [
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY"
+      ],
+      "saved_env_key": "LLM_API_KEY",
+      "config_file": {
+        "path": "~/.config/kilo/kilo.json",
+        "key": "model"
+      }
+    }
+  },
+  {
+    "name": "deepseek",
+    "label": "DeepSeek",
+    "description": "DeepSeek native AI reasoning and coding models",
+    "homepage": "https://deepseek.com",
+    "tags": [
+      "coding",
+      "direct-api",
+      "cloud"
+    ],
+    "featured": true,
+    "order": 7,
+    "builtin": true,
+    "install": {
+      "binary": "deepseek",
+      "api_only": true
+    },
+    "adapter": {
+      "module": "openagents.adapters.deepseek",
+      "class": "DeepSeekAdapter"
+    },
+    "env_config": [
+      {
+        "name": "DEEPSEEK_API_KEY",
+        "description": "DeepSeek API key",
+        "required": true,
+        "password": true
+      },
+      {
+        "name": "DEEPSEEK_BASE_URL",
+        "description": "DeepSeek API base URL",
+        "required": false,
+        "default": "https://api.deepseek.com",
+        "placeholder": "https://api.deepseek.com"
+      },
+      {
+        "name": "DEEPSEEK_MODEL",
+        "description": "Model name (deepseek-chat or deepseek-reasoner)",
+        "required": false,
+        "default": "deepseek-chat",
+        "placeholder": "deepseek-chat"
+      }
+    ],
+    "check_ready": {
+      "env_vars": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "saved_env_key": "DEEPSEEK_API_KEY"
     }
   },
   {
@@ -929,6 +1160,32 @@
         "DEEPSEEK_API_KEY"
       ],
       "not_ready_message": "mini-SWE-agent CLI detected. Configure a model through environment variables (MSWEA_MODEL_NAME + a provider key), a full config file (MSWEA_MINI_CONFIG_PATH), or the Model field before running a task."
+    }
+  },
+  {
+    "name": "custom",
+    "label": "Custom Agent",
+    "description": "Any agent CLI wwj has no built-in adapter for. You supply the command; it runs once per message with the prompt on argv ({prompt}) or stdin.",
+    "homepage": "https://openagents.org",
+    "tags": [
+      "custom"
+    ],
+    "builtin": true,
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
+    "install": {
+      "binary": "custom",
+      "api_only": true
+    },
+    "adapter": {
+      "module": "openagents.adapters.custom",
+      "class": "CustomAdapter"
+    },
+    "launch": {
+      "args": []
     }
   }
 ]

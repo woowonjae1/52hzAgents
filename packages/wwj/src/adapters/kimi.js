@@ -42,14 +42,19 @@ class KimiAdapter extends LlmDirectAdapter {
       DEFAULT_BASE_URL
     ).replace(/\/$/, '');
 
-    const model =
+    // DEFAULT_MODEL is this vendor's documented default, used so a run can still
+    // go out - but it is NOT the user's configuration, and the flag below keeps
+    // the workspace from reporting it as though it were.
+    const configuredModel =
       env.KIMI_MODEL ||
       env.LLM_MODEL ||
-      DEFAULT_MODEL;
+      '';
+    const model = configuredModel || DEFAULT_MODEL;
 
     this._apiKey = apiKey;
     this._baseUrl = baseUrl;
     this._model = model;
+    this._modelIsVendorDefault = !configuredModel;
     this._directMode = !!(this._apiKey && this._baseUrl);
 
     if (this._directMode) {

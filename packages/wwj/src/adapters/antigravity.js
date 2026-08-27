@@ -15,6 +15,7 @@ const path = require('path');
 const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
+const { captureCli, parseHelpChoices, parseTabbedList, toOptions } = require('./model-introspection');
 const { whereBinary } = require('../paths');
 const { formatAttachmentsForPrompt, SESSION_DEFAULT_RE, generateSessionTitle, stripSelfMention } = require('./utils');
 const { buildClaudeSystemPrompt } = require('./workspace-prompt');
@@ -22,15 +23,17 @@ const { buildClaudeSystemPrompt } = require('./workspace-prompt');
 const IS_WINDOWS = process.platform === 'win32';
 
 // Standard Antigravity Model Catalog (Exact matching from Antigravity CLI)
-const ANTIGRAVITY_MODELS = [
-  { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', shortName: 'Gemini 3.7 Flash', agyName: 'Gemini 3.7 Flash (Medium)' },
-  { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', shortName: 'Gemini 3.6 Flash', agyName: 'Gemini 3.6 Flash (Medium)' },
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', shortName: 'Gemini 3.5 Flash', agyName: 'Gemini 3.5 Flash (Medium)' },
-  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', shortName: 'Gemini 3.1 Pro', agyName: 'Gemini 3.1 Pro (High)' },
-  { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6 (Thinking)', shortName: 'Sonnet 4.6', agyName: 'Claude Sonnet 4.6 (Thinking)' },
-  { id: 'claude-opus-4.6', name: 'Claude Opus 4.6 (Thinking)', shortName: 'Opus 4.6', agyName: 'Claude Opus 4.6 (Thinking)' },
-  { id: 'gpt-oss-120b', name: 'GPT-OSS 120B (Medium)', shortName: 'GPT-OSS 120B', agyName: 'GPT-OSS 120B (Medium)' },
-];
+// Antigravity's own settings file. `model` holds the exact name the user
+// selected in the CLI (e.g. "Gemini 3.5 Flash (Medium)"). There is no local
+// catalog file listing the selectable models, so this adapter reports the one
+// model it can actually read and nothing else - the UI offers free-text entry
+// for anything the CLI accepts. Read-only; never written here.
+// `agy models` and `agy --help` run off the 30s heartbeat, so both are cached:
+// long enough that a tick costs nothing, short enough that a newly granted
+// model shows up without a restart.
+const INTROSPECT_CACHE_TTL_MS = 5 * 60 * 1000;
+
+const ANTIGRAVITY_SETTINGS_FILE = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'settings.json');
 
 function stripAnsi(str) {
   if (!str) return '';
@@ -78,6 +81,11 @@ class AntigravityAdapter extends BaseAdapter {
     this._channelSessions = {};
     this._channelProcesses = {};
     this._channelModels = {};
+    this._channelEfforts = {};
+    this._modelsCache = null;
+    this._modelsInFlight = null;
+    this._effortCache = null;
+    this._effortInFlight = null;
     this._stoppingChannels = new Set();
 
     this._historyPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'history.jsonl');
@@ -117,7 +125,7 @@ class AntigravityAdapter extends BaseAdapter {
   }
 
   _findAntigravityBinary() {
-    const viaWhich = whichBinary('agy') || whichBinary('antigravity');
+    const viaWhich = whereBinary('agy') || whereBinary('antigravity');
     if (viaWhich) return viaWhich;
 
     const candidates = IS_WINDOWS ? [
@@ -142,21 +150,34 @@ class AntigravityAdapter extends BaseAdapter {
 
   _resolveModel(channel, msg) {
     if (msg) {
-      const explicit =
-        msg.metadata?.agent_models?.antigravity ||
+      let explicit = null;
+      if (msg.metadata?.agent_models && typeof msg.metadata.agent_models === 'object') {
+        const models = msg.metadata.agent_models;
+        const nameLower = (this.agentName || '').toLowerCase();
+        const typeLower = (this.agentType || '').toLowerCase();
+        explicit =
+          models[this.agentName] ||
+          models[nameLower] ||
+          (this.agentType && models[this.agentType]) ||
+          (typeLower && models[typeLower]) ||
+          models.antigravity ||
+          models.agy;
+        if (!explicit) {
+          for (const k of Object.keys(models)) {
+            const kLower = k.toLowerCase();
+            if (kLower === nameLower || (typeLower && kLower === typeLower) || kLower === 'antigravity' || kLower === 'agy') {
+              explicit = models[k];
+              break;
+            }
+          }
+        }
+      }
+      explicit =
+        explicit ||
         msg.metadata?.selected_model ||
         msg.metadata?.model ||
         msg.model;
-      if (explicit) {
-        const found = ANTIGRAVITY_MODELS.find(
-          (m) =>
-            m.id === explicit ||
-            m.name.toLowerCase() === explicit.toLowerCase() ||
-            m.shortName.toLowerCase() === explicit.toLowerCase() ||
-            (m.agyName && m.agyName.toLowerCase() === explicit.toLowerCase())
-        );
-        return found ? (found.agyName || found.name) : explicit;
-      }
+      if (explicit) return explicit;
     }
     if (channel && this._channelModels && this._channelModels[channel]) {
       return this._channelModels[channel];
@@ -164,7 +185,27 @@ class AntigravityAdapter extends BaseAdapter {
     if (this._channelModels && this._channelModels['*']) {
       return this._channelModels['*'];
     }
-    return this.model || (this.agentEnv.ANTIGRAVITY_MODEL || '').trim() || 'Gemini 3.7 Flash (High)';
+    // No fallback model: what the CLI is set to is what settings.json says, and
+    // if that is empty the run uses Antigravity's own default rather than a
+    // name this adapter made up.
+    return this.model
+      || this._modelFromAntigravitySettings()
+      || (this.agentEnv.ANTIGRAVITY_MODEL || '').trim()
+      || undefined;
+  }
+
+  /**
+   * The model the user selected inside Antigravity, read out of the CLI's own
+   * settings.json. Strictly read-only.
+   */
+  _modelFromAntigravitySettings() {
+    try {
+      if (!fs.existsSync(ANTIGRAVITY_SETTINGS_FILE)) return '';
+      const cfg = JSON.parse(fs.readFileSync(ANTIGRAVITY_SETTINGS_FILE, 'utf-8'));
+      return cfg && typeof cfg.model === 'string' ? cfg.model.trim() : '';
+    } catch {
+      return '';
+    }
   }
 
   _getModel(channel) {
@@ -175,29 +216,145 @@ class AntigravityAdapter extends BaseAdapter {
     return this._resolveModel(channel);
   }
 
+  /**
+   * Every model this install can actually reach, from `agy models` - the CLI's
+   * own answer. There is deliberately no catalog in this repo: the ids
+   * Antigravity accepts (`gemini-3.7-flash-medium`) are not the display names
+   * it shows (`Gemini 3.7 Flash (Medium)`), and the table that used to live
+   * here shipped the display names as ids.
+   */
+  async _listModels() {
+    const now = Date.now();
+    if (this._modelsCache && now - this._modelsCache.at < INTROSPECT_CACHE_TTL_MS) {
+      return this._modelsCache.models;
+    }
+    if (this._modelsInFlight) return this._modelsInFlight;
+
+    const bin = this._agyBin || this._findAntigravityBinary();
+    if (!bin) return [];
+
+    this._modelsInFlight = captureCli(bin, ['models'], { env: this.agentEnv || process.env })
+      .then((out) => {
+        const models = toOptions(parseTabbedList(out), 'antigravity');
+        // Only cache a non-empty answer: a failed probe must stay retryable and
+        // must never harden into "this account has no models".
+        if (models.length) this._modelsCache = { at: Date.now(), models };
+        return models;
+      })
+      .catch(() => [])
+      .finally(() => { this._modelsInFlight = null; });
+    return this._modelsInFlight;
+  }
+
+  /** Effort levels this build accepts, from `agy --help`. Costs no API call. */
+  async _listEffortLevels() {
+    const now = Date.now();
+    if (this._effortCache && now - this._effortCache.at < INTROSPECT_CACHE_TTL_MS) {
+      return this._effortCache.levels;
+    }
+    if (this._effortInFlight) return this._effortInFlight;
+
+    const bin = this._agyBin || this._findAntigravityBinary();
+    if (!bin) return [];
+
+    this._effortInFlight = captureCli(bin, ['--help'], { env: this.agentEnv || process.env, timeoutMs: 20000, includeStderr: true })
+      .then((help) => {
+        const levels = parseHelpChoices(help, '--effort').map((id) => ({ id, label: id }));
+        if (levels.length) this._effortCache = { at: Date.now(), levels };
+        return levels;
+      })
+      .catch(() => [])
+      .finally(() => { this._effortInFlight = null; });
+    return this._effortInFlight;
+  }
+
+  /** Effort in force for a channel: a workspace override, else unset. */
+  _currentEffort(channel) {
+    if (channel && this._channelEfforts[channel]) return this._channelEfforts[channel];
+    return this._channelEfforts['*'] || '';
+  }
+
+  async fetchAndReportUsage() {
+    try {
+      const fromSettings = this._modelFromAntigravitySettings();
+      const current = this.getCurrentModel() || null;
+      const source = !current ? 'unconfigured'
+        : current === fromSettings ? 'antigravity-settings'
+        : 'workspace-override';
+      // Only the model Antigravity itself reports. No catalog is shipped here:
+      // an empty list must read as "not configured", never as a guess.
+      const models = await this._listModels();
+      const efforts = await this._listEffortLevels();
+      const effort = this._currentEffort() || null;
+      // settings.json stores the display name ("Gemini 3.5 Flash (Medium)")
+      // while `agy models` keys on the id ("gemini-3.5-flash-medium"). Report
+      // the id so the UI can match the running model against the list instead
+      // of showing a selection that appears to be in neither.
+      const canonical = current
+        ? (models.find((m) => m.id.toLowerCase() === current.toLowerCase())
+          || models.find((m) => m.label.toLowerCase() === current.toLowerCase()))
+        : null;
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: canonical ? canonical.id : current,
+          available_models: models.length ? JSON.stringify(models) : null,
+          current_effort: effort,
+          available_efforts: efforts.length ? JSON.stringify(efforts) : null,
+          raw_text: `antigravity model_source=${source}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
   async _onControlAction(action, payload) {
+    if (action === 'set_effort') {
+      const requested = payload && (payload.effort || payload.model);
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      // Validated against what this build says it accepts, so a stale UI cannot
+      // push a level that makes every subsequent run fail to launch.
+      const levels = await this._listEffortLevels();
+      if (levels.length && !levels.some((l) => l.id.toLowerCase() === String(requested).toLowerCase())) {
+        this._log(`set_effort: '${requested}' is not one of ${levels.map((l) => l.id).join(', ')} - ignoring`);
+        return;
+      }
+      if (channel) this._channelEfforts[channel] = requested;
+      else this._channelEfforts['*'] = requested;
+      this._log(`Effort override for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'set_model') {
       const requested = payload && payload.model;
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
       if (!requested) return;
 
-      const found = ANTIGRAVITY_MODELS.find(
-        (m) =>
-          m.id === requested ||
-          m.name.toLowerCase() === requested.toLowerCase() ||
-          m.shortName.toLowerCase() === requested.toLowerCase() ||
-          (m.agyName && m.agyName.toLowerCase() === requested.toLowerCase())
-      );
-      const targetModelName = found ? (found.agyName || found.name) : requested;
+      // Matched against what `agy models` itself reports, so a display name
+      // ("Gemini 3.5 Flash (Medium)") resolves to the id the CLI accepts
+      // ("gemini-3.5-flash-medium"). An unknown value passes through untouched
+      // rather than being rewritten against a table in this repo.
+      const known = await this._listModels();
+      const lower = String(requested).toLowerCase();
+      const match = known.find((m) => m.id.toLowerCase() === lower)
+        || known.find((m) => m.label.toLowerCase() === lower);
+      const targetModelName = match ? match.id : requested;
 
       if (channel) {
         this._channelModels[channel] = targetModelName;
       } else {
         for (const c of Object.keys(this._channelModels)) this._channelModels[c] = targetModelName;
         this._channelModels['*'] = targetModelName;
+        this.model = targetModelName;
       }
-      this.model = targetModelName;
       this._log(`Model override for channel=${channel || 'all'} set to '${targetModelName}' (this session only)`);
+      this.fetchAndReportUsage().catch(() => {});
       return;
     }
 
@@ -274,6 +431,10 @@ class AntigravityAdapter extends BaseAdapter {
       const agyModelFlag = this._resolveModel(channel, msg);
 
       const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
+      const agyEffort = this._currentEffort(channel);
+      if (agyEffort) {
+        args.push('--effort', agyEffort);
+      }
       if (agyModelFlag) {
         args.push('--model', agyModelFlag);
       }
@@ -530,4 +691,3 @@ class AntigravityAdapter extends BaseAdapter {
 }
 
 module.exports = AntigravityAdapter;
-module.exports.ANTIGRAVITY_MODELS = ANTIGRAVITY_MODELS;

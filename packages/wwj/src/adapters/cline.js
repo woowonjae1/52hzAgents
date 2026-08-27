@@ -29,6 +29,7 @@ const path = require('path');
 const { execSync, execFile, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
+const { captureCli, parseHelpChoices } = require('./model-introspection');
 const { formatAttachmentsForPrompt, SESSION_DEFAULT_RE, generateSessionTitle } = require('./utils');
 const { defaultAgentWorkdir, whichBinary, whereBinary } = require('../paths');
 const {
@@ -63,6 +64,10 @@ const BENIGN_STDERR_RE = /^hook dispatch failed: session\.hook requires a valid 
 // across messages (no `cline --version` per status refresh) yet re-detects
 // after the TTL — short enough that an install/upgrade isn't masked for long.
 const VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
+
+// `cline --help` only changes on upgrade, so its answer is cached well past
+// the heartbeat interval.
+const EFFORT_CACHE_TTL_MS = 30 * 60 * 1000;
 const _clineVersionCache = new Map(); // binPath -> { version, supported, at }
 
 class ClineAdapter extends BaseAdapter {
@@ -79,6 +84,9 @@ class ClineAdapter extends BaseAdapter {
     // channel → child process (the in-flight `cline` run)
     this._channelProcesses = {};
     this._channelModels = {};
+    this._channelEfforts = {};
+    this._effortCache = null;
+    this._effortInFlight = null;
     this._stoppingChannels = new Set();
     this._sessionsFile = path.join(
       os.homedir(), '.wwj', 'sessions',
@@ -130,8 +138,29 @@ class ClineAdapter extends BaseAdapter {
 
   _resolveModel(channel, msg) {
     if (msg) {
-      const explicit =
-        msg.metadata?.agent_models?.cline ||
+      let explicit = null;
+      if (msg.metadata?.agent_models && typeof msg.metadata.agent_models === 'object') {
+        const models = msg.metadata.agent_models;
+        const nameLower = (this.agentName || '').toLowerCase();
+        const typeLower = (this.agentType || '').toLowerCase();
+        explicit =
+          models[this.agentName] ||
+          models[nameLower] ||
+          (this.agentType && models[this.agentType]) ||
+          (typeLower && models[typeLower]) ||
+          models.cline;
+        if (!explicit) {
+          for (const k of Object.keys(models)) {
+            const kLower = k.toLowerCase();
+            if (kLower === nameLower || (typeLower && kLower === typeLower) || kLower === 'cline') {
+              explicit = models[k];
+              break;
+            }
+          }
+        }
+      }
+      explicit =
+        explicit ||
         msg.metadata?.selected_model ||
         msg.metadata?.model ||
         msg.model;
@@ -151,6 +180,21 @@ class ClineAdapter extends BaseAdapter {
   // ------------------------------------------------------------------
 
   async _onControlAction(action, payload) {
+    if (action === 'set_effort') {
+      const requested = payload && (payload.effort || payload.model);
+      const channel = (payload && typeof payload === 'object') ? payload.channel : null;
+      if (!requested) return;
+      const levels = await this._listEffortLevels();
+      if (levels.length && !levels.some((l) => l.id.toLowerCase() === String(requested).toLowerCase())) {
+        this._log(`set_effort: '${requested}' is not one of ${levels.map((l) => l.id).join(', ')} - ignoring`);
+        return;
+      }
+      if (channel) this._channelEfforts[channel] = requested;
+      else this._channelEfforts['*'] = requested;
+      this._log(`Thinking level for channel=${channel || 'all'} set to '${requested}'`);
+      this.fetchAndReportUsage().catch(() => {});
+      return;
+    }
     if (action === 'set_model') {
       const requested = payload && payload.model;
       const channel = (payload && typeof payload === 'object') ? payload.channel : null;
@@ -160,9 +204,10 @@ class ClineAdapter extends BaseAdapter {
       } else {
         for (const c of Object.keys(this._channelModels)) this._channelModels[c] = requested;
         this._channelModels['*'] = requested;
+        this.model = requested;
       }
-      this.model = requested;
       this._log(`Model override for channel=${channel || 'all'} set to '${requested}' (this session only)`);
+      this.fetchAndReportUsage().catch(() => {});
       return;
     }
     if (action === 'stop') {
@@ -458,6 +503,93 @@ class ClineAdapter extends BaseAdapter {
     return classifyClineAuth(parsed, this.agentEnv || process.env);
   }
 
+  /**
+   * Publish Cline's active provider/model and configured models to the workspace.
+   */
+  /**
+   * Reasoning-effort levels this build accepts. Cline states them on its own
+   * `--thinking <level>` help line ("none|low|medium|high|xhigh"), so the list
+   * tracks the installed version instead of a table here. No API call.
+   */
+  async _listEffortLevels() {
+    const now = Date.now();
+    if (this._effortCache && now - this._effortCache.at < EFFORT_CACHE_TTL_MS) {
+      return this._effortCache.levels;
+    }
+    if (this._effortInFlight) return this._effortInFlight;
+
+    const bin = this._findClineBinary();
+    if (!bin) return [];
+
+    this._effortInFlight = captureCli(bin, ['--help'], { env: this.agentEnv || process.env, timeoutMs: 20000, includeStderr: true })
+      .then((help) => {
+        const levels = parseHelpChoices(help, '--thinking').map((id) => ({ id, label: id }));
+        if (levels.length) this._effortCache = { at: Date.now(), levels };
+        return levels;
+      })
+      .catch(() => [])
+      .finally(() => { this._effortInFlight = null; });
+    return this._effortInFlight;
+  }
+
+  /** Effort in force: a workspace override first, then the agent's env. */
+  _currentEffort(channel) {
+    if (channel && this._channelEfforts[channel]) return this._channelEfforts[channel];
+    if (this._channelEfforts['*']) return this._channelEfforts['*'];
+    return ((this.agentEnv || process.env).CLINE_THINKING || '').trim() || '';
+  }
+
+  async fetchAndReportUsage() {
+    try {
+      const auth = this._authState();
+      const currentModel = this._resolveModel() || auth.model || null;
+      const providersCfg = this._readProvidersConfig();
+      const models = [];
+      const seen = new Set();
+
+      if (providersCfg && providersCfg.providers && typeof providersCfg.providers === 'object') {
+        for (const [providerId, prov] of Object.entries(providersCfg.providers)) {
+          const m = prov?.settings?.model;
+          if (m && typeof m === 'string' && m.trim()) {
+            const id = m.includes('/') ? m.trim() : `${providerId}/${m.trim()}`;
+            if (!seen.has(id)) {
+              seen.add(id);
+              models.push({ id, provider: providerId, label: m.trim() });
+            }
+          }
+        }
+      }
+
+      if (currentModel && !seen.has(currentModel)) {
+        const slash = currentModel.indexOf('/');
+        models.unshift({
+          id: currentModel,
+          provider: slash > 0 ? currentModel.slice(0, slash) : auth.provider || 'cline',
+          label: slash > 0 ? currentModel.slice(slash + 1) : currentModel,
+        });
+      }
+
+      const efforts = await this._listEffortLevels();
+      const effort = this._currentEffort() || null;
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: currentModel,
+          available_models: models.length ? JSON.stringify(models) : null,
+          current_effort: effort,
+          available_efforts: efforts.length ? JSON.stringify(efforts) : null,
+          raw_text: `provider=${auth.provider || 'unknown'} state=${auth.state}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
   // ------------------------------------------------------------------
   // Prompt assembly
   // ------------------------------------------------------------------
@@ -589,7 +721,7 @@ class ClineAdapter extends BaseAdapter {
         provider: (this.agentEnv.CLINE_PROVIDER || '').trim() || undefined,
         model: this._resolveModel(channel, msg),
         apiKey: (this.agentEnv.CLINE_API_KEY || '').trim() || undefined,
-        thinking: (this.agentEnv.CLINE_THINKING || '').trim() || undefined,
+        thinking: this._currentEffort(channel) || undefined,
       });
 
       const spawnStartMs = Date.now();

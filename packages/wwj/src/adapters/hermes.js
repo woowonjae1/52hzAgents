@@ -405,14 +405,67 @@ class HermesAdapter extends BaseAdapter {
     } catch {}
   }
 
-  async _onControlAction(action, _payload) {
+  _listProfiles() {
+    try {
+      const profilesDir = path.join(os.homedir(), '.hermes', 'profiles');
+      if (fs.existsSync(profilesDir)) {
+        const entries = fs.readdirSync(profilesDir, { withFileTypes: true });
+        const profiles = entries
+          .filter((d) => d.isDirectory())
+          .map((d) => ({ id: d.name, provider: 'Hermes Profile', label: d.name }));
+        if (profiles.length) return profiles;
+      }
+    } catch {}
+    return [];
+  }
+
+  async fetchAndReportUsage() {
+    try {
+      const profiles = this._listProfiles();
+      // `hermesProfile` is 'default' when nothing was configured - that is this
+      // adapter's sentinel for "no -p flag", not a profile that exists on disk.
+      // Reporting it as the current selection dressed a missing configuration up
+      // as a real one, so it is surfaced only when ~/.hermes/profiles actually
+      // has something in it (or the user named a profile explicitly).
+      const isRealProfile = !!this.hermesProfile
+        && (this.hermesProfile !== 'default' || profiles.some((p) => p.id === 'default'));
+      const current = isRealProfile ? this.hermesProfile : null;
+      await this.client.reportAgentUsage(
+        this.workspaceId,
+        this.agentName,
+        {
+          session_used_percent: 0,
+          week_used_percent: 0,
+          current_model: current,
+          available_models: profiles.length > 0 ? JSON.stringify(profiles) : null,
+          raw_text: `hermes profile=${current || 'unconfigured'} profiles_dir=${path.join(os.homedir(), '.hermes', 'profiles')}`,
+        },
+        this.token
+      );
+    } catch (e) {
+      this._log(`fetchAndReportUsage error: ${e.message}`);
+    }
+  }
+
+  async _onControlAction(action, payload) {
+    if (action === 'set_model' || action === 'set_profile') {
+      const requested = payload && (payload.model || payload.profile);
+      if (requested) {
+        this.hermesProfile = requested;
+        this._log(`Hermes profile set to: ${requested}`);
+        this.fetchAndReportUsage().catch(() => {});
+        return;
+      }
+    }
     if (action === 'stop') {
       for (const [channel, proc] of Object.entries(this._channelProcesses)) {
         await this._stopProcess(proc);
         delete this._channelProcesses[channel];
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
       }
+      return;
     }
+    await super._onControlAction(action, payload);
   }
 
   // ------------------------------------------------------------------
