@@ -45,6 +45,10 @@ const MODEL_ENV_KEYS = [
 // CLI is upgraded, so it is cached well past the heartbeat interval.
 const EFFORT_CACHE_TTL_MS = 30 * 60 * 1000;
 
+// The account's model catalog changes rarely, and this is a network call off
+// the heartbeat, so it is cached hard.
+const API_MODELS_CACHE_TTL_MS = 15 * 60 * 1000;
+
 class ClaudeAdapter extends BaseAdapter {
   /**
    * @param {object} opts - BaseAdapter opts plus:
@@ -95,6 +99,9 @@ class ClaudeAdapter extends BaseAdapter {
     this._channelEfforts = {};
     this._effortCache = null;
     this._effortInFlight = null;
+    this._apiModelsCache = null;
+    this._apiModelsInFlight = null;
+    this._apiModelsError = '';
     this._loadSessions();
     this._loadChannelModels();
     this._loadChannelEfforts();
@@ -249,9 +256,11 @@ class ClaudeAdapter extends BaseAdapter {
       if (!fs.existsSync(file)) return {};
       const cfg = JSON.parse(fs.readFileSync(file, 'utf-8'));
       const env = (cfg && cfg.env) || {};
-      // Only the model pins. Everything else in this block stays untouched.
+      // Only the model pins and the endpoint. The auth token in this same block
+      // is read solely to call the endpoint below and is never logged, reported,
+      // or written anywhere.
       const picked = {};
-      for (const key of MODEL_ENV_KEYS) {
+      for (const key of [...MODEL_ENV_KEYS, 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY']) {
         if (typeof env[key] === 'string' && env[key].trim()) picked[key] = env[key].trim();
       }
       return picked;
@@ -283,7 +292,7 @@ class ClaudeAdapter extends BaseAdapter {
    * There is no hardcoded catalog: an install the CLI has not populated yet
    * reports nothing, and the UI shows that as "not configured".
    */
-  _listModels() {
+  async _listModels() {
     const out = [];
     const seen = new Set();
     const push = (id, label) => {
@@ -301,6 +310,14 @@ class ClaudeAdapter extends BaseAdapter {
       }
     }
 
+    // The account's real catalog, straight from the endpoint this install is
+    // pointed at. `additionalModelOptionsCache` is only the EXTRA options the
+    // CLI cached on top of its built-in tiers, so on its own it under-reports
+    // badly - one entry on an account with a dozen models.
+    for (const m of await this._listApiModels()) {
+      push(m.id, m.label);
+    }
+
     const pinned = this._readClaudeSettingsEnv();
     for (const key of MODEL_ENV_KEYS) {
       if (pinned[key]) push(pinned[key]);
@@ -309,6 +326,114 @@ class ClaudeAdapter extends BaseAdapter {
     if (current) push(current);
 
     return out;
+  }
+
+  /**
+   * `GET {ANTHROPIC_BASE_URL}/v1/models` - the authoritative list of what this
+   * account can actually run, and the only source that stays correct when
+   * Anthropic ships a new model. Follows the documented `has_more`/`last_id`
+   * pagination.
+   *
+   * Returns [] on any failure and records why in `_apiModelsError`, which the
+   * usage report surfaces: a relay that 500s on this endpoint (or an offline
+   * machine) must read as "could not ask", never as "this account has one
+   * model".
+   */
+  async _listApiModels() {
+    const now = Date.now();
+    if (this._apiModelsCache && now - this._apiModelsCache.at < API_MODELS_CACHE_TTL_MS) {
+      return this._apiModelsCache.models;
+    }
+    if (this._apiModelsInFlight) return this._apiModelsInFlight;
+
+    this._apiModelsInFlight = this._fetchApiModels()
+      .then((models) => {
+        if (models.length) this._apiModelsCache = { at: Date.now(), models };
+        return models;
+      })
+      .catch(() => [])
+      .finally(() => { this._apiModelsInFlight = null; });
+    return this._apiModelsInFlight;
+  }
+
+  async _fetchApiModels() {
+    // Endpoint and credential are resolved as a PAIR from the same source.
+    // Mixing them - a relay URL from settings.json with an unrelated
+    // ANTHROPIC_API_KEY that happens to be in the process env - sends the wrong
+    // token to the right host and comes back 401, which then reads as "this
+    // account has no models". Whichever source supplies a credential supplies
+    // the base URL that goes with it.
+    const env = this.agentEnv || process.env;
+    const pinned = this._readClaudeSettingsEnv();
+    const sources = [
+      { key: env.ANTHROPIC_AUTH_TOKEN || env.ANTHROPIC_API_KEY, base: env.ANTHROPIC_BASE_URL },
+      { key: pinned.ANTHROPIC_AUTH_TOKEN || pinned.ANTHROPIC_API_KEY, base: pinned.ANTHROPIC_BASE_URL },
+    ];
+    const chosen = sources.find((c) => c.key && String(c.key).trim());
+    if (!chosen) {
+      this._apiModelsError = 'no-credential';
+      return [];
+    }
+    const key = String(chosen.key).trim();
+    const base = (chosen.base || 'https://api.anthropic.com').trim().replace(/\/+$/, '');
+
+    const collected = [];
+    let after = '';
+    // Bounded: the endpoint pages at 1000, so a handful of rounds covers any
+    // real account and a broken `has_more` cannot spin forever.
+    for (let page = 0; page < 5; page++) {
+      const res = await this._getJson(`${base}/v1/models?limit=1000${after ? `&after_id=${encodeURIComponent(after)}` : ''}`, key);
+      if (!res.ok) {
+        this._apiModelsError = `http-${res.status}`;
+        return [];
+      }
+      const list = Array.isArray(res.body && res.body.data) ? res.body.data : [];
+      for (const m of list) {
+        const id = typeof m === 'string' ? m : (m && m.id);
+        if (id) collected.push({ id, label: (m && m.display_name) || id });
+      }
+      if (!res.body || !res.body.has_more || !list.length) break;
+      after = res.body.last_id || (list[list.length - 1] && list[list.length - 1].id) || '';
+      if (!after) break;
+    }
+    this._apiModelsError = collected.length ? '' : 'empty';
+    return collected;
+  }
+
+  /** One authenticated GET, resolved as {ok, status, body}. Never rejects. */
+  _getJson(url, key) {
+    return new Promise((resolve) => {
+      let u;
+      try { u = new URL(url); } catch { resolve({ ok: false, status: 0 }); return; }
+      const lib = u.protocol === 'http:' ? require('http') : require('https');
+      const req = lib.request(
+        {
+          hostname: u.hostname,
+          port: u.port || (u.protocol === 'http:' ? 80 : 443),
+          path: u.pathname + u.search,
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${key}`,
+            'x-api-key': key,
+            'anthropic-version': '2023-06-01',
+          },
+          timeout: 15000,
+        },
+        (res) => {
+          let body = '';
+          res.on('data', (d) => { body += d.toString('utf-8'); });
+          res.on('end', () => {
+            const ok = res.statusCode >= 200 && res.statusCode < 300;
+            let parsed = null;
+            try { parsed = JSON.parse(body); } catch {}
+            resolve({ ok, status: res.statusCode, body: parsed });
+          });
+        }
+      );
+      req.on('error', () => resolve({ ok: false, status: 0 }));
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, status: 0 }); });
+      req.end();
+    });
   }
 
   /**
@@ -437,7 +562,7 @@ class ClaudeAdapter extends BaseAdapter {
       // second `-p /model` round trip: that costs an API call per refresh and
       // returns the model's own error text when the configured model is
       // unreachable, so the regexes below it silently produced null.
-      const models = this._listModels();
+      const models = await this._listModels();
       const currentModel = this._resolveModel() || this._currentModelFromConfig() || null;
       const availableModels = models.length ? JSON.stringify(models) : null;
 
@@ -457,6 +582,9 @@ class ClaudeAdapter extends BaseAdapter {
         current_effort: currentEffort,
         available_efforts: availableEfforts,
         raw_text: text,
+        // Surfaces WHY the catalog is short (relay 500, no credential, offline)
+        // instead of leaving a one-item picker looking like the real answer.
+        models_source: this._apiModelsError ? `api:${this._apiModelsError}` : 'api',
         parse_status: parseStatus,
       };
 

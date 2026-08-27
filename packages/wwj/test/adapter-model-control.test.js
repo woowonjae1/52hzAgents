@@ -399,7 +399,9 @@ test('ClaudeAdapter reports the model picker cache and env pin from Claude Code 
   });
 
   assert.equal(adapter._currentModelFromConfig(), 'claude-opus-9-thinking');
-  const models = adapter._listModels();
+  // No credential in this fixture, so the API probe is skipped and the caches
+  // and env pins are the whole answer.
+  const models = await adapter._listModels();
   assert.deepEqual(models.map((m) => m.id), ['claude-fable-9', 'claude-opus-9', 'claude-opus-9-thinking']);
   assert.equal(models[0].label, 'Fable', 'the picker label the CLI cached must survive');
   assert.ok(
@@ -420,7 +422,7 @@ test('ClaudeAdapter reports nothing rather than a catalog when Claude Code has n
   });
 
   assert.equal(adapter._currentModelFromConfig(), '');
-  assert.deepEqual(adapter._listModels(), [], 'must not fall back to a hardcoded model list');
+  assert.deepEqual(await adapter._listModels(), [], 'must not fall back to a hardcoded model list');
 
   fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -561,4 +563,145 @@ test('CodexAdapter reads effort levels from the active model own cache entry', a
   assert.equal(adapter._currentEffort('ch-1'), 'high', 'another model level must be rejected');
 
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('ClaudeAdapter takes its catalog from GET /v1/models, paging through the results', async () => {
+  const http = require('node:http');
+  const { ClaudeAdapter } = require('../src/adapters');
+
+  const seen = [];
+  const server = http.createServer((req, res) => {
+    seen.push(req.url);
+    const page = req.url.includes('after_id=claude-b')
+      ? { data: [{ id: 'claude-c', display_name: 'Model C' }], has_more: false, last_id: 'claude-c' }
+      : {
+          data: [
+            { id: 'claude-a', display_name: 'Model A' },
+            { id: 'claude-b', display_name: 'Model B' },
+          ],
+          has_more: true,
+          last_id: 'claude-b',
+        };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(page));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+
+  try {
+    const dir = makeFixtureDir('wwj-claude-api-', {
+      '.claude.json': JSON.stringify({
+        additionalModelOptionsCache: [{ value: 'claude-extra', label: 'Extra' }],
+      }),
+      'settings.json': JSON.stringify({
+        env: {
+          ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
+          ANTHROPIC_AUTH_TOKEN: 'test-token',
+          ANTHROPIC_MODEL: 'claude-pinned',
+        },
+      }),
+    });
+
+    const adapter = new ClaudeAdapter({
+      agentName: 'claude-api', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+      token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
+    });
+
+    const models = await adapter._listModels();
+    // The API answer leads; the CLI's "additional" cache and the env pin are
+    // unioned on top. additionalModelOptionsCache alone reported ONE model on a
+    // real account, which is what made the picker look broken.
+    assert.deepEqual(models.map((m) => m.id), [
+      'claude-extra', 'claude-a', 'claude-b', 'claude-c', 'claude-pinned',
+    ]);
+    assert.equal(models.find((m) => m.id === 'claude-b').label, 'Model B');
+    assert.equal(seen.length, 2, 'must follow has_more instead of stopping at page 1');
+    assert.ok(seen[1].includes('after_id=claude-b'), 'second page must use last_id');
+    assert.equal(adapter._apiModelsError, '');
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  } finally {
+    server.close();
+  }
+});
+
+test('ClaudeAdapter records why the catalog is short when the endpoint fails', async () => {
+  const http = require('node:http');
+  const { ClaudeAdapter } = require('../src/adapters');
+
+  // Mirrors a relay that implements /v1/models but is erroring - exactly the
+  // case that made a two-item picker look like the real answer.
+  const server = http.createServer((_req, res) => {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: { message: 'Database error' } }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+
+  try {
+    const dir = makeFixtureDir('wwj-claude-api-err-', {
+      '.claude.json': JSON.stringify({ additionalModelOptionsCache: [{ value: 'claude-extra', label: 'Extra' }] }),
+      'settings.json': JSON.stringify({
+        env: { ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`, ANTHROPIC_AUTH_TOKEN: 'test-token' },
+      }),
+    });
+
+    const adapter = new ClaudeAdapter({
+      agentName: 'claude-api-err', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+      token: 't', agentEnv: { CLAUDE_CONFIG_DIR: dir },
+    });
+
+    const models = await adapter._listModels();
+    assert.deepEqual(models.map((m) => m.id), ['claude-extra'], 'falls back to the local caches');
+    assert.equal(adapter._apiModelsError, 'http-500', 'and records why, so the UI can say so');
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  } finally {
+    server.close();
+  }
+});
+
+test('ClaudeAdapter pairs the endpoint with the credential from the same source', async () => {
+  const http = require('node:http');
+  const { ClaudeAdapter } = require('../src/adapters');
+
+  // A reachable endpoint configured in settings.json...
+  let hits = 0;
+  const server = http.createServer((_req, res) => {
+    hits++;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ data: [{ id: 'settings-model' }], has_more: false }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+
+  try {
+    const dir = makeFixtureDir('wwj-claude-pair-', {
+      'settings.json': JSON.stringify({
+        env: { ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`, ANTHROPIC_AUTH_TOKEN: 'settings-token' },
+      }),
+    });
+
+    // ...and an unrelated credential in the agent env with its own (dead)
+    // endpoint. The env source owns a credential, so it wins as a WHOLE pair.
+    // Mixing - the env key against the settings URL - is what returns 401 on a
+    // real relay and then reads as "this account has no models".
+    const adapter = new ClaudeAdapter({
+      agentName: 'claude-pair', workspaceId: 'ws-1', endpoint: 'http://localhost:3000',
+      token: 't',
+      agentEnv: {
+        CLAUDE_CONFIG_DIR: dir,
+        ANTHROPIC_API_KEY: 'unrelated-key',
+        ANTHROPIC_BASE_URL: 'http://127.0.0.1:1',
+      },
+    });
+
+    await adapter._listModels();
+    assert.equal(hits, 0, 'the settings endpoint must not be called with the env credential');
+    assert.equal(adapter._apiModelsError, 'http-0', 'the env pair is used whole, and its endpoint is dead');
+
+    fs.rmSync(dir, { recursive: true, force: true });
+  } finally {
+    server.close();
+  }
 });
