@@ -130,20 +130,29 @@ async function startProductionStack() {
 
   if (serverBin) {
     console.log(`[52hzAgents Desktop] Starting bundled server from ${serverBin}`);
-    backendProcess = spawn(serverBin, [], {
-      env: {
-        ...process.env,
-        CGO_ENABLED: '0',
-        PORT: `${serverPort}`,
-        DATABASE_URL: `sqlite://${dbPath.replace(/\\/g, '/')}`,
-        FILE_STORAGE_PATH: filesPath,
-        AUTH_MODE: 'none',
-        CORS_ORIGINS: '*',
-        FRONTEND_STATIC_PATH: publicPath,
-      },
-      stdio: 'ignore',
-      detached: false,
-    });
+    const spawnServer = () => {
+      backendProcess = spawn(serverBin, [], {
+        env: {
+          ...process.env,
+          CGO_ENABLED: '0',
+          PORT: `${serverPort}`,
+          DATABASE_URL: `sqlite://${dbPath.replace(/\\/g, '/')}`,
+          FILE_STORAGE_PATH: filesPath,
+          AUTH_MODE: 'none',
+          CORS_ORIGINS: '*',
+          FRONTEND_STATIC_PATH: publicPath,
+        },
+        stdio: 'ignore',
+        detached: false,
+      });
+      backendProcess.on('exit', (code, signal) => {
+        if (!isQuitting) {
+          console.warn(`[52hzAgents Desktop] 52hz-server exited unexpectedly (code: ${code}, signal: ${signal}), restarting in 1s...`);
+          setTimeout(spawnServer, 1000);
+        }
+      });
+    };
+    spawnServer();
   } else {
     console.warn('[52hzAgents Desktop] Bundled 52hz-server binary not found, attempting fallback');
   }
@@ -158,14 +167,23 @@ async function startProductionStack() {
   const wwjEntry = possibleWwjPaths.find((p) => fs.existsSync(p));
   if (wwjEntry) {
     console.log(`[52hzAgents Desktop] Starting WWJ connector from ${wwjEntry} (endpoint: http://127.0.0.1:${serverPort})`);
-    connectorProcess = fork(wwjEntry, ['up', '--foreground', '--endpoint', `http://127.0.0.1:${serverPort}`], {
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: '1',
-        WWJ_WORKSPACE_ENDPOINT: `http://127.0.0.1:${serverPort}`,
-      },
-      stdio: 'ignore',
-    });
+    const spawnConnector = () => {
+      connectorProcess = fork(wwjEntry, ['up', '--foreground', '--endpoint', `http://127.0.0.1:${serverPort}`], {
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
+          WWJ_WORKSPACE_ENDPOINT: `http://127.0.0.1:${serverPort}`,
+        },
+        stdio: 'ignore',
+      });
+      connectorProcess.on('exit', (code, signal) => {
+        if (!isQuitting) {
+          console.warn(`[52hzAgents Desktop] WWJ connector exited unexpectedly (code: ${code}, signal: ${signal}), restarting in 1.5s...`);
+          setTimeout(spawnConnector, 1500);
+        }
+      });
+    };
+    spawnConnector();
   }
 
   // Subscribe to live SSE events for approval notifications

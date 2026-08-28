@@ -8,6 +8,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { SignalMark } from '@/components/brand/signal-mark';
 import { MarkdownContent } from './markdown-content';
 import { ToolCallsDisclosure } from './intermediate-steps';
 import { Reasoning } from '@/components/ai-elements/reasoning';
@@ -22,6 +23,8 @@ import { TurnChangesCapsule } from './turn-changes-capsule';
 import { workspaceApi } from '@/lib/api';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useArtifacts, type ArtifactItem } from '@/lib/artifacts-context';
+import { ArtifactInlineCard } from '../canvas/artifact-inline-card';
 
 interface Attachment {
   fileId: string;
@@ -307,6 +310,31 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     return null;
   }, [message.metadata]);
 
+  const { openArtifact } = useArtifacts();
+
+  // Extract or infer structured artifact for Canvas
+  const inferredArtifact = useMemo<ArtifactItem | null>(() => {
+    if (message.senderType !== 'agent' || !cleanContent) return null;
+    if (cleanContent.length < 350) return null;
+
+    const hasHeadings = /^#{1,4}\s+/m.test(cleanContent);
+    const hasCodeBlock = /```[a-z]*\n[\s\S]*?```/i.test(cleanContent);
+    if (!hasHeadings && !hasCodeBlock && cleanContent.length < 800) return null;
+
+    const headingMatch = cleanContent.match(/^#{1,3}\s+(.+)$/m);
+    const title = headingMatch ? headingMatch[1].replace(/[*`_#]/g, '').trim() : `${message.senderName} Deliverable Artifact`;
+
+    return {
+      id: `art-${message.messageId}`,
+      title,
+      type: hasCodeBlock ? 'code' : 'markdown',
+      content: cleanContent,
+      authorAgent: message.senderName,
+      sourceMessageId: message.messageId,
+      updatedAt: typeof message.createdAt === 'number' ? message.createdAt : Date.now(),
+    };
+  }, [message.messageId, message.senderName, message.senderType, message.createdAt, cleanContent]);
+
   // Detect system errors or daemon interruptions
   const isErrorMessage = useMemo(() => {
     if (!cleanContent) return false;
@@ -347,7 +375,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
 
     return (
       <div className="py-2.5 flex justify-end group/usermsg select-text">
-        <div className="flex items-center gap-2 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
+        <div className="flex items-end gap-2 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
+          {/* Your own mark, on your own side of the transcript. Held still: a
+              column of blinking heads down a long thread is a lot to sit next
+              to, and the sidebar already carries the live one. */}
+          <SignalMark size={26} still className="shrink-0 self-end mb-0.5" />
           {/* Refined AI User Bubble */}
           {/*
             The bubble sits directly on the transcript, not above it, so the drop
@@ -472,6 +504,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             <TodoList items={planItems} />
           ) : null}
 
+          {/* Canvas Artifact Card for Long Deliverables / Documents */}
+          {inferredArtifact && (
+            <ArtifactInlineCard artifact={inferredArtifact} />
+          )}
+
           {/* Main Answer Content OR Formatted Error Callout */}
           {isErrorMessage ? (
             <div className="my-2 p-3.5 rounded-xl border border-destructive/25 bg-destructive/5 dark:bg-destructive/10 text-foreground flex items-start gap-3">
@@ -588,9 +625,10 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               content={cleanContent || message.content}
               senderType="agent"
               variant="toolbar"
+              onOpenCanvas={inferredArtifact ? () => openArtifact(inferredArtifact) : undefined}
               onRegenerate={() => {
                 navigator.clipboard.writeText(`@${message.senderName} please regenerate your last answer`);
-                toast.success('已复制重新生成指令');
+                toast.success('Regenerate instruction copied');
               }}
             />
           </div>

@@ -222,11 +222,27 @@ func ListKnowledge(c *gin.Context) {
 	if err != nil || offset < 0 {
 		offset = 0
 	}
+	category := c.Query("category")
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		q = strings.TrimSpace(c.Query("query"))
+	}
 
 	query := db.DB.Where("workspace_id = ?", workspace.ID)
 	if status != "" {
 		query = query.Where("status = ?", status)
 	}
+	if category != "" && category != "all" {
+		normalizedCat := normalizeKnowledgeCategory(&category)
+		if normalizedCat != nil {
+			query = query.Where("category = ?", *normalizedCat)
+		}
+	}
+	if q != "" {
+		qWildcard := "%" + q + "%"
+		query = query.Where("title LIKE ? OR slug LIKE ? OR description LIKE ?", qWildcard, qWildcard, qWildcard)
+	}
+
 	var entries []models.KnowledgeEntry
 	if err := query.Order("updated_at desc").Limit(limit).Offset(offset).Find(&entries).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list knowledge entries"})
@@ -237,9 +253,20 @@ func ListKnowledge(c *gin.Context) {
 	if statusForCount == "" {
 		statusForCount = "active"
 	}
+	countQuery := db.DB.Model(&models.KnowledgeEntry{}).
+		Where("workspace_id = ? AND status = ?", workspace.ID, statusForCount)
+	if category != "" && category != "all" {
+		normalizedCat := normalizeKnowledgeCategory(&category)
+		if normalizedCat != nil {
+			countQuery = countQuery.Where("category = ?", *normalizedCat)
+		}
+	}
+	if q != "" {
+		qWildcard := "%" + q + "%"
+		countQuery = countQuery.Where("title LIKE ? OR slug LIKE ? OR description LIKE ?", qWildcard, qWildcard, qWildcard)
+	}
 	var total int64
-	db.DB.Model(&models.KnowledgeEntry{}).
-		Where("workspace_id = ? AND status = ?", workspace.ID, statusForCount).Count(&total)
+	countQuery.Count(&total)
 
 	items := make([]gin.H, 0, len(entries))
 	for i := range entries {

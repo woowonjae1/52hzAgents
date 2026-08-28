@@ -1,10 +1,29 @@
 import type { KnowledgeEntry } from '../types';
 import { BaseWorkspaceApi } from './base';
 
+export interface KnowledgeSearchResult {
+  chunkId: string;
+  entryId: string;
+  slug: string;
+  title: string;
+  category: string;
+  section: string;
+  sectionPath: string[];
+  snippet: string;
+  charCount: number;
+  score: number;
+}
+
 export class KnowledgeApi extends BaseWorkspaceApi {
-  async listKnowledge(): Promise<{ entries: KnowledgeEntry[]; total: number }> {
+  async listKnowledge(options?: { category?: string; q?: string; limit?: number; offset?: number }): Promise<{ entries: KnowledgeEntry[]; total: number }> {
+    const params = new URLSearchParams({ network: this.workspaceId });
+    if (options?.category) params.set('category', options.category);
+    if (options?.q) params.set('q', options.q);
+    if (options?.limit) params.set('limit', String(options.limit));
+    if (options?.offset) params.set('offset', String(options.offset));
+
     const raw = await this.request<{ entries: Record<string, unknown>[]; total: number }>(
-      `/v1/knowledge?network=${this.workspaceId}`
+      `/v1/knowledge?${params}`
     );
     return {
       entries: (raw.entries || []).map((e): KnowledgeEntry => ({
@@ -21,6 +40,38 @@ export class KnowledgeApi extends BaseWorkspaceApi {
         updatedAt: (e.updated_at || null) as string | null,
       })),
       total: raw.total || 0,
+    };
+  }
+
+  async searchKnowledge(params: { q?: string; query?: string; category?: string; limit?: number; threshold?: number }): Promise<{ query: string; totalMatches: number; results: KnowledgeSearchResult[] }> {
+    const queryStr = params.q || params.query || '';
+    const searchParams = new URLSearchParams({
+      network: this.workspaceId,
+      q: queryStr,
+    });
+    if (params.category) searchParams.set('category', params.category);
+    if (params.limit) searchParams.set('limit', String(params.limit));
+    if (params.threshold !== undefined) searchParams.set('threshold', String(params.threshold));
+
+    const raw = await this.request<{ query: string; total_matches: number; results: Record<string, unknown>[] }>(
+      `/v1/knowledge/search?${searchParams}`
+    );
+
+    return {
+      query: raw.query || queryStr,
+      totalMatches: raw.total_matches || 0,
+      results: (raw.results || []).map((r): KnowledgeSearchResult => ({
+        chunkId: (r.chunk_id || '') as string,
+        entryId: (r.entry_id || '') as string,
+        slug: (r.slug || '') as string,
+        title: (r.title || '') as string,
+        category: (r.category || '') as string,
+        section: (r.section || '') as string,
+        sectionPath: (r.section_path || []) as string[],
+        snippet: (r.snippet || '') as string,
+        charCount: (r.char_count || 0) as number,
+        score: (r.score || 0) as number,
+      })),
     };
   }
 

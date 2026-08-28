@@ -162,19 +162,32 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       if (result.events.length > 0) {
         // Events come newest-first from sort=desc, reverse for chronological display
         const historicMessages = eventsToScopedMessages(result.events, sessionId, dmPair).reverse();
-        setMessages(historicMessages);
-        newestIdRef.current = historicMessages.length > 0
-          ? historicMessages[historicMessages.length - 1].messageId
-          : null;
-        oldestIdRef.current = historicMessages.length > 0
-          ? historicMessages[0].messageId
-          : null;
+        setMessages((prev) => {
+          if (prev.length === 0) return historicMessages;
+          const seenIds = new Set(historicMessages.map((m) => m.messageId));
+          const merged = [...historicMessages];
+          for (const m of prev) {
+            if (!seenIds.has(m.messageId)) {
+              merged.push(m);
+              seenIds.add(m.messageId);
+            }
+          }
+          return merged;
+        });
+
+        if (historicMessages.length > 0) {
+          if (!oldestIdRef.current) {
+            oldestIdRef.current = historicMessages[0].messageId;
+          }
+          const lastHistoric = historicMessages[historicMessages.length - 1];
+          if (!newestIdRef.current) {
+            newestIdRef.current = lastHistoric.messageId;
+          }
+        }
         setHasOlder(historicMessages.length > 0 && result.has_more);
         setGeneration((g) => g + 1);
       } else {
-        setMessages([]);
-        newestIdRef.current = null;
-        oldestIdRef.current = null;
+        setMessages((prev) => (prev.length > 0 ? prev : []));
         setHasOlder(false);
       }
 

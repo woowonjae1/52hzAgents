@@ -389,6 +389,19 @@ function buildToolDefs(disabledModules) {
   if (!disabledModules.has('knowledge')) {
     tools.push(
       {
+        name: 'workspace_search_knowledge',
+        description: 'Search knowledge base entries and section snippets by keywords or natural language intent. Returns relevant chunks with section headings and @knowledge:slug references.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Search keywords or question intent' },
+            category: { type: 'string', description: 'Optional category filter: rules | architecture | api | docs' },
+            limit: { type: 'number', description: 'Maximum number of snippets to return (default 5)' },
+          },
+          required: ['query'],
+        },
+      },
+      {
         name: 'workspace_list_knowledge',
         description: 'List knowledge base entries shared in the workspace.',
         inputSchema: { type: 'object', properties: {} },
@@ -961,6 +974,22 @@ class McpServer {
       }
 
       // ── Knowledge Base ──
+
+      case 'workspace_search_knowledge': {
+        const data = await this.ws.searchKnowledge(this.workspaceId, this.token, {
+          query: args.query,
+          category: args.category,
+          limit: args.limit || 5,
+        });
+        const results = (data && data.results) || [];
+        if (!results.length) return text(`No relevant knowledge entries found for query: "${args.query}"`);
+        const formatted = results.map((r, i) =>
+          `### [${i + 1}] ${r.title} > ${r.section} (@knowledge:${r.slug})\n` +
+          `Match Score: ${(r.score * 100).toFixed(0)}%\n` +
+          `Content:\n${r.snippet}\n`
+        );
+        return text(formatted.join('\n---\n'));
+      }
 
       case 'workspace_list_knowledge': {
         const data = await this.ws.listKnowledge(this.workspaceId, this.token);

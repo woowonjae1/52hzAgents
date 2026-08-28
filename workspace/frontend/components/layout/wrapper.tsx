@@ -204,31 +204,22 @@ export function Wrapper() {
                     <PanelLeft className="size-4" />
                   </button>
                 )}
-                {viewMode === 'mission' ? (
-                  <MissionControl />
-                ) : viewMode === 'connect' ? (
-                  <ConnectAgentView />
-                ) : viewMode === 'files' ? (
-                  <FilePreview />
-                ) : viewMode === 'tasks' ? (
-                  <TasksView />
-                ) : viewMode === 'timers' ? (
-                  <TimersView />
-                ) : viewMode === 'inbox' ? (
-                  <InboxView />
-                ) : viewMode === 'skills' ? (
-                  <SkillsView />
-                ) : viewMode === 'knowledge' ? (
-                  <KnowledgeView />
-                ) : viewMode === 'settings' ? (
-                  <SettingsView />
-                ) : viewMode === 'browser' ? (
-                  <BrowserView />
-                ) : (
+                {/* Keep ChatView alive in DOM to prevent SSE disconnection, dropped messages, and re-fetch flicker */}
+                <div className={cn("h-full w-full", viewMode !== 'threads' && "hidden")}>
                   <main className="h-full" role="content">
                     <ChatView />
                   </main>
-                )}
+                </div>
+                {viewMode === 'mission' && <MissionControl />}
+                {viewMode === 'connect' && <ConnectAgentView />}
+                {viewMode === 'files' && <FilePreview />}
+                {viewMode === 'tasks' && <TasksView />}
+                {viewMode === 'timers' && <TimersView />}
+                {viewMode === 'inbox' && <InboxView />}
+                {viewMode === 'skills' && <SkillsView />}
+                {viewMode === 'knowledge' && <KnowledgeView />}
+                {viewMode === 'settings' && <SettingsView />}
+                {viewMode === 'browser' && <BrowserView />}
                 {/* Agent profile slide-over panel */}
                 {isAgentPanelOpen && <AgentProfilePanel />}
               </div>

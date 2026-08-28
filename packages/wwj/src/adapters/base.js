@@ -83,7 +83,7 @@ class BaseAdapter {
    * @param {string} opts.agentName
    * @param {string} [opts.endpoint]
    */
-  constructor({ workspaceId, channelName, token, agentName, endpoint, agentEnv, agentType, workingDir, onStatus, logFile }) {
+  constructor({ workspaceId, channelName, token, agentName, endpoint, agentEnv, agentType, workingDir, onStatus, logFile, client }) {
     this.workspaceId = workspaceId;
     this.channelName = channelName;
     this.token = token;
@@ -107,7 +107,7 @@ class BaseAdapter {
     // Set when the user explicitly stops this adapter (vs an error/revoke), so a
     // clean stop is never mislabeled as an error.
     this._stopRequested = false;
-    this.client = new WorkspaceClient(this.endpoint);
+    this.client = client || new WorkspaceClient(this.endpoint);
     this._lastEventId = null;
     this._running = false;
     this._sessionId = null;  // issued by server on /v1/join; used to prove liveness
@@ -1026,43 +1026,73 @@ class BaseAdapter {
   }
 
   /**
-   * Auto-resolves any `@knowledge:slug` mentions in the message content
-   * by pulling the full markdown content from the workspace knowledge base and expanding/inlining it.
+   * Auto-resolves knowledge references in message content:
+   * 1. Explicit `@knowledge:slug` mentions: inlines full markdown document.
+   * 2. Implicit / Auto RAG: if no explicit @knowledge mention exists and message has substantive
+   *    inquiry content, queries the workspace semantic search API and injects top matching snippets.
    */
   async _resolveKnowledgeMentions(content) {
     if (!content || typeof content !== 'string') return content;
     const matches = content.match(/@knowledge:([a-zA-Z0-9_-]+)/g);
-    if (!matches || matches.length === 0) return content;
 
-    const slugs = Array.from(new Set(matches.map((m) => m.replace(/^@knowledge:/, ''))));
-    const attachedKnowledge = [];
+    // 1. Explicit @knowledge:slug mentions
+    if (matches && matches.length > 0) {
+      const slugs = Array.from(new Set(matches.map((m) => m.replace(/^@knowledge:/, ''))));
+      const attachedKnowledge = [];
 
-    for (const slug of slugs) {
-      try {
-        let entry = null;
-        if (this.client && this.workspaceId && this.token) {
-          try {
-            entry = await this.client.getKnowledgeBySlug(this.workspaceId, this.token, slug);
-          } catch (e) {}
-          if (!entry || !entry.content) {
+      for (const slug of slugs) {
+        try {
+          let entry = null;
+          if (this.client && this.workspaceId && this.token) {
             try {
-              entry = await this.client.getKnowledge(this.workspaceId, this.token, slug);
+              entry = await this.client.getKnowledgeBySlug(this.workspaceId, this.token, slug);
             } catch (e) {}
+            if (!entry || !entry.content) {
+              try {
+                entry = await this.client.getKnowledge(this.workspaceId, this.token, slug);
+              } catch (e) {}
+            }
           }
+          if (entry && (entry.content || entry.title)) {
+            this._log(`Auto-injected knowledge base entry: ${entry.title || slug} (@knowledge:${slug})`);
+            attachedKnowledge.push(
+              `\n---\n📁 [系统附带知识库文档: ${entry.title || slug} (@knowledge:${slug})]\n${entry.content || ''}\n---`
+            );
+          }
+        } catch (err) {
+          this._log(`Failed to resolve knowledge mention @knowledge:${slug}: ${err.message}`);
         }
-        if (entry && (entry.content || entry.title)) {
-          this._log(`Auto-injected knowledge base entry: ${entry.title || slug} (@knowledge:${slug})`);
-          attachedKnowledge.push(
-            `\n---\n📁 [系统附带知识库文档: ${entry.title || slug} (@knowledge:${slug})]\n${entry.content || ''}\n---`
-          );
-        }
-      } catch (err) {
-        this._log(`Failed to resolve knowledge mention @knowledge:${slug}: ${err.message}`);
       }
+
+      if (attachedKnowledge.length > 0) {
+        return `${attachedKnowledge.join('\n\n')}\n\n${content}`;
+      }
+      return content;
     }
 
-    if (attachedKnowledge.length > 0) {
-      return `${attachedKnowledge.join('\n\n')}\n\n${content}`;
+    // 2. Implicit Auto-RAG for substantive questions (length >= 6 and not pure command/code)
+    if (this.client && this.workspaceId && this.token && typeof this.client.searchKnowledge === 'function') {
+      const cleanText = content.replace(/@[a-zA-Z0-9_-]+/g, '').trim();
+      // Only search if user prompt is between 6 and 300 chars, not starting with markdown code fences or commands
+      if (cleanText.length >= 6 && cleanText.length <= 300 && !cleanText.startsWith('```') && !cleanText.startsWith('/')) {
+        try {
+          const searchRes = await this.client.searchKnowledge(this.workspaceId, this.token, {
+            query: cleanText,
+            limit: 2,
+            threshold: 0.35,
+          });
+          const results = (searchRes && searchRes.results) || [];
+          if (results.length > 0) {
+            const snippets = results.map((r) =>
+              `\n---\n📁 [相关知识库参考: ${r.title} > ${r.section} (@knowledge:${r.slug})]\n${r.snippet}\n---`
+            );
+            this._log(`Auto-RAG retrieved ${results.length} knowledge chunk(s) for prompt: "${cleanText.slice(0, 40)}"`);
+            return `${snippets.join('\n\n')}\n\n${content}`;
+          }
+        } catch (e) {
+          // Non-fatal, continue with original content
+        }
+      }
     }
 
     return content;

@@ -39,6 +39,8 @@ import { eventToMessage } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { toast } from 'sonner';
+import { useArtifacts } from '@/lib/artifacts-context';
+import { ArtifactsCanvas } from '../canvas/artifacts-canvas';
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -250,6 +252,8 @@ export function ChatView() {
     sessionId: currentSessionId,
     initialMessages: initialMessagesRef.current,
   });
+
+  const { isCanvasOpen, toggleCanvas } = useArtifacts();
 
   // Persisted (not just component state): dismissing this once shouldn't mean
   // seeing it again on every reload — that's what made it feel like a
@@ -687,7 +691,8 @@ export function ChatView() {
           attachment_count: attachments?.length ?? 0,
         });
         forceRefresh();
-      } catch {
+      } catch (err) {
+        console.error('[52hzAgents] Failed to send message:', err);
         // Keep the failed message visible so delivery failure is explicit.
         setOptimisticMessages((prev) =>
           prev
@@ -738,8 +743,10 @@ export function ChatView() {
   const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
 
   return (
-    <div className="flex flex-col h-full bg-surface0">
-      {/* Thread header */}
+    <div className="flex h-full bg-surface0 overflow-hidden">
+      {/* Main Chat Stream Column */}
+      <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
+        {/* Thread header */}
       <div className={`flex items-center gap-2 px-5 lg:px-8 py-3 shrink-0 bg-surface0/90 dark:bg-surface0/75 backdrop-blur-xl border-b border-border/40 dark:border-white/[0.04] sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0 [app-region:no-drag]">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
@@ -833,6 +840,18 @@ export function ChatView() {
             title="Export as Markdown"
           >
             {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+          </button>
+
+          {/* Artifacts Canvas Toggle button */}
+          <button
+            onClick={toggleCanvas}
+            className={cn(
+              'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+              isCanvasOpen ? 'bg-primary/15 text-primary shadow-2xs' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+            )}
+            title="Toggle Artifacts Canvas (右侧画布)"
+          >
+            <Sparkles className="size-3.5" />
           </button>
 
           {/* Quick Panels toggle */}
@@ -1115,7 +1134,10 @@ export function ChatView() {
           />
         )}
       </div>
+      </div>
 
+      {/* Artifacts Canvas Panel */}
+      <ArtifactsCanvas />
     </div>
   );
 }

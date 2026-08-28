@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -237,7 +238,8 @@ func TestPipelineRelaysToNextAgent(t *testing.T) {
 	if err := json.Unmarshal(relayed[0].Payload, &payload); err != nil {
 		t.Fatal(err)
 	}
-	if content, _ := payload["content"].(string); content != "@claude-agent refactor it" {
+	content, _ := payload["content"].(string)
+	if !strings.Contains(content, "@claude-agent") || !strings.Contains(content, "refactor it") || !strings.Contains(content, "Prior Stage Deliverables") {
 		t.Fatalf("unexpected relay content: %q", content)
 	}
 }

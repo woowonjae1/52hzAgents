@@ -99,18 +99,28 @@ func (ChannelMember) TableName() string {
 	return "channel_members"
 }
 
+// PipelineDeliverable represents the structured handoff package produced by a pipeline step.
+type PipelineDeliverable struct {
+	Summary       string   `json:"summary"`                  // 核心交付摘要
+	KeyFindings   []string `json:"key_findings,omitempty"`   // 核心发现与关键点
+	Artifacts     []string `json:"artifacts,omitempty"`      // 产生/修改的关键文件与工件路径
+	OpenQuestions []string `json:"open_questions,omitempty"` // 遗留待办或针对下一棒的重点
+	RawExcerpt    string   `json:"raw_excerpt,omitempty"`    // 正文精华摘录
+}
+
 // PipelineStep is one hop of a multi-agent relay chain. Steps are stored as
 // JSON inside ChannelPipeline.Steps rather than in their own table because a
 // chain is always read and written whole.
 type PipelineStep struct {
-	Agent       string  `json:"agent"`
-	Instruction string  `json:"instruction"`
-	Status      string  `json:"status"` // pending | running | done | failed | retrying
-	StartedAt   *int64  `json:"started_at,omitempty"`
-	FinishedAt  *int64  `json:"finished_at,omitempty"`
-	MaxRetries  int     `json:"max_retries,omitempty"` // Maximum self-correction retry attempts (default 3)
-	RetryCount  int     `json:"retry_count,omitempty"` // Number of retry attempts made so far
-	LastError   *string `json:"last_error,omitempty"`  // Diagnostic error string extracted on failure
+	Agent       string               `json:"agent"`
+	Instruction string               `json:"instruction"`
+	Status      string               `json:"status"` // pending | running | done | failed | retrying
+	StartedAt   *int64               `json:"started_at,omitempty"`
+	FinishedAt  *int64               `json:"finished_at,omitempty"`
+	MaxRetries  int                  `json:"max_retries,omitempty"` // Maximum self-correction retry attempts (default 3)
+	RetryCount  int                  `json:"retry_count,omitempty"` // Number of retry attempts made so far
+	LastError   *string              `json:"last_error,omitempty"`  // Diagnostic error string extracted on failure
+	Deliverable *PipelineDeliverable `json:"deliverable,omitempty"` // 结构化交付包
 }
 
 // ChannelPipeline persists the relay chain a human starts with a multi-agent

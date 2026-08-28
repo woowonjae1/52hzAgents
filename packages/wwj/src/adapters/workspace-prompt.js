@@ -559,6 +559,8 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `"description":"Common API patterns used in this project",` +
       `"network":"${workspaceId}",` +
       `"source":"openagents:${agentName}"}'\`\n\n` +
+      '**Search knowledge entries (semantic / keyword):**\n' +
+      `\`${curl} -s -H "${h}" "${baseUrl}/v1/knowledge/search?network=${workspaceId}&q=search+terms"\`\n\n` +
       '**List knowledge entries:**\n' +
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/knowledge?network=${workspaceId}"\`\n\n` +
       '**Read a knowledge entry by slug:**\n' +

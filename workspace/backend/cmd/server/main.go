@@ -154,6 +154,8 @@ func main() { // 服务程序运行主入口函数。
 		// 知识库（共享 Markdown 文档）：
 		v1.POST("/knowledge", handlers.CreateKnowledge)
 		v1.GET("/knowledge", handlers.ListKnowledge)
+		v1.GET("/knowledge/search", handlers.SearchKnowledge)
+		v1.POST("/knowledge/search", handlers.SearchKnowledge)
 		v1.GET("/knowledge/by-slug/:slug", handlers.GetKnowledgeBySlug)
 		v1.GET("/knowledge/:entry_id", handlers.GetKnowledge)
 		v1.PUT("/knowledge/:entry_id", handlers.UpdateKnowledge)

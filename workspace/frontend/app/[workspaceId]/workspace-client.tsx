@@ -3,6 +3,7 @@
 import { use, Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { WorkspaceProvider, useWorkspace } from '@/lib/workspace-context';
+import { ArtifactsProvider } from '@/lib/artifacts-context';
 import { LayoutProvider } from '@/components/layout/layout-context';
 import { Wrapper } from '@/components/layout/wrapper';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
@@ -95,9 +96,11 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
     return (
       <WorkspaceProvider workspaceId={workspaceId} token={effectiveInitialToken} bearerToken={idToken || undefined}>
         <IdentityGate>
-          <LayoutProvider>
-            <Wrapper />
-          </LayoutProvider>
+          <ArtifactsProvider>
+            <LayoutProvider>
+              <Wrapper />
+            </LayoutProvider>
+          </ArtifactsProvider>
         </IdentityGate>
       </WorkspaceProvider>
     );
@@ -113,9 +116,11 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
       return (
         <WorkspaceProvider workspaceId={workspaceId} token="" bearerToken={idToken}>
           <IdentityGate>
-            <LayoutProvider>
-              <Wrapper />
-            </LayoutProvider>
+            <ArtifactsProvider>
+              <LayoutProvider>
+                <Wrapper />
+              </LayoutProvider>
+            </ArtifactsProvider>
           </IdentityGate>
         </WorkspaceProvider>
       );

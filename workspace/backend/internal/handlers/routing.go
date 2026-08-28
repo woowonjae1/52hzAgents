@@ -316,7 +316,9 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 		return
 	}
 
-	// 4. Handle Pass: Advance to next step
+	// 4. Handle Pass: Extract structured deliverable and advance to next step
+	deliverable := evaluator.ExtractDeliverable(actor, steps[idx], turnMessages, dir)
+	steps[idx].Deliverable = deliverable
 	steps[idx].Status = "done"
 	steps[idx].FinishedAt = &nowMs
 
@@ -353,7 +355,7 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 		return
 	}
 
-	relayPipelineStep(workspaceID, target, steps[nextIdx], pipelineTaskID(record.ID, nextIdx))
+	relayPipelineStep(workspaceID, target, steps[nextIdx], actor, deliverable, pipelineTaskID(record.ID, nextIdx))
 }
 
 // relaySelfCorrection posts diagnostic feedback to the same agent to prompt self-repair.
@@ -473,29 +475,28 @@ func RelayPipelineAlert(workspaceID, target, alertContent string) {
 }
 
 // relayPipelineStep posts the next hop's instruction into the channel as if the
-// user had sent it, waking exactly that agent.
-func relayPipelineStep(workspaceID string, target string, nextSeg models.PipelineStep, taskID string) {
+// user had sent it, waking exactly that agent with structured deliverable context.
+func relayPipelineStep(workspaceID string, target string, nextSeg models.PipelineStep, prevActor string, prevDeliverable *models.PipelineDeliverable, taskID string) {
 	go func() {
 		time.Sleep(500 * time.Millisecond)
 
 		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
 		eventID := uuid.New().String()
-		promptContent := "@" + nextSeg.Agent
-		if nextSeg.Instruction != "" {
-			promptContent += " " + nextSeg.Instruction
-		}
+		promptContent := evaluator.FormatRelayPrompt(nextSeg.Agent, prevActor, prevDeliverable, nextSeg.Instruction)
 
 		payload := map[string]interface{}{
 			"content":      promptContent,
 			"sender_name":  "Pipeline Relay",
 			"sender_type":  "pipeline",
 			"message_type": "chat",
+			"deliverable":  prevDeliverable,
 		}
 		metadata := map[string]interface{}{
 			"target_agents": []string{nextSeg.Agent},
 			"pipeline_step": true,
 			"auto_relay":    true,
 			"task_id":       taskID,
+			"deliverable":   prevDeliverable,
 		}
 
 		payloadBytes, _ := json.Marshal(payload)

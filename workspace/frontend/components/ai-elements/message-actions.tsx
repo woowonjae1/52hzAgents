@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Check, RotateCw, Download, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Copy, Check, RotateCw, Download, ThumbsUp, ThumbsDown, FileText, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,6 +12,7 @@ export interface MessageActionsProps {
   variant?: 'capsule' | 'toolbar';
   onRegenerate?: () => void;
   onExportMarkdown?: () => void;
+  onOpenCanvas?: () => void;
   className?: string;
 }
 
@@ -29,6 +30,7 @@ export function MessageActions({
   variant = 'capsule',
   onRegenerate,
   onExportMarkdown,
+  onOpenCanvas,
   className,
 }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
@@ -39,13 +41,13 @@ export function MessageActions({
     if (!content) return;
     navigator.clipboard.writeText(content);
     setCopied(true);
-    toast.success('已复制到剪贴板');
+    toast.success('Copied to clipboard');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleFeedback = (type: 'like' | 'dislike') => {
     setFeedback((prev) => (prev === type ? null : type));
-    toast.success(type === 'like' ? '感谢您的正面反馈' : '已记录您的反馈');
+    toast.success(type === 'like' ? 'Thank you for the feedback!' : 'Feedback noted');
   };
 
   const handleExport = (e: React.MouseEvent) => {
@@ -61,7 +63,7 @@ export function MessageActions({
     a.download = `message-${Date.now()}.md`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('已导出为 Markdown');
+    toast.success('Exported as Markdown');
   };
 
   if (variant === 'toolbar') {
@@ -69,12 +71,12 @@ export function MessageActions({
       <div className={cn('flex items-center gap-0.5 text-foreground-extra-muted select-none mt-1.5 -ml-1', className)}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={handleCopy} className={ghostButton} aria-label="复制内容">
+            <button type="button" onClick={handleCopy} className={ghostButton} aria-label="Copy content">
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>
-            {copied ? '已复制' : '复制内容'}
+            {copied ? 'Copied' : 'Copy content'}
           </TooltipContent>
         </Tooltip>
 
@@ -88,13 +90,13 @@ export function MessageActions({
                   onRegenerate();
                 }}
                 className={cn(ghostButton, 'group/regen')}
-                aria-label="重新生成"
+                aria-label="Regenerate"
               >
                 <RotateCw className="size-3.5 transition-transform duration-300 group-hover/regen:-rotate-180" />
               </button>
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}>
-              重新生成
+              Regenerate
             </TooltipContent>
           </Tooltip>
         )}
@@ -105,13 +107,13 @@ export function MessageActions({
               type="button"
               onClick={() => handleFeedback('like')}
               className={cn(ghostButton, feedback === 'like' && 'text-primary bg-primary/10')}
-              aria-label="有用"
+              aria-label="Helpful"
             >
               <ThumbsUp className="size-3.5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>
-            有用
+            Helpful
           </TooltipContent>
         </Tooltip>
 
@@ -121,24 +123,45 @@ export function MessageActions({
               type="button"
               onClick={() => handleFeedback('dislike')}
               className={cn(ghostButton, feedback === 'dislike' && 'text-status-danger bg-status-danger/10')}
-              aria-label="不满意"
+              aria-label="Unhelpful"
             >
               <ThumbsDown className="size-3.5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>
-            不满意
+            Unhelpful
           </TooltipContent>
         </Tooltip>
 
+        {onOpenCanvas && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCanvas();
+                }}
+                className={ghostButton}
+                aria-label="Open in Canvas"
+              >
+                <Sparkles className="size-3.5 text-primary" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={4}>
+              Open in Canvas
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" onClick={handleExport} className={ghostButton} aria-label="导出 Markdown">
+            <button type="button" onClick={handleExport} className={ghostButton} aria-label="Export Markdown">
               <Download className="size-3.5" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={4}>
-            导出 Markdown
+            Export Markdown
           </TooltipContent>
         </Tooltip>
       </div>

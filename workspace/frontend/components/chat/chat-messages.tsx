@@ -60,7 +60,13 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
     pendingSteps.clear();
   };
 
-  const visibleMessages = messages.filter((msg) => !msg.content.startsWith('__queue_cancel:'));
+  const visibleMessages = messages.filter(
+    (msg) =>
+      !msg.content.startsWith('__queue_cancel:') &&
+      msg.senderType !== 'pipeline' &&
+      msg.senderName !== 'Pipeline Relay' &&
+      msg.senderName !== 'Pipeline Supervisor'
+  );
 
   visibleMessages.forEach((msg) => {
     if (msg.messageType === 'thinking' || msg.messageType === 'status' || msg.messageType === 'todos') {

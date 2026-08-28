@@ -14,6 +14,14 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 
+export interface PipelineDeliverable {
+  summary: string;
+  key_findings?: string[];
+  artifacts?: string[];
+  open_questions?: string[];
+  raw_excerpt?: string;
+}
+
 export interface PipelineStepItem {
   agent: string;
   instruction: string;
@@ -21,6 +29,7 @@ export interface PipelineStepItem {
   retry_count?: number;
   max_retries?: number;
   last_error?: string;
+  deliverable?: PipelineDeliverable;
 }
 
 export interface PipelineData {

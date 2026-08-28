@@ -732,12 +732,28 @@ class WorkspaceClient {
 
   // ── Knowledge Base ──
 
-  async listKnowledge(workspaceId, token, { limit = 100 } = {}) {
+  async listKnowledge(workspaceId, token, { limit = 100, category, q } = {}) {
     const params = new URLSearchParams({
       network: workspaceId,
       limit: String(limit),
     });
+    if (category) params.set('category', category);
+    if (q) params.set('q', q);
     const data = await this._get(`/v1/knowledge?${params}`, this._wsHeaders(token));
+    return data.data || data;
+  }
+
+  async searchKnowledge(workspaceId, token, { q, query, category, limit = 5, top_k, threshold = 0.15 } = {}) {
+    const searchQuery = q || query || '';
+    const searchLimit = top_k || limit || 5;
+    const params = new URLSearchParams({
+      network: workspaceId,
+      q: searchQuery,
+      limit: String(searchLimit),
+      threshold: String(threshold),
+    });
+    if (category) params.set('category', category);
+    const data = await this._get(`/v1/knowledge/search?${params}`, this._wsHeaders(token));
     return data.data || data;
   }
 
