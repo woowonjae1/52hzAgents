@@ -1039,3 +1039,108 @@ test('the workspace prompt tells agents a named peer is a real process, not a su
   assert.match(prompt, /separate processes, not sub-agents of yours/);
   assert.match(prompt, /do not create a local sub-agent named after it/);
 });
+
+// ---------------------------------------------------------------------------
+// The seam between the Go relay and the Node adapter. Each side is tested on
+// its own, but nothing asserted that a message the backend actually emits
+// survives the adapter's intake — which is exactly where the hand-off died.
+// These build the event shape verbatim from relayPipelineStep / routeMessage in
+// workspace/backend/internal/handlers/routing.go and push it through the REAL
+// _eventToMessage, so a change to either side breaks this.
+// ---------------------------------------------------------------------------
+
+const { WorkspaceClient } = require('../src/workspace-client');
+
+function toAdapterMessage(event) {
+  const client = new WorkspaceClient('http://localhost:1');
+  return client._eventToMessage(event);
+}
+
+async function collectAccepted(adapter, message) {
+  const dispatched = [];
+  adapter._dispatchMessage = async (m) => { dispatched.push(m); };
+  adapter.client = {
+    pollPending: async () => ({ messages: [message], cursor: 'c1', composing: false }),
+    heartbeat: async () => {},
+    pollControl: async () => [],
+  };
+  adapter._running = true;
+  const loop = adapter._pollLoop();
+  await new Promise((r) => setTimeout(r, 120));
+  adapter._running = false;
+  await loop.catch(() => {});
+  return dispatched;
+}
+
+test('the adapter accepts the pipeline relay event the backend emits', async () => {
+  // relayPipelineStep: source "human:pipeline", sender_type "pipeline",
+  // content "@<agent> <instruction>", target_agents [<agent>].
+  const event = {
+    id: 'evt-relay-1',
+    source: 'human:pipeline',
+    target: 'channel/thread-1',
+    timestamp: Date.now(),
+    payload: {
+      content: '@claude 然后分析出美国纽约往后 7 天的 天气',
+      sender_name: 'Pipeline Relay',
+      sender_type: 'pipeline',
+      message_type: 'chat',
+    },
+    metadata: { target_agents: ['claude'], pipeline_step: true, auto_relay: true, task_id: 't-0' },
+  };
+
+  const adapter = new BaseAdapter({
+    agentName: 'claude', agentType: 'claude', workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000', token: 't',
+  });
+  const got = await collectAccepted(adapter, toAdapterMessage(event));
+  assert.equal(got.length, 1, 'a pipeline relay must reach the agent it names');
+  assert.match(got[0].content, /7 天的 天气/, 'the step instruction must survive intact');
+});
+
+test('the adapter accepts the agent-to-agent relay the backend routes', async () => {
+  // routeMessage's mention path: an agent reply that @mentions a peer keeps its
+  // own agent source and gains target_agents.
+  const event = {
+    id: 'evt-relay-2',
+    source: 'openagents:antigravity',
+    target: 'channel/thread-1',
+    timestamp: Date.now(),
+    payload: {
+      content: 'Time computed: 04:00 EDT. @claude please take the forecast from here.',
+      sender_name: 'antigravity',
+      message_type: 'chat',
+    },
+    metadata: { target_agents: ['claude'] },
+  };
+
+  const adapter = new BaseAdapter({
+    agentName: 'claude', agentType: 'claude', workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000', token: 't',
+  });
+  const got = await collectAccepted(adapter, toAdapterMessage(event));
+  assert.equal(got.length, 1, 'an agent hand-off the server routed to us must reach us');
+});
+
+test('a pipeline relay aimed at another agent is still ignored', async () => {
+  const event = {
+    id: 'evt-relay-3',
+    source: 'human:pipeline',
+    target: 'channel/thread-1',
+    timestamp: Date.now(),
+    payload: {
+      content: '@opencode build the thing',
+      sender_name: 'Pipeline Relay',
+      sender_type: 'pipeline',
+      message_type: 'chat',
+    },
+    metadata: { target_agents: ['opencode'], pipeline_step: true },
+  };
+
+  const adapter = new BaseAdapter({
+    agentName: 'claude', agentType: 'claude', workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000', token: 't',
+  });
+  const got = await collectAccepted(adapter, toAdapterMessage(event));
+  assert.equal(got.length, 0, 'a step addressed to another agent must not wake us');
+});
