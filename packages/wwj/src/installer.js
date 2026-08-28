@@ -18,7 +18,7 @@ const versionCache = new Map();
 
 /**
  * Compare two dotted version strings numerically, ignoring any pre-release /
- * build suffix (e.g. "1.2.3-beta.1" â†?1.2.3). Returns -1, 0, or 1.
+ * build suffix (e.g. "1.2.3-beta.1" ï¿½?1.2.3). Returns -1, 0, or 1.
  * Returns null when either side has no extractable numeric version.
  */
 function compareVersions(a, b) {
@@ -125,11 +125,11 @@ class Installer {
     const binaryPath = this._whichBinary(agentType);
     if (!binaryPath) {
       // Aider/Amp-only: a marker alone is NOT sufficient evidence of an install.
-      // Their CLIs live outside any npm package (aider: curl/uv/pipx â†?~/.local/bin;
-      // amp: curl/ps1 installer â†?~/.amp/bin), so a historical "installed" marker
+      // Their CLIs live outside any npm package (aider: curl/uv/pipx ï¿½?~/.local/bin;
+      // amp: curl/ps1 installer ï¿½?~/.amp/bin), so a historical "installed" marker
       // can outlive a missing/never-landed binary. Require a real resolvable
       // binary; when only a stale marker remains, report not-installed with a
-      // 'cli-missing' diagnostic (carried by the existing `location` field â€?no
+      // 'cli-missing' diagnostic (carried by the existing `location` field ï¿½?no
       // new field/enum). The marker itself is left untouched.
       if (agentType === 'aider' || agentType === 'amp') {
         return {
@@ -139,7 +139,7 @@ class Installer {
         };
       }
       // If a successful install wrote a marker, surface installed=true even
-      // when binary detection can't (yet) see the freshly-installed CLI â€?      // e.g. PATH caches not yet picking up a brand-new ~/.cursor/bin. The
+      // when binary detection can't (yet) see the freshly-installed CLI ï¿½?      // e.g. PATH caches not yet picking up a brand-new ~/.cursor/bin. The
       // marker is the ground truth of what we just installed; UI was
       // silently showing "not installed" right after a successful install
       // because earlier code aggressively deleted the marker here.
@@ -150,12 +150,12 @@ class Installer {
     }
 
     // Verify it's not a stale shim pointing to a missing package
-    const 52hzAgentsDir = path.join(os.homedir(), '.wwj');
-    if (binaryPath.startsWith(52hzAgentsDir)) {
+    const hzAgentsDir = path.join(os.homedir(), '.wwj');
+    if (binaryPath.startsWith(hzAgentsDir)) {
       const hasRuntime = fs.existsSync(path.join(runtimeModules, pkgName, 'package.json'));
       const hasLegacy = fs.existsSync(path.join(legacyModules, pkgName, 'package.json'));
       if (!hasRuntime && !hasLegacy) {
-        // Stale shim â€?clean it up
+        // Stale shim ï¿½?clean it up
         for (const ext of ['', '.cmd', '.ps1']) {
           try { const p = path.join(path.dirname(binaryPath), binary + ext); if (fs.existsSync(p)) fs.unlinkSync(p); } catch {}
         }
@@ -164,12 +164,12 @@ class Installer {
       return { installed: true, managed: true, location: 'legacy' };
     }
 
-    // Binary found outside ~/.wwj/ â€?global/system install
+    // Binary found outside ~/.wwj/ ï¿½?global/system install
     return { installed: true, managed: false, location: 'global' };
   }
 
   /**
-   * Deep verification â€?runs the agent's verify command (slow, use sparingly).
+   * Deep verification ï¿½?runs the agent's verify command (slow, use sparingly).
    */
   verifyInstalled(agentType) {
     const entry = this.registry.getEntry(agentType);
@@ -180,7 +180,7 @@ class Installer {
     if (verifyCmd) {
       try {
         // Use the enhanced PATH so a freshly-installed CLI living in a dir the
-        // installer added (e.g. %LOCALAPPDATA%\cursor-agent) is found â€?otherwise
+        // installer added (e.g. %LOCALAPPDATA%\cursor-agent) is found ï¿½?otherwise
         // `cursor-agent --version` exits "not recognized" and verify wrongly fails.
         require('child_process').execSync(verifyCmd, {
           stdio: 'ignore', timeout: 5000, env: getEnhancedEnv(), windowsHide: true,
@@ -194,8 +194,8 @@ class Installer {
   /**
    * Aider-only post-install verification.
    *
-   * Confirms a REAL aider binary exists on disk â€?AND that it is actually the
-   * Aider CLI rather than a same-named unrelated executable â€?before the
+   * Confirms a REAL aider binary exists on disk ï¿½?AND that it is actually the
+   * Aider CLI rather than a same-named unrelated executable ï¿½?before the
    * install is recorded. The curl/uv/pipx installer can exit 0 without landing
    * a runnable binary (blocked download, wrong $HOME, custom bin dir), which
    * would otherwise leave a "marker says installed but CLI missing" state.
@@ -205,7 +205,7 @@ class Installer {
    * Hard condition: an absolute path resolves AND the file exists. `aider
    * --version` is best-effort: a flaky/blocked probe does NOT fail the install,
    * but a version string that is clearly NOT Aider (wrong same-named package)
-   * does â€?that is the whole point of the check.
+   * does ï¿½?that is the whole point of the check.
    *
    * Scoped to Aider; never called for any other agent type.
    *
@@ -221,7 +221,7 @@ class Installer {
     //    uv-tools dirs added to paths.js).
     const resolved = this._whichBinary('aider');
     if (resolved) candidates.push(resolved);
-    // 2) Every real install dir the official installer can target â€?XDG bin,
+    // 2) Every real install dir the official installer can target ï¿½?XDG bin,
     //    XDG_DATA_HOME/../bin, ~/.local/bin, and the uv tools venv. This is the
     //    fix for "install succeeded but landed outside ~/.local/bin" (e.g. the
     //    user has XDG_* set, or only the uv-tools venv copy exists).
@@ -250,7 +250,7 @@ class Installer {
         version = raw;
       }
     } catch {
-      // Best-effort only â€?file existence above is the hard condition.
+      // Best-effort only ï¿½?file existence above is the hard condition.
     }
     return { path: found, version };
   }
@@ -259,7 +259,7 @@ class Installer {
    * Aider-only: actionable message when the install command exits 0 but no
    * runnable (and verified) aider binary can be found anywhere we look. The most
    * common real cause is the underlying `uv` step failing to download a Python
-   * runtime on a restricted network â€?so we point at both the PATH/new-terminal
+   * runtime on a restricted network ï¿½?so we point at both the PATH/new-terminal
    * case and a pip fallback.
    */
   _aiderBinaryNotFoundMessage() {
@@ -268,7 +268,7 @@ class Installer {
     const looked = aiderBinDirs().map((d) => `  ${path.join(d, name)}`).join('\n');
     return (
       'Aider install command completed, but the Aider CLI could not be located ' +
-      'afterward. The underlying installer (uv) most likely could not finish â€?' +
+      'afterward. The underlying installer (uv) most likely could not finish ï¿½?' +
       'often it cannot download a Python runtime on a restricted network/proxy.\n\n' +
       `Looked in:\n${looked}\n\n` +
       'Try one of:\n' +
@@ -290,7 +290,7 @@ class Installer {
    * be satisfied by its own about-to-be-written record.
    *
    * Hard condition for success: an absolute path resolves AND the file exists.
-   * `amp --version` is a best-effort enhancement used only for logging â€?a flaky
+   * `amp --version` is a best-effort enhancement used only for logging ï¿½?a flaky
    * or non-interactive `--version` failure does NOT fail the install.
    *
    * Scoped to Amp; never called for any other agent type.
@@ -309,7 +309,7 @@ class Installer {
     //    (already includes ~/.amp/bin).
     const resolved = this._whichBinary('amp');
     if (resolved) candidates.push(resolved);
-    // 2) Honor a custom AMP_HOME, then the installer's default ~/.amp/bin â€?    //    covers a binary that exists but whose dir isn't on PATH yet.
+    // 2) Honor a custom AMP_HOME, then the installer's default ~/.amp/bin ï¿½?    //    covers a binary that exists but whose dir isn't on PATH yet.
     const binDirs = [];
     if (process.env.AMP_HOME) binDirs.push(path.join(process.env.AMP_HOME, 'bin'));
     binDirs.push(path.join(os.homedir(), '.amp', 'bin'));
@@ -333,7 +333,7 @@ class Installer {
         encoding: 'utf-8',
       }).trim() || null;
     } catch {
-      // Best-effort only â€?file existence above is the hard condition.
+      // Best-effort only ï¿½?file existence above is the hard condition.
     }
     return { path: found, version };
   }
@@ -413,7 +413,7 @@ class Installer {
   }
 
   /**
-   * Health check â€?binary existence + version.
+   * Health check ï¿½?binary existence + version.
    * @returns {{ installed: boolean, binary: string|null, version: string|null }}
    */
   healthCheck(agentType) {
@@ -493,7 +493,7 @@ class Installer {
       compatible: gate.compatible,
       min_version: gate.minVersion,
       // Installed is proven (binary resolved). A not-ready installed agent is a
-      // login/config state, never "not installed" â€?version mismatch aside.
+      // login/config state, never "not installed" ï¿½?version mismatch aside.
       reason:
         gate.compatible === false
           ? REASON.VERSION_INCOMPATIBLE
@@ -505,14 +505,14 @@ class Installer {
   /**
    * Build the `<binary> --version` probe command for a resolved binary path.
    *
-   * When the resolved binary is a JS entry (`.mjs`/`.cjs`/`.js` â€?e.g. OpenClaw,
+   * When the resolved binary is a JS entry (`.mjs`/`.cjs`/`.js` ï¿½?e.g. OpenClaw,
    * whose package `bin` is `openclaw.mjs` and is what `_resolvePackageBin`
    * returns when the `.cmd` shim isn't on PATH), it MUST be run through node.
    * execSync goes through a shell; on Windows `cmd.exe "C:\â€¦\openclaw.mjs"
    * --version` finds no PATHEXT association for `.mjs`, so it ShellExecutes the
    * file and the OS pops the "choose an app to open this .mjs file" dialog. The
    * launcher polls health/version on a timer, so that dialog reappears over and
-   * over â€?even at idle, and stacked (one per poll). Prefixing node makes the
+   * over ï¿½?even at idle, and stacked (one per poll). Prefixing node makes the
    * probe run headless. Harmless on Unix (node runs a .mjs regardless of any
    * shebang), so it's applied on every platform for consistency.
    */
@@ -579,10 +579,10 @@ class Installer {
   /**
    * Evaluate `install.min_version` against a detected version. Generic for any
    * agent. Returns { compatible: true|false|null, minVersion, message }.
-   *   â€?no min_version declared â†?compatible:true (gate disabled)
-   *   â€?version unparseable      â†?compatible:null  ("unknown", don't false-pass)
-   *   â€?version < min_version    â†?compatible:false (block + upgrade hint)
-   *   â€?version >= min_version   â†?compatible:true
+   *   ï¿½?no min_version declared ï¿½?compatible:true (gate disabled)
+   *   ï¿½?version unparseable      ï¿½?compatible:null  ("unknown", don't false-pass)
+   *   ï¿½?version < min_version    ï¿½?compatible:false (block + upgrade hint)
+   *   ï¿½?version >= min_version   ï¿½?compatible:true
    */
   _evaluateCompatibility(entry, version) {
     // Opt-in floor declared under either install.min_version or
@@ -600,7 +600,7 @@ class Installer {
       return {
         compatible: false,
         minVersion,
-        message: `${(entry.label || entry.name || 'This agent')} ${version} is too old â€?upgrade to ${minVersion} or newer.`,
+        message: `${(entry.label || entry.name || 'This agent')} ${version} is too old ï¿½?upgrade to ${minVersion} or newer.`,
       };
     }
     return { compatible: true, minVersion, message: null };
@@ -682,7 +682,7 @@ class Installer {
     }
 
     // A credential file was found but could not be read (e.g. permissions).
-    // That is NOT "no credentials" â€?report it as 'unknown' with a distinct
+    // That is NOT "no credentials" ï¿½?report it as 'unknown' with a distinct
     // message so the UI never mislabels a real (if unreadable) login as
     // "Not logged in". Only reachable for agents that opt into creds_no_parse.
     if (credsFile.unreadable) {
@@ -697,8 +697,8 @@ class Installer {
 
     // No positive signal. For agents whose auth cannot be reliably probed
     // without running them (generic `check_ready.unverifiable`), this is
-    // 'unknown' â€?they may already be signed in via a CLI login / keychain /
-    // gh â€?NOT a definitive 'no_credentials'. The launcher can show "unknown"
+    // 'unknown' ï¿½?they may already be signed in via a CLI login / keychain /
+    // gh ï¿½?NOT a definitive 'no_credentials'. The launcher can show "unknown"
     // and still allow a launch attempt; the real run is the final authority.
     return {
       ready: false,
@@ -751,7 +751,7 @@ class Installer {
   }
 
   /**
-   * Existence/readability of a credential file WITHOUT reading its contents â€?   * never loads a token/key into memory. Returns 'present' | 'unreadable' |
+   * Existence/readability of a credential file WITHOUT reading its contents ï¿½?   * never loads a token/key into memory. Returns 'present' | 'unreadable' |
    * 'absent'. A non-empty readable file (or a non-empty directory) is 'present';
    * a path that exists but cannot be statted/read is 'unreadable'. Resolves "~"
    * against the running user's home (the daemon/launcher user), not the
@@ -790,7 +790,7 @@ class Installer {
   /**
    * Treat the named env vars as paths to a credential FILE (e.g.
    * GOOGLE_APPLICATION_CREDENTIALS) and count one as ready only when its target
-   * exists and is a readable file â€?a non-empty value alone is NOT enough.
+   * exists and is a readable file ï¿½?a non-empty value alone is NOT enough.
    * Checks both the process env and the agent's saved env.
    */
   _checkCredsPathEnv(checkReady, savedEnv) {
@@ -804,7 +804,7 @@ class Installer {
         if (!fs.existsSync(p)) continue;
         fs.accessSync(p, fs.constants.R_OK);
         if (fs.statSync(p).isFile()) return true;
-      } catch { /* unreadable / bad path â†?not a usable credential */ }
+      } catch { /* unreadable / bad path ï¿½?not a usable credential */ }
     }
     return false;
   }
@@ -882,7 +882,7 @@ class Installer {
     // Aider-only: the curl/uv/pipx installer can exit 0 without landing a
     // runnable (or genuine) binary, so verify the real CLI exists BEFORE
     // recording the install. Other agent types keep the original
-    // "exit 0 â†?mark installed" behavior.
+    // "exit 0 ï¿½?mark installed" behavior.
     if (agentType === 'aider') {
       const aider = this._verifyAiderBinary();
       if (!aider) {
@@ -947,12 +947,12 @@ class Installer {
     const isWin = process.platform === 'win32';
 
     // Build the spawn invocation. Three shapes:
-    //   1. npm install via bundled `node npm-cli.js` â€?argv array, no shell.
+    //   1. npm install via bundled `node npm-cli.js` ï¿½?argv array, no shell.
     //      Path-safe under non-ASCII home dirs on Windows (preferred).
-    //   2. npm install via legacy shell string (npm.cmd / npm) â€?fallback only
+    //   2. npm install via legacy shell string (npm.cmd / npm) ï¿½?fallback only
     //      when no node + npm-cli.js layout is found; OEM-codepage corruption
     //      means this breaks on non-ASCII paths, but still works for ASCII.
-    //   3. pip / curl / powershell â€?keep the legacy shell-string behaviour.
+    //   3. pip / curl / powershell ï¿½?keep the legacy shell-string behaviour.
     let spawnFile;
     let spawnArgs = [];
     let useShell;
@@ -964,7 +964,7 @@ class Installer {
       fs.mkdirSync(prefixDir, { recursive: true });
       installCwd = prefixDir;
 
-      // `npm install [-g] <pkgâ€?` â†?install --save --prefix <dir> <pkgâ€?
+      // `npm install [-g] <pkgï¿½?` ï¿½?install --save --prefix <dir> <pkgï¿½?
       const pkgArgs = rawCmd
         .replace(/^npm install\s*/, '')
         .replace(/(^|\s)-g(\s|$)/, ' ')
@@ -996,7 +996,7 @@ class Installer {
         displayCmd = spawnFile;
       }
     } else {
-      // pip / curl / powershell â€?unchanged shell-string behaviour.
+      // pip / curl / powershell ï¿½?unchanged shell-string behaviour.
       spawnFile = this._wrapForWindowsShell(rawCmd);
       useShell = isWin ? (env.ComSpec || 'C:\\Windows\\System32\\cmd.exe') : true;
       // Set cwd outside System32 on Windows.
@@ -1246,7 +1246,7 @@ class Installer {
   _deriveUninstallCommand(installCmd, agentType) {
     if (!installCmd) return null;
 
-    // npm install -g <pkg> â†?npm uninstall --prefix <runtimeDir> <pkg>
+    // npm install -g <pkg> ï¿½?npm uninstall --prefix <runtimeDir> <pkg>
     if (installCmd.includes('npm install')) {
       const prefixDir = agentType ? getRuntimePrefix(agentType) : path.join(os.homedir(), '.wwj', 'nodejs');
       return installCmd
@@ -1256,14 +1256,14 @@ class Installer {
         .replace(/@[\d.]+/g, '');
     }
 
-    // pip install <pkg> â†?pip uninstall -y <pkg>
+    // pip install <pkg> ï¿½?pip uninstall -y <pkg>
     if (installCmd.includes('pip install') || installCmd.includes('pip3 install')) {
       return installCmd
         .replace('pip install', 'pip uninstall -y')
         .replace('pip3 install', 'pip3 uninstall -y');
     }
 
-    // pipx install <pkg> â†?pipx uninstall <pkg>
+    // pipx install <pkg> ï¿½?pipx uninstall <pkg>
     if (installCmd.includes('pipx install')) {
       return installCmd.replace('pipx install', 'pipx uninstall');
     }
@@ -1290,7 +1290,7 @@ class Installer {
     // declared as "./bin/x" (e.g. Cline): a local `npm install --prefix DIR`
     // links dependency bins but not the explicitly-installed root package's,
     // so a PATH lookup finds nothing even though the CLI is present and
-    // runnable. Generic and backward-compatible â€?only runs after PATH misses.
+    // runnable. Generic and backward-compatible ï¿½?only runs after PATH misses.
     const pkgBin = this._resolvePackageBin(agentType, entry, binary);
     if (pkgBin) return pkgBin;
     return null;
@@ -1431,7 +1431,7 @@ class Installer {
       extraDirs.push(env.SystemRoot ? path.join(env.SystemRoot, 'System32') : 'C:\\Windows\\System32');
       extraDirs.push(env.ProgramFiles ? path.join(env.ProgramFiles, 'Git', 'cmd') : 'C:\\Program Files\\Git\\cmd');
 
-      // Bundled node â€?fallback only. Skip if system node works, otherwise
+      // Bundled node ï¿½?fallback only. Skip if system node works, otherwise
       // verify the bundled exe can actually launch before exposing it.
       if (!hasSystemNode) {
         try {
@@ -1561,7 +1561,7 @@ class Installer {
     if (onData) onData(`Node.js not found. Installing Node.js ${nodeVersion}...\n\n`);
 
     if (plat === 'windows') {
-      // Download portable zip â€?no admin required
+      // Download portable zip ï¿½?no admin required
       const arch = os.arch() === 'x64' ? 'x64' : 'x86';
       const url = `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-win-${arch}.zip`;
       const zipPath = path.join(os.tmpdir(), `node-${nodeVersion}.zip`);
@@ -1588,7 +1588,7 @@ class Installer {
         });
       });
 
-      // The zip extracts to node-vX.X.X-win-x64/ subfolder â€?flatten it
+      // The zip extracts to node-vX.X.X-win-x64/ subfolder ï¿½?flatten it
       const extractedDir = path.join(nodejsDir, `node-${nodeVersion}-win-${arch}`);
       if (fs.existsSync(extractedDir)) {
         if (onData) onData('Flattening Node.js directory...\n');
@@ -1728,7 +1728,7 @@ class Installer {
         }
       }
     } catch {}
-    // System node â€?its npm-cli.js lives next to (or one level above) it.
+    // System node ï¿½?its npm-cli.js lives next to (or one level above) it.
     try {
       const sys = whichBinary('node');
       if (sys) nodeCandidates.push(sys);
@@ -1773,8 +1773,8 @@ class Installer {
    * Wrap a command in `powershell.exe -Command "..."` when (a) we're on Windows
    * and (b) the command uses PowerShell-only tokens like `irm`, `iex`,
    * `Invoke-RestMethod`, etc. The launcher's install shell is cmd.exe, which
-   * doesn't recognize these aliases â€?without wrapping, e.g. Cursor's
-   * `irm 'â€? | iex` exits 255. Skips commands already prefixed with
+   * doesn't recognize these aliases ï¿½?without wrapping, e.g. Cursor's
+   * `irm 'ï¿½? | iex` exits 255. Skips commands already prefixed with
    * `powershell`/`powershell.exe` so we don't double-wrap.
    */
   _wrapForWindowsShell(cmd) {

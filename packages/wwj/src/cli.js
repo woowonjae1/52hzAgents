@@ -71,7 +71,7 @@ function table(rows, headers) {
 async function cmdUp(connector, flags) {
   if (flags.foreground) {
     // Run in foreground. daemonize() already guards its own child, but the
-    // launcher spawns `up --foreground` DIRECTLY â€?bypassing that guard â€?so a
+    // launcher spawns `up --foreground` DIRECTLY Ã¢â‚¬?bypassing that guard Ã¢â‚¬?so a
     // stale/empty pid file used to let it pile up dozens of daemons that each
     // join the workspace as the same agents (session wars, duplicate replies).
     // Enforce the singleton here using process-liveness from the pid OR status
@@ -107,7 +107,7 @@ async function cmdDown(connector) {
 
 async function cmdRestart(connector, flags, positional) {
   // `wwj restart <name>` restarts that single agent; the extra argument used to
-  // be silently dropped, so it bounced the whole daemon instead â€?including,
+  // be silently dropped, so it bounced the whole daemon instead Ã¢â‚¬?including,
   // when the desktop app owns the daemon, replacing the app's daemon with one
   // started from the shell. Bare `wwj restart` still restarts the daemon.
   const name = positional && positional[0];
@@ -174,14 +174,14 @@ async function cmdCreate(connector, flags, positional) {
   if (type === 'custom' && !command) {
     print("Error: --command is required for --type custom.");
     print('  wwj create my-agent --type custom --command kilo --args "run {prompt}"');
-    print('Without it there is nothing to run â€?the agent would fail preflight.');
+    print('Without it there is nothing to run Ã¢â‚¬?the agent would fail preflight.');
     process.exitCode = 1;
     return;
   }
 
   // Validate the runtime type BEFORE creating any local entry. A typo'd or
   // otherwise unknown type (e.g. "calude") must not leave a broken agent in
-  // config â€?an uninstalled-but-valid type is fine and handled further down.
+  // config Ã¢â‚¬?an uninstalled-but-valid type is fine and handled further down.
   if (!connector.registry.getEntry(type)) {
     const known = connector.registry.getCatalogSync().map((e) => e.name).sort();
     print(`Error: unknown agent type '${type}'.`);
@@ -211,7 +211,7 @@ async function cmdCreate(connector, flags, positional) {
       print(`Agent '${name}' created (type: ${type})`);
     }
 
-    // A custom agent's runtime IS the command the user supplied â€?there is
+    // A custom agent's runtime IS the command the user supplied Ã¢â‚¬?there is
     // nothing named 'custom' to install, so don't tell them to install it.
     if (type !== 'custom' && !connector.isInstalled(type)) {
       if (!flags.install) {
@@ -244,13 +244,13 @@ async function cmdRemove(connector, _flags, positional) {
 async function cmdStart(connector, _flags, positional) {
   const name = positional[0];
   if (!name) { print('Usage: wwj start <name>'); return; }
-  // `start` must be idempotent â€?it ensures the agent is running, it does NOT
+  // `start` must be idempotent Ã¢â‚¬?it ensures the agent is running, it does NOT
   // forcibly restart one that already is. Send `start:` (which the daemon
   // guards: relaunch only when not already running) rather than `restart:`.
   // A blind `restart:` tears down the workspace session the daemon already
   // joined on launch and re-joins as the same agent; the server revokes the
   // first session, so the agent stops the moment it next touches the workspace
-  // (first user message â†?"thinking..." then silence). The launcher already
+  // (first user message Ã¢â€ ?"thinking..." then silence). The launcher already
   // sends `start:`; this aligns the CLI with it.
   connector.sendDaemonCommand(`start:${name}`);
   print(`Sent start command for '${name}'`);
@@ -376,7 +376,7 @@ async function cmdConnect(connector, flags, positional) {
   // for compatibility with the existing mcp-server env var.
   let token = positional[1];
   if (!token || token === '-') {
-    token = flags.token || process.env.WWJ_WORKSPACE_TOKEN || process.env.52hzAgents_TOKEN;
+    token = flags.token || process.env.WWJ_WORKSPACE_TOKEN || process.env.HZ_WORKSPACE_TOKEN || process.env.HZ_TOKEN;
   }
 
   if (!name) {
@@ -386,7 +386,7 @@ async function cmdConnect(connector, flags, positional) {
   }
 
   if (!token) {
-    // No token supplied and none in the environment. Never prompt â€?keep
+    // No token supplied and none in the environment. Never prompt Ã¢â‚¬?keep
     // CI / non-interactive environments from hanging. Print a helpful error
     // explaining why the agent stays invisible and how to fix it.
     print('Workspace token is required.');
@@ -631,7 +631,7 @@ async function cmdToolMode(connector, _flags, positional) {
     if (agents.length === 0) { print('No agents configured'); return; }
     for (const a of agents) {
       connector.config.updateAgent(a.name, { tool_mode: targetMode });
-      print(`  ${a.name}: ${a.tool_mode || 'skills'} â†?${targetMode}`);
+      print(`  ${a.name}: ${a.tool_mode || 'skills'} Ã¢â€ ?${targetMode}`);
     }
     try { connector.sendDaemonCommand('reload'); } catch {}
     print(`\nSet all ${agents.length} agent(s) to '${targetMode}' mode.`);
@@ -684,7 +684,7 @@ async function cmdSkills(connector, _flags, positional) {
   const second = positional[1];
   const third = positional[2];
 
-  // wwj skills â†?list skills for all agents
+  // wwj skills Ã¢â€ ?list skills for all agents
   if (!first) {
     const agents = connector.config.getAgents();
     if (agents.length === 0) { print('No agents configured'); return; }
@@ -702,9 +702,9 @@ async function cmdSkills(connector, _flags, positional) {
     return;
   }
 
-  // wwj skills catalog â†?show full catalog
+  // wwj skills catalog Ã¢â€ ?show full catalog
   if (first === 'catalog') {
-    print('Skill Hub â€?Available Skills:\n');
+    print('Skill Hub Ã¢â‚¬?Available Skills:\n');
     for (const s of SKILL_CATALOG) {
       const tag = s.toggleable ? (s.defaultEnabled ? '[on]' : '[off]') : '[always]';
       print(`  ${s.id.padEnd(16)} ${tag.padEnd(10)} ${s.name}`);
@@ -717,15 +717,15 @@ async function cmdSkills(connector, _flags, positional) {
   const agent = connector.config.getAgent(first);
   if (!agent) { print(`Agent '${first}' not found`); process.exitCode = 1; return; }
 
-  // wwj skills <agent> â†?show agent's skills
+  // wwj skills <agent> -> show agent's skills
   if (!second) {
     const defaults = getSkillDefaults();
     const skills = agent.skills || {};
     print(`Skills for ${first}:\n`);
     for (const s of toggleable) {
       const enabled = skills[s.id] !== undefined ? skills[s.id] : defaults[s.id];
-      const marker = enabled ? '  âœ? : '  âœ?;
-      print(`${marker} ${s.id.padEnd(14)} ${s.name} â€?${s.description}`);
+      const marker = enabled ? '  [x]' : '  [ ]';
+      print(`${marker} ${s.id.padEnd(14)} ${s.name} - ${s.description}`);
     }
     print('\nUsage: wwj skills <agent> enable|disable <skill>');
     return;
@@ -795,7 +795,7 @@ async function cmdUpdate() {
     print(`Already on the latest version (${currentVersion()}).`);
     return;
   }
-  print(`Updating ${info.current} â†?${info.latest}...`);
+  print(`Updating ${info.current} Ã¢â€ ?${info.latest}...`);
   const ok = runUpdate();
   if (!ok) {
     print('Update failed.');

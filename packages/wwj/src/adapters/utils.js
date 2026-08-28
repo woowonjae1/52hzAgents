@@ -12,18 +12,18 @@
  * Deliberately narrow. `general` is NOT listed: it is a standing channel for
  * the whole workspace rather than a session, and renaming it after whatever
  * someone happened to ask first would lose a name people navigate by. A
- * channel the user named themselves is off-limits for the same reason �?the
+ * channel the user named themselves is off-limits for the same reason �?the
  * caller additionally checks `titleManuallySet`, and the two guards are
  * independent on purpose so neither one alone has to be airtight.
  */
 const SESSION_DEFAULT_RE =
-  /^(?:Session \d+|session-[0-9a-f]+|channel-[0-9a-f]+|New [Cc]hat|Untitled|新会话|新对话|未命�?$/;
+  /^(?:Session \d+|session-[0-9a-f]+|channel-[0-9a-f]+|New [Cc]hat|Untitled|新会话|新对话|未命名)$/;
 
 /**
  * Scripts with no inter-word spacing. Their presence switches the generator
  * from counting words to measuring display width: `split(/\s+/)` sees a whole
  * Chinese sentence as a single word, so the word budget never triggers and the
- * only thing left holding the title back is the character cap �?which is how a
+ * only thing left holding the title back is the character cap �?which is how a
  * "short title" ended up being 50 characters of running prose.
  */
 const CJK_CHAR_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]/;
@@ -41,31 +41,31 @@ const WIDE_CHAR_RE =
  * addresses an agent, and "@claude 帮我看下这个报错" should title as the request,
  * not as the agent's name.
  */
-const LEADING_MENTION_RE = /^(?:[@/][^\s@/]+[\s,，�?：]*)+/;
+const LEADING_MENTION_RE = /^(?:[@/][^\s@/]+[\s,，�?：]*)+/;
 
 /**
  * Openers that carry no information about the task. Applied repeatedly because
- * people stack them �?"请帮我看看�? is three of these in a row.
+ * people stack them �?"请帮我看看�? is three of these in a row.
  *
  * Each pattern swallows its own trailing punctuation so "你好，帮我查天气"
  * doesn't leave a dangling comma behind.
  */
 const FILLER_PREFIX_RES = [
-  /^(?:hey|hi|hello|yo|ok|okay|thanks|thx|please|pls)\b[\s,:!�?]*/i,
+  /^(?:hey|hi|hello|yo|ok|okay|thanks|thx|please|pls)\b[\s,:!�?]*/i,
   /^(?:can|could|would|will)\s+you\s+(?:please\s+)?/i,
   /^(?:i\s+(?:need|want|would\s+like)\s+you\s+to|i\s+(?:need|want)\s+to|let'?s|help\s+me)\s+/i,
-  /^(?:你好|您好|哈喽|�?[\s,，�?�?！]*/,
-  /^(?:请问|请帮我|请帮忙|请你帮我|请你|�?[\s,，�?：]*/,
-  /^(?:帮我|帮忙|麻烦你|麻烦)[\s,，�?：]*/,
-  /^(?:我想要|我想|我要|我需要|我打算|我希�?[\s,，�?：]*/,
-  /^(?:能不能|可不可以|能否|可以帮我|可以帮忙|你能不能|你能|你可以|可以)[\s,，�?：]*/,
-  /^(?:给我|来个|来一个|搞一个|搞个)[\s,，�?：]*/,
-  /^(?:写一个|写个|做一个|做个|生成一个|生成个|创建一个|创建个|实现一个|实现个|加一个|加个)[\s,，�?：]*/,
-  /^(?:看看|看一下|看下|查一下|查查|查下|搜一下|搜搜|搜下|试一下|试试)[\s,，�?：]*/,
+  /^(?:你好|您好|哈喽|嗨)[\s,，!！]*/,
+  /^(?:请问|请帮我|请帮忙|请你帮我|请你|请)[\s,，:：]*/,
+  /^(?:帮我|帮忙|麻烦你|麻烦)[\s,，�?：]*/,
+  /^(?:我想要|我想|我要|我需要|我打算|我希望)[\s,，:：]*/,
+  /^(?:能不能|可不可以|能否|可以帮我|可以帮忙|你能不能|你能|你可以|可以)[\s,，�?：]*/,
+  /^(?:给我|来个|来一个|搞一个|搞个)[\s,，�?：]*/,
+  /^(?:写一个|写个|做一个|做个|生成一个|生成个|创建一个|创建个|实现一个|实现个|加一个|加个)[\s,，�?：]*/,
+  /^(?:看看|看一下|看下|查一下|查查|查下|搜一下|搜搜|搜下|试一下|试试)[\s,，�?：]*/,
 ];
 
 /** Trailing punctuation that reads as noise once the title is cut short. */
-const TRAILING_PUNCT_RE = /[\s。，、；：！�?,;:!?~�?]+$/;
+const TRAILING_PUNCT_RE = /[\s。，、；：！�?,;:!?~�?]+$/;
 
 function displayWidth(text) {
   let width = 0;
@@ -116,8 +116,8 @@ function generateSessionTitle(message, maxWords = 6, maxWidth = 32) {
   if (typeof message !== 'string' || !message) return '';
 
   // Code goes before whitespace collapsing. The old order collapsed newlines
-  // first, so an unterminated fence �?routine while a message is still
-  // streaming �?no longer looked like a fence at all and its contents leaked
+  // first, so an unterminated fence �?routine while a message is still
+  // streaming �?no longer looked like a fence at all and its contents leaked
   // into the title.
   let text = message
     .replace(/```[\s\S]*?```/g, ' ')
@@ -154,7 +154,7 @@ function generateSessionTitle(message, maxWords = 6, maxWidth = 32) {
     if (!hasCjk) {
       // Latin drops whole words. The word budget above can still leave a
       // string wider than the column budget when the words are long, and a
-      // width cut there lands inside a word ("...the intermitten�?), which
+      // width cut there lands inside a word ("...the intermitten�?), which
       // reads as corruption rather than as an abbreviation.
       const words = text.split(' ');
       while (words.length > 1 && displayWidth(words.join(' ')) > budget) words.pop();
@@ -164,11 +164,11 @@ function generateSessionTitle(message, maxWords = 6, maxWidth = 32) {
     } else {
       text = truncateToWidth(text, budget).text;
 
-      // Prefer a clause boundary. "成都未来7天的天气怎么样，然�? is a worse title
-      // than "成都未来7天的天气怎么�? despite carrying two more characters �?      // the dangling fragment reads as breakage. Skipped when the boundary
+      // Prefer a clause boundary. "成都未来7天的天气怎么样，然�? is a worse title
+      // than "成都未来7天的天气怎么�? despite carrying two more characters �?      // the dangling fragment reads as breakage. Skipped when the boundary
       // sits so early that taking it would gut the title.
       const boundary = Math.max(
-        text.lastIndexOf('�?), text.lastIndexOf('�?), text.lastIndexOf('�?),
+        text.lastIndexOf('...'), text.lastIndexOf('...'), text.lastIndexOf('...'),
         text.lastIndexOf(','), text.lastIndexOf(';')
       );
       if (boundary > 0) {
@@ -182,11 +182,11 @@ function generateSessionTitle(message, maxWords = 6, maxWidth = 32) {
   if (!text) return '';
 
   // Latin-only titles read better sentence-cased. `toUpperCase` on a Han
-  // character is a no-op, so this is skipped rather than harmlessly wasted �?  // it would otherwise also uppercase a mixed title's Latin lead-in against
+  // character is a no-op, so this is skipped rather than harmlessly wasted �?  // it would otherwise also uppercase a mixed title's Latin lead-in against
   // the surrounding Chinese.
   if (!hasCjk) text = text[0].toUpperCase() + text.slice(1);
 
-  return truncated ? text + '�? : text;
+  return truncated ? text + '...' : text;
 }
 
 /**
@@ -209,14 +209,14 @@ function formatAttachmentsForPrompt(attachments, toolMode = 'mcp', isWindows = p
       const tmpDir = isWindows ? '$env:TEMP' : '/tmp';
       if (contentType.startsWith('image/')) {
         lines.push(
-          `- Image: ${filename} (file_id: ${fileId}) �?` +
+          `- Image: ${filename} (file_id: ${fileId}) �?` +
           `download with curl, then use your Read tool on the local file to view it:\n` +
           `  Step 1: ${curl} -s -H "X-Workspace-Token: $TOKEN" "${url}" -o ${tmpDir}/${filename}\n` +
           `  Step 2: Use the Read tool on ${tmpDir}/${filename} to see the image`
         );
       } else {
         lines.push(
-          `- File: ${filename} (file_id: ${fileId}, type: ${contentType}) �?` +
+          `- File: ${filename} (file_id: ${fileId}, type: ${contentType}) �?` +
           `download with curl, then use your Read tool on the local file:\n` +
           `  Step 1: ${curl} -s -H "X-Workspace-Token: $TOKEN" "${url}" -o ${tmpDir}/${filename}\n` +
           `  Step 2: Use the Read tool on ${tmpDir}/${filename} to read the file`
@@ -225,12 +225,12 @@ function formatAttachmentsForPrompt(attachments, toolMode = 'mcp', isWindows = p
     } else {
       if (contentType.startsWith('image/')) {
         lines.push(
-          `- Image: ${filename} (file_id: ${fileId}) �?` +
+          `- Image: ${filename} (file_id: ${fileId}) �?` +
           'use workspace_read_file to view this image'
         );
       } else {
         lines.push(
-          `- File: ${filename} (file_id: ${fileId}, type: ${contentType}) �?` +
+          `- File: ${filename} (file_id: ${fileId}, type: ${contentType}) �?` +
           'use workspace_read_file to read this file'
         );
       }
@@ -245,7 +245,7 @@ function formatAttachmentsForPrompt(attachments, toolMode = 'mcp', isWindows = p
  * "@antigravity do X": the mention is routing metadata the UI needs, not part
  * of the question being asked.
  *
- * This is hygiene, not a fix for a known failure �?models answer correctly with
+ * This is hygiene, not a fix for a known failure �?models answer correctly with
  * the prefix left in, and the other adapters still pass it through. What it
  * buys: the agent's own name stops accumulating in reused conversation history,
  * and a bare "@agent" with no request no longer turns into a meaningless
@@ -278,16 +278,16 @@ function stripSelfMention(content, agentName) {
     const after = rest.slice(alias.length);
     // Require a boundary so "@antigravity2" or "/antigravity2" is left untouched.
     if (/^[a-z0-9_-]/i.test(after)) break;
-    out = after.replace(/^[,�?：\s]+/, '');
+    out = after.replace(/^[,�?：\s]+/, '');
   }
 
   return out.trim();
 }
 
 /**
- * Names in the run of @mentions or /slash-mentions at the START of a message �?the agents actually
+ * Names in the run of @mentions or /slash-mentions at the START of a message �?the agents actually
  * being addressed. Mentions further in are content, not addressing:
- * "@a 确定日期 然后交给@b 写文�? addresses only `a`, and tells it to delegate.
+ * "@a 确定日期 然后交给@b 写文�? addresses only `a`, and tells it to delegate.
  *
  * Needed because the composer collects every @name anywhere in the text into
  * `mentions`, so a message like the above used to be picked up by BOTH agents,
@@ -312,7 +312,7 @@ function leadingMentions(content) {
     const name = match[1].toLowerCase();
     if (name === 'knowledge') break;
     names.push(name);
-    rest = rest.slice(match[0].length).replace(/^[,，�?：\s]+/, '');
+    rest = rest.slice(match[0].length).replace(/^[,，�?：\s]+/, '');
   }
   return names;
 }
@@ -322,7 +322,7 @@ function leadingMentions(content) {
  *
  * OFF UNLESS `WWJ_RAW_EVENTS` IS SET. These adapters are long-lived daemons
  * handling one event per token in some modes, so unconditional logging would
- * both bury the real log and write whatever the agent happened to be reading �? * file contents, command output �?into it.
+ * both bury the real log and write whatever the agent happened to be reading �? * file contents, command output �?into it.
  *
  * Exists because several adapters were written against an event shape nobody
  * recorded, so the branches that never fired could not be told apart from the

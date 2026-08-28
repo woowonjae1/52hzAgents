@@ -19,7 +19,7 @@
  *   headless); only the built-in `developer` extension is enabled by default.
  *
  * Port of sdk/src/52hzAgents/adapters/goose.py. Verified against block/goose
- * v1.38.0. Goose is currently Beta â€?real end-to-end runs are pending.
+ * v1.38.0. Goose is currently Beta ï¿½?real end-to-end runs are pending.
  */
 
 'use strict';
@@ -52,7 +52,7 @@ const STATUS_PREVIEW = 280;
 // refuse them with a clear upgrade prompt rather than failing obscurely.
 const MIN_GOOSE_VERSION = [1, 37, 0];
 
-/** Parse `goose --version` output (e.g. "goose 1.37.0") â†?[1,37,0], or null. */
+/** Parse `goose --version` output (e.g. "goose 1.37.0") ï¿½?[1,37,0], or null. */
 function parseGooseVersion(text) {
   if (!text) return null;
   const m = String(text).match(/(\d+)\.(\d+)\.(\d+)/);
@@ -60,7 +60,7 @@ function parseGooseVersion(text) {
   return [Number(m[1]), Number(m[2]), Number(m[3])];
 }
 
-/** True if parsed >= minimum (or unknown â€?lenient). */
+/** True if parsed >= minimum (or unknown ï¿½?lenient). */
 function gooseVersionMeetsMinimum(parsed, minimum = MIN_GOOSE_VERSION) {
   if (!parsed) return true;
   for (let i = 0; i < 3; i++) {
@@ -75,7 +75,7 @@ function gooseVersionMeetsMinimum(parsed, minimum = MIN_GOOSE_VERSION) {
 function tooOldMessage(parsed) {
   const cur = parsed ? parsed.join('.') : 'unknown';
   const minv = MIN_GOOSE_VERSION.join('.');
-  return `Goose CLI ${cur} is too old â€?52hzAgents requires Goose >= ${minv} `
+  return `Goose CLI ${cur} is too old ï¿½?52hzAgents requires Goose >= ${minv} `
     + '(headless stream-json support). Upgrade it: curl -fsSL '
     + 'https://github.com/block/goose/releases/download/stable/download_cli.sh '
     + '| CONFIGURE=false bash';
@@ -126,7 +126,7 @@ function findGooseBinary() {
     try { if (fs.existsSync(c)) return c; } catch {}
   }
 
-  // Deep scan of every known bin dir (nvm/fnm/volta/homebrew/â€?.
+  // Deep scan of every known bin dir (nvm/fnm/volta/homebrew/ï¿½?.
   const viaWhich = whichBinary('goose');
   if (viaWhich) return viaWhich;
   return null;
@@ -140,7 +140,7 @@ class GooseAdapter extends BaseAdapter {
     super(opts);
     this.disabledModules = opts.disabledModules || new Set();
 
-    // channel â†?Goose session name. Persisted so the mapping survives a daemon
+    // channel ï¿½?Goose session name. Persisted so the mapping survives a daemon
     // restart (Goose stores the conversation itself in its SQLite session DB).
     this._channelSessions = {};
     this._sessionsFile = path.join(
@@ -309,7 +309,7 @@ class GooseAdapter extends BaseAdapter {
 
   /** Override BaseAdapter.stop so daemon shutdown tears down in-flight runs. */
   stop() {
-    this._stopAll('Task interrupted â€?daemon restarting. Send another message to continue.')
+    this._stopAll('Task interrupted ï¿½?daemon restarting. Send another message to continue.')
       .catch(() => {});
     super.stop();
   }
@@ -329,7 +329,7 @@ class GooseAdapter extends BaseAdapter {
         }
       } else {
         // Kill the whole process group (Goose's shell commands, dev servers and
-        // any MCP/extension children share it â€?we spawn detached).
+        // any MCP/extension children share it ï¿½?we spawn detached).
         try { process.kill(-proc.pid, 'SIGTERM'); } catch {
           proc.kill('SIGTERM');
         }
@@ -363,7 +363,7 @@ class GooseAdapter extends BaseAdapter {
     await this.sendStatus(msgChannel, 'thinking...');
 
     try {
-      // null â†?stopped or a failure already reported; '' â†?empty success; str â†?answer.
+      // null ï¿½?stopped or a failure already reported; '' ï¿½?empty success; str ï¿½?answer.
       const result = await this._runGoose(content, msgChannel);
       if (result === null) return;
       if (result) {
@@ -372,7 +372,7 @@ class GooseAdapter extends BaseAdapter {
         await this.sendResponse(
           msgChannel,
           'Goose ran but produced no response. This usually means no provider/model is '
-          + 'configured â€?set GOOSE_PROVIDER and GOOSE_MODEL (and a key) for this agent, '
+          + 'configured ï¿½?set GOOSE_PROVIDER and GOOSE_MODEL (and a key) for this agent, '
           + 'or run `goose configure` once outside 52hzAgents.',
         );
       }
@@ -420,7 +420,7 @@ class GooseAdapter extends BaseAdapter {
   /**
    * Check the installed Goose CLI meets MIN_GOOSE_VERSION once (cached).
    * Returns an upgrade-prompt string if it is definitively too old, else null
-   * (new enough, missing, or undeterminable â€?lenient).
+   * (new enough, missing, or undeterminable ï¿½?lenient).
    */
   _versionTooOldMessage() {
     if (this._versionChecked) return this._versionTooOld;
@@ -435,7 +435,7 @@ class GooseAdapter extends BaseAdapter {
       });
       parsed = parseGooseVersion(out);
     } catch {
-      return null; // can't determine â†?don't block
+      return null; // can't determine ï¿½?don't block
     }
     if (!gooseVersionMeetsMinimum(parsed)) this._versionTooOld = tooOldMessage(parsed);
     return this._versionTooOld;
@@ -497,7 +497,7 @@ class GooseAdapter extends BaseAdapter {
       // on stdout/stderr a tick later; with a 'data' listener but no 'error'
       // listener that becomes an uncaughtException which crashes the
       // (single-process, e.g. Node 18) test run with exit 1 and no `not ok`.
-      // No-op â€?data handling below is unchanged.
+      // No-op ï¿½?data handling below is unchanged.
       if (proc.stdout) proc.stdout.on('error', () => {});
       if (proc.stderr) proc.stderr.on('error', () => {});
 
@@ -512,7 +512,7 @@ class GooseAdapter extends BaseAdapter {
       const watchdog = setInterval(() => {
         if (proc.exitCode !== null) return;
         if ((Date.now() - lastActivity) / 1000 > timeoutSec) {
-          this._log(`Goose produced no output for ${timeoutSec}s â€?treating as hung, killing.`);
+          this._log(`Goose produced no output for ${timeoutSec}s ï¿½?treating as hung, killing.`);
           this._stoppingChannels.add(channel);
           this._stopProcess(proc).catch(() => {});
           this.sendError(
@@ -543,7 +543,7 @@ class GooseAdapter extends BaseAdapter {
         try {
           proc.stdin.write(content, 'utf-8');
           proc.stdin.end();
-        } catch { /* child gone â€?close handler reports it */ }
+        } catch { /* child gone ï¿½?close handler reports it */ }
       }
 
       proc.on('error', (err) => {
@@ -555,7 +555,7 @@ class GooseAdapter extends BaseAdapter {
           .then(() => resolve(null), () => resolve(null));
       });
 
-      // 'close' fires after stdout/stderr drain â€?never parse a truncated stream.
+      // 'close' fires after stdout/stderr drain ï¿½?never parse a truncated stream.
       proc.on('close', async (code) => {
         if (settled) return;
         settled = true;
@@ -580,7 +580,7 @@ class GooseAdapter extends BaseAdapter {
           this._saveSessions();
           await this.sendStatus(
             channel,
-            'Previous Goose session was unavailable â€?starting a new one (earlier context is reset).',
+            'Previous Goose session was unavailable ï¿½?starting a new one (earlier context is reset).',
           );
           resolve(await this._runGoose(content, channel, true));
           return;
@@ -615,28 +615,28 @@ class GooseAdapter extends BaseAdapter {
     if (kind === 'tool') {
       const name = event.name || 'tool';
       const summary = this._safe(event.summary || '');
-      await this.sendStatus(channel, `ðŸ”§ ${name}${summary ? ` â€?${summary}` : ''}`);
+      await this.sendStatus(channel, `ðŸ”§ ${name}${summary ? ` ï¿½?${summary}` : ''}`);
     } else if (kind === 'progress') {
       // Intermediate assistant narration is assistant output, not internal
-      // reasoning â€?post it as transient status, never as a "thinking" message.
+      // reasoning ï¿½?post it as transient status, never as a "thinking" message.
       let text = this._safe(event.text || '').trim();
       if (text) {
-        if (text.length > STATUS_PREVIEW) text = text.slice(0, STATUS_PREVIEW) + 'â€?;
+        if (text.length > STATUS_PREVIEW) text = text.slice(0, STATUS_PREVIEW) + '...';
         await this.sendStatus(channel, text);
       }
     } else if (kind === 'thinking') {
-      // Genuine model thinking content (ThinkingContent) â€?legitimately a
+      // Genuine model thinking content (ThinkingContent) ï¿½?legitimately a
       // thinking message.
       let text = this._safe(event.text || '').trim();
       if (text) {
-        if (text.length > STATUS_PREVIEW) text = text.slice(0, STATUS_PREVIEW) + 'â€?;
+        if (text.length > STATUS_PREVIEW) text = text.slice(0, STATUS_PREVIEW) + '...';
         await this.sendThinking(channel, text);
       }
     } else if (kind === 'notification') {
       const text = this._safe(event.text || '').trim();
       if (text) await this.sendStatus(channel, text.slice(0, STATUS_PREVIEW));
     }
-    // tool_result / complete / error â†?no direct status (error handled by caller)
+    // tool_result / complete / error ï¿½?no direct status (error handled by caller)
   }
 }
 
