@@ -576,7 +576,7 @@ export interface NetworkProfile {
 export function networkAgentToWorkspaceAgent(agent: Record<string, unknown> | WorkspaceAgent | NetworkProfile): WorkspaceAgent {
   const raw = (agent || {}) as Record<string, unknown>;
   const rawAddr = (raw.address as string) || '';
-  const addrName = rawAddr.replace(/^openagents:/, '').replace(/^agent:/, '');
+  const addrName = rawAddr.replace(/^(52hz:|openagents:|agent:|human:)/, '');
   const name = (raw.agentName || raw.agent_name || raw.AgentName || raw.name || raw.Name || addrName || 'Unknown') as string;
   const role = (raw.role || raw.Role || 'worker') as string;
   const type = (raw.agentType || raw.agent_type || raw.AgentType || raw.Type || null) as string | null;

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, History as HistoryIcon, CalendarClock, BookOpen, Sparkles } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -139,12 +139,53 @@ function DMSection({
   );
 }
 
+function getSmartSessionTitle(session: WorkspaceSession, lastMsg?: LastMessageInfo | null): string {
+  const rawTitle = (session.title || '').trim();
+  const isGeneric =
+    !rawTitle ||
+    rawTitle === '新频道' ||
+    rawTitle === 'New Channel' ||
+    rawTitle === 'Untitled Channel' ||
+    rawTitle === 'Untitled' ||
+    rawTitle === 'New Chat';
+
+  if (!isGeneric) {
+    return rawTitle;
+  }
+
+  if (lastMsg && lastMsg.content) {
+    let clean = lastMsg.content
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[`*_#~>]/g, '')
+      .replace(/[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (clean) {
+      if (clean.length > 24) {
+        clean = clean.slice(0, 24).trim() + '...';
+      }
+      return clean;
+    }
+  }
+
+  if (session.workingDir) {
+    const parts = session.workingDir.replace(/\\/g, '/').split('/').filter(Boolean);
+    if (parts.length > 0) {
+      return parts[parts.length - 1];
+    }
+  }
+
+  return 'New Chat';
+}
+
 export function ThreadList() {
   const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode, viewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editTitleValue, setEditTitleValue] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Debounced content search
@@ -469,10 +510,14 @@ export function ThreadList() {
               preview = 'No messages yet';
             }
 
+            const smartTitle = getSmartSessionTitle(session, lastMsg);
+            const isEditing = editingSessionId === session.sessionId;
+
             return (
               <div
                 key={session.sessionId}
                 onClick={() => {
+                  if (isEditing) return;
                   setCurrentSessionId(session.sessionId);
                   setViewMode('threads');
                   if (isMobile) openMobileDetail();
@@ -493,11 +538,44 @@ export function ThreadList() {
                     {session.starred && (
                       <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
                     )}
-                    <span className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight">
-                      {isSearching
-                        ? highlightMatch(session.title || 'Untitled Channel', searchQuery)
-                        : (session.title || 'Untitled Channel')}
-                    </span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        autoFocus
+                        value={editTitleValue}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setEditTitleValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const trimmed = editTitleValue.trim();
+                            if (trimmed) renameSession(session.sessionId, trimmed);
+                            setEditingSessionId(null);
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setEditingSessionId(null);
+                          }
+                        }}
+                        onBlur={() => {
+                          const trimmed = editTitleValue.trim();
+                          if (trimmed) renameSession(session.sessionId, trimmed);
+                          setEditingSessionId(null);
+                        }}
+                        className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary outline-none"
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSessionId(session.sessionId);
+                          setEditTitleValue(smartTitle);
+                        }}
+                        className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight"
+                        title="Double-click to rename"
+                      >
+                        {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
+                      </span>
+                    )}
                     <span className="text-3xs text-foreground-extra-muted shrink-0 font-mono tabular-nums">
                       {displayTime}
                     </span>
@@ -524,11 +602,8 @@ export function ThreadList() {
                     <DropdownMenuItem
                       onClick={(e) => {
                         e.stopPropagation();
-                        const next = window.prompt('Rename thread', session.title || '');
-                        const trimmed = next?.trim();
-                        if (trimmed && trimmed !== session.title) {
-                          renameSession(session.sessionId, trimmed);
-                        }
+                        setEditingSessionId(session.sessionId);
+                        setEditTitleValue(smartTitle);
                       }}
                     >
                       <Pencil className="size-4" />
@@ -682,7 +757,7 @@ export function ThreadList() {
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm flex-1 min-w-0 truncate font-normal text-foreground">
-                              {session.title || 'Untitled'}
+                              {getSmartSessionTitle(session, lastMsg)}
                             </span>
                             <span className="text-xs text-muted-foreground shrink-0">
                               {displayTime}

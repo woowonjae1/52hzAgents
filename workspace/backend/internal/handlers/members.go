@@ -41,8 +41,9 @@ func workspaceForParam(c *gin.Context) (*models.Workspace, bool) {
 }
 
 func memberForParam(c *gin.Context, workspace *models.Workspace) (*models.WorkspaceMember, bool) {
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	var member models.WorkspaceMember
-	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, c.Param("agent_name")).
+	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).
 		First(&member).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Member not found"})
 		return nil, false
@@ -79,7 +80,7 @@ type memberUpdateRequest struct {
 
 func syncAgentAutostart(agentName, action string) {
 	home, _ := os.UserHomeDir()
-	wwjPkgBin := filepath.Join(home, "openagents", "packages", "wwj", "bin", "agent-connector.js")
+	wwjPkgBin := filepath.Join(home, ".52hzagents", "packages", "wwj", "bin", "agent-connector.js")
 	var cmd *exec.Cmd
 	if _, err := exec.LookPath("wwj"); err == nil {
 		cmd = exec.Command("wwj", "autostart", agentName, action)

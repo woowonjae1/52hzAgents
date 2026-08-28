@@ -62,7 +62,7 @@ func ReportAgentRuntime(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid runtime status"})
 		return
 	}
-	agentName := c.Param("agent_name")
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	if !requireAgentSession(c, workspace, agentName, req.SessionID) {
 		return
 	}
@@ -88,8 +88,9 @@ func GetAgentRuntime(c *gin.Context) {
 	if !ok {
 		return
 	}
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	var record models.AgentRuntimeRecord
-	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, c.Param("agent_name")).First(&record).Error; err != nil {
+	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).First(&record).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Agent runtime not found"})
 		return
 	}
@@ -133,7 +134,7 @@ func ReportAgentUsage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	agentName := c.Param("agent_name")
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	record := models.AgentUsageRecord{
 		WorkspaceID:        workspace.ID,
 		AgentName:          agentName,
@@ -163,7 +164,7 @@ func GetAgentUsage(c *gin.Context) {
 	if !ok {
 		return
 	}
-	agentName := c.Param("agent_name")
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	var record models.AgentUsageRecord
 	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).First(&record).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Agent usage not found"})
@@ -188,7 +189,7 @@ func CreateAgentLog(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	agentName := c.Param("agent_name")
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	if !requireAgentSession(c, workspace, agentName, req.SessionID) {
 		return
 	}
@@ -213,13 +214,14 @@ func ListAgentLogs(c *gin.Context) {
 	if !ok {
 		return
 	}
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	limit, err := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	if err != nil || limit < 1 || limit > 500 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be between 1 and 500"})
 		return
 	}
 	var logs []models.AgentLogRecord
-	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, c.Param("agent_name")).Order("created_at desc").Limit(limit).Find(&logs).Error; err != nil {
+	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, agentName).Order("created_at desc").Limit(limit).Find(&logs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list agent logs"})
 		return
 	}

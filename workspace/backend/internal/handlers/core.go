@@ -124,7 +124,7 @@ func DiscoverNetwork(c *gin.Context) {
 	agents := make([]gin.H, 0, len(members))
 	for _, member := range members {
 		agents = append(agents, gin.H{
-			"address": "52hz:" + member.AgentName, "role": member.Role,
+			"address": "52hz:" + member.AgentName, "agent_name": member.AgentName, "role": member.Role,
 			"status": member.Status, "agent_type": member.AgentType,
 			"server_host": member.ServerHost, "working_dir": member.WorkingDir,
 			"description": member.Description, "enabled_skills": decodeJSONMap(member.EnabledSkills),
@@ -367,7 +367,7 @@ func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, 
 		channelName = "thread-" + strings.ReplaceAll(uuid.New().String(), "-", "")[:12]
 		title, _ := req.Payload["title"].(string)
 		if title == "" {
-			title = "新频道"
+			title = "New Chat"
 		}
 		master, _ := req.Payload["master"].(string)
 		channel := models.Channel{ID: uuid.New().String(), WorkspaceID: workspaceID, Name: channelName, Title: &title, Status: "active", OrchestrationMode: "dynamic", CreatedAt: time.Now()}
@@ -400,6 +400,18 @@ func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, 
 		var channel models.Channel
 		if tx.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error == nil {
 			tx.Model(&channel).Update("last_event_at", timestamp)
+
+			// Auto-update default placeholder title from the first message
+			if channel.Title == nil || *channel.Title == "" || *channel.Title == "新频道" || *channel.Title == "New Chat" || *channel.Title == "Untitled" || *channel.Title == "Untitled Channel" {
+				if content, ok := req.Payload["content"].(string); ok && strings.TrimSpace(content) != "" {
+					cleanTitle := cleanMessageForTitle(content)
+					if cleanTitle != "" {
+						channel.Title = &cleanTitle
+						tx.Model(&channel).Update("title", cleanTitle)
+					}
+				}
+			}
+
 			targets, routed, err := routeMessage(workspaceID, &channel, req)
 			if err != nil {
 				return err
@@ -517,6 +529,7 @@ func CreateAgent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.AgentName = agentNameFromSource(req.AgentName)
 
 	if !agentIdentRe.MatchString(req.AgentName) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "agent_name may contain only letters, digits, dot, underscore and hyphen (max 64)"})
@@ -591,7 +604,7 @@ func CreateAgent(c *gin.Context) {
 }
 
 func LaunchAgent(c *gin.Context) {
-	agentName := c.Param("agent_name")
+	agentName := agentNameFromSource(c.Param("agent_name"))
 	network := c.Query("network")
 	workingDir := c.Query("working_dir")
 	if network == "" {
@@ -754,4 +767,21 @@ func LaunchAgent(c *gin.Context) {
 	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Launcher started; waiting for the agent to connect", "agent_name": agentName, "status": "launching"})
+}
+
+func cleanMessageForTitle(content string) string {
+	c := strings.TrimSpace(content)
+	if idx := strings.Index(c, "\n"); idx != -1 {
+		c = c[:idx]
+	}
+	c = strings.ReplaceAll(c, "`", "")
+	c = strings.ReplaceAll(c, "*", "")
+	c = strings.ReplaceAll(c, "#", "")
+	c = strings.ReplaceAll(c, ">", "")
+	c = strings.TrimSpace(c)
+	runes := []rune(c)
+	if len(runes) > 30 {
+		runes = runes[:30]
+	}
+	return strings.TrimSpace(string(runes))
 }

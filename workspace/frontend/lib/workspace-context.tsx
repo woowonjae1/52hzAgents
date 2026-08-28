@@ -123,7 +123,7 @@ function useWorkspaceIdentity() {
   return { currentUser: localIdentity, setUserName };
 }
 
-interface LastMessageInfo {
+export interface LastMessageInfo {
   content: string;
   senderName: string;
   /**
