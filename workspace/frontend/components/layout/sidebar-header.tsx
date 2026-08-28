@@ -10,15 +10,15 @@ export function SidebarHeader() {
   const { workspace } = useWorkspace();
 
   return (
-    <div className="flex items-center justify-between shrink-0 px-4 pt-3.5 pb-2.5 bg-surface-sidebar [app-region:drag] select-none border-b border-border/40 dark:border-white/[0.04]">
+    <div className="flex items-center justify-between shrink-0 px-4 pt-3.5 pb-3 bg-surface-sidebar [app-region:drag] select-none border-b border-border/40 dark:border-white/[0.04]">
       {/* Left: Brand logo with status dot */}
-      <div className="flex items-center gap-2.5 [app-region:no-drag] min-w-0">
-        <SignalMark size={24} className="shrink-0" title="52hzAgents" />
+      <div className="flex items-center gap-3 [app-region:no-drag] min-w-0">
+        <SignalMark size={32} className="shrink-0" title="52hzAgents" />
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="text-xs font-bold tracking-tight text-foreground font-sans truncate" title={workspace?.name || '52hzAgents'}>
+          <span className="text-sm font-bold tracking-tight text-foreground font-sans truncate" title={workspace?.name || '52hzAgents'}>
             {workspace?.name || '52hzAgents'}
           </span>
-          <span className="size-1.5 rounded-full bg-status-success shrink-0" title="Workspace connected" />
+          <span className="size-2 rounded-full bg-status-success shrink-0" title="Workspace connected" />
         </div>
       </div>
 

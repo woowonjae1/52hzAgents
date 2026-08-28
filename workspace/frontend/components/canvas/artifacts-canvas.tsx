@@ -1,12 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   X,
   FileText,
   Code2,
   MessageSquare,
-  GitCompare,
   Copy,
   Check,
   Download,
@@ -14,14 +13,18 @@ import {
   Minimize2,
   Sparkles,
   ChevronRight,
-  Plus,
   Send,
+  PanelRightClose,
+  Columns2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { MarkdownContent } from '../chat/markdown-content';
 import { AgentAvatar } from '../agents/agent-avatar';
 import { useArtifacts, type ArtifactItem, type ArtifactAnnotation } from '@/lib/artifacts-context';
+
+const MIN_CANVAS_WIDTH = 380;
+const DEFAULT_CANVAS_WIDTH = 580;
 
 export function ArtifactsCanvas({ className }: { className?: string }) {
   const { activeArtifact, isCanvasOpen, closeCanvas, addAnnotation, updateArtifactContent } = useArtifacts();
@@ -31,7 +34,74 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
   const [newComment, setNewComment] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('claude');
 
+  // ── Drag to Resize State ──
+  const [canvasWidth, setCanvasWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('artifacts_canvas_width');
+        if (saved) return Math.max(MIN_CANVAS_WIDTH, parseInt(saved, 10));
+      } catch {}
+    }
+    return DEFAULT_CANVAS_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const widthRef = useRef(canvasWidth);
+  widthRef.current = canvasWidth;
+
   const annotations = useMemo(() => activeArtifact?.annotations || [], [activeArtifact]);
+
+  // Handle ESC key to close Canvas
+  useEffect(() => {
+    if (!isCanvasOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const tag = (document.activeElement?.tagName || '').toLowerCase();
+        if (tag !== 'textarea' && tag !== 'input') {
+          closeCanvas();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isCanvasOpen, closeCanvas]);
+
+  // Drag border resize logic
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const onMove = (e: MouseEvent) => {
+      const maxAllowed = typeof window !== 'undefined' ? Math.max(400, window.innerWidth - 380) : 1000;
+      const newWidth = Math.min(maxAllowed, Math.max(MIN_CANVAS_WIDTH, window.innerWidth - e.clientX));
+      setCanvasWidth(newWidth);
+    };
+
+    const onUp = () => {
+      setIsResizing(false);
+      try {
+        localStorage.setItem('artifacts_canvas_width', widthRef.current.toString());
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+    };
+  }, [isResizing]);
 
   if (!isCanvasOpen || !activeArtifact) {
     return null;
@@ -74,23 +144,41 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
 
   return (
     <div
+      style={{ width: isFullscreen ? '100vw' : `${canvasWidth}px` }}
       className={cn(
-        'flex flex-col bg-surface1 border-l border-border/80 h-full select-text transition-all duration-200 z-20',
-        isFullscreen
-          ? 'fixed inset-0 w-screen h-screen z-50 bg-surface1'
-          : 'w-full lg:w-[480px] xl:w-[560px] 2xl:w-[680px] shrink-0',
+        'relative flex flex-col bg-surface1 border-l border-border/80 h-full select-text transition-all duration-75 z-20 shrink-0',
+        isFullscreen && 'fixed inset-0 w-screen h-screen z-50 bg-surface1',
+        isResizing && 'select-none transition-none',
         className
       )}
     >
+      {/* ── Left Drag-to-Resize Handle & Quick Collapse ── */}
+      {!isFullscreen && (
+        <div
+          onMouseDown={startResize}
+          className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none"
+          title="Drag to resize Canvas border width"
+        >
+          {/* Subtle Hover Glow Line */}
+          <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
+          {/* Central Grip Indicator */}
+          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border/80 shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
+            <div className="size-1 rounded-full bg-foreground-extra-muted" />
+            <div className="size-1 rounded-full bg-foreground-extra-muted" />
+            <div className="size-1 rounded-full bg-foreground-extra-muted" />
+          </div>
+        </div>
+      )}
+
       {/* ── Canvas Top Header Bar ── */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/70 bg-surface0/90 backdrop-blur-md shrink-0 gap-3">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/70 bg-surface0/90 backdrop-blur-md shrink-0 gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <div className="size-7.5 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             {activeArtifact.type === 'code' ? <Code2 className="size-4" /> : <FileText className="size-4" />}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-foreground truncate max-w-[200px] sm:max-w-[260px]">
+              <h3 className="text-xs font-bold text-foreground truncate max-w-[160px] sm:max-w-[240px]">
                 {activeArtifact.title}
               </h3>
               {activeArtifact.authorAgent && (
@@ -107,7 +195,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* Action icons */}
+        {/* Action icons & Obvious Close Button */}
         <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
@@ -133,13 +221,16 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           >
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
           </button>
+
+          {/* Obvious Close Button */}
           <button
             type="button"
             onClick={closeCanvas}
-            className="size-7 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer ml-1"
-            title="Close Canvas"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface2 hover:bg-destructive/15 hover:text-destructive text-foreground-muted text-2xs font-semibold border border-border/70 transition-colors cursor-pointer ml-1"
+            title="Close Canvas (Esc)"
           >
-            <X className="size-4" />
+            <PanelRightClose className="size-3.5" />
+            <span>Close</span>
           </button>
         </div>
       </div>
@@ -153,7 +244,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             className={cn(
               'px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5',
               activeTab === 'document'
-                ? 'bg-primary/10 text-primary border border-primary/20'
+                ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
@@ -166,7 +257,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             className={cn(
               'px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5',
               activeTab === 'raw'
-                ? 'bg-primary/10 text-primary border border-primary/20'
+                ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
@@ -179,7 +270,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             className={cn(
               'px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5',
               activeTab === 'annotations'
-                ? 'bg-primary/10 text-primary border border-primary/20'
+                ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >

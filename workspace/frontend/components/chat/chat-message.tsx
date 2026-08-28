@@ -376,10 +376,8 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     return (
       <div className="py-2.5 flex justify-end group/usermsg select-text">
         <div className="flex items-end gap-2 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
-          {/* Your own mark, on your own side of the transcript. Held still: a
-              column of blinking heads down a long thread is a lot to sit next
-              to, and the sidebar already carries the live one. */}
-          <SignalMark size={26} still className="shrink-0 self-end mb-0.5" />
+          {/* Your animated mark, enlarged for clear presence */}
+          <SignalMark size={36} still={false} className="shrink-0 self-end mb-0.5" />
           {/* Refined AI User Bubble */}
           {/*
             The bubble sits directly on the transcript, not above it, so the drop
