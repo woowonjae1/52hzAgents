@@ -126,7 +126,7 @@ export class EventsApi extends BaseWorkspaceApi {
     return this.sendEvent({
       type: 'workspace.agent.control',
       source: 'human:user',
-      target: `openagents:${agentName}`,
+      target: `52hz:${agentName}`,
       payload: { action, ...params },
       visibility: 'direct',
     });

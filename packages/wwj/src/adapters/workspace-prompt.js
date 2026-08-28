@@ -6,7 +6,7 @@
  * - Multi-agent collaboration (@mention delegation)
  * - Workspace REST API skills (files, browser, tunnels)
  *
- * Direct port of Python: sdk/src/openagents/adapters/workspace_prompt.py
+ * Direct port of Python: sdk/src/52hzAgents/adapters/workspace_prompt.py
  */
 
 'use strict';
@@ -21,7 +21,7 @@
  * concatenate the result.
  *
  * Mirrors `build_browser_directive` in
- * sdk/src/openagents/adapters/workspace_prompt.py.
+ * sdk/src/52hzAgents/adapters/workspace_prompt.py.
  */
 function buildBrowserDirective(browserEnabled) {
   if (!browserEnabled) return '';
@@ -43,13 +43,13 @@ function buildBrowserDirective(browserEnabled) {
     '\n' +
     'If you don\'t have these MCP tools, use `Bash` + `curl` against ' +
     '`/v1/browser/tabs` (documented below in Shared Browser).\n\n' +
-    '**FORBIDDEN â€” do NOT call any of these:**\n' +
+    '**FORBIDDEN â€?do NOT call any of these:**\n' +
     '- `mcp__browsermcp__*` (any local Browser MCP extension tool)\n' +
     '- `mcp__playwright__*`, `mcp__puppeteer__*`, `mcp__chrome-devtools__*`, or any other local-browser MCP\n' +
     '- `WebFetch`, `WebSearch`, `web_fetch`, `web_search`, or any built-in network/browser tool\n' +
     '\n' +
     'If a local browser tool errors with "extension isn\'t connected" or ' +
-    '"connect your browser", do NOT ask the user to connect anything â€” ' +
+    '"connect your browser", do NOT ask the user to connect anything â€?' +
     'the local extension is irrelevant here. Immediately switch to the ' +
     'workspace browser tools above. The Browser Fabric session is already ' +
     'running on the backend.\n'
@@ -60,8 +60,8 @@ function buildBrowserDirective(browserEnabled) {
  * Build the identity section common to all adapters.
  *
  * `toolMode` controls how the "read prior context" hint is phrased:
- * - `'mcp'`    â†’ names the native `workspace_get_history` MCP tool.
- * - `'skills'` â†’ points at the wwj-workspace skill (Bash + curl),
+ * - `'mcp'`    â†?names the native `workspace_get_history` MCP tool.
+ * - `'skills'` â†?points at the wwj-workspace skill (Bash + curl),
  *   since no MCP server is spawned and that tool would not exist.
  */
 function buildWorkspaceIdentity(agentName, workspaceId, channelName, mode = 'execute', toolMode = 'mcp') {
@@ -69,7 +69,7 @@ function buildWorkspaceIdentity(agentName, workspaceId, channelName, mode = 'exe
     ? (
       'When you need prior context, use the wwj-workspace skill to ' +
       `read this channel's recent messages (with \`channel="${channelName}"\`). ` +
-      'Always specify the channel â€” the default may be different from where ' +
+      'Always specify the channel â€?the default may be different from where ' +
       'you are.\n'
     )
     : (
@@ -81,7 +81,7 @@ function buildWorkspaceIdentity(agentName, workspaceId, channelName, mode = 'exe
   return (
     `You are agent '${agentName}' connected to a 52hzAgents workspace.\n` +
     'Your text responses are automatically posted to the workspace chat ' +
-    'â€” just write your answer naturally.\n\n' +
+    'â€?just write your answer naturally.\n\n' +
     '## Workspace Context\n' +
     `- Workspace ID: ${workspaceId}\n` +
     `- Channel: ${channelName}  (this is the channel you are currently speaking in)\n` +
@@ -114,17 +114,17 @@ function buildCollaborationPrompt(toolMode = 'mcp') {
     'To delegate work to another agent, @mention them in your response. ' +
     'Only @mentioned agents will receive the message.\n\n' +
     'IMPORTANT: Do NOT @mention an agent just to say thanks or acknowledge ' +
-    'â€” that wakes them up for nothing. Only @mention when you need them ' +
+    'â€?that wakes them up for nothing. Only @mention when you need them ' +
     'to do work. When the task is complete, report results to the user ' +
     'without @mentioning other agents.\n\n' +
     // Agents whose own runtime ships a sub-agent feature (Antigravity's
-    // define_subagent/invoke_subagent, Claude Code's Task tool, â€¦) will happily
+    // define_subagent/invoke_subagent, Claude Code's Task tool, â€? will happily
     // spin up a local helper NAMED after a workspace peer and then report
     // "handed off to @peer". The peer never ran, the user believes two agents
     // collaborated, and the answer carries one runtime's blind spots twice.
     'These agents are separate processes, not sub-agents of yours. If the user ' +
     'names another workspace agent, hand that step to THAT agent by @mentioning ' +
-    'it and stopping â€” do not do its step yourself, and do not create a local ' +
+    'it and stopping â€?do not do its step yourself, and do not create a local ' +
     'sub-agent named after it. Your own sub-agent / Task tools are for splitting ' +
     'up YOUR OWN step, never for standing in for a named workspace agent. If you ' +
     'cannot reach it, say so plainly rather than simulating the hand-off.\n\n' +
@@ -138,7 +138,7 @@ function buildCollaborationPrompt(toolMode = 'mcp') {
  * Teach agents the preview-block protocol.
  *
  * Required for the same reason as the decision block: nothing else can supply
- * this. The daemon spawns the agent CLI, not the dev server â€” the server is
+ * this. The daemon spawns the agent CLI, not the dev server â€?the server is
  * started by the agent's own shell tool, so its "ready on localhost:3000" line
  * never reaches us. Scraping the reply text for `localhost:\d+` was the
  * alternative and it fires on any sentence that mentions a port.
@@ -178,7 +178,7 @@ function buildPreviewProtocolPrompt() {
  *
  * The "ask in prose instead" instruction at the end is load-bearing. A model
  * told about a nice interactive widget will reach for it to present
- * information, not just to ask â€” and a card whose options are really just
+ * information, not just to ask â€?and a card whose options are really just
  * bullet points forces the user to click to dismiss something that was never
  * a question.
  */
@@ -188,7 +188,7 @@ function buildDecisionProtocolPrompt() {
     'When you need a decision from the user before you can continue, emit a ' +
     '`decision` block. The workspace renders it as clickable buttons and posts ' +
     'the answer back to you as a `[Decision]` message. Write the block INSTEAD ' +
-    'of asking in prose â€” do not do both.\n\n' +
+    'of asking in prose â€?do not do both.\n\n' +
     '```decision\n' +
     '{\n' +
     '  "questions": [\n' +
@@ -208,7 +208,7 @@ function buildDecisionProtocolPrompt() {
     'parse is shown to the user as raw text.\n' +
     '- `title` and at least one `option` are required. `description` and ' +
     '`allowCustom` are optional. Write them in the user\'s language.\n' +
-    '- Use it ONLY for a real fork you cannot resolve yourself â€” a decision ' +
+    '- Use it ONLY for a real fork you cannot resolve yourself â€?a decision ' +
     'that changes what you do next. Do not use it to summarise options, to ' +
     'present findings, to confirm something obvious, or to ask permission for ' +
     'work you were already asked to do. Prefer making a reasonable call and ' +
@@ -271,13 +271,13 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
     'These are WORKSPACE tools shared with all agents and users. ' +
     'They are different from your native tools.\n\n' +
     '**HOW TO USE:** Call your `exec` tool to run the `curl` commands below. ' +
-    'Do NOT output curl commands as text â€” EXECUTE them with `exec`.\n\n' +
-    '**IMPORTANT â€” tool priority:**\n' +
+    'Do NOT output curl commands as text â€?EXECUTE them with `exec`.\n\n' +
+    '**IMPORTANT â€?tool priority:**\n' +
     '- ALWAYS use `exec` + `curl` (documented below) for workspace operations.\n' +
-    '- Do NOT use `workspace_browser_*` native tools â€” they are not configured ' +
+    '- Do NOT use `workspace_browser_*` native tools â€?they are not configured ' +
     'and will fail.\n' +
     '- Do NOT use `web_fetch`, `browser`, or any native browsing tool ' +
-    'when the user asks to use the workspace browser â€” use `exec` + `curl` instead.\n' +
+    'when the user asks to use the workspace browser â€?use `exec` + `curl` instead.\n' +
     '- The workspace browser is a *shared* browser visible to all users and agents.\n\n' +
     '**Auth header** (include on every request):\n' +
     `\`X-Workspace-Token: ${token}\`\n`
@@ -299,7 +299,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
           `\\"content_base64\\":\\"$CONTENT\\",` +
           `\\"content_type\\":\\"text/markdown\\",` +
           `\\"network\\":\\"${workspaceId}\\",` +
-          `\\"source\\":\\"openagents:${agentName}\\",` +
+          `\\"source\\":\\"52hz:${agentName}\\",` +
           `\\"channel_name\\":\\"${channelName}\\"}"\n\n`
         );
       } else {
@@ -313,7 +313,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
           `"content_base64":"'"$CONTENT"'",` +
           `"content_type":"text/markdown",` +
           `"network":"${workspaceId}",` +
-          `"source":"openagents:${agentName}",` +
+          `"source":"52hz:${agentName}",` +
           `"channel_name":"${channelName}"}'\n\n`
         );
       }
@@ -325,7 +325,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `\`${curl} -s -H "${h}" ${baseUrl}/v1/files?network=${workspaceId}\`\n\n` +
       '**Download file (text):**\n' +
       `\`${curl} -s -H "${h}" ${baseUrl}/v1/files/{file_id}\`\n\n` +
-      '**Download file (binary/images) â€” save to disk, then use Read tool to view:**\n' +
+      '**Download file (binary/images) â€?save to disk, then use Read tool to view:**\n' +
       `\`${curl} -s -H "${h}" ${baseUrl}/v1/files/{file_id} -o ${tmpDir}/{filename}\`\n\n` +
       '**File info (metadata):**\n' +
       `\`${curl} -s -H "${h}" ${baseUrl}/v1/files/{file_id}/info\`\n`
@@ -348,10 +348,10 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
     s += (
       'The shared browser is a real cloud browser (backed by BrowserFabric) ' +
       'that all users and agents in the workspace share and can watch live. ' +
-      'Drive it ONLY through these `/v1/browser` endpoints â€” never a local ' +
+      'Drive it ONLY through these `/v1/browser` endpoints â€?never a local ' +
       'browser. Every tab is server-side; you interact by tab id.\n\n' +
       'When you open a tab, the JSON response includes an `id` (use it in every ' +
-      'later call) and, in the cloud, a `live_url` â€” a link to the live, ' +
+      'later call) and, in the cloud, a `live_url` â€?a link to the live, ' +
       'interactive view of that tab. Share the `live_url` with the user when ' +
       'they may want to watch or take over (e.g. a login or a CAPTCHA).\n\n'
     );
@@ -359,14 +359,14 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
     if (!isPlan) {
       s += (
         '**To browse a website**, exec these steps (use exec for each):\n' +
-        `Step 1 â€” open tab: ` +
+        `Step 1 â€?open tab: ` +
         `${curl} -s -X POST ${baseUrl}/v1/browser/tabs ` +
         `-H "${h}" -H "Content-Type: application/json" ` +
         `-d '{"url":"https://example.com","network":"${workspaceId}",` +
-        `"source":"openagents:${agentName}"}'\n` +
-        `Step 2 â€” read content: ` +
+        `"source":"52hz:${agentName}"}'\n` +
+        `Step 2 â€?read content: ` +
         `${curl} -s -H "${h}" ${baseUrl}/v1/browser/tabs/TAB_ID/snapshot\n` +
-        `Step 3 â€” close tab: ` +
+        `Step 3 â€?close tab: ` +
         `${curl} -s -X DELETE -H "${h}" ${baseUrl}/v1/browser/tabs/TAB_ID\n` +
         '(Replace TAB_ID with the `id` from the step 1 response)\n\n'
       );
@@ -387,7 +387,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
         `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json"` +
         ` ${baseUrl}/v1/browser/tabs` +
         ` -d '{"url":"URL","network":"${workspaceId}",` +
-        `"source":"openagents:${agentName}"}'\`\n\n` +
+        `"source":"52hz:${agentName}"}'\`\n\n` +
         '**Navigate:**\n' +
         `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json"` +
         ` ${baseUrl}/v1/browser/tabs/{tab_id}/navigate` +
@@ -422,7 +422,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
         ` (list saved contexts and their ids)\n` +
         `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json"` +
         ` ${baseUrl}/v1/browser/tabs -d '{"url":"URL","context_id":"CONTEXT_ID",` +
-        `"network":"${workspaceId}","source":"openagents:${agentName}"}'\`` +
+        `"network":"${workspaceId}","source":"52hz:${agentName}"}'\`` +
         ' (open a tab already logged in)\n'
       );
     }
@@ -446,7 +446,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       'Post a status/thinking message (visible in the workspace UI as an intermediate step):\n' +
       `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json" ` +
       `${baseUrl}/v1/events -d '{"type":"workspace.message.posted",` +
-      `"source":"openagents:${agentName}","target":"channel/${channelName}",` +
+      `"source":"52hz:${agentName}","target":"channel/${channelName}",` +
       `"payload":{"content":"YOUR_STATUS","message_type":"status"}}'\`\n`
     );
   }
@@ -464,7 +464,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `{"content":"First task","status":"in_progress"},` +
       `{"content":"Second task","status":"pending"}` +
       `],"network":"${workspaceId}","channel":"${channelName}",` +
-      `"source":"openagents:${agentName}"}'\`\n\n` +
+      `"source":"52hz:${agentName}"}'\`\n\n` +
       '**Get your to-do list:**\n' +
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/todos?network=${workspaceId}&channel=${channelName}"\`\n\n` +
       '**IMPORTANT:** When you receive a task with multiple steps or a list of things to do, ' +
@@ -479,7 +479,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
     sections.push(
       '\n### Timers\n\n' +
       'Set a timer that will send you a message after a delay, waking you up ' +
-      'to continue work. Use this instead of `sleep` â€” timers let you release ' +
+      'to continue work. Use this instead of `sleep` â€?timers let you release ' +
       'the session and get called back later.\n\n' +
       'Use cases: check back on a deploy, retry after a rate limit, remind ' +
       'yourself to follow up.\n\n' +
@@ -487,7 +487,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json" ` +
       `${baseUrl}/v1/timers -d '{"delay":300,"message":"Check the build",` +
       `"network":"${workspaceId}","channel":"${channelName}",` +
-      `"source":"openagents:${agentName}"}'\`\n\n` +
+      `"source":"52hz:${agentName}"}'\`\n\n` +
       '**List active timers:**\n' +
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/timers?network=${workspaceId}&channel=${channelName}"\`\n\n` +
       '**Cancel a timer:**\n' +
@@ -502,7 +502,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       'Create a recurring routine that fires on a schedule. Each routine gets ' +
       '**its own dedicated thread** (`routine:<id>`) so different routines never ' +
       'interfere, and the full context is preserved.\n\n' +
-      '**`context` is required** â€” provide a thorough description of what the ' +
+      '**`context` is required** â€?provide a thorough description of what the ' +
       'routine should do, any background info, and relevant details from the ' +
       'current conversation. This context is posted at the start of the routine\'s ' +
       'thread every time it fires, so you have full background.\n\n' +
@@ -518,7 +518,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `CI failures, and stale PRs older than 3 days. Post a summary to the workspace.",` +
       `"hour":8,"minute":0,` +
       `"network":"${workspaceId}",` +
-      `"source":"openagents:${agentName}"}'\`\n\n` +
+      `"source":"52hz:${agentName}"}'\`\n\n` +
       '**List active routines:**\n' +
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/routines?network=${workspaceId}"\`\n\n` +
       '**Cancel a routine:**\n' +
@@ -538,7 +538,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `${baseUrl}/v1/notifications -d '{"title":"Task Complete","message":"The analysis is ready.",` +
       `"priority":"normal","channel":"${channelName}",` +
       `"network":"${workspaceId}",` +
-      `"source":"openagents:${agentName}"}'\`\n\n` +
+      `"source":"52hz:${agentName}"}'\`\n\n` +
       '**Priority values:** `low`, `normal`, `high`\n\n' +
       '**List notifications:**\n' +
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/notifications?network=${workspaceId}"\`\n`
@@ -558,7 +558,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       `${baseUrl}/v1/knowledge -d '{"title":"API Design Patterns","content":"# API Design Patterns\\n\\n...",` +
       `"description":"Common API patterns used in this project",` +
       `"network":"${workspaceId}",` +
-      `"source":"openagents:${agentName}"}'\`\n\n` +
+      `"source":"52hz:${agentName}"}'\`\n\n` +
       '**Search knowledge entries (semantic / keyword):**\n' +
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/knowledge/search?network=${workspaceId}&q=search+terms"\`\n\n` +
       '**List knowledge entries:**\n' +
@@ -568,7 +568,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
       '**Update a knowledge entry:**\n' +
       `\`${curl} -s -X PUT -H "${h}" -H "Content-Type: application/json" ` +
       `${baseUrl}/v1/knowledge/ENTRY_ID -d '{"title":"Updated Title","content":"# Updated\\n\\n...",` +
-      `"network":"${workspaceId}","source":"openagents:${agentName}"}'\`\n\n` +
+      `"network":"${workspaceId}","source":"52hz:${agentName}"}'\`\n\n` +
       '**Delete a knowledge entry:**\n' +
       `\`${curl} -s -X DELETE -H "${h}" "${baseUrl}/v1/knowledge/ENTRY_ID?network=${workspaceId}"\`\n`
     );
@@ -577,11 +577,11 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
   // Discovery
   sections.push(
     '\n### Discover Agents\n\n' +
-    'Before delegating, look up who is available and what they do â€” match the ' +
+    'Before delegating, look up who is available and what they do â€?match the ' +
     'task to an agent by its `description`.\n\n' +
     '**List all agents in the workspace (with descriptions, roles, status):**\n' +
     `\`${curl} -s -H "${h}" ${baseUrl}/v1/discover?network=${workspaceId}\`\n` +
-    'The response has `agents[]` (each with `address` `openagents:<name>`, ' +
+    'The response has `agents[]` (each with `address` `52hz:<name>`, ' +
     '`description`, `role`, `status`, `agent_type`) and `channels[]` (each with ' +
     'an `address` `channel/<name>` and a `participants` list of agent names).\n\n' +
     '**To list the agents in THIS channel with their descriptions:** call ' +
@@ -591,9 +591,9 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
     `\`${curl} -s -H "${h}" ${baseUrl}/v1/discover?network=${workspaceId} | ` +
     'jq --arg ch "channel/' + channelName + '" \'' +
     '(.data.channels[]|select(.address==$ch).participants) as $p | ' +
-    '.data.agents[]|select((.address|sub("openagents:";"")) as $n|$p|index($n))|' +
-    '{name:(.address|sub("openagents:";"")),description,role,status}\'`\n' +
-    '(Discovery is workspace-wide â€” there is no per-channel discover endpoint, ' +
+    '.data.agents[]|select((.address|sub("52hz:";"")) as $n|$p|index($n))|' +
+    '{name:(.address|sub("52hz:";"")),description,role,status}\'`\n' +
+    '(Discovery is workspace-wide â€?there is no per-channel discover endpoint, ' +
     'so cross-reference `participants` yourself as shown.)\n'
   );
 
@@ -611,7 +611,7 @@ function buildGuardrails() {
     'as your text response.\n' +
     '\nIMPORTANT: When the user gives you a numbered list, bulleted list, or ' +
     'multiple tasks in a single message, you MUST create a to-do list BEFORE ' +
-    'doing any work. This is mandatory â€” no exceptions, even for simple tasks. ' +
+    'doing any work. This is mandatory â€?no exceptions, even for simple tasks. ' +
     'The to-do list lets the user track your progress in real time.\n' +
     '\nIMPORTANT: Do NOT use built-in scheduling tools (CronCreate, CronDelete, ' +
     'CronList, ScheduleWakeup). For timers, routines, and recurring tasks, ' +
@@ -639,14 +639,14 @@ function buildClaudeMcpToolBlock() {
 
 /**
  * The skills tool-reference block for Claude in `skills` tool mode. In this
- * mode there is no MCP server â€” every workspace operation goes through the
+ * mode there is no MCP server â€?every workspace operation goes through the
  * wwj-workspace skill (Bash + curl), so we must NOT name any
  * `workspace_*` MCP tool here.
  */
 function buildClaudeSkillsToolBlock() {
   return (
     'IMPORTANT: READ the wwj-workspace skill FIRST, before any workspace\n' +
-    'action. It is your ONLY interface to the workspace â€” every operation goes\n' +
+    'action. It is your ONLY interface to the workspace â€?every operation goes\n' +
     'through the exact Bash + curl commands documented there. Do not guess\n' +
     'endpoints or improvise; open and follow the skill instructions.\n' +
     'The wwj-workspace skill (Bash + curl) covers all workspace operations:\n' +
@@ -661,8 +661,8 @@ function buildClaudeSkillsToolBlock() {
  * Build the system prompt for the Claude adapter.
  *
  * `toolMode` selects how the agent reaches workspace resources:
- * - `'mcp'`    â†’ native `workspace_*` MCP tools (an MCP server is spawned).
- * - `'skills'` â†’ the wwj-workspace skill (Bash + curl); no MCP server.
+ * - `'mcp'`    â†?native `workspace_*` MCP tools (an MCP server is spawned).
+ * - `'skills'` â†?the wwj-workspace skill (Bash + curl); no MCP server.
  *
  * The tool-reference block is emitted directly for the chosen mode so it can
  * never drift out of sync (previously the adapter string-replaced the MCP
@@ -758,7 +758,7 @@ function buildOpenCodeSkillMd({ endpoint, workspaceId, token, agentName, channel
   const frontmatter =
     '---\n' +
     'name: wwj-workspace\n' +
-    'description: 52hzAgents Workspace API â€” shared files, browser, and agent collaboration\n' +
+    'description: 52hzAgents Workspace API â€?shared files, browser, and agent collaboration\n' +
     '---\n\n';
 
   const identity =
@@ -791,7 +791,7 @@ function buildClaudeSkillMd({ endpoint, workspaceId, token, agentName, channelNa
     '---\n' +
     'name: wwj-workspace\n' +
     'description: |\n' +
-    '  52hzAgents Workspace collaboration tools â€” shared files, browser,\n' +
+    '  52hzAgents Workspace collaboration tools â€?shared files, browser,\n' +
     '  and multi-agent coordination. Use when: sharing files or reports,\n' +
     '  browsing websites, reading shared files, checking workspace agents,\n' +
     '  or collaborating with other agents via @mentions.\n' +
@@ -822,7 +822,7 @@ function buildCursorSkillMd({ endpoint, workspaceId, token, agentName, channelNa
     '---\n' +
     'name: wwj-workspace\n' +
     'description: |\n' +
-    '  52hzAgents Workspace collaboration tools â€” shared files, browser,\n' +
+    '  52hzAgents Workspace collaboration tools â€?shared files, browser,\n' +
     '  and multi-agent coordination. Use when: sharing files or reports,\n' +
     '  browsing websites, reading shared files, checking workspace agents,\n' +
     '  or collaborating with other agents via @mentions.\n' +

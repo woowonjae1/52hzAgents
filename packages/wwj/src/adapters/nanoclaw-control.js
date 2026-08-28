@@ -5,8 +5,7 @@
  * `<home>/data/ncl.sock` (the same surface the `ncl` binary speaks). One
  * line-delimited JSON RequestFrame `{id,command,args}` per connection; the
  * host replies with one ResponseFrame `{id,ok,data}` / `{id,ok,false,error}`
- * and closes. We use ONLY `open`-access read commands (`*-list`, `*-get`) â€”
- * NanoClaw gates create/update/delete behind human approval, so the bridge
+ * and closes. We use ONLY `open`-access read commands (`*-list`, `*-get`) â€? * NanoClaw gates create/update/delete behind human approval, so the bridge
  * never silently mutates groups, messaging groups, or wirings.
  *
  * See [[nanoclaw-facts-and-arch]] for the verified contract.
@@ -35,14 +34,14 @@ function nclSocketPath(home) {
   return path.join(home, 'data', 'ncl.sock');
 }
 /**
- * Dedicated local-IPC dir for the `openagents` channel. Kept SEPARATE from
+ * Dedicated local-IPC dir for the `52hzAgents` channel. Kept SEPARATE from
  * NanoClaw's `data/` so we can lock it to 0700 without touching NanoClaw's own
  * files. Holds the bridge socket (0600) and the handshake secret (0600).
  */
 function bridgeSocketDir(home) {
-  return path.join(home, 'data', 'openagents');
+  return path.join(home, 'data', '52hzAgents');
 }
-/** Local IPC socket owned by the native `openagents` channel we ship. */
+/** Local IPC socket owned by the native `52hzAgents` channel we ship. */
 function bridgeSocketPath(home) {
   return path.join(bridgeSocketDir(home), 'bridge.sock');
 }
@@ -53,7 +52,7 @@ function bridgeSecretPath(home) {
 
 // ---------------------------------------------------------------------------
 // Local-IPC security helpers (shared by the bridge; the channel mirrors these
-// in openagents.ts). All best-effort + cross-platform: Unix enforces via file
+// in 52hzAgents.ts). All best-effort + cross-platform: Unix enforces via file
 // mode + ownership, every platform enforces via the random secret.
 // ---------------------------------------------------------------------------
 
@@ -79,7 +78,7 @@ function isPathSafe(p) {
 /**
  * Ensure the IPC dir exists, is a real directory we own, is not a symlink, and
  * is not group/other-accessible. Creates it 0700 if missing. Best-effort on
- * Windows (mode bits are advisory there â€” the secret is the real guard).
+ * Windows (mode bits are advisory there â€?the secret is the real guard).
  * @returns {{ok:boolean, reason?:string}}
  */
 function ensureSecureDir(dir) {
@@ -128,7 +127,7 @@ function readBridgeSecret(home) {
 }
 
 /**
- * Unlink `p` ONLY if it is an actual socket file â€” never a regular file,
+ * Unlink `p` ONLY if it is an actual socket file â€?never a regular file,
  * directory, or symlink. Prevents stale-cleanup from destroying user data.
  * @returns {{removed:boolean, reason?:string}}
  */
@@ -173,7 +172,7 @@ function looksLikeNanoclaw(dir) {
   }
 }
 
-/** Follow `ncl` on PATH back to the checkout root (bin/ncl â†’ <root>). */
+/** Follow `ncl` on PATH back to the checkout root (bin/ncl â†?<root>). */
 function homeFromNclBinary() {
   try {
     const which = IS_WINDOWS ? 'where' : 'which';
@@ -191,7 +190,7 @@ function homeFromNclBinary() {
     } catch {
       /* use as-is */
     }
-    // bin/ncl â†’ dirname(bin) â†’ root
+    // bin/ncl â†?dirname(bin) â†?root
     const root = path.dirname(path.dirname(real));
     return looksLikeNanoclaw(root) ? root : null;
   } catch {
@@ -201,7 +200,7 @@ function homeFromNclBinary() {
 
 /**
  * Resolve the NanoClaw checkout directory.
- * Priority: $NANOCLAW_HOME â†’ `ncl` on PATH â†’ common locations.
+ * Priority: $NANOCLAW_HOME â†?`ncl` on PATH â†?common locations.
  * @returns {{home:string, source:string}|null}
  */
 function findNanoclawHome(env = process.env) {
@@ -267,7 +266,7 @@ function checkPackageManager() {
 }
 
 /**
- * Check Docker: installed AND daemon reachable. `docker info` exit 0 â‡’ running.
+ * Check Docker: installed AND daemon reachable. `docker info` exit 0 â‡?running.
  * `runner` is injectable for tests.
  * @returns {Promise<{installed:boolean, running:boolean, detail:string}>}
  */
@@ -400,7 +399,7 @@ class NclControl {
     });
   }
 
-  /** Liveness probe â€” `groups-list` is an `open` command, safe to call. */
+  /** Liveness probe â€?`groups-list` is an `open` command, safe to call. */
   async ping() {
     await this.request('groups-list', {});
     return true;

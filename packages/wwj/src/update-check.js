@@ -92,12 +92,12 @@ async function checkForUpdate() {
  *
  * npm resolves `-g` installs relative to a PREFIX, and the layout differs by
  * platform:
- *   Unix:    packages â†’ {prefix}/lib/node_modules   (npm bin at {prefix}/bin)
- *   Windows: packages â†’ {prefix}/node_modules        (npm bin at {prefix})
+ *   Unix:    packages â†?{prefix}/lib/node_modules   (npm bin at {prefix}/bin)
+ *   Windows: packages â†?{prefix}/node_modules        (npm bin at {prefix})
  *
  * So the prefix is the PARENT of npm's bin dir on Unix, and the bin dir itself
  * on Windows. The previous implementation walked up to the enclosing
- * node_modules and returned the directory containing it â€” which on Unix is
+ * node_modules and returned the directory containing it â€?which on Unix is
  * `{prefix}/lib`. Passing THAT as `--prefix` made npm append `lib/node_modules`
  * again, installing into `{prefix}/lib/lib/node_modules` while the running `wwj`
  * (loaded from `{prefix}/lib/node_modules`) never changed: `wwj update` reported
@@ -110,20 +110,20 @@ function npmPrefixFromBin(npmBin, platform = process.platform) {
   const p = platform === 'win32' ? path.win32 : path.posix;
   const binDir = p.dirname(npmBin);
   // A bare name (e.g. 'npm' from the PATH hard-fallback) has no usable
-  // directory â€” let npm resolve its own default global prefix instead.
+  // directory â€?let npm resolve its own default global prefix instead.
   if (binDir === '.' || binDir === '') return null;
   return platform === 'win32' ? binDir : p.dirname(binDir);
 }
 
 /**
- * Detect when the running launcher lives in an *isolated runtime* â€” the local
+ * Detect when the running launcher lives in an *isolated runtime* â€?the local
  * npm project install.sh creates at `~/.wwj/nodejs`, where the package
- * is at `<dir>/node_modules/@openagents-org/agent-launcher` and `<dir>` has its
+ * is at `<dir>/node_modules/@52hzAgents-org/agent-launcher` and `<dir>` has its
  * own `package.json`.
  *
  * This matters because a `-g` install (what a normal global/nvm install needs)
  * lands in `<dir>/lib/node_modules`, but the isolated runtime's daemon loads
- * from `<dir>/node_modules` â€” so `wwj update` would report success while the
+ * from `<dir>/node_modules` â€?so `wwj update` would report success while the
  * running code never changed (the acen "update no-op" incident). For an
  * isolated runtime we must do a *local* install into `<dir>` instead.
  *
@@ -143,7 +143,7 @@ function isolatedRuntimeDir(opts = {}) {
     const nodeModules = p.resolve(pkgRoot, '..', '..'); // .../node_modules
     if (p.basename(nodeModules) !== 'node_modules') return null;
     const projectDir = p.resolve(nodeModules, '..');    // dir containing node_modules
-    // Global npm layout is <prefix>/lib/node_modules â€” not an isolated project.
+    // Global npm layout is <prefix>/lib/node_modules â€?not an isolated project.
     if (p.basename(projectDir) === 'lib') return null;
     // A real local project has its own package.json; a global prefix does not.
     if (!exists(p.join(projectDir, 'package.json'))) return null;
@@ -193,7 +193,7 @@ function runUpdate(opts = {}) {
   let args;
   if (isoDir) {
     // Isolated runtime (install.sh's ~/.wwj/nodejs): a LOCAL npm project
-    // whose package lives in <dir>/node_modules â€” NOT <dir>/lib/node_modules.
+    // whose package lives in <dir>/node_modules â€?NOT <dir>/lib/node_modules.
     // A `-g` install lands in lib/node_modules and silently no-ops the running
     // launcher/daemon (which loads from node_modules). Install locally into the
     // project dir instead. `--no-save` leaves package.json untouched (install.sh
@@ -203,7 +203,7 @@ function runUpdate(opts = {}) {
   } else {
     // Global / nvm install. A LOCAL install (`npm install <pkg> --prefix <dir>`)
     // here would treat <dir> as a project root and prune every node_modules
-    // entry not reachable from its package.json â€” deleting node's own bundled
+    // entry not reachable from its package.json â€?deleting node's own bundled
     // npm/corepack. A global install only adds/updates the named package into
     // <prefix>/node_modules and never prunes its siblings.
     const prefix = opts.prefix !== undefined ? opts.prefix : npmPrefixFromBin(npmBin, platform);
@@ -272,7 +272,7 @@ function promptYes(question, timeoutMs = 30000) {
 
 /**
  * Check and print a warning if a newer version is available.
- * Never prompts or auto-updates â€” users run `wwj update` explicitly.
+ * Never prompts or auto-updates â€?users run `wwj update` explicitly.
  */
 async function notifyAndMaybeUpdate() {
   let info;
@@ -280,7 +280,7 @@ async function notifyAndMaybeUpdate() {
   if (!info || !info.isNewer) return;
 
   process.stderr.write(
-    `\n[launcher] Update available: ${info.current} â†’ ${info.latest}\n` +
+    `\n[launcher] Update available: ${info.current} â†?${info.latest}\n` +
     '[launcher] Run `wwj update` to upgrade.\n\n'
   );
 }

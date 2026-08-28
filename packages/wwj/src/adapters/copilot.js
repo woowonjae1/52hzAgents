@@ -1,8 +1,8 @@
 /**
- * GitHub Copilot CLI adapter for OpenAgents workspace.
+ * GitHub Copilot CLI adapter for 52hzAgents workspace.
  *
- * Bridges the OFFICIAL GitHub Copilot CLI — executable `copilot`, npm package
- * `@github/copilot` — to an OpenAgents workspace. This is NOT the retired
+ * Bridges the OFFICIAL GitHub Copilot CLI �?executable `copilot`, npm package
+ * `@github/copilot` �?to an 52hzAgents workspace. This is NOT the retired
  * `gh copilot` GitHub CLI extension; this adapter never invokes `gh`.
  *
  * Per incoming workspace message it spawns one `copilot -p <prompt>
@@ -14,14 +14,14 @@
  *
  * Design notes specific to Copilot CLI (do not copy Cline/Codex semantics
  * blindly):
- *   • Auth is GitHub-based (env tokens / gh / keychain OAuth) — never read or
+ *   �?Auth is GitHub-based (env tokens / gh / keychain OAuth) �?never read or
  *     log tokens; the launcher/installer reports auth state, the CLI's own run
  *     result is the final authority.
- *   • Permissions are explicit and least-privilege: scoped to the working dir
+ *   �?Permissions are explicit and least-privilege: scoped to the working dir
  *     via --add-dir, interactive prompts disabled (--no-ask-user) since the
  *     workspace cannot answer them. We never default to --allow-all / --yolo /
  *     --allow-all-paths / --allow-url.
- *   • plan mode → analysis only (--plan, no write tools); act mode → controlled
+ *   �?plan mode �?analysis only (--plan, no write tools); act mode �?controlled
  *     read/write/shell within the working dir.
  *
  * ── Verification status ────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ const IS_WINDOWS = process.platform === 'win32';
 
 // Minimum Copilot CLI version the adapter can drive. Kept in sync with
 // registry.json `install.min_version`. Basis: the GA 1.0 line is the first to
-// stably provide everything the adapter relies on — `--output-format=json`
+// stably provide everything the adapter relies on �?`--output-format=json`
 // (JSONL; introduced ~0.0.422), non-interactive `-p` with `--no-ask-user`,
 // granular `--allow-tool`/`--add-dir`, `--resume`/`--name` session control, and
 // `--secret-env-vars`/`--no-remote`. Verified end-to-end against 1.0.63.
@@ -58,7 +58,7 @@ const MIN_VERSION = '1.0.0';
 
 // Token-bearing env var NAMES Copilot reads (verified precedence via
 // `copilot help environment`): COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN.
-// Plus OpenAgents' own workspace token. We pass the NAMES (never values) to
+// Plus 52hzAgents' own workspace token. We pass the NAMES (never values) to
 // `--secret-env-vars` so the CLI strips/redacts them, and use the list to scrub
 // our own diagnostics. We never log their VALUES.
 const SECRET_ENV_VARS = [
@@ -134,14 +134,14 @@ class CopilotAdapter extends BaseAdapter {
   /**
    * A stable, working-dir-bound session name for a channel. Binding the working
    * directory into the name prevents a session created for one project from
-   * being resumed against another (the spec's "Session 与 working directory
+   * being resumed against another (the spec's "Session �?working directory
    * 绑定" / no cross-project resume requirement).
    */
   _stableSessionName(channel) {
     const wd = this.workingDir || defaultAgentWorkdir(this.agentName);
     const hash = require('crypto').createHash('sha1')
       .update(`${wd} ${this.workspaceId} ${channel}`).digest('hex').slice(0, 12);
-    return `openagents-${hash}`;
+    return `52hzAgents-${hash}`;
   }
 
   // ------------------------------------------------------------------
@@ -206,7 +206,7 @@ class CopilotAdapter extends BaseAdapter {
   /**
    * Resolve [file, prefixArgs] for spawning. On Windows an npm `.cmd` shim is
    * resolved to `[node, entry.js]` so we can spawn shell:false and keep every
-   * argv element (notably the prompt) literal — no cmd.exe re-parsing, so no
+   * argv element (notably the prompt) literal �?no cmd.exe re-parsing, so no
    * quoting/injection hazard from special characters in the prompt. A native
    * `.exe` (winget/standalone) is spawned directly. On Unix the binary is spawned
    * directly. Returns null if resolution is impossible.
@@ -215,7 +215,7 @@ class CopilotAdapter extends BaseAdapter {
     const lower = bin.toLowerCase();
 
     // A direct JS entry must run via `node` on EVERY platform. Windows cannot
-    // spawn a `.js` (no shebang support, not a PE → `spawn UNKNOWN`); on Unix a
+    // spawn a `.js` (no shebang support, not a PE �?`spawn UNKNOWN`); on Unix a
     // shebang would work, but routing through node is equivalent and keeps
     // behaviour identical cross-platform. This also covers test mocks and any
     // install whose bin resolves straight to a JS file.
@@ -225,11 +225,11 @@ class CopilotAdapter extends BaseAdapter {
 
     if (!isWindows) return [bin];
 
-    // Native executable — spawn directly (shell:false keeps argv literal).
+    // Native executable �?spawn directly (shell:false keeps argv literal).
     if (lower.endsWith('.exe')) return [bin];
 
     // npm/batch shim: resolve to its real target so we spawn shell:false and
-    // every argv element (notably the prompt) stays literal — no cmd.exe
+    // every argv element (notably the prompt) stays literal �?no cmd.exe
     // re-parsing, hence no quoting/injection hazard.
     if (lower.endsWith('.cmd') || lower.endsWith('.bat')) {
       try {
@@ -246,7 +246,7 @@ class CopilotAdapter extends BaseAdapter {
       return ['cmd.exe', '/c', bin];
     }
 
-    // No extension (e.g. a Unix-style shim copied to Windows) — spawn directly.
+    // No extension (e.g. a Unix-style shim copied to Windows) �?spawn directly.
     return [bin];
   }
 
@@ -261,7 +261,7 @@ class CopilotAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Command construction (argv array — never a shell string)
+  // Command construction (argv array �?never a shell string)
   // ------------------------------------------------------------------
 
   /**
@@ -272,7 +272,7 @@ class CopilotAdapter extends BaseAdapter {
   _buildArgs(prompt, channel, { skipResume = false } = {}) {
     const wd = this.workingDir || defaultAgentWorkdir(this.agentName);
     // Required-value flags take the space form; optional-value/variadic flags
-    // (--resume, --secret-env-vars, --allow-tool — declared `[=value]` /
+    // (--resume, --secret-env-vars, --allow-tool �?declared `[=value]` /
     // `[=value...]` in `copilot --help` v1.0.63) MUST use the `=` form so the
     // next token isn't mistaken for a positional argument.
     const args = ['-p', prompt, '--output-format', 'json', '--stream', 'on'];
@@ -291,7 +291,7 @@ class CopilotAdapter extends BaseAdapter {
     // Tool IDs `shell` and `write` are verified against `copilot help permissions`.
     args.push('--no-ask-user');
     if (this._mode === 'plan') {
-      // Analysis/planning only — do not grant write capability.
+      // Analysis/planning only �?do not grant write capability.
       args.push('--plan');
     } else {
       for (const t of ACT_ALLOW_TOOLS) args.push(`--allow-tool=${t}`);
@@ -366,7 +366,7 @@ class CopilotAdapter extends BaseAdapter {
   }
 
   /**
-   * Graceful → forceful interrupt of a Copilot subprocess and its whole process
+   * Graceful �?forceful interrupt of a Copilot subprocess and its whole process
    * tree (Copilot may spawn shell/MCP children). SIGINT first so the CLI can
    * cancel managed work, then SIGTERM/SIGKILL on the process group (Unix) or
    * taskkill /T (Windows).
@@ -428,11 +428,11 @@ class CopilotAdapter extends BaseAdapter {
     const gate = this._checkVersionGate();
     if (gate.compatible === false) {
       await this.sendError(channel,
-        `GitHub Copilot CLI ${gate.version} is too old — this integration requires ${MIN_VERSION} or newer. Upgrade with: copilot update (or npm install -g @github/copilot).`);
+        `GitHub Copilot CLI ${gate.version} is too old �?this integration requires ${MIN_VERSION} or newer. Upgrade with: copilot update (or npm install -g @github/copilot).`);
       return;
     }
 
-    // Working directory must exist — never silently fall back to the repo cwd.
+    // Working directory must exist �?never silently fall back to the repo cwd.
     const wd = this.workingDir;
     if (wd && !this._dirExists(wd)) {
       await this.sendError(channel, `Working directory does not exist: ${wd}`);
@@ -460,7 +460,7 @@ class CopilotAdapter extends BaseAdapter {
 
       if (this._stoppingChannels.has(channel)) return; // user interrupted
 
-      // Stale resume → retry once without it.
+      // Stale resume �?retry once without it.
       if (result.staleSession && attempt === 0 && this._channelSessions[channel]) {
         this._log(`Stale session for ${channel}; retrying with a fresh session`);
         delete this._channelSessions[channel];
@@ -492,8 +492,8 @@ class CopilotAdapter extends BaseAdapter {
    * Pre-launch version gate. Runs `copilot --version` once (cached), parses the
    * version, and compares against MIN_VERSION. Returns
    * { version, compatible: true|false|null }:
-   *   • compatible:false → below MIN_VERSION, callers must not spawn.
-   *   • compatible:null  → version unparseable/undetectable ("unknown"); we do
+   *   �?compatible:false �?below MIN_VERSION, callers must not spawn.
+   *   �?compatible:null  �?version unparseable/undetectable ("unknown"); we do
    *     NOT block (let the run proceed; runtime errors will surface real issues).
    * Mirrors the installer's generic gate semantics but lives in the adapter so a
    * too-old CLI never gets a turn spawned against it.
@@ -532,7 +532,7 @@ class CopilotAdapter extends BaseAdapter {
   /**
    * Run one Copilot turn: spawn the subprocess, stream-parse stdout, map events
    * onto workspace messages, capture the session id, and resolve a summary of
-   * the turn. Never rejects on CLI failure — failures come back as
+   * the turn. Never rejects on CLI failure �?failures come back as
    * `errorMessage` / `staleSession` / `timedOut` so the caller can react.
    */
   _runTurn(channel, args) {
@@ -560,7 +560,7 @@ class CopilotAdapter extends BaseAdapter {
       // on stdout/stderr a tick later; with a 'data' listener but no 'error'
       // listener that becomes an uncaughtException which crashes the
       // (single-process, e.g. Node 18) test run with exit 1 and no `not ok`.
-      // No-op — data handling below is unchanged.
+      // No-op �?data handling below is unchanged.
       if (proc.stdout) proc.stdout.on('error', () => {});
       if (proc.stderr) proc.stderr.on('error', () => {});
 
@@ -606,7 +606,7 @@ class CopilotAdapter extends BaseAdapter {
             // Streamed interim text is shown live; the final `text` event (if
             // any) is the authoritative answer. Flagged as a reply preview so
             // the workspace does not present it as reasoning and can drop it
-            // once that authoritative answer arrives — the `reasoning` case
+            // once that authoritative answer arrives �?the `reasoning` case
             // below is the one that is genuinely chain-of-thought.
             if (sawToolSinceText) { finalParts.length = 0; deltaBuf = ''; sawToolSinceText = false; }
             if (ev.text) { deltaBuf += ev.text; try { await this.sendThinking(channel, ev.text, { isReplyPreview: true }); } catch {} }
@@ -636,7 +636,7 @@ class CopilotAdapter extends BaseAdapter {
             try { await this.sendStatus(channel, `**${ev.action === 'read' ? 'Reading' : 'Editing'}:** \`${ev.path}\``); } catch {}
             break;
           case 'tool_result':
-            // Tool output is operational detail, not an assistant reply — keep it
+            // Tool output is operational detail, not an assistant reply �?keep it
             // out of the chat body; just log a redacted note.
             this._log(`tool_result ${ev.tool}${ev.isError ? ' (error)' : ''}`);
             break;
@@ -711,7 +711,7 @@ class CopilotAdapter extends BaseAdapter {
     } else if (inp != null) {
       preview = String(inp).slice(0, 120);
     }
-    return `${ev.tool} › ${redactSensitive(String(preview))}`;
+    return `${ev.tool} �?${redactSensitive(String(preview))}`;
   }
 
   // ------------------------------------------------------------------
@@ -724,7 +724,7 @@ class CopilotAdapter extends BaseAdapter {
    * redacted text only goes to the dev log.
    *
    * String patterns are anchored on REAL Copilot CLI v1.0.63 stderr (see
-   * test/fixtures/copilot-cli-real-samples.md) — note auth/session/network
+   * test/fixtures/copilot-cli-real-samples.md) �?note auth/session/network
    * failures in non-interactive mode print to stderr with EMPTY stdout (no JSONL
    * error event), so classification is driven by stderr + exit code. Broader
    * synonyms are kept as forward-compatible fallbacks.
@@ -738,13 +738,13 @@ class CopilotAdapter extends BaseAdapter {
 
     const has = (re) => re.test(blob);
 
-    // Session resume miss → retry fresh (not a user-facing error).
+    // Session resume miss �?retry fresh (not a user-facing error).
     // Real: "Error: No session, task, or name matched 'NAME'."
     if (has(/no session,? .*matched|session\s+(not\s+found|expired|unknown|invalid)|no such session/i)) {
       return { staleSession: true };
     }
-    // Token present but REJECTED — must be checked BEFORE the no-credentials rule
-    // because the real CLI appends the SAME "To authenticate … gh auth login"
+    // Token present but REJECTED �?must be checked BEFORE the no-credentials rule
+    // because the real CLI appends the SAME "To authenticate �?gh auth login"
     // help block to both messages; only the leading line distinguishes them.
     // Real: "Authentication token found but could not be validated. Failed to
     // fetch PAT user login (401): ... Bad credentials".

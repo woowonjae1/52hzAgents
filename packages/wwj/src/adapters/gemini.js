@@ -1,7 +1,7 @@
 /**
- * Gemini CLI adapter for OpenAgents workspace.
+ * Gemini CLI adapter for 52hzAgents workspace.
  *
- * Bridges Gemini CLI to an OpenAgents workspace via:
+ * Bridges Gemini CLI to an 52hzAgents workspace via:
  * - Polling loop for incoming messages
  * - Gemini CLI subprocess (stream-json) for task execution
  */
@@ -25,7 +25,7 @@ const IS_WINDOWS = process.platform === 'win32';
  *
  * Ordered by what this adapter actually reads. It parses the Gemini CLI's own
  * envelope (`{type:'init'|'message'|'tool_use'|'result', role, content}`), NOT
- * the native `GenerateContent` response â€” so the documented
+ * the native `GenerateContent` response â€?so the documented
  * `candidates[].content.parts[].thought` test, applied on its own, would never
  * fire here. All three are tried because which one arrives depends on the CLI
  * version and whether it forwards raw responses.
@@ -35,16 +35,16 @@ const IS_WINDOWS = process.platform === 'win32';
  *    `thought` are all accepted. If reasoning still does not appear, capture the
  *    raw events (`WWJ_RAW_EVENTS=1`, look for `[raw-agent-event] gemini`) and
  *    the real marker will be visible.
- * 2. Native `GenerateContent`: `parts[].thought === true`, per Google's schema â€”
+ * 2. Native `GenerateContent`: `parts[].thought === true`, per Google's schema â€?
  *    "whether the part represents the model's thought process". Note
  *    `thoughtSignature` is an opaque continuity token, NOT displayable text, so
  *    it is never read for content.
  * 3. Interactions API, which does not use `candidates[].content.parts[]` at all
- *    â€” reasoning arrives as `thought`/`thought_summary` steps. Kept a separate
+ *    â€?reasoning arrives as `thought`/`thought_summary` steps. Kept a separate
  *    branch on purpose: forcing it through the `parts[]` test silently yields
  *    nothing.
  */
-/** Blank line between thought fragments â€” they are markdown, so a single
+/** Blank line between thought fragments â€?they are markdown, so a single
  *  newline lets one fragment's unterminated list swallow the next one. */
 const THOUGHT_SEP = '\n\n';
 
@@ -94,8 +94,8 @@ class GeminiAdapter extends BaseAdapter {
   constructor(opts) {
     super(opts);
     this.disabledModules = opts.disabledModules || new Set();
-    this._channelSessions = {}; // channel â†’ Gemini CLI session_id
-    this._channelProcesses = {}; // channel â†’ child process
+    this._channelSessions = {}; // channel â†?Gemini CLI session_id
+    this._channelProcesses = {}; // channel â†?child process
     this._sessionsFile = path.join(
       os.homedir(), '.wwj', 'sessions',
       `${this.workspaceId}_${this.agentName}_gemini.json`
@@ -228,7 +228,7 @@ class GeminiAdapter extends BaseAdapter {
       if (jsMatch) {
         return [nodeBin, path.resolve(cmdDir, jsMatch[1])];
       }
-      // .cmd shims that forward to a native .exe â€” resolve to the exe and spawn
+      // .cmd shims that forward to a native .exe â€?resolve to the exe and spawn
       // it directly. Wrapping such a .cmd in `cmd.exe /c` caps the command line
       // at cmd.exe's 8191-char limit, truncating long args (e.g. system prompts).
       const exeMatch = cmdContent.match(/%dp0%\\([^\s"*?]+\.exe)/i);
@@ -297,7 +297,7 @@ class GeminiAdapter extends BaseAdapter {
     try {
       const env = this.agentEnv || process.env;
       const apiKey = (env.GEMINI_API_KEY || env.GOOGLE_API_KEY || '').trim();
-      if (!apiKey) return; // OAuth / other â€” leave the user's setup alone.
+      if (!apiKey) return; // OAuth / other â€?leave the user's setup alone.
       const dir = path.join(os.homedir(), '.gemini');
       fs.mkdirSync(dir, { recursive: true });
       const file = path.join(dir, 'settings.json');
@@ -508,7 +508,7 @@ class GeminiAdapter extends BaseAdapter {
                 else if (inp.query) inputPreview = inp.query;
                 else inputPreview = JSON.stringify(inp).slice(0, 150);
               }
-              await this.sendStatus(msgChannel, `${toolName} â€º ${inputPreview}`);
+              await this.sendStatus(msgChannel, `${toolName} â€?${inputPreview}`);
             } else if (eventType === 'result') {
                if (event.session_id) {
                  this._channelSessions[msgChannel] = event.session_id;

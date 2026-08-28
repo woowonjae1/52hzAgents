@@ -45,8 +45,11 @@ func saveFileLocal(workspaceID, fileID, filename string, data []byte) (string, e
 
 	absBasePath, err1 := filepath.Abs(basePath)
 	absFullPath, err2 := filepath.Abs(fullPath)
-	if err1 == nil && err2 == nil && !strings.HasPrefix(absFullPath, absBasePath) {
-		return "", errors.New("invalid file path traversal")
+	if err1 == nil && err2 == nil {
+		rel, err := filepath.Rel(absBasePath, absFullPath)
+		if err != nil || strings.HasPrefix(rel, "..") || rel == ".." {
+			return "", errors.New("invalid file path traversal")
+		}
 	}
 
 	dir := filepath.Dir(fullPath)

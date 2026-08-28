@@ -1,7 +1,7 @@
 /**
- * Cursor CLI adapter for OpenAgents workspace.
+ * Cursor CLI adapter for 52hzAgents workspace.
  *
- * Bridges the Cursor Agent CLI to an OpenAgents workspace via:
+ * Bridges the Cursor Agent CLI to an 52hzAgents workspace via:
  * - Polling loop for incoming messages
  * - Cursor CLI subprocess (--print --stream-json --stream-partial-output)
  * - SKILL.md file for workspace tool access
@@ -126,7 +126,7 @@ class CursorAdapter extends BaseAdapter {
 
   stop() {
     this._stopAllProcesses(
-      'Task interrupted â€” daemon restarting. Send another message to continue.'
+      'Task interrupted â€?daemon restarting. Send another message to continue.'
     ).catch(() => {});
     super.stop();
   }

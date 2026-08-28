@@ -249,13 +249,13 @@ export function AgentProfilePanel() {
         { icon: <Cloud className="size-3.5" />, label: 'Type', value: displayType },
         { icon: <Monitor className="size-3.5" />, label: 'Model', value: cloudConfig?.model || '—' },
         { icon: <Globe className="size-3.5" />, label: 'API Key', value: cloudConfig?.apiKeyMasked || '—' },
-        { icon: <UserRoundCog className="size-3.5" />, label: 'Agent ID', value: `openagents:${agent.agentName}`, copyable: true },
+        { icon: <UserRoundCog className="size-3.5" />, label: 'Agent ID', value: `52hz:${agent.agentName}`, copyable: true },
       ]
     : [
         { icon: <Monitor className="size-3.5" />, label: 'Type', value: displayType },
         { icon: <Globe className="size-3.5" />, label: 'Server', value: agent.serverHost || '—' },
         { icon: <Folder className="size-3.5" />, label: 'Folder', value: agent.workingDir || '—' },
-        { icon: <UserRoundCog className="size-3.5" />, label: 'Agent ID', value: `openagents:${agent.agentName}`, copyable: true },
+        { icon: <UserRoundCog className="size-3.5" />, label: 'Agent ID', value: `52hz:${agent.agentName}`, copyable: true },
       ];
 
   return (

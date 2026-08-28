@@ -930,10 +930,11 @@ export function ChatView() {
         ) : displayMessages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
             <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.2s_ease-out]">
-              {/* Brand Emblem */}
-              <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center p-1.5 shadow-xs overflow-hidden">
-                <SignalMark size={36} />
-              </div>
+              {/* Brand Emblem — no plate behind it. The mark is a silhouette
+                  with its own edge, and it bobs and spouts past its own box, so
+                  a rounded-square container with `overflow-hidden` both boxed a
+                  non-square shape and clipped the motion it was framing. */}
+              <SignalMark size={88} />
 
               {/* Title & Greeting */}
               <div className="space-y-1">

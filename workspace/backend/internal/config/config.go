@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -31,7 +32,7 @@ var GlobalConfig *Config
 func LoadConfig() {
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgresql://postgres:dev@localhost:5432/openagents_workspace"
+		dbURL = "postgresql://postgres:dev@localhost:5432/52hzagents_workspace"
 	}
 
 	authMode := os.Getenv("AUTH_MODE")
@@ -46,7 +47,7 @@ func LoadConfig() {
 
 	storagePath := os.Getenv("FILE_STORAGE_PATH")
 	if storagePath == "" {
-		storagePath = "/tmp/openagents_files"
+		storagePath = filepath.Join(os.TempDir(), "52hzagents_files")
 	}
 
 	host := os.Getenv("HOST")
@@ -159,7 +160,15 @@ func (c *Config) IsAllowedOrigin(origin string) bool {
 			return true
 		}
 	}
-	if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") || strings.HasPrefix(origin, "https://localhost:") {
+	if strings.HasPrefix(origin, "http://localhost:") ||
+		strings.HasPrefix(origin, "http://127.0.0.1:") ||
+		strings.HasPrefix(origin, "https://localhost:") ||
+		strings.HasPrefix(origin, "https://127.0.0.1:") ||
+		strings.HasPrefix(origin, "app://") ||
+		strings.HasPrefix(origin, "file://") ||
+		strings.HasPrefix(origin, "tauri://") ||
+		strings.HasPrefix(origin, "vscode-webview://") ||
+		origin == "null" {
 		return true
 	}
 	return false

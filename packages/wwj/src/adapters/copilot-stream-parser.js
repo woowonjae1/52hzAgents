@@ -1,12 +1,12 @@
 /**
- * GitHub Copilot CLI — JSONL stream parser (pure, no I/O).
+ * GitHub Copilot CLI �?JSONL stream parser (pure, no I/O).
  *
  * This module turns the raw byte stream produced by
  *   `copilot -p "<prompt>" --output-format=json`
  * into a sequence of *normalized* events the CopilotAdapter can map onto
- * OpenAgents workspace messages. It is deliberately split into two layers:
+ * 52hzAgents workspace messages. It is deliberately split into two layers:
  *
- *   1. FRAMING (schema-agnostic) — `frameChunk()` / `CopilotStreamParser`
+ *   1. FRAMING (schema-agnostic) �?`frameChunk()` / `CopilotStreamParser`
  *      Reassembles complete text lines from arbitrary chunk boundaries. This
  *      is the part that is fully specified regardless of the CLI version:
  *      one JSON object per line (JSONL), lines may be split across chunks,
@@ -14,12 +14,12 @@
  *      `\r\n`, blank lines and non-JSON noise must be tolerated. This layer
  *      is exhaustively unit-tested and does not depend on any field names.
  *
- *   2. CLASSIFICATION (schema-aware) — `classifyEvent()`
+ *   2. CLASSIFICATION (schema-aware) �?`classifyEvent()`
  *      Maps one parsed JSON object onto a normalized event `{ kind, ... }`.
  *      The concrete field/type names live in ONE table (`EVENT_KIND_BY_TYPE`
  *      + the field extractors) so that, once the JSONL schema of the locally
  *      installed `@github/copilot` build is captured, only this table needs
- *      to change — the adapter and the framing layer stay untouched.
+ *      to change �?the adapter and the framing layer stay untouched.
  *
  * ── Schema status ────────────────────────────────────────────────────────
  * The GitHub Copilot CLI (`@github/copilot`, executable `copilot`) ships its
@@ -28,7 +28,7 @@
  * against the actually-installed build (see docs/agents/github-copilot-cli.md
  * and the delivery report). Until then the mapping below recognizes the
  * documented/observed families and ALWAYS degrades unknown objects to a
- * redacted `unknown` event instead of throwing — so a schema drift downgrades
+ * redacted `unknown` event instead of throwing �?so a schema drift downgrades
  * fidelity, never crashes a task. Never infer an event's meaning from a field
  * name alone; verify against real output or the official source.
  *
@@ -65,7 +65,7 @@ const TOKEN_PATTERNS = [
   /\b[A-Fa-f0-9]{40,}\b/g, // long hex blobs (OAuth/refresh tokens)
 ];
 
-// Env-style assignments of well-known secret-bearing variables — redact the
+// Env-style assignments of well-known secret-bearing variables �?redact the
 // value, keep the key so logs still say *which* var was involved.
 const SECRET_ENV_KEYS = [
   'COPILOT_GITHUB_TOKEN', 'GH_TOKEN', 'GITHUB_TOKEN', 'GH_COPILOT_TOKEN',
@@ -102,18 +102,18 @@ function diagnosticForUnknown(obj, maxLen = 300) {
   let s;
   try { s = JSON.stringify(obj); } catch { s = String(obj); }
   s = redactSensitive(s).replace(/\s+/g, ' ').trim();
-  return s.length > maxLen ? s.slice(0, maxLen) + '…' : s;
+  return s.length > maxLen ? s.slice(0, maxLen) + '�? : s;
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Framing (schema-agnostic) — pure
+// Framing (schema-agnostic) �?pure
 // ────────────────────────────────────────────────────────────────────────
 
 /**
  * Append `chunk` to `buffer` and split off every complete line.
  * Returns `{ lines, rest }` where `lines` are complete lines (no trailing
  * newline, `\r` stripped) and `rest` is the leftover partial line to carry
- * into the next call. Handles `\n` and `\r\n`. Pure — no state retained.
+ * into the next call. Handles `\n` and `\r\n`. Pure �?no state retained.
  *
  * @param {string} buffer  carry-over from the previous call
  * @param {string|Buffer} chunk  new bytes
@@ -149,7 +149,7 @@ function parseLine(line) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Classification (schema-aware) — pure. SINGLE source of field/type mapping.
+// Classification (schema-aware) �?pure. SINGLE source of field/type mapping.
 // ────────────────────────────────────────────────────────────────────────
 
 /**
@@ -158,7 +158,7 @@ function parseLine(line) {
  * ── Verification status (IMPORTANT) ──────────────────────────────────────
  * VERIFIED against real CLI v1.0.63: `--output-format json` is "JSONL, one JSON
  * object per line"; auth/session/network failures print to STDERR with EMPTY
- * stdout (no JSONL error event) — so those are NOT parsed here, the adapter
+ * stdout (no JSONL error event) �?so those are NOT parsed here, the adapter
  * classifies them from stderr. The success-path stdout event names below
  * (text/tool/file/done/etc.) could NOT be captured (no Copilot subscription in
  * CI), so they are BEST-EFFORT, intentionally focused rather than broad, and
@@ -171,11 +171,11 @@ const EVENT_KIND_BY_TYPE = {
   // session lifecycle / identity (kind only mapped when an id is also present)
   session: 'session', 'session.created': 'session', 'session.started': 'session',
   session_started: 'session', thread: 'session', 'thread.started': 'session',
-  // streaming assistant text (qualified names only — no bare 'delta'/'token')
+  // streaming assistant text (qualified names only �?no bare 'delta'/'token')
   'text.delta': 'text_delta', text_delta: 'text_delta',
   'message.delta': 'text_delta', 'assistant.delta': 'text_delta',
   content_block_delta: 'text_delta',
-  // final assistant text (qualified/explicit names only — no bare 'message')
+  // final assistant text (qualified/explicit names only �?no bare 'message')
   text: 'text', 'message.completed': 'text', 'assistant.message': 'text',
   assistant: 'text', completion: 'text', agent_message: 'text',
   // reasoning / status narration
@@ -196,9 +196,9 @@ const EVENT_KIND_BY_TYPE = {
   permission_request: 'permission', permission_denied: 'permission',
   approval: 'permission',
   ask_user: 'ask_user', 'user.prompt': 'ask_user', input_request: 'ask_user',
-  // accounting (explicit only — bare 'model'/'tokens' are too generic)
+  // accounting (explicit only �?bare 'model'/'tokens' are too generic)
   usage: 'usage',
-  // terminal (no bare 'end'/'result' — 'result' collides with tool results)
+  // terminal (no bare 'end'/'result' �?'result' collides with tool results)
   done: 'done', completed: 'done', 'turn.completed': 'done', finish: 'done',
   error: 'error', failure: 'error', 'turn.failed': 'error', failed: 'error',
   fatal: 'error', aborted: 'error',
@@ -229,7 +229,7 @@ function _coerceText(v) {
 /**
  * Classify a parsed JSON object into a normalized event. Never throws; an
  * unrecognized shape becomes `{ kind: 'unknown', raw }` with a redacted
- * diagnostic. Pure — the single place that knows Copilot field names.
+ * diagnostic. Pure �?the single place that knows Copilot field names.
  *
  * @param {object} obj
  * @returns {{kind: string} & object}
@@ -257,7 +257,7 @@ function classifyEvent(obj) {
       const sessionId = _firstString(src, [
         'session_id', 'sessionId', 'session', 'thread_id', 'threadId', 'id', 'name',
       ]);
-      if (!sessionId) break; // not actually a session event → fall to unknown
+      if (!sessionId) break; // not actually a session event �?fall to unknown
       return { kind: 'session', sessionId };
     }
     case 'text_delta': {
@@ -330,7 +330,7 @@ function classifyEvent(obj) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Stateful incremental parser — thin wrapper over the pure functions
+// Stateful incremental parser �?thin wrapper over the pure functions
 // ────────────────────────────────────────────────────────────────────────
 
 class CopilotStreamParser {
@@ -350,7 +350,7 @@ class CopilotStreamParser {
     const events = [];
     for (const line of lines) {
       const obj = parseLine(line);
-      if (obj === null) continue; // blank or non-JSON noise — skip, never throw
+      if (obj === null) continue; // blank or non-JSON noise �?skip, never throw
       events.push(classifyEvent(obj));
     }
     return events;

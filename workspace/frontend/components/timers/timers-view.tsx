@@ -79,7 +79,7 @@ export function TimersView() {
     setError(null);
     try {
       await createTimer({
-        source: `openagents:${source}`,
+        source: source.includes(':') ? source : `52hz:${source}`,
         channel,
         message: message.trim(),
         delaySeconds,

@@ -17,7 +17,7 @@ const { execSync, spawn: spawnChild } = require('child_process');
 const net = require('net');
 const { WorkspaceClient } = require('./workspace-client');
 
-// Active tunnels: port → { proc, url }
+// Active tunnels: port �?{ proc, url }
 const _activeTunnels = {};
 
 // ── Tool definitions ────────────────────────────────────────────────────────
@@ -320,7 +320,7 @@ function buildToolDefs(disabledModules) {
           properties: {
             name: { type: 'string', description: 'Human-readable label for the routine (e.g. "Daily PR Review")' },
             message: { type: 'string', description: 'Short trigger message posted each time the routine fires' },
-            context: { type: 'string', description: 'Comprehensive context for the routine: what it should do, background info, goals, relevant details from the current conversation. This is posted at the start of the routine\'s dedicated thread so you have full background every time it fires. Be thorough — this is your only memory of why this routine exists.' },
+            context: { type: 'string', description: 'Comprehensive context for the routine: what it should do, background info, goals, relevant details from the current conversation. This is posted at the start of the routine\'s dedicated thread so you have full background every time it fires. Be thorough �?this is your only memory of why this routine exists.' },
             hour: { type: 'integer', description: 'Daily mode: hour in UTC (0-23). Omit if using interval_minutes.' },
             minute: { type: 'integer', description: 'Daily mode: minute (0-59). Omit if using interval_minutes.' },
             days: {
@@ -518,7 +518,7 @@ class McpServer {
         this._write(jsonRpcError(null, -32700, 'Parse error'));
         return;
       }
-      // Notifications (no id) — acknowledge but don't respond
+      // Notifications (no id) �?acknowledge but don't respond
       if (msg.id === undefined || msg.id === null) return;
       this._handleRequest(msg).catch((e) => {
         this._write(jsonRpcError(msg.id, -32603, e.message));
@@ -611,7 +611,7 @@ class McpServer {
         const agents = data.agents || data || [];
         if (!agents.length) return text('No agents connected.');
         const lines = agents.map((a) =>
-          `- ${a.name} (${a.type || 'unknown'}) — ${a.status || 'unknown'}${a.role ? ` [${a.role}]` : ''}`
+          `- ${a.name} (${a.type || 'unknown'}) �?${a.status || 'unknown'}${a.role ? ` [${a.role}]` : ''}`
         );
         return text(lines.join('\n'));
       }
@@ -661,7 +661,7 @@ class McpServer {
         }
         const result = await this.ws.uploadFile(this.workspaceId, this.token, args.filename, b64, {
           contentType: mime,
-          source: `openagents:${this.agentName}`,
+          source: `52hz:${this.agentName}`,
           channelName: this.channelName,
         });
         const fileId = result.id || result.file_id || 'unknown';
@@ -678,7 +678,7 @@ class McpServer {
       case 'workspace_browser_open': {
         const opts = {
           url: args.url || 'about:blank',
-          source: `openagents:${this.agentName}`,
+          source: `52hz:${this.agentName}`,
         };
         // Resolve context_name to context_id
         if (args.context_name) {
@@ -697,7 +697,7 @@ class McpServer {
         const result = await this.ws.browserOpenTab(this.workspaceId, this.token, opts);
         const tabId = result.tab_id || result.id || 'unknown';
         const persistent = result.persistent ? ' (persistent)' : '';
-        return text(`Browser tab opened${persistent}: ${tabId} → ${args.url || 'about:blank'}`);
+        return text(`Browser tab opened${persistent}: ${tabId} �?${args.url || 'about:blank'}`);
       }
 
       case 'workspace_browser_navigate': {
@@ -823,7 +823,7 @@ class McpServer {
 
         _activeTunnels[port] = { proc, url };
         proc.unref(); // don't block MCP server exit
-        return text(`Tunnel open: localhost:${port} → ${url}`);
+        return text(`Tunnel open: localhost:${port} �?${url}`);
       }
 
       case 'tunnel_close': {
@@ -841,7 +841,7 @@ class McpServer {
         const lines = ports.map((p) => {
           const t = _activeTunnels[p];
           const running = t.proc && t.proc.exitCode === null;
-          return `- localhost:${p} → ${t.url} (${running ? 'running' : 'stopped'})`;
+          return `- localhost:${p} �?${t.url} (${running ? 'running' : 'stopped'})`;
         });
         return text(lines.join('\n'));
       }
@@ -850,11 +850,11 @@ class McpServer {
 
       case 'workspace_put_todos': {
         await this.ws.putTodos(this.workspaceId, this.channelName, this.token, args.todos, {
-          source: `openagents:${this.agentName}`,
+          source: `52hz:${this.agentName}`,
         });
         const summary = (args.todos || []).map((t) => {
           const icon = t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[~]' : '[ ]';
-          return `${icon} ${t.content}${t.assignee ? ` → ${t.assignee}` : ''}`;
+          return `${icon} ${t.content}${t.assignee ? ` �?${t.assignee}` : ''}`;
         }).join('\n');
         return text(`Todos updated:\n${summary}`);
       }
@@ -876,7 +876,7 @@ class McpServer {
         const result = await this.ws.createTimer(
           this.workspaceId, this.channelName, this.token,
           args.delay, args.message,
-          { source: `openagents:${this.agentName}` },
+          { source: `52hz:${this.agentName}` },
         );
         return text(`Timer set: "${args.message}" fires in ${args.delay}s (id: ${result.id})`);
       }
@@ -907,7 +907,7 @@ class McpServer {
             minute: args.minute,
             days: args.days,
             interval_minutes: args.interval_minutes,
-            source: `openagents:${this.agentName}`,
+            source: `52hz:${this.agentName}`,
           },
         );
         let scheduleStr;
@@ -935,7 +935,7 @@ class McpServer {
             when = `at ${String(r.schedule_hour).padStart(2,'0')}:${String(r.schedule_minute).padStart(2,'0')} UTC` +
               (r.schedule_days ? ` [days: ${r.schedule_days.join(',')}]` : ' (daily)');
           }
-          return `- ${r.id}: "${r.name}" ${when} — next: ${r.next_fires_at} (by ${r.created_by})`;
+          return `- ${r.id}: "${r.name}" ${when} �?next: ${r.next_fires_at} (by ${r.created_by})`;
         });
         return text(lines.join('\n'));
       }
@@ -953,7 +953,7 @@ class McpServer {
             message: args.message,
             priority: args.priority || 'normal',
             channel: args.channel || this.channelName,
-            source: `openagents:${this.agentName}`,
+            source: `52hz:${this.agentName}`,
           },
         );
         return text(`Notification sent: "${args.title}" (id: ${result.id})`);
@@ -1019,14 +1019,14 @@ class McpServer {
           result = await this.ws.updateKnowledge(
             this.workspaceId, this.token, args.entry_id,
             { title: args.title, content: args.content, description: args.description,
-              source: `openagents:${this.agentName}` },
+              source: `52hz:${this.agentName}` },
           );
           return text(`Knowledge updated: "${result.title}" (slug: ${result.slug})`);
         } else {
           result = await this.ws.createKnowledge(
             this.workspaceId, this.token,
             { title: args.title, content: args.content, description: args.description,
-              source: `openagents:${this.agentName}` },
+              source: `52hz:${this.agentName}` },
           );
           return text(`Knowledge created: "${result.title}" (slug: ${result.slug}, id: ${result.id})`);
         }

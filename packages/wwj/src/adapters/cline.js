@@ -1,13 +1,13 @@
 /**
- * Cline CLI adapter for OpenAgents workspace.
+ * Cline CLI adapter for 52hzAgents workspace.
  *
  * Bridges the Cline CLI (https://github.com/cline/cline, `npm i -g cline`) to an
- * OpenAgents workspace:
+ * 52hzAgents workspace:
  *   - polling loop + per-channel task dispatch (inherited from BaseAdapter)
  *   - one `cline --json` subprocess per user message (Cline runs the agent loop
  *     in-process for a one-shot run; killing the process tree stops the task)
  *   - the NDJSON event stream is parsed (see cline-stream.js) and mapped to the
- *     standard OpenAgents events (thinking / status / todos / response / error)
+ *     standard 52hzAgents events (thinking / status / todos / response / error)
  *   - real session continuity via Cline's `--id` resume, correlated from
  *     `cline history --json` (Cline does not emit the session id inline)
  *
@@ -50,10 +50,10 @@ const IS_WINDOWS = process.platform === 'win32';
 // Idle watchdog: if stdout is silent this long while a run is in flight we
 // nudge the user; after MAX consecutive silences we kill the (possibly hung)
 // process. Cline can hang on connection errors without exiting, so this is the
-// backstop that prevents a thread spinning on "thinkingâ€¦" forever.
+// backstop that prevents a thread spinning on "thinkingâ€? forever.
 const WATCHDOG_INTERVAL_MS = 15_000;
-const WATCHDOG_NUDGE_AT = 2;     // ~30s of silence â†’ "still working"
-const WATCHDOG_MAX = parseInt(process.env.WWJ_CLINE_WATCHDOG_TIMEOUTS || '80', 10); // ~20 min of silence â†’ kill
+const WATCHDOG_NUDGE_AT = 2;     // ~30s of silence â†?"still working"
+const WATCHDOG_MAX = parseInt(process.env.WWJ_CLINE_WATCHDOG_TIMEOUTS || '80', 10); // ~20 min of silence â†?kill
 
 // The ONE known-benign stderr {type:"error"} diagnostic Cline emits on every
 // run (verified v3.0.27). Matched EXACTLY (whole, trimmed message) so it can
@@ -62,7 +62,7 @@ const BENIGN_STDERR_RE = /^hook dispatch failed: session\.hook requires a valid 
 
 // Cline version check cache: keyed by resolved binary path so it is shared
 // across messages (no `cline --version` per status refresh) yet re-detects
-// after the TTL â€” short enough that an install/upgrade isn't masked for long.
+// after the TTL â€?short enough that an install/upgrade isn't masked for long.
 const VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
 
 // `cline --help` only changes on upgrade, so its answer is cached well past
@@ -79,9 +79,9 @@ class ClineAdapter extends BaseAdapter {
   constructor(opts) {
     super(opts);
     this.disabledModules = opts.disabledModules || new Set();
-    // channel â†’ { sessionId, workingDir }
+    // channel â†?{ sessionId, workingDir }
     this._channelSessions = {};
-    // channel â†’ child process (the in-flight `cline` run)
+    // channel â†?child process (the in-flight `cline` run)
     this._channelProcesses = {};
     this._channelModels = {};
     this._channelEfforts = {};
@@ -233,7 +233,7 @@ class ClineAdapter extends BaseAdapter {
         this._clearSession(channel);
         try {
           await this.client.sendMessage(this.workspaceId, channel, this.token,
-            'Session restarted â€” next message starts a fresh Cline session.',
+            'Session restarted â€?next message starts a fresh Cline session.',
             { senderType: 'agent', senderName: this.agentName, messageType: 'status',
               metadata: { agent_mode: this._mode }, sessionId: this._sessionId });
         } catch {}
@@ -247,11 +247,11 @@ class ClineAdapter extends BaseAdapter {
     await super._onControlAction(action, payload);
   }
 
-  /** Daemon shutdown â€” tear down any in-flight cline runs so threads don't
+  /** Daemon shutdown â€?tear down any in-flight cline runs so threads don't
    *  hang showing "running". Fire-and-forget; the daemon allows a short grace. */
   stop() {
     this._stopAllProcesses(
-      'Task interrupted â€” daemon restarting. Send another message to continue.',
+      'Task interrupted â€?daemon restarting. Send another message to continue.',
     ).catch(() => {});
     super.stop();
   }
@@ -275,7 +275,7 @@ class ClineAdapter extends BaseAdapter {
    * work, then escalate to SIGTERM/SIGKILL on the whole POSIX process group
    * (the node wrapper + the bun worker share the group) or via `taskkill /T`
    * on Windows. The shared `cline --cline-hub-daemon` (ppid=1, its own group)
-   * is intentionally left running â€” it is per-cwd infrastructure shared across
+   * is intentionally left running â€?it is per-cwd infrastructure shared across
    * runs, like a language server; `cline doctor fix` clears stale ones.
    */
   async _stopProcess(proc) {
@@ -353,7 +353,7 @@ class ClineAdapter extends BaseAdapter {
         if (target.endsWith('.js') || target.endsWith('.mjs')) return [nodeBin, target];
         // Cline's package bin (`node_modules/cline/bin/cline`) is an
         // extensionless Node script with a `#!/usr/bin/env node` shebang. Run
-        // it under node explicitly â€” required on Windows (no shebang support)
+        // it under node explicitly â€?required on Windows (no shebang support)
         // and harmless elsewhere.
         if (this._isNodeShebangScript(target)) return [nodeBin, target];
       } catch {}
@@ -392,7 +392,7 @@ class ClineAdapter extends BaseAdapter {
 
     // Tier 0c: the package's OWN bin. npm does not create a node_modules/.bin
     // shim for Cline (its `bin` is "./bin/cline"), so a local prefix install
-    // leaves no `.bin/cline` â€” but the package bin is always present and is a
+    // leaves no `.bin/cline` â€?but the package bin is always present and is a
     // Node script we run via _resolveToNodeCmd. Check the runtime then legacy
     // prefix.
     for (const root of [
@@ -425,7 +425,7 @@ class ClineAdapter extends BaseAdapter {
     ];
     for (const c of candidates) if (fs.existsSync(c)) return c;
 
-    // Tier 4: deep scan of every known bin dir (nvm/fnm/volta/homebrew/â€¦)
+    // Tier 4: deep scan of every known bin dir (nvm/fnm/volta/homebrew/â€?
     const viaWhich = whichBinary('cline');
     if (viaWhich) return viaWhich;
 
@@ -454,7 +454,7 @@ class ClineAdapter extends BaseAdapter {
    * binary path with a TTL so repeated messages/status refreshes don't re-spawn
    * `cline --version`, while an upgrade is picked up after the TTL.
    * @returns {{version: string|null, compatible: boolean|null}}
-   *   compatible true â†’ >= MIN; false â†’ CONFIRMED too old; null â†’ undetermined.
+   *   compatible true â†?>= MIN; false â†?CONFIRMED too old; null â†?undetermined.
    */
   _checkClineVersion(clineBin) {
     const now = Date.now();
@@ -467,7 +467,7 @@ class ClineAdapter extends BaseAdapter {
     try {
       ({ version, supported } = classifyClineVersion(this._readClineVersionRaw(clineBin)));
     } catch {
-      // `cline --version` failed â†’ undetermined (NOT treated as compatible).
+      // `cline --version` failed â†?undetermined (NOT treated as compatible).
       version = null;
       supported = null;
     }
@@ -621,7 +621,7 @@ class ClineAdapter extends BaseAdapter {
         const text = (m.content || '').trim();
         if (!text || text === currentMessage) continue;
         const who = m.senderType === 'human' ? (m.senderName || 'user') : (m.senderName || 'agent');
-        lines.push(`[${who}] ${text.length > 800 ? text.slice(0, 800) + 'â€¦' : text}`);
+        lines.push(`[${who}] ${text.length > 800 ? text.slice(0, 800) + 'â€? : text}`);
       }
       if (lines.length === 0) return null;
       return 'Recent conversation in this channel for context:\n\n' + lines.slice(-12).join('\n');
@@ -647,7 +647,7 @@ class ClineAdapter extends BaseAdapter {
     this._log(`Processing message from ${sender} in ${channel}: ${redactSecrets(content.slice(0, 80))}...`);
 
     // Resolve and validate the working directory up front. Never silently fall
-    // back to the launcher/repo dir â€” return a clear error instead.
+    // back to the launcher/repo dir â€?return a clear error instead.
     const workingDir = this.workingDir || defaultAgentWorkdir(this.agentName);
     if (this.workingDir && !this._dirExists(this.workingDir)) {
       await this.sendError(channel, `Working directory does not exist: ${this.workingDir}`);
@@ -695,8 +695,8 @@ class ClineAdapter extends BaseAdapter {
     for (let attempt = 0; attempt < 2; attempt++) {
       const resumeId = attempt === 0 ? this._resumableSession(channel, workingDir) : null;
 
-      // Build the prompt. Resuming â†’ Cline already has history, send the bare
-      // turn. Fresh â†’ prepend a context header (+ recap when available).
+      // Build the prompt. Resuming â†?Cline already has history, send the bare
+      // turn. Fresh â†?prepend a context header (+ recap when available).
       let prompt;
       // For a fresh run, snapshot the existing session ids BEFORE spawning so we
       // can later identify our run's NEW session unambiguously (concurrency-safe).
@@ -729,10 +729,10 @@ class ClineAdapter extends BaseAdapter {
 
       if (result.userStopped) return;
 
-      // Stale-session handling: a resume that died/erred with nothing useful â†’
+      // Stale-session handling: a resume that died/erred with nothing useful â†?
       // clear and retry fresh once.
       if (resumeId && !result.ok && !result.anyOutput && attempt === 0) {
-        this._log(`Resume of session ${resumeId} failed â€” clearing and retrying fresh`);
+        this._log(`Resume of session ${resumeId} failed â€?clearing and retrying fresh`);
         this._clearSession(channel);
         continue;
       }
@@ -814,7 +814,7 @@ class ClineAdapter extends BaseAdapter {
       anyOutput: false,
       ok: false,
       // Error sources in priority order (resolved into errorMessage at settle):
-      resultError: '',          // run_result/done with a non-completed reason â€” authoritative
+      resultError: '',          // run_result/done with a non-completed reason â€?authoritative
       eventError: '',           // agent_event {type:error}
       stderrError: '',          // fatal {type:error} on stderr (benign noise filtered)
       errorMessage: '',         // resolved, user-facing-bound error text
@@ -850,7 +850,7 @@ class ClineAdapter extends BaseAdapter {
         // run_result/done failure beats an agent error event, which beats a
         // (non-benign) stderr error line.
         state.errorMessage = state.resultError || state.eventError || state.stderrError || '';
-        // Only promote accumulated text to a final answer on a successful run â€”
+        // Only promote accumulated text to a final answer on a successful run â€?
         // never present partial text as the answer when the run failed.
         if (!state.finalText && !state.errorMessage && state.pendingText.length) {
           state.finalText = state.pendingText.join('\n').trim();
@@ -896,7 +896,7 @@ class ClineAdapter extends BaseAdapter {
               state.anyOutput = true;
               {
                 const opts = e.options && e.options.length ? `\n\nOptions: ${e.options.join(' Â· ')}` : '';
-                try { await this.sendResponse(channel, `â“ ${e.question || 'The agent is asking for input.'}${opts}`); } catch {}
+                try { await this.sendResponse(channel, `â?${e.question || 'The agent is asking for input.'}${opts}`); } catch {}
               }
               break;
             case 'notice':
@@ -906,8 +906,8 @@ class ClineAdapter extends BaseAdapter {
               if (e.message && !state.eventError) state.eventError = e.message;
               break;
             case 'done':
-              // `done` carries the turn outcome. reason "completed" â†’ text is the
-              // final answer; any other reason (error/aborted/max_iterations/â€¦) â†’
+              // `done` carries the turn outcome. reason "completed" â†?text is the
+              // final answer; any other reason (error/aborted/max_iterations/â€? â†?
               // text is the failure message, never an assistant reply.
               if (e.reason === 'completed') {
                 if (e.text && !state.finalText) state.finalText = e.text.trim();
@@ -921,7 +921,7 @@ class ClineAdapter extends BaseAdapter {
             case 'result':
               state.ok = e.ok;
               // On a completed run, run_result.text is the final answer. On a
-              // failed run it is the ERROR text â€” authoritative, never a reply.
+              // failed run it is the ERROR text â€?authoritative, never a reply.
               if (e.ok) {
                 if (e.text) { state.finalText = e.text.trim(); state.anyOutput = true; }
               } else if (e.text) {
@@ -937,7 +937,7 @@ class ClineAdapter extends BaseAdapter {
 
       // Swallow stdio stream errors. When we SIGKILL the process (stop /
       // watchdog), the child's stdout/stderr pipe can emit an 'error'
-      // (EPIPE/EBADF/ECONNRESET) â€” notably on macOS â€” and an unhandled stream
+      // (EPIPE/EBADF/ECONNRESET) â€?notably on macOS â€?and an unhandled stream
       // 'error' event would throw and crash the daemon/process. We finalize via
       // exit/end anyway, so these are safe to ignore.
       if (proc.stdout) proc.stdout.on('error', () => {});
@@ -977,7 +977,7 @@ class ClineAdapter extends BaseAdapter {
           try { await this.sendStatus(channel, 'Still working...'); } catch {}
         }
         if (silences >= WATCHDOG_MAX) {
-          this._log(`Watchdog: cline silent ${silences * 15}s on ${channel} â€” killing`);
+          this._log(`Watchdog: cline silent ${silences * 15}s on ${channel} â€?killing`);
           state.resultError = state.resultError || 'Cline became unresponsive and was stopped.';
           await this._stopProcess(proc);
         }
@@ -1021,7 +1021,7 @@ class ClineAdapter extends BaseAdapter {
         exitCode = code;
         exitSignal = signal;
         // If stdout 'end' hasn't fired shortly after exit (a lingering child
-        // holding the pipe), force finalization â€” buffered data is already in.
+        // holding the pipe), force finalization â€?buffered data is already in.
         fallbackTimer = setTimeout(() => { stdoutEnded = true; finalize(); }, 1500);
         maybeFinalize();
       });
@@ -1038,7 +1038,7 @@ class ClineAdapter extends BaseAdapter {
    * (Cline does not emit the session id inline). Uses a BEFORE/AFTER snapshot
    * diff: only sessions that are NEW since `beforeIds`, in this working dir, and
    * within the run window are considered, and we bind ONLY on a single
-   * unambiguous candidate â€” never guessing. Best-effort and non-fatal; failure
+   * unambiguous candidate â€?never guessing. Best-effort and non-fatal; failure
    * just means the next turn starts a fresh session. The prompt is never logged.
    */
   async _captureSessionId(channel, clineBin, workingDir, spawnStartMs, userContent, beforeIds) {
@@ -1056,10 +1056,10 @@ class ClineAdapter extends BaseAdapter {
         this._saveSessions();
         this._log(`Captured Cline session ${sessionId} for ${channel}`);
       } else {
-        // Count the ambiguous/zero candidates for diagnostics â€” no prompt, no values.
+        // Count the ambiguous/zero candidates for diagnostics â€?no prompt, no values.
         const before = opts.beforeIds instanceof Set ? opts.beforeIds : new Set(beforeIds || []);
         const fresh = after.filter((s) => s && s.cwd === workingDir && s.sessionId && !before.has(s.sessionId)).length;
-        this._log(`Session correlation declined for ${channel}: ${fresh} new candidate(s) in workdir â€” next turn starts fresh`);
+        this._log(`Session correlation declined for ${channel}: ${fresh} new candidate(s) in workdir â€?next turn starts fresh`);
       }
     } catch (e) {
       this._log(`Could not capture Cline session id (non-fatal): ${e && e.message ? e.message : e}`);

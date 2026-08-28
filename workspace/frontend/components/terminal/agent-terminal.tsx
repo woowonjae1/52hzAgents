@@ -237,7 +237,7 @@ export function AgentTerminal() {
           </div>
           <TerminalSquare className="size-3.5 text-foreground-extra-muted ml-1" />
           <span className="text-2xs text-foreground-extra-muted font-medium truncate">
-            {activeSession?.title || currentSessionId || 'openagents-shell'}
+            {activeSession?.title || currentSessionId || '52hz-shell'}
           </span>
           <span className="hidden sm:flex items-center gap-1 pl-2 ml-1 border-l border-border text-3xs">
             <Cpu className={cn('size-2.5', isAgentWorking ? 'text-status-warning animate-spin' : 'text-status-success')} />
@@ -338,7 +338,7 @@ export function AgentTerminal() {
       <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-border/70 bg-primary/40 backdrop-blur-md">
         <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-primary/80 border border-border/70 focus-within:border-border-accent transition-colors">
           <span className="shrink-0 select-none font-medium text-2xs text-status-success">
-            52hz@openagents
+            52hz@agents
           </span>
           <span className="shrink-0 text-foreground-muted select-none">~$</span>
           <input

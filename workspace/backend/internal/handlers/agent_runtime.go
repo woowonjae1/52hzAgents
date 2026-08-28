@@ -76,7 +76,7 @@ func ReportAgentRuntime(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save agent runtime"})
 		return
 	}
-	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.agent.runtime.updated", "openagents:"+agentName, "", gin.H{"runtime": record}); err != nil {
+	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.agent.runtime.updated", "52hz:"+agentName, "", gin.H{"runtime": record}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish agent runtime"})
 		return
 	}
@@ -154,7 +154,7 @@ func ReportAgentUsage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save agent usage"})
 		return
 	}
-	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.agent.usage.updated", "openagents:"+agentName, "", gin.H{"usage": record})
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.agent.usage.updated", "52hz:"+agentName, "", gin.H{"usage": record})
 	c.JSON(http.StatusOK, record)
 }
 

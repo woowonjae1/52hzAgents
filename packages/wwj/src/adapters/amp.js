@@ -1,7 +1,7 @@
 /**
- * Amp adapter for OpenAgents workspace.
+ * Amp adapter for 52hzAgents workspace.
  *
- * Bridges Sourcegraph's Amp CLI to an OpenAgents workspace by running the
+ * Bridges Sourcegraph's Amp CLI to an 52hzAgents workspace by running the
  * agent in its official non-interactive *execute* mode with structured output:
  *
  *   amp -x --stream-json                                  // first turn (new thread)
@@ -17,7 +17,7 @@
  * Reuses all shared connectivity / dispatch / state machinery in BaseAdapter;
  * only the Amp-specific subprocess invocation and parsing live here.
  *
- * Mirrors the Python adapter: sdk/src/openagents/adapters/amp.py
+ * Mirrors the Python adapter: sdk/src/52hzAgents/adapters/amp.py
  */
 
 'use strict';
@@ -39,7 +39,7 @@ const IS_WINDOWS = process.platform === 'win32';
 // so both are cached.
 const INTROSPECT_CACHE_TTL_MS = 5 * 60 * 1000;
 // Terminate the subprocess if it produces no output for this long (a wedged
-// turn) â€” guards the daemon against a hung Amp process without arbitrary sleeps.
+// turn) â€?guards the daemon against a hung Amp process without arbitrary sleeps.
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Platform-appropriate Amp CLI install command for "not found" messages. */
@@ -76,7 +76,7 @@ class AmpAdapter extends BaseAdapter {
     if (this._ampBin) {
       this._log(`Using Amp CLI: ${this._ampBin}`);
     } else {
-      this._log(`Warning: Amp CLI not found â€” install with: ${ampInstallHint()}`);
+      this._log(`Warning: Amp CLI not found â€?install with: ${ampInstallHint()}`);
     }
   }
 
@@ -159,10 +159,10 @@ class AmpAdapter extends BaseAdapter {
   /**
    * Preflight gate (run by the daemon before join). Amp needs a resolvable CLI
    * binary to do anything useful, so when none can be found we surface a precise
-   * 'runtime_missing' reason and skip the workspace join entirely â€” instead of
+   * 'runtime_missing' reason and skip the workspace join entirely â€?instead of
    * joining and then failing every message. This is also the one place that
    * logs the resolved Amp path for diagnostics. NOTE: 'runtime_missing' (binary
-   * gone at run time), NOT 'not_installed' â€” install detection lives elsewhere.
+   * gone at run time), NOT 'not_installed' â€?install detection lives elsewhere.
    */
   preflight() {
     if (!this._ampBin) this._ampBin = this._findAmpBinary();
@@ -170,7 +170,7 @@ class AmpAdapter extends BaseAdapter {
       return {
         ok: false,
         reason: REASON.RUNTIME_MISSING,
-        message: `Amp CLI not found â€” install with: ${ampInstallHint()}`,
+        message: `Amp CLI not found â€?install with: ${ampInstallHint()}`,
       };
     }
     this._log(`Amp CLI resolved: ${this._ampBin}`);
@@ -383,7 +383,7 @@ class AmpAdapter extends BaseAdapter {
 
     if (!this._ampBin) this._ampBin = this._findAmpBinary();
     if (!this._ampBin) {
-      const message = `Amp CLI not found â€” install with: ${ampInstallHint()}`;
+      const message = `Amp CLI not found â€?install with: ${ampInstallHint()}`;
       this._reportStatus(REASON.RUNTIME_MISSING, message);
       await this.sendError(msgChannel, message);
       return;
@@ -398,7 +398,7 @@ class AmpAdapter extends BaseAdapter {
       responseText = await this._runAmp(content, msgChannel);
     } catch (e) {
       // A failure to LAUNCH the amp process (ENOENT/EACCES/spawn error) is a
-      // distinct, actionable failure â€” surface it as spawn_failed with the
+      // distinct, actionable failure â€?surface it as spawn_failed with the
       // resolved path + code, never a generic "Not installed". Other errors keep
       // a redacted generic message. Both report up so the agent row shows why.
       if (this._isSpawnError(e)) {
@@ -423,7 +423,7 @@ class AmpAdapter extends BaseAdapter {
       this._stoppingChannels.delete(msgChannel);
       return;
     }
-    // A successful turn proves the runtime is healthy â€” clear any prior
+    // A successful turn proves the runtime is healthy â€?clear any prior
     // spawn/runtime error the agent row may be showing.
     this._reportStatus(null);
     if (responseText) {
@@ -471,7 +471,7 @@ class AmpAdapter extends BaseAdapter {
       if (this._stoppingChannels.has(msgChannel)) return '';
       if (text) return text;
       if (stale && resume) {
-        this._log(`Amp thread for ${msgChannel} appears stale â€” retrying fresh`);
+        this._log(`Amp thread for ${msgChannel} appears stale â€?retrying fresh`);
         delete this._channelThreads[msgChannel];
         this._saveSessions();
         continue;
@@ -496,12 +496,12 @@ class AmpAdapter extends BaseAdapter {
         detached: !IS_WINDOWS,
         windowsHide: true,
         // Windows .cmd/.bat shims (npm/pnpm/yarn global bins) are not directly
-        // executable â€” must go through a shell. Shared helper so the daemon,
+        // executable â€?must go through a shell. Shared helper so the daemon,
         // adapter and launcher probe all agree on the rule.
         shell: shouldUseShellForBinary(cmd[0]),
       });
       this._channelProcesses[msgChannel] = proc;
-      // Diagnostic: the exact argv we launched (no secrets â€” flags only). The
+      // Diagnostic: the exact argv we launched (no secrets â€?flags only). The
       // resolved binary path was logged at preflight/init.
       this._log(`Running Amp: ${cmd.map((c) => String(c)).join(' ')}`);
 
@@ -510,7 +510,7 @@ class AmpAdapter extends BaseAdapter {
       // on stdout/stderr a tick later; with a 'data' listener but no 'error'
       // listener that becomes an uncaughtException which crashes the
       // (single-process, e.g. Node 18) test run with exit 1 and no `not ok`.
-      // No-op â€” data handling below is unchanged.
+      // No-op â€?data handling below is unchanged.
       if (proc.stdout) proc.stdout.on('error', () => {});
       if (proc.stderr) proc.stderr.on('error', () => {});
 
@@ -521,12 +521,12 @@ class AmpAdapter extends BaseAdapter {
       let stderrBuf = '';
       let pending = Promise.resolve();
 
-      // Idle watchdog â€” reset on any stdout activity.
+      // Idle watchdog â€?reset on any stdout activity.
       let idleTimer = null;
       const armIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
-          this._log(`Amp produced no output for ${IDLE_TIMEOUT_MS / 1000}s â€” terminating`);
+          this._log(`Amp produced no output for ${IDLE_TIMEOUT_MS / 1000}s â€?terminating`);
           this._stopProcess(proc);
         }, IDLE_TIMEOUT_MS);
       };
@@ -565,7 +565,7 @@ class AmpAdapter extends BaseAdapter {
             } else if (block.type === 'thinking' || block.type === 'redacted_thinking') {
               // Extended thinking, on `block.thinking` rather than `block.text`.
               // Unflagged: this is the real chain-of-thought, so it belongs in
-              // the Thought disclosure. Kept out of `lastTurnText` â€” reasoning is
+              // the Thought disclosure. Kept out of `lastTurnText` â€?reasoning is
               // not part of the reply. `redacted_thinking` is matched only to be
               // skipped; its payload is encrypted with nothing readable in it.
               const thought = String(block.thinking || '').trim();

@@ -50,7 +50,7 @@ function getExtraBinDirs() {
   // Common: ~/.local/bin (pipx, user installs)
   _push(dirs, path.join(HOME, '.local', 'bin'));
 
-  // Aider (uv tool install) â€” its executable honors XDG_BIN_HOME /
+  // Aider (uv tool install) â€?its executable honors XDG_BIN_HOME /
   // XDG_DATA_HOME/../bin / ~/.local/bin and also always lands in the uv tools
   // venv. A GUI/daemon process won't see the installer's PATH edit, so add the
   // real install dirs explicitly (filtered to existing dirs by the caller).
@@ -116,7 +116,7 @@ function getEnhancedEnv(baseEnv) {
   if (extra.length > 0) {
     // Spreading process.env on Windows yields a "Path" key (not "PATH"), so a
     // bare `env.PATH = â€¦` would create a SECOND key holding only the extra dirs
-    // â€” no System32 â€” and libuv picks that truncated one when resolving spawned
+    // â€?no System32 â€?and libuv picks that truncated one when resolving spawned
     // executables (cmd.exe / where.exe become unfindable). Update the existing
     // case-insensitive path key in place instead.
     const pathKey = Object.keys(env).find((k) => k.toLowerCase() === 'path') || 'PATH';
@@ -150,7 +150,7 @@ function whichBinary(name) {
 
   // On a non-English Windows the console OUTPUT codepage is OEM (e.g. 936/GBK on
   // zh-CN), so `where` prints a path whose non-ASCII bytes don't match the utf-8
-  // decoding execSync does â€” a Chinese username comes back mangled (e.g.
+  // decoding execSync does â€?a Chinese username comes back mangled (e.g.
   // `C:\Users\??.?[\â€¦`) and yields ENOENT downstream. We can't reliably re-encode
   // it (and forcing `chcp` is unsafe under windowsHide's console-less cmd), so we
   // existence-check every hit and only return one that's real; a mangled path
@@ -183,12 +183,12 @@ function whichBinary(name) {
  *
  * Hazard: on a non-English Windows the console output codepage is OEM (e.g.
  * 936/GBK on zh-CN), so execSync decodes `where` stdout with the wrong codepage
- * and mangles a non-ASCII (e.g. Chinese) username in the path â€” yielding ENOENT
+ * and mangles a non-ASCII (e.g. Chinese) username in the path â€?yielding ENOENT
  * downstream (the `C:\Users\??.?[\â€¦\claude.cmd` failure). Two safe defenses,
  * no `chcp` (which is unreliable under windowsHide's console-less cmd):
  *   1. (Windows) check the npm-global default `%APPDATA%\npm\<name>.cmd` FIRST.
  *      APPDATA comes from the OS as UTF-16 via Node, so this path is always
- *      correctly encoded â€” and it's where the npm-installed CLIs actually live.
+ *      correctly encoded â€?and it's where the npm-installed CLIs actually live.
  *   2. Fall back to `where`/`which`, but existence-check every hit so a mangled
  *      path is skipped and the caller drops to its own Node-derived tiers.
  *
@@ -244,13 +244,13 @@ function _addWindowsPaths(dirs) {
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
   const sysRoot = process.env.SystemRoot || 'C:\\Windows';
 
-  // System32 (cmd.exe, powershell, etc) â€” Electron may not have it
+  // System32 (cmd.exe, powershell, etc) â€?Electron may not have it
   _push(dirs, path.join(sysRoot, 'System32'));
 
   // npm global bin (default location)
   if (appData) _push(dirs, path.join(appData, 'npm'));
 
-  // npm global bin (custom prefix â€” e.g. user configured npm prefix to D:\node\node_global)
+  // npm global bin (custom prefix â€?e.g. user configured npm prefix to D:\node\node_global)
   try {
     const npmPrefix = execSync('npm config get prefix', {
       encoding: 'utf-8', timeout: 5000, windowsHide: true,
@@ -259,7 +259,7 @@ function _addWindowsPaths(dirs) {
     if (npmPrefix) _push(dirs, npmPrefix);
   } catch {}
 
-  // Portable Node.js installed by OpenAgents Launcher
+  // Portable Node.js installed by 52hzAgents Launcher
   _push(dirs, path.join(HOME, '.wwj', 'nodejs'));
 
   // Cursor CLI native installer.
@@ -273,7 +273,7 @@ function _addWindowsPaths(dirs) {
   if (localAppData) _push(dirs, path.join(localAppData, 'cursor-agent'));
   _push(dirs, path.join(HOME, '.local', 'bin'));
 
-  // Amp CLI (irm https://ampcode.com/install.ps1 | iex) â€” same registry-PATH
+  // Amp CLI (irm https://ampcode.com/install.ps1 | iex) â€?same registry-PATH
   // staleness as Cursor; add the canonical install dir(s) so an already-running
   // daemon resolves amp without a reboot.
   _push(dirs, path.join(HOME, '.amp', 'bin'));
@@ -281,7 +281,7 @@ function _addWindowsPaths(dirs) {
 
   // Hermes CLI native (no-WSL) installer drops hermes.exe in the portable
   // venv's Scripts dir and the uv shim in %LOCALAPPDATA%\hermes\bin. Same
-  // registry-PATH staleness as Cursor â€” add explicitly so an already-running
+  // registry-PATH staleness as Cursor â€?add explicitly so an already-running
   // daemon resolves hermes via `where` without a reboot.
   if (localAppData) {
     _push(dirs, path.join(localAppData, 'hermes', 'hermes-agent', 'venv', 'Scripts'));
@@ -304,7 +304,7 @@ function _addWindowsPaths(dirs) {
   if (localAppData) _push(dirs, path.join(localAppData, 'fnm_multishells'));
   const fnmDir = process.env.FNM_DIR || path.join(appData, 'fnm');
   if (fnmDir) {
-    // fnm aliases â€” current version
+    // fnm aliases â€?current version
     try {
       const defaultDir = path.join(fnmDir, 'aliases', 'default');
       if (fs.existsSync(defaultDir)) _push(dirs, defaultDir);
@@ -376,7 +376,7 @@ function _addUnixPaths(dirs) {
 
   // Amp CLI native installer (curl https://ampcode.com/install.sh | bash)
   // drops the binary in ~/.amp/bin and only symlinks into ~/.local/bin when
-  // that dir is already on PATH â€” so a GUI- or daemon-spawned process never
+  // that dir is already on PATH â€?so a GUI- or daemon-spawned process never
   // sees it unless the canonical dir is listed here explicitly.
   _push(dirs, path.join(HOME, '.amp', 'bin'));
 }
@@ -460,8 +460,8 @@ function getCorePrefix() {
  * (or the app's Program Files dir), so writing .claude/skills, .claude/plans,
  * etc. relative to cwd fails with `EPERM: operation not permitted, mkdir`.
  *
- * Rooted under ~/.wwj â€” the same writable tree the daemon already uses
- * for its pid/status/log files â€” with one isolated subdir per agent. Uses
+ * Rooted under ~/.wwj â€?the same writable tree the daemon already uses
+ * for its pid/status/log files â€?with one isolated subdir per agent. Uses
  * os.homedir() (OS-account based, reliable even when HOME/USERPROFILE are
  * stripped from a child process's environment) rather than the env-derived
  * HOME above.
@@ -486,12 +486,12 @@ function clearBinaryLookupCache() {
 
 /**
  * Directories where the Aider CLI executable can land, in the SAME priority the
- * official installer (aider.chat/install.{sh,ps1} â†’ `uv tool install`) uses, so
+ * official installer (aider.chat/install.{sh,ps1} â†?`uv tool install`) uses, so
  * detection matches reality on every platform:
  *   1. $XDG_BIN_HOME
  *   2. $XDG_DATA_HOME/../bin
  *   3. ~/.local/bin              (the default uv-tool / pipx / pip --user bin)
- *   4. the uv tools venv for aider-chat (Scripts on Windows, bin on Unix) â€” the
+ *   4. the uv tools venv for aider-chat (Scripts on Windows, bin on Unix) â€?the
  *      executable always lands here on a successful `uv tool install`, even if
  *      the bin-dir copy/PATH edit didn't happen.
  * Uses os.homedir()/live env so it reflects the current process (test-friendly).

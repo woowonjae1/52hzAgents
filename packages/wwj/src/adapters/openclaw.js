@@ -1,12 +1,12 @@
 /**
- * OpenClaw adapter for OpenAgents workspace.
+ * OpenClaw adapter for 52hzAgents workspace.
  *
- * Bridges OpenClaw to an OpenAgents workspace via:
+ * Bridges OpenClaw to an 52hzAgents workspace via:
  * - CLI mode: `openclaw agent --local --json` (preferred)
  * - Workspace context injected via SKILL.md auto-discovery
  *
- * Direct port of Python: sdk/src/openagents/adapters/openclaw.py
- * (CLI mode only â€” gateway WS and direct HTTP modes are not yet ported)
+ * Direct port of Python: sdk/src/52hzAgents/adapters/openclaw.py
+ * (CLI mode only â€?gateway WS and direct HTTP modes are not yet ported)
  */
 
 'use strict';
@@ -46,13 +46,13 @@ class OpenClawAdapter extends BaseAdapter {
     this._gatewaySessionChannels = new Map();
     this._pendingApprovals = new Map();
 
-    // Find the openclaw binary â€” always use CLI/gateway mode for full tool support
+    // Find the openclaw binary â€?always use CLI/gateway mode for full tool support
     this._openclawBinary = this._findOpenclawBinary();
 
     if (this._openclawBinary) {
       this._log(`Using OpenClaw CLI mode (${this._openclawBinary})`);
     } else {
-      this._log('OpenClaw binary not found â€” agent will not be able to process messages');
+      this._log('OpenClaw binary not found â€?agent will not be able to process messages');
     }
 
     // Install workspace skill
@@ -193,7 +193,7 @@ class OpenClawAdapter extends BaseAdapter {
   async run() {
     // Native exec approvals are broadcast by the OpenClaw Gateway. Keep this
     // operator connection alive alongside the workspace bridge so requests can
-    // be displayed and resolved by the OpenAgents chat UI.
+    // be displayed and resolved by the 52hzAgents chat UI.
     this._connectGatewayApprovalRelay();
     return super.run();
   }
@@ -350,7 +350,7 @@ class OpenClawAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Model selection â€” openclaw.json is the single source of truth
+  // Model selection â€?openclaw.json is the single source of truth
   // ------------------------------------------------------------------
 
   get _configPath() {
@@ -389,7 +389,7 @@ class OpenClawAdapter extends BaseAdapter {
   /**
    * Every model openclaw.json actually declares, as `{ id, name }` where the
    * id is the `<provider>/<modelId>` string OpenClaw expects. Two sources:
-   * `models.providers.*.models` (custom endpoints â€” the list the user
+   * `models.providers.*.models` (custom endpoints â€?the list the user
    * configured) and the current `agents.defaults.model.primary` (standard
    * providers write only this, with no provider block to enumerate).
    *
@@ -420,7 +420,7 @@ class OpenClawAdapter extends BaseAdapter {
       }
     }
 
-    // A standard provider (openai/anthropic) has no provider block â€” the only
+    // A standard provider (openai/anthropic) has no provider block â€?the only
     // evidence it exists is the primary itself.
     const primary = this._getCurrentModel();
     if (primary) push(primary, primary.split('/').slice(1).join('/') || primary);
@@ -431,7 +431,7 @@ class OpenClawAdapter extends BaseAdapter {
   /**
    * Publish the openclaw.json model state so the UI's model switcher can offer
    * the models this install actually has, instead of a hardcoded guess. Called
-   * off BaseAdapter's heartbeat. Percentages stay 0 â€” OpenClaw exposes no quota
+   * off BaseAdapter's heartbeat. Percentages stay 0 â€?OpenClaw exposes no quota
    * figures, and the quota capsule excludes this agent kind for that reason.
    */
   async fetchAndReportUsage() {
@@ -459,7 +459,7 @@ class OpenClawAdapter extends BaseAdapter {
       if (!requested) return;
 
       // Accept the full `<provider>/<modelId>` id (what the UI sends), or a
-      // bare model id when exactly one provider declares it â€” the same bare id
+      // bare model id when exactly one provider declares it â€?the same bare id
       // can legitimately exist under two providers, and guessing which one
       // would silently route to the wrong endpoint.
       const known = this._listModels();
@@ -467,9 +467,9 @@ class OpenClawAdapter extends BaseAdapter {
       const match = known.find((m) => m.id === requested) || (bare.length === 1 ? bare[0] : null);
       if (!match) {
         const why = bare.length > 1
-          ? `is ambiguous (declared by ${bare.length} providers â€” send the full <provider>/<model> id)`
+          ? `is ambiguous (declared by ${bare.length} providers â€?send the full <provider>/<model> id)`
           : `is not declared in ${this._configPath}`;
-        this._log(`set_model: '${requested}' ${why} â€” ignoring`);
+        this._log(`set_model: '${requested}' ${why} â€?ignoring`);
         return;
       }
 
@@ -508,7 +508,7 @@ class OpenClawAdapter extends BaseAdapter {
         this._stoppingChannels.add(channel);
         await this._stopProcess(proc);
         delete this._channelProcesses[channel];
-        // No _channelQueues here â€” this adapter never had one, and the delete
+        // No _channelQueues here â€?this adapter never had one, and the delete
         // that used to sit on this line threw on `undefined[channel]`, aborting
         // the loop before the status below (and before any later channel).
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
@@ -548,7 +548,7 @@ class OpenClawAdapter extends BaseAdapter {
     // msg.sessionId may be a channel name (from workspace UI) or an agent target
     // (from API). Only use it if it looks like a channel, otherwise use channelName.
     let msgChannel = this.channelName || 'general';
-    if (msg.sessionId && !msg.sessionId.startsWith('openagents:') && !msg.sessionId.startsWith('agent:')) {
+    if (msg.sessionId && !msg.sessionId.startsWith('52hz:') && !msg.sessionId.startsWith('agent:')) {
       msgChannel = msg.sessionId;
     }
     const sender = msg.senderName || msg.senderType || 'user';
@@ -586,11 +586,11 @@ class OpenClawAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Workspace file sync â€” publish files the agent produced
+  // Workspace file sync â€?publish files the agent produced
   // ------------------------------------------------------------------
 
   /**
-   * Recursively map relative-path â†’ mtimeMs for files under `root`, skipping
+   * Recursively map relative-path â†?mtimeMs for files under `root`, skipping
    * internal/noise directories. Used to diff the workspace before/after a run.
    */
   _collectWorkspaceFiles(root) {
@@ -650,7 +650,7 @@ class OpenClawAdapter extends BaseAdapter {
         const buf = fs.readFileSync(abs);
         await this.client.uploadFile(
           this.workspaceId, this.token, rel, buf.toString('base64'),
-          { contentType, source: `openagents:${this.agentName}`, channelName: channel },
+          { contentType, source: `52hz:${this.agentName}`, channelName: channel },
         );
         this._log(`Uploaded ${rel}`);
       } catch (e) {
@@ -680,7 +680,7 @@ class OpenClawAdapter extends BaseAdapter {
       }
 
       const channelSuffix = (channel || 'general').replace(/[^a-zA-Z0-9-]/g, '').slice(-8) || 'general';
-      const sessionKey = `openagents-${this.workspaceId.slice(0, 8)}-${channelSuffix}`;
+      const sessionKey = `52hzAgents-${this.workspaceId.slice(0, 8)}-${channelSuffix}`;
       this._gatewaySessionChannels.set(`agent:${this.openclawAgentId}:explicit:${sessionKey}`, channel);
       this._gatewaySessionChannels.set(sessionKey, channel);
 
@@ -714,7 +714,7 @@ class OpenClawAdapter extends BaseAdapter {
         }
       }
 
-      // Tool name â†’ human-readable status
+      // Tool name â†?human-readable status
       const toolLabels = {
         exec: 'Running command...',
         read: 'Reading file...',
@@ -748,7 +748,7 @@ class OpenClawAdapter extends BaseAdapter {
       // even in non-TTY mode. We poll the temp file for new lines every 500ms.
       const stderrFile = path.join(os.tmpdir(), `openclaw-stderr-${Date.now()}.log`);
       const stderrFd = fs.openSync(stderrFile, 'w');
-      this._log('Spawn: stderr â†’ ' + stderrFile);
+      this._log('Spawn: stderr â†?' + stderrFile);
 
       // Always spawn node + openclaw.mjs directly (no shims, no cmd.exe, cross-platform)
       // This avoids Windows .cmd shim issues and Unicode path encoding problems.
@@ -813,8 +813,7 @@ class OpenClawAdapter extends BaseAdapter {
       }, 500);
 
       // 'error' and 'exit' can BOTH fire for a single failed spawn. Closing
-      // stderrFd twice throws EBADF from inside the event callback, which â€”
-      // with no daemon-level handler â€” used to crash the entire daemon. Guard
+      // stderrFd twice throws EBADF from inside the event callback, which â€?      // with no daemon-level handler â€?used to crash the entire daemon. Guard
       // so the fd is closed once and the promise settles once.
       let settled = false;
       const closeFd = () => { try { fs.closeSync(stderrFd); } catch {} };
@@ -973,7 +972,7 @@ class OpenClawAdapter extends BaseAdapter {
    */
   static configureNativeAuth(env) {
     const apiKey = env.LLM_API_KEY;
-    // Strip /chat/completions suffix â€” OpenClaw appends it internally
+    // Strip /chat/completions suffix â€?OpenClaw appends it internally
     const rawUrl = env.LLM_BASE_URL || 'https://api.openai.com/v1';
     const baseUrl = rawUrl.replace(/\/chat\/completions\/?$/, '');
     const model = env.LLM_MODEL || 'gpt-4o';
@@ -984,7 +983,7 @@ class OpenClawAdapter extends BaseAdapter {
     const configFile = path.join(OPENCLAW_STATE_DIR, 'openclaw.json');
 
     if (isOpenAI || isAnthropic) {
-      // Standard provider â€” use auth-profiles.json
+      // Standard provider â€?use auth-profiles.json
       const provider = isAnthropic ? 'anthropic' : 'openai';
       const profileId = `${provider}:manual`;
       const agentDir = path.join(OPENCLAW_STATE_DIR, 'agents', 'main', 'agent');
@@ -1011,7 +1010,7 @@ class OpenClawAdapter extends BaseAdapter {
         fs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf-8');
       } catch {}
     } else {
-      // Custom endpoint â€” use models.providers for full gateway/tool support
+      // Custom endpoint â€?use models.providers for full gateway/tool support
       // This is the proper way to add custom LLM endpoints to OpenClaw.
       // See: https://docs.openclaw.ai/concepts/model-providers
       try {

@@ -1,8 +1,8 @@
 /**
- * Hermes adapter for OpenAgents workspace.
+ * Hermes adapter for 52hzAgents workspace.
  *
  * Bridges Nous Research's Hermes Agent CLI (https://github.com/NousResearch/hermes-agent)
- * to an OpenAgents workspace using `hermes chat -Q --query-file --source wwj`.
+ * to an 52hzAgents workspace using `hermes chat -Q --query-file --source wwj`.
  *
  * Key design decisions per official Hermes documentation:
  * - Uses --query-file instead of -q to avoid shell interpretation of user input

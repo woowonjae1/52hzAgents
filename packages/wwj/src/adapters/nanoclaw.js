@@ -1,27 +1,26 @@
 /**
- * NanoClaw adapter for OpenAgents workspace.
+ * NanoClaw adapter for 52hzAgents workspace.
  *
  * NanoClaw is a CONTAINERIZED agent runtime (each Agent Group runs in its own
  * Docker container; Bun + Claude Agent SDK inside). It is NOT an stdin/stdout
- * CLI and NOT a direct LLM API. This adapter is the OpenAgents-side ORCHESTRATOR
+ * CLI and NOT a direct LLM API. This adapter is the 52hzAgents-side ORCHESTRATOR
  * that bridges a workspace to a NanoClaw Agent Group via a thin NATIVE NanoClaw
- * `openagents` *channel* (the official extension point) over a local IPC socket
- * (`<home>/data/openagents.sock`).
+ * `52hzAgents` *channel* (the official extension point) over a local IPC socket
+ * (`<home>/data/52hzAgents.sock`).
  *
- *   workspace message ──poll──▶ this adapter ──IPC inbound──▶ openagents channel
- *      ──native router──▶ session ──▶ container(Agent Group) ──▶ outbound.db
- *      ──host delivery──▶ channel.deliver() ──IPC outbound──▶ this adapter
- *      ──▶ workspace events (text / status / error)
+ *   workspace message ──poll──�?this adapter ──IPC inbound──�?52hzAgents channel
+ *      ──native router──�?session ──�?container(Agent Group) ──�?outbound.db
+ *      ──host delivery──�?channel.deliver() ──IPC outbound──�?this adapter
+ *      ──�?workspace events (text / status / error)
  *
- * Mapping:  OpenAgents Agent ↔ NanoClaw Agent Group (NANOCLAW_AGENT_GROUP)
- *           OpenAgents Channel ↔ NanoClaw Session (distinct platform_id ⇒
- *           distinct messaging group ⇒ isolated session per channel).
+ * Mapping:  52hzAgents Agent �?NanoClaw Agent Group (NANOCLAW_AGENT_GROUP)
+ *           52hzAgents Channel �?NanoClaw Session (distinct platform_id �? *           distinct messaging group �?isolated session per channel).
  *
  * Management/health uses NanoClaw's official `ncl` control socket (read-only
- * commands only — create/wiring are approval-gated). We never read or write
+ * commands only �?create/wiring are approval-gated). We never read or write
  * NanoClaw's databases, and never duplicate the workspace token into NanoClaw.
  *
- * Direct port target: sdk/src/openagents/adapters/nanoclaw.py
+ * Direct port target: sdk/src/52hzAgents/adapters/nanoclaw.py
  */
 
 'use strict';
@@ -73,7 +72,7 @@ class NanoClawAdapter extends BaseAdapter {
     // Turn collectors keyed by platformId.
     this._pending = new Map();
     // Persistent dedup of PROCESSED outbound (delivered or intentionally
-    // dropped) — survives bridge restart; drives ACK + no-re-display on replay.
+    // dropped) �?survives bridge restart; drives ACK + no-re-display on replay.
     // NANOCLAW_STATE_DIR overrides the location (used by tests).
     this._delivered = new DeliveryStore(
       defaultStorePath(this.workspaceId, this.agentName, (env.NANOCLAW_STATE_DIR || '').trim() || undefined),
@@ -85,21 +84,21 @@ class NanoClawAdapter extends BaseAdapter {
     // NOT prove the host delivery sweep has flushed the session's last outbound
     // (the sweep delivers any 'active' session's undelivered rows regardless of
     // container state). So we do NOT wait on / reuse the old session. Instead each
-    // Stop bumps the channel's delivery epoch → a new threadId → a fresh NanoClaw
+    // Stop bumps the channel's delivery epoch �?a new threadId �?a fresh NanoClaw
     // session (resolveSession per-thread under the SAME wiring; no approval, no DB
     // access). The OLD threadId is recorded: NanoClaw stamps every outbound with
     // the AUTHORITATIVE thread_id of its triggering inbound, so the old session's
-    // replies are suppressed reliably — even if they arrive long after the new
+    // replies are suppressed reliably �?even if they arrive long after the new
     // message. Detach state is per-process and persists across bridge reconnects.
-    this._activeTurn = new Map(); // channel → in-flight turnId (turn collector)
-    this._channelEpoch = new Map(); // channel → epoch int (delivery thread generation)
+    this._activeTurn = new Map(); // channel �?in-flight turnId (turn collector)
+    this._channelEpoch = new Map(); // channel �?epoch int (delivery thread generation)
     this._detachedThreads = new Set(); // threadIds whose outbound must be dropped
 
     // Resolved Agent Group, cached preflight, container status.
     this._agentGroup = null; // {id, name}
     this._agentGroupErr = null;
     this._preflight = { at: 0, ok: false, code: null };
-    this._containerStatus = new Map(); // sessionId/platformId → status
+    this._containerStatus = new Map(); // sessionId/platformId �?status
     this._statusPoller = null;
     this._stopping = false;
     this._authError = null; // set when the channel handshake is rejected
@@ -130,7 +129,7 @@ class NanoClawAdapter extends BaseAdapter {
     }
 
     if (!this._home) {
-      this._log('NanoClaw checkout not found — set NANOCLAW_HOME or put `ncl` on PATH. Messages will report this until configured.');
+      this._log('NanoClaw checkout not found �?set NANOCLAW_HOME or put `ncl` on PATH. Messages will report this until configured.');
       return;
     }
     this._log(`NanoClaw home: ${this._home} (${this._homeSource})`);
@@ -164,7 +163,7 @@ class NanoClawAdapter extends BaseAdapter {
     });
     this._bridge.on('ready', () => {
       this._authError = null;
-      this._log('NanoClaw openagents channel ready');
+      this._log('NanoClaw 52hzAgents channel ready');
     });
     this._bridge.on('reconnecting', (n, d) => this._log(`Reconnecting to NanoClaw channel (attempt ${n}, ${d}ms)`));
     this._bridge.on('disconnect', () => this._onBridgeDisconnect());
@@ -202,8 +201,7 @@ class NanoClawAdapter extends BaseAdapter {
         /* best-effort */
       }
     }
-    // Note: we deliberately do NOT stop the NanoClaw host or any container —
-    // those are shared services other channels/agent groups may rely on.
+    // Note: we deliberately do NOT stop the NanoClaw host or any container �?    // those are shared services other channels/agent groups may rely on.
     super.stop();
   }
 
@@ -212,7 +210,7 @@ class NanoClawAdapter extends BaseAdapter {
   // ------------------------------------------------------------------
 
   async _handleMessage(msg) {
-    // Loop / echo guard — never forward our own (or another agent's) output.
+    // Loop / echo guard �?never forward our own (or another agent's) output.
     if (!proto.shouldForwardInbound(msg, this.agentName)) return;
 
     let content = (msg.content || '').trim();
@@ -224,7 +222,7 @@ class NanoClawAdapter extends BaseAdapter {
     const platformId = proto.platformIdFor(this.workspaceId, channel);
     const msgId = proto.makeMessageId(msg, this.workspaceId);
     const turnId = msgId; // one turn per source message (stable across redelivery)
-    // Current delivery epoch → threadId → NanoClaw session for this channel. A
+    // Current delivery epoch �?threadId �?NanoClaw session for this channel. A
     // prior Stop bumped the epoch, so a new message lands on a fresh session.
     const threadId = this._threadIdFor(channel);
     // Mark the turn in-flight synchronously (before any await) so a Stop during
@@ -237,7 +235,7 @@ class NanoClawAdapter extends BaseAdapter {
       return;
     }
 
-    // Environment / connectivity preconditions → actionable user error.
+    // Environment / connectivity preconditions �?actionable user error.
     const pre = await this._preconditions(channel);
     if (!pre.ok) {
       this._activeTurn.delete(channel);
@@ -273,8 +271,8 @@ class NanoClawAdapter extends BaseAdapter {
 
   // ------------------------------------------------------------------
   // Stop = detach (NOT cancel). NanoClaw has no native per-message cancel
-  // from a channel surface, so a "stop" stops OpenAgents from WAITING on and
-  // DELIVERING the current turn — it does NOT stop the container task, and it
+  // from a channel surface, so a "stop" stops 52hzAgents from WAITING on and
+  // DELIVERING the current turn �?it does NOT stop the container task, and it
   // never kills the Agent Group, the NanoClaw host, or any shared container.
   // ------------------------------------------------------------------
 
@@ -292,7 +290,7 @@ class NanoClawAdapter extends BaseAdapter {
     return [...this._activeTurn.keys()];
   }
 
-  /** Current threadId for a channel's delivery epoch (→ NanoClaw session). */
+  /** Current threadId for a channel's delivery epoch (�?NanoClaw session). */
   _threadIdFor(channel) {
     return `oa-${this._channelEpoch.get(channel) || 0}`;
   }
@@ -306,13 +304,13 @@ class NanoClawAdapter extends BaseAdapter {
   /**
    * Stop = detach. Record the channel's CURRENT threadId so the old (still
    * running) session's replies are dropped, and bump the epoch so the NEXT
-   * message starts a FRESH NanoClaw session/thread — officially-supported
+   * message starts a FRESH NanoClaw session/thread �?officially-supported
    * per-thread routing under the same wiring (no approval, no DB access).
    *
    * NanoClaw exposes no outbound-drained signal, so we never wait on / reuse the
    * old session. The old session's replies carry the AUTHORITATIVE old thread_id
    * (NanoClaw stamps outbound with the triggering inbound's thread_id), so they
-   * are suppressed reliably — even if they arrive after the new message. This
+   * are suppressed reliably �?even if they arrive after the new message. This
    * never cancels the container task or kills the host / containers / other
    * sessions.
    */
@@ -331,12 +329,12 @@ class NanoClawAdapter extends BaseAdapter {
     if (this._bridge) this._bridge.sendCancel(platformId, null); // best-effort notify
     this.sendStatus(
       channel,
-      'Stopped — replies from the previous task are dropped; a new message starts a fresh NanoClaw session. The previous task may keep running in the background.',
+      'Stopped �?replies from the previous task are dropped; a new message starts a fresh NanoClaw session. The previous task may keep running in the background.',
       { nanoclaw_state: 'detached' },
     ).catch(() => {});
   }
 
-  /** A queued NanoClaw reply was dropped (overflow / expiry / corrupt) — surface it. */
+  /** A queued NanoClaw reply was dropped (overflow / expiry / corrupt) �?surface it. */
   _onDropped(frame) {
     // Corrupt records have no recoverable platformId; fall back to the default channel.
     const channel = proto.channelFromPlatformId(frame.platformId, this.workspaceId) || this.channelName || 'general';
@@ -352,7 +350,7 @@ class NanoClawAdapter extends BaseAdapter {
 
   _channelFor(msg) {
     let channel = this.channelName || 'general';
-    if (msg.sessionId && !msg.sessionId.startsWith('openagents:') && !msg.sessionId.startsWith('agent:')) {
+    if (msg.sessionId && !msg.sessionId.startsWith('52hz:') && !msg.sessionId.startsWith('agent:')) {
       channel = msg.sessionId;
     }
     return channel;
@@ -376,7 +374,7 @@ class NanoClawAdapter extends BaseAdapter {
     }
     // Wait briefly for the channel to become ready (host restart / late load).
     const ready = await this._waitReady(this._connectWaitMs);
-    if (!ready) throw Object.assign(new Error('openagents channel not ready'), { code: proto.ERR.CHANNEL_NOT_LOADED });
+    if (!ready) throw Object.assign(new Error('52hzAgents channel not ready'), { code: proto.ERR.CHANNEL_NOT_LOADED });
     return this._bridge.sendInbound(fields);
   }
 
@@ -445,7 +443,7 @@ class NanoClawAdapter extends BaseAdapter {
   async _onOutbound(frame) {
     const platformId = frame.platformId;
     const channel = proto.channelFromPlatformId(platformId, this.workspaceId);
-    // Not our workspace — leave it for the owning bridge; do NOT ACK (acking
+    // Not our workspace �?leave it for the owning bridge; do NOT ACK (acking
     // someone else's message would drop it from the channel's replay buffer).
     if (!channel) return;
 
@@ -467,12 +465,12 @@ class NanoClawAdapter extends BaseAdapter {
     }
 
     // Suppress replies of a detached turn (or anything draining on a still-blocked
-    // channel — turnId tagging is best-effort, so while blocked we suppress all).
+    // channel �?turnId tagging is best-effort, so while blocked we suppress all).
     // We still ACK + mark processed so the channel stops holding/replaying it,
     // and we keep the channel blocked as long as its old turn keeps producing.
     // Suppress replies of a DETACHED session. NanoClaw stamps every outbound with
     // the AUTHORITATIVE thread_id of its triggering inbound, so a detached
-    // (platformId, threadId) reliably identifies the old session's replies — even
+    // (platformId, threadId) reliably identifies the old session's replies �?even
     // arriving long after a new message on a new thread. Keyed by platformId too
     // so an `oa-<epoch>` thread on one channel never matches another's. ACK + mark
     // processed so the channel stops holding/replaying, but never write it out.
@@ -486,7 +484,7 @@ class NanoClawAdapter extends BaseAdapter {
     }
 
     if (!text) {
-      // Non-text outbound we don't render — still processed; ACK so it isn't
+      // Non-text outbound we don't render �?still processed; ACK so it isn't
       // replayed forever.
       if (outId) {
         this._delivered.add(outId);
@@ -499,7 +497,7 @@ class NanoClawAdapter extends BaseAdapter {
       await this.sendResponse(channel, text); // reliable hand-off to the Workspace
     } catch (e) {
       this._log(`Failed to deliver reply: ${this._redact(e.message)}`);
-      return; // do NOT ack/persist → the channel replays it on the next cycle
+      return; // do NOT ack/persist �?the channel replays it on the next cycle
     }
     // Persist BEFORE ACK so a crash after delivery still dedups on restart.
     if (outId) {
@@ -509,7 +507,7 @@ class NanoClawAdapter extends BaseAdapter {
   }
 
   // ACK confirmation point: an outbound is only ACKed AFTER `sendResponse`
-  // (which awaits `client.sendMessage` — an HTTP POST to the Workspace REST API)
+  // (which awaits `client.sendMessage` �?an HTTP POST to the Workspace REST API)
   // resolves successfully, i.e. the reply is persisted in the Workspace backend,
   // not merely emitted. A failed/rejected POST does NOT ACK, so the channel
   // replays the reply on the next cycle.
@@ -524,7 +522,7 @@ class NanoClawAdapter extends BaseAdapter {
       this.sendStatus(channel, 'working...').catch(() => {});
     } else if (frame.state === 'idle') {
       const state = this._pending.get(frame.platformId);
-      // Idle after a reply → settle promptly instead of waiting out the silence.
+      // Idle after a reply �?settle promptly instead of waiting out the silence.
       if (state && state.firstReplySeen && state.settle) state.settle({ timedOut: false });
     }
   }
@@ -542,9 +540,9 @@ class NanoClawAdapter extends BaseAdapter {
   }
 
   _onBridgeDisconnect() {
-    this._log('NanoClaw channel disconnected — reconnecting (replies will resume).');
+    this._log('NanoClaw channel disconnected �?reconnecting (replies will resume).');
     for (const st of this._pending.values()) {
-      this.sendStatus(st.channel, 'reconnecting to NanoClaw…').catch(() => {});
+      this.sendStatus(st.channel, 'reconnecting to NanoClaw�?).catch(() => {});
     }
   }
 
@@ -579,10 +577,10 @@ class NanoClawAdapter extends BaseAdapter {
       this._agentGroup = ag;
 
       const wirings = await this._control.listWirings({ agent_group_id: ag.id }).catch(() => []);
-      const hasOpenagentsWiring = Array.isArray(wirings) && wirings.length > 0
-        ? await this._hasOpenagentsWiring(wirings)
+      const has52hzAgentsWiring = Array.isArray(wirings) && wirings.length > 0
+        ? await this._has52hzAgentsWiring(wirings)
         : false;
-      if (!hasOpenagentsWiring) return { ok: false, code: proto.ERR.WIRING_MISSING };
+      if (!has52hzAgentsWiring) return { ok: false, code: proto.ERR.WIRING_MISSING };
 
       return { ok: true, code: 'ok' };
     } catch (e) {
@@ -608,8 +606,8 @@ class NanoClawAdapter extends BaseAdapter {
     return byName ? { id: byName.id, name: byName.name } : null;
   }
 
-  /** Does the agent group have a wiring whose messaging group is channel_type 'openagents'? */
-  async _hasOpenagentsWiring(wirings) {
+  /** Does the agent group have a wiring whose messaging group is channel_type '52hzAgents'? */
+  async _has52hzAgentsWiring(wirings) {
     for (const w of wirings) {
       const mgId = w.messaging_group_id || w.messagingGroupId;
       if (!mgId) continue;
@@ -634,7 +632,7 @@ class NanoClawAdapter extends BaseAdapter {
     for (const s of sessions || []) {
       const prev = this._containerStatus.get(s.id);
       this._containerStatus.set(s.id, s.container_status);
-      // A container that flips running→stopped while we await a reply ≈ crash.
+      // A container that flips running→stopped while we await a reply �?crash.
       if (prev === 'running' && s.container_status === 'stopped') {
         this._log(`Container for session ${String(s.id).slice(0, 8)} stopped unexpectedly.`);
       }

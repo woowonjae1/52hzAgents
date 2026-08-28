@@ -1,5 +1,5 @@
 /**
- * Interactive TUI dashboard for OpenAgents — `openagents` or `openagents tui`
+ * Interactive TUI dashboard for 52hzAgents �?`52hzAgents` or `52hzAgents tui`
  *
  * Mirrors the Python Textual TUI (cli_tui.py) with blessed.
  */
@@ -297,8 +297,8 @@ function createTUI() {
         const details = [];
         details.push(r.path || process.env.HOME || '~');
         if (r.health) details.push(`{cyan-fg}${describeHealth(r.health)}{/cyan-fg}`);
-        if (r.notReadyMsg) details.push(`{yellow-fg}⚠ ${r.notReadyMsg}{/yellow-fg}`);
-        if (r.lastError) details.push(`{red-fg}✗ ${r.lastError}{/red-fg}`);
+        if (r.notReadyMsg) details.push(`{yellow-fg}�?${r.notReadyMsg}{/yellow-fg}`);
+        if (r.lastError) details.push(`{red-fg}�?${r.lastError}{/red-fg}`);
         items.push(`  {gray-fg}  ${details.join('  |  ')}{/gray-fg}`);
       }
       agentList.setItems(items);
@@ -359,7 +359,7 @@ function createTUI() {
   });
   agentList.on('select item', () => updateFooter());
 
-  // ── Enter key → Context menu ──
+  // ── Enter key �?Context menu ──
   agentList.key('enter', () => {
     if (currentView !== 'main') return;
     const agent = selectedAgent();
@@ -482,7 +482,7 @@ function createTUI() {
       },
     });
 
-    // Install log panel — shows full streaming output
+    // Install log panel �?shows full streaming output
     const logPanel = blessed.box({
       parent: box, top: '50%+1', left: 0, width: '100%', height: '50%-2',
       border: { type: 'line' },
@@ -769,7 +769,7 @@ function createTUI() {
       // (e.g. Gemini's OAuth login). Detect that via the registry's check_ready
       // and show readiness + login guidance instead of a misleading "no
       // configuration required". Agents without any credential metadata keep the
-      // original message — this is gated, so other agents are untouched.
+      // original message �?this is gated, so other agents are untouched.
       const entry = connector.registry.getEntry(agent.type);
       const checkReady = entry && entry.check_ready;
       if (hasCredentialMetadata(checkReady)) {
@@ -1246,7 +1246,7 @@ function createTUI() {
       opened = true;
     } catch {}
 
-    // Show URL in a dialog — full width, auto-height for long URLs
+    // Show URL in a dialog �?full width, auto-height for long URLs
     const innerW = screen.width - 4;
     const urlLines = Math.ceil(url.length / innerW);
     const dialog = blessed.box({
@@ -1461,7 +1461,7 @@ function createTUI() {
     const configuredTypes = new Set(agentRows.map(r => r.type));
     const unused = installed.filter(t => !configuredTypes.has(t));
     if (unused.length > 0) {
-      log(`{green-fg}\u2713{/green-fg} Installed: {bold}${unused.join(', ')}{/bold} — press {cyan-fg}n{/cyan-fg} to create an agent`);
+      log(`{green-fg}\u2713{/green-fg} Installed: {bold}${unused.join(', ')}{/bold} �?press {cyan-fg}n{/cyan-fg} to create an agent`);
     }
     if (installed.length === 0) {
       log('{yellow-fg}!{/yellow-fg} No agent runtimes installed. Press {cyan-fg}i{/cyan-fg} to install one.');

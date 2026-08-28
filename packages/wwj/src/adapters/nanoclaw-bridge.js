@@ -1,10 +1,10 @@
 /**
- * NanoclawBridge â€” client side of the local IPC to the native NanoClaw
- * `openagents` channel.
+ * NanoclawBridge â€?client side of the local IPC to the native NanoClaw
+ * `52hzAgents` channel.
  *
  * The channel (running inside the NanoClaw host) owns a Unix-socket SERVER at
- * `<home>/data/openagents.sock`; this bridge is the CLIENT. We send `inbound`
- * frames (a workspace message addressed to an OpenAgents channel) and receive
+ * `<home>/data/52hzAgents.sock`; this bridge is the CLIENT. We send `inbound`
+ * frames (a workspace message addressed to an 52hzAgents channel) and receive
  * `outbound` / `status` / `error` frames (the agent container's replies and
  * liveness, correlated by `platformId`). The channel does the native
  * routerâ†’sessionâ†’container routing; we never touch NanoClaw's database.
@@ -92,7 +92,7 @@ class NanoclawBridge extends EventEmitter {
     // secret rotation, and re-auth on reconnect).
     const secret = this._secretProvider();
     if (!secret) {
-      this._log('bridge: handshake secret not available yet â€” will retry');
+      this._log('bridge: handshake secret not available yet â€?will retry');
       this.emit('auth-pending');
       this._scheduleReconnect();
       return;
@@ -105,7 +105,7 @@ class NanoclawBridge extends EventEmitter {
       this._connected = true;
       this._attempt = 0;
       this._log(`bridge connected: ${this.socketPath}`);
-      // Handshake â€” identify ourselves + present the local secret. The channel
+      // Handshake â€?identify ourselves + present the local secret. The channel
       // replies 'ready' only on a valid secret + matching protocol.
       try {
         sock.write(proto.buildHello(this.workspace, this.agent, secret));
@@ -119,10 +119,10 @@ class NanoclawBridge extends EventEmitter {
       this._buffer += chunk.toString('utf8');
       const { frames, rest } = proto.parseFrames(this._buffer);
       this._buffer = rest;
-      // Guard against an unbounded line with no frame delimiter â€” drop the
+      // Guard against an unbounded line with no frame delimiter â€?drop the
       // buffer and reset the connection rather than growing memory without limit.
       if (this._buffer.length > MAX_BUFFER_BYTES) {
-        this._log(`bridge buffer exceeded ${MAX_BUFFER_BYTES} bytes without a complete frame â€” resetting connection`);
+        this._log(`bridge buffer exceeded ${MAX_BUFFER_BYTES} bytes without a complete frame â€?resetting connection`);
         this._buffer = '';
         try { sock.destroy(); } catch { /* best-effort */ }
         return;
@@ -151,7 +151,7 @@ class NanoclawBridge extends EventEmitter {
     switch (frame.op) {
       case 'ready':
         this._ready = true;
-        this._log(`bridge ready (channel=${frame.channelType || 'openagents'}, proto=${frame.protocol})`);
+        this._log(`bridge ready (channel=${frame.channelType || '52hzAgents'}, proto=${frame.protocol})`);
         this.emit('ready', frame);
         break;
       case 'outbound':

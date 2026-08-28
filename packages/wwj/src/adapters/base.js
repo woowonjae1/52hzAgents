@@ -1,5 +1,5 @@
 /**
- * Base adapter for OpenAgents workspace.
+ * Base adapter for 52hzAgents workspace.
  *
  * Extracts the common connectivity logic shared by all adapters:
  * - Event cursor management and skip-existing-events on startup
@@ -12,7 +12,7 @@
  *
  * Subclasses must implement _handleMessage(msg).
  *
- * Direct port of Python: sdk/src/openagents/adapters/base.py
+ * Direct port of Python: sdk/src/52hzAgents/adapters/base.py
  */
 
 'use strict';
@@ -34,7 +34,7 @@ const {
 const DEFAULT_ENDPOINT = process.env.WWJ_WORKSPACE_ENDPOINT || process.env.WWJ_ENDPOINT || 'http://localhost:8000';
 
 // Heartbeat runs every 30s. A SINGLE failure is usually a transient blip (brief
-// network hiccup, server redeploy) that the next tick recovers from — surfacing
+// network hiccup, server redeploy) that the next tick recovers from �?surfacing
 // it as a hard 'error' would make the agent flap red for no real reason. Only
 // after this many CONSECUTIVE failures (~60s+ of real downtime) do we report
 // heartbeat_failed up to the daemon. A success resets the streak immediately.
@@ -43,7 +43,7 @@ const HEARTBEAT_ERROR_THRESHOLD = 2;
 // Hard cutoff for agent-to-agent ping-pong: the completion-phrase and
 // direct-action regexes below are wording-dependent and can be bypassed by
 // two agents that keep issuing directives at each other without ever using a
-// phrase either regex recognizes. This counter is the backstop — it counts
+// phrase either regex recognizes. This counter is the backstop �?it counts
 // consecutive agent-to-agent turns processed per channel and refuses once the
 // limit is hit, regardless of message wording. Any human message resets it.
 const MAX_AGENT_HOPS_WITHOUT_HUMAN = 20;
@@ -98,7 +98,7 @@ class BaseAdapter {
     // null reason means "healthy again" (clears any prior error).
     this._onStatus = typeof onStatus === 'function' ? onStatus : null;
     this._lastReportedStatusKey = null;
-    // Consecutive heartbeat failures — a transient single blip must not flip the
+    // Consecutive heartbeat failures �?a transient single blip must not flip the
     // agent to a hard error (see HEARTBEAT_ERROR_THRESHOLD).
     this._heartbeatFailStreak = 0;
     // Structured terminal exit reason ({ reason, message }) read by the daemon
@@ -120,7 +120,7 @@ class BaseAdapter {
     this._channelBusy = new Set();
     this._channelQueues = {};
     // Cached workspace.browser_enabled. Populated lazily on first read so we
-    // don't pay an HTTP roundtrip per message — adapters that toggle the
+    // don't pay an HTTP roundtrip per message �?adapters that toggle the
     // workspace flag must reconnect/restart to pick up the change (matches
     // the Python adapter behavior in workspace_prompt.py).
     this._browserEnabledCache = null;
@@ -139,7 +139,7 @@ class BaseAdapter {
     // the daemon's stdout is redirected into the log file (the `wwj up` path,
     // daemon.js `stdio: ['ignore', logFd, logFd]`). When the desktop app spawns
     // the daemon itself there is no such redirection, so every adapter line was
-    // silently lost — which makes any spawn/error diagnostics invisible.
+    // silently lost �?which makes any spawn/error diagnostics invisible.
     this._logFile = logFile || path.join(os.homedir(), '.wwj', 'daemon.log');
     this._log = (msg) => {
       const ts = new Date().toISOString();
@@ -198,7 +198,7 @@ class BaseAdapter {
       if (!stat.isFile() || stat.size === 0) return false;
       // Server rejects >50MB; skip rather than fail the upload.
       if (stat.size > 50 * 1024 * 1024) {
-        this._log(`Files: skipping ${base} — ${Math.round(stat.size / 1048576)}MB exceeds the 50MB limit`);
+        this._log(`Files: skipping ${base} �?${Math.round(stat.size / 1048576)}MB exceeds the 50MB limit`);
         return false;
       }
 
@@ -213,7 +213,7 @@ class BaseAdapter {
         data.toString('base64'),
         {
           contentType: guessContentType(base),
-          source: `openagents:${this.agentName}`,
+          source: `52hz:${this.agentName}`,
           channelName: channel || undefined,
         }
       );
@@ -234,7 +234,7 @@ class BaseAdapter {
    * Surface a live status transition to the daemon. `reason` null/'' means the
    * agent is healthy again (clears any prior error). Deduped so a repeated
    * failure (e.g. heartbeat every 30s on a down workspace) writes the status
-   * file once, not on every tick. Never throws — status is best-effort.
+   * file once, not on every tick. Never throws �?status is best-effort.
    */
   _reportStatus(reason, message) {
     const key = `${reason || ''}|${message || ''}`;
@@ -278,7 +278,7 @@ class BaseAdapter {
   /**
    * Announce this agent to the workspace (/v1/join). Returns true on success.
    * On failure surfaces the REAL reason (e.g. "Workspace join failed: HTTP 401")
-   * to the daemon status instead of only logging it — non-fatal, the poll/
+   * to the daemon status instead of only logging it �?non-fatal, the poll/
    * heartbeat loops keep retrying and a later success clears it. Extracted from
    * run() so the failure-reporting can be unit-tested without the poll loop.
    */
@@ -292,7 +292,7 @@ class BaseAdapter {
       });
       this._sessionId = (joinResult && joinResult.session_id) || null;
       this._log(`Joined workspace ${this.workspaceId}${this._sessionId ? ` (session ${this._sessionId.slice(0, 8)})` : ''}`);
-      this._reportStatus(null); // joined OK → clear any prior error
+      this._reportStatus(null); // joined OK �?clear any prior error
       return true;
     } catch (e) {
       const { reason, message } = classifyJoinError(e);
@@ -327,7 +327,7 @@ class BaseAdapter {
     // Fast-path operations (control-event cursor + heartbeat + control poll)
     // run BEFORE the message-cursor advance. Even though _skipExistingEvents
     // is fast on a healthy backend, we don't want slash commands gated on
-    // its success — keeping these paths independent makes /restart and
+    // its success �?keeping these paths independent makes /restart and
     // /status responsive immediately after join.
     await this._skipExistingControlEvents();
     const heartbeatInterval = setInterval(() => this._heartbeat(), 30000);
@@ -398,7 +398,7 @@ class BaseAdapter {
     try {
       await this.client.heartbeat(this.workspaceId, this.agentName, this.token, this._sessionId);
       this._heartbeatFailStreak = 0;
-      this._reportStatus(null); // alive → clear any prior connectivity error
+      this._reportStatus(null); // alive �?clear any prior connectivity error
 
       // Periodic quota & usage background refresh
       if (typeof this.fetchAndReportUsage === 'function') {
@@ -408,7 +408,7 @@ class BaseAdapter {
       if (e instanceof SessionRevokedError) {
         this._log(`SESSION REVOKED: another client joined as '${this.agentName}'. Stopping adapter.`);
         // Terminal (not a user stop): record so the daemon can show why it ended.
-        this._setExitInfo(REASON.SESSION_REVOKED, 'Workspace session revoked — another client joined with the same agent name');
+        this._setExitInfo(REASON.SESSION_REVOKED, 'Workspace session revoked �?another client joined with the same agent name');
         this._reportStatus(REASON.SESSION_REVOKED, 'Workspace session revoked');
         this._running = false;
         return;
@@ -432,7 +432,7 @@ class BaseAdapter {
    * Advance `_lastControlId` past any pending control events for this agent
    * so we don't re-process them after a respawn. Without this, /restart
    * triggers a daemon bounce, the new adapter starts with _lastControlId=null,
-   * polls and re-finds the same /restart event, bounces again — restart loop.
+   * polls and re-finds the same /restart event, bounces again �?restart loop.
    */
   async _skipExistingControlEvents() {
     try {
@@ -512,7 +512,7 @@ class BaseAdapter {
 
   /**
    * Handle adapter-specific control actions. Override in subclasses to add
-   * per-adapter actions (`stop`, `restart`, …); always call
+   * per-adapter actions (`stop`, `restart`, �?; always call
    * `await super._onControlAction(action, payload)` from the override for
    * actions you don't recognize, so shared actions like `status` keep
    * working uniformly across adapter types.
@@ -548,8 +548,8 @@ class BaseAdapter {
   /**
    * Install a Skill Hub catalog skill into this agent's local skills
    * directory, then report the result back to the workspace so the UI can
-   * show installing → installed / failed. Errors are logged loudly and
-   * surfaced as a `failed` status — never swallowed.
+   * show installing �?installed / failed. Errors are logged loudly and
+   * surfaced as a `failed` status �?never swallowed.
    *
    * payload: { action: "skill.install", skill: { id, name, source_repo, source_path } }
    */
@@ -558,7 +558,7 @@ class BaseAdapter {
     const skill = (payload && payload.skill) || null;
     const skillId = skill && (skill.id || skill.skill_id);
     if (!skillId) {
-      this._log('skill.install: missing skill metadata in payload — ignoring');
+      this._log('skill.install: missing skill metadata in payload �?ignoring');
       return;
     }
     this._log(`skill.install: starting install of "${skillId}" (type=${this.agentType}, dir=${this.workingDir || defaultAgentWorkdir(this.agentName)})`);
@@ -587,7 +587,7 @@ class BaseAdapter {
       } catch (e) {
         this._log(`skill.install: installed on disk but failed to report 'installed': ${e && e.message ? e.message : e}`);
       }
-      this._log(`skill.install: SUCCESS "${skillId}" → ${result.path}${result.partial ? ' (partial)' : ''}`);
+      this._log(`skill.install: SUCCESS "${skillId}" �?${result.path}${result.partial ? ' (partial)' : ''}`);
       await this._onSkillsChanged();
     } catch (e) {
       const msg = e && e.message ? e.message : String(e);
@@ -610,7 +610,7 @@ class BaseAdapter {
     const skill = (payload && payload.skill) || null;
     const skillId = skill && (skill.id || skill.skill_id);
     if (!skillId) {
-      this._log('skill.uninstall: missing skill metadata in payload — ignoring');
+      this._log('skill.uninstall: missing skill metadata in payload �?ignoring');
       return;
     }
     try {
@@ -693,7 +693,7 @@ class BaseAdapter {
   /**
    * Post a markdown table of the agent's active routines back to the
    * requesting channel. Used by the `/routines` slash command. Each agent
-   * reports only routines it owns (created_by === openagents:<agentName>)
+   * reports only routines it owns (created_by === 52hz:<agentName>)
    * so the user sees a clear "my routines" view per agent, mirroring how
    * /status reports per-agent uptime.
    */
@@ -704,11 +704,11 @@ class BaseAdapter {
     let routines = [];
     try {
       const data = await this.client.listRoutines(this.workspaceId, channel, this.token);
-      // Accept both the canonical `openagents:<name>` source and the bare
+      // Accept both the canonical `52hz:<name>` source and the bare
       // `<name>` form. Agents that follow the workspace prompt verbatim
       // produce the prefixed form, but some agents send the bare name when
       // they construct the POST body themselves.
-      const prefixed = `openagents:${this.agentName}`;
+      const prefixed = `52hz:${this.agentName}`;
       routines = ((data && data.routines) || []).filter(
         (r) => r.created_by === prefixed || r.created_by === this.agentName,
       );
@@ -733,7 +733,7 @@ class BaseAdapter {
           ? `every ${r.schedule_interval_minutes} min`
           : `${String(r.schedule_hour ?? 0).padStart(2, '0')}:${String(r.schedule_minute ?? 0).padStart(2, '0')} UTC` +
             (r.schedule_days ? ` (days [${r.schedule_days.join(',')}])` : ' daily');
-        const next = r.next_fires_at || '—';
+        const next = r.next_fires_at || '�?;
         const name = String(r.name || '').replace(/\|/g, '\\|');
         const id = String(r.id || '').slice(0, 8);
         return `| \`${id}\` | ${name} | ${schedule} | ${next} |`;
@@ -822,7 +822,7 @@ class BaseAdapter {
         this._pollFailures = (this._pollFailures || 0) + 1;
         const backoff = Math.min(500 * 2 ** Math.min(this._pollFailures - 1, 6), 30_000);
         if (this._pollFailures === 1 || this._pollFailures % 20 === 0) {
-          this._log(`Poll #${pollCount} failed (${this._pollFailures}x consecutively): ${e.message} — backing off ${backoff}ms`);
+          this._log(`Poll #${pollCount} failed (${this._pollFailures}x consecutively): ${e.message} �?backing off ${backoff}ms`);
         }
         await this._sleep(backoff);
         continue;
@@ -855,8 +855,8 @@ class BaseAdapter {
           continue;
         }
 
-        // 方案 2 落地：禁止 Agent 自动对系统连线或非目标消息打招呼。
-        // 只有当消息来自用户 (human)，或者显式 @ 当前 Agent / 指定 targetAgents 时才激活回应。
+        // 方案 2 落地：禁�?Agent 自动对系统连线或非目标消息打招呼�?
+        // 只有当消息来自用�?(human)，或者显�?@ 当前 Agent / 指定 targetAgents 时才激活回应�?
         const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || msg.senderType === 'pipeline' || (msg.senderId || '').startsWith('human:') || (msg.senderId || '').startsWith('user:');
         const addressedAgents = leadingMentions(msg.content);
         const selfLower = this.agentName.toLowerCase();
@@ -869,7 +869,7 @@ class BaseAdapter {
               msg.content.toLowerCase().includes(`@${selfLower}`) ||
               msg.content.toLowerCase().includes(`/${selfLower}`)
             )));
-        const isSelf = msg.senderName === this.agentName || msg.senderId === `openagents:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
+        const isSelf = msg.senderName === this.agentName || msg.senderId === `52hz:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 
         if (isSelf) continue;
 
@@ -910,7 +910,7 @@ class BaseAdapter {
           // 1. Action directive guard: check if message explicitly requests action
           //    from this.agentName.
           //
-          //    `targetedMe` is the authoritative signal here — the server already
+          //    `targetedMe` is the authoritative signal here �?the server already
           //    decided this message is for us and put us in metadata.target_agents.
           //    This used to read `msg.targetAgents`, a field _eventToMessage never
           //    builds (it exposes the raw `metadata`), so that half of the check was
@@ -922,7 +922,7 @@ class BaseAdapter {
           const hasDirectAction = targetedMe || actionRegex.test(contentStr);
 
           // 2. Completion / wrap-up guard: if no direct action requested or if general wrap-up without explicit delegation, ignore
-          const isFinished = /(任务|流程|工作|审查)(已|全|全部)?(完成|结束|完毕)|确认——报告已完成|所有三步协作|任务已全部完成|还有什么要做的吗|不需要再次|不存在/i.test(contentStr);
+          const isFinished = /(任务|流程|工作|审查)(已|全|全部)?(完成|结束|完毕)|确认——报告已完成|所有三步协作|任务已全部完成|还有什么要做的吗|不需要再次|不存�?i.test(contentStr);
           //    The wrap-up test is a heuristic over prose, so it must not overrule
           //    an explicit server routing decision: a hand-off legitimately reads
           //    like a summary ("here are the results, @next take it from here").
@@ -937,7 +937,7 @@ class BaseAdapter {
           // MAX_AGENT_HOPS_WITHOUT_HUMAN comment above).
           const hopCount = (this._agentHopCounts[hopChannel] || 0) + 1;
           if (hopCount > MAX_AGENT_HOPS_WITHOUT_HUMAN) {
-            this._log(`Ignoring agent message from ${msg.senderName}: hop limit (${MAX_AGENT_HOPS_WITHOUT_HUMAN}) reached in channel ${hopChannel} without a human message — likely ping-pong loop`);
+            this._log(`Ignoring agent message from ${msg.senderName}: hop limit (${MAX_AGENT_HOPS_WITHOUT_HUMAN}) reached in channel ${hopChannel} without a human message �?likely ping-pong loop`);
             continue;
           }
           this._agentHopCounts[hopChannel] = hopCount;
@@ -992,7 +992,7 @@ class BaseAdapter {
   async _dispatchMessage(msg) {
     // Use sessionId only if it looks like a channel, not an agent target
     let channel = this.channelName || 'general';
-    if (msg.sessionId && !msg.sessionId.startsWith('openagents:') && !msg.sessionId.startsWith('agent:')) {
+    if (msg.sessionId && !msg.sessionId.startsWith('52hz:') && !msg.sessionId.startsWith('agent:')) {
       channel = msg.sessionId;
     }
 
@@ -1002,7 +1002,7 @@ class BaseAdapter {
       msg._queueId = queueId;
       this._channelQueues[channel].push(msg);
       try {
-        await this.sendStatus(channel, 'message queued — will process after current task', {
+        await this.sendStatus(channel, 'message queued �?will process after current task', {
           queued_message: (msg.content || '').slice(0, 200),
           queue_id: queueId,
         });
@@ -1010,7 +1010,7 @@ class BaseAdapter {
       return;
     }
 
-    // Run channel worker (don't await — parallel execution)
+    // Run channel worker (don't await �?parallel execution)
     this._channelWorker(channel, msg);
     this._wakeControlPoller();
   }
@@ -1056,7 +1056,7 @@ class BaseAdapter {
           if (entry && (entry.content || entry.title)) {
             this._log(`Auto-injected knowledge base entry: ${entry.title || slug} (@knowledge:${slug})`);
             attachedKnowledge.push(
-              `\n---\n📁 [系统附带知识库文档: ${entry.title || slug} (@knowledge:${slug})]\n${entry.content || ''}\n---`
+              `\n---\n📁 [系统附带知识库文�? ${entry.title || slug} (@knowledge:${slug})]\n${entry.content || ''}\n---`
             );
           }
         } catch (err) {
@@ -1084,7 +1084,7 @@ class BaseAdapter {
           const results = (searchRes && searchRes.results) || [];
           if (results.length > 0) {
             const snippets = results.map((r) =>
-              `\n---\n📁 [相关知识库参考: ${r.title} > ${r.section} (@knowledge:${r.slug})]\n${r.snippet}\n---`
+              `\n---\n📁 [相关知识库参�? ${r.title} > ${r.section} (@knowledge:${r.slug})]\n${r.snippet}\n---`
             );
             this._log(`Auto-RAG retrieved ${results.length} knowledge chunk(s) for prompt: "${cleanText.slice(0, 40)}"`);
             return `${snippets.join('\n\n')}\n\n${content}`;
@@ -1163,7 +1163,7 @@ class BaseAdapter {
    * that set it).
    *
    * Cached per channel for WORKING_DIR_CACHE_TTL_MS so every message doesn't
-   * pay a network round trip — call after computing `channel` for a message,
+   * pay a network round trip �?call after computing `channel` for a message,
    * not once at adapter startup, since the binding is per-thread not per-agent.
    */
   async _resolveWorkingDir(channel, messageText = '') {
@@ -1182,7 +1182,7 @@ class BaseAdapter {
         resolved = info.workingDir;
       } else if (messageText && typeof messageText === 'string') {
         // Try parsing explicit working dir pattern from message text (e.g. "工作目录 D:\code\X I LIKE" or "D:\code\...")
-        const match = messageText.match(/(?:工作目录|working\s*dir|directory|folder)[:：=\s]*([a-zA-Z]:\\[^\s"',;\n\r]+|\/[^\s"',;\n\r]+)/i)
+        const match = messageText.match(/(?:工作目录|working\s*dir|directory|folder)[:�?\s]*([a-zA-Z]:\\[^\s"',;\n\r]+|\/[^\s"',;\n\r]+)/i)
           || messageText.match(/([a-zA-Z]:\\(?:[^\s"',;\n\r\\]+\\)*[^\s"',;\n\r\\]+)/);
         if (match && match[1] && fs.existsSync(match[1])) {
           resolved = match[1];
@@ -1225,7 +1225,7 @@ class BaseAdapter {
    * @param {object} [opts]
    * @param {boolean} [opts.isReplyPreview]
    *   This chunk is part of the model's REPLY, streamed early so the user sees
-   *   progress — not chain-of-thought.
+   *   progress �?not chain-of-thought.
    *
    *   Most adapters here stream the reply through this method and then post the
    *   assembled text again through `sendResponse`, so the same answer reaches
@@ -1238,7 +1238,7 @@ class BaseAdapter {
    *   Pass `true` and the guess is not needed: the workspace can drop the
    *   preview the moment the real reply lands, and can render what is left as
    *   prose rather than as reasoning. Genuine `reasoning`/`thought` events must
-   *   NOT pass it — that is the whole distinction.
+   *   NOT pass it �?that is the whole distinction.
    */
   async sendThinking(channel, content, opts) {
     // Skip empty thinking traces entirely.
@@ -1266,7 +1266,7 @@ class BaseAdapter {
   async sendResponse(channel, content) {
     // Promote an explicit ```decision block into metadata the workspace renders
     // as an interactive card. Sits here rather than in each adapter because
-    // every adapter funnels its final reply through this one method — the
+    // every adapter funnels its final reply through this one method �?the
     // per-adapter streaming paths (sendThinking/sendStatus) deliberately do NOT
     // parse, since a card that appears mid-stream and then moves is worse than
     // one that appears once at the end.
@@ -1274,7 +1274,7 @@ class BaseAdapter {
     const questions = decision.questions;
     if (decision.invalid > 0) {
       this._log(
-        `Decision block ignored (${decision.invalid} malformed) — left as text ` +
+        `Decision block ignored (${decision.invalid} malformed) �?left as text ` +
         `so the question still reaches the user`
       );
     }
@@ -1286,7 +1286,7 @@ class BaseAdapter {
     if (previewResult.invalid > 0) {
       this._log(
         `Preview block ignored (${previewResult.invalid} malformed or ` +
-        `non-loopback) — left as text`
+        `non-loopback) �?left as text`
       );
     }
     if (preview) this._log(`Preview target reported: ${preview.url}`);
@@ -1333,7 +1333,7 @@ class BaseAdapter {
         assignee: t.assignee,
       }));
       await this.client.putTodos(this.workspaceId, channel, this.token, updated, {
-        source: `openagents:${this.agentName}`,
+        source: `52hz:${this.agentName}`,
       });
     } catch {
       // Best-effort cleanup
@@ -1355,13 +1355,13 @@ class BaseAdapter {
   async sendTodos(channel, todos) {
     try {
       await this.client.putTodos(this.workspaceId, channel, this.token, todos, {
-        source: `openagents:${this.agentName}`,
+        source: `52hz:${this.agentName}`,
       });
     } catch (e) {
       if (e instanceof SessionRevokedError) { this._onSessionRevoked(); return; }
       // Fallback to event-based approach for older backends
       const lines = todos.map((t) => {
-        const icon = t.status === 'completed' ? '✅' : t.status === 'in_progress' ? '🔄' : '⬜';
+        const icon = t.status === 'completed' ? '�? : t.status === 'in_progress' ? '🔄' : '�?;
         return `${icon} ${t.content}`;
       });
       try {
@@ -1418,7 +1418,7 @@ class BaseAdapter {
 
   /**
    * Return whether the workspace has the Browser Fabric viewer toggle on.
-   * Cached for the lifetime of the adapter — restart to pick up a flip.
+   * Cached for the lifetime of the adapter �?restart to pick up a flip.
    * Falls back to false on error so the prompt builders don't accidentally
    * inject the strong directive against an older backend that can't route
    * to Browser Fabric.

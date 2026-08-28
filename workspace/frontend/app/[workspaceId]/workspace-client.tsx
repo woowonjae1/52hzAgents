@@ -14,9 +14,8 @@ export function WorkspaceLoadingSplash() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        <div className="size-16 flex items-center justify-center rounded-xl border border-border/20 bg-surface1 p-2 shadow-md">
-          <SignalMark size={48} />
-        </div>
+        {/* No plate: see the note in chat-view.tsx. */}
+        <SignalMark size={72} />
         <div className="text-center">
           <h1 className="text-xl font-semibold tracking-tight">Workspace</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Loading...</p>
@@ -38,9 +37,9 @@ export function WorkspaceLoadingSplash() {
 
 function setWorkspaceCookie(slug: string, token: string) {
   const maxAge = 30 * 24 * 60 * 60;
-  const shared = `path=/;max-age=${maxAge};secure;samesite=lax;domain=.openagents.org`;
-  document.cookie = `oa_workspace=${encodeURIComponent(JSON.stringify({ slug, token }))};${shared}`;
-  document.cookie = `oa_has_workspace=1;${shared}`;
+  const shared = `path=/;max-age=${maxAge};samesite=lax`;
+  document.cookie = `hz_workspace=${encodeURIComponent(JSON.stringify({ slug, token }))};${shared}`;
+  document.cookie = `hz_has_workspace=1;${shared}`;
 }
 
 function IdentityGate({ children }: { children: React.ReactNode }) {

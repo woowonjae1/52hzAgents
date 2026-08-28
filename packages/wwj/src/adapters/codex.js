@@ -1,7 +1,7 @@
 /**
- * Codex adapter for OpenAgents workspace.
+ * Codex adapter for 52hzAgents workspace.
  *
- * Bridges OpenAI Codex CLI to an OpenAgents workspace via:
+ * Bridges OpenAI Codex CLI to an 52hzAgents workspace via:
  * - Codex CLI subprocess (exec --json --full-auto) as primary mode
  * - Direct HTTP mode for OpenAI-compatible LLM APIs as fallback
  *
@@ -77,7 +77,7 @@ class CodexAdapter extends BaseAdapter {
         this._log(`Direct LLM mode: ${this._directBaseUrl} model=${this._directModel || 'gpt-4o'}`);
       }
     } else if (this._codexBin) {
-      // CLI binary found, no custom base URL â€” assume OpenAI or subscription auth
+      // CLI binary found, no custom base URL â€?assume OpenAI or subscription auth
       this._useCliMode = true;
       this._log(`CLI mode: ${this._codexBin}`);
     } else {
@@ -150,7 +150,7 @@ class CodexAdapter extends BaseAdapter {
 
   /**
    * Explain an empty turn using what the CLI actually reported. Every branch
-   * here used to collapse into "No response generated. Please try again." â€”
+   * here used to collapse into "No response generated. Please try again." â€?
    * advice that cannot help when the real cause is an expired login, a bad
    * model name, or a non-zero exit, and that makes a retry pointless.
    */
@@ -166,7 +166,7 @@ class CodexAdapter extends BaseAdapter {
         ? 'the CLI exited cleanly but emitted no agent message'
         : `the CLI exited with code ${code} and wrote nothing to stderr`);
     }
-    return `codex produced no response â€” ${bits.join('\n\n')}`;
+    return `codex produced no response â€?${bits.join('\n\n')}`;
   }
 
   /**
@@ -181,7 +181,7 @@ class CodexAdapter extends BaseAdapter {
       return 'codex CLI not found. Install with: npm install -g @openai/codex'
         + '\n\nOr configure OPENAI_API_KEY + OPENAI_BASE_URL for direct API mode.';
     }
-    const detail = blocked.map(([p, code]) => `  â€¢ ${p} â€” ${code}`).join('\n');
+    const detail = blocked.map(([p, code]) => `  â€?${p} â€?${code}`).join('\n');
     return 'codex CLI was found but could not be launched:\n' + detail
       + '\n\nEACCES usually means a Microsoft Store install (under WindowsApps),'
       + ' which cannot be spawned directly. Install a runnable copy instead:'
@@ -285,7 +285,7 @@ class CodexAdapter extends BaseAdapter {
     }
     if (!skills.length) return '';
     const lines = skills.map((s) => {
-      const desc = s.description ? ` â€” ${s.description}` : '';
+      const desc = s.description ? ` â€?${s.description}` : '';
       return `- **${s.name}** (\`${s.id}\`)${desc}\n  Read its instructions: \`cat ${s.skillMd}\``;
     });
     return (
@@ -322,7 +322,7 @@ class CodexAdapter extends BaseAdapter {
     } catch {}
   }
 
-  /** Codex's own config directory â€” CODEX_HOME when set, else ~/.codex. */
+  /** Codex's own config directory â€?CODEX_HOME when set, else ~/.codex. */
   _codexHome() {
     const env = this.agentEnv || process.env;
     return (env.CODEX_HOME && env.CODEX_HOME.trim()) || path.join(os.homedir(), '.codex');
@@ -331,7 +331,7 @@ class CodexAdapter extends BaseAdapter {
   /**
    * The model and provider the user selected inside Codex, from the top-level
    * keys of `~/.codex/config.toml`. Only the keys above the first `[section]`
-   * are read â€” those are the document-level ones â€” so a `model = ` inside a
+   * are read â€?those are the document-level ones â€?so a `model = ` inside a
    * `[model_providers.x]` table can never be mistaken for the active model.
    * Strictly read-only; this adapter never writes Codex's config.
    */
@@ -360,7 +360,7 @@ class CodexAdapter extends BaseAdapter {
 
   /**
    * Every model this install can actually reach, from Codex's own
-   * `models_cache.json` â€” the catalog the CLI fetched for this account. Returns
+   * `models_cache.json` â€?the catalog the CLI fetched for this account. Returns
    * [] when the cache is absent; an empty list must read as "unknown" and is
    * never substituted with a hardcoded guess.
    */
@@ -380,7 +380,7 @@ class CodexAdapter extends BaseAdapter {
         }
       }
     } catch {
-      // Unparsable cache â†’ report nothing rather than a half-read list.
+      // Unparsable cache â†?report nothing rather than a half-read list.
     }
     const current = this._configFromCodexToml().model;
     if (current && !seen.has(current)) {
@@ -455,7 +455,7 @@ class CodexAdapter extends BaseAdapter {
 
   /**
    * Read-only runtime snapshot for the workspace UI. `available_models` is
-   * omitted entirely â€” not padded with the current model â€” when Codex has no
+   * omitted entirely â€?not padded with the current model â€?when Codex has no
    * model cache to read, so the UI shows "not configured" instead of a guess.
    */
   async fetchAndReportUsage() {
@@ -616,14 +616,14 @@ class CodexAdapter extends BaseAdapter {
           await this.sendResponse(msgChannel, result.responseText);
           return;
         } else if (result.exitCode !== 0 && threadId && attempt === 0) {
-          // Stale thread â€” clear and retry fresh
+          // Stale thread â€?clear and retry fresh
           this._log(`Stale thread detected for ${msgChannel}, clearing and retrying`);
           delete this._channelThreads[msgChannel];
           this._saveSessions();
           continue;
         } else {
           // The CLI produced no answer. It already told us why via turn.failed,
-          // a non-zero exit code, or stderr â€” report that instead of a generic
+          // a non-zero exit code, or stderr â€?report that instead of a generic
           // "try again", which hides the cause and makes a retry pointless.
           await this.sendError(msgChannel, this._describeEmptyResult(result));
           return;
@@ -726,12 +726,12 @@ class CodexAdapter extends BaseAdapter {
               hasToolUseSinceLastText = false;
             }
             responseTexts.push(item.text);
-            // The reply arriving early, not reasoning â€” see the `reasoning`
+            // The reply arriving early, not reasoning â€?see the `reasoning`
             // branch below for the real thing.
             try { await this.sendThinking(msgChannel, item.text, { isReplyPreview: true }); } catch {}
           } else if (item.type === 'reasoning') {
             /*
-             * o-series reasoning â€” the genuine chain-of-thought, which this
+             * o-series reasoning â€?the genuine chain-of-thought, which this
              * adapter previously ignored entirely (the word "reasoning" did not
              * appear in this file). So the reply was shown inside a "Thought"
              * disclosure while the actual thought was dropped.
@@ -739,7 +739,7 @@ class CodexAdapter extends BaseAdapter {
              * `item.text` IS THE EXPECTED FIELD HERE. Codex's exec JSONL layer
              * aggregates the model's reasoning summary into a string before
              * emitting it, so the CLI's `ReasoningItem` is `{ id, type, text }`
-             * â€” there is no `summary` array at this boundary.
+             * â€?there is no `summary` array at this boundary.
              *
              * The `summary` branch is a cross-interface fallback, not a guess at
              * this one: that array shape belongs to the raw Responses API
@@ -771,7 +771,7 @@ class CodexAdapter extends BaseAdapter {
               status += ` (exit ${exitCode})`;
             }
             try { await this.sendStatus(msgChannel, status); } catch {}
-            this._log(`Command: ${cmdText} â†’ exit ${exitCode}`);
+            this._log(`Command: ${cmdText} â†?exit ${exitCode}`);
           } else if (item.type === 'file_change') {
             hasToolUseSinceLastText = true;
             const filename = item.filename || '';
@@ -845,9 +845,9 @@ class CodexAdapter extends BaseAdapter {
         await this.sendResponse(msgChannel, responseText);
       } else {
         // Name the endpoint and model that came back empty. "Please try again"
-        // hid the usual causes here â€” wrong model id, or a proxy that answers
-        // 200 with no choices â€” neither of which a retry fixes.
-        await this.sendError(msgChannel, 'codex produced no response â€” the API returned an empty completion'
+        // hid the usual causes here â€?wrong model id, or a proxy that answers
+        // 200 with no choices â€?neither of which a retry fixes.
+        await this.sendError(msgChannel, 'codex produced no response â€?the API returned an empty completion'
           + ` (endpoint: ${this._directBaseUrl || 'default'}, model: ${activeModel})`);
       }
     } catch (e) {

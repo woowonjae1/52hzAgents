@@ -1,8 +1,8 @@
 /**
- * Pi adapter for OpenAgents workspace.
+ * Pi adapter for 52hzAgents workspace.
  *
  * Bridges the Pi coding agent CLI (@earendil-works/pi-coding-agent) to an
- * OpenAgents workspace using `pi --mode json --session <path>` for real-time
+ * 52hzAgents workspace using `pi --mode json --session <path>` for real-time
  * JSON Lines event streaming.
  *
  * Follows official Pi CLI documentation:
@@ -293,7 +293,7 @@ class PiAdapter extends BaseAdapter {
 
       let event;
       try { event = JSON.parse(line); } catch {
-        // Not JSON â€” treat as plain text output (fallback)
+        // Not JSON â€?treat as plain text output (fallback)
         if (line.trim()) responseChunks.push(line.trim());
         return;
       }
@@ -304,7 +304,7 @@ class PiAdapter extends BaseAdapter {
        * `thinking` and `assistant`/`text_delta` used to share one branch, so
        * they were indistinguishable downstream. They are not the same thing:
        * `thinking` is the model reasoning, the other two are its reply arriving
-       * a piece at a time. Only the latter is flagged as a reply preview â€” with
+       * a piece at a time. Only the latter is flagged as a reply preview â€?with
        * them merged, tagging the branch would have mislabelled real reasoning as
        * the answer, and not tagging it would have left the answer duplicated.
        */
@@ -399,7 +399,7 @@ class PiAdapter extends BaseAdapter {
   }
 
   /**
-   * Read one of Pi's own config files. Strictly read-only â€” this adapter never
+   * Read one of Pi's own config files. Strictly read-only â€?this adapter never
    * writes them. Returns null when the file is absent or unparsable, which must
    * read as "unknown", never as an empty configuration.
    */
@@ -436,7 +436,7 @@ class PiAdapter extends BaseAdapter {
 
   /**
    * Every model this install can actually reach, from `~/.pi/agent/models.json`
-   * â€” the providers the user configured in Pi itself. There is no hardcoded
+   * â€?the providers the user configured in Pi itself. There is no hardcoded
    * catalog: an install with no configured provider reports nothing, and the UI
    * must show that as "not configured" rather than offering a guess.
    */
@@ -492,8 +492,8 @@ class PiAdapter extends BaseAdapter {
   /**
    * Read-only runtime snapshot for the workspace UI. `source` says where the
    * current model came from so the UI can never present an inferred value as
-   * configuration truth, and `available_models` is omitted entirely â€” not
-   * padded with the current model â€” when Pi has no configured providers.
+   * configuration truth, and `available_models` is omitted entirely â€?not
+   * padded with the current model â€?when Pi has no configured providers.
    */
   async fetchAndReportUsage() {
     try {

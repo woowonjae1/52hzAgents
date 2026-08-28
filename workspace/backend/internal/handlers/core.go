@@ -124,7 +124,7 @@ func DiscoverNetwork(c *gin.Context) {
 	agents := make([]gin.H, 0, len(members))
 	for _, member := range members {
 		agents = append(agents, gin.H{
-			"address": "openagents:" + member.AgentName, "role": member.Role,
+			"address": "52hz:" + member.AgentName, "role": member.Role,
 			"status": member.Status, "agent_type": member.AgentType,
 			"server_host": member.ServerHost, "working_dir": member.WorkingDir,
 			"description": member.Description, "enabled_skills": decodeJSONMap(member.EnabledSkills),
@@ -661,7 +661,6 @@ func LaunchAgent(c *gin.Context) {
 	}
 	runCmd.Env = append(os.Environ(),
 		"WWJ_WORKSPACE_TOKEN="+reqToken,
-		"OPENAGENTS_TOKEN="+reqToken,
 		"WWJ_WORKSPACE_ENDPOINT="+endpoint,
 	)
 	// The chosen project directory becomes the connector process's cwd, so the
@@ -730,7 +729,7 @@ func LaunchAgent(c *gin.Context) {
 		NetworkID: workspace.ID,
 		Type:      "workspace.agent.control",
 		Source:    "system:launcher",
-		Target:    "openagents:" + agentName,
+		Target:    "52hz:" + agentName,
 		Payload:   payloadBytes,
 		Metadata:  metaBytes,
 		Timestamp: nowMs,
@@ -743,7 +742,7 @@ func LaunchAgent(c *gin.Context) {
 		"network":   workspace.ID,
 		"type":      "workspace.agent.control",
 		"source":    "system:launcher",
-		"target":    "openagents:" + agentName,
+		"target":    "52hz:" + agentName,
 		"payload":   gin.H{"agent_name": agentName, "status": "launching", "action": "launched"},
 		"timestamp": nowMs,
 	})

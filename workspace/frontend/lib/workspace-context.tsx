@@ -126,7 +126,37 @@ function useWorkspaceIdentity() {
 interface LastMessageInfo {
   content: string;
   senderName: string;
+  /**
+   * The agent is working RIGHT NOW — drives the animated "thinking…" preview in
+   * the thread list and the 5s-vs-15s discovery poll interval. It is a claim
+   * about the present, so it must never be derived from message type alone: a
+   * turn that was interrupted (app closed, agent disconnected) leaves a trailing
+   * `thinking` event in the channel forever.
+   */
   isStatus?: boolean;
+}
+
+/** How long a status/thinking event still counts as "happening now". */
+const STATUS_FRESHNESS_MS = 60_000;
+
+/** Backends have sent both seconds and milliseconds here. */
+function eventTimeMs(timestamp: unknown): number {
+  const raw = Number(timestamp) || 0;
+  return raw > 1e11 ? raw : raw * 1000;
+}
+
+/**
+ * The single gate for `isStatus`. Two call sites derive previews — the initial
+ * bulk fetch and the discovery poll — and only the poll used to apply a
+ * freshness window. The bulk fetch ran on every page load, so any channel whose
+ * last event was a `thinking` message came back marked active regardless of age:
+ * a thread abandoned a day ago showed a spinning "thinking…" forever AND pinned
+ * the discovery poll to its 5s active interval.
+ */
+function isLiveStatus(messageType: string, timestamp: unknown): boolean {
+  if (messageType !== 'status' && messageType !== 'thinking') return false;
+  const ms = eventTimeMs(timestamp);
+  return ms > 0 && Date.now() - ms < STATUS_FRESHNESS_MS;
 }
 
 interface WorkspaceContextValue {
@@ -788,10 +818,8 @@ export function WorkspaceProvider({
               const latest = result.events[0];
               const latestPayload = latest.payload as Record<string, string>;
               const latestType = latestPayload?.message_type || 'chat';
-              const rawTs = Number(latest.timestamp) || 0;
-              const eventTime = rawTs > 1e11 ? rawTs : rawTs * 1000;
-              const isFresh = eventTime > 0 && Date.now() - eventTime < 60000;
-              const isAgentWorking = (latestType === 'status' || latestType === 'thinking') && isFresh;
+              const eventTime = eventTimeMs(latest.timestamp);
+              const isAgentWorking = isLiveStatus(latestType, latest.timestamp);
               // Find the latest chat/thinking message (not status) for preview
               const lastChat = result.events.find((e) => {
                 const mt = (e.payload as Record<string, string>)?.message_type || 'chat';
@@ -803,7 +831,7 @@ export function WorkspaceProvider({
               const sender = payload?.sender_name || pick.source.replace(/^(openagents:|human:)/, '');
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
-              const isStatus = (msgType === 'status' || msgType === 'thinking') && isFresh;
+              const isStatus = isLiveStatus(msgType, pick.timestamp);
               return { sessionId: ch.sessionId, senderName: sender, content, isStatus, timestamp: eventTime };
             } catch { /* ignore */ }
             return null;
@@ -1228,12 +1256,21 @@ export function WorkspaceProvider({
           }
         }
 
-        // Seed previews from localStorage for instant display
+        // Seed previews from localStorage for instant display. The cache is for
+        // preview TEXT only — `isStatus` is dropped on the way in, because a
+        // stored "working right now" flag is false by definition after a reload
+        // and would spin a "thinking…" on threads that are doing nothing until
+        // the bulk fetch lands (or forever, if it fails).
         const cacheKey = `previews:${workspaceId}`;
         try {
           const cached = localStorage.getItem(cacheKey);
           if (cached && !cancelled) {
-            setLastMessageBySession((prev) => ({ ...JSON.parse(cached), ...prev }));
+            const parsed = JSON.parse(cached) as Record<string, LastMessageInfo>;
+            const seeded: Record<string, LastMessageInfo> = {};
+            for (const [sid, info] of Object.entries(parsed)) {
+              seeded[sid] = { ...info, isStatus: false };
+            }
+            setLastMessageBySession((prev) => ({ ...seeded, ...prev }));
           }
         } catch { /* ignore corrupt cache */ }
 
@@ -1247,7 +1284,7 @@ export function WorkspaceProvider({
               const sender = payload?.sender_name || event.source.replace(/^(openagents:|human:)/, '');
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
-              const isStatus = msgType === 'status' || msgType === 'thinking';
+              const isStatus = isLiveStatus(msgType, event.timestamp);
               if (content) {
                 batch[channelName] = { senderName: sender, content: content.slice(0, 100), isStatus };
               }

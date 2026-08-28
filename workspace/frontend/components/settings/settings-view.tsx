@@ -68,8 +68,6 @@ export function SettingsView() {
   const [name, setName] = useState(workspace?.name || '52hz');
   const [saving, setSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [bfApiKey, setBfApiKey] = useState('');
-  const [testingBf, setTestingBf] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [collaborators, setCollaborators] = useState<Array<{ email: string; role: string }>>([]);
@@ -135,7 +133,6 @@ export function SettingsView() {
     setSaving(true);
     try {
       const updates: Record<string, unknown> = { name: name.trim() };
-      if (bfApiKey.trim()) updates.browserfabric_api_key = bfApiKey.trim();
       await workspaceApi.updateWorkspace(updates);
       await refreshWorkspace();
       toast.success('Workspace settings updated successfully');
@@ -143,23 +140,6 @@ export function SettingsView() {
       toast.error('Failed to save workspace settings');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleTestBrowserFabric = async () => {
-    const keyToTest = bfApiKey.trim() || workspace?.browserfabricApiKey;
-    if (!keyToTest) {
-      toast.error('Please provide a BrowserFabric API key');
-      return;
-    }
-    setTestingBf(true);
-    try {
-      await new Promise((r) => setTimeout(r, 600));
-      toast.success('BrowserFabric connection verified!');
-    } catch {
-      toast.error('Failed to connect to BrowserFabric service');
-    } finally {
-      setTestingBf(false);
     }
   };
 
@@ -545,41 +525,6 @@ export function SettingsView() {
                     <kbd className="px-2.5 py-1 rounded bg-surface2 border border-border text-xs font-mono font-medium text-foreground">
                       Alt + Space
                     </kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 3: Shared Browser & Sandbox */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/30 pb-3">
-                  <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                    <Globe className="size-4 text-primary" />
-                    BrowserFabric 云端浏览器沙箱
-                  </h2>
-                </div>
-
-                <div className="space-y-3">
-                  <p className="text-xs text-foreground-muted">
-                    配置 BrowserFabric API Key 允许 Agent 自主进行网页访问、DOM 交互、全景截图和沙箱运行。
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="password"
-                      value={bfApiKey}
-                      onChange={(e) => setBfApiKey(e.target.value)}
-                      placeholder={workspace?.browserfabricApiKey ? '••••••••••••••••' : 'bf_live_...'}
-                      className="bg-surface0 border-border/60 text-sm h-9"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleTestBrowserFabric}
-                      disabled={testingBf}
-                      className="h-9 px-3 shrink-0 text-xs cursor-pointer"
-                    >
-                      {testingBf ? <Loader2 className="size-3.5 animate-spin mr-1" /> : null}
-                      验证密钥
-                    </Button>
                   </div>
                 </div>
               </div>

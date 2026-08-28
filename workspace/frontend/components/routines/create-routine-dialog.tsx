@@ -98,7 +98,7 @@ export function CreateRoutineDialog({ open, onOpenChange, agents, conversationHi
       const params: Parameters<typeof onCreateRoutine>[0] = {
         name: name.trim(),
         message: message.trim(),
-        source: `openagents:${source}`,
+        source: source.includes(':') ? source : `52hz:${source}`,
         ...(conversationHistory ? { conversation_history: conversationHistory } : {}),
       };
       if (scheduleType === 'interval') {

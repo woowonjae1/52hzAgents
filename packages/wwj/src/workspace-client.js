@@ -24,7 +24,7 @@ const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100, keepAlive
 /**
  * HTTP client for workspace API operations.
  *
- * Mirrors the Python SDK's WorkspaceClient â€” same endpoints, same
+ * Mirrors the Python SDK's WorkspaceClient â€?same endpoints, same
  * auth headers (X-Workspace-Token), same request/response shapes.
  */
 class WorkspaceClient {
@@ -168,7 +168,7 @@ class WorkspaceClient {
   async sendMessage(workspaceId, channelName, token, content, {
     senderType = 'agent', senderName, messageType = 'chat', metadata, attachments, sessionId,
   } = {}) {
-    const sourcePrefix = senderType === 'agent' ? 'openagents' : 'human';
+    const sourcePrefix = senderType === 'agent' ? '52hzAgents' : 'human';
     const source = senderName ? `${sourcePrefix}:${senderName}` : `${sourcePrefix}:unknown`;
 
     const payload = { content, message_type: messageType };
@@ -261,7 +261,7 @@ class WorkspaceClient {
       type: 'workspace.message.posted',
       // Server-side pre-filter: only return events routed to this agent (plus
       // untargeted ones) instead of the whole network's traffic. Backward
-      // compatible â€” older backends ignore the unknown param and return
+      // compatible â€?older backends ignore the unknown param and return
       // everything, so the client-side filter below stays as the safety net.
       target_agents: agentName,
       limit: String(limit),
@@ -275,7 +275,7 @@ class WorkspaceClient {
     // Prefer the server's next_cursor: with server-side target filtering the
     // last returned event lags the stream tip, so advancing by it alone would
     // re-scan the same range every poll. next_cursor jumps past other agents'
-    // events once ours are drained. Older backends don't send it â€” fall back
+    // events once ours are drained. Older backends don't send it â€?fall back
     // to the last returned event id (they return the full stream, so that IS
     // the tip).
     let cursor = null;
@@ -291,11 +291,11 @@ class WorkspaceClient {
     // the server includes as a safe superset.
     //
     // target_agents semantics:
-    //   â€¢ absent            â†’ legacy server with no routing decision
+    //   â€?absent            â†?legacy server with no routing decision
     //                         (broadcast for human messages, ignore for agents)
-    //   â€¢ [...agentNames]   â†’ only listed agents should respond
-    //   â€¢ ["__no_response__"]
-    //                       â†’ routing happened and decided nobody
+    //   â€?[...agentNames]   â†?only listed agents should respond
+    //   â€?["__no_response__"]
+    //                       â†?routing happened and decided nobody
     //                         should respond. Sentinel is used instead
     //                         of [] because pre-0.2.106 clients treat
     //                         empty array as "broadcast" and every
@@ -309,7 +309,7 @@ class WorkspaceClient {
       const hasTargetList = Array.isArray(targetAgents);
 
       // Skip own messages
-      if (source === `openagents:${agentName}`) continue;
+      if (source === `52hz:${agentName}`) continue;
 
       if (source.startsWith('human:')) {
         if (hasTargetList) {
@@ -325,7 +325,7 @@ class WorkspaceClient {
         if (hasTargetList && targetAgents.includes(agentName)) {
           messages.push(this._eventToMessage(e));
         }
-      } else if (source.startsWith('openagents:')) {
+      } else if (source.startsWith('52hz:')) {
         // Agent messages: only pick up if explicitly listed
         if (hasTargetList && targetAgents.includes(agentName)) {
           messages.push(this._eventToMessage(e));
@@ -340,7 +340,7 @@ class WorkspaceClient {
   /**
    * Get the workspace's top-level metadata via GET /v1/workspaces/{id}.
    *
-   * Returns the full data block from the backend â€” adapters care about
+   * Returns the full data block from the backend â€?adapters care about
    * `browserEnabled` today, but more keys may be surfaced over time. On
    * error, returns null so callers can fall back to defaults rather than
    * crashing.
@@ -366,7 +366,7 @@ class WorkspaceClient {
    *
    * The backend updates WorkspaceMember.enabled_skills.skill_status so the
    * Skill Hub UI can render installing / installed / failed states. Best
-   * effort â€” returns the updated payload or throws (caller decides).
+   * effort â€?returns the updated payload or throws (caller decides).
    */
   async reportSkillStatus(workspaceId, agentName, token, { skillId, state, path: installPath, error, partial } = {}) {
     const body = { skill_id: skillId, state };
@@ -396,7 +396,7 @@ class WorkspaceClient {
         title: result.title || channelName,
         // The API serialises snake_case (`json:"title_manually_set"` in
         // internal/models/models.go), so the camelCase read was always
-        // undefined and this collapsed to `false` unconditionally â€” leaving
+        // undefined and this collapsed to `false` unconditionally â€?leaving
         // `_autoTitleChannel`'s "don't touch a title the user set" guard dead
         // for as long as it has existed. Both spellings are accepted so the
         // fix does not depend on which shape a given build returns.
@@ -436,7 +436,7 @@ class WorkspaceClient {
       const params = new URLSearchParams({
         network: workspaceId,
         type: 'workspace.agent.control',
-        target: `openagents:${agentName}`,
+        target: `52hz:${agentName}`,
         limit: '10',
         sort: 'desc',
       });
@@ -462,7 +462,7 @@ class WorkspaceClient {
     const result = data.data || data;
     const agents = (result && result.agents) || [];
     return agents.map((a) => ({
-      agentName: (a.address || '').replace('openagents:', ''),
+      agentName: (a.address || '').replace('52hz:', ''),
       role: a.role || 'member',
       status: a.status || 'offline',
       enabledSkills: a.enabled_skills || null,
@@ -632,7 +632,7 @@ class WorkspaceClient {
       todos,
       network: workspaceId,
       channel: channelName,
-      source: source || 'openagents:unknown',
+      source: source || '52hz:unknown',
     };
     const data = await this._put('/v1/todos', body, this._wsHeaders(token));
     return data.data || data;
@@ -653,7 +653,7 @@ class WorkspaceClient {
       message,
       network: workspaceId,
       channel: channelName,
-      source: source || 'openagents:unknown',
+      source: source || '52hz:unknown',
     };
     const data = await this._post('/v1/timers', body, this._wsHeaders(token));
     return data.data || data;
@@ -681,7 +681,7 @@ class WorkspaceClient {
       context: context || '',
       network: workspaceId,
       channel: channelName,
-      source: source || 'openagents:unknown',
+      source: source || '52hz:unknown',
     };
     if (interval_minutes != null) {
       body.interval_minutes = interval_minutes;
@@ -714,7 +714,7 @@ class WorkspaceClient {
       message,
       priority: priority || 'normal',
       network: workspaceId,
-      source: source || 'openagents:unknown',
+      source: source || '52hz:unknown',
     };
     if (channel) body.channel = channel;
     const data = await this._post('/v1/notifications', body, this._wsHeaders(token));
@@ -770,14 +770,14 @@ class WorkspaceClient {
   }
 
   async createKnowledge(workspaceId, token, { title, content, description, source } = {}) {
-    const body = { title, content, network: workspaceId, source: source || 'openagents:unknown' };
+    const body = { title, content, network: workspaceId, source: source || '52hz:unknown' };
     if (description) body.description = description;
     const data = await this._post('/v1/knowledge', body, this._wsHeaders(token));
     return data.data || data;
   }
 
   async updateKnowledge(workspaceId, token, entryId, { title, content, description, source } = {}) {
-    const body = { network: workspaceId, source: source || 'openagents:unknown' };
+    const body = { network: workspaceId, source: source || '52hz:unknown' };
     if (title !== undefined) body.title = title;
     if (content !== undefined) body.content = content;
     if (description !== undefined) body.description = description;
@@ -798,7 +798,7 @@ class WorkspaceClient {
   _eventToMessage(event) {
     const source = event.source || '';
     const isHuman = source.startsWith('human:');
-    const senderName = source.replace('openagents:', '').replace('human:', '');
+    const senderName = source.replace('52hz:', '').replace('human:', '');
     const payload = event.payload || {};
     const target = event.target || '';
     const ts = event.timestamp;
@@ -816,7 +816,7 @@ class WorkspaceClient {
             // `@knowledge:slug` is knowledge-base syntax, not an agent address.
           // Scanned as-is it yields "knowledge", which lands in `mentions` and
           // makes the addressing filter in _dispatchMessage read the message as
-          // aimed at some other agent â€” every agent then backs off and a bare
+          // aimed at some other agent â€?every agent then backs off and a bare
           // "@knowledge:x <question>" is silently dropped. The same exclusion
           // exists on the text-derived mention paths (leadingMentions,
           // agentMentions); this is the third source feeding that decision.
@@ -859,7 +859,7 @@ class WorkspaceClient {
         headers,
         timeout,
         // Hard end-to-end deadline. The `timeout` option above is only a SOCKET
-        // inactivity timeout â€” it is NOT armed until a socket exists, so it does
+        // inactivity timeout â€?it is NOT armed until a socket exists, so it does
         // not bound DNS resolution or TCP connect. During a network partition a
         // request stuck in getaddrinfo/connect never fires 'timeout', so the
         // await never settles and the caller's single poll loop wedges forever

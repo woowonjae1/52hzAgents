@@ -1,12 +1,12 @@
 /**
- * Claude Code adapter for OpenAgents workspace.
+ * Claude Code adapter for 52hzAgents workspace.
  *
- * Bridges Claude Code to an OpenAgents workspace via:
+ * Bridges Claude Code to an 52hzAgents workspace via:
  * - Polling loop for incoming messages
  * - Claude CLI subprocess (stream-json) for task execution
  * - MCP server for workspace tool access
  *
- * Direct port of Python: sdk/src/openagents/adapters/claude.py
+ * Direct port of Python: sdk/src/52hzAgents/adapters/claude.py
  */
 
 'use strict';
@@ -65,13 +65,13 @@ class ClaudeAdapter extends BaseAdapter {
     this.disabledModules = opts.disabledModules || new Set();
     /** @type {'mcp' | 'skills'} Tool integration mode */
     this.toolMode = opts.toolMode || 'skills';
-    this._channelSessions = {}; // channel ‚Üí Claude CLI session_id
-    // channel ‚Üí messageId of the last channel message already accounted for in
+    this._channelSessions = {}; // channel ‚Ü?Claude CLI session_id
+    // channel ‚Ü?messageId of the last channel message already accounted for in
     // the CLI session. Anything newer is pushed in as a context prefix on the
     // next turn. In-memory only: after a restart the session may resume but we
     // no longer know what it saw, so the first turn falls back to a full recap.
     this._recapCursor = {};
-    this._channelProcesses = {}; // channel ‚Üí child process
+    this._channelProcesses = {}; // channel ‚Ü?child process
     this._stoppingChannels = new Set();
     // Channels that have already announced "Execution stopped by user." for the
     // current stop. Two paths race to post it (the control-action handler that
@@ -79,7 +79,7 @@ class ClaudeAdapter extends BaseAdapter {
     // pp.userStopped after exit), so this dedups to a single notice. Reset when
     // a new message starts processing in the channel.
     this._stopNoticeSent = new Set();
-    this._persistentProcs = {}; // channel ‚Üí { proc, lineBuffer, pendingLines, idleTimer, messageResolve }
+    this._persistentProcs = {}; // channel ‚Ü?{ proc, lineBuffer, pendingLines, idleTimer, messageResolve }
     this._IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
     this._WATCHDOG_INTERVAL_MS = 15_000; // 15s between checks
     this._WATCHDOG_MAX_TIMEOUTS = parseInt(process.env.WWJ_CLAUDE_WATCHDOG_TIMEOUTS || '80', 10); // 80 * 15s = 20 min of silence before watchdog kill
@@ -333,7 +333,7 @@ class ClaudeAdapter extends BaseAdapter {
       const pinKey = `ANTHROPIC_DEFAULT_${tier.toUpperCase()}_MODEL`;
       const target = (envAll[pinKey] || pins[pinKey] || '').trim();
       const name = tier.charAt(0).toUpperCase() + tier.slice(1);
-      push(tier, target ? `${name} ‚Üí ${target}` : name);
+      push(tier, target ? `${name} ‚Ü?${target}` : name);
     }
 
     // The account's real catalog, straight from the endpoint this install is
@@ -788,7 +788,7 @@ class ClaudeAdapter extends BaseAdapter {
           this._channelModels[channel] = model;
           // Must survive an adapter restart (daemon bounce, `restart` control,
           // watchdog kill). Without this the choice evaporated on the agent side
-          // while the UI chip ‚Äî backed by localStorage ‚Äî kept showing it, so the
+          // while the UI chip ‚Ä?backed by localStorage ‚Ä?kept showing it, so the
           // next turn silently ran on the old model.
           this._saveChannelModels();
           if (this._persistentProcs[channel]) {
@@ -848,7 +848,7 @@ class ClaudeAdapter extends BaseAdapter {
         // we're still online.
         try {
           await this.client.sendMessage(this.workspaceId, channel, this.token,
-            'Session restarted ‚Äî next message starts fresh.',
+            'Session restarted ‚Ä?next message starts fresh.',
             {
               senderType: 'agent',
               senderName: this.agentName,
@@ -860,13 +860,13 @@ class ClaudeAdapter extends BaseAdapter {
           this._log(`Restart: failed to post status: ${e && e.message ? e.message : e}`);
         }
       } else {
-        // Defensive ‚Äî no channel, clear everything before the bounce.
+        // Defensive ‚Ä?no channel, clear everything before the bounce.
         this._channelSessions = {};
         try { this._saveSessions(); } catch {}
         await this._stopAllProcesses('Execution stopped by user.');
         this._log('Restart: cleared all sessions (no channel param)');
       }
-      // Ask the daemon to bounce just THIS agent ‚Äî true process-level
+      // Ask the daemon to bounce just THIS agent ‚Ä?true process-level
       // restart. Daemon's command-file poller picks up `restart:<name>`
       // within ~1s, calls restartAgent, our run() loop exits cleanly,
       // and a fresh adapter is spawned with a new `_startedAt`. Sibling
@@ -893,8 +893,8 @@ class ClaudeAdapter extends BaseAdapter {
   /**
    * Override BaseAdapter.stop so daemon shutdown also tears down in-flight
    * claude subprocesses cleanly. Without this, killing the daemon leaves
-   * the channel's last event as a `status` (e.g. "Bash ‚Ä∫ ..." mid-tool-call)
-   * forever ‚Äî the workspace UI then shows the thread as "running" until a
+   * the channel's last event as a `status` (e.g. "Bash ‚Ä?..." mid-tool-call)
+   * forever ‚Ä?the workspace UI then shows the thread as "running" until a
    * new message arrives. Fire-and-forget; daemon._killAgent gives us up to
    * 5s to actually finish the cleanup before the parent exits.
    */
@@ -903,7 +903,7 @@ class ClaudeAdapter extends BaseAdapter {
       this._killPersistentProc(channel);
     }
     this._stopAllProcesses(
-      'Task interrupted ‚Äî daemon restarting. Send another message to continue.'
+      'Task interrupted ‚Ä?daemon restarting. Send another message to continue.'
     ).catch(() => {});
     super.stop();
   }
@@ -956,16 +956,16 @@ class ClaudeAdapter extends BaseAdapter {
    * Build the channel-context prefix for one turn.
    *
    * We are only *delivered* messages that @mention us (see BaseAdapter's
-   * addressing filter), so everything else said in the channel ‚Äî including
-   * whole analyses posted by sibling agents ‚Äî never reaches the CLI session.
-   * A message like "@claude ‰Ω†ÂØπ‰ª•‰∏äÂàÜÊûêÊÄé‰πàÁúã" then resolves "‰ª•‰∏ä" against
+   * addressing filter), so everything else said in the channel ‚Ä?including
+   * whole analyses posted by sibling agents ‚Ä?never reaches the CLI session.
+   * A message like "@claude ‰Ω†ÂØπ‰ª•‰∏äÂàÜÊûêÊÄé‰πàÁú? then resolves "‰ª•‰∏ä" against
    * our own last turn instead of the message it actually points at. Pushing
    * the gap in is the only fix: the agent cannot know it is missing context,
    * so `workspace_get_history` (a pull) is never called.
    *
    * Two shapes, both keyed off `_recapCursor`:
    * - `full` (fresh CLI, or the cursor fell out of the fetch window): the
-   *   old behaviour ‚Äî a tail recap of the recent conversation, own messages
+   *   old behaviour ‚Ä?a tail recap of the recent conversation, own messages
    *   included, since the new session has no history at all.
    * - incremental (a live/resumed session): only what was posted after the
    *   cursor, minus our own posts. Normally one to three lines.
@@ -992,7 +992,7 @@ class ClaudeAdapter extends BaseAdapter {
     if (cursor) {
       const idx = messages.findIndex((m) => m.messageId === cursor);
       if (idx === -1) {
-        // Cursor aged out of the window ‚Äî fall back to a tail recap rather
+        // Cursor aged out of the window ‚Ä?fall back to a tail recap rather
         // than replaying all 60 messages.
         startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
       } else {
@@ -1023,14 +1023,14 @@ class ClaudeAdapter extends BaseAdapter {
       if (mt === 'status' || mt === 'thinking' || mt === 'loading') continue;
       const text = (m.content || '').trim();
       if (!text) continue;
-      // Exclude the message being handled ‚Äî the caller appends it below.
+      // Exclude the message being handled ‚Ä?the caller appends it below.
       if (currentMessageId ? m.messageId === currentMessageId : text === currentMessage) continue;
       // Our own posts are already in a live session's history.
       if (incremental && m.senderType !== 'human' && m.senderName === this.agentName) continue;
       const who = m.senderType === 'human'
         ? (m.senderName || 'user')
         : (m.senderName || 'agent');
-      const truncated = text.length > 2000 ? text.slice(0, 2000) + '‚Ä¶' : text;
+      const truncated = text.length > 2000 ? text.slice(0, 2000) + '‚Ä? : text;
       lines.push(`[${who}] ${truncated}`);
     }
     if (lines.length === 0) return null;
@@ -1051,7 +1051,7 @@ class ClaudeAdapter extends BaseAdapter {
       tail + '\n\n' +
       'The message below is the one addressed to you. If it refers to "the ' +
       'above", "that analysis", "the previous message" or anything similar, ' +
-      'it means the channel messages above ‚Äî not your own earlier work.'
+      'it means the channel messages above ‚Ä?not your own earlier work.'
     );
   }
 
@@ -1118,7 +1118,7 @@ class ClaudeAdapter extends BaseAdapter {
         return [nodeBin, path.resolve(cmdDir, jsMatch[1])];
       }
       // .cmd shims that forward to a native .exe (e.g. Claude Code's
-      // claude.cmd ‚Üí @anthropic-ai/claude-code/bin/claude.exe). Resolve to the
+      // claude.cmd ‚Ü?@anthropic-ai/claude-code/bin/claude.exe). Resolve to the
       // exe and spawn it directly. Wrapping such a .cmd in `cmd.exe /c` caps the
       // command line at cmd.exe's 8191-char limit, which truncates the ~14KB
       // --append-system-prompt and makes the agent hang ("command line too long").
@@ -1127,7 +1127,7 @@ class ClaudeAdapter extends BaseAdapter {
         return [path.resolve(cmdDir, exeMatch[1])];
       }
     } else {
-      // Unix: symlink ‚Üí resolve to actual .js file
+      // Unix: symlink ‚Ü?resolve to actual .js file
       try {
         let target = binPath;
         if (fs.lstatSync(binPath).isSymbolicLink()) {
@@ -1158,7 +1158,7 @@ class ClaudeAdapter extends BaseAdapter {
     // output + verifies existence, so a non-ASCII/Chinese username isn't mangled
     // into an ENOENT). Uses the ENRICHED env so a packaged daemon's minimal PATH
     // still sees the node-version-manager / homebrew / npm-global dirs the
-    // launcher adds ‚Äî that's why a bare `which claude` came up empty before.
+    // launcher adds ‚Ä?that's why a bare `which claude` came up empty before.
     const viaWhere = whereBinary('claude');
     if (viaWhere) return viaWhere;
 
@@ -1182,8 +1182,8 @@ class ClaudeAdapter extends BaseAdapter {
     }
 
     // Tier 4: Deep scan of every known bin dir (nvm/fnm/volta node-global,
-    // homebrew, cargo, pip, ‚Ä¶). This is what catches a `claude` installed as a
-    // global npm package under a version-managed Node ‚Äî the most common setup,
+    // homebrew, cargo, pip, ‚Ä?. This is what catches a `claude` installed as a
+    // global npm package under a version-managed Node ‚Ä?the most common setup,
     // and the one the fixed-PATH tiers above miss.
     const viaWhich = whichBinary('claude');
     if (viaWhich) return viaWhich;
@@ -1198,7 +1198,7 @@ class ClaudeAdapter extends BaseAdapter {
     }
 
     // The builder emits the correct tool-reference block for toolMode directly
-    // (mcp ‚Üí workspace_* tools, skills ‚Üí wwj-workspace skill), so there
+    // (mcp ‚Ü?workspace_* tools, skills ‚Ü?wwj-workspace skill), so there
     // is no post-hoc string replacement to drift out of sync.
     const systemPrompt = '\n' + buildClaudeSystemPrompt({
       agentName: this.agentName,
@@ -1255,7 +1255,7 @@ class ClaudeAdapter extends BaseAdapter {
     }
 
     // Write SKILL.md to .claude/skills/ in the working directory. Never use
-    // process.cwd() as the fallback ‚Äî on a packaged Windows daemon that is
+    // process.cwd() as the fallback ‚Ä?on a packaged Windows daemon that is
     // C:\WINDOWS\system32 and mkdir there throws EPERM.
     const workDir = workingDir || this.workingDir || defaultAgentWorkdir(this.agentName);
     const skillDir = path.join(workDir, '.claude', 'skills');
@@ -1363,7 +1363,7 @@ class ClaudeAdapter extends BaseAdapter {
       // mangled into an ENOENT (see whereBinary).
       if (!oaBin) oaBin = whereBinary('wwj');
       if (!oaBin) {
-        this._log('Could not find wwj binary ‚Äî MCP tools may not be available');
+        this._log('Could not find wwj binary ‚Ä?MCP tools may not be available');
         mcpCommand = 'wwj';
       } else {
         const resolved = this._resolveToNodeCmd(oaBin);
@@ -1450,7 +1450,7 @@ class ClaudeAdapter extends BaseAdapter {
       }
 
       if (consecutiveTimeouts >= this._WATCHDOG_MAX_TIMEOUTS) {
-        this._log(`Watchdog: process unresponsive for ${consecutiveTimeouts * 15}s on ${pp.msgChannel} ‚Äî killing`);
+        this._log(`Watchdog: process unresponsive for ${consecutiveTimeouts * 15}s on ${pp.msgChannel} ‚Ä?killing`);
         this._stopWatchdog(pp);
         try { await this.sendError(pp.msgChannel, `‚ö†Ô∏è Agent execution exceeded watchdog limit (${Math.round((consecutiveTimeouts * 15) / 60)}m) and was restarted.`); } catch {}
         if (pp.messageResolve) {
@@ -1472,12 +1472,12 @@ class ClaudeAdapter extends BaseAdapter {
    * via stdin (--input-format stream-json). Returns the persistent proc entry.
    */
   _spawnPersistentProc(channel, cmd, cleanEnv, workingDir) {
-    // Remove -p and its argument from cmd ‚Äî prompts go via stdin
+    // Remove -p and its argument from cmd ‚Ä?prompts go via stdin
     const filteredCmd = [];
     for (let i = 0; i < cmd.length; i++) {
       if (cmd[i] === '-p' || cmd[i] === '--print') {
         // -p in stream-json mode is just a flag (no argument to skip)
-        // but _buildClaudeCmd passes [-p, prompt] ‚Äî skip both
+        // but _buildClaudeCmd passes [-p, prompt] ‚Ä?skip both
         if (i + 1 < cmd.length && !cmd[i + 1].startsWith('-')) {
           i++; // skip the prompt argument
         }
@@ -1557,7 +1557,7 @@ class ClaudeAdapter extends BaseAdapter {
        * the `block.type === 'thinking'` branch below handles reasoning. Add that
        * flag, though, and Claude Code stops sending whole blocks: reasoning then
        * arrives only as Anthropic's SSE deltas, nested inside a `stream_event`
-       * wrapper ‚Äî
+       * wrapper ‚Ä?
        *
        *   stream_event -> content_block_delta -> delta.thinking_delta -> .thinking
        *
@@ -1619,7 +1619,7 @@ class ClaudeAdapter extends BaseAdapter {
             /*
              * Claude's extended thinking. THIS IS THE ONLY GENUINE
              * CHAIN-OF-THOUGHT THIS ADAPTER RECEIVES, and it used to fall
-             * through this if/else chain and be discarded ‚Äî so the model with
+             * through this if/else chain and be discarded ‚Ä?so the model with
              * the strongest reasoning trace showed no reasoning at all, while
              * its reply was being displayed under a "Thought" heading instead.
              *
@@ -1675,7 +1675,7 @@ class ClaudeAdapter extends BaseAdapter {
             } else {
               inputPreview = String(block.input || '').slice(0, 150);
             }
-            await this.sendStatus(pp.msgChannel, `${toolName} ‚Ä∫ ${inputPreview}`);
+            await this.sendStatus(pp.msgChannel, `${toolName} ‚Ä?${inputPreview}`);
             pp.everPostedAnything = true;
           }
         }
@@ -1704,9 +1704,9 @@ class ClaudeAdapter extends BaseAdapter {
           // Background-triggered turn: the CLI produced output on its own after
           // the user-initiated turn already resolved (e.g. a run_in_background
           // task finished and fed its result back to the model). That text was
-          // streamed as `thinking` only ‚Äî with no messageResolve waiting,
+          // streamed as `thinking` only ‚Ä?with no messageResolve waiting,
           // _handleMessage never posts it as a `chat`, so the thread visually
-          // hangs on "thinking‚Ä¶/Working‚Ä¶". Finalize the accumulated text as a
+          // hangs on "thinking‚Ä?Working‚Ä?. Finalize the accumulated text as a
           // real answer so the turn settles on an actual message bubble.
           const trailing = pp.lastResponseText.join('\n').trim();
           if (trailing && !event.is_error) {
@@ -1821,13 +1821,13 @@ class ClaudeAdapter extends BaseAdapter {
   /**
    * Turn a raw Claude `result` error into a user-facing message. Auth failures
    * (401 / invalid token) are the most common real-world cause and are otherwise
-   * invisible ‚Äî add a concrete hint about which env vars to check.
+   * invisible ‚Ä?add a concrete hint about which env vars to check.
    */
   _formatClaudeError(text) {
     const msg = String(text || '').trim() || 'Claude returned an error.';
-    if (/401|403|authenticate|invalid.*(token|key|api)|Êó†ÊïàÁöÑ?\s*(‰ª§Áâå|ÂØÜÈí•|key)/i.test(msg)) {
+    if (/401|403|authenticate|invalid.*(token|key|api)|Êó†ÊïàÁö?\s*(‰ª§Áâå|ÂØÜÈí•|key)/i.test(msg)) {
       return `Claude authentication failed: ${msg}\n\n` +
-        'Check this agent\'s API key and Base URL in the launcher ‚Äî the key may be invalid or expired.';
+        'Check this agent\'s API key and Base URL in the launcher ‚Ä?the key may be invalid or expired.';
     }
     return `Claude error: ${msg}`;
   }
@@ -1838,7 +1838,7 @@ class ClaudeAdapter extends BaseAdapter {
    * re-submit them (BaseAdapter also dedupes by size+mtime, which covers a file
    * genuinely rewritten with identical content).
    *
-   * Never rejects ‚Äî a failed upload must not affect the conversation.
+   * Never rejects ‚Ä?a failed upload must not affect the conversation.
    *
    * @param {object} pp persistent-process state
    */
@@ -1866,7 +1866,7 @@ class ClaudeAdapter extends BaseAdapter {
     if (!content) return;
 
     const msgChannel = msg.sessionId || this.channelName;
-    // Resolved once per message (not stashed on `this`) ‚Äî multiple channels can
+    // Resolved once per message (not stashed on `this`) ‚Ä?multiple channels can
     // be in flight concurrently on the same adapter instance, each potentially
     // bound to a different "Open Folder" directory.
     const resolvedWorkingDir = await this._resolveWorkingDir(msgChannel);
@@ -1909,7 +1909,7 @@ class ClaudeAdapter extends BaseAdapter {
       this._log(`Reusing persistent process for ${msgChannel}`);
       this._resetIdleTimer(msgChannel);
       existingPP.msgChannel = msgChannel;
-      // The live session only ever saw messages addressed to us ‚Äî push in
+      // The live session only ever saw messages addressed to us ‚Ä?push in
       // whatever else the channel said since our last turn.
       let turnContent = content;
       try {
@@ -1953,7 +1953,7 @@ class ClaudeAdapter extends BaseAdapter {
           // The nudge has already run once for this plan. Anything still open is
           // not going to be picked up by this turn, and leaving it as "pending"
           // means the next, unrelated task opens with the previous task's list
-          // still on the panel. Cancel it ‚Äî the cursor adapter has always done
+          // still on the panel. Cancel it ‚Ä?the cursor adapter has always done
           // this; claude had no else branch, so its todos never got closed out.
           try { await this.cleanupTodos(msgChannel); } catch {}
         }
@@ -1968,7 +1968,7 @@ class ClaudeAdapter extends BaseAdapter {
         try { await this.cleanupTodos(msgChannel); } catch {}
         return;
       }
-      // Process died mid-message ‚Äî fall through to spawn a fresh one
+      // Process died mid-message ‚Ä?fall through to spawn a fresh one
       this._log(`Persistent process died, falling back to fresh spawn for ${msgChannel}`);
     }
 
@@ -1977,7 +1977,7 @@ class ClaudeAdapter extends BaseAdapter {
 
     // Clean env: strip CLAUDE_* / AI_AGENT variables that make the spawned
     // `claude` think it's running under an SDK harness (org-scoped auth
-    // path ‚Üí 403). But preserve config vars the child needs for cloud
+    // path ‚Ü?403). But preserve config vars the child needs for cloud
     // provider auth (Vertex, Bedrock) and model selection.
     const CLAUDE_ENV_KEEP = new Set([
       'CLAUDE_CODE_USE_VERTEX',
@@ -1996,8 +1996,8 @@ class ClaudeAdapter extends BaseAdapter {
     // Third-party Anthropic-compatible relays (the common reason a custom
     // ANTHROPIC_BASE_URL is set) authenticate via `Authorization: Bearer`, which
     // the Claude CLI only sends when ANTHROPIC_AUTH_TOKEN is set. With just
-    // ANTHROPIC_API_KEY the CLI sends `x-api-key`, which most relays ignore ‚Äî the
-    // relay then rejects every request as 401 "invalid token / Êó†ÊïàÁöÑ‰ª§Áâå". When a
+    // ANTHROPIC_API_KEY the CLI sends `x-api-key`, which most relays ignore ‚Ä?the
+    // relay then rejects every request as 401 "invalid token / Êó†ÊïàÁöÑ‰ª§Áâ?. When a
     // non-official base URL is configured and no auth token was provided, mirror
     // the API key into ANTHROPIC_AUTH_TOKEN (it outranks the API key in Claude
     // Code's auth precedence) so the CLI uses Bearer auth. The launcher normally
@@ -2092,7 +2092,7 @@ class ClaudeAdapter extends BaseAdapter {
           break;
         }
 
-        // Success ‚Äî post final response
+        // Success ‚Ä?post final response
         const fullResponse = pp.lastResponseText.join('\n').trim();
 
         if (this._mode === 'plan') {
@@ -2155,7 +2155,7 @@ class ClaudeAdapter extends BaseAdapter {
           // The nudge has already run once for this plan. Anything still open is
           // not going to be picked up by this turn, and leaving it as "pending"
           // means the next, unrelated task opens with the previous task's list
-          // still on the panel. Cancel it ‚Äî the cursor adapter has always done
+          // still on the panel. Cancel it ‚Ä?the cursor adapter has always done
           // this; claude had no else branch, so its todos never got closed out.
           try { await this.cleanupTodos(msgChannel); } catch {}
         }

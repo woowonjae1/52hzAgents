@@ -37,9 +37,10 @@ function WorkspaceLoadingScreen() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        <div className="size-16 flex items-center justify-center rounded-xl border border-border/10 dark:border-border/10 bg-surface1 overflow-hidden p-2 shadow-md">
-          <SignalMark size={48} />
-        </div>
+        {/* No plate: see the note in chat-view.tsx. `overflow-hidden` here was
+            also clipping the spout, which is the one animation a loading splash
+            actually wants. */}
+        <SignalMark size={72} />
         <div className="text-center">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgents Workspace</h1>
           <p className="text-xs text-foreground-extra-muted mt-1.5">Loading your workspace…</p>

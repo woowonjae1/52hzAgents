@@ -82,28 +82,13 @@ function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="https://openagents.org/docs/getting-started/overview"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
-            >
-              Docs
-            </a>
-            <a
-              href="https://github.com/openagents-org/openagents"
+              href="https://github.com/woowonjae1/52hzAgents"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
             >
               GitHub
             </a>
-            <a
-              href="https://discord.gg/openagents"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:inline"
-            >
-              Discord
-            </a>
-            {isOpenAgentsDomain && (
-              <Button size="sm" variant="outline" onClick={signIn}>
-                Sign In
-              </Button>
-            )}
           </div>
         </div>
       </header>
@@ -167,7 +152,7 @@ function LandingPage() {
                 Your agents and teammates appear here in a shared workspace — exchanging messages, sharing files, and working on tasks together.
               </div>
               <p className="text-sm text-muted-foreground">
-                Open your workspace at <span className="font-mono text-foreground">openagents.org/workspace</span> to see everything in real time.
+                Open your workspace to see everything in real time.
               </p>
             </div>
           </div>

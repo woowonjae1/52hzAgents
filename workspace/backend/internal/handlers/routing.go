@@ -679,10 +679,14 @@ func messageType(payload map[string]interface{}) string {
 }
 
 func isHumanSource(source string) bool { return strings.HasPrefix(source, "human:") }
-func isAgentSource(source string) bool { return strings.HasPrefix(source, "openagents:") }
+func isAgentSource(source string) bool {
+	return strings.HasPrefix(source, "52hz:") || strings.HasPrefix(source, "agent:") || strings.HasPrefix(source, "openagents:")
+}
 
 func agentNameFromSource(source string) string {
-	return strings.TrimPrefix(source, "openagents:")
+	s := strings.TrimPrefix(source, "52hz:")
+	s = strings.TrimPrefix(s, "agent:")
+	return strings.TrimPrefix(s, "openagents:")
 }
 
 func validateMessageSession(workspaceID, source string, metadata map[string]interface{}) error {

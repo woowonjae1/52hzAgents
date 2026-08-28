@@ -1,5 +1,5 @@
 /**
- * Google Antigravity (AGY) Adapter for OpenAgents workspace.
+ * Google Antigravity (AGY) Adapter for 52hzAgents workspace.
  *
  * Bridges the local Antigravity CLI (agy) / Google Antigravity Agent to 52hzAgents:
  * - Reads and syncs model configurations with ~/.gemini/antigravity-cli/settings.json
@@ -45,11 +45,11 @@ function stripAnsi(str) {
 //
 //   Condition met: 'any' (received message from '<uuid>')
 //   **Message from <uuid> (Claude Assistant)**:
-//   Hello! I have completed …
+//   Hello! I have completed �?
 //
 // That is plumbing, not an answer. Left in, the bubble opens with an opaque UUID
-// and a framework's internal vocabulary — and worse, a reader sees "Message from
-// … (Claude Assistant)" and reasonably concludes the workspace's @claude
+// and a framework's internal vocabulary �?and worse, a reader sees "Message from
+// �?(Claude Assistant)" and reasonably concludes the workspace's @claude
 // answered, when it was an internal sub-agent of Antigravity's own.
 //
 // Matched structurally (literal keyword plus a UUID) and only at the START of
@@ -59,7 +59,7 @@ function stripAnsi(str) {
 const SUBAGENT_FRAMING_PATTERNS = [
   // "Condition met: 'any' (received message from '<uuid>')"
   /^\s*Condition met:\s*'[^']*'\s*\(received message from\s*'[0-9a-fA-F-]{8,}'\)\s*/,
-  // "**Message from <uuid> (Some Name)**:" — asterisks and the name optional
+  // "**Message from <uuid> (Some Name)**:" �?asterisks and the name optional
   /^\s*\*{0,2}Message from\s+[0-9a-fA-F-]{8,}\s*(?:\([^)]*\))?\*{0,2}\s*:?\s*/,
 ];
 
@@ -110,7 +110,7 @@ function formatToolPreview(toolName, params) {
   if (params.Url) return params.Url;
   if (params.prompt) return params.prompt;
   const str = JSON.stringify(params);
-  return str.length > 150 ? str.slice(0, 150) + '…' : str;
+  return str.length > 150 ? str.slice(0, 150) + '�? : str;
 }
 
 class AntigravityAdapter extends BaseAdapter {
@@ -441,7 +441,7 @@ class AntigravityAdapter extends BaseAdapter {
 
   async _handleMessage(msg) {
     let channel = this.channelName || 'general';
-    if (msg.sessionId && !msg.sessionId.startsWith('openagents:') && !msg.sessionId.startsWith('agent:')) {
+    if (msg.sessionId && !msg.sessionId.startsWith('52hz:') && !msg.sessionId.startsWith('agent:')) {
       channel = msg.sessionId;
     }
     const content = stripSelfMention(msg.content || '', this.agentName);
@@ -457,7 +457,7 @@ class AntigravityAdapter extends BaseAdapter {
     if (!agyBin) {
       await this.sendError(
         channel,
-        '⚠️ 未在当前系统中找到 Antigravity (`agy`) 可执行程序。请确认已正确安装 Google Antigravity 或配置 PATH 环境变量。'
+        '⚠️ 未在当前系统中找�?Antigravity (`agy`) 可执行程序。请确认已正确安�?Google Antigravity 或配�?PATH 环境变量�?
       );
       return;
     }
@@ -541,7 +541,7 @@ class AntigravityAdapter extends BaseAdapter {
             if (!reportedSteps.has(stepKey)) {
               reportedSteps.add(stepKey);
               if (preview) {
-                try { await this.sendStatus(channel, `${toolName} › ${preview}`); } catch {}
+                try { await this.sendStatus(channel, `${toolName} �?${preview}`); } catch {}
               } else {
                 try { await this.sendStatus(channel, `${toolName}`); } catch {}
               }
@@ -564,7 +564,7 @@ class AntigravityAdapter extends BaseAdapter {
 
               // Detect if agent text announces launching subagents in real-time
               const fullTextSoFar = textDeltas.join('');
-              if (!reportedSteps.has('text_subagent_detected') && (fullTextSoFar.includes('子代理') || fullTextSoFar.includes('子智能体') || fullTextSoFar.includes('subagent') || fullTextSoFar.includes('Subagent'))) {
+              if (!reportedSteps.has('text_subagent_detected') && (fullTextSoFar.includes('子代�?) || fullTextSoFar.includes('子智能体') || fullTextSoFar.includes('subagent') || fullTextSoFar.includes('Subagent'))) {
                 const listMatches = fullTextSoFar.match(/(?:^|\n)\s*(?:\d+\.|\*|-)\s*([^—\n:：]+)[—\-:：]\s*([^\n]+)/g);
                 if (listMatches && listMatches.length > 0) {
                   const detectedAgents = [];
@@ -579,7 +579,7 @@ class AntigravityAdapter extends BaseAdapter {
                           prompt,
                           typeName: 'research',
                           workspace: 'inherit',
-                          status: fullTextSoFar.includes('已完成') || fullTextSoFar.includes('报告已完成') ? 'completed' : 'running',
+                          status: fullTextSoFar.includes('已完�?) || fullTextSoFar.includes('报告已完�?) ? 'completed' : 'running',
                         });
                       }
                     }
@@ -587,7 +587,7 @@ class AntigravityAdapter extends BaseAdapter {
                   if (detectedAgents.length > 0) {
                     reportedSteps.add('text_subagent_detected');
                     try {
-                      await this.sendStatus(channel, `invoke_subagent › ${JSON.stringify(detectedAgents)}`);
+                      await this.sendStatus(channel, `invoke_subagent �?${JSON.stringify(detectedAgents)}`);
                     } catch {}
                   }
                 }
@@ -613,7 +613,7 @@ class AntigravityAdapter extends BaseAdapter {
 
       // `agy` gets no timeout of its own, and a single-agent turn has no
       // pipeline sweeper behind it either, so a hung child left the channel
-      // sitting on "正在推理中..." forever with nothing to report and no way
+      // sitting on "正在推理�?.." forever with nothing to report and no way
       // out. Reap on *silence* rather than total duration: a long task keeps
       // emitting stream-json, so any real work resets this.
       const IDLE_KILL_MS = Number(process.env.ANTIGRAVITY_IDLE_TIMEOUT_MS) || 5 * 60 * 1000;
@@ -693,7 +693,7 @@ class AntigravityAdapter extends BaseAdapter {
           const mins = Math.round(IDLE_KILL_MS / 60000);
           const detail = tail
             ? `\n最后的 stderr:\n${tail}`
-            : '\n没有 stderr 输出 — agy 可能在等待登录或交互确认。';
+            : '\n没有 stderr 输出 �?agy 可能在等待登录或交互确认�?;
           await this.sendError(
             channel,
             `⏱️ Antigravity ${mins} 分钟内没有任何输出，已终止。`
@@ -722,7 +722,7 @@ class AntigravityAdapter extends BaseAdapter {
         clearIdle();
         delete this._channelProcesses[channel];
         this._log(`[spawn] event=error channel=${channel} msg=${err.message}`);
-        await this.sendError(channel, `❌ 启动 Antigravity 失败: ${err.message}`);
+        await this.sendError(channel, `�?启动 Antigravity 失败: ${err.message}`);
         resolve();
       });
     });

@@ -22,7 +22,7 @@
       "windows": "irm https://aider.chat/install.ps1 | iex"
     },
     "adapter": {
-      "module": "openagents.adapters.aider",
+      "module": "wwj.adapters.aider",
       "class": "AiderAdapter"
     },
     "launch": {
@@ -38,7 +38,7 @@
       },
       {
         "name": "AIDER_MODEL",
-        "description": "Model to use, e.g. sonnet, gpt-4o, claude-3-5-sonnet-20241022, openrouter/anthropic/claude-3.5-sonnet, gemini/gemini-1.5-pro, deepseek/deepseek-chat. May be left blank to let Aider auto-select â€” but if you set LLM_API_KEY, the provider must be determinable (via AIDER_PROVIDER or the model name).",
+        "description": "Model to use, e.g. sonnet, gpt-4o, claude-3-5-sonnet-20241022, openrouter/anthropic/claude-3.5-sonnet, gemini/gemini-1.5-pro, deepseek/deepseek-chat. May be left blank to let Aider auto-select â€?but if you set LLM_API_KEY, the provider must be determinable (via AIDER_PROVIDER or the model name).",
         "required": false,
         "placeholder": "gpt-4o"
       },
@@ -50,7 +50,7 @@
       },
       {
         "name": "LLM_BASE_URL",
-        "description": "Endpoint URL â€” ONLY for AIDER_PROVIDER=openai-compatible (self-hosted / relay / local). Becomes OPENAI_API_BASE; leave blank for hosted providers.",
+        "description": "Endpoint URL â€?ONLY for AIDER_PROVIDER=openai-compatible (self-hosted / relay / local). Becomes OPENAI_API_BASE; leave blank for hosted providers.",
         "required": false,
         "placeholder": "https://my-endpoint.example/v1"
       }
@@ -64,7 +64,7 @@
         "DEEPSEEK_API_KEY"
       ],
       "saved_env_key": "LLM_API_KEY",
-      "not_ready_message": "No model API key â€” set a model + LLM_API_KEY (or a provider key such as OPENAI_API_KEY) â€” press e to configure"
+      "not_ready_message": "No model API key â€?set a model + LLM_API_KEY (or a provider key such as OPENAI_API_KEY) â€?press e to configure"
     }
   },
   {
@@ -91,7 +91,7 @@
       "windows": "irm https://ampcode.com/install.ps1 | iex"
     },
     "adapter": {
-      "module": "openagents.adapters.amp",
+      "module": "wwj.adapters.amp",
       "class": "AmpAdapter"
     },
     "launch": {
@@ -100,7 +100,7 @@
     "env_config": [
       {
         "name": "AMP_API_KEY",
-        "description": "Amp API key (create one at https://ampcode.com/settings) â€” leave blank if you have run `amp login`",
+        "description": "Amp API key (create one at https://ampcode.com/settings) â€?leave blank if you have run `amp login`",
         "required": false,
         "password": true
       },
@@ -112,7 +112,7 @@
     ],
     "check_ready": {
       "login_command": "amp login",
-      "not_ready_message": "Amp is installed but not signed in â€” run: amp login or set AMP_API_KEY"
+      "not_ready_message": "Amp is installed but not signed in â€?run: amp login or set AMP_API_KEY"
     }
   },
   {
@@ -144,7 +144,7 @@
       "windows": "npm install -g @anthropic-ai/claude-code"
     },
     "adapter": {
-      "module": "openagents.adapters.claude",
+      "module": "wwj.adapters.claude",
       "class": "ClaudeAdapter"
     },
     "launch": {
@@ -189,7 +189,7 @@
       "binary": "agy"
     },
     "adapter": {
-      "module": "openagents.adapters.antigravity",
+      "module": "wwj.adapters.antigravity",
       "class": "AntigravityAdapter"
     },
     "launch": {
@@ -225,7 +225,7 @@
       "windows": "npm install -g cline"
     },
     "adapter": {
-      "module": "openagents.adapters.cline",
+      "module": "wwj.adapters.cline",
       "class": "ClineAdapter"
     },
     "launch": {
@@ -261,7 +261,7 @@
       ],
       "saved_env_key": "CLINE_API_KEY",
       "login_command": "cline auth",
-      "not_ready_message": "Not configured â€” set an API key (press e) or run: cline auth"
+      "not_ready_message": "Not configured â€?set an API key (press e) or run: cline auth"
     }
   },
   {
@@ -292,7 +292,7 @@
       "windows": "npm install -g @openai/codex"
     },
     "adapter": {
-      "module": "openagents.adapters.codex",
+      "module": "wwj.adapters.codex",
       "class": "CodexAdapter"
     },
     "launch": {
@@ -375,7 +375,7 @@
       "windows": "npm install -g @github/copilot"
     },
     "adapter": {
-      "module": "openagents.adapters.copilot",
+      "module": "wwj.adapters.copilot",
       "class": "CopilotAdapter"
     },
     "launch": {
@@ -384,7 +384,7 @@
     "env_config": [
       {
         "name": "COPILOT_GITHUB_TOKEN",
-        "description": "GitHub token with Copilot access (optional â€” you can also sign in by running `copilot`, or rely on GH_TOKEN / GITHUB_TOKEN / gh auth)",
+        "description": "GitHub token with Copilot access (optional â€?you can also sign in by running `copilot`, or rely on GH_TOKEN / GITHUB_TOKEN / gh auth)",
         "required": false,
         "password": true
       },
@@ -433,7 +433,7 @@
       "windows": "\"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\" -NoProfile -ExecutionPolicy Bypass -Command \"Invoke-RestMethod -UseBasicParsing 'https://cursor.com/install?win32=true' | Invoke-Expression\""
     },
     "adapter": {
-      "module": "openagents.adapters.cursor",
+      "module": "wwj.adapters.cursor",
       "class": "CursorAdapter"
     },
     "launch": {
@@ -454,7 +454,7 @@
     ],
     "check_ready": {
       "binary": "agent",
-      "not_ready_message": "Cursor CLI not found â€” install with: curl https://cursor.com/install -fsSL | bash"
+      "not_ready_message": "Cursor CLI not found â€?install with: curl https://cursor.com/install -fsSL | bash"
     },
     "resolve_env": {
       "rules": [
@@ -496,7 +496,7 @@
       "windows": "npm install -g @google/gemini-cli"
     },
     "adapter": {
-      "module": "openagents.adapters.gemini",
+      "module": "wwj.adapters.gemini",
       "class": "GeminiAdapter"
     },
     "launch": {
@@ -520,7 +520,7 @@
       ],
       "saved_env_key": "GEMINI_API_KEY",
       "login_command": "gemini",
-      "not_ready_message": "Needs sign-in â€” run `gemini` to sign in, or set GEMINI_API_KEY.",
+      "not_ready_message": "Needs sign-in â€?run `gemini` to sign in, or set GEMINI_API_KEY.",
       "unreadable_message": "Gemini credentials were found but could not be read. Check permissions on ~/.gemini, or run `gemini` to sign in again.",
       "auth_detected_labels": {
         "cli_login": "Google account sign-in detected",
@@ -532,7 +532,7 @@
   {
     "name": "goose",
     "label": "Goose",
-    "description": "An open-source AI developer agent by Block (CLI â€” Beta)",
+    "description": "An open-source AI developer agent by Block (CLI â€?Beta)",
     "homepage": "https://github.com/block/goose",
     "tags": [
       "coding",
@@ -554,7 +554,7 @@
       "windows": "powershell -c \"$env:CONFIGURE='false'; irm https://raw.githubusercontent.com/block/goose/main/download_cli.ps1 | iex\""
     },
     "adapter": {
-      "module": "openagents.adapters.goose",
+      "module": "wwj.adapters.goose",
       "class": "GooseAdapter"
     },
     "launch": {
@@ -579,7 +579,7 @@
       },
       {
         "name": "GOOSE_PROVIDER__HOST",
-        "description": "Custom provider endpoint/host URL (optional â€” for proxies or self-hosted/OpenAI-compatible endpoints).",
+        "description": "Custom provider endpoint/host URL (optional â€?for proxies or self-hosted/OpenAI-compatible endpoints).",
         "required": false
       },
       {
@@ -591,13 +591,13 @@
     ],
     "check_ready": {
       "require_binary": true,
-      "not_ready_message": "Goose CLI not found. Install it: openagents install goose â€” then set a provider/model (or run `goose configure` once)."
+      "not_ready_message": "Goose CLI not found. Install it: wwj install goose â€?then set a provider/model (or run `goose configure` once)."
     }
   },
   {
     "name": "nanoclaw",
     "label": "NanoClaw",
-    "description": "Containerized agent runtime â€” each Agent Group runs in its own Docker container (Claude Agent SDK). Bridged to the Workspace via a native OpenAgents channel.",
+    "description": "Containerized agent runtime â€?each Agent Group runs in its own Docker container (Claude Agent SDK). Bridged to the Workspace via a native 52hzAgents channel.",
     "homepage": "https://github.com/nanocoai/nanoclaw",
     "tags": [
       "coding",
@@ -619,9 +619,9 @@
         "docker",
         "git"
       ],
-      "macos": "echo 'NanoClaw is an external containerized runtime. Set it up from https://github.com/nanocoai/nanoclaw (clone, pnpm install, ./nanoclaw.sh setup), symlink bin/ncl onto your PATH, then install the OpenAgents channel: see docs/nanoclaw.md (/add-openagents).'",
-      "linux": "echo 'NanoClaw is an external containerized runtime. Set it up from https://github.com/nanocoai/nanoclaw (clone, pnpm install, ./nanoclaw.sh setup), symlink bin/ncl onto your PATH, then install the OpenAgents channel: see docs/nanoclaw.md (/add-openagents).'",
-      "windows": "echo 'NanoClaw requires Docker Desktop + WSL2 on Windows. Set it up inside WSL2 from https://github.com/nanocoai/nanoclaw, symlink bin/ncl onto your PATH, then install the OpenAgents channel: see docs/nanoclaw.md (/add-openagents).'"
+      "macos": "echo 'NanoClaw is an external containerized runtime. Set it up from https://github.com/nanocoai/nanoclaw (clone, pnpm install, ./nanoclaw.sh setup), symlink bin/ncl onto your PATH, then install the 52hzAgents channel: see docs/nanoclaw.md (/add-52hzAgents).'",
+      "linux": "echo 'NanoClaw is an external containerized runtime. Set it up from https://github.com/nanocoai/nanoclaw (clone, pnpm install, ./nanoclaw.sh setup), symlink bin/ncl onto your PATH, then install the 52hzAgents channel: see docs/nanoclaw.md (/add-52hzAgents).'",
+      "windows": "echo 'NanoClaw requires Docker Desktop + WSL2 on Windows. Set it up inside WSL2 from https://github.com/nanocoai/nanoclaw, symlink bin/ncl onto your PATH, then install the 52hzAgents channel: see docs/nanoclaw.md (/add-52hzAgents).'"
     },
     "launch": {
       "args": [
@@ -647,14 +647,14 @@
         "NANOCLAW_AGENT_GROUP"
       ],
       "saved_env_key": "NANOCLAW_AGENT_GROUP",
-      "not_ready_message": "Set NANOCLAW_AGENT_GROUP (and NANOCLAW_HOME) â€” press e to configure"
+      "not_ready_message": "Set NANOCLAW_AGENT_GROUP (and NANOCLAW_HOME) â€?press e to configure"
     }
   },
   {
     "name": "openclaw",
     "label": "OpenClaw",
     "description": "Open-source coding agent with multi-model support",
-    "homepage": "https://github.com/openagents/openclaw",
+    "homepage": "https://github.com/52hzAgents/openclaw",
     "tags": [
       "coding",
       "open-source"
@@ -678,7 +678,7 @@
       "windows": "npm install -g openclaw@latest"
     },
     "adapter": {
-      "module": "openagents.adapters.openclaw",
+      "module": "wwj.adapters.openclaw",
       "class": "OpenClawAdapter",
       "options": {
         "openclaw_host": "127.0.0.1",
@@ -735,7 +735,7 @@
         "OPENAI_API_KEY"
       ],
       "saved_env_key": "LLM_API_KEY",
-      "not_ready_message": "Not configured â€” press e to configure"
+      "not_ready_message": "Not configured â€?press e to configure"
     }
   },
   {
@@ -762,7 +762,7 @@
       "windows": "npm install -g opencode-ai@1.17.11"
     },
     "adapter": {
-      "module": "openagents.adapters.opencode",
+      "module": "wwj.adapters.opencode",
       "class": "OpenCodeAdapter"
     },
     "env_config": [
@@ -781,7 +781,7 @@
       },
       {
         "name": "LLM_MODEL",
-        "description": "Model name (required â€” OpenCode hangs without one)",
+        "description": "Model name (required â€?OpenCode hangs without one)",
         "required": true,
         "placeholder": "gpt-4o, claude-sonnet-4-20250514, etc."
       }
@@ -809,7 +809,7 @@
       ],
       "saved_env_key": "LLM_API_KEY",
       "min_version": "1.17.0",
-      "not_ready_message": "Not configured â€” press e to configure"
+      "not_ready_message": "Not configured â€?press e to configure"
     }
   },
   {
@@ -833,12 +833,12 @@
     "install": {
       "binary": "kimi",
       "api_only": true,
-      "macos": "echo 'Kimi uses direct API mode â€” no binary install needed'",
-      "linux": "echo 'Kimi uses direct API mode â€” no binary install needed'",
-      "windows": "echo 'Kimi uses direct API mode â€” no binary install needed'"
+      "macos": "echo 'Kimi uses direct API mode â€?no binary install needed'",
+      "linux": "echo 'Kimi uses direct API mode â€?no binary install needed'",
+      "windows": "echo 'Kimi uses direct API mode â€?no binary install needed'"
     },
     "adapter": {
-      "module": "openagents.adapters.kimi",
+      "module": "wwj.adapters.kimi",
       "class": "KimiAdapter"
     },
     "launch": {
@@ -872,13 +872,13 @@
         "MOONSHOT_API_KEY"
       ],
       "saved_env_key": "KIMI_API_KEY",
-      "not_ready_message": "No API key â€” press e to configure"
+      "not_ready_message": "No API key â€?press e to configure"
     }
   },
   {
     "name": "hermes",
     "label": "Hermes Agent",
-    "description": "Nous Hermes Agent â€” self-improving AI with tools, profiles, memory, and messaging",
+    "description": "Nous Hermes Agent â€?self-improving AI with tools, profiles, memory, and messaging",
     "homepage": "https://github.com/NousResearch/hermes-agent",
     "tags": [
       "coding",
@@ -910,14 +910,14 @@
       "creds_file": "~/.hermes/config.yaml",
       "status_command": "hermes status",
       "login_command": "hermes setup",
-      "not_ready_message": "Hermes not configured â€” run: hermes setup"
+      "not_ready_message": "Hermes not configured â€?run: hermes setup"
     }
   },
   {
     "name": "pi",
     "label": "Pi Agent",
     "description": "Multi-provider coding agent CLI with read/bash/edit/write tools (@earendil-works/pi-coding-agent).",
-    "homepage": "https://openagents.org",
+    "homepage": "https://github.com/woowonjae1/52hzAgents",
     "tags": [
       "coding",
       "cli"
@@ -934,7 +934,7 @@
       "api_only": true
     },
     "adapter": {
-      "module": "openagents.adapters.pi",
+      "module": "wwj.adapters.pi",
       "class": "PiAdapter"
     },
     "launch": {
@@ -965,7 +965,7 @@
       "windows": "npm install -g @kilocode/cli"
     },
     "adapter": {
-      "module": "openagents.adapters.opencode",
+      "module": "wwj.adapters.opencode",
       "class": "OpenCodeAdapter"
     },
     "env_config": [
@@ -1035,7 +1035,7 @@
       "api_only": true
     },
     "adapter": {
-      "module": "openagents.adapters.deepseek",
+      "module": "wwj.adapters.deepseek",
       "class": "DeepSeekAdapter"
     },
     "env_config": [
@@ -1104,7 +1104,7 @@
       },
       {
         "name": "MSWEA_MINI_CONFIG_PATH",
-        "description": "Path to a FULL mini config file (YAML). Optional. This REPLACES mini's built-in default config (agent prompt templates, step/environment settings) â€” it does not merge â€” so provide a complete file (a good starting point is the output of `mini-extra config setup`). Leave blank to use mini's default config.",
+        "description": "Path to a FULL mini config file (YAML). Optional. This REPLACES mini's built-in default config (agent prompt templates, step/environment settings) â€?it does not merge â€?so provide a complete file (a good starting point is the output of `mini-extra config setup`). Leave blank to use mini's default config.",
         "required": false,
         "placeholder": "/path/to/mini.yaml"
       },
@@ -1116,31 +1116,31 @@
       },
       {
         "name": "ANTHROPIC_API_KEY",
-        "description": "Anthropic API key â€” used when the model is an Anthropic model. Leave blank if using another provider or a key already in your environment.",
+        "description": "Anthropic API key â€?used when the model is an Anthropic model. Leave blank if using another provider or a key already in your environment.",
         "required": false,
         "password": true
       },
       {
         "name": "ANTHROPIC_BASE_URL",
-        "description": "Custom endpoint for native `anthropic/â€¦` models (an enterprise gateway or Anthropic-protocol relay). Leave blank for hosted Anthropic. Note: most third-party relays are OpenAI-compatible â€” for those use an `openai/â€¦` model + OPENAI_BASE_URL instead.",
+        "description": "Custom endpoint for native `anthropic/â€¦` models (an enterprise gateway or Anthropic-protocol relay). Leave blank for hosted Anthropic. Note: most third-party relays are OpenAI-compatible â€?for those use an `openai/â€¦` model + OPENAI_BASE_URL instead.",
         "required": false,
         "placeholder": "https://your-anthropic-gateway.example"
       },
       {
         "name": "OPENAI_API_KEY",
-        "description": "OpenAI API key â€” used when the model is an OpenAI model. Leave blank if using another provider or a key already in your environment.",
+        "description": "OpenAI API key â€?used when the model is an OpenAI model. Leave blank if using another provider or a key already in your environment.",
         "required": false,
         "password": true
       },
       {
         "name": "OPENAI_BASE_URL",
-        "description": "Custom endpoint for OpenAI-compatible models (a relay/proxy or self-hosted gateway) â€” applies only to `openai/â€¦` models. Leave blank for hosted OpenAI, or for native providers like `deepseek/â€¦` / `anthropic/â€¦`.",
+        "description": "Custom endpoint for OpenAI-compatible models (a relay/proxy or self-hosted gateway) â€?applies only to `openai/â€¦` models. Leave blank for hosted OpenAI, or for native providers like `deepseek/â€¦` / `anthropic/â€¦`.",
         "required": false,
         "placeholder": "https://your-relay.example/v1"
       },
       {
         "name": "DEEPSEEK_API_KEY",
-        "description": "DeepSeek API key â€” used when the model is a `deepseek/â€¦` model (e.g. deepseek/deepseek-chat or deepseek/deepseek-reasoner). Connects directly to api.deepseek.com; no base URL needed.",
+        "description": "DeepSeek API key â€?used when the model is a `deepseek/â€¦` model (e.g. deepseek/deepseek-chat or deepseek/deepseek-reasoner). Connects directly to api.deepseek.com; no base URL needed.",
         "required": false,
         "password": true
       },
@@ -1166,7 +1166,7 @@
     "name": "custom",
     "label": "Custom Agent",
     "description": "Any agent CLI wwj has no built-in adapter for. You supply the command; it runs once per message with the prompt on argv ({prompt}) or stdin.",
-    "homepage": "https://openagents.org",
+    "homepage": "https://github.com/woowonjae1/52hzAgents",
     "tags": [
       "custom"
     ],
@@ -1181,7 +1181,7 @@
       "api_only": true
     },
     "adapter": {
-      "module": "openagents.adapters.custom",
+      "module": "wwj.adapters.custom",
       "class": "CustomAdapter"
     },
     "launch": {
