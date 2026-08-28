@@ -31,8 +31,57 @@ export interface PendingFile {
   preview?: string; // data URL for images
 }
 
+export interface MentionSegment {
+  agent: string;
+  instruction: string;
+}
+
+export function extractMentionSegments(
+  text: string,
+  knownAgents?: (WorkspaceAgent | string)[]
+): MentionSegment[] {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  // Match all @mentions with their positions
+  const mentionRegex = /@([\w:.-]+)/g;
+  const matches = Array.from(trimmed.matchAll(mentionRegex));
+  if (matches.length === 0) return [];
+
+  const allowedMap = new Map<string, string>();
+  if (knownAgents && knownAgents.length > 0) {
+    for (const a of knownAgents) {
+      const name = typeof a === 'string' ? a : a.agentName;
+      if (name && name.toLowerCase() !== 'knowledge') {
+        allowedMap.set(name.toLowerCase(), name);
+      }
+    }
+  }
+
+  const segments: MentionSegment[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const match = matches[i];
+    const rawName = match[1];
+    if (rawName.toLowerCase() === 'knowledge') continue;
+
+    const agentName = allowedMap.size > 0 ? (allowedMap.get(rawName.toLowerCase()) || rawName) : rawName;
+
+    const matchStart = match.index ?? 0;
+    const matchEnd = matchStart + match[0].length;
+    const nextMatchStart = i + 1 < matches.length ? (matches[i + 1].index ?? trimmed.length) : trimmed.length;
+
+    const instruction = trimmed.slice(matchEnd, nextMatchStart).trim();
+    segments.push({
+      agent: agentName,
+      instruction,
+    });
+  }
+
+  return segments;
+}
+
 export interface PromptComposerProps {
-  onSend: (content: string, mentions: string[], files: PendingFile[]) => void;
+  onSend: (content: string, mentions: string[], files: PendingFile[], segments?: MentionSegment[]) => void;
   disabled?: boolean;
   className?: string;
   agents?: WorkspaceAgent[];
@@ -306,14 +355,19 @@ export function PromptComposer({
     setShowMentions(false);
   };
 
+  const activePipelineSegments = React.useMemo(() => {
+    return extractMentionSegments(message, agents);
+  }, [message, agents]);
+
   const handleSend = () => {
     const trimmed = message.trim();
     if ((!trimmed && pendingFiles.length === 0) || disabled || isWorking) return;
 
+    const segments = extractMentionSegments(trimmed, agents);
     const mentionMatches = trimmed.match(/@([\w:.-]+)/g) || [];
-    const mentions = mentionMatches.map((m) => m.slice(1));
+    const mentions = segments.length > 0 ? segments.map((s) => s.agent) : mentionMatches.map((m) => m.slice(1));
 
-    onSend(trimmed, mentions, pendingFiles);
+    onSend(trimmed, mentions, pendingFiles, segments.length >= 2 ? segments : undefined);
 
     setMessage('');
     setPendingFiles([]);
@@ -644,6 +698,47 @@ export function PromptComposer({
                   </button>
                 </div>
               ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Deterministic Multi-Agent Pipeline Live Preview */}
+        <AnimatePresence>
+          {activePipelineSegments.length >= 2 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="px-3.5 pt-2 pb-1 overflow-hidden"
+            >
+              <div className="flex items-center gap-2 p-2 rounded-xl bg-primary/8 border border-primary/25 text-2xs text-foreground backdrop-blur-xs">
+                <div className="flex items-center gap-1 text-primary font-semibold shrink-0">
+                  <Waypoints className="size-3.5" />
+                  <span>Pipeline Preview:</span>
+                </div>
+                <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto py-0.5 flex-1">
+                  {activePipelineSegments.map((seg, idx) => (
+                    <React.Fragment key={idx}>
+                      {idx > 0 && <span className="text-primary/60 font-bold shrink-0">➔</span>}
+                      <div
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground max-w-[220px]"
+                        title={seg.instruction ? `@${seg.agent}: ${seg.instruction}` : `@${seg.agent}`}
+                      >
+                        <span className="size-3.5 rounded-full bg-primary text-primary-foreground text-3xs font-bold flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <AgentAvatar name={seg.agent} size={13} />
+                        <span className="font-semibold truncate">@{seg.agent}</span>
+                        {seg.instruction && (
+                          <span className="text-3xs text-muted-foreground truncate max-w-[100px]">
+                            {seg.instruction}
+                          </span>
+                        )}
+                      </div>
+                    </React.Fragment>
+                  ))}
+                </div>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

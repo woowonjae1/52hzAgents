@@ -379,3 +379,52 @@ func TestPipelineAdvancesOnAnalyticalReviewWithReportedBugs(t *testing.T) {
 		t.Fatalf("Expected step 1 (claude-agent) to be running, got %s", steps[1].Status)
 	}
 }
+
+func TestPipelineStructuredMentionSegmentsDirect(t *testing.T) {
+	workspace, channel := setupPipelineDB(t)
+
+	// User sends structured mention_segments containing complex Chinese conjunctions
+	req := &SendEventRequest{
+		Type:   "workspace.message.posted",
+		Source: "human:user",
+		Target: "channel/general",
+		Payload: map[string]interface{}{
+			"content":      "@codex-agent 检查项目的微服务组件有哪些交给 @claude-agent 给出微服务组件的优化建议",
+			"message_type": "chat",
+		},
+		Metadata: map[string]interface{}{
+			"mention_segments": []interface{}{
+				map[string]interface{}{
+					"agent":       "codex-agent",
+					"instruction": "检查项目的微服务组件有哪些交给",
+				},
+				map[string]interface{}{
+					"agent":       "claude-agent",
+					"instruction": "给出微服务组件的优化建议",
+				},
+			},
+		},
+	}
+
+	targets, routed, err := routeMessage(workspace.ID, &channel, req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !routed || len(targets) != 1 || targets[0] != "codex-agent" {
+		t.Fatalf("expected structured chain to route directly to codex-agent, got routed=%v targets=%v", routed, targets)
+	}
+
+	record, steps := loadChain(t, channel.ID)
+	if record.Status != "running" || record.CurrentIndex != 0 {
+		t.Fatalf("expected running chain at index 0, got status=%s index=%d", record.Status, record.CurrentIndex)
+	}
+	if len(steps) != 2 {
+		t.Fatalf("expected 2 steps in chain, got %d", len(steps))
+	}
+	if steps[0].Agent != "codex-agent" || steps[0].Instruction != "检查项目的微服务组件有哪些交给" {
+		t.Fatalf("unexpected step 0: %+v", steps[0])
+	}
+	if steps[1].Agent != "claude-agent" || steps[1].Instruction != "给出微服务组件的优化建议" {
+		t.Fatalf("unexpected step 1: %+v", steps[1])
+	}
+}

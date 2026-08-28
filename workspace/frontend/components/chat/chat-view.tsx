@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
-import { ChatInput, type PendingFile } from './chat-input';
+import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
 import { ThreadStatusBar } from './thread-status-bar';
 import { EmptyState } from './empty-state';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -581,7 +581,8 @@ export function ChatView() {
     async (
       content: string,
       mentions: string[] = [],
-      files: PendingFile[] = []
+      files: PendingFile[] = [],
+      segments?: MentionSegment[]
     ) => {
       if (!currentSessionId) return;
       if (!currentUser.id || !currentUser.name.trim()) return;
@@ -607,6 +608,7 @@ export function ChatView() {
       };
       const onlineAgents = agents.filter((a) => a.status === 'online');
       const predictedAgentName =
+        (segments && segments.length > 0 ? segments[0].agent : null) ||
         mentions[0] ||
         (currentSession?.master && onlineAgents.some((a) => a.agentName === currentSession.master) ? currentSession.master : null) ||
         (onlineAgents.length === 1 ? onlineAgents[0].agentName : null) ||
@@ -668,6 +670,14 @@ export function ChatView() {
           }
         } catch {}
 
+        const msgMetadata: Record<string, unknown> = {};
+        if (Object.keys(agentModelsMeta).length > 0) {
+          msgMetadata.agent_models = agentModelsMeta;
+        }
+        if (segments && segments.length >= 2) {
+          msgMetadata.mention_segments = segments;
+        }
+
         const confirmation = await workspaceApi.sendMessage(
           currentSessionId,
           content || (attachments ? attachments.map((a) => a.filename).join(', ') : ''),
@@ -676,7 +686,7 @@ export function ChatView() {
           attachments,
           currentUser.id,
           clientMessageId,
-          Object.keys(agentModelsMeta).length > 0 ? { agent_models: agentModelsMeta } : undefined,
+          Object.keys(msgMetadata).length > 0 ? msgMetadata : undefined,
         );
         if (confirmation.status !== 'confirmed' || !confirmation.event_id) {
           throw new Error('Message was not confirmed by the workspace');

@@ -26,6 +26,45 @@ var (
 	pipelineRegex = regexp.MustCompile(`(?i)(?:^|[^\w@])[#/]?@([a-zA-Z0-9_-]+)`)
 )
 
+func parseStructuredSegments(raw []interface{}, participants []string) []models.PipelineStep {
+	if len(raw) < 2 {
+		return nil
+	}
+	allowed := make(map[string]string, len(participants))
+	for _, p := range participants {
+		allowed[strings.ToLower(p)] = p
+	}
+
+	var steps []models.PipelineStep
+	for _, item := range raw {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		rawAgent, _ := m["agent"].(string)
+		rawAgent = strings.TrimPrefix(strings.TrimSpace(rawAgent), "@")
+		if strings.ToLower(rawAgent) == "knowledge" || rawAgent == "" {
+			continue
+		}
+		agentName, ok := allowed[strings.ToLower(rawAgent)]
+		if !ok {
+			agentName = rawAgent
+		}
+		instruction, _ := m["instruction"].(string)
+		steps = append(steps, models.PipelineStep{
+			Agent:       agentName,
+			Instruction: strings.TrimSpace(instruction),
+			Status:      "pending",
+			MaxRetries:  3,
+			RetryCount:  0,
+		})
+	}
+	if len(steps) < 2 {
+		return nil
+	}
+	return steps
+}
+
 func parseAgentPipeline(content string, participants []string) []models.PipelineStep {
 	if len(participants) < 2 {
 		return nil
@@ -611,7 +650,25 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 
 	// If human message contains multi-agent pipeline (@agent1 ... @agent2 ... @agent3 ...)
 	if isHumanSource(req.Source) {
-		if segments := parseAgentPipeline(content, availableCandidates); len(segments) >= 2 {
+		var segments []models.PipelineStep
+		// 1. Direct structured mention_segments check (deterministic, 0ms, no NLP guessing)
+		if req.Metadata != nil {
+			if rawSegments, ok := req.Metadata["mention_segments"].([]interface{}); ok && len(rawSegments) >= 2 {
+				segments = parseStructuredSegments(rawSegments, availableCandidates)
+			}
+		}
+		if len(segments) < 2 && req.Payload != nil {
+			if rawSegments, ok := req.Payload["mention_segments"].([]interface{}); ok && len(rawSegments) >= 2 {
+				segments = parseStructuredSegments(rawSegments, availableCandidates)
+			}
+		}
+
+		// 2. Positional regex parsing fallback if structured segments were not supplied
+		if len(segments) < 2 {
+			segments = parseAgentPipeline(content, availableCandidates)
+		}
+
+		if len(segments) >= 2 {
 			if pipelineID := startPipeline(workspaceID, channel.ID, req.Source, segments); pipelineID != "" && req.Metadata != nil {
 				// Turn attribution groups every retry of a step under that
 				// step's key. Step 0 is dispatched through the event handler
