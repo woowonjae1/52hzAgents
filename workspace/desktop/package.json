@@ -27,6 +27,7 @@
       "main.js",
       "preload.js",
       "icon.png",
+      "icon.ico",
       "tray-icon.png"
     ],
     "extraResources": [
@@ -40,7 +41,7 @@
         "nsis",
         "portable"
       ],
-      "icon": "icon.png"
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": false,
