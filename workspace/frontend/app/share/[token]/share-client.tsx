@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import Image from 'next/image';
+import { SignalMark } from '@/components/brand/signal-mark';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { Loader2 } from 'lucide-react';
@@ -98,7 +99,7 @@ export function ShareClient({ params }: { params: Promise<{ token: string }> }) 
   if (error || !snapshot) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
-        <Image src="/logo-icon.png" alt="52hzAgents" width={40} height={40} />
+        <SignalMark size={40} />
         <h1 className="text-xl font-semibold">Shared Conversation</h1>
         <p className="text-muted-foreground text-sm max-w-md text-center">{error}</p>
         <a
@@ -117,7 +118,7 @@ export function ShareClient({ params }: { params: Promise<{ token: string }> }) 
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-icon.png" alt="52hzAgents" width={24} height={24} />
+            <SignalMark size={24} />
             <span className="text-sm font-medium text-muted-foreground">Shared Conversation</span>
           </div>
           <a
@@ -154,7 +155,7 @@ export function ShareClient({ params }: { params: Promise<{ token: string }> }) 
           href="https://github.com/woowonjae1/52hzAgents"
           className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
         >
-          <Image src="/logo-icon.png" alt="" width={16} height={16} />
+          <SignalMark size={18} />
           Try 52hzAgents Workspace
         </a>
       </div>

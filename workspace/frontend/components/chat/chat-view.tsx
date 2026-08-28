@@ -29,6 +29,7 @@ import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
@@ -930,8 +931,8 @@ export function ChatView() {
           <div className="flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
             <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.2s_ease-out]">
               {/* Brand Emblem */}
-              <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center p-2 shadow-xs overflow-hidden">
-                <img src="/logo-icon.png" alt="52hzAgents Logo" className="size-7 object-contain" />
+              <div className="size-12 rounded-2xl bg-surface2/80 border border-border/80 flex items-center justify-center p-1.5 shadow-xs overflow-hidden">
+                <SignalMark size={36} />
               </div>
 
               {/* Title & Greeting */}

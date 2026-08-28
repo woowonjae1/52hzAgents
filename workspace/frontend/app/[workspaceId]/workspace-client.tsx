@@ -7,14 +7,15 @@ import { ArtifactsProvider } from '@/lib/artifacts-context';
 import { LayoutProvider } from '@/components/layout/layout-context';
 import { Wrapper } from '@/components/layout/wrapper';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
+import { SignalMark } from '@/components/brand/signal-mark';
 import { Network } from 'lucide-react';
 
 export function WorkspaceLoadingSplash() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        <div className="size-16 flex items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Network className="size-8" />
+        <div className="size-16 flex items-center justify-center rounded-xl border border-border/20 bg-surface1 p-2 shadow-md">
+          <SignalMark size={48} />
         </div>
         <div className="text-center">
           <h1 className="text-xl font-semibold tracking-tight">Workspace</h1>

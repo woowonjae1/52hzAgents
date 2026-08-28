@@ -30,14 +30,15 @@ import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 
+import { SignalMark } from '@/components/brand/signal-mark';
 import { Network, X, PanelLeft } from 'lucide-react';
 
 function WorkspaceLoadingScreen() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        <div className="size-16 flex items-center justify-center rounded-xl border border-border/10 dark:border-border/10 bg-surface1 overflow-hidden p-2.5 shadow-md">
-          <img src="/logo-icon.png" alt="52hzAgents Logo" className="w-full h-full object-contain" />
+        <div className="size-16 flex items-center justify-center rounded-xl border border-border/10 dark:border-border/10 bg-surface1 overflow-hidden p-2 shadow-md">
+          <SignalMark size={48} />
         </div>
         <div className="text-center">
           <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgents Workspace</h1>

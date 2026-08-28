@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/workspace-client';
 import Image from 'next/image';
+import { SignalMark } from '@/components/brand/signal-mark';
 import {
   Bot, Plus, LogOut, Users, Clock, Archive, Loader2,
   Terminal, Copy, Check, ArrowRight, Download,
@@ -76,8 +77,7 @@ function LandingPage() {
       <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-icon.png" alt="52hzAgents" width={28} height={28} className="dark:hidden" />
-            <Image src="/logo-icon.png" alt="52hzAgents" width={28} height={28} className="hidden dark:block" />
+            <SignalMark size={32} />
             <span className="font-semibold text-lg">52hzAgents</span>
           </div>
           <div className="flex items-center gap-3">
@@ -305,7 +305,7 @@ function LandingPage() {
       <footer className="border-t py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Image src="/logo-icon.png" alt="52hzAgents" width={20} height={20} />
+            <SignalMark size={20} />
             <span>52hzAgents</span>
           </div>
           <div className="flex items-center gap-4">
@@ -625,7 +625,7 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
       <header className="border-b border-border/60 bg-card/80 backdrop-blur-md sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Image src="/logo-icon.png" alt="52hzAgents" width={18} height={18} />
+            <SignalMark size={22} />
             <h1 className="font-semibold text-sm tracking-tight">52hzAgents Workspaces</h1>
           </div>
           <div className="flex items-center gap-3">
