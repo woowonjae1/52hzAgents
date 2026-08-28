@@ -7,6 +7,7 @@ import { useOpenAgentsAuth } from './openagents-auth-context';
 import { generateUserId, getStoredIdentity, storeIdentity } from './identity';
 import { networkAgentToWorkspaceAgent, networkChannelToSession } from './types';
 import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TimerItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
+import { stripAddressPrefix, isAgentAddress } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
 // Reference stability for polled collections
@@ -407,7 +408,7 @@ export function WorkspaceProvider({
       // First load — pick the most recent agent-opened tab if nothing is selected
       initialSelectDoneRef.current = true;
       if (!selectedBrowserTabId) {
-        const agentTabs = browserTabs.filter(t => t.createdBy?.startsWith('openagents:'));
+        const agentTabs = browserTabs.filter(t => isAgentAddress(t.createdBy));
         if (agentTabs.length > 0) {
           setSelectedBrowserTabId(agentTabs[agentTabs.length - 1].id);
         }
@@ -828,7 +829,7 @@ export function WorkspaceProvider({
               // If agent is actively working, show the status; otherwise show last chat
               const pick = isAgentWorking ? latest : (lastChat || latest);
               const payload = pick.payload as Record<string, string>;
-              const sender = payload?.sender_name || pick.source.replace(/^(openagents:|human:)/, '');
+              const sender = payload?.sender_name || stripAddressPrefix(pick.source);
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
               const isStatus = isLiveStatus(msgType, pick.timestamp);
@@ -1281,7 +1282,7 @@ export function WorkspaceProvider({
             const batch: Record<string, LastMessageInfo> = {};
             for (const [channelName, event] of Object.entries(bulk.channels)) {
               const payload = event.payload as Record<string, string>;
-              const sender = payload?.sender_name || event.source.replace(/^(openagents:|human:)/, '');
+              const sender = payload?.sender_name || stripAddressPrefix(event.source);
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
               const isStatus = isLiveStatus(msgType, event.timestamp);

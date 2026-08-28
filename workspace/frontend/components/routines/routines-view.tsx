@@ -9,6 +9,7 @@ import { workspaceApi } from '@/lib/api';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from './create-routine-dialog';
 import type { RoutineItem } from '@/lib/types';
+import { stripAddressPrefix } from '@/lib/types';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -125,7 +126,7 @@ export function RoutinesView() {
         ) : (
           <div className="p-4 space-y-3">
             {activeRoutines.map((routine) => {
-              const agentName = routine.createdBy.replace('openagents:', '') || 'agent';
+              const agentName = stripAddressPrefix(routine.createdBy) || 'agent';
               const session = sessions.find((s) => s.sessionId === routine.channelName);
               const channelTitle = session?.title || routine.channelName;
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
-import { eventToMessage } from '@/lib/types';
+import { eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { ONMEvent, WorkspaceMessage } from '@/lib/types';
 
 interface UsePollingOptions {
@@ -21,7 +21,7 @@ function parseDMSession(sessionId: string | null): [string, string] | null {
 }
 
 function normalizeAgentAddress(address: string): string {
-  return address.replace(/^openagents:/, '');
+  return stripAddressPrefix(address);
 }
 
 function messageBelongsToSession(

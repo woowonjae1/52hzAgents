@@ -24,6 +24,9 @@ export function getApiBaseUrl(): string {
     if (globalConfig?.apiUrl) {
       return globalConfig.apiUrl;
     }
+    if (window.location && window.location.origin && window.location.origin.startsWith('http')) {
+      return window.location.origin;
+    }
   }
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 }

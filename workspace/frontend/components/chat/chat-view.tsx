@@ -36,7 +36,7 @@ import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
 import { AgentModelSwitcher } from './agent-model-switcher';
 import { PipelineStepper } from './pipeline-stepper';
-import { eventToMessage } from '@/lib/types';
+import { eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { toast } from 'sonner';
@@ -99,7 +99,7 @@ function parseDMSession(sessionId: string | null): [string, string] | null {
 }
 
 function normalizeAgentAddress(address: string): string {
-  return address.replace(/^openagents:/, '');
+  return stripAddressPrefix(address);
 }
 
 function messagesForSession(sessionId: string, msgs: WorkspaceMessage[]): WorkspaceMessage[] {
@@ -763,7 +763,7 @@ export function ChatView() {
           {isDM ? (
             <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
               <MessageSquare className="size-4 text-muted-foreground" />
-              <span>{currentSessionId!.slice(3).split(',').map((a) => a.replace(/^openagents:/, '')).join(' ↔ ')}</span>
+              <span>{currentSessionId!.slice(3).split(',').map(stripAddressPrefix).join(' ↔ ')}</span>
               <span className="text-3xs px-2 py-0.5 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-mono">
                 read-only
               </span>

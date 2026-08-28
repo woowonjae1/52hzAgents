@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { stripAddressPrefix } from '@/lib/types';
 
 function AvatarStack({ agents, max = 2 }: { agents: WorkspaceAgent[]; max?: number }) {
   const shown = agents.slice(0, max);
@@ -101,9 +102,9 @@ function DMSection({
             const agent1 = convo.agents?.[1] || 'agent';
             const dmId = `dm:${agent0},${agent1}`;
             const isSelected = currentSessionId === dmId;
-            const agentA = agent0.replace(/^openagents:/, '');
-            const agentB = agent1.replace(/^openagents:/, '');
-            const sender = (convo.lastMessage?.sender || '').replace(/^openagents:/, '');
+            const agentA = stripAddressPrefix(agent0);
+            const agentB = stripAddressPrefix(agent1);
+            const sender = stripAddressPrefix(convo.lastMessage?.sender);
             const preview = `${sender}: ${convo.lastMessage?.content || ''}`;
             const displayTime = convo.lastMessage?.timestamp
               ? timeAgo(new Date(convo.lastMessage.timestamp).toISOString())
@@ -687,7 +688,7 @@ export function ThreadList() {
               // For each side, if it's an agent it must be online; humans pass through.
               return (c.agents || []).every((addr: string) => {
                 if (addr.startsWith('human:')) return true;
-                const name = addr.replace(/^openagents:/, '');
+                const name = stripAddressPrefix(addr);
                 return onlineAgentNames.has(name);
               });
             });

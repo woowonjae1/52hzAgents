@@ -10,6 +10,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from './create-routine-dialog';
 import { cn } from '@/lib/utils';
 import type { RoutineItem } from '@/lib/types';
+import { stripAddressPrefix } from '@/lib/types';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -125,7 +126,7 @@ export function RoutineList() {
         ) : (
           <div className="py-1">
             {activeRoutines.map((routine) => {
-              const agentName = routine.createdBy.replace('openagents:', '') || 'agent';
+              const agentName = stripAddressPrefix(routine.createdBy) || 'agent';
               const isSelected = currentSessionId === routine.channelName;
 
               return (

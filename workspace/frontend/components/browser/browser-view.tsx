@@ -7,6 +7,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { stripAddressPrefix } from '@/lib/types';
 
 export function BrowserView() {
   const {
@@ -257,7 +258,7 @@ export function BrowserView() {
         )}
 
         <span className="text-3xs text-muted-foreground shrink-0">
-          by {(tab.createdBy || 'unknown').replace(/^(openagents:|human:)/, '')}
+          by {stripAddressPrefix(tab.createdBy || 'unknown')}
         </span>
 
         {tab.contextId ? (

@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
-import { eventToMessage, type ONMEvent } from '@/lib/types';
+import { eventToMessage, type ONMEvent, stripAddressPrefix } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { toast } from 'sonner';
 
@@ -302,7 +302,7 @@ export function MissionControl() {
           return {
             id: m.messageId || ev.event_id || `activity-${idx}-${ev.timestamp || Date.now()}`,
             time: m.createdAt ? new Date(m.createdAt) : new Date(ev.timestamp),
-            sender: m.senderName || (ev.source || '').replace(/^(human:|openagents:)/, ''),
+            sender: m.senderName || stripAddressPrefix(ev.source),
             channel: titleFor(channel),
             channelId: channel,
             content: m.content,

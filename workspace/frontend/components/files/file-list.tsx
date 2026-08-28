@@ -7,6 +7,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { formatSize, getFileIcon, timeAgo, basename } from './file-utils';
+import { stripAddressPrefix } from '@/lib/types';
 
 export function FileList() {
   const { files: allFiles, selectedFileId, setSelectedFileId, uploadFile, deleteFile, currentFilePath, currentSessionId } = useWorkspace();
@@ -147,7 +148,7 @@ export function FileList() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{basename(file.filename)}</p>
                 <p className="text-2xs text-muted-foreground">
-                  {formatSize(file.size)} · {(file.uploadedBy || 'unknown').replace(/^(openagents:|human:)/, '')}
+                  {formatSize(file.size)} · {stripAddressPrefix(file.uploadedBy || 'unknown')}
                   {file.createdAt && ` · ${timeAgo(file.createdAt)}`}
                 </p>
               </div>

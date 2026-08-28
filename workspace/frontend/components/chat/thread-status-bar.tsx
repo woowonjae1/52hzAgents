@@ -5,6 +5,7 @@ import { Circle, Loader2, Timer, MessageSquareMore, X, ChevronDown, ChevronUp } 
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import type { TimerItem, WorkspaceMessage } from '@/lib/types';
+import { stripAddressPrefix } from '@/lib/types';
 
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -156,7 +157,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-foreground leading-snug break-words">{todo.content}</p>
                   <div className="flex items-center gap-2 mt-0.5 text-3xs text-muted-foreground">
-                    {todo.createdBy && <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>}
+                    {todo.createdBy && <span>by {stripAddressPrefix(todo.createdBy)}</span>}
                     {todo.assignee && <span>assigned to {todo.assignee}</span>}
                     {/* A handoff used to go silent here: the agent that wrote the
                         todo finishes its turn, and nothing said whether the

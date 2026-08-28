@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { stripAddressPrefix } from '@/lib/types';
 
 const DELAY_PRESETS = [
   { label: '5 min', seconds: 5 * 60 },
@@ -122,7 +123,7 @@ export function TimersView() {
                   <p className="text-sm leading-snug">{timer.message}</p>
                   <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
                     <span>{timer.channelName}</span>
-                    <span>for {timer.createdBy.replace(/^openagents:/, '')}</span>
+                    <span>for {stripAddressPrefix(timer.createdBy)}</span>
                     <span title={formatDate(timer.firesAt)}>{timeUntil(timer.firesAt)}</span>
                   </div>
                 </div>

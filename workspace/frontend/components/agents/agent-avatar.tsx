@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { resolveAgentIconName } from '@/lib/agent-catalog';
+import { stripAddressPrefix } from '@/lib/types';
 
 const KNOWN_AGENTS = [
   'amp', 'anthropic', 'antigravity', 'agy', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
@@ -32,7 +33,7 @@ interface AgentAvatarProps {
 
 export function AgentAvatar({ name = '', agentType, size = 28, status, showStatus = false, className, square = false }: AgentAvatarProps) {
   const [imgError, setImgError] = useState(false);
-  const cleanName = (name || '').replace(/^(openagents:|agent:|human:)/, '').trim();
+  const cleanName = stripAddressPrefix(name).trim();
   const lowercaseName = cleanName.toLowerCase();
 
   // Cloud agents report "cloud:<provider>"; the provider is what has an icon.

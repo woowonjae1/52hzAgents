@@ -572,6 +572,10 @@ ipcMain.on('window-maximize', () => {
     mainWindow?.maximize();
   }
 });
+ipcMain.on('get-api-url-sync', (event) => {
+  event.returnValue = isPackaged ? `http://127.0.0.1:${serverPort}` : 'http://127.0.0.1:8000';
+});
+ipcMain.handle('get-api-url', () => (isPackaged ? `http://127.0.0.1:${serverPort}` : 'http://127.0.0.1:8000'));
 ipcMain.on('window-close', () => mainWindow?.hide());
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false);
 

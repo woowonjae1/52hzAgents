@@ -9,6 +9,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { cn } from '@/lib/utils';
 import type { TodoItem } from '@/lib/types';
+import { stripAddressPrefix } from '@/lib/types';
 
 type TodoStatus = TodoItem['status'];
 
@@ -222,7 +223,7 @@ export function TasksView() {
                   <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-3xs text-foreground-extra-muted">
                     <span>{STATUS_LABEL[todo.status].toLowerCase()}</span>
                     <span>{todo.channelName}</span>
-                    <span>by {todo.createdBy.replace(/^(openagents:|human:)/, '')}</span>
+                    <span>by {stripAddressPrefix(todo.createdBy)}</span>
                     {todo.assignee && <span>assigned to {todo.assignee}</span>}
                     <span>{timeAgo(todo.updatedAt || todo.createdAt)}</span>
                   </div>

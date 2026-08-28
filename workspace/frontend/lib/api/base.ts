@@ -46,22 +46,42 @@ export class BaseWorkspaceApi {
     }
 
     const url = `${getApiBaseUrl()}${path}`;
-    const res = await fetch(url, {
-      ...options,
-      cache: 'no-store',
-      headers: {
-        'Content-Type': 'application/json',
-        ...authHeaders,
-        ...options.headers,
-      },
-    });
+    let lastErr: unknown;
 
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`API ${res.status}: ${body}`);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(url, {
+          ...options,
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+            ...options.headers,
+          },
+        });
+
+        if (!res.ok) {
+          const body = await res.text();
+          throw new Error(`API ${res.status}: ${body}`);
+        }
+
+        const json = await res.json();
+        return (json && typeof json === 'object' && 'data' in json ? json.data : json) as T;
+      } catch (err: unknown) {
+        lastErr = err;
+        const isNetworkErr =
+          err instanceof TypeError &&
+          (err.message.includes('fetch') ||
+            err.message.includes('network') ||
+            err.message.includes('Failed') ||
+            err.message.includes('NetworkError'));
+        if (isNetworkErr && attempt < 2) {
+          await new Promise((r) => setTimeout(r, (attempt + 1) * 350));
+          continue;
+        }
+        throw err;
+      }
     }
-
-    const json = await res.json();
-    return (json && typeof json === 'object' && 'data' in json ? json.data : json) as T;
+    throw lastErr;
   }
 }

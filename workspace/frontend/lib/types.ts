@@ -573,10 +573,35 @@ export interface NetworkProfile {
   joined_at?: string;
 }
 
+/**
+ * Every scheme an address/source can arrive with, in one place.
+ *
+ * `52hz:` is what the connector emits today; `openagents:` is the pre-rename
+ * form and is still accepted by the backend (see `isAgentSource` in
+ * routing.go), so it is still on the wire from older sessions and stored
+ * events. The rename updated the emitters and the backend but left ~20 call
+ * sites in here stripping `openagents:` alone, which rendered agent names as
+ * a raw "52hz:opencode" wherever `sender_name` was absent.
+ *
+ * Use `stripAddressPrefix` rather than inlining a regex — that is how the two
+ * halves drifted apart the first time.
+ */
+export const ADDRESS_PREFIX_RE = /^(52hz:|openagents:|agent:|human:|system:)/;
+
+export function stripAddressPrefix(address: string | null | undefined): string {
+  return (address || '').replace(ADDRESS_PREFIX_RE, '');
+}
+
+/** True for an address that belongs to an agent rather than a human or the system. */
+export function isAgentAddress(address: string | null | undefined): boolean {
+  const a = address || '';
+  return a.startsWith('52hz:') || a.startsWith('openagents:') || a.startsWith('agent:');
+}
+
 export function networkAgentToWorkspaceAgent(agent: Record<string, unknown> | WorkspaceAgent | NetworkProfile): WorkspaceAgent {
   const raw = (agent || {}) as Record<string, unknown>;
   const rawAddr = (raw.address as string) || '';
-  const addrName = rawAddr.replace(/^(52hz:|openagents:|agent:|human:)/, '');
+  const addrName = stripAddressPrefix(rawAddr);
   const name = (raw.agentName || raw.agent_name || raw.AgentName || raw.name || raw.Name || addrName || 'Unknown') as string;
   const role = (raw.role || raw.Role || 'worker') as string;
   const type = (raw.agentType || raw.agent_type || raw.AgentType || raw.Type || null) as string | null;

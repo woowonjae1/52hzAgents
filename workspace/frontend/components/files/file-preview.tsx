@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { FileGrid } from './file-grid';
 import { cn } from '@/lib/utils';
+import { stripAddressPrefix } from '@/lib/types';
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -219,7 +220,7 @@ export function FilePreview() {
             {file.filename.includes('/') && (
               <span className="text-muted-foreground/60">{file.filename.split('/').slice(0, -1).join('/')}/ · </span>
             )}
-            {formatSize(file.size)} · {file.contentType || 'file'} · {(file.uploadedBy || 'unknown').replace(/^(openagents:|human:)/, '')}
+            {formatSize(file.size)} · {file.contentType || 'file'} · {stripAddressPrefix(file.uploadedBy || 'unknown')}
           </p>
         </div>
 

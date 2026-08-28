@@ -36,6 +36,49 @@ export const KNOWLEDGE_IMPORT_ACCEPT = '.md,.markdown,.txt,.mdx';
 const ACCEPTED_EXTENSIONS = ['.md', '.markdown', '.mdx', '.txt'];
 
 /**
+ * Decode an uploaded text file.
+ *
+ * `File.text()` is hardcoded to UTF-8 AND is lossy: bytes it cannot decode
+ * become U+FFFD rather than throwing, so a GBK-encoded .txt — the default for
+ * Notepad on a Chinese Windows install — imported as a wall of replacement
+ * characters and reported success, because the only check afterwards was
+ * `text.trim()`.
+ *
+ * So: decode strictly first. `fatal: true` is what turns a mis-detected
+ * encoding into an error we can act on instead of silent mojibake. Only when
+ * that rejects the bytes do we try the legacy Chinese codepages, in the order
+ * that keeps the widest one last.
+ */
+const FALLBACK_ENCODINGS = ['gb18030', 'big5'];
+
+async function decodeTextFile(file: File): Promise<{ text: string; encoding: string }> {
+  const buffer = await file.arrayBuffer();
+
+  // A UTF-8 BOM is definitive — and must be stripped, or it survives into the
+  // entry title as an invisible leading character that breaks title matching.
+  const head = new Uint8Array(buffer.slice(0, 3));
+  if (head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf) {
+    return { text: new TextDecoder('utf-8').decode(buffer.slice(3)), encoding: 'utf-8' };
+  }
+
+  try {
+    return { text: new TextDecoder('utf-8', { fatal: true }).decode(buffer), encoding: 'utf-8' };
+  } catch {
+    // Not valid UTF-8.
+  }
+
+  for (const enc of FALLBACK_ENCODINGS) {
+    try {
+      return { text: new TextDecoder(enc, { fatal: true }).decode(buffer), encoding: enc };
+    } catch {
+      // Try the next one.
+    }
+  }
+
+  throw new Error('unrecognised text encoding');
+}
+
+/**
  * Refuse anything above this. These are documents, not blobs: a 5 MB "markdown"
  * file is a mistake (a minified dump, a wrong drag), and importing it would
  * bloat every agent prompt that references the entry.
@@ -57,6 +100,8 @@ interface ParsedDoc {
   /** Existing active entry with the same title, if any. */
   conflict: KnowledgeEntry | null;
   action: ImportAction;
+  /** Which codepage the bytes turned out to be. Shown when it is not UTF-8. */
+  encoding?: string;
   /** Set when the file could not be used at all; such rows are never imported. */
   error: string | null;
 }
@@ -284,10 +329,11 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
         }
 
         let text: string;
+        let encoding: string;
         try {
-          text = await file.text();
+          ({ text, encoding } = await decodeTextFile(file));
         } catch {
-          parsed.push({ ...base, title: stripExtension(file.name), content: '', conflict: null, action: 'skip', error: 'Could not read file' });
+          parsed.push({ ...base, title: stripExtension(file.name), content: '', conflict: null, action: 'skip', error: 'Unreadable — not UTF-8, GB18030 or Big5' });
           continue;
         }
         if (!text.trim()) {
@@ -302,6 +348,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
           title,
           content: text,
           conflict,
+          encoding,
           // Re-importing an edited local file is the common case, so replacing
           // is the sane default — but it is shown, never silent.
           action: conflict ? 'overwrite' : 'create',
@@ -435,6 +482,12 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                         </div>
                         <p className={cn(MICRO, 'mt-1 truncate normal-case tracking-normal')}>
                           {doc.fileName} · {formatBytes(doc.bytes)}
+                          {doc.encoding && doc.encoding !== 'utf-8' && (
+                            // Worth surfacing: the file was NOT UTF-8, so the
+                            // preview above is a guess that the user should
+                            // eyeball before importing.
+                            <span className="ml-1.5 uppercase text-status-warning">{doc.encoding}</span>
+                          )}
                         </p>
                         {doc.error && (
                           <p className="mt-1.5 flex items-center gap-1 text-xs text-status-danger">

@@ -8,6 +8,7 @@ import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import type { NotificationItem } from '@/lib/types';
+import { stripAddressPrefix } from '@/lib/types';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -45,7 +46,7 @@ function NotificationCard({
   onDismiss: (id: string) => void;
   onNavigate: (notification: NotificationItem) => void;
 }) {
-  const agentName = notification.createdBy.replace(/^(openagents:|system:)/, '') || 'system';
+  const agentName = stripAddressPrefix(notification.createdBy) || 'system';
 
   return (
     <div

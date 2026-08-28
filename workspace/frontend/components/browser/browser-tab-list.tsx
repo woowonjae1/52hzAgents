@@ -6,6 +6,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { stripAddressPrefix } from '@/lib/types';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -238,7 +239,7 @@ export function BrowserTabList() {
                     <p className="text-2xs text-muted-foreground truncate">
                       {truncateUrl(tab.url)}
                       {' · '}
-                      {(tab.createdBy || 'unknown').replace(/^(openagents:|human:)/, '')}
+                      {stripAddressPrefix(tab.createdBy || 'unknown')}
                       {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                     </p>
                   </div>
