@@ -375,9 +375,9 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
 
     return (
       <div className="py-2.5 flex justify-end group/usermsg select-text">
-        <div className="flex items-end gap-2 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
-          {/* Your animated mark, enlarged for clear presence */}
-          <SignalMark size={36} still={false} className="shrink-0 self-end mb-0.5" />
+        <div className="flex items-start gap-2.5 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
+          {/* Your animated mark, aligned cleanly to top of message bubble */}
+          <SignalMark size={30} still={false} className="shrink-0 mt-0.5" />
           {/* Refined AI User Bubble */}
           {/*
             The bubble sits directly on the transcript, not above it, so the drop
@@ -424,7 +424,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               navigator.clipboard.writeText(message.content);
               toast.success('Message copied');
             }}
-            className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-center"
+            className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-start mt-1.5"
             title="Copy message"
             aria-label="Copy message"
           >
