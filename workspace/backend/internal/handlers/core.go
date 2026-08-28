@@ -406,7 +406,7 @@ func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, 
 			}
 			if routed {
 				req.Metadata["target_agents"] = targets
-				if isHumanSource(req.Source) && !strings.HasPrefix(channel.Name, "routines:") {
+				if !strings.HasPrefix(channel.Name, "routines:") {
 					for _, target := range targets {
 						if target != noResponseAgent {
 							tx.FirstOrCreate(&models.ChannelMember{ChannelID: channel.ID, AgentName: target})

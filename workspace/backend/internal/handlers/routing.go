@@ -23,7 +23,7 @@ import (
 var (
 	rrMutex       sync.Mutex
 	rrIndexMap    = make(map[string]int) // channelID -> last routed index
-	pipelineRegex = regexp.MustCompile(`(?i)(?:^|\s)[@/]([a-zA-Z0-9_-]+)`)
+	pipelineRegex = regexp.MustCompile(`(?i)(?:^|[^\w@])[#/]?@([a-zA-Z0-9_-]+)`)
 )
 
 func parseAgentPipeline(content string, participants []string) []models.PipelineStep {
@@ -571,6 +571,16 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		return nil, false, nil
 	}
 
+	// Retrieve all workspace agents to support global @mentions and multi-agent pipelines
+	var wsMembers []models.WorkspaceMember
+	db.DB.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
+	allWorkspaceAgents := make([]string, 0, len(wsMembers))
+	for _, m := range wsMembers {
+		if m.AgentName != "" && m.AgentName != noResponseAgent {
+			allWorkspaceAgents = append(allWorkspaceAgents, m.AgentName)
+		}
+	}
+
 	var memberships []models.ChannelMember
 	if err := db.DB.Where("channel_id = ?", channel.ID).Order("agent_name ASC").Find(&memberships).Error; err != nil {
 		return []string{noResponseAgent}, true, nil
@@ -583,30 +593,24 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	}
 
 	if len(participants) == 0 {
-		var wsMembers []models.WorkspaceMember
-		db.DB.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
-		named := make([]string, 0, len(wsMembers))
-		for _, m := range wsMembers {
-			if m.AgentName != "" && m.AgentName != noResponseAgent {
-				named = append(named, m.AgentName)
-			}
-		}
-		if len(named) == 1 {
-			participants = named
+		if len(allWorkspaceAgents) == 1 {
+			participants = allWorkspaceAgents
 		}
 	}
 
-	if len(participants) == 0 {
-		return []string{noResponseAgent}, true, nil
+	// For mention resolution and multi-agent pipeline detection, allow any workspace agent
+	availableCandidates := allWorkspaceAgents
+	if len(availableCandidates) == 0 {
+		availableCandidates = participants
 	}
 
 	content, _ := req.Payload["content"].(string)
-	mentions := mentionedAgents(content, req.Payload, participants)
-	online := onlineParticipants(workspaceID, participants)
+	mentions := mentionedAgents(content, req.Payload, availableCandidates)
+	online := onlineParticipants(workspaceID, availableCandidates)
 
 	// If human message contains multi-agent pipeline (@agent1 ... @agent2 ... @agent3 ...)
 	if isHumanSource(req.Source) {
-		if segments := parseAgentPipeline(content, participants); len(segments) >= 2 {
+		if segments := parseAgentPipeline(content, availableCandidates); len(segments) >= 2 {
 			if pipelineID := startPipeline(workspaceID, channel.ID, req.Source, segments); pipelineID != "" && req.Metadata != nil {
 				// Turn attribution groups every retry of a step under that
 				// step's key. Step 0 is dispatched through the event handler
@@ -626,9 +630,22 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	// turn, creating an infinite echo storm.
 	if isAgentSource(req.Source) {
 		if len(mentions) > 0 {
-			return mentions, true, nil
+			sender := agentNameFromSource(req.Source)
+			var nextTargets []string
+			for _, m := range mentions {
+				if !strings.EqualFold(m, sender) {
+					nextTargets = append(nextTargets, m)
+				}
+			}
+			if len(nextTargets) > 0 {
+				return nextTargets, true, nil
+			}
 		}
 		return nil, false, nil
+	}
+
+	if len(participants) == 0 {
+		return []string{noResponseAgent}, true, nil
 	}
 
 	mode := strings.ToLower(strings.TrimSpace(channel.OrchestrationMode))
