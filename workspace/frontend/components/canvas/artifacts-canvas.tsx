@@ -142,6 +142,8 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
     toast.success('Review note added to canvas');
   };
 
+  const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+
   return (
     <div
       style={{ width: isFullscreen ? '100vw' : `${canvasWidth}px` }}
@@ -171,8 +173,13 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
       )}
 
       {/* ── Canvas Top Header Bar ── */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/70 bg-surface0/90 backdrop-blur-md shrink-0 gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
+      <div
+        className={cn(
+          'flex items-center justify-between px-4 py-2.5 border-b border-border/70 bg-surface0/90 backdrop-blur-md shrink-0 gap-3 select-none [app-region:drag]',
+          isDesktop && (isFullscreen ? 'pt-8 pr-36' : 'pr-36')
+        )}
+      >
+        <div className="flex items-center gap-2.5 min-w-0 [app-region:no-drag]">
           <div className="size-7.5 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             {activeArtifact.type === 'code' ? <Code2 className="size-4" /> : <FileText className="size-4" />}
           </div>
@@ -196,7 +203,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
         </div>
 
         {/* Action icons & Obvious Close Button */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 [app-region:no-drag]">
           <button
             type="button"
             onClick={handleCopy}
@@ -226,7 +233,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           <button
             type="button"
             onClick={closeCanvas}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-surface2 hover:bg-destructive/15 hover:text-destructive text-foreground-muted text-2xs font-semibold border border-border/70 transition-colors cursor-pointer ml-1"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface2 hover:bg-destructive/15 hover:text-destructive text-foreground-muted text-2xs font-semibold border border-border/70 transition-colors cursor-pointer ml-1"
             title="Close Canvas (Esc)"
           >
             <PanelRightClose className="size-3.5" />
