@@ -37,6 +37,7 @@ import {
   Plug,
   MonitorPlay,
   Power,
+  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +50,9 @@ import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { SignalMark } from '@/components/brand/signal-mark';
+import { useMarkColor } from '@/hooks/use-mark-color';
+import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { SkillsView } from '@/components/skills/skills-view';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { RoutineList } from '@/components/routines/routine-list';
@@ -73,6 +77,7 @@ export function SettingsView() {
   const [loadingCollabs, setLoadingCollabs] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showConnectAgent, setShowConnectAgent] = useState(false);
+  const [markColor, setMarkColor] = useMarkColor();
 
   const { isCopied: urlCopied, copyToClipboard: copyUrl } = useCopyToClipboard();
   const { isCopied: tokenCopied, copyToClipboard: copyToken } = useCopyToClipboard();
@@ -437,7 +442,75 @@ export function SettingsView() {
                 </div>
               </div>
 
-              {/* Section 2: Desktop & System Integration */}
+              {/* Section 2: Brand Mark Colour */}
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/30 pb-3">
+                  <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
+                    <Palette className="size-4 text-primary" />
+                    品牌标识
+                  </h2>
+                  {markColor !== DEFAULT_MARK_COLOR && (
+                    <button
+                      type="button"
+                      onClick={() => setMarkColor(DEFAULT_MARK_COLOR)}
+                      className="text-2xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <RefreshCw className="size-3" />
+                      恢复默认
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                  {/* Live preview. The mark reads the same CSS variable the
+                      swatches write, so this needs no props to stay in sync. */}
+                  <div className="shrink-0 size-24 rounded-xl bg-surface0 border border-border/40 flex items-center justify-center">
+                    <SignalMark size={56} title="标识预览" />
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <p className="text-xs text-foreground-muted">
+                      选择 SignalMark 的主体颜色。侧边栏、空状态、分享页与消息头像会同时更新，五官保持固定深色以确保各配色下都清晰可辨。
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {MARK_COLOR_PRESETS.map((preset) => {
+                        const active = markColor === preset.value;
+                        return (
+                          <button
+                            key={preset.value}
+                            type="button"
+                            onClick={() => setMarkColor(preset.value)}
+                            title={`${preset.label} · ${preset.sublabel}`}
+                            aria-label={`${preset.label} ${preset.sublabel}`}
+                            aria-pressed={active}
+                            className={cn(
+                              'relative size-9 rounded-full cursor-pointer transition-all duration-150',
+                              // The ring sits OUTSIDE the swatch so selecting one
+                              // does not change its apparent colour area — with
+                              // an inset ring the active chip reads as a
+                              // different shade than the colour it applies.
+                              'ring-offset-2 ring-offset-surface1',
+                              active
+                                ? 'ring-2 ring-foreground scale-105'
+                                : 'ring-1 ring-border/60 hover:ring-foreground-muted hover:scale-105',
+                            )}
+                            style={{ backgroundColor: preset.value }}
+                          >
+                            {active && (
+                              <Check className="absolute inset-0 m-auto size-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-3xs text-foreground-extra-muted font-mono">
+                      当前：{MARK_COLOR_PRESETS.find((p) => p.value === markColor)?.label ?? '自定义'} · {markColor.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Desktop & System Integration */}
               <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
                 <div className="flex items-center justify-between border-b border-border/30 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">

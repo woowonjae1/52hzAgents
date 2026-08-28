@@ -7,10 +7,14 @@
     "sync-wwj": "node -e \"const fs=require('fs'),path=require('path');function cp(s,d){if(!fs.existsSync(d))fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){if(e.name==='node_modules'||e.name==='.git')continue;const sp=path.join(s,e.name),dp=path.join(d,e.name);if(e.isDirectory())cp(sp,dp);else fs.copyFileSync(sp,dp);}}const destSrc='resources/wwj/src';if(fs.existsSync(destSrc))fs.rmSync(destSrc,{recursive:true,force:true});cp('../../packages/wwj/src',destSrc);fs.copyFileSync('../../packages/wwj/registry.json','resources/wwj/registry.json');fs.copyFileSync('../../packages/wwj/package.json','resources/wwj/package.json');console.log('WWJ resources cleanly synced!');\"",
     "start": "electron .",
     "dev": "electron .",
-    "prepack": "npm run sync-wwj",
+    "prepack": "npm run sync-all",
     "pack": "electron-builder --dir",
-    "predist": "npm run sync-wwj",
-    "dist": "electron-builder --win"
+    "predist": "npm run sync-all",
+    "dist": "electron-builder --win",
+    "build-icons": "node build-icons.js",
+    "build-frontend": "npm --prefix ../frontend run build",
+    "sync-public": "node -e \"const fs=require('fs'),path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const sp=path.join(s,e.name),dp=path.join(d,e.name);if(e.isDirectory())cp(sp,dp);else fs.copyFileSync(sp,dp);}}const src='../frontend/out';if(!fs.existsSync(src)){console.error('frontend/out missing - run build-frontend first');process.exit(1);}fs.rmSync('resources/public',{recursive:true,force:true});cp(src,'resources/public');console.log('Frontend export synced to resources/public');\"",
+    "sync-all": "npm run build-icons && npm run build-frontend && npm run sync-public && npm run sync-wwj"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

@@ -12,11 +12,18 @@ import { cn } from '@/lib/utils';
  * That leaves the turn carrying the roundness on its own, which it can, because
  * the foreshortening IS the shading.
  *
- * The palette is fixed rather than themed. A brand mark that restyles itself per
- * surface stops being a mark, and these two colours hold on both grounds.
+ * The palette does NOT follow the theme. A brand mark that restyles itself per
+ * surface stops being a mark, so the body is one colour on both grounds — but it
+ * is the colour the user picked in Settings → 通用与桌面 → 品牌标识, delivered as
+ * a CSS variable on <html> (see lib/mark-color-store.ts). The literal below is
+ * the fallback the SVG carries on its own, for the frame before the pre-paint
+ * script runs and for anything that renders the mark outside the app shell.
+ *
+ * FEATURE stays fixed. Every preset is chosen to hold this near-black face, and
+ * letting both ends move is how a mark ends up with an invisible one.
  */
 
-const BODY = '#1C6EA4';
+const BODY = 'var(--signal-mark-body, #1C6EA4)';
 const FEATURE = '#0B1013';
 
 const BODY_PATH =

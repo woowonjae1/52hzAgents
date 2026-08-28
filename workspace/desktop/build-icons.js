@@ -7,16 +7,64 @@ const root = path.resolve(__dirname, '../..');
 const svgPath = path.join(__dirname, 'icon.svg');
 const svg = fs.readFileSync(svgPath, 'utf-8');
 
-// ── Render SVG to PNG at given size ─────────────────────────────────────────
-function renderPNG(size) {
+function renderRaw(size) {
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: size } });
   const rendered = resvg.render();
-  return rendered.asPng();
+  return { pixels: rendered.pixels, png: rendered.asPng() };
 }
 
-// ── Build multi-res ICO with PNG frames ─────────────────────────────────────
-function buildICO(pngBuffers) {
-  const count = pngBuffers.length;
+function renderPNG(size) {
+  return renderRaw(size).png;
+}
+
+// ── Convert RGBA buffer to Windows DIB buffer (for sizes < 256) ─────────────
+function rgbaToDIB(size, rgba) {
+  const dibHeaderSize = 40;
+  const pixelDataSize = size * size * 4;
+  const maskRowBytes = Math.ceil(size / 32) * 4;
+  const maskSize = maskRowBytes * size;
+  const totalSize = dibHeaderSize + pixelDataSize + maskSize;
+
+  const buf = Buffer.alloc(totalSize);
+
+  // BITMAPINFOHEADER
+  buf.writeUInt32LE(40, 0);              // biSize
+  buf.writeInt32LE(size, 4);             // biWidth
+  buf.writeInt32LE(size * 2, 8);         // biHeight (doubled for ICO mask!)
+  buf.writeUInt16LE(1, 12);              // biPlanes
+  buf.writeUInt16LE(32, 14);             // biBitCount (32-bit BGRA)
+  buf.writeUInt32LE(0, 16);              // biCompression (BI_RGB = uncompressed)
+  buf.writeUInt32LE(pixelDataSize + maskSize, 20); // biSizeImage
+  buf.writeInt32LE(0, 24);              // biXPelsPerMeter
+  buf.writeInt32LE(0, 28);              // biYPelsPerMeter
+  buf.writeUInt32LE(0, 32);             // biClrUsed
+  buf.writeUInt32LE(0, 36);             // biClrImportant
+
+  // Write pixel data: bottom-to-top rows, BGRA order
+  let dstOffset = 40;
+  for (let y = size - 1; y >= 0; y--) {
+    for (let x = 0; x < size; x++) {
+      const srcIdx = (y * size + x) * 4;
+      const r = rgba[srcIdx];
+      const g = rgba[srcIdx + 1];
+      const b = rgba[srcIdx + 2];
+      const a = rgba[srcIdx + 3];
+
+      buf.writeUInt8(b, dstOffset);
+      buf.writeUInt8(g, dstOffset + 1);
+      buf.writeUInt8(r, dstOffset + 2);
+      buf.writeUInt8(a, dstOffset + 3);
+      dstOffset += 4;
+    }
+  }
+
+  // 1-bit AND mask is already 0 (transparent handled by 32-bit alpha)
+  return buf;
+}
+
+// ── Build multi-res ICO (DIB for sizes < 256, PNG for 256) ──────────────────
+function buildICO(frames) {
+  const count = frames.length;
   const headerSize = 6 + count * 16;
 
   const header = Buffer.alloc(headerSize);
@@ -26,7 +74,7 @@ function buildICO(pngBuffers) {
 
   let offset = headerSize;
   for (let i = 0; i < count; i++) {
-    const { size, png } = pngBuffers[i];
+    const { size, buffer } = frames[i];
     const entryOff = 6 + i * 16;
     const w = size >= 256 ? 0 : size;
     const h = size >= 256 ? 0 : size;
@@ -37,12 +85,12 @@ function buildICO(pngBuffers) {
     header.writeUInt8(0, entryOff + 3);   // reserved
     header.writeUInt16LE(1, entryOff + 4);  // color planes
     header.writeUInt16LE(32, entryOff + 6); // bpp
-    header.writeUInt32LE(png.length, entryOff + 8);
+    header.writeUInt32LE(buffer.length, entryOff + 8);
     header.writeUInt32LE(offset, entryOff + 12);
-    offset += png.length;
+    offset += buffer.length;
   }
 
-  return Buffer.concat([header, ...pngBuffers.map(p => p.png)]);
+  return Buffer.concat([header, ...frames.map(f => f.buffer)]);
 }
 
 // ── Generate PNGs ───────────────────────────────────────────────────────────
@@ -74,18 +122,20 @@ for (const { size, out } of pngOutputs) {
 }
 
 // ── Generate ICO ────────────────────────────────────────────────────────────
-console.log('Building multi-resolution ICO...');
+console.log('Building multi-resolution ICO (hybrid DIB + PNG)...');
 
 const icoSizes = [16, 24, 32, 48, 64, 128, 256];
-const icoPngs = icoSizes.map(size => {
-  if (!pngCache[size]) {
-    console.log(`  Rendering ${size}x${size}...`);
-    pngCache[size] = renderPNG(size);
+const icoFrames = icoSizes.map(size => {
+  console.log(`  Rendering ICO frame ${size}x${size}...`);
+  const raw = renderRaw(size);
+  if (size >= 256) {
+    return { size, buffer: raw.png };
+  } else {
+    return { size, buffer: rgbaToDIB(size, raw.pixels) };
   }
-  return { size, png: pngCache[size] };
 });
 
-const ico = buildICO(icoPngs);
+const ico = buildICO(icoFrames);
 console.log(`  ICO total: ${ico.length} bytes, ${icoSizes.length} frames`);
 
 const icoTargets = [
