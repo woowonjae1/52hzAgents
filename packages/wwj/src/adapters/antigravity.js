@@ -63,6 +63,52 @@ const SUBAGENT_FRAMING_PATTERNS = [
   /^\s*\*{0,2}Message from\s+[0-9a-fA-F-]{8,}\s*(?:\([^)]*\))?\*{0,2}\s*:?\s*/,
 ];
 
+// Antigravity narrates its plan before doing the work — "I will list the
+// contents of the workspace directory. I will search for any Go files. I will
+// view README.md. …" — and emits it as `agent_response` rather than as a
+// `thought`, so the adapter's own step_type routing cannot separate it. It only
+// reaches the transcript at all when the run produces no `result.response` and
+// the reply falls back to concatenating every response delta; when it does, the
+// bubble opens with a paragraph of intentions before the answer.
+//
+// Stripped structurally and only from the START, and only when there is a RUN of
+// them: one such sentence is ordinary prose ("I will check that now."), and
+// eating it would be worse than leaving the plan in.
+const PLAN_SENTENCE =
+  /^\s*(?:First,?\s+|Next,?\s+|Then,?\s+|Finally,?\s+)?(?:I will|I'll|I am going to|I'm going to|Let me)[^.!?]*[.!?]+["'”’]?\s*/i;
+
+function stripLeadingPlan(text) {
+  const original = String(text || '');
+  let out = original;
+  let n = 0;
+  // Bounded: a malformed run cannot spin, and no real plan is 60 sentences.
+  while (n < 60) {
+    const m = out.match(PLAN_SENTENCE);
+    if (!m) break;
+    out = out.slice(m[0].length);
+    n++;
+  }
+  if (n < 2) return original;
+  const trimmed = out.trim();
+  // If the plan was the whole message there is nothing else to show, so keep it
+  // rather than posting an empty bubble.
+  return trimmed || original;
+}
+
+/**
+ * Peel every recognised preamble off the front, in whatever order they arrived.
+ * Loops because a sub-agent hand-off can carry its own plan behind it.
+ */
+function stripPreamble(text) {
+  let out = String(text || '');
+  for (let i = 0; i < 4; i++) {
+    const before = out;
+    out = stripLeadingPlan(stripSubagentFraming(out));
+    if (out === before) break;
+  }
+  return out;
+}
+
 function stripSubagentFraming(text) {
   if (!text) return '';
   let out = String(text);
@@ -682,7 +728,7 @@ class AntigravityAdapter extends BaseAdapter {
           outputText = rawStdout;
         }
 
-        const cleanOutput = stripSubagentFraming(stripAnsi(outputText));
+        const cleanOutput = stripPreamble(stripAnsi(outputText));
 
         if (lastErrorText) {
           await this.sendError(channel, `⚠️ Antigravity 调用异常提示:\n${lastErrorText}`);
@@ -731,3 +777,5 @@ class AntigravityAdapter extends BaseAdapter {
 
 module.exports = AntigravityAdapter;
 module.exports.stripSubagentFraming = stripSubagentFraming;
+module.exports.stripLeadingPlan = stripLeadingPlan;
+module.exports.stripPreamble = stripPreamble;

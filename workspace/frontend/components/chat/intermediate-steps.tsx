@@ -33,6 +33,7 @@ import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
 import { SubagentList } from '@/components/ai-elements/subagent-list';
 import { MarkdownContent } from './markdown-content';
+import { useLayout } from '@/components/layout/layout-context';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
 // ── Content Parsing ──
@@ -832,20 +833,11 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   defaultOpen = false,
 }: ToolCallsDisclosureProps) {
   const [open, setOpen] = useState(defaultOpen);
+  const { setActiveRightTab } = useLayout();
 
   const renderable = (steps || []).filter((s) => !isPlaceholderThinking(s));
   if (renderable.length === 0) return null;
 
-  /*
-   * What the whole run amounted to, counted rather than listed: "4 tool calls,
-   * 2 thoughts". One line standing in for a dozen is the point — a finished turn
-   * is scrollback, and scrollback that costs a screen and a half to scroll past
-   * is what makes a long conversation unreadable.
-   *
-   * Thoughts are counted as RUNS, not as messages, because a single thought
-   * arrives as however many fragments the connector felt like sending. Counting
-   * messages would report "11 thoughts" for one.
-   */
   const runs = coalesceThinking(renderable);
   const toolCount = renderable.filter((s) => {
     if (s.messageType === 'todos' || s.messageType === 'thinking') return false;
@@ -856,8 +848,6 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   const parts: string[] = [];
   if (toolCount > 0) parts.push(`${toolCount} tool call${toolCount === 1 ? '' : 's'}`);
   if (thoughtCount > 0) parts.push(`${thoughtCount} thought${thoughtCount === 1 ? '' : 's'}`);
-  // Neither — statuses only. Fall back to the raw count rather than claiming
-  // zero of something.
   if (parts.length === 0) {
     parts.push(`${renderable.length} step${renderable.length === 1 ? '' : 's'}`);
   }
@@ -868,9 +858,19 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
       icon={<Wrench />}
       label={parts.join(', ')}
       defaultOpen={defaultOpen}
+      actions={
+        <EventLineAction
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            setActiveRightTab('trace');
+          }}
+          title="Open in Trace Panel"
+        >
+          <Activity className="size-3" />
+        </EventLineAction>
+      }
     >
-      {/* `live` is deliberately absent: a disclosure only exists once the reply
-          it sits inside has landed, so nothing in here is still streaming. */}
       <StepRuns steps={renderable} />
     </EventLine>
   );
@@ -885,6 +885,7 @@ interface IntermediateStepsProps {
 }
 
 export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents, isActive = false }: IntermediateStepsProps) {
+  const { setActiveRightTab } = useLayout();
   if (!steps || steps.length === 0) return null;
   const renderableSteps = steps.filter((s) => !isPlaceholderThinking(s));
   if (renderableSteps.length === 0) return null;
@@ -901,48 +902,22 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
     }
   }
 
-  // Whose steps these are. `senderGroups` is ordered, so the first group is the
-  // agent that opened the run.
   const primarySender = senderGroups[0]?.sender || '';
   const primaryAgent = agents?.find((a) => a.agentName === primarySender);
 
   return (
     <div className="flex items-start gap-3 py-1">
-      {/*
-        THE AVATAR, which used to be an empty 32px spacer.
-
-        That spacer was harmless while a separate "Starting" row above carried
-        the avatar — but that row is now suppressed whenever an agent has begun
-        reporting for itself (otherwise one working agent announced its identity
-        twice on adjacent lines). With the row gone and this slot empty, a turn
-        that emitted any `status` event showed tool calls and thoughts with no
-        indication of who was doing them.
-
-        It only looked intermittent: a run of pure `thinking` groups as
-        `ThinkingMessage`, which draws its own avatar, so the identity appeared.
-        One interleaved status demoted the run to this component and the avatar
-        vanished.
-      */}
       <AgentAvatar
         name={primarySender}
         agentType={primaryAgent?.agentType}
         size={28}
         className="mt-0.5 shrink-0"
       />
-      {/* One rail width for the whole app: a centred 1px column in a 1rem
-          track, matching `EventLineBody`. This was `border-l-2 … pl-3` — a 2px
-          line at a different indent from the one every expanded event draws. */}
       <div className="grid min-w-0 flex-1 grid-cols-[1rem_1fr] gap-x-1.5 py-0.5 [&>*:nth-child(even)]:min-w-0">
         <span aria-hidden className="mx-auto h-full w-px bg-border" />
         <div className="min-w-0">
         {senderGroups.map((group, gi) => (
           <div key={`${group.sender}-${gi}`}>
-            {/*
-              A sub-label only for HANDOVERS — a second agent picking up inside
-              the same run. `gi > 0` because the 28px avatar beside the rail
-              already names the agent that opened it; labelling the first group
-              as well printed the same identity twice, half an inch apart.
-            */}
             {hasMultipleAgents && gi > 0 && (
               <div className="flex items-baseline gap-1.5 mb-0.5 mt-1.5">
                 <AgentAvatar name={group.sender} size={14} className="translate-y-px" />
@@ -955,9 +930,20 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
           </div>
         ))}
           {isActive && !hasTerminalStatus && (
-            <ActivityIndicator
-              startTime={steps[0]?.createdAt ? new Date(steps[0].createdAt).getTime() : undefined}
-            />
+            <div className="flex items-center justify-between py-1">
+              <ActivityIndicator
+                startTime={steps[0]?.createdAt ? new Date(steps[0].createdAt).getTime() : undefined}
+              />
+              <button
+                type="button"
+                onClick={() => setActiveRightTab('trace')}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                title="Open Trace Panel"
+              >
+                <Activity className="size-2.5" />
+                <span>Trace</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -149,11 +149,19 @@ func startPipeline(workspaceID, channelID, startedBy string, steps []models.Pipe
 	return record.ID
 }
 
-// clearPipeline drops the channel's chain. A plain human message ends any relay
-// that was in flight.
+// clearPipeline drops the channel's chain completely.
 func clearPipeline(channelID string) {
 	if err := db.DB.Where("channel_id = ?", channelID).Delete(&models.ChannelPipeline{}).Error; err != nil {
 		log.Printf("pipeline: failed to clear chain for channel %s: %v", channelID, err)
+	}
+}
+
+// pausePipeline suspends the pipeline without deleting its progress, allowing safe human-in-the-loop takeover.
+func pausePipeline(channelID string) {
+	if err := db.DB.Model(&models.ChannelPipeline{}).
+		Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying"}).
+		Update("status", "paused").Error; err != nil {
+		log.Printf("pipeline: failed to pause chain for channel %s: %v", channelID, err)
 	}
 }
 
@@ -177,7 +185,7 @@ func GetChannelPipeline(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"active":            record.Status == "running" || record.Status == "retrying",
+		"active":            record.Status == "running" || record.Status == "retrying" || record.Status == "paused",
 		"id":                record.ID,
 		"status":            record.Status,
 		"current_index":     record.CurrentIndex,
@@ -186,6 +194,77 @@ func GetChannelPipeline(c *gin.Context) {
 		"started_by":        record.StartedBy,
 		"steps":             steps,
 	})
+}
+
+// PauseChannelPipeline handles POST /v1/channels/:channel_id/pipeline/pause
+func PauseChannelPipeline(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+	channelID := c.Param("channel_id")
+	if channelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "channel_id is required"})
+		return
+	}
+
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying"}).First(&record).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"status": "not_running"})
+		return
+	}
+
+	db.DB.Model(&record).Update("status", "paused")
+
+	var channel models.Channel
+	if err := db.DB.Where("id = ?", channelID).First(&channel).Error; err == nil {
+		RelayPipelineAlert(workspace.ID, "channel/"+channel.Name, "⏸️ 管线已暂停，等待用户人工干预。点击恢复或继续对话。")
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "paused"})
+}
+
+// ResumeChannelPipeline handles POST /v1/channels/:channel_id/pipeline/resume
+func ResumeChannelPipeline(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+	channelID := c.Param("channel_id")
+	if channelID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "channel_id is required"})
+		return
+	}
+
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ? AND status IN ?", channelID, []string{"paused", "halted_user"}).First(&record).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No paused or halted pipeline found for this channel"})
+		return
+	}
+
+	var steps []models.PipelineStep
+	if err := json.Unmarshal(record.Steps, &steps); err != nil || len(steps) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Pipeline has unreadable steps"})
+		return
+	}
+
+	idx := record.CurrentIndex
+	if idx < 0 || idx >= len(steps) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Pipeline index out of range"})
+		return
+	}
+
+	db.DB.Model(&record).Update("status", "running")
+
+	var channel models.Channel
+	if err := db.DB.Where("id = ?", channelID).First(&channel).Error; err == nil {
+		targetChan := "channel/" + channel.Name
+		currentAgent := steps[idx].Agent
+		resumeMsg := fmt.Sprintf("▶️ 管线已恢复执行，当前步骤 [%d/%d] 继续由 @%s 推进。", idx+1, len(steps), currentAgent)
+		RelayPipelineAlert(workspace.ID, targetChan, resumeMsg)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "resumed", "current_index": idx, "agent": steps[idx].Agent})
 }
 
 // HaltChannelPipeline handles POST /v1/channels/:channel_id/pipeline/halt
@@ -201,7 +280,7 @@ func HaltChannelPipeline(c *gin.Context) {
 	}
 
 	var record models.ChannelPipeline
-	if err := db.DB.Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying"}).First(&record).Error; err != nil {
+	if err := db.DB.Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying", "paused"}).First(&record).Error; err != nil {
 		c.JSON(http.StatusOK, gin.H{"status": "not_running"})
 		return
 	}
@@ -678,8 +757,8 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 			}
 			return []string{segments[0].Agent}, true, nil
 		}
-		// Clear any previous pipeline if user sends a normal message
-		clearPipeline(channel.ID)
+		// Suspend running pipeline instead of destroying it when human intervenes
+		pausePipeline(channel.ID)
 	}
 
 	// Agent-sourced messages: only route if the agent explicitly @mentions

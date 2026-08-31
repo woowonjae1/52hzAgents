@@ -38,6 +38,7 @@ import {
   MonitorPlay,
   Power,
   Palette,
+  Activity,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -249,6 +250,13 @@ export function SettingsView() {
       sublabel: 'Agent Terminal Logs',
       icon: Terminal,
       desc: '查看外部 Agent 运行时的 CLI 进程标准输出流与原始日志。',
+    },
+    {
+      id: 'trace',
+      name: '执行轨迹与思考流',
+      sublabel: 'Execution Trace & Reasoning',
+      icon: Activity,
+      desc: '集中查看当前会话中 Agent 的多步思考、Tool 调用、Subagents 派发与实时执行树。',
     },
   ];
 

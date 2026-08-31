@@ -23,7 +23,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2 } from 'lucide-react';
+import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -58,25 +58,29 @@ const PROMPT_SUGGESTIONS = [
   },
   {
     icon: Terminal,
-    title: 'Diagnose the environment',
-    desc: 'Run local commands to check dependencies and runtime state',
-    prompt: 'Check this project’s git status and dependency health, and surface anything that looks broken.',
+    title: 'Diagnose environment',
+    desc: 'Check installed runtimes, tools, and local servers',
+    prompt: 'Diagnose the local environment: check Node, Python, and Go runtimes, running background tasks, and active ports.',
   },
   {
     icon: Layers,
-    title: 'Design an architecture',
-    desc: 'Plan module architecture and the API contract between front and back end',
-    prompt: 'Draft a system architecture document and the core API contract for the feature we are about to build.',
+    title: 'Design architecture',
+    desc: 'Propose module boundaries, data flow, and file layout',
+    prompt: 'Draft an architectural plan for this workspace, proposing clear module boundaries, data flow, and a scalable file layout.',
   },
 ];
 
 /**
- * The side panels, previously four always-visible toolbar buttons. They are
+ * Quick-open panels available in the thread header.
+ *
+ * `LocalPreview` (the dev-server viewer) has its own dedicated button beside
+ * these. The rest — sandbox browser, radar, file tree, tasks, terminal, and trace — are
  * collapsed into a single dropdown to keep the thread header quiet — but they
  * stay in the header rather than moving into Settings, because these are view
  * switchers people toggle constantly, not configuration.
  */
 const SIDE_PANELS = [
+  { id: 'trace' as const, label: 'Trace', icon: Activity },
   { id: 'browser' as const, label: 'Sandbox', icon: Globe },
   { id: 'radar' as const, label: 'Agents', icon: Users },
   { id: 'file' as const, label: 'Files', icon: FileText },
@@ -828,6 +832,20 @@ export function ChatView() {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0 [app-region:no-drag]">
+          {/* Orchestration Mode Header Control */}
+          {currentSession && !isDM && (
+            <OrchestrationControl
+              session={currentSession}
+              agents={agents}
+              onChange={(updates) => {
+                if (currentSessionId) {
+                  setSessionOrchestration(currentSessionId, updates);
+                }
+              }}
+              variant="standalone"
+            />
+          )}
+
           {/* Agent Quota & Usage Capsule (Claude) */}
           <AgentQuotaCapsule agentName={activeModelAgentName} />
 
@@ -863,6 +881,18 @@ export function ChatView() {
             title="Toggle Artifacts Canvas (右侧画布)"
           >
             <Sparkles className="size-3.5" />
+          </button>
+
+          {/* Trace Panel Toggle button */}
+          <button
+            onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}
+            className={cn(
+              'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+              activeRightTab === 'trace' ? 'bg-primary/15 text-primary shadow-2xs' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+            )}
+            title="Toggle Execution Trace (执行轨迹)"
+          >
+            <Activity className="size-3.5" />
           </button>
 
           {/* Quick Panels toggle */}

@@ -538,128 +538,33 @@ export function PromptComposer({
           isDragging && 'border-border-accent bg-surface2'
         )}
       >
-        {/* Top Orchestration Strip: Channel Collaboration Modes */}
-        <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5 pb-2 border-b border-border/40 dark:border-white/[0.06] text-xs select-none bg-surface2/30">
-          <div className="flex items-center gap-2 min-w-0 flex-wrap">
-            {/* Real Collaboration Mode Switcher */}
-            <div className="flex items-center p-0.5 rounded-base bg-surface2 border border-border text-2xs font-medium text-muted-foreground shrink-0 shadow-2xs">
-              <button
-                type="button"
-                onClick={() => onOrchestrationChange?.({ mode: 'dynamic' })}
-                className={cn(
-                  'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
-                  currentMode === 'dynamic'
-                    ? 'bg-surface1 text-foreground border border-border-accent font-medium'
-                    : 'hover:text-foreground hover:bg-surface3/50'
-                )}
-                title="Dynamic routing — pick the best agent for each message from context"
-              >
-                <Sparkles className="size-3" />
-                <span>Dynamic</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onOrchestrationChange?.({ mode: 'master' })}
-                className={cn(
-                  'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
-                  currentMode === 'master'
-                    ? 'bg-surface1 text-foreground border border-border-accent font-medium'
-                    : 'hover:text-foreground hover:bg-surface3/50'
-                )}
-                title="Master / sub — one lead agent schedules and delegates subtasks"
-              >
-                <Crown className="size-3" />
-                <span>Master / Sub</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setWorkflowPlanOpen(true);
-                  if (currentMode !== 'workflow') {
-                    onOrchestrationChange?.({ mode: 'workflow' });
-                  }
-                }}
-                className={cn(
-                  'px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5',
-                  currentMode === 'workflow'
-                    ? 'bg-surface1 text-foreground border border-border-accent font-medium'
-                    : 'hover:text-foreground hover:bg-surface3/50'
-                )}
-                title="Workflow — write an explicit execution plan"
-              >
-                <Waypoints className="size-3" />
-                <span>Workflow</span>
-              </button>
+        {/* Compact Mode Hint (Macro orchestration is controlled via Header) */}
+        {currentMode !== 'dynamic' && (
+          <div className="flex items-center justify-between gap-2 px-3.5 py-1.5 border-b border-border/40 text-3xs select-none bg-surface2/20 text-foreground-muted">
+            <div className="flex items-center gap-1.5">
+              {currentMode === 'master' ? (
+                <>
+                  <Crown className="size-3 text-status-warning" />
+                  <span>Master Mode: @{masterAgentName}</span>
+                </>
+              ) : (
+                <>
+                  <Waypoints className="size-3 text-primary" />
+                  <span>Custom Workflow Plan active</span>
+                </>
+              )}
             </div>
-
-            {/* Mode-specific Controls */}
-            {currentMode === 'master' && (
-              <div className="flex items-center gap-1.5 min-w-0 pl-1">
-                {/* Master Agent Dropdown */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setMasterDropdownOpen((v) => !v)}
-                    className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
-                  >
-                    <Crown className="size-3" />
-                    <span>Master: @{masterAgentName}</span>
-                    <ChevronDown className="size-2.5" />
-                  </button>
-
-                  {masterDropdownOpen && (
-                    <div className="absolute top-full left-0 mt-1.5 z-30 min-w-[150px] rounded-xl bg-surface1 border border-border/80 p-1 shadow-xl space-y-0.5 backdrop-blur-xl">
-                      {agents.map((a) => (
-                        <button
-                          key={a.agentName}
-                          type="button"
-                          onClick={() => {
-                            onMasterChange?.(a.agentName);
-                            setMasterDropdownOpen(false);
-                          }}
-                          className={cn(
-                            'w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-2 cursor-pointer transition-colors',
-                            masterAgentName === a.agentName
-                              ? 'bg-primary text-primary-foreground font-semibold'
-                              : 'hover:bg-surface2 text-foreground'
-                          )}
-                        >
-                          <AgentAvatar name={a.agentName} size={18} />
-                          <span>@{a.agentName}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <span className="text-3xs text-muted-foreground hidden sm:inline">
-                  Sub-agents assist
-                </span>
-              </div>
-            )}
-
             {currentMode === 'workflow' && (
-              <div className="flex items-center gap-1 min-w-0 pl-1">
-                <button
-                  type="button"
-                  onClick={() => setWorkflowPlanOpen(true)}
-                  className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-base bg-surface2 text-foreground-muted border border-border text-3xs font-medium cursor-pointer hover:bg-surface3 hover:text-foreground transition-colors"
-                >
-                  <FileEdit className="size-3" />
-                  <span>Edit workflow plan…</span>
-                </button>
-              </div>
-            )}
-
-            {currentMode === 'dynamic' && (
-              <span className="text-3xs text-muted-foreground/80 hidden md:inline pl-1">
-                Agents are routed automatically based on intent
-              </span>
+              <button
+                type="button"
+                onClick={() => setWorkflowPlanOpen(true)}
+                className="hover:text-foreground underline cursor-pointer"
+              >
+                Edit Plan
+              </button>
             )}
           </div>
-        </div>
+        )}
 
         {/* Pending Files Previews */}
         <AnimatePresence>

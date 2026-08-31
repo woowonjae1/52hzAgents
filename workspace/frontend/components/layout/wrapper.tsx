@@ -27,6 +27,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
 import { EmptyState } from '@/components/chat/empty-state';
 import { AgentTerminal } from '@/components/terminal/agent-terminal';
+import { TracePanel } from '@/components/trace/trace-panel';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 
@@ -243,6 +244,7 @@ export function Wrapper() {
                   {activeRightTab === 'tasks' && <TasksView />}
                   {activeRightTab === 'radar' && <RadarPanel />}
                   {activeRightTab === 'terminal' && <AgentTerminal />}
+                  {activeRightTab === 'trace' && <TracePanel />}
                 </div>
               )}
             </>
