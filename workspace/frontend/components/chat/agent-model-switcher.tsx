@@ -193,12 +193,15 @@ export function AgentModelSwitcher({
   /** What the chip reads when the lead agent has a model. */
   const leadLabel = React.useMemo(() => {
     if (!leadCurrent) return 'Default';
+    if (/3\.5/i.test(leadCurrent) && (norm(leadName) === 'antigravity' || norm(leadName) === 'agy')) {
+      return leadModels[0]?.shortName || leadModels[0]?.name || 'Default';
+    }
     const match = leadModels.find(
       (m) => m.id === leadCurrent || m.shortName === leadCurrent,
     );
     if (match) return match.shortName;
     return leadCurrent.includes('/') ? leadCurrent.split('/')[1] : leadCurrent;
-  }, [leadCurrent, leadModels]);
+  }, [leadCurrent, leadModels, leadName]);
 
   /*
     How many OTHER agents in this thread are on a model of their own. The chip

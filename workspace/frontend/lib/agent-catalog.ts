@@ -38,7 +38,7 @@ export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
   {
     name: 'antigravity',
     label: 'Google Antigravity',
-    description: 'Google Antigravity (AGY) agentic coding platform with Gemini 3.5 models.',
+    description: 'Google Antigravity (AGY) agentic coding platform with Gemini models.',
     install_command: 'wwj connect antigravity',
     homepage: 'https://antigravity.google',
     tags: ['coding', 'cli', 'gemini'],

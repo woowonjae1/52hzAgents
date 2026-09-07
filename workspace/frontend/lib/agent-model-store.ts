@@ -129,12 +129,23 @@ export function modelsFor(snapshot: AgentModelState, agentName: string): AgentMo
 /** Read the current model id for one agent out of a snapshot. */
 export function currentModelFor(snapshot: AgentModelState, agentName: string): string | undefined {
   if (!agentName) return undefined;
-  if (snapshot[agentName]?.current) return snapshot[agentName].current;
-  const lower = agentName.toLowerCase();
-  for (const [k, v] of Object.entries(snapshot)) {
-    if (k.toLowerCase() === lower && v.current) return v.current;
+  let raw: string | undefined = snapshot[agentName]?.current;
+  if (!raw) {
+    const lower = agentName.toLowerCase();
+    for (const [k, v] of Object.entries(snapshot)) {
+      if (k.toLowerCase() === lower && v.current) {
+        raw = v.current;
+        break;
+      }
+    }
   }
-  return undefined;
+  if (!raw) return undefined;
+  const isAntigravity = agentName.toLowerCase() === 'antigravity' || agentName.toLowerCase() === 'agy';
+  if (isAntigravity && /3\.5/i.test(raw)) {
+    const opts = modelsFor(snapshot, agentName);
+    return opts[0]?.id || undefined;
+  }
+  return raw;
 }
 
 /**
@@ -143,7 +154,7 @@ export function currentModelFor(snapshot: AgentModelState, agentName: string): s
  * `current` from the adapter does NOT overwrite a value set locally: a switch
  * is optimistic and the next `getAgentUsage` may still be answering with the
  * pre-switch model, which would make the menu flip back for one poll cycle.
- * Only fills a blank.
+ * Only fills a blank, while validating stale/deprecated models against options.
  */
 export function hydrateAgentModels(
   agentName: string,
@@ -154,7 +165,27 @@ export function hydrateAgentModels(
     reported.options && reported.options.length > 0
       ? reported.options
       : prev?.options ?? [];
-  const nextCurrent = prev?.current ?? reported.current ?? undefined;
+
+  const isAntigravity = agentName.toLowerCase() === 'antigravity' || agentName.toLowerCase() === 'agy';
+
+  let candidateCurrent = prev?.current;
+  if (candidateCurrent && isAntigravity && /3\.5/i.test(candidateCurrent)) {
+    candidateCurrent = undefined;
+  }
+  if (candidateCurrent && nextOptions.length > 0) {
+    const lower = candidateCurrent.toLowerCase();
+    const exists = nextOptions.some(
+      (o) => o.id.toLowerCase() === lower || o.name.toLowerCase() === lower || o.shortName.toLowerCase() === lower,
+    );
+    if (!exists) {
+      candidateCurrent = undefined;
+    }
+  }
+
+  let nextCurrent = candidateCurrent ?? reported.current ?? undefined;
+  if (nextCurrent && isAntigravity && /3\.5/i.test(nextCurrent)) {
+    nextCurrent = nextOptions[0]?.id;
+  }
 
   const optionsUnchanged =
     prev !== undefined &&
@@ -199,10 +230,18 @@ export function rememberForSession(sessionId: string, agentName: string, modelId
 export function restoreForSession(sessionId: string, agentNames: string[]): void {
   for (const name of agentNames) {
     try {
-      const saved =
-        localStorage.getItem(storageKey(sessionId, name)) ||
-        localStorage.getItem(defaultStorageKey(name));
-      if (saved) setCurrentModel(name, saved);
+      const isAntigravity = name.toLowerCase() === 'antigravity' || name.toLowerCase() === 'agy';
+      const sKey = storageKey(sessionId, name);
+      const dKey = defaultStorageKey(name);
+      const saved = localStorage.getItem(sKey) || localStorage.getItem(dKey);
+      if (saved) {
+        if (isAntigravity && /3\.5/i.test(saved)) {
+          localStorage.removeItem(sKey);
+          localStorage.removeItem(dKey);
+          continue;
+        }
+        setCurrentModel(name, saved);
+      }
     } catch {
       return;
     }

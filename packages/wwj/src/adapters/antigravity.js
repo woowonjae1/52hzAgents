@@ -3,7 +3,7 @@
  *
  * Bridges the local Antigravity CLI (agy) / Google Antigravity Agent to 52hzAgents:
  * - Reads and syncs model configurations with ~/.gemini/antigravity-cli/settings.json
- * - Supports dynamic model switching across Gemini 3.5 Pro / Flash / Lite
+ * - Supports dynamic model switching across Gemini 3.6 / 3.7 / 3.8 models
  * - Runs commands non-interactively in the background with windowsHide
  */
 
@@ -24,7 +24,7 @@ const IS_WINDOWS = process.platform === 'win32';
 
 // Standard Antigravity Model Catalog (Exact matching from Antigravity CLI)
 // Antigravity's own settings file. `model` holds the exact name the user
-// selected in the CLI (e.g. "Gemini 3.5 Flash (Medium)"). There is no local
+// selected in the CLI (e.g. "Gemini 3.6 Flash (Medium)"). There is no local
 // catalog file listing the selectable models, so this adapter reports the one
 // model it can actually read and nothing else - the UI offers free-text entry
 // for anything the CLI accepts. Read-only; never written here.
@@ -265,18 +265,20 @@ class AntigravityAdapter extends BaseAdapter {
       if (explicit) return explicit;
     }
     if (channel && this._channelModels && this._channelModels[channel]) {
-      return this._channelModels[channel];
+      const m = this._channelModels[channel];
+      if (!/gemini\s*3\.5/i.test(m)) return m;
     }
     if (this._channelModels && this._channelModels['*']) {
-      return this._channelModels['*'];
+      const m = this._channelModels['*'];
+      if (!/gemini\s*3\.5/i.test(m)) return m;
     }
     // No fallback model: what the CLI is set to is what settings.json says, and
     // if that is empty the run uses Antigravity's own default rather than a
     // name this adapter made up.
-    return this.model
-      || this._modelFromAntigravitySettings()
-      || (this.agentEnv.ANTIGRAVITY_MODEL || '').trim()
-      || undefined;
+    if (this.model && !/gemini\s*3\.5/i.test(this.model)) return this.model;
+    const fromSettings = this._modelFromAntigravitySettings();
+    if (fromSettings && !/gemini\s*3\.5/i.test(fromSettings)) return fromSettings;
+    return (this.agentEnv.ANTIGRAVITY_MODEL || '').trim() || undefined;
   }
 
   /**
@@ -374,21 +376,25 @@ class AntigravityAdapter extends BaseAdapter {
       const models = await this._listModels();
       const efforts = await this._listEffortLevels();
       const effort = this._currentEffort() || null;
-      // settings.json stores the display name ("Gemini 3.5 Flash (Medium)")
-      // while `agy models` keys on the id ("gemini-3.5-flash-medium"). Report
+      // settings.json stores the display name ("Gemini 3.6 Flash (Medium)")
+      // while `agy models` keys on the id ("gemini-3.6-flash-medium"). Report
       // the id so the UI can match the running model against the list instead
       // of showing a selection that appears to be in neither.
       const canonical = current
         ? (models.find((m) => m.id.toLowerCase() === current.toLowerCase())
           || models.find((m) => m.label.toLowerCase() === current.toLowerCase()))
         : null;
+      let reportedCurrent = canonical ? canonical.id : current;
+      if (reportedCurrent && /gemini\s*3\.5/i.test(reportedCurrent)) {
+        reportedCurrent = models.length ? models[0].id : null;
+      }
       await this.client.reportAgentUsage(
         this.workspaceId,
         this.agentName,
         {
           session_used_percent: 0,
           week_used_percent: 0,
-          current_model: canonical ? canonical.id : current,
+          current_model: reportedCurrent,
           available_models: models.length ? JSON.stringify(models) : null,
           current_effort: effort,
           available_efforts: efforts.length ? JSON.stringify(efforts) : null,
@@ -425,8 +431,8 @@ class AntigravityAdapter extends BaseAdapter {
       if (!requested) return;
 
       // Matched against what `agy models` itself reports, so a display name
-      // ("Gemini 3.5 Flash (Medium)") resolves to the id the CLI accepts
-      // ("gemini-3.5-flash-medium"). An unknown value passes through untouched
+      // ("Gemini 3.6 Flash (Medium)") resolves to the id the CLI accepts
+      // ("gemini-3.6-flash-medium"). An unknown value passes through untouched
       // rather than being rewritten against a table in this repo.
       const known = await this._listModels();
       const lower = String(requested).toLowerCase();

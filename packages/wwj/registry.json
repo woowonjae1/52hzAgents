@@ -169,7 +169,7 @@
   {
     "name": "antigravity",
     "label": "Google Antigravity (AGY)",
-    "description": "Google Antigravity agentic coding platform with Gemini 3.5 models",
+    "description": "Google Antigravity agentic coding platform with Gemini models",
     "homepage": "https://antigravity.google",
     "tags": [
       "coding",
