@@ -234,7 +234,7 @@ export function AgentModelSwitcher({
         model: modelId,
         channel: sessionId || undefined,
       });
-      if (sessionId) rememberForSession(sessionId, targetAgentName, modelId);
+      rememberForSession(sessionId || 'default', targetAgentName, modelId);
       toast.success(`${targetAgentName} switched to ${modelName}`);
     } catch (e) {
       setCurrentModel(targetAgentName, previousId);

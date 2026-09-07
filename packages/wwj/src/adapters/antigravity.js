@@ -287,7 +287,10 @@ class AntigravityAdapter extends BaseAdapter {
     try {
       if (!fs.existsSync(ANTIGRAVITY_SETTINGS_FILE)) return '';
       const cfg = JSON.parse(fs.readFileSync(ANTIGRAVITY_SETTINGS_FILE, 'utf-8'));
-      return cfg && typeof cfg.model === 'string' ? cfg.model.trim() : '';
+      const model = cfg && typeof cfg.model === 'string' ? cfg.model.trim() : '';
+      if (!model) return '';
+      if (/gemini\s*3\.5/i.test(model)) return '';
+      return model;
     } catch {
       return '';
     }
@@ -433,12 +436,11 @@ class AntigravityAdapter extends BaseAdapter {
 
       if (channel) {
         this._channelModels[channel] = targetModelName;
-      } else {
-        for (const c of Object.keys(this._channelModels)) this._channelModels[c] = targetModelName;
-        this._channelModels['*'] = targetModelName;
-        this.model = targetModelName;
       }
-      this._log(`Model override for channel=${channel || 'all'} set to '${targetModelName}' (this session only)`);
+      for (const c of Object.keys(this._channelModels)) this._channelModels[c] = targetModelName;
+      this._channelModels['*'] = targetModelName;
+      this.model = targetModelName;
+      this._log(`Model override for channel=${channel || 'all'} set to '${targetModelName}'`);
       this.fetchAndReportUsage().catch(() => {});
       return;
     }
@@ -512,8 +514,25 @@ class AntigravityAdapter extends BaseAdapter {
     const conversationId = this._channelSessions[channel] || null;
     await this.sendStatus(channel, 'Reasoning');
 
+    const rawModel = this._resolveModel(channel, msg);
+    let agyModelFlag = null;
+    if (rawModel) {
+      const known = await this._listModels();
+      const lower = String(rawModel).trim().toLowerCase();
+      const match = known.find((m) => m.id.toLowerCase() === lower || m.label.toLowerCase() === lower);
+      if (match) {
+        // agy requires the label from `agy models` (e.g. "Gemini 3.6 Flash (Medium)")
+        agyModelFlag = match.label;
+      } else if (known.length === 0) {
+        if (!/gemini\s*3\.5/i.test(rawModel)) {
+          agyModelFlag = rawModel;
+        }
+      } else {
+        this._log(`Model '${rawModel}' not in agy models (${known.map(m => m.label).join(', ')}). Omitting --model flag to use CLI default.`);
+      }
+    }
+
     return new Promise((resolve) => {
-      const agyModelFlag = this._resolveModel(channel, msg);
 
       const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
       const agyEffort = this._currentEffort(channel);
@@ -728,7 +747,7 @@ class AntigravityAdapter extends BaseAdapter {
           outputText = rawStdout;
         }
 
-        const cleanOutput = stripPreamble(stripAnsi(outputText));
+        const cleanOutput = stripLeadingPlan(stripSubagentFraming(stripAnsi(outputText)));
 
         if (lastErrorText) {
           await this.sendError(channel, `⚠️ Antigravity 调用异常提示:\n${lastErrorText}`);

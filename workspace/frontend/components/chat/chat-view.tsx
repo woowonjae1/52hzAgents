@@ -36,6 +36,7 @@ import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
 import { AgentModelSwitcher } from './agent-model-switcher';
+import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { PipelineStepper } from './pipeline-stepper';
 import { eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
@@ -678,11 +679,19 @@ export function ChatView() {
         // Per-agent model hints, keyed by agent name and agent type
         const agentModelsMeta: Record<string, string> = {};
         try {
+          const modelSnapshot = getSnapshot();
           for (const agent of agents) {
-            const saved = localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName}`);
+            const saved =
+              (currentSessionId && localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName}`)) ||
+              (currentSessionId && localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName.toLowerCase()}`)) ||
+              currentModelFor(modelSnapshot, agent.agentName) ||
+              localStorage.getItem(`52hz_model_default_${agent.agentName}`) ||
+              localStorage.getItem(`52hz_model_default_${agent.agentName.toLowerCase()}`);
             if (saved) {
+              agentModelsMeta[agent.agentName] = saved;
               agentModelsMeta[agent.agentName.toLowerCase()] = saved;
               if (agent.agentType) {
+                agentModelsMeta[agent.agentType] = saved;
                 agentModelsMeta[agent.agentType.toLowerCase()] = saved;
               }
             }

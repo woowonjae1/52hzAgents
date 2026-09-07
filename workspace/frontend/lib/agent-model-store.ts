@@ -105,7 +105,7 @@ function subscribe(listener: () => void) {
  * `useSyncExternalStore` compares by identity and a fresh object every call is
  * an infinite render loop.
  */
-function getSnapshot(): AgentModelState {
+export function getSnapshot(): AgentModelState {
   return state;
 }
 
@@ -125,7 +125,13 @@ export function modelsFor(snapshot: AgentModelState, agentName: string): AgentMo
 
 /** Read the current model id for one agent out of a snapshot. */
 export function currentModelFor(snapshot: AgentModelState, agentName: string): string | undefined {
-  return snapshot[agentName]?.current;
+  if (!agentName) return undefined;
+  if (snapshot[agentName]?.current) return snapshot[agentName].current;
+  const lower = agentName.toLowerCase();
+  for (const [k, v] of Object.entries(snapshot)) {
+    if (k.toLowerCase() === lower && v.current) return v.current;
+  }
+  return undefined;
 }
 
 /**
@@ -174,10 +180,13 @@ export function setCurrentModel(agentName: string, modelId: string | undefined):
 */
 const storageKey = (sessionId: string, agentName: string) =>
   `52hz_model_${sessionId}_${agentName}`;
+const defaultStorageKey = (agentName: string) =>
+  `52hz_model_default_${agentName}`;
 
 export function rememberForSession(sessionId: string, agentName: string, modelId: string): void {
   try {
     localStorage.setItem(storageKey(sessionId, agentName), modelId);
+    localStorage.setItem(defaultStorageKey(agentName), modelId);
   } catch {
     // Private windows and cleared site data both throw here; the switch itself
     // already reached the agent, so this is only the memory of it.
@@ -187,7 +196,9 @@ export function rememberForSession(sessionId: string, agentName: string, modelId
 export function restoreForSession(sessionId: string, agentNames: string[]): void {
   for (const name of agentNames) {
     try {
-      const saved = localStorage.getItem(storageKey(sessionId, name));
+      const saved =
+        localStorage.getItem(storageKey(sessionId, name)) ||
+        localStorage.getItem(defaultStorageKey(name));
       if (saved) setCurrentModel(name, saved);
     } catch {
       return;
