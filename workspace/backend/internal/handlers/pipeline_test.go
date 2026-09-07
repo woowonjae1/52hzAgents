@@ -74,7 +74,7 @@ func startTestPipeline(t *testing.T, workspace models.Workspace, channel models.
 			"message_type": "chat",
 		},
 	}
-	targets, routed, err := routeMessage(workspace.ID, &channel, req)
+	targets, routed, err := routeMessage(nil, workspace.ID, &channel, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestPipelineClearedByPlainMessage(t *testing.T) {
 		Target:  "channel/general",
 		Payload: map[string]interface{}{"content": "never mind", "message_type": "chat"},
 	}
-	if _, _, err := routeMessage(workspace.ID, &channel, req); err != nil {
+	if _, _, err := routeMessage(nil, workspace.ID, &channel, req); err != nil {
 		t.Fatal(err)
 	}
 
@@ -347,7 +347,7 @@ func TestPipelineAdvancesOnAnalyticalReviewWithReportedBugs(t *testing.T) {
 			"message_type": "chat",
 		},
 	}
-	_, _, err := routeMessage(workspace.ID, &channel, req)
+	_, _, err := routeMessage(nil, workspace.ID, &channel, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -408,7 +408,7 @@ func TestPipelineStructuredMentionSegmentsDirect(t *testing.T) {
 		},
 	}
 
-	targets, routed, err := routeMessage(workspace.ID, &channel, req)
+	targets, routed, err := routeMessage(nil, workspace.ID, &channel, req)
 	if err != nil {
 		t.Fatal(err)
 	}

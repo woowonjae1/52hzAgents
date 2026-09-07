@@ -168,7 +168,7 @@ class WorkspaceClient {
   async sendMessage(workspaceId, channelName, token, content, {
     senderType = 'agent', senderName, messageType = 'chat', metadata, attachments, sessionId,
   } = {}) {
-    const sourcePrefix = senderType === 'agent' ? '52hzAgents' : 'human';
+    const sourcePrefix = senderType === 'agent' ? '52hz' : 'human';
     const source = senderName ? `${sourcePrefix}:${senderName}` : `${sourcePrefix}:unknown`;
 
     const payload = { content, message_type: messageType };

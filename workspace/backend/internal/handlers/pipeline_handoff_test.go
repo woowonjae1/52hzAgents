@@ -87,7 +87,7 @@ func TestHandoffStartsPipelineWhenOnlyFirstAgentIsInChannel(t *testing.T) {
 		Metadata: map[string]interface{}{},
 	}
 
-	targets, routed, err := routeMessage(workspace.ID, &channel, req)
+	targets, routed, err := routeMessage(nil, workspace.ID, &channel, req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,3 +116,55 @@ func decodeSteps(t *testing.T, record models.ChannelPipeline) []models.PipelineS
 	_, steps := loadChain(t, record.ChannelID)
 	return steps
 }
+
+func TestHandoffStartsPipelineInsideTransaction(t *testing.T) {
+	workspace, channel := setupHandoffDB(t, []string{"antigravity"})
+
+	req := &SendEventRequest{
+		Type:   "workspace.message.posted",
+		Source: "human:user",
+		Target: "channel/" + channel.Name,
+		Payload: map[string]interface{}{
+			"content":      handoffPrompt,
+			"message_type": "chat",
+		},
+		Metadata: map[string]interface{}{},
+	}
+
+	// Verify that inside a GORM transaction (exactly as HandleEvent is called by materializeEventTx),
+	// routeMessage(tx, ...) successfully starts the pipeline without SQLite lock contention.
+	err := db.DB.Transaction(func(tx *gorm.DB) error {
+		targets, routed, err := routeMessage(tx, workspace.ID, &channel, req)
+		if err != nil {
+			return err
+		}
+		if !routed || len(targets) != 1 || targets[0] != "antigravity" {
+			t.Fatalf("expected routing to antigravity, got routed=%v targets=%v", routed, targets)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("failed inside transaction: %v", err)
+	}
+
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ?", channel.ID).First(&record).Error; err != nil {
+		t.Fatalf("pipeline was not persisted in tx: %v", err)
+	}
+	steps := decodeSteps(t, record)
+	if len(steps) != 2 || steps[0].Agent != "antigravity" || steps[1].Agent != "claude" {
+		t.Fatalf("unexpected pipeline steps: %+v", steps)
+	}
+}
+
+func TestAgentSourceWith52hzAgentsPrefix(t *testing.T) {
+	src := "52hzAgents:antigravity"
+	if !isAgentSource(src) {
+		t.Fatalf("expected isAgentSource(%q) to be true", src)
+	}
+	name := agentNameFromSource(src)
+	if name != "antigravity" {
+		t.Fatalf("expected agentNameFromSource(%q) to be 'antigravity', got %q", src, name)
+	}
+}
+

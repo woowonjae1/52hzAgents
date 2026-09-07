@@ -18,6 +18,7 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/evaluator"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
+	"gorm.io/gorm"
 )
 
 var (
@@ -132,7 +133,11 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 // startPipeline persists a freshly parsed relay chain for a channel, replacing
 // whatever chain that channel had. Step 0 starts out running because
 // routeMessage returns it as the target of the message that opened the chain.
-func startPipeline(workspaceID, channelID, startedBy string, steps []models.PipelineStep) string {
+func startPipeline(tx *gorm.DB, workspaceID, channelID, startedBy string, steps []models.PipelineStep) string {
+	database := tx
+	if database == nil {
+		database = db.DB
+	}
 	nowMs := time.Now().UnixMilli()
 	steps[0].Status = "running"
 	steps[0].StartedAt = &nowMs
@@ -146,7 +151,7 @@ func startPipeline(workspaceID, channelID, startedBy string, steps []models.Pipe
 		return ""
 	}
 
-	clearPipeline(channelID)
+	clearPipeline(database, channelID)
 	record := models.ChannelPipeline{
 		ID:           uuid.NewString(),
 		WorkspaceID:  workspaceID,
@@ -156,7 +161,7 @@ func startPipeline(workspaceID, channelID, startedBy string, steps []models.Pipe
 		Status:       "running",
 		StartedBy:    startedBy,
 	}
-	if err := db.DB.Create(&record).Error; err != nil {
+	if err := database.Create(&record).Error; err != nil {
 		log.Printf("pipeline: failed to persist chain for channel %s: %v", channelID, err)
 		return ""
 	}
@@ -164,15 +169,23 @@ func startPipeline(workspaceID, channelID, startedBy string, steps []models.Pipe
 }
 
 // clearPipeline drops the channel's chain completely.
-func clearPipeline(channelID string) {
-	if err := db.DB.Where("channel_id = ?", channelID).Delete(&models.ChannelPipeline{}).Error; err != nil {
+func clearPipeline(tx *gorm.DB, channelID string) {
+	database := tx
+	if database == nil {
+		database = db.DB
+	}
+	if err := database.Where("channel_id = ?", channelID).Delete(&models.ChannelPipeline{}).Error; err != nil {
 		log.Printf("pipeline: failed to clear chain for channel %s: %v", channelID, err)
 	}
 }
 
 // pausePipeline suspends the pipeline without deleting its progress, allowing safe human-in-the-loop takeover.
-func pausePipeline(channelID string) {
-	if err := db.DB.Model(&models.ChannelPipeline{}).
+func pausePipeline(tx *gorm.DB, channelID string) {
+	database := tx
+	if database == nil {
+		database = db.DB
+	}
+	if err := database.Model(&models.ChannelPipeline{}).
 		Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying"}).
 		Update("status", "paused").Error; err != nil {
 		log.Printf("pipeline: failed to pause chain for channel %s: %v", channelID, err)
@@ -686,12 +699,17 @@ var mentionPattern = regexp.MustCompile(`@([A-Za-z0-9_-]+)`)
 // routeMessage applies the original WorkspaceMod routing rules to one chat
 // event. It returns routed=false for operational/status events, which must be
 // persisted and shown in the UI but must never wake another agent.
-func routeMessage(workspaceID string, channel *models.Channel, req *SendEventRequest) (targets []string, routed bool, err error) {
+func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req *SendEventRequest) (targets []string, routed bool, err error) {
 	if req.Type != "workspace.message.posted" || channel == nil {
 		return nil, false, nil
 	}
 	if _, explicit := req.Metadata["target_agents"]; explicit {
 		return nil, false, nil
+	}
+
+	database := tx
+	if database == nil {
+		database = db.DB
 	}
 
 	if isAgentSource(req.Source) {
@@ -712,7 +730,7 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 
 	// Retrieve all workspace agents to support global @mentions and multi-agent pipelines
 	var wsMembers []models.WorkspaceMember
-	db.DB.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
+	database.Where("workspace_id = ?", workspaceID).Find(&wsMembers)
 	allWorkspaceAgents := make([]string, 0, len(wsMembers))
 	for _, m := range wsMembers {
 		if m.AgentName != "" && m.AgentName != noResponseAgent {
@@ -721,7 +739,7 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 	}
 
 	var memberships []models.ChannelMember
-	if err := db.DB.Where("channel_id = ?", channel.ID).Order("agent_name ASC").Find(&memberships).Error; err != nil {
+	if err := database.Where("channel_id = ?", channel.ID).Order("agent_name ASC").Find(&memberships).Error; err != nil {
 		return []string{noResponseAgent}, true, nil
 	}
 	participants := make([]string, 0, len(memberships))
@@ -745,7 +763,7 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 
 	content, _ := req.Payload["content"].(string)
 	mentions := mentionedAgents(content, req.Payload, availableCandidates)
-	online := onlineParticipants(workspaceID, availableCandidates)
+	online := onlineParticipants(database, workspaceID, availableCandidates)
 
 	// If human message contains multi-agent pipeline (@agent1 ... @agent2 ... @agent3 ...)
 	if isHumanSource(req.Source) {
@@ -768,7 +786,7 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 		}
 
 		if len(segments) >= 2 {
-			if pipelineID := startPipeline(workspaceID, channel.ID, req.Source, segments); pipelineID != "" && req.Metadata != nil {
+			if pipelineID := startPipeline(database, workspaceID, channel.ID, req.Source, segments); pipelineID != "" && req.Metadata != nil {
 				// Turn attribution groups every retry of a step under that
 				// step's key. Step 0 is dispatched through the event handler
 				// rather than a relay, so its key travels in metadata to keep
@@ -778,7 +796,7 @@ func routeMessage(workspaceID string, channel *models.Channel, req *SendEventReq
 			return []string{segments[0].Agent}, true, nil
 		}
 		// Suspend running pipeline instead of destroying it when human intervenes
-		pausePipeline(channel.ID)
+		pausePipeline(database, channel.ID)
 	}
 
 	// Agent-sourced messages: only route if the agent explicitly @mentions
@@ -836,11 +854,12 @@ func messageType(payload map[string]interface{}) string {
 
 func isHumanSource(source string) bool { return strings.HasPrefix(source, "human:") }
 func isAgentSource(source string) bool {
-	return strings.HasPrefix(source, "52hz:") || strings.HasPrefix(source, "agent:") || strings.HasPrefix(source, "openagents:")
+	return strings.HasPrefix(source, "52hz:") || strings.HasPrefix(source, "52hzAgents:") || strings.HasPrefix(source, "agent:") || strings.HasPrefix(source, "openagents:")
 }
 
 func agentNameFromSource(source string) string {
-	s := strings.TrimPrefix(source, "52hz:")
+	s := strings.TrimPrefix(source, "52hzAgents:")
+	s = strings.TrimPrefix(s, "52hz:")
 	s = strings.TrimPrefix(s, "agent:")
 	return strings.TrimPrefix(s, "openagents:")
 }
@@ -886,12 +905,15 @@ func mentionedAgents(content string, payload map[string]interface{}, participant
 	return mentions
 }
 
-func onlineParticipants(workspaceID string, participants []string) map[string]bool {
+func onlineParticipants(database *gorm.DB, workspaceID string, participants []string) map[string]bool {
 	if len(participants) == 0 {
 		return nil
 	}
+	if database == nil {
+		database = db.DB
+	}
 	var members []models.WorkspaceMember
-	db.DB.Where("workspace_id = ? AND agent_name IN ?", workspaceID, participants).Find(&members)
+	database.Where("workspace_id = ? AND agent_name IN ?", workspaceID, participants).Find(&members)
 	now := time.Now()
 	// Connector sends heartbeats every 30s; require 90s (3x margin) for online status
 	timeout := 90 * time.Second

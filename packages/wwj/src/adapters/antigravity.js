@@ -489,7 +489,7 @@ class AntigravityAdapter extends BaseAdapter {
 
   async _handleMessage(msg) {
     let channel = this.channelName || 'general';
-    if (msg.sessionId && !msg.sessionId.startsWith('52hz:') && !msg.sessionId.startsWith('agent:')) {
+    if (msg.sessionId && !msg.sessionId.startsWith('52hz:') && !msg.sessionId.startsWith('agent:') && !msg.sessionId.startsWith('52hzAgents:')) {
       channel = msg.sessionId;
     }
     const content = stripSelfMention(msg.content || '', this.agentName);
@@ -534,7 +534,9 @@ class AntigravityAdapter extends BaseAdapter {
 
     return new Promise((resolve) => {
 
-      const args = ['-p', content, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
+      const collaborationNotice = `[System Notice: You are agent '@${this.agentName}' in a multi-agent workspace. Other agents (such as @claude) are independent processes running in this workspace, NOT your subagents. NEVER call define_subagent or invoke_subagent to simulate or impersonate other workspace agents. ONLY complete your own part of the task, output your deliverable/findings, and stop. The workspace orchestrator will automatically relay your results to the next agent.]\n\n`;
+      const promptText = `${collaborationNotice}${content}`;
+      const args = ['-p', promptText, '--output-format', 'stream-json', '--dangerously-skip-permissions'];
       const agyEffort = this._currentEffort(channel);
       if (agyEffort) {
         args.push('--effort', agyEffort);

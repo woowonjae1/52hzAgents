@@ -412,7 +412,7 @@ func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, 
 				}
 			}
 
-			targets, routed, err := routeMessage(workspaceID, &channel, req)
+			targets, routed, err := routeMessage(tx, workspaceID, &channel, req)
 			if err != nil {
 				return err
 			}
