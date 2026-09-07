@@ -135,8 +135,10 @@ function DMSection({
                 key={dmId}
                 onClick={() => onSelect(dmId)}
                 className={cn(
-                  'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors cursor-pointer',
-                  isSelected ? 'bg-surface2 ring-2 ring-border-accent' : 'hover:bg-surface1 dark:hover:bg-primary/50'
+                  'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors cursor-pointer relative',
+                  isSelected
+                    ? 'bg-white dark:bg-surface2 text-foreground font-medium border border-black/10 dark:border-white/10 shadow-xs before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+                    : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground'
                 )}
               >
                 <div className="shrink-0 flex items-center justify-center border border-border rounded-full size-[30px] bg-card">
@@ -221,12 +223,12 @@ interface ThreadRowProps {
   isEditing: boolean;
   editTitleValue: string;
   agents: WorkspaceAgent[];
-  onSelect: () => void;
-  onStartEdit: (title: string) => void;
+  onSelect: (sessionId: string) => void;
+  onStartEdit: (sessionId: string, title: string) => void;
   onCancelEdit: () => void;
-  onSaveEdit: (title: string) => void;
-  onUpdateStarred: (starred: boolean) => void;
-  onUpdateStatus: (status: 'active' | 'archived' | 'deleted') => void;
+  onSaveEdit: (sessionId: string, title: string) => void;
+  onUpdateStarred: (sessionId: string, starred: boolean) => void;
+  onUpdateStatus: (sessionId: string, status: 'active' | 'archived' | 'deleted') => void;
   setEditTitleValue: (v: string) => void;
 }
 
@@ -312,14 +314,14 @@ const ThreadRow = memo(function ThreadRow({
     <div
       onClick={() => {
         if (isEditing) return;
-        onSelect();
+        onSelect(session.sessionId);
       }}
       className={cn(
         'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors relative group cursor-pointer select-none',
         isSelected
-          ? 'bg-surface2/90 dark:bg-surface2/80 text-foreground border border-border/80 dark:border-white/[0.1] shadow-xs before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:rounded-r-full before:bg-surface2'
-          : 'border border-transparent hover:bg-surface2/40 text-foreground-muted hover:text-foreground',
-        'has-data-[state=open]:bg-surface2/40',
+          ? 'bg-white dark:bg-surface2 text-foreground font-medium border border-black/10 dark:border-white/10 shadow-xs before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+          : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
+        'has-data-[state=open]:bg-surface2/60',
         isActive && 'thread-wip',
         isCompleted && !isSelected && 'bg-surface2/50 border border-border/60'
       )}
@@ -352,7 +354,7 @@ const ThreadRow = memo(function ThreadRow({
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   const trimmed = editTitleValue.trim();
-                  if (trimmed) onSaveEdit(trimmed);
+                  if (trimmed) onSaveEdit(session.sessionId, trimmed);
                   onCancelEdit();
                 } else if (e.key === 'Escape') {
                   e.preventDefault();
@@ -361,7 +363,7 @@ const ThreadRow = memo(function ThreadRow({
               }}
               onBlur={() => {
                 const trimmed = editTitleValue.trim();
-                if (trimmed) onSaveEdit(trimmed);
+                if (trimmed) onSaveEdit(session.sessionId, trimmed);
                 onCancelEdit();
               }}
               className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary outline-none"
@@ -370,9 +372,12 @@ const ThreadRow = memo(function ThreadRow({
             <span
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                onStartEdit(smartTitle);
+                onStartEdit(session.sessionId, smartTitle);
               }}
-              className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight"
+              className={cn(
+                'text-xs flex-1 min-w-0 truncate tracking-tight',
+                isSelected ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+              )}
               title="Double-click to rename"
             >
               {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
@@ -383,7 +388,8 @@ const ThreadRow = memo(function ThreadRow({
           </span>
         </div>
         <p className={cn(
-          'text-3xs text-foreground-muted truncate leading-relaxed font-sans',
+          'text-3xs truncate leading-relaxed font-sans',
+          isSelected ? 'text-foreground/70' : 'text-foreground-muted',
           previewIsStatus && 'italic text-foreground-muted'
         )}>
           {preview}
@@ -404,7 +410,7 @@ const ThreadRow = memo(function ThreadRow({
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
-              onStartEdit(smartTitle);
+              onStartEdit(session.sessionId, smartTitle);
             }}
           >
             <Pencil className="size-4" />
@@ -413,7 +419,7 @@ const ThreadRow = memo(function ThreadRow({
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
-              onUpdateStarred(!session.starred);
+              onUpdateStarred(session.sessionId, !session.starred);
             }}
           >
             <Star className={cn('size-4', session.starred && 'fill-status-warning text-status-warning')} />
@@ -422,7 +428,7 @@ const ThreadRow = memo(function ThreadRow({
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation();
-              onUpdateStatus(session.status === 'archived' ? 'active' : 'archived');
+              onUpdateStatus(session.sessionId, session.status === 'archived' ? 'active' : 'archived');
             }}
           >
             {session.status === 'archived'
@@ -435,7 +441,7 @@ const ThreadRow = memo(function ThreadRow({
             className="text-destructive focus:text-destructive"
             onClick={(e) => {
               e.stopPropagation();
-              onUpdateStatus('deleted');
+              onUpdateStatus(session.sessionId, 'deleted');
             }}
           >
             <Trash2 className="size-4" />
@@ -444,6 +450,20 @@ const ThreadRow = memo(function ThreadRow({
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}, (prev, next) => {
+  return (
+    prev.session === next.session &&
+    prev.isSelected === next.isSelected &&
+    prev.isActive === next.isActive &&
+    prev.isCompleted === next.isCompleted &&
+    prev.lastMsg === next.lastMsg &&
+    prev.contentHit === next.contentHit &&
+    prev.isSearching === next.isSearching &&
+    prev.searchQuery === next.searchQuery &&
+    prev.isEditing === next.isEditing &&
+    prev.editTitleValue === next.editTitleValue &&
+    prev.agents === next.agents
   );
 });
 
@@ -858,7 +878,7 @@ export function ThreadList() {
       {/* Thread rows grouped by Project (TanStack Virtualized) */}
       <div
         ref={listContainerRef}
-        className="flex-1 overflow-y-auto px-2 py-1 overscroll-contain transform-gpu [contain:content] will-change-scroll"
+        className="flex-1 overflow-y-auto px-2 py-1 overscroll-contain transform-gpu [contain:content]"
       >
         {virtualListItems.length > 0 && (
           <div
@@ -919,12 +939,12 @@ export function ThreadList() {
                       isEditing={editingSessionId === item.session.sessionId}
                       editTitleValue={editTitleValue}
                       agents={agents}
-                      onSelect={() => handleSelectSession(item.session.sessionId)}
-                      onStartEdit={(title) => handleStartEdit(item.session.sessionId, title)}
+                      onSelect={handleSelectSession}
+                      onStartEdit={handleStartEdit}
                       onCancelEdit={handleCancelEdit}
-                      onSaveEdit={(title) => handleSaveEdit(item.session.sessionId, title)}
-                      onUpdateStarred={(starred) => handleUpdateStarred(item.session.sessionId, starred)}
-                      onUpdateStatus={(status) => handleUpdateStatus(item.session.sessionId, status)}
+                      onSaveEdit={handleSaveEdit}
+                      onUpdateStarred={handleUpdateStarred}
+                      onUpdateStatus={handleUpdateStatus}
                       setEditTitleValue={setEditTitleValue}
                     />
                   )}
@@ -1034,8 +1054,10 @@ export function ThreadList() {
                         }}
                         className={cn(
                           'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative group cursor-pointer',
-                          isSelected ? 'bg-surface2 ring-2 ring-border-accent' : 'hover:bg-surface1 dark:hover:bg-primary/50',
-                          'has-data-[state=open]:bg-surface1 dark:has-data-[state=open]:bg-primary/50'
+                          isSelected
+                            ? 'bg-white dark:bg-surface2 text-foreground font-medium border border-black/10 dark:border-white/10 shadow-xs before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+                            : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
+                          'has-data-[state=open]:bg-surface2/60'
                         )}
                       >
                         <div className="shrink-0">

@@ -530,7 +530,10 @@ export function ChatView() {
     const lastMsg = displayMessages[displayMessages.length - 1];
     if (lastMsg) {
       const isTerm = isTerminalStatus(lastMsg.content);
-      const isWorking = !isTerm && (
+      const isOptimistic = Boolean(lastMsg.messageId?.startsWith('optimistic-'));
+      const msgTime = lastMsg.createdAt ? new Date(lastMsg.createdAt).getTime() : 0;
+      const isRecent = isOptimistic || (msgTime > 0 && Date.now() - msgTime < 60_000);
+      const isWorking = !isTerm && isRecent && (
         lastMsg.messageType === 'status' ||
         lastMsg.messageType === 'thinking' ||
         lastMsg.messageType === 'loading'
@@ -547,6 +550,9 @@ export function ChatView() {
     prevActiveSessionRef.current = currentSessionId;
 
     if (!currentSessionId || displayMessages.length === 0) {
+      if (currentSessionId) {
+        setSessionActive(currentSessionId, false, null);
+      }
       return;
     }
     const lastMsg = displayMessages[displayMessages.length - 1];
@@ -560,13 +566,23 @@ export function ChatView() {
       return;
     }
     const isTerm = isTerminalStatus(lastMsg.content);
-    const isAgentWorking = !isTerm && (
+    const isOptimistic = Boolean(lastMsg.messageId?.startsWith('optimistic-'));
+    const msgTime = lastMsg.createdAt ? new Date(lastMsg.createdAt).getTime() : 0;
+    const isRecent = isOptimistic || (msgTime > 0 && Date.now() - msgTime < 60_000);
+    const isAgentWorking = !isTerm && isRecent && (
       lastMsg.messageType === 'status' ||
       lastMsg.messageType === 'thinking' ||
       lastMsg.messageType === 'loading'
     );
-    const isOptimistic = Boolean(lastMsg.messageId?.startsWith('optimistic-'));
     setSessionActive(currentSessionId, isAgentWorking, isOptimistic ? null : (isAgentWorking ? lastMsg.senderName : null));
+
+    if (isAgentWorking && !isOptimistic && msgTime > 0) {
+      const remainingMs = Math.max(1000, 60_000 - (Date.now() - msgTime));
+      const timer = setTimeout(() => {
+        setSessionActive(currentSessionId, false, null);
+      }, remainingMs);
+      return () => clearTimeout(timer);
+    }
   }, [currentSessionId, displayMessages, setSessionActive, isTerminalStatus]);
 
   // Extract agent mode from status message metadata

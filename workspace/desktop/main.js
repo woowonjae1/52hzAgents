@@ -5,9 +5,10 @@ const net = require('net');
 const fs = require('fs');
 const { spawn, execSync, fork } = require('child_process');
 
-// 1. Isolate userData folder & disable GPU crashes
+// 1. Isolate userData folder & configure GPU acceleration
 try {
-  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
   app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
   app.commandLine.appendSwitch('disable-gpu-program-cache');
   const customUserData = path.join(app.getPath('appData'), '52hzAgents-Desktop');

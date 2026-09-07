@@ -55,10 +55,13 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
     for (const [sender, own] of pendingSteps) {
       if (own.length === 0) continue;
       const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+      const lastStep = own[own.length - 1];
+      const isRecent = lastStep?.createdAt ? Date.now() - new Date(lastStep.createdAt).getTime() < 60_000 : false;
+      const isSettled = !isChannelActive || !isRecent;
       if (thinkingOnly) {
-        groups.push({ type: 'thinking', sender, messages: [...own], settled: !isChannelActive });
+        groups.push({ type: 'thinking', sender, messages: [...own], settled: isSettled });
       } else {
-        groups.push({ type: 'steps', messages: [...own], settled: !isChannelActive });
+        groups.push({ type: 'steps', messages: [...own], settled: isSettled });
       }
     }
     pendingSteps.clear();
