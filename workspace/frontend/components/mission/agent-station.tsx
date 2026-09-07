@@ -13,37 +13,12 @@ import {
   Check,
   X,
   RotateCw,
-  Cpu,
-  Gauge,
-  ChevronDown,
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { parseReportedModels, type AgentModelOption } from '@/components/chat/agent-model-switcher';
-import {
-  currentModelFor,
-  setCurrentModel as publishCurrentModel,
-  useAgentModels,
-} from '@/lib/agent-model-store';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 
 export type StationStatus = 'working' | 'ready' | 'offline' | 'blocked' | 'stalled';
-
-export interface StationModelInfo {
-  current: string | null;
-  models: AgentModelOption[];
-}
-
-export interface StationEffortInfo {
-  current: string | null;
-  levels: AgentModelOption[];
-}
 
 export interface StationData {
   agent: WorkspaceAgent;
@@ -62,8 +37,6 @@ export interface StationData {
     path?: string;
   };
   lastHeartbeatAt?: string | number | null;
-  modelInfo?: StationModelInfo;
-  effortInfo?: StationEffortInfo;
 }
 
 function fmtTokens(n: number): string {
@@ -86,7 +59,6 @@ interface AgentStationProps {
   onOpenThread: (sessionId: string) => void;
   onPairAgent?: () => void;
   onApprovalResolved?: () => void;
-  onRefreshUsage?: () => void;
   className?: string;
 }
 
@@ -96,7 +68,6 @@ export function AgentStation({
   onOpenThread,
   onPairAgent,
   onApprovalResolved,
-  onRefreshUsage,
   className,
 }: AgentStationProps) {
   const {
@@ -110,83 +81,14 @@ export function AgentStation({
     stalledMs,
     pendingApproval,
     lastHeartbeatAt,
-    modelInfo: initialModelInfo,
-    effortInfo: initialEffortInfo,
   } = data;
 
   const isWorking = status === 'working';
   const isBlocked = status === 'blocked';
   const isStalled = status === 'stalled';
   const isCustomPlaceholder = isCatalogPlaceholder === true && agent.agentName.toLowerCase() === 'custom';
-  // Model and effort are pushed to a running adapter over the control channel.
-  // An offline agent has nothing polling for that event, so the change would be
-  // accepted by the UI and quietly go nowhere - the controls are disabled
-  // instead of failing after the fact.
-  const canConfigure = status !== 'offline' && !isCatalogPlaceholder;
-  const offlineHint = 'Agent offline — connect it first';
   const activeThread = threads[0];
   const [busy, setBusy] = React.useState(false);
-  const [modelInfo, setModelInfo] = React.useState<StationModelInfo>(
-    initialModelInfo || { current: null, models: [] }
-  );
-  // Reasoning effort is a separate axis from the model and only some runtimes
-  // have one, so it renders only when the adapter actually reported levels.
-  const [effortInfo, setEffortInfo] = React.useState<StationEffortInfo>(
-    initialEffortInfo || { current: null, levels: [] }
-  );
-  const [customModelInput, setCustomModelInput] = React.useState('');
-  const [isEnteringCustom, setIsEnteringCustom] = React.useState(false);
-
-  // Sync state when parent provides fresh model/effort info
-  React.useEffect(() => {
-    if (initialModelInfo) {
-      setModelInfo(initialModelInfo);
-    }
-  }, [initialModelInfo]);
-
-  React.useEffect(() => {
-    if (initialEffortInfo) {
-      setEffortInfo(initialEffortInfo);
-    }
-  }, [initialEffortInfo]);
-
-  /*
-    The shared model store wins over the prop.
-
-    `initialModelInfo` comes from Mission Control's own 5s usage poll, so a
-    switch made in the composer chip did not reach this row until that poll
-    came round -- two controls for one fact, disagreeing for up to five
-    seconds. The store is written the moment any surface switches.
-  */
-  const modelState = useAgentModels();
-  const effectiveModelId = currentModelFor(modelState, agent.agentName) ?? modelInfo.current;
-
-  const handleSwitchEffort = async (level: string) => {
-    if (!canConfigure) return;
-    try {
-      await workspaceApi.sendAgentControl(agent.agentName, 'set_effort', { effort: level });
-      setEffortInfo((prev) => ({ ...prev, current: level }));
-      toast.success(`@${agent.agentName} reasoning effort set to ${level}`);
-      onRefreshUsage?.();
-    } catch (e) {
-      toast.error(`Could not change reasoning effort: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
-  const handleSwitchModel = async (newModelId: string, modelLabel: string) => {
-    if (!canConfigure) return;
-    try {
-      await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
-      setModelInfo((prev) => ({ ...prev, current: newModelId }));
-      // Publish to the shared store so the composer chip and the profile
-      // panel stop showing the pre-switch model.
-      publishCurrentModel(agent.agentName, newModelId);
-      toast.success(`@${agent.agentName} switched to ${modelLabel}`);
-      onRefreshUsage?.();
-    } catch (e) {
-      toast.error(`Could not switch model: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
 
   // Heartbeat timeout calculation
   const heartbeatDiffSec = React.useMemo(() => {
@@ -488,155 +390,6 @@ export function AgentStation({
             )}
           </div>
 
-          {/* Model indicator & fast switcher */}
-          <div className="flex items-center justify-between px-1 text-3xs text-muted-foreground border-t border-border/20 pt-1.5">
-            <span className="flex items-center gap-1">
-              <Cpu className="size-3 text-muted-foreground/70" />
-              <span>Model</span>
-            </span>
-
-            <DropdownMenu onOpenChange={(open) => { if (!open) { setIsEnteringCustom(false); setCustomModelInput(''); } }}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  disabled={!canConfigure}
-                  className={cn(
-                    'inline-flex items-center gap-1 font-mono font-medium px-1.5 py-0.5 rounded transition-colors',
-                    canConfigure
-                      ? 'text-foreground hover:text-primary cursor-pointer bg-surface2/60 hover:bg-surface2'
-                      : 'text-muted-foreground/60 bg-surface2/30 cursor-not-allowed'
-                  )}
-                  title={canConfigure ? 'Click to switch model' : offlineHint}
-                >
-                  <span className="truncate max-w-[120px]">
-                    {modelInfo.models.find((m) => m.id === effectiveModelId)?.shortName || effectiveModelId || 'No model set'}
-                  </span>
-                  <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 p-1 max-h-[320px] overflow-y-auto">
-                {modelInfo.models.map((m) => (
-                  <DropdownMenuItem
-                    key={m.id}
-                    onClick={() => handleSwitchModel(m.id, m.name)}
-                    className={cn(
-                      'flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer',
-                      effectiveModelId === m.id && 'font-bold text-primary bg-surface3'
-                    )}
-                  >
-                    <span className="truncate">{m.name}</span>
-                    {effectiveModelId === m.id && <Check className="size-3 text-primary ml-1" />}
-                  </DropdownMenuItem>
-                ))}
-
-                {isEnteringCustom ? (
-                  <div
-                    className="p-1.5 space-y-1.5 border-t border-border/30 mt-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="text"
-                      value={customModelInput}
-                      onChange={(e) => setCustomModelInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        e.stopPropagation();
-                        if (e.key === 'Enter' && customModelInput.trim()) {
-                          handleSwitchModel(customModelInput.trim(), customModelInput.trim());
-                          setIsEnteringCustom(false);
-                          setCustomModelInput('');
-                        } else if (e.key === 'Escape') {
-                          setIsEnteringCustom(false);
-                          setCustomModelInput('');
-                        }
-                      }}
-                      placeholder="Model ID, e.g. gpt-4o"
-                      className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
-                      autoFocus
-                    />
-                    <div className="flex gap-1 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => { setIsEnteringCustom(false); setCustomModelInput(''); }}
-                        className="px-2 py-0.5 text-3xs rounded border hover:bg-surface2 text-muted-foreground"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!customModelInput.trim()}
-                        onClick={() => {
-                          if (customModelInput.trim()) {
-                            handleSwitchModel(customModelInput.trim(), customModelInput.trim());
-                            setIsEnteringCustom(false);
-                            setCustomModelInput('');
-                          }
-                        }}
-                        className="px-2 py-0.5 text-3xs rounded bg-primary text-primary-foreground font-medium disabled:opacity-50"
-                      >
-                        Confirm
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setIsEnteringCustom(true);
-                      setCustomModelInput(effectiveModelId || '');
-                    }}
-                    className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/30 mt-1"
-                  >
-                    <span>Custom model…</span>
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Reasoning effort - rendered only when this runtime reported levels
-              of its own, so a runtime without the concept shows nothing. */}
-          {effortInfo.levels.length > 0 && (
-            <div className="flex items-center justify-between px-1 text-3xs text-muted-foreground pt-1">
-              <span className="flex items-center gap-1">
-                <Gauge className="size-3 text-muted-foreground/70" />
-                <span>Effort</span>
-              </span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    disabled={!canConfigure}
-                    className={cn(
-                      'inline-flex items-center gap-1 font-mono font-medium px-1.5 py-0.5 rounded transition-colors',
-                      canConfigure
-                        ? 'text-foreground hover:text-primary cursor-pointer bg-surface2/60 hover:bg-surface2'
-                        : 'text-muted-foreground/60 bg-surface2/30 cursor-not-allowed'
-                    )}
-                    title={canConfigure ? 'Click to change reasoning effort' : offlineHint}
-                  >
-                    <span className="truncate max-w-[120px]">{effortInfo.current || 'Not set'}</span>
-                    <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 p-1">
-                  {effortInfo.levels.map((lv) => (
-                    <DropdownMenuItem
-                      key={lv.id}
-                      onClick={() => handleSwitchEffort(lv.id)}
-                      className={cn(
-                        'flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer',
-                        effortInfo.current === lv.id && 'font-bold text-primary bg-surface3'
-                      )}
-                    >
-                      <span className="truncate">{lv.name}</span>
-                      {effortInfo.current === lv.id && <Check className="size-3 text-primary ml-1" />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
         </div>
       ) : (
         /* Unconnected Template Agent */

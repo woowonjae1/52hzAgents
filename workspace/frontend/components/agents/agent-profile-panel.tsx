@@ -37,9 +37,6 @@ export function AgentProfilePanel() {
   const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
   const [currentModel, setCurrentModel] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<AgentModelOption[]>([]);
-  // Separate axis from the model; only runtimes that reported levels get a control.
-  const [currentEffort, setCurrentEffort] = useState<string | null>(null);
-  const [availableEfforts, setAvailableEfforts] = useState<AgentModelOption[]>([]);
   const [switchingModel, setSwitchingModel] = useState(false);
   const [customModelInput, setCustomModelInput] = useState('');
   const [isEnteringCustom, setIsEnteringCustom] = useState(false);
@@ -60,8 +57,6 @@ export function AgentProfilePanel() {
       if (nextUsage) {
         setCurrentModel(nextUsage.current_model || null);
         setAvailableModels(parseReportedModels(nextUsage.available_models));
-        setCurrentEffort(nextUsage.current_effort || null);
-        setAvailableEfforts(parseReportedModels(nextUsage.available_efforts));
       }
     } catch {
       // A local/cloud agent may not expose bridge diagnostics.
@@ -70,22 +65,11 @@ export function AgentProfilePanel() {
     }
   }, [agent]);
 
-  // set_model / set_effort reach the adapter over the control channel, which an
+  // set_model reaches the adapter over the control channel, which an
   // offline agent is not polling - the change would look accepted and go
-  // nowhere, so the controls are disabled rather than failing silently.
+  // nowhere, so the control is disabled rather than failing silently.
   const canConfigure = !!agent && agent.status === 'online';
   const offlineHint = 'Agent offline — connect it first';
-
-  const handleSwitchEffort = async (level: string) => {
-    if (!agent || !canConfigure) return;
-    try {
-      await workspaceApi.sendAgentControl(agent.agentName, 'set_effort', { effort: level });
-      setCurrentEffort(level);
-      toast.success(`@${agent.agentName} reasoning effort set to ${level}`);
-    } catch (e) {
-      toast.error(`Could not change reasoning effort: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
 
   /*
     Mirror a switch made on another surface into this panel's own state.
@@ -104,8 +88,8 @@ export function AgentProfilePanel() {
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
       setCurrentModel(newModelId);
-      // And to the shared store, so the composer chip and the Mission
-      // Control station agree without waiting for their own polls.
+      // And to the shared store, so the composer chip agrees without
+      // waiting for its own poll.
       publishCurrentModel(agent.agentName, newModelId);
       toast.success(`@${agent.agentName} model switched to ${newModelId}`);
     } catch (e) {
@@ -542,39 +526,6 @@ export function AgentProfilePanel() {
                 </DropdownMenu>
               </div>
 
-              {/* Reasoning effort - only for runtimes that reported their own
-                  levels, so nothing is invented for the ones without the concept. */}
-              {availableEfforts.length > 0 && (
-                <div className="pt-2 border-t">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-2xs text-muted-foreground">Reasoning effort</span>
-                    <span className="text-xs font-mono font-medium text-foreground">
-                      {currentEffort || 'Not set'}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {availableEfforts.map((lv) => (
-                      <button
-                        key={lv.id}
-                        type="button"
-                        disabled={!canConfigure}
-                        title={canConfigure ? undefined : offlineHint}
-                        onClick={() => handleSwitchEffort(lv.id)}
-                        className={cn(
-                          'px-2 py-0.5 text-2xs rounded border font-mono transition-colors',
-                          !canConfigure
-                            ? 'bg-surface2/30 text-muted-foreground/60 cursor-not-allowed'
-                            : currentEffort === lv.id
-                              ? 'bg-primary text-primary-foreground border-primary font-semibold cursor-pointer'
-                              : 'bg-surface2/60 hover:bg-surface2 text-muted-foreground hover:text-foreground cursor-pointer'
-                        )}
-                      >
-                        {lv.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

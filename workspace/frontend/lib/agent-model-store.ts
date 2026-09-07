@@ -3,15 +3,18 @@
 /**
  * One place that knows which model each agent is running.
  *
- * THREE SURFACES CHANGE AN AGENT'S MODEL and they all write the same control
- * event: the composer chip (`components/chat/agent-model-switcher.tsx`), the
- * Mission Control station (`components/mission/agent-station.tsx`), and the
- * agent profile panel (`components/agents/agent-profile-panel.tsx`). The server
- * was never the problem — `sendAgentControl(name, 'set_model', …)` is the same
- * call in all three. The problem was that each one kept its OWN `useState`
+ * TWO SURFACES CHANGE AN AGENT'S MODEL and they both write the same control
+ * event: the composer chip (`components/chat/agent-model-switcher.tsx`) and
+ * the agent profile panel (`components/agents/agent-profile-panel.tsx`).
+ * Mission Control used to have a third copy of this control on its agent
+ * cards, but that just meant the same fact could disagree across three
+ * places, so it was removed there — Mission Control still calls
+ * `hydrateAgentModels` to keep the store warm from its own usage poll, but it
+ * never performs a user-initiated switch. The server was never the problem —
+ * `sendAgentControl(name, 'set_model', …)` is the same call from both
+ * remaining surfaces. The problem was that each one kept its OWN `useState`
  * copy of "current model", fetched on its own schedule, so switching in one
- * place left the other two showing the old value until their next poll. Three
- * controls disagreeing about the same fact is what read as a conflict.
+ * place left the other showing the old value until its next poll.
  *
  * So the fact lives here instead, outside React, and every surface subscribes.
  * A switch anywhere is visible everywhere on the next frame.

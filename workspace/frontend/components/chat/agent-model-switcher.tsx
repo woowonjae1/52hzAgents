@@ -23,9 +23,9 @@ import {
   useAgentModels,
 } from '@/lib/agent-model-store';
 
-// Re-exported: agent-station, agent-profile-panel and mission-control import
-// these from here. The definitions moved to lib/agent-model-store.ts because
-// all four surfaces parse the same adapter payload.
+// Re-exported: agent-profile-panel and mission-control import these from
+// here. The definitions moved to lib/agent-model-store.ts because all
+// surfaces parse the same adapter payload.
 export { parseReportedModels, type AgentModelOption } from '@/lib/agent-model-store';
 
 export function getAgentKind(agentName?: string | null, agentType?: string | null): string {

@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
-import { AgentStation, type StationData, type StationStatus, type StationModelInfo, type StationEffortInfo } from './agent-station';
+import { AgentStation, type StationData, type StationStatus } from './agent-station';
 import { ActionRequiredBanner, type PendingActionItem } from './action-required-banner';
 import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
 import { ConnectAgentModal } from './connect-agent-modal';
@@ -102,11 +102,6 @@ export function MissionControl() {
   // Activity feed
   const [activityFeed, setActivityFeed] = useState<TimelineEventItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
-
-  // Agent usage batch map (lifted from individual cards to parent)
-  const [agentUsageMap, setAgentUsageMap] = useState<
-    Record<string, { modelInfo: StationModelInfo; effortInfo: StationEffortInfo }>
-  >({});
 
   const fetchRecentData = useCallback(async () => {
     if (!sessions.length) return;
@@ -210,44 +205,26 @@ export function MissionControl() {
 
   useVisibilityPolling(fetchMissionOverview, 5000);
 
-  // Batch agent usage polling (25s interval, fully paused on document.hidden)
+  /*
+    Keeps the shared model store (lib/agent-model-store.ts) warm for every
+    configured agent, not just the online ones the composer chip already
+    polls -- so the profile panel and composer chip agree on a model the
+    moment either of them needs it, without Mission Control showing its own
+    switcher for the same fact.
+  */
   const fetchAgentUsages = useCallback(async () => {
     const configuredNames = agents.map((a) => a.agentName);
     if (configuredNames.length === 0) return;
 
-    const results = await Promise.allSettled(
+    await Promise.allSettled(
       configuredNames.map(async (name) => {
         const usage = await workspaceApi.getAgentUsage(name);
-        const parsedModels = parseReportedModels(usage?.available_models);
-        const parsedEfforts = parseReportedModels(usage?.available_efforts);
-        // This poll is the widest one in the app (every configured agent, not
-        // just the online ones), so it is the best place to keep the shared
-        // store warm for whichever surface reads it next.
-        hydrateAgentModels(name, { options: parsedModels, current: usage?.current_model });
-        return {
-          name,
-          modelInfo: {
-            current: usage?.current_model || null,
-            models: parsedModels,
-          },
-          effortInfo: {
-            current: usage?.current_effort || null,
-            levels: parsedEfforts,
-          },
-        };
+        hydrateAgentModels(name, {
+          options: parseReportedModels(usage?.available_models),
+          current: usage?.current_model,
+        });
       })
     );
-
-    const nextMap: Record<string, { modelInfo: StationModelInfo; effortInfo: StationEffortInfo }> = {};
-    for (const res of results) {
-      if (res.status === 'fulfilled' && res.value) {
-        nextMap[res.value.name] = {
-          modelInfo: res.value.modelInfo,
-          effortInfo: res.value.effortInfo,
-        };
-      }
-    }
-    setAgentUsageMap((prev) => ({ ...prev, ...nextMap }));
   }, [agents]);
 
   useVisibilityPolling(fetchAgentUsages, 25_000);
@@ -310,15 +287,13 @@ export function MissionControl() {
             }
           : undefined,
         lastHeartbeatAt: agent.lastHeartbeatAt,
-        modelInfo: agentUsageMap[agent.agentName]?.modelInfo,
-        effortInfo: agentUsageMap[agent.agentName]?.effortInfo,
       };
     }).sort((a, b) => {
       const rank = { blocked: 0, stalled: 1, working: 2, ready: 3, offline: 4 } as const;
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
       return a.agent.agentName.localeCompare(b.agent.agentName);
     });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals, agentUsageMap]);
+  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
 
   // Section 2: Available Catalog Presets
   const integrationStations: StationData[] = useMemo(() => {
@@ -609,7 +584,6 @@ export function MissionControl() {
                         onOpenThread={openThread}
                         onPairAgent={() => handlePairAgent(s.agent.agentName)}
                         onApprovalResolved={fetchRecentData}
-                        onRefreshUsage={fetchAgentUsages}
                       />
                     </motion.div>
                   ))}
