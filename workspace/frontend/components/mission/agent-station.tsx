@@ -30,6 +30,16 @@ import { workspaceApi } from '@/lib/api';
 
 export type StationStatus = 'working' | 'ready' | 'offline' | 'blocked' | 'stalled';
 
+export interface StationModelInfo {
+  current: string | null;
+  models: AgentModelOption[];
+}
+
+export interface StationEffortInfo {
+  current: string | null;
+  levels: AgentModelOption[];
+}
+
 export interface StationData {
   agent: WorkspaceAgent;
   status: StationStatus;
@@ -47,6 +57,8 @@ export interface StationData {
     path?: string;
   };
   lastHeartbeatAt?: string | number | null;
+  modelInfo?: StationModelInfo;
+  effortInfo?: StationEffortInfo;
 }
 
 function fmtTokens(n: number): string {
@@ -69,6 +81,7 @@ interface AgentStationProps {
   onOpenThread: (sessionId: string) => void;
   onPairAgent?: () => void;
   onApprovalResolved?: () => void;
+  onRefreshUsage?: () => void;
   className?: string;
 }
 
@@ -78,6 +91,7 @@ export function AgentStation({
   onOpenThread,
   onPairAgent,
   onApprovalResolved,
+  onRefreshUsage,
   className,
 }: AgentStationProps) {
   const {
@@ -91,6 +105,8 @@ export function AgentStation({
     stalledMs,
     pendingApproval,
     lastHeartbeatAt,
+    modelInfo: initialModelInfo,
+    effortInfo: initialEffortInfo,
   } = data;
 
   const isWorking = status === 'working';
@@ -105,44 +121,29 @@ export function AgentStation({
   const offlineHint = 'Agent 未连接 - 连接后才能切换';
   const activeThread = threads[0];
   const [busy, setBusy] = React.useState(false);
-  const [modelInfo, setModelInfo] = React.useState<{ current: string | null; models: AgentModelOption[] }>({
-    current: null,
-    models: [],
-  });
+  const [modelInfo, setModelInfo] = React.useState<StationModelInfo>(
+    initialModelInfo || { current: null, models: [] }
+  );
   // Reasoning effort is a separate axis from the model and only some runtimes
   // have one, so it renders only when the adapter actually reported levels.
-  const [effortInfo, setEffortInfo] = React.useState<{ current: string | null; levels: AgentModelOption[] }>({
-    current: null,
-    levels: [],
-  });
+  const [effortInfo, setEffortInfo] = React.useState<StationEffortInfo>(
+    initialEffortInfo || { current: null, levels: [] }
+  );
   const [customModelInput, setCustomModelInput] = React.useState('');
   const [isEnteringCustom, setIsEnteringCustom] = React.useState(false);
 
+  // Sync state when parent provides fresh model/effort info
   React.useEffect(() => {
-    if (isCatalogPlaceholder) return;
-    let mounted = true;
-    const fetchUsage = async () => {
-      try {
-        const usage = await workspaceApi.getAgentUsage(agent.agentName);
-        if (!mounted) return;
-        const parsed = parseReportedModels(usage?.available_models);
-        setModelInfo({
-          current: usage?.current_model || null,
-          models: parsed,
-        });
-        setEffortInfo({
-          current: usage?.current_effort || null,
-          levels: parseReportedModels(usage?.available_efforts),
-        });
-      } catch {}
-    };
-    fetchUsage();
-    const interval = setInterval(fetchUsage, 25_000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [agent.agentName, isCatalogPlaceholder]);
+    if (initialModelInfo) {
+      setModelInfo(initialModelInfo);
+    }
+  }, [initialModelInfo]);
+
+  React.useEffect(() => {
+    if (initialEffortInfo) {
+      setEffortInfo(initialEffortInfo);
+    }
+  }, [initialEffortInfo]);
 
   const handleSwitchEffort = async (level: string) => {
     if (!canConfigure) return;
@@ -150,6 +151,7 @@ export function AgentStation({
       await workspaceApi.sendAgentControl(agent.agentName, 'set_effort', { effort: level });
       setEffortInfo((prev) => ({ ...prev, current: level }));
       toast.success(`@${agent.agentName} 推理强度已设为 ${level}`);
+      onRefreshUsage?.();
     } catch (e) {
       toast.error(`切换推理强度失败: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -161,6 +163,7 @@ export function AgentStation({
       await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
       setModelInfo((prev) => ({ ...prev, current: newModelId }));
       toast.success(`@${agent.agentName} 已切换为 ${modelLabel}`);
+      onRefreshUsage?.();
     } catch (e) {
       toast.error(`切换模型失败: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -301,8 +304,15 @@ export function AgentStation({
   return (
     <div
       className={cn(
-        'group relative flex flex-col justify-between rounded-2xl p-3.5 h-full min-h-[220px]',
-        'bg-surface1/70 dark:bg-surface1/40 backdrop-blur-md shadow-2xs transition-all duration-150',
+        'group relative flex flex-col justify-between rounded-xl p-3.5 h-full',
+        /*
+          220px is the height a *connected* station needs for its live rows —
+          model switcher, quota, activity. A catalog placeholder has a logo, two
+          lines of description and a Connect button, so the same floor left it
+          with ~40px of empty card, thirteen times over on an empty workspace.
+        */
+        !isCatalogPlaceholder && 'min-h-[220px]',
+        'bg-surface1 transition-colors duration-150',
         'border border-border/30 hover:border-border/60 hover:shadow-xs',
         isBlocked && 'ring-2 ring-status-warning/20 bg-status-warning/[0.02]',
         isStalled && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
@@ -317,7 +327,7 @@ export function AgentStation({
         <button
           type="button"
           onClick={onOpenAgent}
-          className="flex items-center gap-2.5 min-w-0 text-left cursor-pointer group/title"
+          className="flex flex-1 items-center gap-2.5 min-w-0 text-left cursor-pointer group/title"
         >
           <AgentAvatar
             name={agent.agentName}
@@ -328,7 +338,10 @@ export function AgentStation({
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-xs text-foreground truncate group-hover/title:text-primary transition-colors max-w-[110px]">
+              {/* No max-width cap: the flex row already bounds this, and the
+                  cap plus a `shrink-0` status badge left the name 20px in a
+                  two-column grid — every card showed a single letter. */}
+              <span className="font-semibold text-xs text-foreground truncate group-hover/title:text-primary transition-colors">
                 {agent.agentName}
               </span>
               {agent.role === 'master' && (
@@ -337,28 +350,35 @@ export function AgentStation({
                 </span>
               )}
             </div>
-            <div className="text-3xs text-muted-foreground truncate font-mono mt-0.5 max-w-[120px]">
+            <div className="text-3xs text-muted-foreground truncate font-mono mt-0.5">
               {agent.agentType || 'agent'}
             </div>
           </div>
         </button>
 
-        {/* Unified Status Badge */}
+        {/*
+          Unified Status Badge. Allowed to shrink — it was `shrink-0` while
+          carrying a relative timestamp ("Heartbeat lost · 1 week ago"), so it
+          took ~150px of a 236px card and the agent's identity paid for it. The
+          dot never shrinks, so the state is still readable even when the label
+          is clipped.
+        */}
         <span
           className={cn(
-            'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs shrink-0',
+            'inline-flex min-w-0 items-center gap-1 px-2 py-0.5 rounded-full text-3xs',
             statusBadge.badge
           )}
         >
           <span
             className={cn(
-              'size-1.5 rounded-full ring-2',
+              'size-1.5 shrink-0 rounded-full ring-2',
               statusBadge.dot,
               statusBadge.ring,
-              (isWorking || isBlocked) && 'animate-pulse'
             )}
           />
-          <span className="truncate max-w-[130px]">{statusBadge.label}</span>
+          <span className={cn('truncate', isWorking && 'event-running')} title={statusBadge.label}>
+            {statusBadge.label}
+          </span>
         </span>
       </div>
 
@@ -425,7 +445,7 @@ export function AgentStation({
 
           <div className="flex items-center gap-1 text-2xs text-muted-foreground px-1 truncate">
             {isWorking ? (
-              <span className="inline-flex items-center gap-1 text-status-warning font-medium truncate animate-pulse">
+              <span className="inline-flex items-center gap-1 font-medium truncate event-running">
                 <Wrench className="size-3 shrink-0" />
                 <span className="truncate">{stripMarkdown(activity?.content || 'Working…')}</span>
               </span>
@@ -475,7 +495,7 @@ export function AgentStation({
                   <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 p-1 bg-surface1/95 backdrop-blur-xl max-h-[320px] overflow-y-auto">
+              <DropdownMenuContent align="end" className="w-56 p-1 max-h-[320px] overflow-y-auto">
                 {modelInfo.models.map((m) => (
                   <DropdownMenuItem
                     key={m.id}
@@ -580,7 +600,7 @@ export function AgentStation({
                     <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-40 p-1 bg-surface1/95 backdrop-blur-xl">
+                <DropdownMenuContent align="end" className="w-40 p-1">
                   {effortInfo.levels.map((lv) => (
                     <DropdownMenuItem
                       key={lv.id}

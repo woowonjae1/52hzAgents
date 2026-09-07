@@ -835,6 +835,7 @@ Commands:
   workspace join <token>      Join workspace with token
   workspace list              List configured workspaces
   mcp-server                  Start MCP server (stdio) for workspace tools
+                              (--session-id <id> binds acts to the live session)
   update                      Upgrade launcher to the latest npm release
   version                     Show version
   help                        Show this help
@@ -925,6 +926,10 @@ async function main() {
       const agentName = flags['agent-name'] || process.env.WWJ_AGENT_NAME || 'agent';
       const endpoint = flags.endpoint || process.env.WWJ_WORKSPACE_ENDPOINT || process.env.WWJ_ENDPOINT || 'http://localhost:8000';
       const token = process.env.WWJ_WORKSPACE_TOKEN || '';
+      // The join-issued session id proves this process is the agent's *current*
+      // session. Council speech acts are rejected as `session_revoked` without a
+      // matching id, so a stale MCP subprocess cannot vote on the blackboard.
+      const sessionId = flags['session-id'] || process.env.WWJ_SESSION_ID || null;
       if (!workspaceId || !token) {
         print('Error: --workspace-id required and WWJ_WORKSPACE_TOKEN env var must be set');
         process.exitCode = 1;
@@ -933,7 +938,7 @@ async function main() {
       const disabledModules = new Set();
       if (flags['disable-files']) disabledModules.add('files');
       if (flags['disable-browser']) disabledModules.add('browser');
-      runMcpServer({ workspaceId, channelName, agentName, endpoint, token, disabledModules });
+      runMcpServer({ workspaceId, channelName, agentName, endpoint, token, sessionId, disabledModules });
     },
   };
 

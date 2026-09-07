@@ -551,8 +551,11 @@ export function SkillsView() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="shrink-0 px-5 pt-4 pb-3 border-b border-border space-y-3">
-        <div className="flex items-center gap-2">
+      {/* Title bar — the 48px `.app-header` row every view shares, so this
+          line and the sidebar's are one continuous divider. Filters live in
+          their own band below rather than stretching the header to 3 rows. */}
+      <div className="app-header px-5">
+        <div className="flex flex-1 items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setViewMode('threads')}
@@ -574,7 +577,10 @@ export function SkillsView() {
             Upload custom skill
           </button>
         </div>
+      </div>
 
+      {/* Toolbar band: search + category filters. */}
+      <div className="shrink-0 px-5 py-2.5 border-b border-border space-y-2.5">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <input

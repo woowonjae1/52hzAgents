@@ -672,6 +672,24 @@ class WorkspaceClient {
     return data.data || data;
   }
 
+  // ── Council Deliberation (Blackboard & Speech Acts) ──
+
+  async postSpeechAct(workspaceId, sessionId, data, token, { actor } = {}) {
+    const headers = this._wsHeaders(token);
+    if (actor) {
+      headers['X-Actor-Id'] = actor;
+    }
+    const url = '/v1/council/sessions/' + encodeURIComponent(sessionId) + '/acts?network=' + encodeURIComponent(workspaceId);
+    const res = await this._post(url, data, headers);
+    return res.data || res;
+  }
+
+  async getCouncilSession(workspaceId, sessionId, token) {
+    const url = '/v1/council/sessions/' + encodeURIComponent(sessionId) + '?network=' + encodeURIComponent(workspaceId);
+    const res = await this._get(url, this._wsHeaders(token));
+    return res.data || res;
+  }
+
   // ── Routines ──
 
   async createRoutine(workspaceId, channelName, token, { name, message, context, hour, minute, days, interval_minutes, source } = {}) {
@@ -830,6 +848,9 @@ class WorkspaceClient {
       })(),
       messageType: payload.message_type || 'chat',
       metadata: event.metadata || {},
+      targetAgents: (event.metadata && Array.isArray(event.metadata.target_agents))
+        ? event.metadata.target_agents
+        : (Array.isArray(payload.target_agents) ? payload.target_agents : null),
     };
     if (ts) {
       msg.createdAt = new Date(ts).toISOString();

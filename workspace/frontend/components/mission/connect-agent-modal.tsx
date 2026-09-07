@@ -123,7 +123,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                         )}
                       >
                         {isStarting ? (
-                          <Loader2 className="size-3 animate-spin" />
+                          <span className="event-running">Starting</span>
                         ) : isOnline ? (
                           <>
                             <ShieldCheck className="size-3" />

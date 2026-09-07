@@ -23,11 +23,12 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity } from 'lucide-react';
+import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/config';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
@@ -40,7 +41,6 @@ import { eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { toast } from 'sonner';
-import { useArtifacts } from '@/lib/artifacts-context';
 import { ArtifactsCanvas } from '../canvas/artifacts-canvas';
 
 const PROMPT_SUGGESTIONS = [
@@ -177,7 +177,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent, workspaceId } = useWorkspace();
   
   useEffect(() => {
     console.log('[52hzAgents Monitor] [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
@@ -233,6 +233,7 @@ export function ChatView() {
     // Periodic incremental refresh — skip the session the user is currently viewing
     // (useMessagePolling handles that one)
     const interval = setInterval(async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       const top = getTopSessions();
       for (const s of top) {
         if (s.sessionId === currentSessionIdRef.current) continue;
@@ -257,8 +258,6 @@ export function ChatView() {
     sessionId: currentSessionId,
     initialMessages: initialMessagesRef.current,
   });
-
-  const { isCanvasOpen, toggleCanvas } = useArtifacts();
 
   // Persisted (not just component state): dismissing this once shouldn't mean
   // seeing it again on every reload — that's what made it feel like a
@@ -736,34 +735,61 @@ export function ChatView() {
           </>
         ) : (
           <>
-            <div className="flex items-center p-4 rounded-full bg-primary/10 mb-4">
-              <MessageSquare className="size-8 text-primary" />
+            <div className="flex items-center justify-center size-11 rounded-xl bg-surface2 border border-border mb-4">
+              <MessageSquare className="size-5 text-foreground-muted" />
             </div>
-            <p className="text-lg font-semibold text-foreground">Start a new channel</p>
-            <p className="text-sm mt-1 max-w-xs">
-              Create a channel, pick the agents to include, and start collaborating.
+            <p className="text-sm font-semibold text-foreground">
+              {agents.length > 0 ? 'No channel selected' : 'No agents connected yet'}
             </p>
-            {agents.length > 0 && (
-              <Button className="mt-5 gap-1.5" onClick={openNewThread}>
-                <Plus className="size-4" />
-                New Channel
-              </Button>
-            )}
+            <p className="text-xs mt-1 max-w-xs">
+              {agents.length > 0
+                ? 'Pick a channel from the sidebar, or create one and choose who joins.'
+                : 'Connect an agent first — a channel needs at least one participant.'}
+            </p>
+            {/*
+              There is always an action here. Previously the button was gated on
+              `agents.length > 0`, so the state a brand-new workspace actually
+              lands in — no agents — was the one with nothing to click.
+            */}
+            <Button
+              variant="outline"
+              className="mt-5 gap-1.5"
+              onClick={agents.length > 0 ? openNewThread : () => setViewMode('mission')}
+            >
+              <Plus className="size-4" />
+              {agents.length > 0 ? 'New channel' : 'Connect an agent'}
+            </Button>
+            {/* Desktop apps teach their shortcuts in the empty pane. */}
+            <div className="mt-7 flex items-center gap-4 text-3xs text-foreground-extra-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <kbd className="rounded border border-border/60 bg-surface2 px-1.5 py-0.5 font-mono">Ctrl+N</kbd>
+                new chat
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <kbd className="rounded border border-border/60 bg-surface2 px-1.5 py-0.5 font-mono">Ctrl+K</kbd>
+                commands
+              </span>
+            </div>
           </>
         )}
       </div>
     );
   }
 
-  const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
-
   return (
     <div className="flex h-full bg-surface0 overflow-hidden">
       {/* Main Chat Stream Column */}
       <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
         {/* Thread header */}
-      <div className={`flex items-center gap-2 px-5 lg:px-8 py-3 shrink-0 bg-surface0/90 dark:bg-surface0/75 backdrop-blur-xl border-b border-border/40 dark:border-white/[0.04] sticky top-0 z-10 [app-region:drag] select-none ${isDesktop ? 'pr-36' : ''}`}>
-        <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0 [app-region:no-drag]">
+      {/*
+        `.app-header` (globals.css) owns the height, border, fill and padding —
+        the same contract Tasks / Mission / Skills / Knowledge / Settings use, so
+        this bottom border and the sidebar's are one continuous line. It no
+        longer reserves space for the native window buttons either: those live
+        in AppTitlebar above, which is also the app's single drag region.
+      */}
+      <div className="app-header sticky top-0 z-10 lg:px-8">
+        <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
             <button
@@ -831,7 +857,7 @@ export function ChatView() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0 [app-region:no-drag]">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Orchestration Mode Header Control */}
           {currentSession && !isDM && (
             <OrchestrationControl
@@ -852,69 +878,48 @@ export function ChatView() {
           {/* Git chip */}
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
-          {/* Quick Share button */}
-          <button
-            onClick={() => setShareDialogOpen(true)}
-            className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title="Share conversation"
-          >
-            <Share2 className="size-3.5" />
-          </button>
-
-          {/* Quick Export Markdown button */}
-          <button
-            onClick={() => void handleExportMarkdown()}
-            disabled={exporting || !currentSessionId}
-            className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer disabled:opacity-30"
-            title="Export as Markdown"
-          >
-            {exporting ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-          </button>
-
-          {/* Artifacts Canvas Toggle button */}
-          <button
-            onClick={toggleCanvas}
-            className={cn(
-              'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
-              isCanvasOpen ? 'bg-primary/15 text-primary shadow-2xs' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
-            )}
-            title="Toggle Artifacts Canvas (右侧画布)"
-          >
-            <Sparkles className="size-3.5" />
-          </button>
-
-          {/* Trace Panel Toggle button */}
-          <button
-            onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}
-            className={cn(
-              'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
-              activeRightTab === 'trace' ? 'bg-primary/15 text-primary shadow-2xs' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
-            )}
-            title="Toggle Execution Trace (执行轨迹)"
-          >
-            <Activity className="size-3.5" />
-          </button>
-
-          {/* Quick Panels toggle */}
+          {/* Quick Panels / Preview toggle */}
           <button
             onClick={() => setActiveRightTab(activeRightTab ? null : 'preview')}
             className={cn(
               'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
               activeRightTab ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
             )}
-            title="Toggle Preview Panel"
+            title={activeRightTab ? 'Close Side Panel' : 'Open Side Panel'}
           >
             <PanelRight className="size-4" />
           </button>
 
-          {/* Settings Center shortcut */}
-          <button
-            onClick={() => openSettings('general')}
-            className="size-8 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title="设置中心 (智能体/辅助面板/导出/技能)"
-          >
-            <Settings className="size-4" />
-          </button>
+          {/* More Actions Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                title="More actions"
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
+                <Download className="size-4 mr-2" />
+                <span>Export as Markdown</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShareDialogOpen(true)}>
+                <Share2 className="size-4 mr-2" />
+                <span>Share conversation</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}>
+                <Activity className="size-4 mr-2" />
+                <span>Execution Trace</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setViewMode(viewMode === 'tasks' ? 'threads' : 'tasks')}>
+                <ListChecks className="size-4 mr-2" />
+                <span>Tasks & Kanban</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -968,44 +973,175 @@ export function ChatView() {
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : displayMessages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
-            <div className="w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.2s_ease-out]">
-              {/* Brand Emblem — no plate behind it. The mark is a silhouette
-                  with its own edge, and it bobs and spouts past its own box, so
-                  a rounded-square container with `overflow-hidden` both boxed a
-                  non-square shape and clipped the motion it was framing. */}
-              <SignalMark size={88} />
+          <div className="relative flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
+            {/* Linear-style Ambient Lighting Mesh */}
+            <div className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 w-[600px] h-[320px] bg-gradient-to-tr from-primary/15 via-sky-500/10 to-indigo-500/10 blur-[110px] rounded-full opacity-60 dark:opacity-40" />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-35 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_40%,#000_60%,transparent_100%)]" />
+
+            <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.25s_ease-out]">
+              {/* Brand Status Pill Badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/80 bg-surface1/80 backdrop-blur-md shadow-2xs text-2xs font-medium text-foreground-muted">
+                <span className="relative flex h-2 w-2">
+                  <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", hasOnlineAgents ? "bg-emerald-400" : "bg-amber-400")} />
+                  <span className={cn("relative inline-flex rounded-full h-2 w-2", hasOnlineAgents ? "bg-emerald-500" : "bg-amber-500")} />
+                </span>
+                <span>{hasOnlineAgents ? `${onlineAgents.length} Agents Online & Ready` : "System Standby · Awaiting Agent"}</span>
+                <span className="text-foreground-extra-muted opacity-50">/</span>
+                <span className="font-mono text-3xs text-foreground-extra-muted">52hz Workspace</span>
+              </div>
+
+              {/* Brand Emblem with breathing glow halo */}
+              <div className="relative group">
+                <div className="absolute -inset-2 bg-gradient-to-r from-sky-500/20 to-primary/20 rounded-full blur-xl opacity-60 group-hover:opacity-100 transition duration-500" />
+                <div className="relative">
+                  <SignalMark size={84} />
+                </div>
+              </div>
 
               {/* Title & Greeting */}
-              <div className="space-y-1">
-                <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+              <div className="space-y-1.5 max-w-lg">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                   What can I help you build?
                 </h1>
-                <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-                  52hzAgents — a local multi-agent workspace. Quick recall, deep reasoning, safe execution.
+                <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">
+                  52hzAgents — autonomous multi-agent workspace. Deep reasoning, instant recall, and tool-augmented execution.
                 </p>
               </div>
 
               {!hasOnlineAgents ? (
-                <div className="w-full max-w-md p-5 rounded-2xl bg-surface1/95 border border-border/80 shadow-sm flex flex-col items-center text-center space-y-3.5 mt-2">
-                  <div className="size-10 rounded-xl bg-status-warning/10 border border-status-warning/20 flex items-center justify-center text-status-warning">
-                    <Radio className="size-5" />
+                <div className="w-full space-y-4">
+                  {/* Hero Connection Card */}
+                  <div className="w-full p-5 rounded-2xl bg-surface1/90 border border-border/80 shadow-sm backdrop-blur-md flex flex-col items-center text-center space-y-3.5 transition-all hover:border-border-accent/60">
+                    <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 dark:text-amber-400 shadow-2xs">
+                      <Radio className="size-5 animate-pulse" />
+                    </div>
+                    <div className="space-y-1 max-w-md">
+                      <h2 className="text-sm font-semibold text-foreground">No Connected Agents Online</h2>
+                      <p className="text-xs text-foreground-muted leading-relaxed">
+                        Start the local connector CLI, or open the connect station to hook Claude, OpenClaw, or custom agents before initiating conversations.
+                      </p>
+                    </div>
+                    <div className="pt-1 flex flex-wrap items-center justify-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('mission')}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+                      >
+                        <Plug className="size-3.5" />
+                        <span>Connect Agent</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cmd = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=${getApiBaseUrl()}`;
+                          navigator.clipboard.writeText(cmd);
+                          toast.success('Connector CLI command copied to clipboard');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface2 hover:bg-surface3 border border-border/60 text-foreground text-xs font-medium transition-colors cursor-pointer"
+                        title="Copy command to run agent connector locally"
+                      >
+                        <Copy className="size-3.5 text-foreground-muted" />
+                        <span>Copy CLI Command</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <h2 className="text-sm font-semibold text-foreground">No agents online</h2>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      No connected agents were found in this workspace. Start the local connector, or open the connect page to add an agent (Claude, OpenClaw, and so on) before starting a conversation.
-                    </p>
-                  </div>
-                  <div className="pt-1 flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('mission')}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
-                    >
-                      <Plug className="size-3.5" />
-                      <span>Connect agent</span>
-                    </button>
+
+                  {/* Linear-style Quick Launch Exploration Grid (4 Cards) */}
+                  <div className="w-full pt-1">
+                    <div className="text-2xs font-semibold text-foreground-extra-muted uppercase tracking-wider mb-2.5 text-left px-1">
+                      Quick Workspace Actions
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">
+                      {/* Tasks & Kanban */}
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('tasks')}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                      >
+                        <div className="size-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                            <span>Tasks & Kanban Board</span>
+                            <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                              Open →
+                            </span>
+                          </div>
+                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
+                            Manage sprint backlog, priorities & board swimlanes
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Command Palette */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+                        }}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                      >
+                        <div className="size-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-sky-600 dark:text-sky-400">
+                          <Search className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                            <span>Command Palette</span>
+                            <kbd className="text-3xs font-mono text-foreground-extra-muted bg-surface3 px-1.5 py-0.2 rounded border border-border/50">
+                              Ctrl+K
+                            </kbd>
+                          </div>
+                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
+                            Instant navigation, search, and system actions
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* Mission Control */}
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('mission')}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                      >
+                        <div className="size-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-indigo-600 dark:text-indigo-400">
+                          <Activity className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                            <span>Mission Control</span>
+                            <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                              Open →
+                            </span>
+                          </div>
+                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
+                            Agent topology, event feeds & execution status
+                          </div>
+                        </div>
+                      </button>
+
+                      {/* System Settings */}
+                      <button
+                        type="button"
+                        onClick={() => openSettings('general')}
+                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                      >
+                        <div className="size-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-amber-600 dark:text-amber-400">
+                          <Settings className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                            <span>System Settings</span>
+                            <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
+                              Open →
+                            </span>
+                          </div>
+                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
+                            Model parameters, shortcuts & account configs
+                          </div>
+                        </div>
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (

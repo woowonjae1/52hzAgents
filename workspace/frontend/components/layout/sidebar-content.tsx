@@ -53,10 +53,7 @@ export function SidebarContent() {
     <div className="flex flex-col h-full min-h-0 bg-surface0">
       {/* Explorer List Area (Defaults to Threads/Chats) */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {(viewMode === 'threads' || viewMode === 'mission' || viewMode === 'connect' || viewMode === 'settings') && <ThreadList />}
-        {viewMode === 'files' && <FileList />}
-        {viewMode === 'tasks' && <TasksView />}
-        {viewMode === 'routines' && <RoutineList />}
+        {viewMode === 'files' ? <FileList /> : viewMode === 'routines' ? <RoutineList /> : <ThreadList />}
       </div>
 
       {/* Account row if on openagents domain */}

@@ -22,12 +22,16 @@ import { toast } from 'sonner';
 import { MarkdownContent } from '../chat/markdown-content';
 import { AgentAvatar } from '../agents/agent-avatar';
 import { useArtifacts, type ArtifactItem, type ArtifactAnnotation } from '@/lib/artifacts-context';
+import { useWorkspace } from '@/lib/workspace-context';
 
 const MIN_CANVAS_WIDTH = 380;
 const DEFAULT_CANVAS_WIDTH = 580;
 
 export function ArtifactsCanvas({ className }: { className?: string }) {
   const { activeArtifact, isCanvasOpen, closeCanvas, addAnnotation, updateArtifactContent } = useArtifacts();
+  const { currentSessionId, sessions } = useWorkspace();
+  const currentSession = sessions.find((s) => (s as { sessionId?: string; id?: string }).sessionId === currentSessionId || (s as { sessionId?: string; id?: string }).id === currentSessionId);
+  const workingDir = currentSession?.workingDir ?? undefined;
   const [activeTab, setActiveTab] = useState<'document' | 'raw' | 'annotations' | 'diff'>('document');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -142,14 +146,16 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
     toast.success('Review note added to canvas');
   };
 
-  const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
-
   return (
     <div
       style={{ width: isFullscreen ? '100vw' : `${canvasWidth}px` }}
       className={cn(
         'relative flex flex-col bg-surface1 border-l border-border/80 h-full select-text transition-all duration-75 z-20 shrink-0',
-        isFullscreen && 'fixed inset-0 w-screen h-screen z-50 bg-surface1',
+        /* Stops at the titlebar rather than covering it: the window stays
+           draggable and the native caption buttons stay reachable while the
+           canvas is expanded, which is also why the header below no longer
+           reserves any inset of its own. */
+        isFullscreen && 'fixed top-[var(--titlebar-height)] inset-x-0 bottom-0 w-screen z-50 bg-surface1',
         isResizing && 'select-none transition-none',
         className
       )}
@@ -174,27 +180,17 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
 
       {/* ── Canvas Top Header Bar ── */}
       <div
-        className={cn(
-          'flex items-center justify-between px-4 py-2.5 border-b border-border/70 bg-surface0/90 backdrop-blur-md shrink-0 gap-3 select-none [app-region:drag]',
-          isDesktop && (isFullscreen ? 'pt-8 pr-36' : 'pr-36')
-        )}
+        className="app-header justify-between px-3.5 flex-nowrap min-w-0 overflow-hidden"
+
       >
-        <div className="flex items-center gap-2.5 min-w-0 [app-region:no-drag]">
-          <div className="size-7.5 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+          <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             {activeArtifact.type === 'code' ? <Code2 className="size-4" /> : <FileText className="size-4" />}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-xs font-bold text-foreground truncate max-w-[160px] sm:max-w-[240px]">
-                {activeArtifact.title}
-              </h3>
-              {activeArtifact.authorAgent && (
-                <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface2 text-foreground-muted text-3xs font-medium border border-border/60 shrink-0">
-                  <AgentAvatar name={activeArtifact.authorAgent} size={12} />
-                  <span>@{activeArtifact.authorAgent}</span>
-                </div>
-              )}
-            </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xs font-bold text-foreground truncate min-w-0 flex-1" title={activeArtifact.title}>
+              {activeArtifact.title}
+            </h3>
             <p className="text-3xs text-muted-foreground font-mono truncate">
               {activeArtifact.filePath || (activeArtifact.language ? `${activeArtifact.language} · artifact` : 'Markdown Document')}
               {activeArtifact.version && ` · v${activeArtifact.version}`}
@@ -202,12 +198,12 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           </div>
         </div>
 
-        {/* Action icons & Obvious Close Button */}
-        <div className="flex items-center gap-1 shrink-0 [app-region:no-drag]">
+        {/* Action icons & Aligned Close Button */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
             onClick={handleCopy}
-            className="size-7 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             title="Copy content"
           >
             {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
@@ -215,7 +211,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           <button
             type="button"
             onClick={handleDownload}
-            className="size-7 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             title="Download document"
           >
             <Download className="size-3.5" />
@@ -223,66 +219,65 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           <button
             type="button"
             onClick={() => setIsFullscreen((prev) => !prev)}
-            className="size-7 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
           >
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
           </button>
 
-          {/* Obvious Close Button */}
+          {/* Symmetrical, Aligned Close Button */}
           <button
             type="button"
             onClick={closeCanvas}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-surface2 hover:bg-destructive/15 hover:text-destructive text-foreground-muted text-2xs font-semibold border border-border/70 transition-colors cursor-pointer ml-1"
+            className="size-7 rounded-lg border border-border/50 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             title="Close Canvas (Esc)"
           >
             <PanelRightClose className="size-3.5" />
-            <span>Close</span>
           </button>
         </div>
       </div>
 
       {/* ── Mode Navigation Tabs ── */}
-      <div className="flex items-center justify-between px-4 py-1.5 border-b border-border/50 bg-surface1 text-2xs shrink-0">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-surface1 text-2xs shrink-0 gap-2 flex-nowrap overflow-hidden">
+        <div className="flex items-center gap-1 shrink-0 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('document')}
             className={cn(
-              'px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5',
+              'px-2 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0',
               activeTab === 'document'
                 ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
-            <FileText className="size-3" />
+            <FileText className="size-3 shrink-0" />
             <span>Document</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('raw')}
             className={cn(
-              'px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5',
+              'px-2 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0',
               activeTab === 'raw'
                 ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
-            <Code2 className="size-3" />
-            <span>Source / Raw</span>
+            <Code2 className="size-3 shrink-0" />
+            <span>Raw</span>
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('annotations')}
             className={cn(
-              'px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5',
+              'px-2 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0',
               activeTab === 'annotations'
                 ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
-            <MessageSquare className="size-3" />
-            <span>Annotations & Reviews</span>
+            <MessageSquare className="size-3 shrink-0" />
+            <span>Reviews</span>
             {annotations.length > 0 && (
               <span className="size-4 rounded-full bg-primary/20 text-primary text-3xs flex items-center justify-center font-bold">
                 {annotations.length}
@@ -291,7 +286,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           </button>
         </div>
 
-        <div className="text-3xs text-muted-foreground font-mono">
+        <div className="text-3xs text-muted-foreground font-mono shrink-0 whitespace-nowrap pl-1">
           {activeArtifact.content.length} chars
         </div>
       </div>
@@ -300,7 +295,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
       <div className="flex-1 min-h-0 overflow-y-auto p-5 lg:p-7">
         {activeTab === 'document' && (
           <div className="prose prose-sm dark:prose-invert max-w-none leading-relaxed select-text space-y-4">
-            <MarkdownContent content={activeArtifact.content} />
+            <MarkdownContent content={activeArtifact.content} workingDir={workingDir} />
           </div>
         )}
 

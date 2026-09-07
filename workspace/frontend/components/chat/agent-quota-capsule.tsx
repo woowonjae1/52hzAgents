@@ -100,9 +100,41 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
   React.useEffect(() => {
     if (!selectedName) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+
+    const stopTimer = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const startTimer = () => {
+      if (timer !== null || cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      timer = setInterval(() => fetchUsage(selectedName), 30_000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        fetchUsage(selectedName);
+        startTimer();
+      }
+    };
+
     fetchUsage(selectedName);
-    const interval = setInterval(() => fetchUsage(selectedName), 30_000);
-    return () => clearInterval(interval);
+    startTimer();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchUsage, selectedName]);
 
   // 只有在没有任何可展示用量的 agent 在线时才完全隐藏。

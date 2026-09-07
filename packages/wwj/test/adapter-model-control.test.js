@@ -1144,3 +1144,27 @@ test('a pipeline relay aimed at another agent is still ignored', async () => {
   const got = await collectAccepted(adapter, toAdapterMessage(event));
   assert.equal(got.length, 0, 'a step addressed to another agent must not wake us');
 });
+
+test('a pipeline relay with wrap-up text is accepted by targeted agent and not swallowed', async () => {
+  const event = {
+    id: 'evt-relay-wrapup',
+    source: 'human:pipeline',
+    target: 'channel/thread-1',
+    timestamp: Date.now(),
+    payload: {
+      content: '@openclaw\n\n### 📋 Prior Stage Deliverables (from @claude)\n**Summary**: 测试用例编写任务已全部完成，审查结束。\n\n**👉 Next Hop Task & Directives**:\n帮我完成剩余的工作',
+      sender_name: 'Pipeline Relay',
+      sender_type: 'pipeline',
+      message_type: 'chat',
+    },
+    metadata: { target_agents: ['openclaw'], pipeline_step: true, auto_relay: true, task_id: 't-1' },
+  };
+
+  const adapter = new BaseAdapter({
+    agentName: 'openclaw', agentType: 'openclaw', workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000', token: 't',
+  });
+  const got = await collectAccepted(adapter, toAdapterMessage(event));
+  assert.equal(got.length, 1, 'a pipeline relay with wrap-up keywords must be accepted by target agent');
+  assert.match(got[0].content, /帮我完成剩余的工作/);
+});

@@ -263,7 +263,7 @@ export function SettingsView() {
   return (
     <div className="flex flex-col h-full bg-surface0 text-foreground overflow-hidden">
       {/* Header Bar */}
-      <div className="shrink-0 flex items-center justify-between px-6 py-3.5 bg-surface0 border-b border-border/40">
+      <div className="app-header justify-between px-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setViewMode('threads')}

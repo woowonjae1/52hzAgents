@@ -876,12 +876,25 @@ class BaseAdapter {
         const hopChannel = msg.sessionId || this.channelName || 'general';
         this._agentHopCounts = this._agentHopCounts || {};
 
+        // Authoritative orchestration messages (pipeline relay, self-correction retry, or queue-wake):
+        // When targeted at this agent, these MUST bypass all heuristic filters (wrap-up regex,
+        // action regex, hop count guards) because their content naturally contains status summaries
+        // like "Prior Stage Deliverables: completed" which would otherwise trigger the wrap-up drop.
+        const isPipelineRelay = msg.metadata?.pipeline_step && msg.metadata?.auto_relay;
+        const isSelfCorrection = msg.metadata?.pipeline_step && msg.metadata?.self_correct;
+        const isQueuedWake = msg.metadata?.queued_wake;
+        if ((isPipelineRelay || isSelfCorrection || isQueuedWake) && (targetedMe || mentionsMe)) {
+          this._log(`Accepting pipeline ${isPipelineRelay ? 'relay' : isSelfCorrection ? 'self-correction' : 'queue-wake'} message for ${this.agentName}`);
+          incoming.push(msg);
+          continue;
+        }
+
         if (isHuman) {
           this._agentHopCounts[hopChannel] = 0;
 
           // If the human message explicitly targets specific agent(s) via @mention, /agent or targetAgents,
           // other agents who were NOT mentioned/targeted MUST NOT process or interrupt this message.
-          const explicitTargeted = Array.isArray(msg.targetAgents) && msg.targetAgents.length > 0;
+          const explicitTargeted = (Array.isArray(msg.targetAgents) && msg.targetAgents.length > 0) || (Array.isArray(rawTargetAgents) && rawTargetAgents.length > 0);
           const explicitMentions = Array.isArray(msg.mentions) && msg.mentions.length > 0;
           const contentWithoutKnowledge = typeof msg.content === 'string'
             ? msg.content.replace(/@knowledge:[a-zA-Z0-9_-]+/gi, ' ')

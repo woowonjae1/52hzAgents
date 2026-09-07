@@ -150,11 +150,39 @@ export function AgentModelSwitcher({
       });
     };
 
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const stopTimer = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const startTimer = () => {
+      if (timer !== null || cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      timer = setInterval(load, 30_000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        load();
+        startTimer();
+      }
+    };
+
     load();
-    const interval = setInterval(load, 30_000);
+    startTimer();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [agentNamesKey, workspaceId]);
 

@@ -25,6 +25,8 @@ func setupTestDB(t *testing.T) {
 		&models.AgentApprovalRecord{},
 		&models.WorkspaceMember{},
 		&models.EventRecord{},
+		&models.CouncilSession{},
+		&models.SpeechActRecord{},
 	)
 	if err != nil {
 		t.Fatalf("failed to auto migrate: %v", err)
@@ -182,3 +184,49 @@ func TestExpireStalePipelineStepsSparesAnActiveAgent(t *testing.T) {
 		t.Fatalf("an agent active 1s ago must not be halted, got status %q", updated.Status)
 	}
 }
+
+func TestExpireStaleCouncilSessions(t *testing.T) {
+	setupTestDB(t)
+
+	wsID := uuid.New().String()
+	ch := models.Channel{
+		ID:          uuid.New().String(),
+		WorkspaceID: wsID,
+		Name:        "general",
+	}
+	db.DB.Create(&ch)
+
+	// Past deadline by 10 seconds
+	pastDeadline := time.Now().Add(-10 * time.Second).UnixMilli()
+	session := models.CouncilSession{
+		ID:                  uuid.New().String(),
+		WorkspaceID:         wsID,
+		ChannelID:           ch.ID,
+		Topic:               "Authentication RFC",
+		Status:              models.CouncilStatusDebating,
+		InitiatedBy:         "human:user",
+		ProposerAgent:       "claude",
+		MandatoryChallenger: "codex",
+		CurrentRound:        1,
+		MaxRounds:           3,
+		ChallengeDeadlineAt: &pastDeadline,
+		CreatedAt:           time.Now().Add(-15 * time.Second),
+	}
+	db.DB.Create(&session)
+
+	// Run scheduler sweep
+	expireStaleCouncilSessions()
+
+	var updated models.CouncilSession
+	db.DB.Where("id = ?", session.ID).First(&updated)
+	if updated.Status != models.CouncilStatusBudgetExhausted {
+		t.Fatalf("expected council session to transition to budget_exhausted, got %s", updated.Status)
+	}
+
+	// Verify alert event was posted to channel
+	var alert models.EventRecord
+	if err := db.DB.Where("network_id = ? AND source = ?", wsID, "system:council").First(&alert).Error; err != nil {
+		t.Fatalf("expected alert event from system:council, got error: %v", err)
+	}
+}
+

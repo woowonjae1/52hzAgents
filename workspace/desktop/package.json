@@ -35,6 +35,11 @@
       "icon.ico",
       "tray-icon.png"
     ],
+    "asarUnpack": [
+      "icon.ico",
+      "icon.png",
+      "tray-icon.png"
+    ],
     "extraResources": [
       {
         "from": "resources",

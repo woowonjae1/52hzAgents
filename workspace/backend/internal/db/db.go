@@ -40,6 +40,7 @@ func InitDB() {
 			DB.Exec("PRAGMA busy_timeout = 10000;")
 			DB.Exec("PRAGMA synchronous = NORMAL;")
 			DB.Exec("PRAGMA temp_store = MEMORY;")
+			DB.Exec("PRAGMA wal_autocheckpoint = 1000;")
 		}
 	} else {
 		// Postgres mode
@@ -83,6 +84,8 @@ func InitDB() {
 		&models.Agent{},
 		&models.ChannelCompactionRecord{},
 		&models.AgentTurnChange{},
+		&models.CouncilSession{},
+		&models.SpeechActRecord{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)

@@ -394,8 +394,8 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const EntryList = (
     <div className="h-full flex flex-col bg-background select-none">
       {/* Top Header */}
-      <div className="shrink-0 px-4 pt-3.5 pb-3 border-b border-border/70 space-y-3 bg-surface1/60 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-2">
+      <div className="app-header px-4">
+        <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
@@ -455,7 +455,11 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             </Tooltip>
           </div>
         </div>
+      </div>
 
+      {/* Toolbar band: broadcast notice, search and category pills. Kept out of
+          `.app-header` so the header row stays one shared height. */}
+      <div className="shrink-0 px-4 py-2.5 border-b border-border space-y-2.5">
         {/* Global Agent Broadcast Strip */}
         <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface2/60 border border-border/50 text-3xs text-foreground-muted">
           <div className="flex items-center gap-1.5 min-w-0">
@@ -652,7 +656,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const EntryDetail = selectedEntry ? (
     <div className="h-full flex flex-col bg-background">
       {/* Detail Header Bar */}
-      <div className="shrink-0 px-6 py-3.5 border-b border-border/70 flex items-center justify-between gap-4 bg-surface1/60 backdrop-blur-md">
+      <div className="app-header justify-between px-6 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           {isMobile && (
             <button

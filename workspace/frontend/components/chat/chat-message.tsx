@@ -41,15 +41,37 @@ function isPreviewable(contentType: string, filename: string): boolean {
   return false;
 }
 
-function extractThinking(text: string): { thinking: string | null; answer: string } {
-  if (!text || typeof text !== 'string') return { thinking: null, answer: text || '' };
-  const thinkMatch = text.match(/<think>([\s\S]*?)<\/think>/i);
+function extractThinking(text: string): { thinking: string | null; answer: string; isStreamingThink?: boolean } {
+  if (!text || typeof text !== 'string') return { thinking: null, answer: text || '', isStreamingThink: false };
+
+  // 1. Tag-based thinking: <think>...</think> or <thinking>...</thinking>
+  const tagRegex = /<(?:think|thinking)>([\s\S]*?)<\/(?:think|thinking)>/i;
+  const thinkMatch = text.match(tagRegex);
   if (thinkMatch) {
     const thinking = thinkMatch[1].trim();
-    const answer = text.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
-    return { thinking, answer };
+    const answer = text.replace(tagRegex, '').trim();
+    return { thinking, answer, isStreamingThink: false };
   }
-  return { thinking: null, answer: text };
+
+  // 2. Open thinking tag while streaming: <think>... (not yet closed)
+  if (/^<(?:think|thinking)>/i.test(text)) {
+    const thinking = text.replace(/^<(?:think|thinking)>/i, '').trim();
+    return { thinking, answer: '', isStreamingThink: true };
+  }
+
+  // 3. Explicit Thought headers at the start: e.g. "Thought:\n..."
+  const headerPrefix = text.match(/^(?:(?:\*\*|\*|#+)?\s*(?:Thought|Thinking Process|Reasoning|Planning Process|思考过程)\s*(?:\*\*|\*|#+)?:?\s*\n+)/i);
+  if (headerPrefix) {
+    const rest = text.slice(headerPrefix[0].length);
+    const answerDivider = rest.match(/\n+(?:(?:\*\*|\*|#+)?\s*(?:Answer|Deliverable|Response|Final Response|回答|总结|结论)\s*(?:\*\*|\*|#+)?:?\s*\n+|#{1,3}\s+|经过|基于|根据|Here is|Based on)/i);
+    if (answerDivider && answerDivider.index !== undefined) {
+      const thinking = rest.slice(0, answerDivider.index).trim();
+      const answer = rest.slice(answerDivider.index).trim();
+      return { thinking, answer, isStreamingThink: false };
+    }
+  }
+
+  return { thinking: null, answer: text, isStreamingThink: false };
 }
 
 function Attachments({ items }: { items: Attachment[] }) {
@@ -62,6 +84,13 @@ function Attachments({ items }: { items: Attachment[] }) {
     setSelectedFileId(fileId);
     setViewMode('files');
   }, [setSelectedFileId, setViewMode]);
+
+  const handleDownload = useCallback((url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+  }, []);
 
   const fixedItems = useMemo(() =>
     items.map((a) => ({ ...a, url: workspaceApi.getFileUrl(a.fileId) })),
@@ -96,28 +125,33 @@ function Attachments({ items }: { items: Attachment[] }) {
         <div className="flex flex-wrap gap-2">
           {files.map((file) => {
             const previewable = isPreviewable(file.contentType, file.filename);
-            return previewable ? (
-              <button
+            return (
+              <div
                 key={file.fileId}
-                type="button"
-                onClick={() => openPreview(file.fileId)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs group"
               >
-                <Eye className="size-3.5 text-primary shrink-0" />
-                <span className="truncate max-w-[200px]">{file.filename}</span>
-              </button>
-            ) : (
-              <a
-                key={file.fileId}
-                href={file.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs"
-              >
-                <FileIcon className="size-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate max-w-[200px]">{file.filename}</span>
-                <Download className="size-3 text-muted-foreground shrink-0" />
-              </a>
+                <button
+                  type="button"
+                  onClick={() => openPreview(file.fileId)}
+                  className="inline-flex items-center gap-2 cursor-pointer text-foreground hover:text-primary transition-colors"
+                  title="View in Files"
+                >
+                  {previewable ? (
+                    <Eye className="size-3.5 text-primary shrink-0" />
+                  ) : (
+                    <FileIcon className="size-3.5 text-muted-foreground shrink-0" />
+                  )}
+                  <span className="truncate max-w-[200px]">{file.filename}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownload(file.url, file.filename)}
+                  className="size-5 rounded hover:bg-surface1 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
+                  title="Download file"
+                >
+                  <Download className="size-3" />
+                </button>
+              </div>
             );
           })}
         </div>
@@ -255,7 +289,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     : null;
 
   // Extract thinking content from inline text, steps, or metadata
-  const { thinking: inlineThinking, answer: cleanContent } = useMemo(
+  const { thinking: inlineThinking, answer: cleanContent, isStreamingThink } = useMemo(
     () => extractThinking(message.content),
     [message.content]
   );
@@ -335,23 +369,29 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     };
   }, [message.messageId, message.senderName, message.senderType, message.createdAt, cleanContent]);
 
-  // Detect system errors or daemon interruptions
+  // Detect system errors or daemon interruptions (only for short runtime error notices, not content responses)
   const isErrorMessage = useMemo(() => {
     if (!cleanContent) return false;
-    const lower = cleanContent.toLowerCase();
+    // Deliverable content, code blocks, or markdown articles are NEVER system errors
+    if (cleanContent.length > 300 || cleanContent.includes('```') || /^#{1,4}\s+/m.test(cleanContent)) {
+      return false;
+    }
+    if (message.messageType === 'error' || Boolean(message.metadata?.error || message.metadata?.is_error)) {
+      return true;
+    }
+    const lower = cleanContent.toLowerCase().trim();
+    // Only detect genuine short runtime fault strings from daemon or adapter
     return (
-      lower.includes('authentication failed') ||
-      lower.includes('oauth session expired') ||
+      lower.startsWith('authentication failed') ||
+      lower.startsWith('oauth session expired') ||
       lower.includes('task interrupted — daemon restarting') ||
-      lower.includes('failed to authenticate') ||
-      lower.includes('invalid api key') ||
-      lower.includes('daemon restarting') ||
-      lower.includes('quota reached') ||
-      lower.includes('调用异常') ||
-      lower.includes('rate limit') ||
-      lower.includes('individual quota')
+      lower.startsWith('failed to authenticate') ||
+      lower.startsWith('invalid api key') ||
+      lower.startsWith('daemon restarting') ||
+      lower.startsWith('error: quota reached') ||
+      lower.startsWith('error: rate limit')
     );
-  }, [cleanContent]);
+  }, [cleanContent, message.messageType, message.metadata]);
 
   if (isSystem) {
     const isQueued = message.content.includes('queued');
@@ -375,9 +415,26 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
 
     return (
       <div className="py-2.5 flex justify-end group/usermsg select-text">
-        <div className="flex items-start gap-2.5 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
-          {/* Your animated mark, aligned cleanly to top of message bubble */}
-          <SignalMark size={30} still={false} className="shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
+          {/*
+            Your mark mirrors the agent avatar across the transcript, so it has
+            to match it: 28px (AgentAvatar's size, and the size-7 spacer used
+            when a header is suppressed) and a gap-3 gutter. It was 30px at
+            gap-2.5, which read as subtly off on both axes.
+
+            Vertically it centres on the bubble's FIRST TEXT LINE rather than
+            the bubble's top edge — the agent avatar aligns to a bare text row,
+            while this one sits beside a padded bubble, so matching the raw top
+            offset would ride high by the bubble's padding. The box below is the
+            bubble's top padding (py-2.5) plus one line box, and it inherits the
+            bubble's own type so it survives the pending root/type rescale.
+          */}
+          <div
+            className="flex shrink-0 items-center text-sm leading-relaxed"
+            style={{ height: 'calc(1.25rem + 1lh)' }}
+          >
+            <SignalMark size={28} still={false} />
+          </div>
           {/* Refined AI User Bubble */}
           {/*
             The bubble sits directly on the transcript, not above it, so the drop
@@ -491,7 +548,11 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
 
           {/* 1. Collapsible Reasoning (o1 / o3 style - Top of message body) */}
           {activeThinking ? (
-            <Reasoning content={activeThinking} defaultExpanded={false} />
+            <Reasoning
+              content={activeThinking}
+              isStreaming={Boolean(isStreamingThink)}
+              defaultExpanded={Boolean(isStreamingThink)}
+            />
           ) : null}
 
           {/* 2. Tool Calls & Intermediate Steps */}

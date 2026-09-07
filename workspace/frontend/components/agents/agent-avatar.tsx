@@ -48,6 +48,8 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
   const isOffline = status === 'offline';
   const identityFill = deriveIdentityColor(cleanName || 'agent');
   const initial = (cleanName || '?').charAt(0).toUpperCase();
+  // A real brand mark renders bare; only the generated initial tile is framed.
+  const hasBrandMark = Boolean(matchedAgent) && !imgError;
 
   return (
     <div
@@ -58,11 +60,24 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
       )}
       style={{ width: size, height: size }}
     >
+      {/*
+        The chrome below is the LETTER TILE's chrome, not the logo's. A brand
+        mark (chatgpt, claude, cline, ...) already is a designed object; boxing
+        it in a bordered, tinted, blurred, shadowed circle was the single
+        biggest source of the "plastic" read — 28px of frame around 22px of
+        logo. The generated initial tile does need a shape, so it keeps one.
+
+        The online state also dropped `shadow-status-success/20 ring-1
+        ring-status-success/30`: a coloured glow, off-token, and redundant with
+        the `showStatus` dot that already reports the same thing.
+      */}
       <div
         className={cn(
-          square ? 'rounded-xl' : 'rounded-full',
-          'overflow-hidden border border-border/80 dark:border-white/[0.1] bg-surface2/90 dark:bg-surface2/80 backdrop-blur-xs flex items-center justify-center shrink-0 shadow-2xs transition-all duration-200',
-          status === 'online' && 'border-status-success/60 shadow-xs shadow-status-success/20 ring-1 ring-status-success/30'
+          'flex items-center justify-center shrink-0 overflow-hidden',
+          !hasBrandMark && [
+            square ? 'rounded-xl' : 'rounded-full',
+            'border border-border/80 dark:border-white/[0.1] bg-surface2/90 dark:bg-surface2/80',
+          ],
         )}
         style={{ width: size, height: size }}
       >
@@ -72,8 +87,11 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
             alt={cleanName}
             onError={() => setImgError(true)}
             className={cn(
-              "w-full h-full object-contain p-1 drop-shadow-xs",
-              ['cursor', 'openai', 'codex', 'grok', 'xai', 'pi', 'cline', 'kilo', 'opencode', 'copilot'].includes(matchedAgent) && "dark:invert"
+              // No `p-1` inset and no `drop-shadow-xs`: with the frame gone
+              // there is nothing to insert the mark into, and the shadow was
+              // depth under a flat logo.
+              'w-full h-full object-contain',
+              ['cursor', 'openai', 'codex', 'grok', 'xai', 'pi', 'cline', 'kilo', 'opencode', 'copilot'].includes(matchedAgent) && 'dark:invert'
             )}
           />
         ) : (

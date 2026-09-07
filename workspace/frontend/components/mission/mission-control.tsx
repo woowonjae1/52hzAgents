@@ -4,18 +4,15 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
-import { AgentStation, type StationData, type StationStatus } from './agent-station';
+import { AgentStation, type StationData, type StationStatus, type StationModelInfo, type StationEffortInfo } from './agent-station';
 import { ActionRequiredBanner, type PendingActionItem } from './action-required-banner';
 import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
-import { OnboardingGuide } from './onboarding-guide';
 import { ConnectAgentModal } from './connect-agent-modal';
-import { MetricCard, SparklineBar, SparklineArea, RingProgress } from './metrics-charts';
+import { useVisibilityPolling } from '@/lib/use-visibility-polling';
+import { parseReportedModels } from '@/components/chat/agent-model-switcher';
 import {
   Users,
-  Activity,
-  Zap,
-  ShieldAlert,
-  Layers,
+  PanelRight,
   ChevronDown,
   ChevronUp,
   Play,
@@ -26,6 +23,48 @@ import { workspaceApi } from '@/lib/api';
 import { eventToMessage, type ONMEvent, stripAddressPrefix } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { toast } from 'sonner';
+
+/*
+  The filter affordance that replaced the metric cards. Deliberately flat: no
+  card, no badge, no chart. The count IS the state, so nothing is coloured —
+  the single exception is a non-zero blocked count, which is the only number
+  here that asks the reader to act, and `--destructive` is the token this
+  project reserves for exactly that.
+*/
+function FilterChip({
+  label,
+  count,
+  active,
+  urgent,
+  onClick,
+}: {
+  label: string;
+  count?: number | string;
+  active: boolean;
+  urgent?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'inline-flex items-baseline gap-1.5 rounded-md px-2 py-1 text-xs transition-colors cursor-pointer',
+        active
+          ? 'bg-surface2 text-foreground'
+          : 'text-muted-foreground hover:text-foreground hover:bg-surface2/60',
+      )}
+    >
+      <span>{label}</span>
+      {count !== undefined && (
+        <span className={cn('font-mono tabular-nums', urgent && 'text-destructive')}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
 
 export function MissionControl() {
   const {
@@ -41,6 +80,9 @@ export function MissionControl() {
 
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [showIntegrations, setShowIntegrations] = useState(true);
+  // Live activity is the one cross-channel view, but it is a companion pane —
+  // on a narrow window it costs 350px that the roster wants back.
+  const [showActivity, setShowActivity] = useState(true);
 
   // Filter state: 'all' | 'working' | 'blocked' | 'online'
   const [filterTab, setFilterTab] = useState<'all' | 'working' | 'blocked' | 'online'>('all');
@@ -55,6 +97,15 @@ export function MissionControl() {
   >({});
   const [agentTokens, setAgentTokens] = useState<Record<string, number>>({});
   const [pendingApprovals, setPendingApprovals] = useState<PendingActionItem[]>([]);
+
+  // Activity feed
+  const [activityFeed, setActivityFeed] = useState<TimelineEventItem[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+
+  // Agent usage batch map (lifted from individual cards to parent)
+  const [agentUsageMap, setAgentUsageMap] = useState<
+    Record<string, { modelInfo: StationModelInfo; effortInfo: StationEffortInfo }>
+  >({});
 
   const fetchRecentData = useCallback(async () => {
     if (!sessions.length) return;
@@ -121,11 +172,80 @@ export function MissionControl() {
     setPendingApprovals(approvals);
   }, [sessions]);
 
-  useEffect(() => {
-    fetchRecentData();
-    const id = setInterval(fetchRecentData, 4000);
-    return () => clearInterval(id);
-  }, [fetchRecentData]);
+  const fetchFeed = useCallback(async () => {
+    const titleFor = (channel: string) => sessions.find((s) => s.sessionId === channel)?.title || channel;
+    try {
+      const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 40 });
+      const lines: TimelineEventItem[] = res.events.map((ev: ONMEvent, idx: number) => {
+        const m = eventToMessage(ev);
+        const channel = (ev.target || '').replace(/^channel\//, '');
+        let type: TimelineEventItem['type'] = 'info';
+        if (m.messageType === 'thinking') type = 'thinking';
+        else if (m.metadata?.tool_approval_request) type = 'approval';
+        else if (m.messageType === 'status') type = /failed|error|stopped|denied/i.test(m.content) ? 'error' : 'success';
+        else if (m.senderType === 'agent') type = 'command';
+        return {
+          id: m.messageId || ev.event_id || `activity-${idx}-${ev.timestamp || Date.now()}`,
+          time: m.createdAt ? new Date(m.createdAt) : new Date(ev.timestamp),
+          sender: m.senderName || stripAddressPrefix(ev.source),
+          channel: titleFor(channel),
+          channelId: channel,
+          content: m.content,
+          type,
+        };
+      });
+      setActivityFeed(lines);
+    } catch {
+      /* keep last feed */
+    } finally {
+      setFeedLoading(false);
+    }
+  }, [sessions]);
+
+  // Unified overview polling: 5s interval, fully paused on document.hidden
+  const fetchMissionOverview = useCallback(async () => {
+    await Promise.allSettled([fetchRecentData(), fetchFeed()]);
+  }, [fetchRecentData, fetchFeed]);
+
+  useVisibilityPolling(fetchMissionOverview, 5000);
+
+  // Batch agent usage polling (25s interval, fully paused on document.hidden)
+  const fetchAgentUsages = useCallback(async () => {
+    const configuredNames = agents.map((a) => a.agentName);
+    if (configuredNames.length === 0) return;
+
+    const results = await Promise.allSettled(
+      configuredNames.map(async (name) => {
+        const usage = await workspaceApi.getAgentUsage(name);
+        const parsedModels = parseReportedModels(usage?.available_models);
+        const parsedEfforts = parseReportedModels(usage?.available_efforts);
+        return {
+          name,
+          modelInfo: {
+            current: usage?.current_model || null,
+            models: parsedModels,
+          },
+          effortInfo: {
+            current: usage?.current_effort || null,
+            levels: parsedEfforts,
+          },
+        };
+      })
+    );
+
+    const nextMap: Record<string, { modelInfo: StationModelInfo; effortInfo: StationEffortInfo }> = {};
+    for (const res of results) {
+      if (res.status === 'fulfilled' && res.value) {
+        nextMap[res.value.name] = {
+          modelInfo: res.value.modelInfo,
+          effortInfo: res.value.effortInfo,
+        };
+      }
+    }
+    setAgentUsageMap((prev) => ({ ...prev, ...nextMap }));
+  }, [agents]);
+
+  useVisibilityPolling(fetchAgentUsages, 25_000);
 
   // Section 1: User's Configured Agents
   const myStations: StationData[] = useMemo(() => {
@@ -185,13 +305,15 @@ export function MissionControl() {
             }
           : undefined,
         lastHeartbeatAt: agent.lastHeartbeatAt,
+        modelInfo: agentUsageMap[agent.agentName]?.modelInfo,
+        effortInfo: agentUsageMap[agent.agentName]?.effortInfo,
       };
     }).sort((a, b) => {
       const rank = { blocked: 0, stalled: 1, working: 2, ready: 3, offline: 4 } as const;
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
       return a.agent.agentName.localeCompare(b.agent.agentName);
     });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
+  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals, agentUsageMap]);
 
   // Section 2: Available Catalog Presets
   const integrationStations: StationData[] = useMemo(() => {
@@ -209,6 +331,34 @@ export function MissionControl() {
       isCatalogPlaceholder: true,
     }));
   }, [agents, allCatalogAgents]);
+
+  const allStations = useMemo(() => [...myStations, ...integrationStations], [myStations, integrationStations]);
+
+  // Status Counts for Chips
+  const blockedCount = myStations.filter((s) => s.status === 'blocked').length;
+  const workingCount = myStations.filter((s) => s.status === 'working').length;
+  const onlineCount = agents.filter((a) => a.status === 'online').length;
+
+  // Filtered lists
+  const filteredMyStations = useMemo(() => {
+    if (filterTab === 'all') return myStations;
+    if (filterTab === 'working') return myStations.filter((s) => s.status === 'working' || s.status === 'stalled');
+    if (filterTab === 'blocked') return myStations.filter((s) => s.status === 'blocked');
+    if (filterTab === 'online') return myStations.filter((s) => s.agent.status === 'online');
+    return myStations;
+  }, [myStations, filterTab]);
+
+  const openAgent = (agentName: string, focusSessionId: string | null) => {
+    setViewMode('threads');
+    if (focusSessionId) {
+      setCurrentSessionId(focusSessionId);
+    }
+  };
+
+  const openThread = (sessionId: string) => {
+    setViewMode('threads');
+    setCurrentSessionId(sessionId);
+  };
 
   // Stalled items for ActionRequiredBanner
   const [dismissedActionIds, setDismissedActionIds] = useState<Set<string>>(new Set());
@@ -237,35 +387,11 @@ export function MissionControl() {
   }, [pendingApprovals, stalledItems, dismissedActionIds]);
 
 
-  // Filtered station cards
-  const filteredMyStations = useMemo(() => {
-    if (filterTab === 'working') return myStations.filter((s) => s.status === 'working' || s.status === 'stalled');
-    if (filterTab === 'blocked') return myStations.filter((s) => s.status === 'blocked' || s.status === 'stalled');
-    if (filterTab === 'online') return myStations.filter((s) => s.status !== 'offline');
-    return myStations;
-  }, [myStations, filterTab]);
-
-  const onlineCount = agents.filter((a) => a.status === 'online').length;
-  const workingCount = myStations.filter((s) => s.status === 'working').length;
-  const blockedCount = myStations.filter((s) => s.status === 'blocked' || s.status === 'stalled').length;
   const totalTokens = useMemo(() => Object.values(agentTokens).reduce((sum, v) => sum + v, 0), [agentTokens]);
   const fmtTokens = (n: number) => (n > 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`);
 
-  const openAgent = (agentName: string, focusSessionId: string | null) => {
-    setViewMode('threads');
-    if (focusSessionId) {
-      setCurrentSessionId(focusSessionId);
-    }
-  };
-
-  const openThread = (sessionId: string) => {
-    setViewMode('threads');
-    setCurrentSessionId(sessionId);
-  };
-
   const handlePairAgent = async (agentName: string) => {
     try {
-      toast.info(`Connecting ${agentName}…`);
       await workspaceApi.launchAgent(agentName);
       toast.success(`${agentName} is online`);
       const updated = await workspaceApi.listAgents();
@@ -280,140 +406,113 @@ export function MissionControl() {
     }
   };
 
-  // Activity feed
-  const [activityFeed, setActivityFeed] = useState<TimelineEventItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    const titleFor = (channel: string) => sessions.find((s) => s.sessionId === channel)?.title || channel;
-    const fetchFeed = async () => {
-      try {
-        const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 40 });
-        if (cancelled) return;
-        const lines: TimelineEventItem[] = res.events.map((ev: ONMEvent, idx: number) => {
-          const m = eventToMessage(ev);
-          const channel = (ev.target || '').replace(/^channel\//, '');
-          let type: TimelineEventItem['type'] = 'info';
-          if (m.messageType === 'thinking') type = 'thinking';
-          else if (m.metadata?.tool_approval_request) type = 'approval';
-          else if (m.messageType === 'status') type = /failed|error|stopped|denied/i.test(m.content) ? 'error' : 'success';
-          else if (m.senderType === 'agent') type = 'command';
-          return {
-            id: m.messageId || ev.event_id || `activity-${idx}-${ev.timestamp || Date.now()}`,
-            time: m.createdAt ? new Date(m.createdAt) : new Date(ev.timestamp),
-            sender: m.senderName || stripAddressPrefix(ev.source),
-            channel: titleFor(channel),
-            channelId: channel,
-            content: m.content,
-            type,
-          };
-        });
-        setActivityFeed(lines);
-      } catch {
-        /* keep last feed */
-      } finally {
-        if (!cancelled) setFeedLoading(false);
-      }
-    };
-    fetchFeed();
-    const id = setInterval(fetchFeed, 4000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [sessions]);
 
   const hasZeroAgents = agents.length === 0 && !catalogLoading;
   const isAllOffline = agents.length > 0 && onlineCount === 0;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header Strip with 4 Always-Visible Analytics Cards */}
-      <div className={cn("shrink-0 bg-surface1/50 backdrop-blur-md px-6 pt-5 pb-4 space-y-3.5 transition-all duration-200", !isSidebarOpen && "pl-14")}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-surface2 text-primary shadow-2xs">
-              <Layers className="size-4" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold tracking-tight text-foreground">
-                Mission control
-              </h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Multi-agent scheduling, load monitoring, and live activity
-              </p>
-            </div>
-          </div>
-        </div>
+      {/*
+        One header line, not a 110px analytics strip.
 
-        {/* 4 Rich Metric Cards (Always Visible) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* Card 1: Action Required */}
-          <div
-            onClick={() => setFilterTab(filterTab === 'blocked' ? 'all' : 'blocked')}
-            className="cursor-pointer"
-          >
-            <MetricCard
-              title="Needs attention"
-              value={blockedCount}
-              subtitle={blockedCount > 0 ? 'Human confirmation required' : 'Running clean, nothing blocked'}
-              icon={<ShieldAlert className={cn('size-3.5', blockedCount > 0 ? 'text-status-warning animate-pulse' : 'text-muted-foreground')} />}
-              badge={blockedCount > 0 ? { text: 'Blocked', trend: 'down' } : undefined}
+        The four "rich metric cards" this replaced carried three problems at
+        once. Empty, they were four boxes reading 0 — a whole band of screen
+        with nothing in it. Non-empty, two of them drew `SparklineBar`/
+        `SparklineArea` over HARDCODED arrays ([12,18,14,28,22,35,30]) in
+        hardcoded hex (#f59e0b, #8b5cf6): invented trends, which this project
+        does not ship. And the only real facts among them — how many need me,
+        how many are running, how many are online — are single integers that
+        read faster inline than as cards.
+
+        Every card was also a filter toggle. Those toggles are preserved below
+        as chips; nothing that did something lost its home.
+      */}
+      <div className={cn('app-header px-6', !isSidebarOpen && 'ps-14')}>
+        <div className="flex flex-1 items-center justify-between gap-4 min-w-0">
+          <div className="flex items-baseline gap-2.5 min-w-0">
+            <h1 className="text-sm font-semibold tracking-tight text-foreground shrink-0">
+              Mission control
+            </h1>
+            <p className="truncate text-xs text-muted-foreground tabular-nums">
+              {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
+              {sessions.length > 0 && ` · ${sessions.length} ${sessions.length === 1 ? 'channel' : 'channels'}`}
+              {totalTokens > 0 && ` · ${fmtTokens(totalTokens)} used`}
+            </p>
+          </div>
+
+          {/*
+            The filter set the cards used to carry. State is the count itself,
+            so no chip is coloured — except a non-zero blocked count, which is
+            the one number that asks the reader to go do something.
+          */}
+          <div className="flex items-center gap-1 shrink-0">
+            {agents.length > 0 && (blockedCount > 0 || workingCount > 0 || filterTab !== 'all') && (
+              <FilterChip
+                active={filterTab === 'all'}
+                onClick={() => setFilterTab('all')}
+                label="All"
+              />
+            )}
+            {/*
+              A filter that would select nothing is not shown.
+
+              These four rendered unconditionally, so the state a workspace
+              spends most of its time in — nothing blocked, nothing running —
+              put up "Needs attention 0" and "Running 0" as permanent furniture,
+              and an empty workspace showed all four at zero above a pane
+              reading "No agents match this filter". `Online` stays whatever its
+              count, because x/y is a status readout as much as a filter.
+
+              The active chip also survives its count dropping to 0, or the
+              control you are currently filtered by would vanish under you and
+              leave no way back to `All`.
+            */}
+            {(blockedCount > 0 || filterTab === 'blocked') && (
+              <FilterChip
+                active={filterTab === 'blocked'}
+                onClick={() => setFilterTab(filterTab === 'blocked' ? 'all' : 'blocked')}
+                label="Needs attention"
+                count={blockedCount}
+                urgent={blockedCount > 0}
+              />
+            )}
+            {(workingCount > 0 || filterTab === 'working') && (
+              <FilterChip
+                active={filterTab === 'working'}
+                onClick={() => setFilterTab(filterTab === 'working' ? 'all' : 'working')}
+                label="Running"
+                count={workingCount}
+              />
+            )}
+            {agents.length > 0 && (
+              <FilterChip
+                active={filterTab === 'online'}
+                onClick={() => setFilterTab(filterTab === 'online' ? 'all' : 'online')}
+                label="Online"
+                count={`${onlineCount}/${agents.length}`}
+              />
+            )}
+
+            <span className="mx-1 h-4 w-px bg-border/60" aria-hidden />
+
+            <button
+              type="button"
+              onClick={() => setShowActivity((prev) => !prev)}
+              aria-pressed={showActivity}
+              title={showActivity ? 'Hide live activity' : 'Show live activity'}
               className={cn(
-                filterTab === 'blocked' && 'ring-2 ring-primary border-primary',
-                blockedCount > 0 && 'bg-status-warning/[0.04]'
+                'inline-flex size-7 items-center justify-center rounded-md transition-colors cursor-pointer',
+                showActivity
+                  ? 'bg-surface2 text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-surface2/60',
               )}
-            />
-          </div>
-
-          {/* Card 2: Working Now */}
-          <div
-            onClick={() => setFilterTab(filterTab === 'working' ? 'all' : 'working')}
-            className="cursor-pointer"
-          >
-            <MetricCard
-              title="Running"
-              value={workingCount}
-              subtitle={workingCount > 0 ? `${workingCount} working on a task` : 'All agents standing by'}
-              icon={<Activity className={cn('size-3.5', workingCount > 0 ? 'text-status-warning animate-spin' : 'text-muted-foreground')} />}
-              badge={workingCount > 0 ? { text: `${workingCount} active`, trend: 'neutral' } : undefined}
-              chart={workingCount > 0 ? <SparklineBar data={[12, 18, 14, 28, 22, 35, 30]} color="#f59e0b" height={30} barWidth={4} barGap={2.5} /> : undefined}
-              className={cn(filterTab === 'working' && 'ring-2 ring-primary border-primary')}
-            />
-          </div>
-
-          {/* Card 3: Agents Online */}
-          <div
-            onClick={() => setFilterTab(filterTab === 'online' ? 'all' : 'online')}
-            className="cursor-pointer"
-          >
-            <MetricCard
-              title="Agents online"
-              value={`${onlineCount} / ${agents.length}`}
-              subtitle={onlineCount > 0 ? 'Heartbeat healthy' : 'All agents offline'}
-              icon={<Users className="size-3.5 text-status-success" />}
-              chart={
-                onlineCount > 0 ? (
-                  <RingProgress
-                    value={(onlineCount / agents.length) * 100}
-                    size={32}
-                    strokeWidth={3}
-                    color="#10b981"
-                    label={`${onlineCount}`}
-                  />
-                ) : undefined
-              }
-              className={cn(filterTab === 'online' && 'ring-2 ring-primary border-primary')}
-            />
-          </div>
-
-          {/* Card 4: Tokens Reported */}
-          <div>
-            <MetricCard
-              title="Token usage"
-              value={totalTokens > 0 ? fmtTokens(totalTokens) : '0 tok'}
-              subtitle={totalTokens > 0 ? 'Cumulative across sessions' : 'Nothing recorded yet'}
-              icon={<Zap className="size-3.5 text-status-merged" />}
-              chart={totalTokens > 0 ? <SparklineArea data={[10, 18, 14, 26, 22, 34, 30]} color="#8b5cf6" height={30} width={72} /> : undefined}
-            />
+            >
+              <PanelRight className="size-3.5" />
+              <span className="sr-only">
+                {showActivity ? 'Hide live activity' : 'Show live activity'}
+              </span>
+            </button>
           </div>
         </div>
       </div>
@@ -432,14 +531,6 @@ export function MissionControl() {
             onOpenThread={openThread}
             onResolved={handleActionResolved}
           />
-
-          {/* True 0 Configuration State */}
-          {hasZeroAgents && (
-            <OnboardingGuide
-              onQuickConnect={handlePairAgent}
-              className="my-2"
-            />
-          )}
 
           {/* All Offline Wakeup Callout Banner */}
           {isAllOffline && (
@@ -513,6 +604,7 @@ export function MissionControl() {
                         onOpenThread={openThread}
                         onPairAgent={() => handlePairAgent(s.agent.agentName)}
                         onApprovalResolved={fetchRecentData}
+                        onRefreshUsage={fetchAgentUsages}
                       />
                     </motion.div>
                   ))}
@@ -523,6 +615,20 @@ export function MissionControl() {
             {/* Section 2: Available Integrations */}
             {integrationStations.length > 0 && filterTab === 'all' && (
               <div className="space-y-3 pt-2">
+                {/*
+                  With nothing connected this list IS the onboarding step, so it
+                  says so in a sentence. It used to be preceded by an "Add your
+                  first agent" card showing `DEFAULT_AGENT_CATALOG.slice(0, 6)`
+                  behind the same `handlePairAgent` — a strict subset of these
+                  rows, minus the connection state, shown only in the state where
+                  this list is at its longest.
+                */}
+                {hasZeroAgents && (
+                  <p className="text-xs text-muted-foreground">
+                    No agents connected yet. Pick one below, or configure a custom
+                    ACP / MCP adapter.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowIntegrations((prev) => !prev)}
@@ -553,13 +659,13 @@ export function MissionControl() {
         </div>
 
         {/* Right Activity Timeline */}
-        <ActivityTimeline
+        {showActivity && <ActivityTimeline
           events={activityFeed}
           agents={agents.map((a) => a.agentName)}
           onOpenThread={openThread}
           loading={feedLoading}
           className="lg:w-[320px] xl:w-[350px]"
-        />
+        />}
       </div>
     </div>
   );

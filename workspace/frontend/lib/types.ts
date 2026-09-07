@@ -356,11 +356,14 @@ export interface RoutineItem {
 }
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TodoPriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
 
 export interface TodoItem {
   id: string;
   content: string;
   status: TodoStatus;
+  priority?: TodoPriority;
+  labels?: string[];
   assignee: string;
   createdBy: string;
   channelName: string;

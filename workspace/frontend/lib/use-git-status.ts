@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { workspaceApi } from './api';
 import { useWorkspace } from './workspace-context';
+import { useVisibilityPolling } from './use-visibility-polling';
 
 export interface GitFileChange {
   path: string;
@@ -88,19 +89,7 @@ export function useGitStatus(channelId: string | null | undefined) {
     }
   }, [boundChannelId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      if (cancelled) return;
-      await refresh();
-    };
-    tick();
-    const id = setInterval(tick, POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [refresh]);
+  useVisibilityPolling(refresh, POLL_MS, { enabled: !!boundChannelId });
 
   // `channelId` is echoed back so write calls (stage, commit) go to the same
   // channel the status came from, and are skipped entirely when there is none.

@@ -58,9 +58,17 @@ export function AgentStatusStrip() {
     );
   }
 
+  /*
+    Only agents that are actually up get a mark. Showing the whole roster meant
+    the same six logos sat here permanently — identical every render, saying
+    nothing the "N of M online" text does not already say, while the one fact
+    worth seeing (which agents are live right now) was buried among the offline
+    ones at 50% opacity. With nothing online the strip is just the sentence.
+  */
   const MAX_SHOWN = 6;
-  const shown = ordered.slice(0, MAX_SHOWN);
-  const overflow = ordered.length - shown.length;
+  const live = ordered.filter((x) => x.state !== 'offline');
+  const shown = live.slice(0, MAX_SHOWN);
+  const overflow = live.length - shown.length;
 
   const summary = workingCount > 0
     ? `${workingCount} working`
@@ -73,7 +81,7 @@ export function AgentStatusStrip() {
       title="Open agent station"
       className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
     >
-      <div className="flex items-center -space-x-1.5 shrink-0">
+      <div className="flex items-center -space-x-1 shrink-0 empty:hidden">
         {shown.map(({ agent, state }) => (
           <Tooltip key={agent.agentName}>
             <TooltipTrigger asChild>

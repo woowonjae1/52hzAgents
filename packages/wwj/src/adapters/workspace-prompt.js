@@ -574,6 +574,18 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
     );
   }
 
+  // Council Deliberation (Blackboard & Speech Acts)
+  sections.push(
+    '\n### Council Deliberation (Speech Acts)\n\n' +
+    'When participating in a council deliberation (/rfc), submit structured speech acts:\n\n' +
+    '**Submit a Speech Act (PROPOSAL, CHALLENGE, DEFENSE, SUPPORT, RESOLUTION):**\n' +
+    `\`${curl} -s -X POST -H "${h}" -H "X-Actor-Id: ${agentName}" -H "Content-Type: application/json" ` +
+    `"${baseUrl}/v1/council/sessions/SESSION_ID/acts?network=${workspaceId}" ` +
+    `-d '{"act_type":"CHALLENGE","summary":"High-density critique","target_act_id":"ACT_ID","payload":{"analysis":"..."}}'\`\n\n` +
+    '**View Council Session & History:**\n' +
+    `\`${curl} -s -H "${h}" "${baseUrl}/v1/council/sessions/SESSION_ID?network=${workspaceId}"\`\n`
+  );
+
   // Discovery
   sections.push(
     '\n### Discover Agents\n\n' +

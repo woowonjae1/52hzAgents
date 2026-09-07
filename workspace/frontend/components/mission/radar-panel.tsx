@@ -110,7 +110,7 @@ export function RadarPanel() {
         </p>
         <button
           onClick={() => setViewMode('connect')}
-          className="mt-4 inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-sm transition-all duration-200 hover:bg-primary/90 hover:shadow-md active:scale-[0.98]"
+          className="mt-4 inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
         >
           <Plus className="size-3.5" />
           Connect agent
@@ -145,11 +145,11 @@ export function RadarPanel() {
               className={cn(
                 'flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-200',
                 isSel
-                  ? 'border-border/70 bg-surface2 shadow-sm'
+                  ? 'border-border/70 bg-surface2'
                   : 'border-transparent hover:bg-surface2/60',
               )}
             >
-              <span className={cn('size-1.5 shrink-0 rounded-full ring-2', c.dot, c.ring, r.status === 'working' && 'motion-safe:animate-pulse')} />
+              <span className={cn('size-1.5 shrink-0 rounded-full ring-2', c.dot, c.ring)} />
               <span
                 className={cn(
                   'flex-1 truncate text-xs',
@@ -158,7 +158,7 @@ export function RadarPanel() {
               >
                 {r.agent.agentName}
               </span>
-              <span className={cn('shrink-0 text-3xs font-medium uppercase tracking-wider', c.text)}>{c.label}</span>
+              <span className={cn('shrink-0 text-3xs font-medium uppercase tracking-wider', c.text, r.status === 'working' && 'event-running')}>{c.label}</span>
             </motion.button>
           );
         })}
@@ -194,10 +194,11 @@ export function RadarPanel() {
                     'size-1.5 rounded-full ring-2',
                     STATUS_COLOR[current.status].dot,
                     STATUS_COLOR[current.status].ring,
-                    current.status === 'working' && 'motion-safe:animate-pulse',
                   )}
                 />
-                {STATUS_COLOR[current.status].label}
+                <span className={cn(current.status === 'working' && 'event-running')}>
+                  {STATUS_COLOR[current.status].label}
+                </span>
               </span>
             </div>
 

@@ -30,6 +30,9 @@ import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { TracePanel } from '@/components/trace/trace-panel';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
+import { CommandPalette } from './command-palette';
+import { AppTitlebar } from './app-titlebar';
+import { useIsDesktop } from '@/lib/desktop';
 
 import { SignalMark } from '@/components/brand/signal-mark';
 import { Network, X, PanelLeft } from 'lucide-react';
@@ -64,9 +67,10 @@ function WorkspaceLoadingScreen() {
 const MIN_DOCKED_WIDTH = 680;
 
 export function Wrapper() {
-  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, sidebarWidth, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
+  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading, workspace } = useWorkspace();
   const hasAgents = agents.length > 0;
+  const isDesktop = useIsDesktop();
   const desktopContainerRef = React.useRef<HTMLDivElement>(null);
   const narrowStateRef = React.useRef<boolean | null>(null);
 
@@ -165,14 +169,18 @@ export function Wrapper() {
     );
   }
 
-  const isDesktop = typeof window !== 'undefined' && !!(window as unknown as { electronBridge?: unknown }).electronBridge;
   const isSettings = viewMode === 'settings';
   const shouldShowSidebar = !isDetailExpanded && !isSettings;
 
   // ── Desktop layout: sidebar + center chat + collapsible right preview ──
   return (
-    <div ref={desktopContainerRef} className={cn("flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5", isDesktop && "pt-7")}>
-      {isDesktop && <div className="fixed top-0 left-0 right-0 h-7 [app-region:drag] z-40 select-none pointer-events-auto" />}
+    <div
+      ref={desktopContainerRef}
+      /* pt is `--titlebar-height`, which is 0px outside the Electron shell —
+         one rule for both, rather than a conditional class and a magic 28. */
+      className="flex h-screen w-full bg-surface0 pt-[var(--titlebar-height)] [&_.container-fluid]:px-5"
+    >
+      {isDesktop && <AppTitlebar />}
       {shouldShowSidebar && <Sidebar />}
 
       <div className="flex flex-col flex-grow min-w-0 w-full">
@@ -183,7 +191,7 @@ export function Wrapper() {
           {shouldShowSidebar && (
             <div
               className={cn('shrink-0', !isSidebarResizing && 'transition-all duration-300')}
-              style={{ width: isSidebarOpen ? `${sidebarWidth}px` : '0px' }}
+              style={{ width: isSidebarOpen ? 'var(--sidebar-width)' : '0px' }}
             />
           )}
 
@@ -253,6 +261,7 @@ export function Wrapper() {
       </div>
       <NewThreadDialogHost />
       <DropzoneOverlay />
+      <CommandPalette />
     </div>
   );
 }

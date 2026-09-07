@@ -473,6 +473,19 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
      * argument sits in a chip, and the expanded body uses the shared rail and
      * the shared `<pre>` instead of a card.
      */
+    const formattedArgs = (() => {
+      if (!parsed.args) return '';
+      const trimmed = parsed.args.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          return JSON.stringify(JSON.parse(trimmed), null, 2);
+        } catch {
+          return parsed.args;
+        }
+      }
+      return parsed.args;
+    })();
+
     return (
       <EventLine
         icon={<Icon />}
@@ -483,24 +496,21 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
             <EventLineAction
               onClick={(e) => {
                 e.stopPropagation();
-                // `preventDefault` as well: this button lives inside a
-                // `<summary>`, and without it a click would toggle the
-                // disclosure on its way to copying.
                 e.preventDefault();
                 if (parsed.args) {
-                  navigator.clipboard.writeText(parsed.args);
+                  navigator.clipboard.writeText(formattedArgs || parsed.args);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }
               }}
               title="Copy parameters"
             >
-              {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+              {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
             </EventLineAction>
           ) : undefined
         }
       >
-        {hasDetail && parsed.args ? <EventLinePre>{parsed.args}</EventLinePre> : undefined}
+        {hasDetail && parsed.args ? <EventLinePre>{formattedArgs || parsed.args}</EventLinePre> : undefined}
       </EventLine>
     );
   }
@@ -650,7 +660,7 @@ const ParallelTools = memo(function ParallelTools({ messages }: { messages: Work
   return (
     <EventLine
       icon={<Icon />}
-      label={`${messages.length} tools`}
+      label={`${messages.length} parallel tools`}
       detail={names.join(', ')}
       meta={`×${messages.length}`}
     >

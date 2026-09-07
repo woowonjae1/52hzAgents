@@ -271,6 +271,13 @@ func SendEvent(c *gin.Context) {
 		CheckAndTriggerNextPipelineStep(workspace.ID, req.Target, req.Source)
 	}
 
+	// Intercept explicit /rfc command from human to initiate a council blackboard session
+	if isHumanSource(req.Source) && messageType(req.Payload) == "chat" {
+		if content, ok := req.Payload["content"].(string); ok {
+			InterceptRFCCommand(workspace.ID, req.Target, req.Source, content)
+		}
+	}
+
 	// 返回成功响应，包含已生成的 event_id。
 	c.JSON(http.StatusOK, fullEvent)
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
   CheckCircle2,
   Loader2,
@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
+import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 
 export interface PipelineDeliverable {
   summary: string;
@@ -53,7 +54,7 @@ export function PipelineStepper({
   const [pipeline, setPipeline] = useState<PipelineData | null>(null);
   const [halting, setHalting] = useState(false);
 
-  const fetchPipeline = async () => {
+  const fetchPipeline = useCallback(async () => {
     if (!channelId) return;
     try {
       const data = (await workspaceApi.getChannelPipeline(channelId)) as unknown as PipelineData;
@@ -65,14 +66,9 @@ export function PipelineStepper({
     } catch {
       setPipeline(null);
     }
-  };
-
-  useEffect(() => {
-    if (!channelId) return;
-    fetchPipeline();
-    const interval = setInterval(fetchPipeline, 3000);
-    return () => clearInterval(interval);
   }, [channelId]);
+
+  useVisibilityPolling(fetchPipeline, 3000, { enabled: !!channelId });
 
   const handleHalt = async () => {
     if (!channelId || halting) return;

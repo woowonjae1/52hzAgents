@@ -235,6 +235,36 @@ function buildToolDefs(disabledModules) {
     );
   }
 
+  // -- Council Deliberation (Blackboard & Speech Acts) --
+  tools.push(
+    {
+      name: 'workspace_council_post',
+      description: 'Submit a structured speech act to the active council blackboard session. Supported act_types: PROPOSAL, CHALLENGE, DEFENSE, SUPPORT, RESOLUTION.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          session_id: { type: 'string', description: 'Active council session ID' },
+          act_type: { type: 'string', enum: ['PROPOSAL', 'CHALLENGE', 'DEFENSE', 'SUPPORT', 'RESOLUTION'], description: 'Speech act type' },
+          summary: { type: 'string', description: 'High-density summary of the proposal, challenge, defense, support, or resolution' },
+          target_act_id: { type: 'string', description: 'UUID of the target speech act being challenged or defended' },
+          payload: { type: 'object', description: 'Structured JSON payload (spec, architecture, analysis, diffs)' },
+        },
+        required: ['session_id', 'act_type', 'summary'],
+      },
+    },
+    {
+      name: 'workspace_council_get',
+      description: 'Get details, status, and all speech acts of an active council blackboard session.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          session_id: { type: 'string', description: 'Council session ID' },
+        },
+        required: ['session_id'],
+      },
+    },
+  );
+
   // -- Todos --
   if (!disabledModules.has('todos')) {
     tools.push(
@@ -496,12 +526,16 @@ function isTextMime(mime) {
 // ── MCP Server ──────────────────────────────────────────────────────────────
 
 class McpServer {
-  constructor({ wsClient, workspaceId, channelName, agentName, token, disabledModules }) {
+  constructor({ wsClient, workspaceId, channelName, agentName, token, sessionId, disabledModules }) {
     this.ws = wsClient;
     this.workspaceId = workspaceId;
     this.channelName = channelName;
     this.agentName = agentName;
     this.token = token;
+    // Passed down from the adapter's /v1/join result. Council speech acts read it
+    // to prove liveness; null here means the backend cannot tell this process
+    // apart from a revoked session and will fall back to accepting it.
+    this.sessionId = sessionId || null;
     this.disabledModules = disabledModules || new Set();
     this.tools = buildToolDefs(this.disabledModules);
   }
@@ -846,6 +880,37 @@ class McpServer {
         return text(lines.join('\n'));
       }
 
+      // ── Council Deliberation ──
+
+      case 'workspace_council_post': {
+        const { session_id, act_type, summary, target_act_id, payload } = args;
+        const res = await this.ws.postSpeechAct(this.workspaceId, session_id, {
+          act_type,
+          summary,
+          target_act_id: target_act_id || null,
+          payload: payload || {},
+          metadata: { session_id: this.sessionId || null },
+        }, this.token, { actor: this.agentName });
+        const currentRound = (res && res.session && res.session.current_round) ? res.session.current_round : 1;
+        const status = (res && res.session && res.session.status) ? res.session.status : 'debating';
+        return {
+          content: [{
+            type: 'text',
+            text: '[Council] Successfully submitted ' + act_type + ' for session ' + session_id + '. Round: ' + currentRound + ', Status: ' + status + '.',
+          }],
+        };
+      }
+
+      case 'workspace_council_get': {
+        const res = await this.ws.getCouncilSession(this.workspaceId, args.session_id, this.token);
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify(res, null, 2),
+          }],
+        };
+      }
+
       // ── Todos & Timers ──
 
       case 'workspace_put_todos': {
@@ -1099,6 +1164,7 @@ function runMcpServer(opts) {
     channelName: opts.channelName,
     agentName: opts.agentName,
     token: opts.token,
+    sessionId: opts.sessionId,
     disabledModules: opts.disabledModules,
   });
   server.start();

@@ -104,13 +104,41 @@ export function BrowserView() {
       }
     };
 
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const stopPolling = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const startPolling = () => {
+      if (timer !== null || cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      timer = setInterval(fetchScreenshot, 2000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        stopPolling();
+      } else {
+        fetchScreenshot();
+        startPolling();
+      }
+    };
+
     setLoading(true);
     fetchScreenshot();
-    const interval = setInterval(fetchScreenshot, 2000);
+    startPolling();
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (prevBlobRef.current) {
         URL.revokeObjectURL(prevBlobRef.current);
         prevBlobRef.current = null;

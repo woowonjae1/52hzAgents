@@ -106,7 +106,18 @@
   --muted-foreground: #64748b;
   --input: #f4f4f6;
   --ring: #09090b;
-  --radius: 0.75rem;
+  /*
+    P4 scale recalibration. 12px was a card radius on a surface that is not made
+    of cards — at `rounded-lg`'s 202 call sites it read soft rather than dense,
+    which is most of the gap against a desktop-native tool.
+
+    The root font-size half of P4 is deliberately NOT taken. Tailwind's
+    `text-xs`/`text-sm` are rem, so a 15px root drags `text-xs` to 11.25px and
+    lands it on top of the px-pinned `--text-2xs` (11px) below, collapsing the
+    12/11/10 ladder that 32 components use to separate a badge from a label.
+    Radius buys the density without spending the type scale.
+  */
+  --radius: 0.5rem;
 
   --chat-column: min(1380px, 100%);
 }
@@ -386,10 +397,15 @@
    */
   --radius-sm: 2px;
   --radius-base: 4px;
-  --radius-md: calc(var(--radius) - 2px);
+  /*
+    md/lg/xl/2xl are ratios off `--radius` rather than +/- fixed px, so the
+    scale stays proportional if that value moves again. sm and base stay
+    absolute: they are Paseo's own steps, not derived ones.
+  */
+  --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: 16px;
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 2);
 
   /** Animations **/
   --animate-marquee: marquee var(--duration) infinite linear;
@@ -587,6 +603,129 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* ==========================================================================
+   Desktop shell geometry
+   ==========================================================================
+
+   Mirrors lib/desktop.ts, which mirrors TITLEBAR_HEIGHT in desktop/main.js.
+   `data-desktop` / `data-platform` are stamped on <html> pre-paint by
+   DESKTOP_PREPAINT_SCRIPT, so these apply on the first frame — the shell does
+   not start web-shaped and then reflow.
+
+   In the browser every inset is 0 and the whole block collapses to nothing,
+   which is why the values are variables rather than conditional classes: the
+   same markup serves both without a single `isDesktop &&` in a className.
+*/
+:root {
+  --titlebar-height: 0px;
+  --window-controls-inset: 0px;
+  --traffic-lights-inset: 0px;
+  /* One height for every top-level view header. See HEADER_HEIGHT. */
+  --header-height: 48px;
+  /* Desktop-native motion. 300ms reads as sluggish next to a real window;
+     the shell settles in ~150ms and individual controls faster still. */
+  --shell-duration: 150ms;
+  --shell-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:root[data-desktop] {
+  --titlebar-height: 36px;
+  --window-controls-inset: 138px;
+}
+
+/* macOS puts the traffic lights at the inline-start instead, on top of where
+   the brand sits. Reserve there and give the caption side back. */
+:root[data-desktop][data-platform='darwin'] {
+  --window-controls-inset: 0px;
+  --traffic-lights-inset: 78px;
+}
+
+/**
+ * The titlebar band: full window width, above everything, and draggable along
+ * its whole length. It is the main window's only drag region now (the QuickBar
+ * is a separate frameless window and keeps its own) — previously three
+ * components declared their own `[app-region:drag]` and the five views that did
+ * not could only be dragged from a 28px sliver at the top of the window.
+ */
+@layer components {
+.app-titlebar {
+  height: var(--titlebar-height);
+  padding-inline-start: max(0.75rem, var(--traffic-lights-inset));
+  padding-inline-end: var(--window-controls-inset);
+  app-region: drag;
+  -webkit-app-region: drag;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Anything interactive inside the titlebar has to opt out, or the drag region
+   swallows its clicks. */
+.app-titlebar :where(button, a, input, [role='button'], [data-no-drag]) {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+}
+
+/**
+ * One header contract for every top-level view (chat, tasks, mission, skills,
+ * knowledge, settings, files, browser). Fixed height so the sidebar divider and
+ * the main-pane divider are one continuous line, and one border/background so
+ * they do not each pick their own opacity — the previous five headers used
+ * `border-border/40`, `/70` and the solid token across four different fills,
+ * which is what made the shell look assembled rather than designed.
+ */
+@layer components {
+.app-header {
+  display: flex;
+  align-items: center;
+  height: var(--header-height);
+  flex-shrink: 0;
+  gap: 0.5rem;
+  padding-inline: 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface0);
+  user-select: none;
+  -webkit-user-select: none;
+}
+}
+
+/**
+ * Chrome — anything that is shell rather than content — is not selectable.
+ * Drag-selecting a sidebar row's label is a web behaviour; in a desktop app
+ * that gesture is a drag or a rubber-band, never a text selection. Content
+ * (message bodies, code, file contents) opts back in with `.selectable`.
+ */
+:root[data-desktop] :where(aside, nav, .app-header, .app-titlebar) {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.selectable,
+.selectable * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/**
+ * Native cursor semantics. A desktop control shows the default arrow — the
+ * pointing hand means "hyperlink" and is the loudest single web tell in the
+ * app, which had `cursor-pointer` at several hundred call sites. Rather than
+ * remove them one by one (and have the next component add one back), the shell
+ * overrides them and real links keep the hand.
+ */
+:root[data-desktop] :where(button, [role='button'], [role='tab'], [role='option'], summary, label) {
+  cursor: default;
+}
+
+:root[data-desktop] :where(a[href], .cursor-text, input, textarea, [contenteditable]) {
+  cursor: revert;
+}
+
+/* Window-level rubber-banding is a browser behaviour; a window does not bounce. */
+:root[data-desktop] body {
+  overscroll-behavior: none;
+}
+
 /** Safe area for iOS notch/home indicator **/
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
@@ -620,48 +759,99 @@ html {
 /* ── Syntax Highlighting (highlight.js) ── */
 @import 'highlight.js/styles/github-dark.css';
 
+/* Light Theme Code Syntax (High Contrast GitHub Light) */
 .markdown-content pre code,
 .markdown-content .hljs {
   background: transparent !important;
-  color: #e6edf3 !important;
+  color: #1f2328 !important;
   padding: 0 !important;
 }
 
 .markdown-content .hljs-keyword,
 .markdown-content .hljs-selector-tag,
 .markdown-content .hljs-subst {
-  color: #ff7b72 !important;
+  color: #cf222e !important;
 }
 
 .markdown-content .hljs-string,
-.markdown-content .hljs-title,
-.markdown-content .hljs-section,
-.markdown-content .hljs-attribute,
 .markdown-content .hljs-literal,
 .markdown-content .hljs-template-tag,
 .markdown-content .hljs-template-variable,
-.markdown-content .hljs-type,
 .markdown-content .hljs-addition {
-  color: #a5d6ff !important;
+  color: #0a3069 !important;
+}
+
+.markdown-content .hljs-title,
+.markdown-content .hljs-type,
+.markdown-content .hljs-section {
+  color: #8250df !important;
 }
 
 .markdown-content .hljs-comment,
 .markdown-content .hljs-quote,
 .markdown-content .hljs-deletion,
 .markdown-content .hljs-meta {
-  color: #8b949e !important;
+  color: #57606a !important;
 }
 
 .markdown-content .hljs-number,
 .markdown-content .hljs-regexp,
 .markdown-content .hljs-link {
-  color: #79c0ff !important;
+  color: #0550ae !important;
 }
 
 .markdown-content .hljs-variable,
 .markdown-content .hljs-template-variable,
 .markdown-content .hljs-tag,
 .markdown-content .hljs-name {
+  color: #116329 !important;
+}
+
+/* Dark Theme Code Syntax (Vibrant GitHub Dark) */
+.dark .markdown-content pre code,
+.dark .markdown-content .hljs {
+  background: transparent !important;
+  color: #e6edf3 !important;
+  padding: 0 !important;
+}
+
+.dark .markdown-content .hljs-keyword,
+.dark .markdown-content .hljs-selector-tag,
+.dark .markdown-content .hljs-subst {
+  color: #ff7b72 !important;
+}
+
+.dark .markdown-content .hljs-string,
+.dark .markdown-content .hljs-literal,
+.dark .markdown-content .hljs-template-tag,
+.dark .markdown-content .hljs-template-variable,
+.dark .markdown-content .hljs-addition {
+  color: #a5d6ff !important;
+}
+
+.dark .markdown-content .hljs-title,
+.dark .markdown-content .hljs-type,
+.dark .markdown-content .hljs-section {
+  color: #d2a8ff !important;
+}
+
+.dark .markdown-content .hljs-comment,
+.dark .markdown-content .hljs-quote,
+.dark .markdown-content .hljs-deletion,
+.dark .markdown-content .hljs-meta {
+  color: #8b949e !important;
+}
+
+.dark .markdown-content .hljs-number,
+.dark .markdown-content .hljs-regexp,
+.dark .markdown-content .hljs-link {
+  color: #79c0ff !important;
+}
+
+.dark .markdown-content .hljs-variable,
+.dark .markdown-content .hljs-template-variable,
+.dark .markdown-content .hljs-tag,
+.dark .markdown-content .hljs-name {
   color: #7ee787 !important;
 }
 

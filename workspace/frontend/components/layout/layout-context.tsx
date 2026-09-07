@@ -96,16 +96,16 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setSidebarWidthState(readStoredSidebarWidth());
   }, []);
-  const setSidebarWidth = (width: number) => {
+  const setSidebarWidth = useCallback((width: number) => {
     const clamped = clampSidebarWidth(width);
     setSidebarWidthState(clamped);
     storeSidebarWidth(clamped);
-  };
+  }, []);
   const [isSidebarResizing, setSidebarResizing] = useState(false);
   const [viewMode, setViewModeState] = useState<ViewMode>('threads');
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
 
-  const setViewMode = (mode: ViewMode) => {
+  const setViewMode = useCallback((mode: ViewMode) => {
     if (mode === 'skills') {
       setSettingsTab('skills');
       setViewModeState('settings');
@@ -122,12 +122,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       return;
     }
     setViewModeState(mode);
-  };
+  }, []);
 
-  const openSettings = (tab: SettingsTab = 'general') => {
+  const openSettings = useCallback((tab: SettingsTab = 'general') => {
     setSettingsTab(tab);
     setViewModeState('settings');
-  };
+  }, []);
 
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
@@ -137,10 +137,10 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     return localStorage.getItem('x-split-browser') === '1';
   });
 
-  const handleSetSplitBrowser = (v: boolean) => {
+  const handleSetSplitBrowser = useCallback((v: boolean) => {
     setSplitBrowser(v);
     localStorage.setItem('x-split-browser', v ? '1' : '0');
-  };
+  }, []);
 
   const [activeRightTab, setActiveRightTab] = useState<RightPanelTab>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -169,17 +169,17 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   
   // Compatibility computed helper
   const showBrowserPreview = activeRightTab === 'browser';
-  const setShowBrowserPreview = (v: boolean) => {
+  const setShowBrowserPreview = useCallback((v: boolean) => {
     setActiveRightTab(v ? 'browser' : null);
-  };
+  }, []);
 
   const [newThreadOpen, setNewThreadOpen] = useState(false);
-  const openNewThread = () => setNewThreadOpen(true);
+  const openNewThread = useCallback(() => setNewThreadOpen(true), []);
 
   const isAgentPanelOpen = selectedAgentName !== null;
-  const openMobileDetail = () => setMobilePane('detail');
-  const openMobileList = () => setMobilePane('list');
-  const toggleDetailExpanded = () => setIsDetailExpanded((v) => !v);
+  const openMobileDetail = useCallback(() => setMobilePane('detail'), []);
+  const openMobileList = useCallback(() => setMobilePane('list'), []);
+  const toggleDetailExpanded = useCallback(() => setIsDetailExpanded((v) => !v), []);
 
   const cssVariables = useMemo(() => ({
     // Tracks the real, resizable width instead of a hardcoded 240px that never
@@ -189,7 +189,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     '--header-height-mobile': '60px',
   } as React.CSSProperties), [sidebarWidth]);
 
-  const sidebarToggle = () => setIsSidebarOpen((open) => !open);
+  const sidebarToggle = useCallback(() => setIsSidebarOpen((open) => !open), []);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -209,8 +209,14 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     };
   }, [cssVariables, isSidebarOpen]);
 
-  return (
-    <LayoutContext.Provider value={{
+  /*
+    Memoised deliberately. This was an inline object literal, so every provider
+    render handed every `useLayout()` consumer a brand-new value and re-rendered
+    the entire app shell — including on each pointer event of a sidebar drag.
+    The handlers above are all useCallback-stable so this only changes when real
+    state does.
+  */
+  const value = useMemo<LayoutState>(() => ({
       isMobile,
       isSidebarOpen,
       sidebarToggle,
@@ -242,7 +248,17 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       newThreadOpen,
       setNewThreadOpen,
       openNewThread,
-    }}>
+  }), [
+    isMobile, isSidebarOpen, sidebarToggle, sidebarWidth, setSidebarWidth,
+    isSidebarResizing, viewMode, setViewMode, settingsTab, openSettings,
+    selectedAgentName, isAgentPanelOpen, mobilePane, openMobileDetail,
+    openMobileList, isDetailExpanded, toggleDetailExpanded, splitBrowser,
+    handleSetSplitBrowser, showBrowserPreview, setShowBrowserPreview,
+    activeRightTab, previewUrl, openPreview, newThreadOpen, openNewThread,
+  ]);
+
+  return (
+    <LayoutContext.Provider value={value}>
       <div data-slot="layout-wrapper" className="flex grow">
         <TooltipProvider delayDuration={0}>
           {children}

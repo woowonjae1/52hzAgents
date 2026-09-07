@@ -505,10 +505,37 @@ export function WorkspaceProvider({
     void sendPresence('workspace.user.joined');
     void applyPresenceEvents();
 
-    const heartbeat = window.setInterval(() => {
-      void sendPresence('workspace.user.heartbeat');
-      void applyPresenceEvents();
-    }, 15_000);
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+    const stopHeartbeat = () => {
+      if (heartbeat !== null) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+      }
+    };
+
+    const startHeartbeat = () => {
+      if (heartbeat !== null || cancelled) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      heartbeat = setInterval(() => {
+        void sendPresence('workspace.user.heartbeat');
+        void applyPresenceEvents();
+      }, 15_000);
+    };
+
+    const handleVisibility = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        stopHeartbeat();
+      } else {
+        void sendPresence('workspace.user.heartbeat');
+        void applyPresenceEvents();
+        startHeartbeat();
+      }
+    };
+
+    startHeartbeat();
+    document.addEventListener('visibilitychange', handleVisibility);
 
     const handlePageHide = () => void sendPresence('workspace.user.left');
     window.addEventListener('pagehide', handlePageHide);
@@ -516,7 +543,8 @@ export function WorkspaceProvider({
 
     return () => {
       cancelled = true;
-      clearInterval(heartbeat);
+      stopHeartbeat();
+      document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handlePageHide);
       window.removeEventListener('beforeunload', handlePageHide);
       void sendPresence('workspace.user.left');
@@ -1048,6 +1076,7 @@ export function WorkspaceProvider({
   // the first 15s tick costs nothing on first paint.
   useEffect(() => {
     const refreshAuxiliaryState = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       workspaceApi.listFiles().then((r) => setFiles(r.files)).catch(() => {});
       workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
       workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
@@ -1061,8 +1090,39 @@ export function WorkspaceProvider({
         setUnreadNotificationCount(r.unreadCount);
       }).catch(() => {});
     };
-    const interval = window.setInterval(refreshAuxiliaryState, 15_000);
-    return () => window.clearInterval(interval);
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const stopTimer = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    const startTimer = () => {
+      if (timer !== null) return;
+      if (typeof document !== 'undefined' && document.hidden) return;
+      timer = setInterval(refreshAuxiliaryState, 15_000);
+    };
+
+    const handleVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        stopTimer();
+      } else {
+        refreshAuxiliaryState();
+        startTimer();
+      }
+    };
+
+    startTimer();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      stopTimer();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const refreshKnowledge = useCallback(async () => {

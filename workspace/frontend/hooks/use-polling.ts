@@ -127,7 +127,8 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   // Keep agentWorkingRef in sync with the newest message.
   useEffect(() => {
     const last = messages[messages.length - 1];
-    agentWorkingRef.current = !!last && last.senderType !== 'human' &&
+    const isRecent = last?.createdAt ? Date.now() - new Date(last.createdAt).getTime() < 60_000 : false;
+    agentWorkingRef.current = !!last && isRecent && last.senderType !== 'human' &&
       (last.messageType === 'status' || last.messageType === 'thinking');
   }, [messages]);
 

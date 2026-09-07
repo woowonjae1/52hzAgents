@@ -10,6 +10,7 @@ import { MonitorOverlay } from './monitor-overlay';
 import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/helpers';
+import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 
 const POLL_INTERVAL = 5_000;
 
@@ -115,13 +116,7 @@ export function MonitorGrid() {
     setTileData((prev) => ({ ...prev, ...results }));
   }, [topSessions]);
 
-  // Initial fetch + polling
-  useEffect(() => {
-    if (topSessions.length === 0) return;
-    fetchTileData();
-    const interval = setInterval(fetchTileData, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [fetchTileData, topSessions.length]);
+  useVisibilityPolling(fetchTileData, POLL_INTERVAL, { enabled: topSessions.length > 0 });
 
   const overlaySession = sessions.find((s) => s.sessionId === overlaySessionId);
 

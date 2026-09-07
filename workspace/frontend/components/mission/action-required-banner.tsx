@@ -143,7 +143,7 @@ export function ActionRequiredBanner({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="flex size-6 items-center justify-center rounded-lg bg-status-warning/15 text-status-warning">
-            <ShieldAlert className="size-3.5 animate-pulse" />
+            <ShieldAlert className="size-3.5" />
           </span>
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-semibold text-status-warning">
@@ -175,7 +175,7 @@ export function ActionRequiredBanner({
               {/* Top info */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="size-1.5 rounded-full bg-status-warning animate-pulse shrink-0" />
+                  <span className="size-1.5 rounded-full bg-status-warning shrink-0" />
                   <span className="font-semibold text-xs text-foreground truncate">
                     @{item.agentName}
                   </span>

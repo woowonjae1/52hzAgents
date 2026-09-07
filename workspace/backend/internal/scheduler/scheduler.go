@@ -39,6 +39,7 @@ func StartScheduler() {
 				expireStaleAgents()
 				expirePendingApprovals()
 				expireStalePipelineSteps()
+				expireStaleCouncilSessions()
 				fireDueTimers()   // 执行到期 Timers 触发扫描。
 				fireDueRoutines() // 执行到期 Routines 触发扫描。
 
@@ -399,4 +400,100 @@ func expirePendingApprovals() {
 	db.DB.Model(&models.AgentApprovalRecord{}).
 		Where("status = ? AND expires_at IS NULL AND created_at < ?", "pending", cutoff24h).
 		Updates(map[string]interface{}{"status": "expired"})
+}
+
+// expireStaleCouncilSessions monitors active council sessions and transitions to budget_exhausted if challenger times out.
+func expireStaleCouncilSessions() {
+	if db.DB == nil {
+		return
+	}
+	timeoutSec := 1800
+	if config.GlobalConfig != nil && config.GlobalConfig.PipelineStepTimeoutSeconds > 0 {
+		timeoutSec = config.GlobalConfig.PipelineStepTimeoutSeconds
+	}
+	nowMs := time.Now().UnixMilli()
+
+	var sessions []models.CouncilSession
+	if err := db.DB.Where("status = ? AND challenge_deadline_at IS NOT NULL", models.CouncilStatusDebating).Find(&sessions).Error; err != nil || len(sessions) == 0 {
+		return
+	}
+
+	for _, sess := range sessions {
+		if sess.ChallengeDeadlineAt == nil || nowMs < *sess.ChallengeDeadlineAt {
+			continue
+		}
+
+		var lastAct models.SpeechActRecord
+		var lastActivityMs int64 = sess.CreatedAt.UnixMilli()
+		if err := db.DB.Where("session_id = ?", sess.ID).Order("created_at desc").First(&lastAct).Error; err == nil {
+			lastActivityMs = lastAct.CreatedAt.UnixMilli()
+		}
+
+		elapsedSec := (nowMs - lastActivityMs) / 1000
+		if elapsedSec >= int64(timeoutSec) {
+			res := db.DB.Model(&models.CouncilSession{}).
+				Where("id = ? AND status = ?", sess.ID, models.CouncilStatusDebating).
+				Update("status", models.CouncilStatusBudgetExhausted)
+
+			if res.RowsAffected > 0 {
+				log.Printf("scheduler: council session %s timed out waiting for challenger @%s (%ds silent)", sess.ID, sess.MandatoryChallenger, elapsedSec)
+
+				var ch models.Channel
+				if err := db.DB.Where("id = ?", sess.ChannelID).First(&ch).Error; err == nil {
+					targetChan := "channel/" + ch.Name
+					eventID := uuid.New().String()
+					alertPayload := map[string]interface{}{
+						"content": fmt.Sprintf("⚠️ **[Council Alert] Challenger Timeout**\n\n"+
+							"Mandatory Challenger @%s was silent for %d seconds without adversarial review.\n"+
+							"Council session `%s` (%s) has halted and escalated to Human Chairman for arbitration.",
+							sess.MandatoryChallenger, elapsedSec, sess.ID, sess.Topic),
+						"sender_name":  "Council Supervisor",
+						"sender_type":  "system",
+						"message_type": "chat",
+					}
+					alertMetadata := map[string]interface{}{
+						"speech_act":    true,
+						"act_type":      "CHALLENGE_TIMEOUT",
+						"session_id":    sess.ID,
+						"target_agents": []string{sess.ProposerAgent},
+					}
+
+					payloadBytes, _ := json.Marshal(alertPayload)
+					metaBytes, _ := json.Marshal(alertMetadata)
+					eventRec := models.EventRecord{
+						ID:         eventID,
+						NetworkID:  sess.WorkspaceID,
+						Type:       "workspace.message.posted",
+						Source:     "system:council",
+						Target:     targetChan,
+						Payload:    payloadBytes,
+						Metadata:   metaBytes,
+						Timestamp:  nowMs,
+						Visibility: "channel",
+					}
+					_ = db.DB.Create(&eventRec)
+
+					if hub.GlobalHub != nil {
+						fullEvent, _ := json.Marshal(map[string]interface{}{
+							"id":        eventID,
+							"event_id":  eventID,
+							"network":   sess.WorkspaceID,
+							"type":      "workspace.message.posted",
+							"source":    "system:council",
+							"target":    targetChan,
+							"payload":   alertPayload,
+							"metadata":  alertMetadata,
+							"timestamp": nowMs,
+							"status":    "confirmed",
+						})
+						hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+							WorkspaceID: sess.WorkspaceID,
+							ChannelName: targetChan,
+							Payload:     string(fullEvent),
+						})
+					}
+				}
+			}
+		}
+	}
 }

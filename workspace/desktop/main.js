@@ -5,13 +5,39 @@ const net = require('net');
 const fs = require('fs');
 const { spawn, execSync, fork } = require('child_process');
 
-// 1. Isolate userData folder & disable GPU shader cache lock (0x5)
+// 1. Isolate userData folder & disable GPU crashes
 try {
+  app.disableHardwareAcceleration();
   app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
   app.commandLine.appendSwitch('disable-gpu-program-cache');
   const customUserData = path.join(app.getPath('appData'), '52hzAgents-Desktop');
   app.setPath('userData', customUserData);
 } catch (e) {}
+
+function getAssetPath(filename) {
+  const unpackedPath = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), filename);
+  if (fs.existsSync(unpackedPath)) return unpackedPath;
+  return path.join(__dirname, filename);
+}
+
+
+/**
+ * Height of the app's own titlebar band, and the value handed to
+ * `titleBarOverlay.height` so the native caption buttons are drawn exactly
+ * inside it. MUST equal TITLEBAR_HEIGHT in frontend/lib/desktop.ts and
+ * `--titlebar-height` in frontend/styles/globals.css: the overlay used to be
+ * 38px against a 28px reservation in the renderer, which left the bottom of
+ * the minimise/close buttons sitting on top of the app's content.
+ */
+const TITLEBAR_HEIGHT = 36;
+
+/**
+ * The window's ground colour, painted before the renderer's first frame.
+ * Matches `--surface0` of the dark theme (globals.css). It was #0e0e10, which
+ * is not any colour in the palette, so every launch flashed a slightly wrong
+ * grey before the app painted over it.
+ */
+const WINDOW_BACKGROUND = '#09090b';
 
 let mainWindow = null;
 let quickBarWindow = null;
@@ -28,6 +54,64 @@ let backendProcess = null;
 let connectorProcess = null;
 let sseReq = null;
 let devStackSpawned = false;
+
+/**
+ * Window geometry, remembered across launches.
+ *
+ * A desktop window that reopens at 1360x860 in the middle of the screen every
+ * time — forgetting that it was maximised, or parked on a second monitor — is
+ * one of the clearest tells that a window is really a web page. Stored as JSON
+ * in userData rather than pulling in electron-store, which would be the app's
+ * only runtime dependency.
+ */
+const WINDOW_STATE_FILE = path.join(app.getPath('userData'), 'window-state.json');
+const DEFAULT_WINDOW_STATE = { width: 1360, height: 860, maximized: false };
+
+function readWindowState() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(WINDOW_STATE_FILE, 'utf8'));
+    const state = {
+      width: Number.isFinite(raw.width) ? Math.max(960, raw.width) : DEFAULT_WINDOW_STATE.width,
+      height: Number.isFinite(raw.height) ? Math.max(640, raw.height) : DEFAULT_WINDOW_STATE.height,
+      maximized: !!raw.maximized,
+    };
+    // x/y are only honoured together, and only if they land on a display that
+    // still exists — otherwise an unplugged second monitor opens the window
+    // off-screen where it cannot be dragged back.
+    if (Number.isFinite(raw.x) && Number.isFinite(raw.y)) {
+      const { screen } = require('electron');
+      const visible = screen.getAllDisplays().some(({ workArea: a }) =>
+        raw.x >= a.x - 8 && raw.y >= a.y - 8 &&
+        raw.x < a.x + a.width - 48 && raw.y < a.y + a.height - 48);
+      if (visible) { state.x = raw.x; state.y = raw.y; }
+    }
+    return state;
+  } catch {
+    return { ...DEFAULT_WINDOW_STATE };
+  }
+}
+
+function persistWindowState(win) {
+  if (!win || win.isDestroyed() || win.isMinimized()) return;
+  try {
+    // getNormalBounds(), not getBounds(): while maximised the latter reports the
+    // screen, so saving it would make "restore" a no-op forever after.
+    const { x, y, width, height } = win.getNormalBounds();
+    fs.writeFileSync(
+      WINDOW_STATE_FILE,
+      JSON.stringify({ x, y, width, height, maximized: win.isMaximized() }),
+    );
+  } catch {}
+}
+
+/** Trailing-edge debounce: resize/move fire continuously while dragging. */
+function debounce(fn, ms) {
+  let t = null;
+  return (...args) => {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => { t = null; fn(...args); }, ms);
+  };
+}
 
 // Dynamic port discovery helper
 function findFreePort(startPort = 8000) {
@@ -272,8 +356,20 @@ function ensureDevStackRunning() {
 
 function createTray() {
   try {
-    const iconPath = path.join(__dirname, 'tray-icon.png');
-    tray = new Tray(iconPath);
+    const { nativeImage } = require('electron');
+    const icoPath = getAssetPath('icon.ico');
+    const pngPath = getAssetPath('tray-icon.png');
+    let trayIcon = null;
+    if (process.platform === 'win32' && fs.existsSync(icoPath)) {
+      trayIcon = nativeImage.createFromPath(icoPath);
+    } else if (fs.existsSync(pngPath)) {
+      trayIcon = nativeImage.createFromPath(pngPath);
+    }
+    if (!trayIcon || trayIcon.isEmpty()) {
+      console.log('[52hzAgents Desktop] Tray icon not found or empty, tray setup skipped');
+      return;
+    }
+    tray = new Tray(trayIcon);
     tray.setToolTip('52hzAgents Workspace');
 
     const contextMenu = Menu.buildFromTemplate([
@@ -340,22 +436,28 @@ function createTray() {
 }
 
 function createMainWindow() {
-  const appIconPath = path.join(__dirname, 'icon.png');
+  const appIconPath = getAssetPath(process.platform === 'win32' ? 'icon.ico' : 'icon.png');
+  const windowState = readWindowState();
   mainWindow = new BrowserWindow({
-    width: 1360,
-    height: 860,
+    width: windowState.width,
+    height: windowState.height,
+    x: windowState.x,
+    y: windowState.y,
     minWidth: 960,
     minHeight: 640,
     title: '52hzAgents Workspace',
     icon: appIconPath,
-    backgroundColor: '#0e0e10',
+    backgroundColor: WINDOW_BACKGROUND,
     darkTheme: true,
-    show: false,
+    show: true,
     titleBarStyle: 'hidden',
+    // On macOS the traffic lights are inset to line up with the 36px band;
+    // `titleBarOverlay` is a Windows/Linux-only option and is ignored there.
+    trafficLightPosition: { x: 12, y: (TITLEBAR_HEIGHT - 16) / 2 },
     titleBarOverlay: {
       color: 'rgba(0, 0, 0, 0)',
       symbolColor: '#8a8a8a',
-      height: 38,
+      height: TITLEBAR_HEIGHT,
     },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -374,6 +476,31 @@ function createMainWindow() {
       webviewTag: true,
     },
   });
+
+  if (windowState.maximized) mainWindow.maximize();
+
+  const saveState = debounce(() => persistWindowState(mainWindow), 400);
+  mainWindow.on('resize', saveState);
+  mainWindow.on('move', saveState);
+  mainWindow.on('maximize', saveState);
+  mainWindow.on('unmaximize', saveState);
+  // 'close' rather than 'closed': the window still has bounds to read here.
+  mainWindow.on('close', () => persistWindowState(mainWindow));
+
+  const splashHtml = `data:text/html;charset=utf-8,
+    <html>
+      <head><meta charset="utf-8"><title>52hzAgents Workspace</title></head>
+      <body style="background:#09090b;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;user-select:none;-webkit-user-select:none;overflow:hidden;">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+          <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.12);border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;"></div>
+          <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#f4f4f5;">52hzAgents Workspace</div>
+          <div style="font-size:12px;color:#71717a;">正在连接本地服务...</div>
+        </div>
+        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+      </body>
+    </html>
+  `;
+  mainWindow.loadURL(splashHtml);
 
   // Guard every <webview> attach. Two independent things are enforced here:
   //
@@ -399,7 +526,113 @@ function createMainWindow() {
     }
   });
 
-  Menu.setApplicationMenu(null);
+  /*
+    A real menu, not `Menu.setApplicationMenu(null)`.
+
+    Passing null removed the menu bar — which is what was wanted, the app has
+    its own titlebar — but it also took every standard accelerator with it.
+    Ctrl/Cmd +/-/0 did nothing, so the window had no zoom at all; Cmd+Q, Cmd+W
+    and the Edit roles were gone on macOS, where they are not optional. The
+    menu is built from roles and then hidden on Windows/Linux
+    (`autoHideMenuBar` + `setMenuBarVisibility(false)`), which keeps the
+    accelerators live without drawing a menu bar inside our titlebar.
+  */
+  const isMac = process.platform === 'darwin';
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'File',
+      // Deliberately no New Chat item. A CmdOrCtrl+N accelerator here would
+      // fire before the renderer's keydown handler and shadow the in-page
+      // Ctrl+N the sidebar advertises.
+      submenu: [isMac ? { role: 'close' } : { role: 'quit' }],
+    },
+    { role: 'editMenu' },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        // Ctrl+- only reaches the app as Ctrl+Shift+- on some layouts, so the
+        // usual second binding is registered explicitly.
+        { role: 'zoomOut' },
+        { role: 'zoomOut', accelerator: 'CmdOrCtrl+Shift+-', visible: false },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    { role: 'windowMenu' },
+  ]));
+  if (!isMac) {
+    mainWindow.setAutoHideMenuBar(true);
+    mainWindow.setMenuBarVisibility(false);
+  }
+
+  /*
+    Right-click. Without this there is no way to copy selected text with the
+    mouse, no paste into an input, and no spelling suggestions — all three are
+    things people reach for in a window without thinking, and their absence is
+    read as the app being broken rather than as a missing feature.
+  */
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const items = [];
+
+    // `dictionarySuggestions` is documented as an array but is only populated
+    // for a misspelled word in an editable field, and is absent otherwise —
+    // reading `.slice` off it unguarded threw inside the handler, which
+    // Electron swallows, so no menu appeared at all anywhere in the app.
+    const suggestions = Array.isArray(params.dictionarySuggestions)
+      ? params.dictionarySuggestions.slice(0, 5)
+      : [];
+    for (const suggestion of suggestions) {
+      items.push({
+        label: suggestion,
+        click: () => mainWindow?.webContents.replaceMisspelling(suggestion),
+      });
+    }
+    if (items.length) items.push({ type: 'separator' });
+
+    if (params.linkURL) {
+      items.push(
+        { label: 'Open Link in Browser', click: () => shell.openExternal(params.linkURL) },
+        { label: 'Copy Link Address', click: () => require('electron').clipboard.writeText(params.linkURL) },
+        { type: 'separator' },
+      );
+    }
+
+    if (params.isEditable) {
+      items.push(
+        { role: 'undo' }, { role: 'redo' }, { type: 'separator' },
+        { role: 'cut' }, { role: 'copy' }, { role: 'paste' },
+        { role: 'pasteAndMatchStyle' }, { role: 'selectAll' },
+      );
+    } else if (params.selectionText) {
+      items.push({ role: 'copy' }, { role: 'selectAll' });
+    } else {
+      items.push({ role: 'selectAll' });
+    }
+
+    if (!isPackaged) {
+      items.push(
+        { type: 'separator' },
+        { label: 'Inspect Element', click: () => mainWindow?.webContents.inspectElement(params.x, params.y) },
+      );
+    }
+
+    try {
+      Menu.buildFromTemplate(items).popup({ window: mainWindow });
+    } catch (e) {
+      // An exception thrown in this handler is swallowed by Electron, which is
+      // how a bad `dictionarySuggestions` read silently disabled right-click
+      // everywhere. Log rather than disappear.
+      console.error('[52hzAgents] context menu failed:', e);
+    }
+  });
+
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
@@ -422,22 +655,20 @@ function createMainWindow() {
       if (ready) {
         isAppLoaded = true;
         mainWindow.loadURL(TARGET_URL);
-        mainWindow.show();
       } else if (retryCount < maxRetries) {
         retryCount++;
-        setTimeout(loadAppUrl, 1000);
+        setTimeout(loadAppUrl, 600);
       } else {
         isAppLoaded = true;
         mainWindow.loadURL(`data:text/html;charset=utf-8,
           <html>
-            <body style="background:#0e0e10;color:#f4f4f5;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
-              <h2>Unable to connect to 52hzAgents Server</h2>
-              <p style="color:#a1a1aa">Target URL: ${TARGET_URL}</p>
-              <button onclick="location.reload()" style="background:#27272a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:16px;">Retry Connection</button>
+            <body style="background:#09090b;color:#f4f4f5;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;">
+              <h2>无法连接到 52hzAgents 本地服务</h2>
+              <p style="color:#a1a1aa">目标地址: ${TARGET_URL}</p>
+              <button onclick="location.reload()" style="background:#27272a;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;margin-top:16px;">重新尝试连接</button>
             </body>
           </html>
         `);
-        mainWindow.show();
       }
     });
   }
@@ -449,6 +680,7 @@ function createMainWindow() {
       try {
         if (url.startsWith('file:')) {
           let filePath = decodeURIComponent(url.replace(/^file:\/\/\/?/i, '')).split('#')[0];
+          filePath = filePath.replace(/:L\d+.*$/i, '').replace(/:\d+(?::\d+)?$/, '');
           if (process.platform === 'win32') {
             if (filePath.startsWith('/') && /^[a-zA-Z]:/i.test(filePath.slice(1))) {
               filePath = filePath.slice(1);
@@ -475,6 +707,14 @@ function createMainWindow() {
       return { action: 'deny' };
     }
     if (url.startsWith('http:') || url.startsWith('https:')) {
+      const isInternal =
+        (serverPort && (url.includes(`127.0.0.1:${serverPort}`) || url.includes(`localhost:${serverPort}`))) ||
+        url.includes('127.0.0.1:3005') ||
+        url.includes('localhost:3005') ||
+        url.includes('/api/files/');
+      if (isInternal) {
+        return { action: 'deny' };
+      }
       shell.openExternal(url);
       return { action: 'deny' };
     }
@@ -483,8 +723,13 @@ function createMainWindow() {
 
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
+      if (tray) {
+        event.preventDefault();
+        mainWindow.hide();
+      } else {
+        isQuitting = true;
+        app.quit();
+      }
     }
   });
 
@@ -576,8 +821,33 @@ ipcMain.on('get-api-url-sync', (event) => {
   event.returnValue = isPackaged ? `http://127.0.0.1:${serverPort}` : 'http://127.0.0.1:8000';
 });
 ipcMain.handle('get-api-url', () => (isPackaged ? `http://127.0.0.1:${serverPort}` : 'http://127.0.0.1:8000'));
-ipcMain.on('window-close', () => mainWindow?.hide());
+ipcMain.on('window-close', () => {
+  if (tray) {
+    mainWindow?.hide();
+  } else {
+    isQuitting = true;
+    app.quit();
+  }
+});
 ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false);
+
+ipcMain.on('window-titlebar-symbol-color', (_event, color) => {
+  // `setTitleBarOverlay` is Windows/Linux-only and throws on macOS, where the
+  // traffic lights follow the system appearance anyway.
+  if (process.platform === 'darwin' || !mainWindow || mainWindow.isDestroyed()) return;
+  // The value crosses the context bridge from the renderer, so it is validated
+  // rather than passed through to a native API.
+  if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) return;
+  try {
+    mainWindow.setTitleBarOverlay({
+      color: 'rgba(0, 0, 0, 0)',
+      symbolColor: color,
+      height: TITLEBAR_HEIGHT,
+    });
+  } catch (e) {
+    console.warn('[52hzAgents] setTitleBarOverlay failed:', e.message);
+  }
+});
 
 ipcMain.on('quickbar-hide', () => quickBarWindow?.hide());
 ipcMain.on('main-window-open', (event, route) => {
@@ -621,7 +891,14 @@ ipcMain.handle('shell-open-path', async (event, pathStr) => {
   if (!pathStr) return false;
   try {
     if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
-      shell.openExternal(pathStr);
+      const isInternal =
+        (serverPort && (pathStr.includes(`127.0.0.1:${serverPort}`) || pathStr.includes(`localhost:${serverPort}`))) ||
+        pathStr.includes('127.0.0.1:3005') ||
+        pathStr.includes('localhost:3005') ||
+        pathStr.includes('/api/files/');
+      if (!isInternal) {
+        shell.openExternal(pathStr);
+      }
       return true;
     }
     if (pathStr.startsWith('vscode:') || pathStr.startsWith('cursor:')) {
@@ -629,6 +906,7 @@ ipcMain.handle('shell-open-path', async (event, pathStr) => {
       return true;
     }
     let cleanPath = decodeURIComponent(pathStr.replace(/^file:\/\/\/?/i, '')).split('#')[0];
+    cleanPath = cleanPath.replace(/:L\d+.*$/i, '').replace(/:\d+(?::\d+)?$/, '');
     if (process.platform === 'win32') {
       if (cleanPath.startsWith('/') && /^[a-zA-Z]:/i.test(cleanPath.slice(1))) {
         cleanPath = cleanPath.slice(1);
@@ -701,10 +979,13 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.setAlwaysOnTop(true);
+      mainWindow.focus();
+      mainWindow.setAlwaysOnTop(false);
+    }
   });
 }
 

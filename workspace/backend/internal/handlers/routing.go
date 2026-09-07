@@ -30,9 +30,16 @@ func parseStructuredSegments(raw []interface{}, participants []string) []models.
 	if len(raw) < 2 {
 		return nil
 	}
-	allowed := make(map[string]string, len(participants))
+	allowed := make(map[string]string, len(participants)*2)
 	for _, p := range participants {
-		allowed[strings.ToLower(p)] = p
+		pLower := strings.ToLower(p)
+		allowed[pLower] = p
+		trimmed := strings.TrimSuffix(strings.TrimSuffix(pLower, "-agent"), "_agent")
+		if trimmed != "" && trimmed != pLower {
+			if _, exists := allowed[trimmed]; !exists {
+				allowed[trimmed] = p
+			}
+		}
 	}
 
 	var steps []models.PipelineStep
@@ -69,9 +76,16 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 	if len(participants) < 2 {
 		return nil
 	}
-	allowed := make(map[string]string, len(participants))
+	allowed := make(map[string]string, len(participants)*2)
 	for _, p := range participants {
-		allowed[strings.ToLower(p)] = p
+		pLower := strings.ToLower(p)
+		allowed[pLower] = p
+		trimmed := strings.TrimSuffix(strings.TrimSuffix(pLower, "-agent"), "_agent")
+		if trimmed != "" && trimmed != pLower {
+			if _, exists := allowed[trimmed]; !exists {
+				allowed[trimmed] = p
+			}
+		}
 	}
 
 	matches := pipelineRegex.FindAllStringSubmatchIndex(content, -1)
@@ -344,6 +358,9 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 
 	var turnMessages []string
 	for _, te := range turnEvents {
+		if !isAgentSource(te.Source) || !strings.EqualFold(agentNameFromSource(te.Source), actor) {
+			continue
+		}
 		var p map[string]interface{}
 		if json.Unmarshal(te.Payload, &p) == nil {
 			if c, ok := p["content"].(string); ok && strings.TrimSpace(c) != "" {
@@ -472,6 +489,9 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 	if result.RowsAffected == 0 || nextStatus == "completed" {
 		return
 	}
+
+	// Settle the finished agent's turn to release working directory and prevent contention for the next agent
+	closeAgentTurn(workspaceID, &channel, actor)
 
 	relayPipelineStep(workspaceID, target, steps[nextIdx], actor, deliverable, pipelineTaskID(record.ID, nextIdx))
 }

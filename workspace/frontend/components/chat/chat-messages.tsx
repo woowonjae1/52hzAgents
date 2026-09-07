@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { useLayout } from '@/components/layout/layout-context';
+import { useWorkspace } from '@/lib/workspace-context';
 
 // ── Message Grouping ──
 
@@ -20,12 +21,13 @@ type MessageGroup =
   // steps group. That group already printed the avatar and sender name, so this
   // one suppresses its header instead of printing a second identical one.
   | { type: 'chat'; message: WorkspaceMessage; steps?: WorkspaceMessage[]; continuesFrom?: boolean }
+  | { type: 'speech_act'; message: WorkspaceMessage; actType: string; summary?: string }
   // `settled` means the agent has since posted its reply, so the trace below is
   // history rather than live output.
   | { type: 'thinking'; sender: string; messages: WorkspaceMessage[]; settled?: boolean }
   | { type: 'steps'; messages: WorkspaceMessage[]; settled?: boolean };
 
-function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
+function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): MessageGroup[] {
   const groups: MessageGroup[] = [];
   // Steps and thinking are held PER SENDER: in a multi-agent channel several agents work at
   // once, and a reply from one of them must not absorb another's tool calls or reasoning.
@@ -47,14 +49,16 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
 
   // Steps / thinking from an agent that never followed up with a message yet (it is still
   // thinking/working) still have to be shown in real-time.
+  // When the channel is inactive, orphan steps are marked as settled so historical
+  // threads don't show spinning "thinking..." states.
   const flushOrphanSteps = () => {
     for (const [sender, own] of pendingSteps) {
       if (own.length === 0) continue;
       const thinkingOnly = own.every((m) => m.messageType === 'thinking');
       if (thinkingOnly) {
-        groups.push({ type: 'thinking', sender, messages: [...own] });
+        groups.push({ type: 'thinking', sender, messages: [...own], settled: !isChannelActive });
       } else {
-        groups.push({ type: 'steps', messages: [...own] });
+        groups.push({ type: 'steps', messages: [...own], settled: !isChannelActive });
       }
     }
     pendingSteps.clear();
@@ -69,7 +73,14 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
   );
 
   visibleMessages.forEach((msg) => {
-    if (msg.messageType === 'thinking' || msg.messageType === 'status' || msg.messageType === 'todos') {
+    if (msg.metadata?.speech_act && msg.metadata?.act_type) {
+      groups.push({
+        type: 'speech_act',
+        message: msg,
+        actType: String(msg.metadata.act_type),
+        summary: msg.metadata.summary ? String(msg.metadata.summary) : undefined,
+      });
+    } else if (msg.messageType === 'thinking' || msg.messageType === 'status' || msg.messageType === 'todos') {
       const own = pendingSteps.get(msg.senderName);
       if (own) own.push(msg);
       else pendingSteps.set(msg.senderName, [msg]);
@@ -95,6 +106,9 @@ function groupMessages(messages: WorkspaceMessage[]): MessageGroup[] {
 function groupKey(group: MessageGroup, index: number): string {
   if (group.type === 'chat') {
     return group.message.messageId ? `chat-${group.message.messageId}` : `chat-idx-${index}`;
+  }
+  if (group.type === 'speech_act') {
+    return group.message.messageId ? `speech-act-${group.message.messageId}` : `speech-act-idx-${index}`;
   }
   const firstId = group.messages[0]?.messageId;
   if (group.type === 'thinking') {
@@ -352,8 +366,15 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     });
   }, [realMessages, showAllSteps]);
 
+  const { activeSessionIds } = useWorkspace();
+  const currentSessionId = messages.length > 0 ? messages[0].sessionId : null;
+  const isChannelActive = currentSessionId ? activeSessionIds.has(currentSessionId) : false;
+
   // Group into chat messages and intermediate step clusters
-  const groups = useMemo(() => groupMessages(filteredMessages), [filteredMessages]);
+  const groups = useMemo(
+    () => groupMessages(filteredMessages, isChannelActive),
+    [filteredMessages, isChannelActive]
+  );
 
   // Only the NEWEST message can mean "this run is over". Scanning the whole
   // history meant one old "Execution stopped by user." (or any answer that
@@ -362,15 +383,38 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   const hasTerminalStatus = realMessages.length > 0
     && isTerminalStatus(realMessages[realMessages.length - 1]);
 
-  // Loading indicator counts as a virtual row when present
-  const hasLoading = loadingMessages.length > 0 && !hasTerminalStatus;
+  // Loading indicator counts as a virtual row when present (only if the channel is active)
+  const hasLoading = loadingMessages.length > 0 && !hasTerminalStatus && isChannelActive;
   const totalCount = groups.length + (hasLoading ? 1 : 0);
+
+  // Precompute approval responses and answered decision card IDs for fast O(1) row lookups
+  const approvalResponses = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const m of messages) {
+      const resp = m.metadata?.tool_approval_response;
+      if (resp?.approval_id) {
+        map.set(resp.approval_id, !!resp.granted);
+      }
+    }
+    return map;
+  }, [messages]);
+
+  const answeredDecisionIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of messages) {
+      const srcId = m.metadata?.decision_response?.source_message_id;
+      if (srcId) {
+        set.add(srcId);
+      }
+    }
+    return set;
+  }, [messages]);
 
   // ── Virtualizer ──
   const virtualizer = useVirtualizer({
     count: totalCount,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => 80, // rough estimate; dynamic measurement corrects it
+    estimateSize: () => 140, // 140px is a much closer match to typical message height, preventing scroll jumps
     overscan: 10,
     getItemKey: (index) => {
       if (index < groups.length) return groupKey(groups[index], index);
@@ -420,8 +464,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     requestAnimationFrame(step);
   }, [totalCount]);
 
-  // Derive the current session + first/last message identity from messages.
-  const currentSessionId = messages.length > 0 ? messages[0].sessionId : null;
+  // Derive first/last message identity from messages.
   const firstId = messages.length > 0 ? messages[0].messageId : null;
   const lastId = messages.length > 0 ? messages[messages.length - 1].messageId : null;
 
@@ -669,23 +712,10 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                 {group.type === 'chat' ? (
                   (() => {
                     const approvalRequest = group.message.metadata?.tool_approval_request;
-                    let isApproved = false;
-                    let isRejected = false;
-                    if (approvalRequest && approvalRequest.approval_id) {
-                      const response = messages.find(m =>
-                        m.metadata?.tool_approval_response?.approval_id === approvalRequest.approval_id
-                      );
-                      if (response) {
-                        isApproved = !!response.metadata?.tool_approval_response?.granted;
-                        isRejected = !isApproved;
-                      }
-                    }
+                    const approvalId = approvalRequest?.approval_id;
+                    const isApproved = approvalId ? approvalResponses.get(approvalId) === true : false;
+                    const isRejected = approvalId ? approvalResponses.get(approvalId) === false : false;
 
-                    // Same idea for a decision card: if its `[Decision]` reply
-                    // is already in the channel, the card must render answered
-                    // rather than offering the buttons again. Keyed on the
-                    // asking message's id, so two similar cards in one channel
-                    // cannot claim each other's answer.
                     const meta = group.message.metadata;
                     const hasCard =
                       (Array.isArray(meta?.questions) && meta.questions.length > 0) ||
@@ -693,11 +723,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     const isDecisionAnswered = Boolean(
                       hasCard &&
                       group.message.messageId &&
-                      messages.some(
-                        (m) =>
-                          m.metadata?.decision_response?.source_message_id ===
-                          group.message.messageId
-                      )
+                      answeredDecisionIds.has(group.message.messageId)
                     );
 
                     return (
@@ -713,6 +739,46 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                       />
                     );
                   })()
+                ) : group.type === 'speech_act' ? (
+                  <div className={`my-2 p-3.5 rounded-xl border shadow-sm transition-colors ${
+                    group.actType === 'RESOLUTION'
+                      ? 'border-teal-500/30 bg-teal-50/40 dark:bg-teal-950/20 dark:border-teal-500/30'
+                      : 'border-border/80 bg-card dark:bg-card/60 dark:border-border/60'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded tracking-wider uppercase border ${
+                        group.actType === 'PROPOSAL'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60'
+                          : group.actType === 'CHALLENGE'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
+                          : group.actType === 'DEFENSE'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800/60'
+                          : group.actType === 'SUPPORT'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
+                          : group.actType === 'RESOLUTION'
+                          ? 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/60 dark:text-teal-200 dark:border-teal-700 font-extrabold ring-1 ring-teal-500/20'
+                          : 'bg-muted text-muted-foreground border-border'
+                      }`}>
+                        {group.actType === 'RESOLUTION' ? '📜 ' : '🏛️ '}{group.actType}
+                      </span>
+                      <span className="text-xs font-semibold text-foreground">
+                        {group.message.senderName || 'Council Supervisor'}
+                      </span>
+                      {group.message.createdAt && (
+                        <span className="text-[10px] text-muted-foreground ml-auto">
+                          {new Date(group.message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    {group.summary && (
+                      <div className="text-xs font-semibold text-foreground mb-1.5 leading-snug">
+                        {group.summary}
+                      </div>
+                    )}
+                    <div className="text-xs text-foreground/85 dark:text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                      {group.message.content}
+                    </div>
+                  </div>
                 ) : group.type === 'thinking' ? (
                   <ThinkingMessage
                     sender={group.sender}

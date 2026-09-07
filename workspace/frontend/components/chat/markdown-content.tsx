@@ -278,17 +278,17 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         }
       }
 
-      // Modern IDE-grade Code Block
+      // Modern IDE-grade Code Block (Optimized for both Light & Dark themes)
       return (
-        <div className="my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-surface-diff-empty text-neutral-200 font-mono shadow-md dark:shadow-xl">
-          <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/60 dark:border-white/[0.06] bg-[#14141a] dark:bg-[#0e0e14] text-3xs font-medium text-neutral-400 select-none">
+        <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono shadow-xs dark:shadow-md">
+          <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/60 dark:border-white/[0.06] bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none">
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 mr-1">
-                <span className="size-2.5 rounded-full bg-[#ff5f56]/80 inline-block" />
-                <span className="size-2.5 rounded-full bg-[#ffbd2e]/80 inline-block" />
-                <span className="size-2.5 rounded-full bg-[#27c93f]/80 inline-block" />
+              <div className="flex items-center gap-1.5 mr-1 opacity-80">
+                <span className="size-2.5 rounded-full bg-[#ff5f56] inline-block" />
+                <span className="size-2.5 rounded-full bg-[#ffbd2e] inline-block" />
+                <span className="size-2.5 rounded-full bg-[#27c93f] inline-block" />
               </div>
-              <span className="font-mono uppercase tracking-wider text-neutral-400 font-semibold">{language}</span>
+              <span className="font-mono uppercase tracking-wider font-semibold">{language}</span>
             </div>
             <button
               onClick={() => {
@@ -298,12 +298,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 hover:text-white text-neutral-400 transition-colors cursor-pointer text-3xs font-sans font-medium"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors cursor-pointer text-3xs font-sans font-medium"
             >
               <span>Copy</span>
             </button>
           </div>
-          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] text-foreground font-mono bg-transparent selection:bg-surface4/70 selection:bg-surface2/30">
+          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] font-mono bg-transparent selection:bg-primary/20">
             {children}
           </pre>
         </div>
@@ -312,9 +312,10 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
     // Links
     a: ({ href, children }) => {
-      const isHttp = href && (href.startsWith('http://') || href.startsWith('https://'));
+      const isInternalFile = href && (href.includes('/api/files/') || href.startsWith('/api/files/'));
+      const isHttp = href && !isInternalFile && (href.startsWith('http://') || href.startsWith('https://'));
       const isEditorScheme = href && (href.startsWith('vscode:') || href.startsWith('cursor:'));
-      const isLocalPath = href && !isHttp && !isEditorScheme && (
+      const isLocalPath = href && !isHttp && !isEditorScheme && !isInternalFile && (
         href.startsWith('file://') ||
         href.startsWith('file:') ||
         WIN_DRIVE.test(href) ||
@@ -324,24 +325,26 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         (!href.includes('://') && !href.startsWith('mailto:') && !href.startsWith('#'))
       );
 
+      if (isInternalFile) {
+        return (
+          <button
+            type="button"
+            onClick={() => {
+              const a = document.createElement('a');
+              a.href = href!;
+              a.download = '';
+              a.click();
+            }}
+            title={href}
+            className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
+          >
+            {children}
+          </button>
+        );
+      }
+
       /**
        * A LOCAL PATH IS A BUTTON, NOT AN ANCHOR.
-       *
-       * This is the fix for "clicking a path opens the app's own web page in a
-       * browser". Every link here used to render as `<a href={href}
-       * target="_blank">`, local paths included. For a relative href like
-       * `workspace/frontend` that is a relative URL: `window.open` resolves it
-       * against the page, producing `http://localhost:3005/workspace/frontend`,
-       * and the desktop shell's `setWindowOpenHandler` sees an `http:` URL and
-       * hands it to `shell.openExternal` — so the system browser opens this very
-       * app. `preventDefault` in the click handler cannot save it, because
-       * middle-click and ctrl-click never go through that path, and "copy link
-       * address" produces the same bogus URL.
-       *
-       * Rendering a `<button>` removes the navigation surface entirely rather
-       * than trying to suppress it: there is no href to resolve, so there is
-       * nothing for any modifier, any context menu, or any future window-open
-       * handler to get wrong.
        */
       if (isLocalPath || isEditorScheme) {
         const openLocal = async () => {
@@ -353,9 +356,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             !WIN_DRIVE.test(targetPath) &&
             !isEditorScheme
           ) {
+            const lineMatch = targetPath.match(/(:L\d+.*$|:\d+(?::\d+)?$)/i);
+            const lineSuffix = lineMatch ? lineMatch[1] : '';
+            const barePath = targetPath.replace(/:L\d+.*$/i, '').replace(/:\d+(?::\d+)?$/, '');
             const sep = workingDir.includes('\\') ? '\\' : '/';
-            const cleanRel = targetPath.replace(/^\.?[/\\]+/, '');
-            targetPath = `${workingDir}${sep}${cleanRel}`;
+            const cleanRel = barePath.replace(/^\.?[/\\]+/, '');
+            targetPath = `${workingDir}${sep}${cleanRel}${lineSuffix}`;
           } else if (
             !workingDir &&
             !isEditorScheme &&
@@ -363,13 +369,6 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             !targetPath.startsWith('/') &&
             !WIN_DRIVE.test(targetPath)
           ) {
-            /*
-             * A bare relative path with no working directory to resolve it
-             * against cannot be opened by anything — `shell.openPath` would
-             * resolve it against the Electron process's cwd, which is not the
-             * project. Say so instead of firing a call that is guaranteed to
-             * fail and then reporting success.
-             */
             toast.error(`Cannot resolve ${targetPath} — this conversation has no working directory set`);
             return;
           }
@@ -386,13 +385,6 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             return;
           }
 
-          /*
-           * Browser mode. The URL must be absolute: this was `fetch('/v1/…')`,
-           * which resolves against the FRONTEND origin (:3005) rather than the
-           * API (:8000), so the request never reached the handler that exists at
-           * `workspace/backend` — and any HTML the dev server returned came back
-           * `res.ok`, which the old code reported as "opened locally".
-           */
           try {
             const res = await fetch(`${getApiBaseUrl()}/v1/system/open-path`, {
               method: 'POST',
@@ -423,8 +415,6 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         <a
           href={href}
           onClick={(e) => {
-            // Inside the desktop shell, hand external URLs to the OS browser
-            // rather than letting Electron open an app sub-window.
             const bridge = (window as unknown as { electronBridge?: { openPath?: (p: string) => void } }).electronBridge;
             if (isHttp && bridge?.openPath) {
               e.preventDefault();

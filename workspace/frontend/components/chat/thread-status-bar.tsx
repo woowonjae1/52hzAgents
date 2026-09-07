@@ -7,6 +7,8 @@ import { workspaceApi } from '@/lib/api';
 import type { TimerItem, WorkspaceMessage } from '@/lib/types';
 import { stripAddressPrefix } from '@/lib/types';
 
+import { useVisibilityPolling } from '@/lib/use-visibility-polling';
+
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now();
   if (diff <= 0) return 'now';
@@ -15,6 +17,28 @@ function timeUntil(dateStr: string): string {
   const mins = Math.floor(secs / 60);
   if (mins < 60) return `${mins}m`;
   return `${Math.floor(mins / 60)}h`;
+}
+
+function TimerCountdown({ firesAt }: { firesAt: string }) {
+  const [text, setText] = useState(() => timeUntil(firesAt));
+
+  useEffect(() => {
+    const update = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      setText(timeUntil(firesAt));
+    };
+    const id = setInterval(update, 1000);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) update();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [firesAt]);
+
+  return <span className="text-status-warning font-mono">{text}</span>;
 }
 
 interface QueuedMessage {
@@ -34,23 +58,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     } catch {}
   }, [channelName]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      const result = await workspaceApi.listTimers(channelName).catch(() => null);
-      if (!cancelled && result) setTimers(result.timers);
-    };
-    poll();
-    const interval = setInterval(poll, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [channelName]);
-
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!timers.length) return;
-    const interval = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(interval);
-  }, [timers.length]);
+  useVisibilityPolling(pollTimers, 15000);
 
   const channelTodos = useMemo(() =>
     todos.filter((t) => t.channelName === channelName && (t.status === 'pending' || t.status === 'in_progress')),
@@ -225,7 +233,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
               <span key={t.id} className="flex items-center gap-1">
                 <Timer className="size-3 text-status-warning" />
                 <span>{msg.length > 30 ? msg.slice(0, 30) + '…' : msg}</span>
-                <span className="text-status-warning font-mono">{firesAt ? timeUntil(firesAt) : ''}</span>
+                {firesAt ? <TimerCountdown firesAt={firesAt} /> : null}
                 <button
                   onClick={() => handleCancelTimer(t.id)}
                   className="p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"

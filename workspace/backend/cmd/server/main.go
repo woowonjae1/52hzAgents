@@ -142,6 +142,11 @@ func main() { // 服务程序运行主入口函数。
 		v1.GET("/approvals", handlers.ListAgentApprovals)
 		v1.PATCH("/approvals/:approval_id", handlers.ResolveAgentApproval)
 
+		// Council (黑板议事与言语动作):
+		v1.POST("/council/sessions", handlers.CreateCouncilSession)
+		v1.GET("/council/sessions/:session_id", handlers.GetCouncilSession)
+		v1.POST("/council/sessions/:session_id/acts", handlers.PostSpeechAct)
+
 		// Agent Catalog & Cloud Agents
 		v1.GET("/agent-catalog", handlers.GetAgentCatalog)
 		v1.POST("/agents", handlers.CreateAgent)

@@ -130,24 +130,19 @@ export function ActivityTimeline({
   return (
     <aside
       className={cn(
-        'flex flex-col h-full bg-surface1/40 backdrop-blur-md border-l border-border/25 overflow-hidden',
+        'flex flex-col h-full bg-surface1 border-l border-border/40 overflow-hidden',
         className
       )}
     >
-      {/* Header */}
-      <div className="p-3.5 space-y-2.5 shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-status-success ring-2 ring-status-success/20 animate-pulse" />
-            <span className="text-xs font-semibold tracking-tight text-foreground">
-              Live activity
-            </span>
-          </div>
-          <span className="text-3xs font-mono text-muted-foreground tabular-nums">
-            {groupedTimeline.length} groups
-          </span>
-        </div>
+      {/* Title bar — `.app-header` so this panel's first divider sits on the
+          same baseline as the main pane's and the sidebar's. */}
+      <div className="app-header px-3.5 bg-surface1">
+        <span className="text-xs font-semibold tracking-tight text-foreground">
+          Live activity
+        </span>
+      </div>
 
+      <div className="px-3.5 py-2.5 shrink-0">
         {/* Filter Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto text-2xs font-medium no-scrollbar">
           <button
@@ -156,7 +151,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'all'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -168,7 +163,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'knowledge'
-                ? 'bg-status-warning text-white'
+                ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -180,7 +175,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'tools'
-                ? 'bg-status-success text-white'
+                ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -192,7 +187,7 @@ export function ActivityTimeline({
             className={cn(
               'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
               selectedType === 'issues'
-                ? 'bg-status-danger text-white'
+                ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
             )}
           >
@@ -264,7 +259,7 @@ export function ActivityTimeline({
                           ) : isTool ? (
                             <Terminal className="size-3 text-status-success" />
                           ) : isApproval ? (
-                            <ShieldAlert className="size-3 text-status-warning animate-pulse" />
+                            <ShieldAlert className="size-3 text-status-warning" />
                           ) : isError ? (
                             <AlertCircle className="size-3 text-status-danger" />
                           ) : (

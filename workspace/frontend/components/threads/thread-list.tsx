@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from 'sonner';
 import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, History as HistoryIcon, CalendarClock, BookOpen, Sparkles } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
@@ -9,6 +10,7 @@ import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { SignalMark } from '@/components/brand/signal-mark';
 import { AgentStatusStrip } from '@/components/agents/agent-status-strip';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { workspaceApi } from '@/lib/api';
@@ -22,25 +24,43 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { stripAddressPrefix } from '@/lib/types';
 
-function AvatarStack({ agents, max = 2 }: { agents: WorkspaceAgent[]; max?: number }) {
+/*
+  Who is in this channel, as marks rather than names. One agent renders as a
+  single logo; several overlap into a stack that collapses to `+N` past `max`.
+
+  The separating ring is what keeps overlapping logos readable, so it stays
+  even though logos are otherwise unframed now — but it is `ring-surface-sidebar`
+  (the colour this list actually sits on), not the hardcoded `ring-white` it
+  was, which drew a white halo around every avatar in dark mode. The single
+  case also used `size={30}` against the stack's 18, so a one-agent channel
+  and a two-agent channel disagreed on row height.
+*/
+function AvatarStack({
+  agents,
+  max = 3,
+  size = 18,
+}: { agents: WorkspaceAgent[]; max?: number; size?: number }) {
   const shown = agents.slice(0, max);
   const extra = agents.length - max;
 
-  if (shown.length <= 1) {
-    const agent = shown[0];
-    if (!agent) return null;
-    return <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={30} />;
+  if (shown.length === 0) return null;
+
+  if (shown.length === 1) {
+    return <AgentAvatar name={shown[0].agentName} agentType={shown[0].agentType} size={size} />;
   }
 
   return (
-    <div className="flex -space-x-1.5">
+    <div className="flex -space-x-1">
       {shown.map((agent) => (
-        <div key={agent.agentName} className="ring-2 ring-white rounded-full">
-          <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={18} />
+        <div key={agent.agentName} className="rounded-full ring-2 ring-surface-sidebar">
+          <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={size} />
         </div>
       ))}
       {extra > 0 && (
-        <div className="h-[18px] min-w-[18px] px-0.5 rounded-full bg-surface3 flex items-center justify-center text-[9px] font-mono font-medium tracking-tighter text-foreground-muted ring-2 ring-surface0 leading-none select-none">
+        <div
+          className="px-0.5 rounded-full bg-surface3 flex items-center justify-center font-mono font-medium tracking-tighter text-foreground-muted ring-2 ring-surface-sidebar leading-none select-none"
+          style={{ height: size, minWidth: size, fontSize: Math.max(8, Math.round(size * 0.5)) }}
+        >
           +{extra}
         </div>
       )}
@@ -155,17 +175,27 @@ function getSmartSessionTitle(session: WorkspaceSession, lastMsg?: LastMessageIn
   }
 
   if (lastMsg && lastMsg.content) {
-    let clean = lastMsg.content
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/[`*_#~>]/g, '')
-      .replace(/[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/gu, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (clean) {
-      if (clean.length > 24) {
-        clean = clean.slice(0, 24).trim() + '...';
+    const trimmed = lastMsg.content.trim();
+    const isStatusOrThinking =
+      lastMsg.isStatus ||
+      /^thinking(\.{0,3})?$/i.test(trimmed) ||
+      /^<think/i.test(trimmed) ||
+      /^Using tool/i.test(trimmed) ||
+      /^sse-probe/i.test(trimmed);
+
+    if (!isStatusOrThinking) {
+      let clean = trimmed
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/[`*_#~>]/g, '')
+        .replace(/[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (clean && !/^thinking(\.{0,3})?$/i.test(clean)) {
+        if (clean.length > 24) {
+          clean = clean.slice(0, 24).trim() + '...';
+        }
+        return clean;
       }
-      return clean;
     }
   }
 
@@ -179,8 +209,261 @@ function getSmartSessionTitle(session: WorkspaceSession, lastMsg?: LastMessageIn
   return 'New Chat';
 }
 
+interface ThreadRowProps {
+  session: WorkspaceSession;
+  isSelected: boolean;
+  lastMsg?: LastMessageInfo;
+  isActive: boolean;
+  isCompleted: boolean;
+  contentHit?: SearchHit;
+  isSearching: boolean;
+  searchQuery: string;
+  isEditing: boolean;
+  editTitleValue: string;
+  agents: WorkspaceAgent[];
+  onSelect: () => void;
+  onStartEdit: (title: string) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (title: string) => void;
+  onUpdateStarred: (starred: boolean) => void;
+  onUpdateStatus: (status: 'active' | 'archived' | 'deleted') => void;
+  setEditTitleValue: (v: string) => void;
+}
+
+const ThreadRow = memo(function ThreadRow({
+  session,
+  isSelected,
+  lastMsg,
+  isActive,
+  isCompleted,
+  contentHit,
+  isSearching,
+  searchQuery,
+  isEditing,
+  editTitleValue,
+  agents,
+  onSelect,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onUpdateStarred,
+  onUpdateStatus,
+  setEditTitleValue,
+}: ThreadRowProps) {
+  const activityMs = session.lastEventAt;
+  const displayTime = activityMs
+    ? timeAgo(new Date(activityMs).toISOString())
+    : session.createdAt ? timeAgo(session.createdAt) : '';
+
+  const lastSpeaker: WorkspaceAgent | 'you' | null = !lastMsg
+    ? null
+    : lastMsg.senderName === 'user'
+      ? 'you'
+      : agents.find((a) => a.agentName === lastMsg.senderName) ?? null;
+
+  let preview: React.ReactNode;
+  let previewIsStatus = false;
+  if (isSearching && contentHit) {
+    const snippet = contentHit.snippet.length > 80
+      ? contentHit.snippet.slice(0, 80) + '...'
+      : contentHit.snippet;
+    preview = highlightMatch(snippet, searchQuery);
+  } else if (lastMsg && lastMsg.content) {
+    const trimmed = lastMsg.content.trim();
+    const isThinkingText = /^thinking(\.{0,3})?$/i.test(trimmed) || /^<think/i.test(trimmed);
+
+    if (lastMsg.isStatus && isActive) {
+      previewIsStatus = true;
+      const toolMatch = lastMsg.content.match(/Using tool:?\**\s*`?([^`\n]+)`?/i);
+      if (toolMatch) {
+        const rawTool = toolMatch[1].trim();
+        const cleanTool = rawTool.replace(/^mcp__[^_]+__/, '');
+        preview = (
+          <span className="flex items-center gap-1">
+            <Wrench className="size-3 shrink-0" /> {cleanTool}
+          </span>
+        );
+      } else if (isThinkingText || lastMsg.content.includes('thinking')) {
+        preview = (
+          <span className="flex items-center gap-1">
+            <span className="event-running">thinking</span>
+          </span>
+        );
+      } else {
+        const cleaned = lastMsg.content
+          .replace(/\*\*/g, '')
+          .replace(/`/g, '')
+          .replace(/```[\s\S]*/g, '')
+          .trim();
+        preview = cleaned || 'No messages yet';
+      }
+    } else if (isThinkingText || trimmed === 'sse-probe') {
+      preview = 'No messages yet';
+    } else {
+      preview = lastMsg.content;
+    }
+  } else {
+    preview = 'No messages yet';
+  }
+
+  const smartTitle = getSmartSessionTitle(session, lastMsg);
+
+  return (
+    <div
+      onClick={() => {
+        if (isEditing) return;
+        onSelect();
+      }}
+      className={cn(
+        'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors relative group cursor-pointer select-none',
+        isSelected
+          ? 'bg-surface2/90 dark:bg-surface2/80 text-foreground border border-border/80 dark:border-white/[0.1] shadow-xs before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:rounded-r-full before:bg-surface2'
+          : 'border border-transparent hover:bg-surface2/40 text-foreground-muted hover:text-foreground',
+        'has-data-[state=open]:bg-surface2/40',
+        isActive && 'thread-wip',
+        isCompleted && !isSelected && 'bg-surface2/50 border border-border/60'
+      )}
+    >
+      <div className="shrink-0 self-start pt-0.5 size-[18px]">
+        {lastSpeaker === 'you' ? (
+          <SignalMark size={18} still />
+        ) : lastSpeaker ? (
+          <AgentAvatar
+            name={lastSpeaker.agentName}
+            agentType={lastSpeaker.agentType}
+            size={18}
+          />
+        ) : null}
+      </div>
+
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="flex items-center justify-between gap-1.5">
+          {session.starred && (
+            <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
+          )}
+          {isEditing ? (
+            <input
+              type="text"
+              autoFocus
+              value={editTitleValue}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setEditTitleValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const trimmed = editTitleValue.trim();
+                  if (trimmed) onSaveEdit(trimmed);
+                  onCancelEdit();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onCancelEdit();
+                }
+              }}
+              onBlur={() => {
+                const trimmed = editTitleValue.trim();
+                if (trimmed) onSaveEdit(trimmed);
+                onCancelEdit();
+              }}
+              className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary outline-none"
+            />
+          ) : (
+            <span
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onStartEdit(smartTitle);
+              }}
+              className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight"
+              title="Double-click to rename"
+            >
+              {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
+            </span>
+          )}
+          <span className="text-3xs text-foreground-extra-muted shrink-0 font-mono tabular-nums">
+            {displayTime}
+          </span>
+        </div>
+        <p className={cn(
+          'text-3xs text-foreground-muted truncate leading-relaxed font-sans',
+          previewIsStatus && 'italic text-foreground-muted'
+        )}>
+          {preview}
+        </p>
+      </div>
+
+      {/* Hover actions */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 dark:hover:bg-primary shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical className="size-3.5 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEdit(smartTitle);
+            }}
+          >
+            <Pencil className="size-4" />
+            <span>Rename</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateStarred(!session.starred);
+            }}
+          >
+            <Star className={cn('size-4', session.starred && 'fill-status-warning text-status-warning')} />
+            <span>{session.starred ? 'Unstar' : 'Star'}</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateStatus(session.status === 'archived' ? 'active' : 'archived');
+            }}
+          >
+            {session.status === 'archived'
+              ? <><ArchiveRestore className="size-4" /><span>Unarchive</span></>
+              : <><Archive className="size-4" /><span>Archive</span></>
+            }
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateStatus('deleted');
+            }}
+          >
+            <Trash2 className="size-4" />
+            <span>Delete</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+});
+
+interface VirtualGroupHeaderItem {
+  type: 'header';
+  key: string;
+  dir: string | null;
+  count: number;
+}
+
+interface VirtualSessionItem {
+  type: 'session';
+  key: string;
+  session: WorkspaceSession;
+}
+
+type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem;
+
 export function ThreadList() {
-  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent } = useWorkspace();
+  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode, viewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
@@ -188,6 +471,34 @@ export function ThreadList() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    setViewMode('threads');
+    if (isMobile) openMobileDetail();
+  }, [setCurrentSessionId, setViewMode, isMobile, openMobileDetail]);
+
+  const handleStartEdit = useCallback((sessionId: string, title: string) => {
+    setEditingSessionId(sessionId);
+    setEditTitleValue(title);
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingSessionId(null);
+  }, []);
+
+  const handleSaveEdit = useCallback((sessionId: string, title: string) => {
+    renameSession(sessionId, title);
+    setEditingSessionId(null);
+  }, [renameSession]);
+
+  const handleUpdateStarred = useCallback((sessionId: string, starred: boolean) => {
+    updateSession(sessionId, { starred });
+  }, [updateSession]);
+
+  const handleUpdateStatus = useCallback((sessionId: string, status: 'active' | 'archived' | 'deleted') => {
+    updateSession(sessionId, { status });
+  }, [updateSession]);
 
   // Debounced content search
   useEffect(() => {
@@ -283,6 +594,54 @@ export function ThreadList() {
     [visualOrder],
   );
 
+  // Flatten grouped sessions into list items for TanStack Virtual
+  const virtualListItems = useMemo<VirtualListItem[]>(() => {
+    const items: VirtualListItem[] = [];
+    for (const group of groupedSessions) {
+      const groupKey = group.dir ?? '__no_folder__';
+      items.push({
+        type: 'header',
+        key: `header-${groupKey}`,
+        dir: group.dir,
+        count: group.sessions.length,
+      });
+      for (const s of group.sessions) {
+        items.push({
+          type: 'session',
+          key: s.sessionId,
+          session: s,
+        });
+      }
+    }
+    return items;
+  }, [groupedSessions]);
+
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualListItems.length,
+    getScrollElement: () => listContainerRef.current,
+    estimateSize: (index) => {
+      const item = virtualListItems[index];
+      return item?.type === 'header' ? 34 : 52;
+    },
+    overscan: 8,
+    getItemKey: (index) => virtualListItems[index]?.key || index,
+  });
+
+  // Keep active session in view when navigating or switching threads
+  const lastScrolledSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentSessionId || currentSessionId === lastScrolledSessionIdRef.current) return;
+    lastScrolledSessionIdRef.current = currentSessionId;
+    const index = virtualListItems.findIndex(
+      (item) => item.type === 'session' && item.session.sessionId === currentSessionId
+    );
+    if (index !== -1) {
+      rowVirtualizer.scrollToIndex(index, { align: 'auto' });
+    }
+  }, [currentSessionId, virtualListItems]);
+
   const startChannel = async (dir: string | null) => {
     try {
       const session = await createSession({ workingDir: dir ?? undefined });
@@ -363,21 +722,94 @@ export function ThreadList() {
 
 
       {/* Top Action & Navigation Block */}
-      <div className="px-3.5 pt-2.5 pb-2 shrink-0 space-y-3 select-none">
+      <div className="px-3.5 pt-2.5 pb-1 shrink-0 select-none">
         {/* + New Conversation Primary Button */}
         <button
-          onClick={() => startChannel(null)}
-          className="w-full flex items-center justify-between py-2.5 px-3.5 rounded-xl bg-primary text-primary-foreground hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-xs group font-medium text-xs"
+          onClick={() => {
+            setViewMode('threads');
+            startChannel(null);
+          }}
+          /*
+            A row, not a filled pill.
+
+            This was `bg-primary` — in dark mode a near-white block spanning the
+            full sidebar width, which made the single loudest element on screen
+            a button you press once per conversation. It also sat one idiom
+            apart from the three navigation rows directly beneath it while
+            being the same shape and size, so the group read as "one CTA plus
+            some links" rather than a nav list. It is now the same row as its
+            neighbours, distinguished by weight and a filled icon rather than by
+            inverting the palette.
+          */
+          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground hover:bg-surface2 transition-colors group"
         >
           <div className="flex items-center gap-2">
-            <Plus className="size-4 group-hover:rotate-90 transition-transform duration-200" />
-            <span className="font-semibold">New chat</span>
+            <Plus className="size-3.5 text-primary" />
+            <span>New chat</span>
           </div>
-          <kbd className="inline-flex items-center px-1.5 py-0.5 text-3xs font-mono rounded bg-primary-foreground/15 text-primary-foreground font-medium">
+          <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted border border-border/50">
             Ctrl+N
           </kbd>
         </button>
 
+        {/* Workspace Quick Navigation Items (Linear / Circle Style) */}
+        <div className="flex flex-col gap-0.5">
+          {/* Chats & Threads */}
+          <button
+            type="button"
+            onClick={() => setViewMode('threads')}
+            className={cn(
+              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              viewMode === 'threads'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <MessageSquare className="size-3.5 text-primary" />
+              <span>Chats & Threads</span>
+            </div>
+          </button>
+
+          {/* Tasks & Issues (Linear Style!) */}
+          <button
+            type="button"
+            onClick={() => setViewMode('tasks')}
+            className={cn(
+              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              viewMode === 'tasks'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-3.5 text-emerald-500" />
+              <span>Tasks & Issues</span>
+            </div>
+            {todos && todos.length > 0 && (
+              <span className="text-3xs font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+                {todos.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length || todos.length}
+              </span>
+            )}
+          </button>
+
+          {/* Command Palette (Ctrl+K) Trigger Button */}
+          <button
+            type="button"
+            onClick={() => {
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+            }}
+            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <Search className="size-3.5 text-foreground-extra-muted" />
+              <span>Command Palette</span>
+            </div>
+            <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted border border-border/50">
+              Ctrl+K
+            </kbd>
+          </button>
+        </div>
       </div>
 
       {/* Agent presence — one strip, not a roster. See AgentStatusStrip. */}
@@ -423,231 +855,86 @@ export function ThreadList() {
         </div>
       </div>
 
-      {/* Thread rows grouped by Project */}
-      <div className="flex-1 overflow-y-auto px-2 py-1">
-        <div className="space-y-1">
-          {groupedSessions.map((group) => (
-          <div key={group.dir ?? '__no_folder__'} className="mb-2">
-            <div className="flex items-center gap-1.5 px-2 mt-1 mb-1">
-              <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
-              <span
-                className="text-sm font-semibold text-foreground truncate"
-                title={group.dir ?? 'Direct chats'}
-              >
-                {group.dir ? basename(group.dir) : 'Direct chats'}
-              </span>
-              <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
-                {group.sessions.length}
-              </span>
-              <button
-                onClick={() => startChannel(group.dir)}
-                title={group.dir ? `New channel in ${group.dir}` : 'New direct chat'}
-                className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
-              >
-                <Plus className="size-3" />
-              </button>
-            </div>
-          {group.sessions.map((session) => {
-            const idx = orderIndex.get(session.sessionId) ?? 0;
-            const isSelected = session.sessionId === currentSessionId;
-            const lastMsg = lastMessageBySession[session.sessionId];
-            const isActive = activeSessionIds.has(session.sessionId);
-            const isCompleted = completedSessionIds.has(session.sessionId) && !isActive;
-            const contentHit = hitsByChannel.get(session.sessionId);
-            // Numeric shortcut hint for the first 9 active threads. Hidden
-            // while searching because the rendered list reorders and the
-            // 1-9 handler operates on activeSessions, not search results.
-            const shortcutKey = !isSearching && idx < 9 ? idx + 1 : null;
+      {/* Thread rows grouped by Project (TanStack Virtualized) */}
+      <div
+        ref={listContainerRef}
+        className="flex-1 overflow-y-auto px-2 py-1 overscroll-contain transform-gpu [contain:content] will-change-scroll"
+      >
+        {virtualListItems.length > 0 && (
+          <div
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: '100%',
+              position: 'relative',
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const item = virtualListItems[virtualRow.index];
+              if (!item) return null;
 
-            // Show last activity time from backend
-            const activityMs = session.lastEventAt;
-            const displayTime = activityMs
-              ? timeAgo(new Date(activityMs).toISOString())
-              : session.createdAt ? timeAgo(session.createdAt) : '';
-
-            // Determine the preview line
-            let preview: React.ReactNode;
-            let previewIsStatus = false;
-            if (isSearching && contentHit) {
-              // Show matching snippet with highlight
-              const snippet = contentHit.snippet.length > 80
-                ? contentHit.snippet.slice(0, 80) + '...'
-                : contentHit.snippet;
-              preview = highlightMatch(snippet, searchQuery);
-            } else if (lastMsg && lastMsg.content) {
-              const sender = lastMsg.senderName === 'user' ? 'You' : lastMsg.senderName;
-              if (lastMsg.isStatus) {
-                previewIsStatus = true;
-                // Parse "Using tool: <tool_name>" pattern from status messages
-                const toolMatch = lastMsg.content.match(/Using tool:?\**\s*`?([^`\n]+)`?/i);
-                if (toolMatch) {
-                  // Clean MCP prefix: mcp__openagents-workspace__foo → foo, mcp__playwright__bar → bar
-                  const rawTool = toolMatch[1].trim();
-                  const cleanTool = rawTool.replace(/^mcp__[^_]+__/, '');
-                  preview = (
-                    <span className="flex items-center gap-1">
-                      {sender}: <Wrench className="size-3 shrink-0" /> {cleanTool}
-                    </span>
-                  );
-                } else if (lastMsg.content.includes('thinking')) {
-                  preview = (
-                    <span className="flex items-center gap-1">
-                      {sender}: <Loader2 className="size-3 shrink-0 animate-spin" /> thinking...
-                    </span>
-                  );
-                } else {
-                  // Other status messages — strip markdown
-                  const cleaned = lastMsg.content
-                    .replace(/\*\*/g, '')
-                    .replace(/`/g, '')
-                    .replace(/```[\s\S]*/g, '')
-                    .trim();
-                  preview = `${sender}: ${cleaned}`;
-                }
-              } else {
-                preview = `${sender}: ${lastMsg.content}`;
-              }
-            } else {
-              preview = 'No messages yet';
-            }
-
-            const smartTitle = getSmartSessionTitle(session, lastMsg);
-            const isEditing = editingSessionId === session.sessionId;
-
-            return (
-              <div
-                key={session.sessionId}
-                onClick={() => {
-                  if (isEditing) return;
-                  setCurrentSessionId(session.sessionId);
-                  setViewMode('threads');
-                  if (isMobile) openMobileDetail();
-                }}
-                className={cn(
-                  'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all relative group cursor-pointer select-none',
-                  isSelected
-                    ? 'bg-surface2/90 dark:bg-surface2/80 text-foreground border border-border/80 dark:border-white/[0.1] shadow-xs before:absolute before:left-0 before:top-2.5 before:bottom-2.5 before:w-1 before:rounded-r-full before:bg-surface2'
-                    : 'border border-transparent hover:bg-surface2/40 text-foreground-muted hover:text-foreground',
-                  'has-data-[state=open]:bg-surface2/40',
-                  isActive && 'thread-wip',
-                  isCompleted && !isSelected && 'bg-surface2/50 border border-border/60'
-                )}
-              >
-                {/* Content */}
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center justify-between gap-1.5">
-                    {session.starred && (
-                      <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
-                    )}
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        autoFocus
-                        value={editTitleValue}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setEditTitleValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const trimmed = editTitleValue.trim();
-                            if (trimmed) renameSession(session.sessionId, trimmed);
-                            setEditingSessionId(null);
-                          } else if (e.key === 'Escape') {
-                            e.preventDefault();
-                            setEditingSessionId(null);
-                          }
-                        }}
-                        onBlur={() => {
-                          const trimmed = editTitleValue.trim();
-                          if (trimmed) renameSession(session.sessionId, trimmed);
-                          setEditingSessionId(null);
-                        }}
-                        className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary outline-none"
-                      />
-                    ) : (
+              return (
+                <div
+                  key={item.key}
+                  ref={rowVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  className="pb-0.5"
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  {item.type === 'header' ? (
+                    <div className="flex items-center gap-1.5 px-2 pt-2.5 pb-1 select-none">
+                      <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
                       <span
-                        onDoubleClick={(e) => {
-                          e.stopPropagation();
-                          setEditingSessionId(session.sessionId);
-                          setEditTitleValue(smartTitle);
-                        }}
-                        className="text-xs font-semibold flex-1 min-w-0 truncate text-foreground tracking-tight"
-                        title="Double-click to rename"
+                        className="text-sm font-semibold text-foreground truncate"
+                        title={item.dir ?? 'Direct chats'}
                       >
-                        {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
+                        {item.dir ? basename(item.dir) : 'Direct chats'}
                       </span>
-                    )}
-                    <span className="text-3xs text-foreground-extra-muted shrink-0 font-mono tabular-nums">
-                      {displayTime}
-                    </span>
-                  </div>
-                  <p className={cn(
-                    'text-3xs text-foreground-muted truncate leading-relaxed font-sans',
-                    previewIsStatus && 'italic text-foreground-muted'
-                  )}>
-                    {preview}
-                  </p>
+                      <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
+                        {item.count}
+                      </span>
+                      <button
+                        onClick={() => startChannel(item.dir)}
+                        title={item.dir ? `New channel in ${item.dir}` : 'New direct chat'}
+                        className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+                      >
+                        <Plus className="size-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <ThreadRow
+                      session={item.session}
+                      isSelected={item.session.sessionId === currentSessionId}
+                      lastMsg={lastMessageBySession[item.session.sessionId]}
+                      isActive={activeSessionIds.has(item.session.sessionId)}
+                      isCompleted={completedSessionIds.has(item.session.sessionId) && !activeSessionIds.has(item.session.sessionId)}
+                      contentHit={hitsByChannel.get(item.session.sessionId)}
+                      isSearching={isSearching}
+                      searchQuery={searchQuery}
+                      isEditing={editingSessionId === item.session.sessionId}
+                      editTitleValue={editTitleValue}
+                      agents={agents}
+                      onSelect={() => handleSelectSession(item.session.sessionId)}
+                      onStartEdit={(title) => handleStartEdit(item.session.sessionId, title)}
+                      onCancelEdit={handleCancelEdit}
+                      onSaveEdit={(title) => handleSaveEdit(item.session.sessionId, title)}
+                      onUpdateStarred={(starred) => handleUpdateStarred(item.session.sessionId, starred)}
+                      onUpdateStatus={(status) => handleUpdateStatus(item.session.sessionId, status)}
+                      setEditTitleValue={setEditTitleValue}
+                    />
+                  )}
                 </div>
-
-                {/* Hover actions */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 dark:hover:bg-primary shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="size-3.5 text-muted-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-44">
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingSessionId(session.sessionId);
-                        setEditTitleValue(smartTitle);
-                      }}
-                    >
-                      <Pencil className="size-4" />
-                      <span>Rename</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateSession(session.sessionId, { starred: !session.starred });
-                      }}
-                    >
-                      <Star className={cn('size-4', session.starred && 'fill-status-warning text-status-warning')} />
-                      <span>{session.starred ? 'Unstar' : 'Star'}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateSession(session.sessionId, { status: session.status === 'archived' ? 'active' : 'archived' });
-                      }}
-                    >
-                      {session.status === 'archived'
-                        ? <><ArchiveRestore className="size-4" /><span>Unarchive</span></>
-                        : <><Archive className="size-4" /><span>Archive</span></>
-                      }
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateSession(session.sessionId, { status: 'deleted' });
-                      }}
-                    >
-                      <Trash2 className="size-4" />
-                      <span>Delete</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          })}
+              );
+            })}
           </div>
-          ))}
+        )}
+
+        <div className="space-y-1">
 
           {filteredSessions.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -733,7 +1020,8 @@ export function ThreadList() {
                     const displayTime = activityMs
                       ? timeAgo(new Date(activityMs).toISOString())
                       : session.createdAt ? timeAgo(session.createdAt) : '';
-                    const preview = lastMsg && lastMsg.content
+                    const isThinking = lastMsg?.content ? (/^thinking(\.{0,3})?$/i.test(lastMsg.content.trim()) || /^<think/i.test(lastMsg.content.trim())) : false;
+                    const preview = lastMsg && lastMsg.content && !isThinking && lastMsg.content.trim() !== 'sse-probe'
                       ? `${lastMsg.senderName === 'user' ? 'You' : lastMsg.senderName}: ${lastMsg.content}`
                       : 'No messages yet';
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { Brain, Copy, Check } from 'lucide-react';
+import { Brain, Copy, Check, Sparkles } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { EventLine, EventLineAction } from './event-line';
 import { formatElapsed } from '@/lib/use-elapsed';
+import { cn } from '@/lib/utils';
 
 export interface ReasoningProps {
   content: string;
@@ -16,20 +17,6 @@ export interface ReasoningProps {
   className?: string;
 }
 
-/**
- * The agent's thought process.
- *
- * This was a rounded-full capsule with its own indigo accent — an indigo ring,
- * an indigo glow behind a pulsing brain icon, an indigo-tinted rail, and a
- * bespoke indigo-to-foreground gradient shimmer driven by a `motion` animation
- * loop. None of that indigo existed as a token, so it was a fifth accent colour
- * that nothing in the theme could reach or change.
- *
- * It now draws through `EventLine` like every other event. Streaming is signalled
- * by the shared shimmer, which is the same shimmer a running tool call uses, so
- * "the agent is working on something with nothing to show yet" looks the same
- * wherever it happens.
- */
 export function Reasoning({
   content,
   isStreaming = false,
@@ -40,21 +27,15 @@ export function Reasoning({
 }: ReasoningProps) {
   const [copied, setCopied] = useState(false);
 
-  /**
-   * How long the thought took — ONLY from `durationMs`.
-   *
-   * This used to fall back to `Date.now() - startTime` when no duration was
-   * passed, which is not the thought's duration, it is the thought's AGE. On a
-   * settled block that is wrong by however long ago the message was sent: a
-   * reply from twenty minutes ago read "Thought 1367.1s". It stayed hidden while
-   * traces rendered as loose per-message rows and never reached this label at
-   * all. `startTime` is still accepted, but it now feeds only the LIVE clock in
-   * `EventLine` — where "now minus then" is exactly the right sum.
-   */
   const durationText = useMemo(
     () => (durationMs && durationMs > 0 ? formatElapsed(durationMs) : null),
     [durationMs]
   );
+
+  const wordCount = useMemo(() => {
+    if (!content) return 0;
+    return content.trim().split(/\s+/).length;
+  }, [content]);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -70,13 +51,8 @@ export function Reasoning({
   return (
     <EventLine
       className={className}
-      icon={<Brain />}
+      icon={<Brain className={cn(isStreaming && 'text-primary animate-pulse')} />}
       label={isStreaming ? 'Thinking' : 'Thought'}
-      // Once settled the duration carries the information the old label spelled
-      // out ("Thought for 4.2s"), so the label stops repeating it. While
-      // streaming `meta` is left undefined on purpose: EventLine then fills the
-      // same slot with a live clock off `startTime`, so the number does not
-      // appear out of nowhere the instant the thought lands.
       meta={!isStreaming && durationText ? durationText : undefined}
       startTime={startTime}
       state={isStreaming ? 'running' : 'idle'}
@@ -84,20 +60,32 @@ export function Reasoning({
       actions={
         content ? (
           <EventLineAction onClick={handleCopy} title="Copy reasoning text">
-            {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+            {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
           </EventLineAction>
         ) : undefined
       }
     >
       {content ? (
-        <div className="py-0.5 text-xs leading-[1.75] text-foreground-muted [&_*]:text-xs [&_p]:my-1.5 [&_pre]:text-2xs">
-          <MarkdownContent content={content} />
+        <div className="relative my-1 rounded-lg border border-border/50 bg-surface1/50 dark:bg-surface1/70 px-3.5 py-2.5 space-y-1.5 shadow-2xs">
+          <div className="flex items-center justify-between text-3xs font-mono text-foreground-extra-muted border-b border-border/40 pb-1 select-none">
+            <span className="flex items-center gap-1 font-medium">
+              <Sparkles className="size-2.5 text-primary/70" />
+              <span>Chain of Thought</span>
+            </span>
+            {wordCount > 0 && <span>~{wordCount} words</span>}
+          </div>
+          <div className="py-0.5 text-xs leading-[1.75] text-foreground-muted [&_*]:text-xs [&_p]:my-1.5 [&_pre]:text-2xs selection:bg-primary/20">
+            <MarkdownContent content={content} />
+            {isStreaming && (
+              <span className="inline-block w-1.5 h-3 bg-primary/70 animate-pulse ml-1 translate-y-0.5" />
+            )}
+          </div>
         </div>
       ) : (
-        // Streaming with nothing buffered yet. The shimmer on the row above is
-        // already saying this, so the placeholder stays flat and quiet rather
-        // than adding a second animation.
-        <div className="py-1 text-xs text-foreground-extra-muted">Nothing yet.</div>
+        <div className="py-1 text-xs text-foreground-extra-muted flex items-center gap-1.5 font-mono">
+          <span className="inline-block size-1.5 rounded-full bg-primary/60 animate-ping" />
+          <span>Generating reasoning stream…</span>
+        </div>
       )}
     </EventLine>
   );

@@ -134,10 +134,12 @@ func TestPipelineClearedByPlainMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var count int64
-	db.DB.Model(&models.ChannelPipeline{}).Where("channel_id = ?", channel.ID).Count(&count)
-	if count != 0 {
-		t.Fatalf("expected the chain to be cleared, still found %d", count)
+	var record models.ChannelPipeline
+	if err := db.DB.Where("channel_id = ? AND status IN ?", channel.ID, []string{"running", "retrying"}).First(&record).Error; err == nil {
+		t.Fatalf("expected the running chain to be paused, still found active pipeline %s with status %s", record.ID, record.Status)
+	}
+	if err := db.DB.Where("channel_id = ? AND status = ?", channel.ID, "paused").First(&record).Error; err != nil {
+		t.Fatalf("expected pipeline to be paused on human intervention, got error: %v", err)
 	}
 }
 

@@ -1333,6 +1333,9 @@ class ClaudeAdapter extends BaseAdapter {
       '--agent-name', this.agentName,
       '--endpoint', this.endpoint,
     ];
+    if (this._sessionId) {
+      mcpArgs.push('--session-id', this._sessionId);
+    }
     if (this.disabledModules.has('files')) mcpArgs.push('--disable-files');
     if (this.disabledModules.has('browser')) mcpArgs.push('--disable-browser');
 
