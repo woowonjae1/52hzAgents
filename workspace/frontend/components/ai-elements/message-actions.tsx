@@ -191,7 +191,7 @@ export function MessageActions({
           </button>
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={6}>
-          {copied ? '已复制' : '复制内容'}
+          {copied ? 'Copied' : 'Copy'}
         </TooltipContent>
       </Tooltip>
 
@@ -211,7 +211,7 @@ export function MessageActions({
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>
-            重新生成
+            Regenerate
           </TooltipContent>
         </Tooltip>
       )}
@@ -224,7 +224,7 @@ export function MessageActions({
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>
-            导出 Markdown
+            Export Markdown
           </TooltipContent>
         </Tooltip>
       )}

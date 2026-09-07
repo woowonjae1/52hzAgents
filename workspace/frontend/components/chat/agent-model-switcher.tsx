@@ -98,7 +98,7 @@ export function AgentModelSwitcher({
   // connected agent polls. With nothing online the chip stays visible (so the
   // composer's layout does not jump) but is inert.
   const canConfigure = !!activeAgent;
-  const offlineHint = 'Agent 未连接 - 连接后才能切换模型';
+  const offlineHint = 'Agent offline — connect it to switch models';
 
   // Dynamic model selections per agent name
   const [agentSelectedModels, setAgentSelectedModels] = React.useState<Record<string, string>>({});
@@ -263,7 +263,7 @@ export function AgentModelSwitcher({
           localStorage.setItem(`52hz_model_${sessionId}_${targetAgentName}`, modelId);
         } catch {}
       }
-      toast.success(`${targetAgentName} 已切换为 ${modelName}`);
+      toast.success(`${targetAgentName} switched to ${modelName}`);
     } catch (e) {
       if (previousId) {
         setAgentSelectedModels((prev) => ({
@@ -271,8 +271,8 @@ export function AgentModelSwitcher({
           [targetAgentName]: previousId,
         }));
       }
-      const detail = e instanceof Error && e.message ? `：${e.message}` : '';
-      toast.error(`${targetAgentName} 切换到 ${modelName} 失败${detail}`);
+      const detail = e instanceof Error && e.message ? `: ${e.message}` : '';
+      toast.error(`${targetAgentName} could not switch to ${modelName}${detail}`);
     }
   };
 
@@ -289,13 +289,13 @@ export function AgentModelSwitcher({
               : 'bg-surface2/40 border-border/40 text-muted-foreground/60 cursor-not-allowed',
             className
           )}
-          title={canConfigure ? `当前模型: ${currentModelOption.name} (@${activeTargetName})` : offlineHint}
+          title={canConfigure ? `Model: ${currentModelOption.name} (@${activeTargetName})` : offlineHint}
         >
           {/* No weight of its own — the chip is already `font-medium`, and the
               600 that used to sit here rendered at the chip's 11px, where the
               weight axis stops separating and only thickens. */}
           <span className="truncate max-w-[140px]">
-            {canConfigure ? currentModelOption.shortName : '未连接'}
+            {canConfigure ? currentModelOption.shortName : 'Offline'}
           </span>
           <ChevronDown className={cn('size-3 shrink-0', canConfigure ? 'text-foreground-extra-muted' : 'text-muted-foreground/40')} />
         </button>
@@ -350,7 +350,7 @@ export function AgentModelSwitcher({
                 })
               ) : (
                 <div className="px-2.5 py-1 text-xs text-muted-foreground italic flex items-center justify-between">
-                  <span>{currentSelectedId || '默认环境模型 (Default)'}</span>
+                  <span>{currentSelectedId || 'Environment default'}</span>
                 </div>
               )}
             </div>

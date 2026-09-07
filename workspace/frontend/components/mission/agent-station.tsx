@@ -118,7 +118,7 @@ export function AgentStation({
   // accepted by the UI and quietly go nowhere - the controls are disabled
   // instead of failing after the fact.
   const canConfigure = status !== 'offline' && !isCatalogPlaceholder;
-  const offlineHint = 'Agent 未连接 - 连接后才能切换';
+  const offlineHint = 'Agent offline — connect it first';
   const activeThread = threads[0];
   const [busy, setBusy] = React.useState(false);
   const [modelInfo, setModelInfo] = React.useState<StationModelInfo>(
@@ -150,10 +150,10 @@ export function AgentStation({
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_effort', { effort: level });
       setEffortInfo((prev) => ({ ...prev, current: level }));
-      toast.success(`@${agent.agentName} 推理强度已设为 ${level}`);
+      toast.success(`@${agent.agentName} reasoning effort set to ${level}`);
       onRefreshUsage?.();
     } catch (e) {
-      toast.error(`切换推理强度失败: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Could not change reasoning effort: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -162,10 +162,10 @@ export function AgentStation({
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
       setModelInfo((prev) => ({ ...prev, current: newModelId }));
-      toast.success(`@${agent.agentName} 已切换为 ${modelLabel}`);
+      toast.success(`@${agent.agentName} switched to ${modelLabel}`);
       onRefreshUsage?.();
     } catch (e) {
-      toast.error(`切换模型失败: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Could not switch model: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -487,10 +487,10 @@ export function AgentStation({
                       ? 'text-foreground hover:text-primary cursor-pointer bg-surface2/60 hover:bg-surface2'
                       : 'text-muted-foreground/60 bg-surface2/30 cursor-not-allowed'
                   )}
-                  title={canConfigure ? '点击切换模型' : offlineHint}
+                  title={canConfigure ? 'Click to switch model' : offlineHint}
                 >
                   <span className="truncate max-w-[120px]">
-                    {modelInfo.models.find((m) => m.id === modelInfo.current)?.shortName || modelInfo.current || '未配置模型'}
+                    {modelInfo.models.find((m) => m.id === modelInfo.current)?.shortName || modelInfo.current || 'No model set'}
                   </span>
                   <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
                 </button>
@@ -531,7 +531,7 @@ export function AgentStation({
                           setCustomModelInput('');
                         }
                       }}
-                      placeholder="输入模型 ID (如 gpt-4o)..."
+                      placeholder="Model ID, e.g. gpt-4o"
                       className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
                       autoFocus
                     />
@@ -541,7 +541,7 @@ export function AgentStation({
                         onClick={() => { setIsEnteringCustom(false); setCustomModelInput(''); }}
                         className="px-2 py-0.5 text-3xs rounded border hover:bg-surface2 text-muted-foreground"
                       >
-                        取消
+                        Cancel
                       </button>
                       <button
                         type="button"
@@ -555,7 +555,7 @@ export function AgentStation({
                         }}
                         className="px-2 py-0.5 text-3xs rounded bg-primary text-primary-foreground font-medium disabled:opacity-50"
                       >
-                        确定
+                        Confirm
                       </button>
                     </div>
                   </div>
@@ -568,7 +568,7 @@ export function AgentStation({
                     }}
                     className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/30 mt-1"
                   >
-                    <span>输入自定义模型…</span>
+                    <span>Custom model…</span>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -594,9 +594,9 @@ export function AgentStation({
                         ? 'text-foreground hover:text-primary cursor-pointer bg-surface2/60 hover:bg-surface2'
                         : 'text-muted-foreground/60 bg-surface2/30 cursor-not-allowed'
                     )}
-                    title={canConfigure ? '点击切换推理强度' : offlineHint}
+                    title={canConfigure ? 'Click to change reasoning effort' : offlineHint}
                   >
-                    <span className="truncate max-w-[120px]">{effortInfo.current || '未配置'}</span>
+                    <span className="truncate max-w-[120px]">{effortInfo.current || 'Not set'}</span>
                     <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
                   </button>
                 </DropdownMenuTrigger>

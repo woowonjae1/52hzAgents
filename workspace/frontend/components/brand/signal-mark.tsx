@@ -187,49 +187,15 @@ export function SignalMark({ size = 24, still = false, className, title }: Signa
         <circle className="sm-spout sm-spout3" cx="59" cy="16" r="2.5" />
       </g>
 
-      <style>{`
-        .signal-mark { display:block; overflow:visible; }
-
-        /* A slow, continuous turn rather than a snap. Biologically an eye
-           saccades, but a mark that darts reads nervous in a sidebar you look at
-           all day. The layers deliberately do NOT share a duration: parts that
-           start and stop together read as one rigid object being driven by
-           something. */
-        .signal-mark .sm-face   { transition:transform 1150ms cubic-bezier(.42,0,.3,1); }
-        .signal-mark .sm-mouth  { transition:transform 1290ms cubic-bezier(.42,0,.3,1); }
-        .signal-mark .sm-jaw    { transform-box:fill-box; transform-origin:center;
-                                  transition:transform 1240ms cubic-bezier(.42,0,.3,1); }
-        .signal-mark .sm-turn   { transform-origin:50px 62px;
-                                  transition:transform 1420ms cubic-bezier(.42,0,.28,1); }
-        .signal-mark .sm-socket { transform-box:fill-box; transform-origin:center;
-                                  transition:transform 1200ms cubic-bezier(.42,0,.3,1); }
-        .signal-mark .sm-flex   { transform-box:fill-box; transform-origin:center;
-                                  transition:transform 240ms cubic-bezier(.3,1.35,.4,1); }
-        .signal-mark .sm-pupil  { transform-box:fill-box; transform-origin:center;
-                                  transition:transform 90ms ease-out; }
-        .signal-mark.sm-blink .sm-pupil { transform:scaleY(.06); }
-
-        /* Never perfectly still, on a deliberately unrounded period so it cannot
-           phase-lock with anything the driver does. */
-        .signal-mark .sm-pod { animation:sm-bob 5.7s ease-in-out infinite; transform-origin:50px 60px; }
-        @keyframes sm-bob { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-2.2px);} }
-
-        .signal-mark .sm-spout { opacity:0; transform:translateY(4px) scale(.4); transform-origin:50px 20px; }
-        .signal-mark.sm-jet .sm-spout  { animation:sm-spout 1.15s ease-out 1; }
-        .signal-mark.sm-jet .sm-spout2 { animation-delay:.09s; }
-        .signal-mark.sm-jet .sm-spout3 { animation-delay:.045s; }
-        @keyframes sm-spout {
-          0%   { opacity:0; transform:translateY(4px) scale(.4); }
-          22%  { opacity:1; transform:translateY(-6px) scale(1); }
-          62%  { opacity:.5; transform:translateY(-13px) scale(.8); }
-          100% { opacity:0; transform:translateY(-18px) scale(.5); }
-        }
-
-        .signal-mark--still .sm-pod { animation:none; }
-        @media (prefers-reduced-motion: reduce) {
-          .signal-mark .sm-pod { animation:none; }
-        }
-      `}</style>
+      {/*
+        The mark's CSS lives in styles/globals.css, not in a <style> child here.
+        It used to sit inline, which meant one COPY OF THE WHOLE SHEET PER
+        INSTANCE: a transcript with a mark on every agent message carried a
+        stylesheet per bubble, and each mount/unmount during a virtualised
+        scroll appended or removed a <style> node — measured at ~3.9ms of style
+        work per insertion against this app's document. Nothing about the rules
+        is per-instance, so there is no reason for more than one to exist.
+      */}
     </svg>
   );
 }

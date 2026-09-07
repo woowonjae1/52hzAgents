@@ -126,7 +126,7 @@ export function LocalPreview() {
         errorDescription?: string; errorCode?: number;
       };
       if (errorCode === -3) return; // ERR_ABORTED
-      setLoadError(errorDescription || '无法连接到本地服务');
+      setLoadError(errorDescription || 'Could not reach the local server');
       setIsLoading(false);
     };
 
@@ -163,7 +163,7 @@ export function LocalPreview() {
           <button
             onClick={() => webviewRef.current?.goBack()}
             disabled={!isDesktop}
-            title="后退"
+            title="Back"
             className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
           >
             <ArrowLeft className="size-3.5" />
@@ -171,14 +171,14 @@ export function LocalPreview() {
           <button
             onClick={() => webviewRef.current?.goForward()}
             disabled={!isDesktop}
-            title="前进"
+            title="Forward"
             className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
           >
             <ArrowRight className="size-3.5" />
           </button>
           <button
             onClick={reload}
-            title="刷新"
+            title="Reload"
             className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
           >
             {isLoading ? (
@@ -200,7 +200,7 @@ export function LocalPreview() {
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
             spellCheck={false}
-            placeholder="输入 localhost:3000 或网址..."
+            placeholder="localhost:3000, or a URL"
             className="flex-1 min-w-0 bg-transparent text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none truncate"
           />
         </form>
@@ -226,7 +226,7 @@ export function LocalPreview() {
                     ? "bg-primary text-primary-foreground font-semibold"
                     : "bg-surface2 text-muted-foreground hover:text-foreground hover:bg-surface3"
                 )}
-                title={`切换到 :${port}`}
+                title={`Switch to :${port}`}
               >
                 :{port}
               </button>
@@ -239,7 +239,7 @@ export function LocalPreview() {
           <div className="flex items-center gap-0.5 rounded-lg bg-surface2/70 p-0.5">
             <button
               onClick={() => setViewport('desktop')}
-              title="桌面视口 (100%)"
+              title="Desktop viewport"
               className={cn(
                 'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
                 viewport === 'desktop' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
@@ -249,7 +249,7 @@ export function LocalPreview() {
             </button>
             <button
               onClick={() => setViewport('mobile')}
-              title="手机视口 (375px)"
+              title="Mobile viewport (375px)"
               className={cn(
                 'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
                 viewport === 'mobile' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
@@ -262,7 +262,7 @@ export function LocalPreview() {
           {isDesktop && (
             <button
               onClick={() => webviewRef.current?.openDevTools()}
-              title="打开控制台 DevTools"
+              title="Open DevTools"
               className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
             >
               <Terminal className="size-3.5" />
@@ -273,7 +273,7 @@ export function LocalPreview() {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            title="在系统浏览器中打开"
+            title="Open in system browser"
             className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
           >
             <ExternalLink className="size-3.5" />
@@ -310,17 +310,17 @@ export function LocalPreview() {
               <div className="size-13 rounded-2xl bg-surface2 border border-border/80 flex items-center justify-center mb-3 shadow-2xs">
                 <Globe className="size-6 text-foreground-extra-muted" />
               </div>
-              <h3 className="text-sm font-semibold text-foreground mb-1">本地服务尚未启动</h3>
+              <h3 className="text-sm font-semibold text-foreground mb-1">No local server running</h3>
               <p className="text-xs text-muted-foreground max-w-xs mb-4 font-mono">
-                {url} 连接未就绪
+                {url} is not answering
               </p>
               <div className="text-2xs text-muted-foreground bg-surface1 border border-border/60 rounded-xl p-3.5 max-w-xs mb-4 text-left space-y-2">
                 <p className="font-semibold text-foreground flex items-center gap-1.5">
                   <Sparkles className="size-3 text-primary" />
-                  <span>快捷启动方式：</span>
+                  <span>Two ways to start one:</span>
                 </p>
-                <p className="text-foreground/90">在左侧对 Agent 说：<br/><span className="text-primary font-mono font-medium">@claude 帮我启动本地开发服务</span></p>
-                <p className="text-foreground/75">或在终端执行 <code className="bg-surface2 px-1 py-0.5 rounded font-mono text-foreground">npm run dev</code></p>
+                <p className="text-foreground/90">Ask an agent, on the left:<br/><span className="text-primary font-mono font-medium">@claude start the local dev server</span></p>
+                <p className="text-foreground/75">or run <code className="bg-surface2 px-1 py-0.5 rounded font-mono text-foreground">npm run dev</code></p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -328,7 +328,7 @@ export function LocalPreview() {
                   className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-2xs"
                 >
                   <RefreshCw className="size-3" />
-                  <span>刷新检测</span>
+                  <span>Check again</span>
                 </button>
               </div>
             </div>
@@ -340,7 +340,7 @@ export function LocalPreview() {
       {isDesktop && consoleErrors.length > 0 && (
         <div className="shrink-0 max-h-24 overflow-auto border-t border-status-danger/20 bg-status-danger/5">
           <div className="px-3 py-1 text-3xs font-medium text-status-danger sticky top-0 bg-surface1/95">
-            控制台错误 ({consoleErrors.length})
+            Console errors ({consoleErrors.length})
           </div>
           {consoleErrors.map((msg, i) => (
             <div key={i} className="px-3 py-0.5 text-3xs font-mono text-foreground-muted break-all">

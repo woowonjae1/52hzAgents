@@ -190,7 +190,11 @@ export function Wrapper() {
               the main pane with it. */}
           {shouldShowSidebar && (
             <div
-              className={cn('shrink-0', !isSidebarResizing && 'transition-all duration-300')}
+              data-sidebar-sized
+              /* `transition-[width]`, not `transition-all`: the only property
+                 that ever changes here is the width, and `all` puts every
+                 animatable property of a flex sibling on a 300ms clock. */
+              className={cn('shrink-0', !isSidebarResizing && 'transition-[width] duration-300')}
               style={{ width: isSidebarOpen ? 'var(--sidebar-width)' : '0px' }}
             />
           )}
@@ -209,8 +213,14 @@ export function Wrapper() {
                 {!isSidebarOpen && !isSettings && viewMode !== 'threads' && (
                   <button
                     onClick={sidebarToggle}
-                    className="absolute top-4 left-3.5 z-30 size-8 rounded-lg bg-surface2/90 backdrop-blur border border-border text-foreground-muted hover:text-foreground shadow-sm flex items-center justify-center transition-all hover:scale-105 cursor-pointer"
-                    title="展开侧边栏 (Expand Sidebar)"
+                    /* `backdrop-blur` (bare) was the one site not on the blur
+                       ramp — it reads `--blur`, which is still Tailwind's 8px.
+                       `hover:scale-105` and `transition-all` went with it: a
+                       chrome button that grows under the cursor is a web
+                       affordance, and a desktop tool answers a hover with
+                       colour, not with size. */
+                    className="absolute top-4 left-3.5 z-30 size-8 rounded-lg bg-surface2/90 backdrop-blur-sm border border-border text-foreground-muted hover:text-foreground hover:bg-surface3/90 shadow-sm flex items-center justify-center transition-colors cursor-pointer"
+                    title="Expand sidebar"
                   >
                     <PanelLeft className="size-4" />
                   </button>

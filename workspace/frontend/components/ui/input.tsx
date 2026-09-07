@@ -28,7 +28,13 @@ const inputVariants = cva(
 );
 
 const inputAddonVariants = cva(
-  'flex items-center shrink-0 justify-center bg-muted border border-input shadow-xs shadow-[rgba(0,0,0,0.05)] text-secondary-foreground [&_svg]:text-secondary-foreground/60',
+  // `shadow-xs shadow-[rgba(0,0,0,0.05)]`: the second class was a shadow-COLOR
+  // modifier, which recolours the whole of `shadow-xs` to one flat 5% black.
+  // Since the elevation ramp landed, `shadow-xs` carries a hairline ring on the
+  // light ground and an inset top highlight on the dark one, and a colour
+  // modifier flattens both back out. The step is the decision; its colours are
+  // not a per-component choice.
+  'flex items-center shrink-0 justify-center bg-muted border border-input shadow-xs text-secondary-foreground [&_svg]:text-secondary-foreground/60',
   {
     variants: {
       variant: {

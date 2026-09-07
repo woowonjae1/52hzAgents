@@ -40,18 +40,33 @@ export function Sidebar() {
       then re-renders the tree 120 times a second. That was the dropped-frame
       feel, not the animation.
 
-      Instead the drag writes `--sidebar-width` straight to the document, which
-      both the sidebar and the main-pane spacer are sized off. One rAF-coalesced
-      style write per frame, no React work at all. State is committed once on
-      pointerup so localStorage and `aria-valuenow` catch up.
+      Instead the drag writes the width straight to the DOM, rAF-coalesced, with
+      no React work at all. State is committed once on pointerup so localStorage
+      and `aria-valuenow` catch up.
+
+      IT WRITES THE THREE ELEMENTS, NOT `--sidebar-width` ON `<html>`, which is
+      what this used to do. A custom property is INHERITED, so setting one on
+      the root invalidates style for every element in the document: measured at
+      37.6ms per write against this app's transcript (~1.9k nodes), where
+      writing `width` on the three elements that actually read it costs 0.2ms.
+      A 37ms frame is 2.3 frames of budget, so the drag still dropped frames —
+      the rAF coalescing was never the problem, the invalidation scope was, and
+      trading a React re-render for a full-document restyle is not a trade.
+
+      `[data-sidebar-sized]` marks those three — this <aside>, its inner column,
+      and the spacer that stands in for the fixed sidebar in wrapper.tsx — so
+      the drag can size them without threading refs across the shell.
     */
     const html = document.documentElement;
+    const sized = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-sidebar-sized]'),
+    ).map((el) => ({ el, declared: el.style.width }));
     let pending = 0;
     let frame = 0;
 
     const flush = () => {
       frame = 0;
-      html.style.setProperty('--sidebar-width', `${pending}px`);
+      for (const { el } of sized) el.style.width = `${pending}px`;
     };
     const onMove = (event: MouseEvent) => {
       // The sidebar is pinned to the start edge, so clientX *is* the width.
@@ -61,7 +76,19 @@ export function Sidebar() {
     const onUp = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
-      if (pending) setSidebarWidth(pending);
+      if (pending) {
+        // Set the variable BEFORE handing the elements back, or they render one
+        // frame at the pre-drag width while React's effect catches up.
+        html.style.setProperty('--sidebar-width', `${pending}px`);
+        setSidebarWidth(pending);
+      }
+      // React's inline width for these has not changed across the drag, so it
+      // will not rewrite what the drag overwrote. Put back the exact string
+      // each element was carrying when the drag began — snapshotted rather
+      // than assumed, because a collapse mid-drag leaves React holding `0px`
+      // for the aside and the spacer while the inner column still wants the
+      // variable, and one hardcoded value cannot be right for both.
+      for (const { el, declared } of sized) el.style.width = declared;
       setIsResizing(false);
     };
 
@@ -116,12 +143,13 @@ export function Sidebar() {
         // the click. Desktop panels settle in ~150ms.
         !isResizing && 'transition-[width,border-width] duration-[var(--shell-duration)] ease-[var(--shell-ease)]',
       )}
+      data-sidebar-sized
       style={{
         width: isSidebarOpen ? 'var(--sidebar-width)' : '0px',
         borderRightWidth: isSidebarOpen ? '1px' : '0px',
       }}
     >
-      <div className="flex flex-col h-full shrink-0 min-w-0" style={{ width: 'var(--sidebar-width)' }}>
+      <div data-sidebar-sized className="flex flex-col h-full shrink-0 min-w-0" style={{ width: 'var(--sidebar-width)' }}>
         <SidebarHeader />
         <SidebarContent />
       </div>

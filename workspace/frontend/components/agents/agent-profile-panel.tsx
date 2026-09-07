@@ -69,16 +69,16 @@ export function AgentProfilePanel() {
   // offline agent is not polling - the change would look accepted and go
   // nowhere, so the controls are disabled rather than failing silently.
   const canConfigure = !!agent && agent.status === 'online';
-  const offlineHint = 'Agent 未连接 - 连接后才能切换';
+  const offlineHint = 'Agent offline — connect it first';
 
   const handleSwitchEffort = async (level: string) => {
     if (!agent || !canConfigure) return;
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_effort', { effort: level });
       setCurrentEffort(level);
-      toast.success(`@${agent.agentName} 推理强度已设为 ${level}`);
+      toast.success(`@${agent.agentName} reasoning effort set to ${level}`);
     } catch (e) {
-      toast.error(`切换推理强度失败: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Could not change reasoning effort: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -88,9 +88,9 @@ export function AgentProfilePanel() {
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
       setCurrentModel(newModelId);
-      toast.success(`@${agent.agentName} 模型已切换为 ${newModelId}`);
+      toast.success(`@${agent.agentName} model switched to ${newModelId}`);
     } catch (e) {
-      toast.error(`切换模型失败: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Could not switch model: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSwitchingModel(false);
     }
@@ -218,9 +218,9 @@ export function AgentProfilePanel() {
     try {
       await workspaceApi.updateMember(agent.agentName, { autostart: nextAutostart });
       await refreshWorkspace();
-      toast.success(nextAutostart ? `已开启 @${agent.agentName} 启动自连` : `已关闭 @${agent.agentName} 启动自连`);
+      toast.success(nextAutostart ? `@${agent.agentName} will connect on launch` : `@${agent.agentName} will not connect on launch`);
     } catch {
-      toast.error('更新自启动配置失败');
+      toast.error('Could not update autostart');
     } finally {
       setTogglingAutostart(false);
     }
@@ -385,8 +385,8 @@ export function AgentProfilePanel() {
               <div className="flex items-center gap-2 min-w-0">
                 <Power className={cn('size-4 shrink-0', agent.autostart ? 'text-primary' : 'text-muted-foreground')} />
                 <div className="min-w-0">
-                  <div className="text-xs font-medium truncate">应用启动时自动连接</div>
-                  <div className="text-3xs text-muted-foreground mt-0.5">软件打开时自动拉起并连接此 Agent</div>
+                  <div className="text-xs font-medium truncate">Connect on launch</div>
+                  <div className="text-3xs text-muted-foreground mt-0.5">Start and connect this agent when the app opens.</div>
                 </div>
               </div>
               <button
@@ -394,7 +394,7 @@ export function AgentProfilePanel() {
                 onClick={handleToggleAutostart}
                 disabled={togglingAutostart}
                 className="text-primary hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
-                title={agent.autostart ? '点击关闭自启动' : '点击开启自启动'}
+                title={agent.autostart ? 'Click to turn off' : 'Click to turn on'}
               >
                 {agent.autostart ? (
                   <ToggleRight className="size-6 text-primary" />
@@ -416,9 +416,9 @@ export function AgentProfilePanel() {
             </div>
             <div className="p-3.5 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-2xs text-muted-foreground">当前运行模型</span>
+                <span className="text-2xs text-muted-foreground">Model</span>
                 <span className="text-xs font-mono font-medium text-foreground truncate max-w-[180px]">
-                  {currentModel || '默认环境配置'}
+                  {currentModel || 'Environment default'}
                 </span>
               </div>
 
@@ -438,7 +438,7 @@ export function AgentProfilePanel() {
                       )}
                     >
                       <span className="truncate">
-                        {availableModels.find((m) => m.id === currentModel)?.name || currentModel || '选择或修改模型…'}
+                        {availableModels.find((m) => m.id === currentModel)?.name || currentModel || 'Choose a model…'}
                       </span>
                       <ChevronDown className="size-3 text-muted-foreground ml-1 shrink-0" />
                     </button>
@@ -479,7 +479,7 @@ export function AgentProfilePanel() {
                               setCustomModelInput('');
                             }
                           }}
-                          placeholder="输入模型 ID (如 gpt-4o)..."
+                          placeholder="Model ID, e.g. gpt-4o"
                           className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
                           autoFocus
                         />
@@ -489,7 +489,7 @@ export function AgentProfilePanel() {
                             onClick={() => { setIsEnteringCustom(false); setCustomModelInput(''); }}
                             className="px-2 py-0.5 text-3xs rounded border hover:bg-surface2 text-muted-foreground"
                           >
-                            取消
+                            Cancel
                           </button>
                           <button
                             type="button"
@@ -503,7 +503,7 @@ export function AgentProfilePanel() {
                             }}
                             className="px-2 py-0.5 text-3xs rounded bg-primary text-primary-foreground font-medium disabled:opacity-50"
                           >
-                            确定
+                            Confirm
                           </button>
                         </div>
                       </div>
@@ -516,7 +516,7 @@ export function AgentProfilePanel() {
                         }}
                         className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/30 mt-1"
                       >
-                        <span>输入自定义模型…</span>
+                        <span>Custom model…</span>
                       </DropdownMenuItem>
                     )}
                   </DropdownMenuContent>
@@ -528,9 +528,9 @@ export function AgentProfilePanel() {
               {availableEfforts.length > 0 && (
                 <div className="pt-2 border-t">
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-2xs text-muted-foreground">推理强度</span>
+                    <span className="text-2xs text-muted-foreground">Reasoning effort</span>
                     <span className="text-xs font-mono font-medium text-foreground">
-                      {currentEffort || '未配置'}
+                      {currentEffort || 'Not set'}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1">

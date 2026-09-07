@@ -9,8 +9,14 @@ const { spawn, execSync, fork } = require('child_process');
 try {
   app.commandLine.appendSwitch('enable-gpu-rasterization');
   app.commandLine.appendSwitch('enable-zero-copy');
-  app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
-  app.commandLine.appendSwitch('disable-gpu-program-cache');
+  // `disable-gpu-shader-disk-cache` and `disable-gpu-program-cache` used to sit
+  // here, directly under the two switches above, and undid part of what they
+  // buy: with both caches off every launch recompiles the shader programs for
+  // every draw path the UI hits, and nothing is retained between runs. Turning
+  // GPU rasterisation on and then refusing to keep its compiled programs is a
+  // contradiction. If they were added to work around a shader-cache write
+  // failure in the packaged app, the fix is the userData path below, not
+  // disabling the cache.
   const customUserData = path.join(app.getPath('appData'), '52hzAgents-Desktop');
   app.setPath('userData', customUserData);
 } catch (e) {}

@@ -81,14 +81,14 @@ export function SettingsView() {
   const { isCopied: urlCopied, copyToClipboard: copyUrl } = useCopyToClipboard();
   const { isCopied: tokenCopied, copyToClipboard: copyToken } = useCopyToClipboard();
 
-  const SETTINGS_NAV_ITEMS: { id: SettingsTab; label: string; sublabel: string; icon: typeof Settings }[] = [
-    { id: 'general', label: '通用与桌面', sublabel: 'General & Desktop', icon: Settings },
-    { id: 'agents', label: '智能体管理', sublabel: 'Manage Agents', icon: Users },
-    { id: 'panels', label: '辅助面板', sublabel: 'Panels & Display', icon: PanelRight },
-    { id: 'export', label: '数据与分享', sublabel: 'Export & Share', icon: Download },
-    { id: 'skills', label: '技能扩展', sublabel: 'Skills Hub', icon: Sparkles },
-    { id: 'knowledge', label: '知识库', sublabel: 'Knowledge Base', icon: BookOpen },
-    { id: 'routines', label: '定时任务', sublabel: 'Scheduled Tasks', icon: CalendarClock },
+  const SETTINGS_NAV_ITEMS: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
+    { id: 'general', label: 'General & Desktop', icon: Settings },
+    { id: 'agents', label: 'Manage Agents', icon: Users },
+    { id: 'panels', label: 'Panels & Display', icon: PanelRight },
+    { id: 'export', label: 'Export & Share', icon: Download },
+    { id: 'skills', label: 'Skills Hub', icon: Sparkles },
+    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
+    { id: 'routines', label: 'Scheduled Tasks', icon: CalendarClock },
   ];
 
   useEffect(() => {
@@ -171,9 +171,9 @@ export function SettingsView() {
     try {
       await workspaceApi.updateMember(agentName, { autostart: !currentAutostart });
       await refreshWorkspace();
-      toast.success(!currentAutostart ? `已开启 @${agentName} 启动自连` : `已关闭 @${agentName} 启动自连`);
+      toast.success(!currentAutostart ? `@${agentName} will connect on launch` : `@${agentName} will not connect on launch`);
     } catch {
-      toast.error('更新自启动配置失败');
+      toast.error('Could not update autostart');
     }
   };
 
@@ -181,7 +181,7 @@ export function SettingsView() {
   const handleExportCurrentMarkdown = async () => {
     const sessionId = currentSessionId || (sessions[0]?.sessionId);
     if (!sessionId || exporting) {
-      toast.error('暂无可导出的对话会话');
+      toast.error('No conversation to export');
       return;
     }
     setExporting(true);
@@ -195,9 +195,9 @@ export function SettingsView() {
         participants: currentSession?.participants,
       });
       downloadTextFile(conversationFilename(title), md);
-      toast.success('当前对话已成功导出为 Markdown 文件');
+      toast.success('Conversation exported as Markdown');
     } catch (err) {
-      toast.error('导出失败: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error('Export failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setExporting(false);
     }
@@ -208,55 +208,48 @@ export function SettingsView() {
     ? `${window.location.origin}/share/${workspace.workspaceId || 'default'}`
     : '';
 
-  const PANELS_LIST: { id: RightPanelTab; name: string; sublabel: string; icon: typeof Globe; desc: string }[] = [
+  const PANELS_LIST: { id: RightPanelTab; name: string; icon: typeof Globe; desc: string }[] = [
     {
       id: 'browser',
-      name: '云端浏览器沙箱',
-      sublabel: 'Browser Sandbox Preview',
+      name: 'Browser Sandbox Preview',
       icon: Globe,
-      desc: '实时预览 Agent 操作的无头浏览器页面、DOM 变化与全景页面交互。',
+      desc: 'A live view of the headless browser the agents drive — pages, DOM changes, and full-page interaction.',
     },
     {
       id: 'preview',
-      name: '本地实时预览',
-      sublabel: 'Local Dev Server Preview',
+      name: 'Local Dev Server Preview',
       icon: MonitorPlay,
-      desc: '直连本机 dev server（localhost 任意端口），支持热重载、多端视口切换。桌面端额外提供 DevTools 与控制台错误捕获。',
+      desc: 'Connects straight to a dev server on this machine, any localhost port, with hot reload and viewport switching. The desktop app adds DevTools and console-error capture.',
     },
     {
       id: 'file',
-      name: '文件产物预览器',
-      sublabel: 'File Artifacts & Preview',
+      name: 'File Artifacts & Preview',
       icon: FileText,
-      desc: '快速浏览与下载由智能体生成、编辑的项目代码与 Markdown 产物。',
+      desc: 'Browse and download the project code and Markdown the agents write.',
     },
     {
       id: 'tasks',
-      name: '任务矩阵看板',
-      sublabel: 'Task Matrix & Todos',
+      name: 'Task Matrix & Todos',
       icon: ListTodo,
-      desc: '集中管理多智能体协作的任务分解列表、执行进度与状态。',
+      desc: 'One place for the task breakdown, progress, and status of a multi-agent run.',
     },
     {
       id: 'radar',
-      name: '智能体雷达拓扑',
-      sublabel: 'Agent Radar Topology',
+      name: 'Agent Radar Topology',
       icon: Radio,
-      desc: '可视化展示智能体协作网络、通信拓扑结构与实时心跳状态。',
+      desc: 'The collaboration network, how the agents are connected, and their live heartbeats.',
     },
     {
       id: 'terminal',
-      name: '智能体终端输出',
-      sublabel: 'Agent Terminal Logs',
+      name: 'Agent Terminal Logs',
       icon: Terminal,
-      desc: '查看外部 Agent 运行时的 CLI 进程标准输出流与原始日志。',
+      desc: 'Raw stdout and logs from an external agent’s CLI process.',
     },
     {
       id: 'trace',
-      name: '执行轨迹与思考流',
-      sublabel: 'Execution Trace & Reasoning',
+      name: 'Execution Trace & Reasoning',
       icon: Activity,
-      desc: '集中查看当前会话中 Agent 的多步思考、Tool 调用、Subagents 派发与实时执行树。',
+      desc: 'Multi-step reasoning, tool calls, subagent dispatch, and the live execution tree for this thread.',
     },
   ];
 
@@ -268,16 +261,16 @@ export function SettingsView() {
           <button
             onClick={() => setViewMode('threads')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-2xs"
-            title="返回对话"
+            title="Back to chat"
           >
             <ArrowLeft className="size-3.5" />
-            <span>返回对话</span>
+            <span>Back to chat</span>
           </button>
           <div className="h-4 w-px bg-border/50" />
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
               <Settings className="size-4 text-primary" />
-              <span>{workspace?.name || '52hzAgents'} · 设置中心</span>
+              <span>{workspace?.name || '52hzAgents'} · Settings</span>
             </h1>
           </div>
         </div>
@@ -290,7 +283,7 @@ export function SettingsView() {
               className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-3.5 h-8 shadow-xs cursor-pointer"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Save className="size-3.5 mr-1.5" />}
-              保存修改
+              Save changes
             </Button>
           </div>
         )}
@@ -301,7 +294,7 @@ export function SettingsView() {
         {/* Settings Navigation Sidebar */}
         <div className="w-56 lg:w-60 shrink-0 border-r border-border/40 bg-surface1/30 p-3 flex flex-col gap-1 select-none overflow-y-auto">
           <div className="px-2.5 py-1.5 text-2xs font-medium text-foreground-extra-muted uppercase tracking-wider">
-            设置选项
+            Settings
           </div>
 
           {SETTINGS_NAV_ITEMS.map((item) => {
@@ -328,8 +321,10 @@ export function SettingsView() {
                   <Icon className="size-3.5" />
                 </div>
                 <div className="min-w-0 flex-1">
+                  {/* One line. `sublabel` used to hold the English half of a
+                      bilingual pair; with the label itself in English the second
+                      line only restated the first. */}
                   <div className="text-xs truncate">{item.label}</div>
-                  <div className="text-3xs text-foreground-extra-muted truncate">{item.sublabel}</div>
                 </div>
               </button>
             );
@@ -350,20 +345,20 @@ export function SettingsView() {
                 <div className="flex items-center justify-between border-b border-border/30 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Folder className="size-4 text-primary" />
-                    工作区基础配置
+                    Workspace
                   </h2>
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-foreground-muted">工作区名称</Label>
+                    <Label className="text-xs font-medium text-foreground-muted">Workspace name</Label>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="52hz"
                       className="bg-surface0 border-border/60 text-sm h-9 max-w-lg"
                     />
-                    <p className="text-2xs text-foreground-extra-muted">自定义当前工作区在界面和侧边栏顶部显示的名称</p>
+                    <p className="text-2xs text-foreground-extra-muted">The name shown in the interface and at the top of the sidebar.</p>
                   </div>
 
                   {/* Collapsible Advanced / Developer Options for Workspace ID & Token */}
@@ -374,13 +369,13 @@ export function SettingsView() {
                       className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium transition-colors cursor-pointer select-none py-1"
                     >
                       <ChevronRight className={cn('size-3.5 transition-transform duration-200', showAdvanced && 'rotate-90 text-primary')} />
-                      <span>高级开发者选项（工作区 ID 与鉴权 Token）</span>
+                      <span>Developer options (workspace ID and token)</span>
                     </button>
 
                     {showAdvanced && (
                       <div className="mt-3 p-4 rounded-xl bg-surface0/70 border border-border/40 grid grid-cols-1 md:grid-cols-2 gap-4 animate-[fadeIn_0.15s_ease-out]">
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-foreground-muted">工作区 ID (Workspace ID)</Label>
+                          <Label className="text-xs font-medium text-foreground-muted">Workspace ID</Label>
                           <div className="flex items-center gap-2">
                             <Input
                               readOnly
@@ -396,11 +391,11 @@ export function SettingsView() {
                               {urlCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                             </Button>
                           </div>
-                          <p className="text-3xs text-foreground-extra-muted">用于 CLI、API 或外部 Agent 连接时的路由标识</p>
+                          <p className="text-3xs text-foreground-extra-muted">The routing identifier a CLI, the API, or an external agent connects with.</p>
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-foreground-muted">管理 Token (Token)</Label>
+                          <Label className="text-xs font-medium text-foreground-muted">Admin token</Label>
                           <div className="flex items-center gap-2">
                             <Input
                               readOnly
@@ -414,7 +409,7 @@ export function SettingsView() {
                               onClick={() => {
                                 if (token) {
                                   copyToken(token);
-                                  toast.success('Token 已复制到剪贴板');
+                                  toast.success('Token copied');
                                 }
                               }}
                               className="h-9 px-3 shrink-0 cursor-pointer"
@@ -422,7 +417,7 @@ export function SettingsView() {
                               {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                             </Button>
                           </div>
-                          <p className="text-3xs text-foreground-extra-muted">用于保护工作区管理权限的高权限安全密钥</p>
+                          <p className="text-3xs text-foreground-extra-muted">A high-privilege key that guards workspace administration. Treat it like a password.</p>
                         </div>
                       </div>
                     )}
@@ -435,7 +430,7 @@ export function SettingsView() {
                 <div className="flex items-center justify-between border-b border-border/30 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Palette className="size-4 text-primary" />
-                    品牌标识
+                    Brand mark
                   </h2>
                   {markColor !== DEFAULT_MARK_COLOR && (
                     <button
@@ -444,7 +439,7 @@ export function SettingsView() {
                       className="text-2xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
                     >
                       <RefreshCw className="size-3" />
-                      恢复默认
+                      Reset
                     </button>
                   )}
                 </div>
@@ -453,12 +448,12 @@ export function SettingsView() {
                   {/* Live preview. The mark reads the same CSS variable the
                       swatches write, so this needs no props to stay in sync. */}
                   <div className="shrink-0 size-24 rounded-xl bg-surface0 border border-border/40 flex items-center justify-center">
-                    <SignalMark size={56} title="标识预览" />
+                    <SignalMark size={56} title="Mark preview" />
                   </div>
 
                   <div className="min-w-0 flex-1 space-y-3">
                     <p className="text-xs text-foreground-muted">
-                      选择 SignalMark 的主体颜色。侧边栏、空状态、分享页与消息头像会同时更新，五官保持固定深色以确保各配色下都清晰可辨。
+                      The mark's body colour. The sidebar, empty states, share pages, and message avatars all follow it; the face stays a fixed near-black so it reads on every choice.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {MARK_COLOR_PRESETS.map((preset) => {
@@ -468,8 +463,8 @@ export function SettingsView() {
                             key={preset.value}
                             type="button"
                             onClick={() => setMarkColor(preset.value)}
-                            title={`${preset.label} · ${preset.sublabel}`}
-                            aria-label={`${preset.label} ${preset.sublabel}`}
+                            title={preset.label}
+                            aria-label={preset.label}
                             aria-pressed={active}
                             className={cn(
                               'relative size-9 rounded-full cursor-pointer transition-all duration-150',
@@ -492,7 +487,7 @@ export function SettingsView() {
                       })}
                     </div>
                     <p className="text-3xs text-foreground-extra-muted font-mono">
-                      当前：{MARK_COLOR_PRESETS.find((p) => p.value === markColor)?.label ?? '自定义'} · {markColor.toUpperCase()}
+                      {MARK_COLOR_PRESETS.find((p) => p.value === markColor)?.label ?? 'Custom'} · {markColor.toUpperCase()}
                     </p>
                   </div>
                 </div>
@@ -503,18 +498,18 @@ export function SettingsView() {
                 <div className="flex items-center justify-between border-b border-border/30 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Monitor className="size-4 text-primary" />
-                    桌面端与快捷键
+                    Desktop & shortcuts
                   </h2>
                   <span className="text-2xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                    {isDesktop ? '桌面客户端已激活' : '网页端模式'}
+                    {isDesktop ? 'Desktop app' : 'Browser'}
                   </span>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface0 border border-border/40">
                     <div>
-                      <p className="text-sm font-medium text-foreground">开机自动启动</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">电脑开机时自动在系统托盘静默启动 52hzAgents</p>
+                      <p className="text-sm font-medium text-foreground">Launch at login</p>
+                      <p className="text-xs text-foreground-muted mt-0.5">Start 52hzAgents in the system tray when the computer boots.</p>
                     </div>
                     <button
                       onClick={handleToggleAutostart}
@@ -527,8 +522,8 @@ export function SettingsView() {
 
                   <div className="p-3.5 rounded-xl bg-surface0 border border-border/40 flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-foreground">Quick Bar 全局快捷键</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">在系统任意界面随时呼出 Raycast 风格 AI 快捷指令栏</p>
+                      <p className="text-sm font-medium text-foreground">Quick Bar shortcut</p>
+                      <p className="text-xs text-foreground-muted mt-0.5">Summon the command bar from anywhere in the system.</p>
                     </div>
                     <kbd className="px-2.5 py-1 rounded bg-surface2 border border-border text-xs font-mono font-medium text-foreground">
                       Alt + Space
@@ -542,7 +537,7 @@ export function SettingsView() {
                 <div className="flex items-center justify-between border-b border-border/30 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Users className="size-4 text-primary" />
-                    工作区成员协作
+                    Members
                   </h2>
                 </div>
 
@@ -561,14 +556,14 @@ export function SettingsView() {
                       disabled={!newCollabEmail.trim()}
                       className="h-9 px-4 text-xs shrink-0 cursor-pointer"
                     >
-                      添加成员
+                      Add member
                     </Button>
                   </div>
 
                   <div className="divide-y divide-border/30 rounded-xl bg-surface0 border border-border/40 overflow-hidden">
                     {collaborators.length === 0 ? (
                       <div className="p-4 text-center text-xs text-foreground-muted">
-                        当前工作区暂无其他协作成员
+                        No other members yet
                       </div>
                     ) : (
                       collaborators.map((c) => (
@@ -586,7 +581,7 @@ export function SettingsView() {
                             onClick={() => handleRemoveCollaborator(c.email)}
                             className="text-xs text-status-danger hover:text-status-danger transition-colors cursor-pointer"
                           >
-                            移除
+                            Remove
                           </button>
                         </div>
                       ))
@@ -608,7 +603,7 @@ export function SettingsView() {
                       className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground cursor-pointer font-medium"
                     >
                       <ArrowLeft className="size-3.5" />
-                      <span>返回智能体列表</span>
+                      <span>Back to agents</span>
                     </button>
                   </div>
                   <div className="rounded-2xl border border-border/40 bg-surface1 p-6">
@@ -621,10 +616,10 @@ export function SettingsView() {
                     <div>
                       <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                         <Users className="size-5 text-primary" />
-                        智能体接入与角色管理
+                        Agents & roles
                       </h2>
                       <p className="text-xs text-foreground-muted mt-1">
-                        共接入 {agents.length} 个智能体（{agents.filter(a => a.status === 'online').length} 个在线）。支持一键指定对话 Leader、配置专属角色或接入新 Agent。
+                        {agents.filter(a => a.status === 'online').length} of {agents.length} agents online. Name a thread leader, give an agent a role, or connect a new one.
                       </p>
                     </div>
 
@@ -633,7 +628,7 @@ export function SettingsView() {
                       className="bg-primary text-primary-foreground text-xs h-8.5 px-3.5 flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
                       <Plug className="size-3.5" />
-                      <span>接入新智能体</span>
+                      <span>Connect agent</span>
                     </Button>
                   </div>
 
@@ -643,16 +638,16 @@ export function SettingsView() {
                         <div className="size-12 rounded-2xl bg-surface2 mx-auto flex items-center justify-center text-foreground-muted">
                           <Bot className="size-6" />
                         </div>
-                        <h3 className="text-sm font-semibold text-foreground">暂无在线智能体</h3>
+                        <h3 className="text-sm font-semibold text-foreground">No agents online</h3>
                         <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-                          当前工作区尚未连接 Agent。点击右上角「接入新智能体」快速接入 Claude CLI、Antigravity、OpenClaw 或自定义智能体。
+                          No agent is connected yet. Use Connect agent, top right, to hook up Claude CLI, Antigravity, OpenClaw, or a custom agent.
                         </p>
                         <Button
                           onClick={() => setShowConnectAgent(true)}
                           size="sm"
                           className="text-xs mt-2"
                         >
-                          立即接入 Agent
+                          Connect an agent
                         </Button>
                       </div>
                     ) : (
@@ -700,23 +695,23 @@ export function SettingsView() {
                                       ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
                                       : 'bg-surface2/60 border-border/40 text-foreground-extra-muted hover:text-foreground-muted'
                                   )}
-                                  title={agent.autostart ? '已开启应用启动时自动连接（点击关闭）' : '未开启应用启动时自动连接（点击开启）'}
+                                  title={agent.autostart ? 'Connects on launch — click to turn off' : 'Does not connect on launch — click to turn on'}
                                 >
                                   <Power className="size-2.5" />
-                                  <span>{agent.autostart ? '自启动' : '手动'}</span>
+                                  <span>{agent.autostart ? 'Auto' : 'Manual'}</span>
                                 </button>
 
                                 <span className={cn(
                                   'text-3xs px-2 py-0.5 rounded-full font-medium',
                                   isOnline ? 'bg-status-success/10 text-status-success' : 'bg-surface2 text-foreground-muted'
                                 )}>
-                                  {isOnline ? '在线' : '离线'}
+                                  {isOnline ? 'Online' : 'Offline'}
                                 </span>
                               </div>
                             </div>
 
                             <p className="text-xs text-foreground-muted line-clamp-2 leading-relaxed">
-                              {agent.description || '暂无详细描述。点击下方配置可自定义此 Agent 的提示词与能力职责。'}
+                              {agent.description || 'No description. Use the role settings below to give this agent a prompt and a remit.'}
                             </p>
 
                             <div className="pt-2 border-t border-border/30 flex items-center justify-between gap-2">
@@ -728,10 +723,10 @@ export function SettingsView() {
                                       'px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1',
                                       isMaster ? 'bg-status-warning/15 text-status-warning font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
                                     )}
-                                    title="设为此对话的 Leader 主导智能体"
+                                    title="Make this the leader of the thread"
                                   >
                                     <Crown className="size-3" />
-                                    <span>{isMaster ? '主导者' : '设为 Leader'}</span>
+                                    <span>{isMaster ? 'Leader' : 'Make leader'}</span>
                                   </button>
                                 )}
 
@@ -741,14 +736,14 @@ export function SettingsView() {
                                       onClick={() => removeParticipant(currentSessionId, agent.agentName)}
                                       className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-status-danger hover:bg-status-danger/10 transition-colors cursor-pointer"
                                     >
-                                      移出会话
+                                      Remove from thread
                                     </button>
                                   ) : (
                                     <button
                                       onClick={() => addParticipant(currentSessionId, agent.agentName)}
                                       className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-primary hover:bg-primary/10 transition-colors cursor-pointer"
                                     >
-                                      加入会话
+                                      Add to thread
                                     </button>
                                   )
                                 )}
@@ -758,7 +753,7 @@ export function SettingsView() {
                                 onClick={() => setSelectedAgentName(agent.agentName)}
                                 className="text-xs text-foreground-muted hover:text-foreground inline-flex items-center gap-1 cursor-pointer"
                               >
-                                <span>角色配置</span>
+                                <span>Role</span>
                                 <ChevronRight className="size-3" />
                               </button>
                             </div>
@@ -778,10 +773,10 @@ export function SettingsView() {
               <div className="p-6 rounded-2xl bg-surface1 border border-border/40 shadow-sm space-y-2">
                 <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                   <PanelRight className="size-5 text-primary" />
-                  辅助侧边面板与预览配置
+                  Side panels
                 </h2>
                 <p className="text-xs text-foreground-muted leading-relaxed">
-                  在对话主界面右侧提供沉浸式的多模态协同面板（浏览器、代码产物、任务看板、雷达拓扑与终端日志）。
+                  Panels that open beside the thread: browser, file artifacts, task board, agent topology, and terminal logs.
                 </p>
               </div>
 
@@ -790,17 +785,17 @@ export function SettingsView() {
                 <div>
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Globe className="size-4 text-primary" />
-                    分屏浏览器模式 (Split Browser)
+                    Split browser
                   </h3>
                   <p className="text-xs text-foreground-muted mt-0.5">
-                    在主界面将浏览器与对话窗口并排分屏显示，适合网页开发、自动化调试与实时巡检。
+                    Show the browser side by side with the thread — for web work, debugging automation, and watching a run.
                   </p>
                 </div>
                 <button
                   onClick={() => {
                     const next = !splitBrowser;
                     setSplitBrowser(next);
-                    toast.success(next ? '已开启分屏浏览器模式' : '已关闭分屏浏览器模式');
+                    toast.success(next ? 'Split browser on' : 'Split browser off');
                   }}
                   className="text-primary hover:opacity-80 transition-opacity cursor-pointer"
                 >
@@ -834,7 +829,6 @@ export function SettingsView() {
                           </div>
                           <div>
                             <h4 className="text-sm font-semibold text-foreground">{panel.name}</h4>
-                            <span className="text-3xs text-foreground-extra-muted font-mono">{panel.sublabel}</span>
                           </div>
                         </div>
 
@@ -842,7 +836,7 @@ export function SettingsView() {
                           'text-3xs px-2 py-0.5 rounded-full font-medium',
                           isActive ? 'bg-primary/15 text-primary' : 'bg-surface2 text-foreground-extra-muted'
                         )}>
-                          {isActive ? '已激活' : '未开启'}
+                          {isActive ? 'Open' : 'Closed'}
                         </span>
                       </div>
 
@@ -851,17 +845,17 @@ export function SettingsView() {
                       </p>
 
                       <div className="pt-2 border-t border-border/30 flex items-center justify-between">
-                        <span className="text-2xs text-foreground-extra-muted">右侧快捷面板</span>
+                        <span className="text-2xs text-foreground-extra-muted">Side panel</span>
                         <Button
                           variant={isActive ? 'primary' : 'outline'}
                           size="sm"
                           onClick={() => {
                             setActiveRightTab(isActive ? null : panel.id);
-                            toast.success(isActive ? `已关闭 ${panel.name}` : `已打开 ${panel.name}`);
+                            toast.success(isActive ? `${panel.name} closed` : `${panel.name} opened`);
                           }}
                           className="h-7.5 px-3 text-xs cursor-pointer"
                         >
-                          {isActive ? '关闭面板' : '打开预览'}
+                          {isActive ? 'Close' : 'Open'}
                         </Button>
                       </div>
                     </div>
@@ -877,10 +871,10 @@ export function SettingsView() {
               <div className="p-6 rounded-2xl bg-surface1 border border-border/40 shadow-sm space-y-2">
                 <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                   <Download className="size-5 text-primary" />
-                  会话数据导出与公开分享
+                  Export & share
                 </h2>
                 <p className="text-xs text-foreground-muted leading-relaxed">
-                  将多智能体协作讨论记录、执行代码与关键成果导出为标准 Markdown，或生成只读安全分享链接。
+                  Export the thread — discussion, code, and results — as Markdown, or create a read-only share link.
                 </p>
               </div>
 
@@ -891,9 +885,9 @@ export function SettingsView() {
                     <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                       <FileText className="size-5" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground">导出当前会话为 Markdown</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Export this thread as Markdown</h3>
                     <p className="text-xs text-foreground-muted leading-relaxed">
-                      将当前正在进行的对话历史、智能体思考推理与产出的代码块完整保存为单文件 `.md` 格式，方便导入 Notion 或 Obsidian 归档。
+                      Saves the history, the agents’ reasoning, and every code block into one `.md` file, ready for Notion or Obsidian.
                     </p>
                   </div>
 
@@ -903,7 +897,7 @@ export function SettingsView() {
                     className="w-full bg-primary text-primary-foreground text-xs h-9 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
-                    <span>{exporting ? '正在导出...' : '一键导出 Markdown (.md)'}</span>
+                    <span>{exporting ? 'Exporting…' : 'Export Markdown (.md)'}</span>
                   </Button>
                 </div>
 
@@ -913,9 +907,9 @@ export function SettingsView() {
                     <div className="size-10 rounded-xl bg-status-success/10 text-status-success flex items-center justify-center">
                       <Share2 className="size-5" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground">工作区公开只读分享</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Read-only share link</h3>
                     <p className="text-xs text-foreground-muted leading-relaxed">
-                      生成安全只读只看链接，允许团队成员或外部访客无需登录即可浏览当前工作区的实时对话与产物。
+                      Creates a link that shows this workspace’s live threads and artifacts without a login. Read-only.
                     </p>
                   </div>
 
@@ -931,7 +925,7 @@ export function SettingsView() {
                         size="sm"
                         onClick={() => {
                           copyShare(workspaceShareUrl);
-                          toast.success('分享链接已复制到剪贴板');
+                          toast.success('Share link copied');
                         }}
                         className="h-9 px-3 shrink-0 cursor-pointer"
                       >

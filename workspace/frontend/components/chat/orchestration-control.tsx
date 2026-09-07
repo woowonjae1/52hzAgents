@@ -132,7 +132,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
         <ShieldCheck className="size-3.5 mt-0.5 shrink-0 text-primary" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium">质量门验证命令…</span>
+            <span className="text-xs font-medium">Verification command…</span>
             {session.verificationCmd && (
               <span className="text-3xs px-1.5 py-0.2 rounded bg-primary/10 text-primary font-mono truncate max-w-[100px]">
                 {session.verificationCmd}
@@ -140,7 +140,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
             )}
           </div>
           <p className="text-2xs text-muted-foreground leading-snug">
-            设置 Turn 结束时的真实验证命令（如 go test / npm test）
+            The command to run when a turn ends, e.g. go test or npm test
           </p>
         </div>
       </DropdownMenuItem>
@@ -392,33 +392,33 @@ export function QualityGateDialog({ open, onOpenChange, initialValue, onSave }: 
         <DialogHeader>
           <div className="flex items-center gap-2">
             <ShieldCheck className="size-4 text-primary" />
-            <DialogTitle>质量门真实验证命令</DialogTitle>
+            <DialogTitle>Verification command</DialogTitle>
           </div>
           <DialogDescription>
-            显式配置此会话的真实编译与测试命令（如 <code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">go test ./...</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">npm test</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">pytest</code>）。
-            系统会在 Agent 开始前记录初始基线，结束时对比差集，仅当引入<strong>新错误或回归</strong>时才会触发自愈修复。
+            The command this thread actually compiles and tests with — <code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">go test ./...</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">npm test</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">pytest</code>.
+            A baseline is recorded before the agent starts and diffed against the result at the end, so self-repair only fires on a <strong>new error or a regression</strong>.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2 py-2">
-          <label className="text-xs font-medium text-foreground">验证命令 (Verification Command)</label>
+          <label className="text-xs font-medium text-foreground">Verification command</label>
           <input
             type="text"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             autoFocus
-            placeholder="例如: go test ./... 或 npm test"
+            placeholder="e.g. go test ./... or npm test"
             className="w-full rounded-md border bg-transparent px-3 py-2 text-sm font-mono outline-none focus:border-primary"
           />
-          <p className="text-3xs text-muted-foreground">留空则表示关闭真实验证，回退至散文文本启发式检测。</p>
+          <p className="text-3xs text-muted-foreground">Leave empty to turn real verification off and fall back to reading the agent’s own prose.</p>
         </div>
 
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            取消
+            Cancel
           </Button>
           <Button size="sm" onClick={save}>
-            保存配置
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -14,7 +14,6 @@ export interface MarkColorPreset {
   /** The `--signal-mark-body` value. */
   value: string;
   label: string;
-  sublabel: string;
 }
 
 /**
@@ -29,14 +28,14 @@ export interface MarkColorPreset {
  * which is exactly how this was first written.
  */
 export const MARK_COLOR_PRESETS: MarkColorPreset[] = [
-  { value: '#1c6ea4', label: '信号蓝', sublabel: 'Signal' },
-  { value: '#137d74', label: '深青', sublabel: 'Teal' },
-  { value: '#4a7c3f', label: '松绿', sublabel: 'Moss' },
-  { value: '#b7791f', label: '琥珀', sublabel: 'Amber' },
-  { value: '#c4562b', label: '赤陶', sublabel: 'Terracotta' },
-  { value: '#b03a48', label: '绛红', sublabel: 'Crimson' },
-  { value: '#8b5ca8', label: '玫紫', sublabel: 'Mauve' },
-  { value: '#5a6b78', label: '石板', sublabel: 'Slate' },
+  { value: '#1c6ea4', label: 'Signal' },
+  { value: '#137d74', label: 'Teal' },
+  { value: '#4a7c3f', label: 'Moss' },
+  { value: '#b7791f', label: 'Amber' },
+  { value: '#c4562b', label: 'Terracotta' },
+  { value: '#b03a48', label: 'Crimson' },
+  { value: '#8b5ca8', label: 'Mauve' },
+  { value: '#5a6b78', label: 'Slate' },
 ];
 
 /** The mark's original colour, and the fallback baked into the SVG fills. */

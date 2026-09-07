@@ -420,7 +420,7 @@ export function TasksView() {
                   ? 'bg-background text-foreground shadow-xs font-semibold'
                   : 'text-foreground-muted hover:text-foreground'
               )}
-              title="List View (列表视图)"
+              title="List View (List)"
             >
               <LayoutList className="size-3.5" />
               <span>List</span>
@@ -434,7 +434,7 @@ export function TasksView() {
                   ? 'bg-background text-foreground shadow-xs font-semibold'
                   : 'text-foreground-muted hover:text-foreground'
               )}
-              title="Board Kanban View (看板视图)"
+              title="Board Kanban View (Board)"
             >
               <LayoutGrid className="size-3.5" />
               <span>Board</span>

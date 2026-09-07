@@ -246,7 +246,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
           if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
             const formattedQuestions: ApprovalCardQuestion[] = rawQuestions.map((q: any, idx: number) => ({
               id: q.id || q.title || `q${idx + 1}`,
-              title: q.title || q.question || '请选择',
+              title: q.title || q.question || 'Choose one',
               options: (q.options || q.choices || []).map((opt: any) =>
                 typeof opt === 'string'
                   ? { value: opt, label: opt }
@@ -266,7 +266,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                       .join('\n');
                     if (sessionId) {
                       workspaceApi.sendMessage(sessionId, `[Decision]\n${answerSummary}`, 'User');
-                      toast.success('已提交选择');
+                      toast.success('Answer sent');
                     }
                   }}
                 />

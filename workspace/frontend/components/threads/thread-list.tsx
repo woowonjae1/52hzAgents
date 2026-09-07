@@ -310,6 +310,48 @@ const ThreadRow = memo(function ThreadRow({
 
   const smartTitle = getSmartSessionTitle(session, lastMsg);
 
+  /*
+    THE SECOND LINE IS DROPPED WHEN IT RESTATES THE FIRST.
+
+    `getSmartSessionTitle` falls back to the last message's content for any
+    session without a real title — cleaned, then cut at 24 characters with an
+    ellipsis. `preview` is that same message. So on every unnamed thread the row
+    spent two lines of height and a 10px type step to say one thing twice:
+      看了下现有覆盖（9 篇 /...
+      看了下现有覆盖（9 篇 / 40+ 节，基础→并...
+    Four of six rows looked like that. Comparing on normalised text — same
+    markdown/emoji stripping the title got, trailing ellipsis removed — catches
+    the truncation case, which a plain equality check cannot.
+
+    `No messages yet` deliberately survives: it does not repeat the title, and
+    "this thread is empty" is the one thing the second line can say that the
+    first cannot.
+  */
+  const normalizeForCompare = (s: string) =>
+    s
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[`*_#~>]/g, '')
+      .replace(/[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/gu, '')
+      .replace(/\s+/g, ' ')
+      .replace(/(\.{3}|…)$/, '')
+      .trim()
+      .toLowerCase();
+  /*
+    `preview` is a ReactNode, not a string — a search hit, a running tool chip
+    and the `thinking` sweep are all JSX. Those can never be a restatement of
+    the title, and the empty string below makes the test fall through to
+    "show it", which is the right answer for all three.
+  */
+  const normalizedPreview = typeof preview === 'string' ? normalizeForCompare(preview) : '';
+  const normalizedTitle = normalizeForCompare(smartTitle);
+  const previewRestatesTitle =
+    normalizedPreview.length > 0 &&
+    normalizedTitle.length > 0 &&
+    (normalizedPreview === normalizedTitle ||
+      normalizedPreview.startsWith(normalizedTitle) ||
+      normalizedTitle.startsWith(normalizedPreview));
+  const showPreview = !previewRestatesTitle;
+
   return (
     <div
       onClick={() => {
@@ -338,7 +380,10 @@ const ThreadRow = memo(function ThreadRow({
         ) : null}
       </div>
 
-      <div className="flex-1 min-w-0 space-y-1">
+      {/* No `space-y-1` here any more: the gap belongs to the preview line,
+          which is now conditional, and a `space-y` that only ever applies to
+          one optional child is a rule looking for a sibling. */}
+      <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1.5">
           {session.starred && (
             <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
@@ -383,17 +428,23 @@ const ThreadRow = memo(function ThreadRow({
               {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
             </span>
           )}
-          <span className="text-3xs text-foreground-extra-muted shrink-0 font-mono tabular-nums">
+          {/* `font-sans`, not `font-mono tabular-nums`: this is "5 hours ago",
+              not a column of figures. Monospacing prose sets it in a second
+              typeface for no alignment benefit, and at 10px the mono face is
+              the widest thing in a row that is fighting for width. */}
+          <span className="text-3xs text-foreground-extra-muted shrink-0">
             {displayTime}
           </span>
         </div>
-        <p className={cn(
-          'text-3xs truncate leading-relaxed font-sans',
-          isSelected ? 'text-foreground/70' : 'text-foreground-muted',
-          previewIsStatus && 'italic text-foreground-muted'
-        )}>
-          {preview}
-        </p>
+        {showPreview && (
+          <p className={cn(
+            'text-3xs truncate leading-relaxed font-sans mt-1',
+            isSelected ? 'text-foreground/70' : 'text-foreground-muted',
+            previewIsStatus && 'italic text-foreground-muted'
+          )}>
+            {preview}
+          </p>
+        )}
       </div>
 
       {/* Hover actions */}
@@ -643,7 +694,11 @@ export function ThreadList() {
     getScrollElement: () => listContainerRef.current,
     estimateSize: (index) => {
       const item = virtualListItems[index];
-      return item?.type === 'header' ? 34 : 52;
+      // 52 assumed every row carried a preview line. Most no longer do (see
+      // `previewRestatesTitle` in ThreadRow), so the estimate sat ~18px over
+      // the common case and the scrollbar was wrong until `measureElement`
+      // caught up. 44 is between a one-line and a two-line row.
+      return item?.type === 'header' ? 34 : 44;
     },
     overscan: 8,
     getItemKey: (index) => virtualListItems[index]?.key || index,

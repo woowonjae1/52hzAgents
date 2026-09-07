@@ -573,7 +573,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
             <div className="my-2 p-3.5 rounded-xl border border-destructive/25 bg-destructive/5 dark:bg-destructive/10 text-foreground flex items-start gap-3">
               <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0 space-y-1">
-                <p className="text-xs font-semibold text-destructive">异常中断与鉴权提示</p>
+                <p className="text-xs font-semibold text-destructive">Interrupted, or an auth problem</p>
                 <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
                   {cleanContent}
                 </div>

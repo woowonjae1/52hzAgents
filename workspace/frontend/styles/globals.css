@@ -108,18 +108,41 @@
   --ring: #09090b;
   /*
     P4 scale recalibration. 12px was a card radius on a surface that is not made
-    of cards — at `rounded-lg`'s 202 call sites it read soft rather than dense,
+    of cards — at `rounded-lg`'s 216 call sites it read soft rather than dense,
     which is most of the gap against a desktop-native tool.
 
-    The root font-size half of P4 is deliberately NOT taken. Tailwind's
-    `text-xs`/`text-sm` are rem, so a 15px root drags `text-xs` to 11.25px and
-    lands it on top of the px-pinned `--text-2xs` (11px) below, collapsing the
-    12/11/10 ladder that 32 components use to separate a badge from a label.
-    Radius buys the density without spending the type scale.
+    NOW IN px, NOT rem. It was `0.5rem`, which was the same 8px only because the
+    root was 16px; the root is 15px as of the second half of P4 (below), and
+    radius is a deliberate value that should not ride along with a density
+    change. 8px is the decision, so 8px is what it says.
   */
-  --radius: 0.5rem;
+  --radius: 8px;
 
   --chat-column: min(1380px, 100%);
+
+  /*
+    ── Elevation ──
+
+    ONE ramp, five steps, mapped onto Tailwind's own `--shadow-*` keys in
+    `@theme` below — so all 150 `shadow-*` sites across 65 files draw from it
+    without any of them being edited. That count, spread over seven of
+    Tailwind's default steps plus two arbitrary `shadow-[…]` values, is what the
+    comment further down this file means by "none of which agree": the steps
+    were never wrong individually, they were just never one scale.
+
+    Tailwind's defaults are tuned for a white page — a soft `rgb(0 0 0 / 0.1)`
+    drop with no ring. Two things follow. On the light ground that reads as a
+    generic web card, so every step here carries a hairline `0 0 0 1px` ring
+    that does the separating and lets the blur stay tight. On the obsidian
+    ground a black drop is invisible against #09090b, so the dark ramp leads
+    with an INSET TOP HIGHLIGHT — a 1px lit edge is what makes a dark surface
+    read as raised, and it is the one thing Tailwind's scale cannot express.
+  */
+  --elevation-1: 0 1px 1px 0 rgb(9 9 11 / 0.04), 0 0 0 1px rgb(9 9 11 / 0.05);
+  --elevation-2: 0 1px 2px -1px rgb(9 9 11 / 0.10), 0 1px 1px 0 rgb(9 9 11 / 0.04), 0 0 0 1px rgb(9 9 11 / 0.05);
+  --elevation-3: 0 4px 10px -2px rgb(9 9 11 / 0.10), 0 2px 4px -2px rgb(9 9 11 / 0.06), 0 0 0 1px rgb(9 9 11 / 0.06);
+  --elevation-4: 0 10px 24px -6px rgb(9 9 11 / 0.14), 0 3px 8px -3px rgb(9 9 11 / 0.08), 0 0 0 1px rgb(9 9 11 / 0.07);
+  --elevation-5: 0 20px 44px -12px rgb(9 9 11 / 0.20), 0 6px 14px -6px rgb(9 9 11 / 0.10), 0 0 0 1px rgb(9 9 11 / 0.08);
 }
 
 /**
@@ -215,6 +238,20 @@
   --muted-foreground: #a1a1aa;
   --input: #18181e;
   --ring: #f4f4f6;
+
+  /*
+    Dark elevation. See the light ramp in `:root` for why this is a different
+    recipe rather than the same one with more alpha: on #09090b a black drop
+    has almost nothing to darken, so the lit top edge carries the raise and the
+    drop only separates the surface from the ground behind it. The ring is gone
+    for the same reason — a dark hairline on a dark ground is invisible, and the
+    inset highlight already draws the top edge.
+  */
+  --elevation-1: inset 0 1px 0 0 rgb(255 255 255 / 0.03), 0 1px 1px 0 rgb(0 0 0 / 0.30);
+  --elevation-2: inset 0 1px 0 0 rgb(255 255 255 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.50), 0 1px 1px 0 rgb(0 0 0 / 0.35);
+  --elevation-3: inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.40);
+  --elevation-4: inset 0 1px 0 0 rgb(255 255 255 / 0.06), 0 12px 28px -8px rgb(0 0 0 / 0.65), 0 4px 10px -4px rgb(0 0 0 / 0.45);
+  --elevation-5: inset 0 1px 0 0 rgb(255 255 255 / 0.07), 0 24px 56px -16px rgb(0 0 0 / 0.75), 0 8px 18px -8px rgb(0 0 0 / 0.55);
 }
 
 /** Theme Setup **/
@@ -401,11 +438,73 @@
     md/lg/xl/2xl are ratios off `--radius` rather than +/- fixed px, so the
     scale stays proportional if that value moves again. sm and base stay
     absolute: they are Paseo's own steps, not derived ones.
+
+    xl and 2xl were `* 1.5` and `* 2` — 12px and 16px, which put the top of the
+    ramp back where `--radius` started before P4 pulled it down. 152 sites use
+    those two steps, so the tightening that the 8px base bought was being spent
+    again by the steps above it. `* 1.25` / `* 1.75` keeps a visible ramp
+    (8 → 10 → 14) without any step reading as a card corner.
   */
   --radius-md: calc(var(--radius) * 0.75);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.5);
-  --radius-2xl: calc(var(--radius) * 2);
+  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-2xl: calc(var(--radius) * 1.75);
+
+  /*
+    ── Elevation, mapped onto Tailwind's own keys ──
+
+    Every `shadow-*` utility in the app resolves through here, so the ramp in
+    `:root` / `.dark` is the only place a depth decision is made. `@theme
+    inline` matters: without it Tailwind wraps the value in another variable of
+    its own and the `.dark` override never reaches the utility.
+
+    Two keys share a step at each end on purpose. `xs` (77 sites) and `2xs` are
+    both resting chrome, and `xl` (8) and `2xl` (7) are both "floating over the
+    whole app" — the ramp has five steps because the app has five depths, not
+    because Tailwind ships seven names.
+  */
+  --shadow-2xs: var(--elevation-1);
+  --shadow-xs: var(--elevation-1);
+  --shadow-sm: var(--elevation-2);
+  --shadow-md: var(--elevation-3);
+  --shadow-lg: var(--elevation-4);
+  --shadow-xl: var(--elevation-5);
+  --shadow-2xl: var(--elevation-5);
+
+  /*
+    ── Blur ──
+
+    Tailwind's `blur-*` namespace drives `backdrop-blur-*` too, so these 31
+    sites (16 of them `backdrop-blur-md`) all read from here. Collapsed from six
+    steps onto two real ones: 6px is "this is chrome sitting on content", 20px
+    is "this is an overlay and the content behind it is not for reading now".
+    Nothing in this app needs a third answer, and every backdrop-filter element
+    is its own compositing layer, so the smaller radii are not only tidier.
+  */
+  --blur-xs: 6px;
+  --blur-sm: 6px;
+  --blur-md: 6px;
+  --blur-lg: 20px;
+  --blur-xl: 20px;
+  --blur-2xl: 20px;
+  --blur-3xl: 20px;
+
+  /*
+    ── The type ladder, pinned ──
+
+    `xs` and `sm` were Tailwind's rem defaults (12px / 14px at a 16px root).
+    They are px now because the root is 15px: left in rem, `text-xs` would have
+    computed to 11.25px and landed on top of the px-pinned `--text-2xs` (11px),
+    collapsing the 12/11/10 ladder that 32 components use to separate a badge
+    from a label. That collision is why the root half of P4 was declined
+    earlier; pinning the two rem-based steps removes it instead of avoiding it.
+
+    `sm` also drops 14 → 13, which is the density the root change is for: the
+    ladder is now an even 15/13/12/11/10, and a desktop tool's body text lives
+    at 13, not 14.
+  */
+  --text-xs: 12px;
+  --text-sm: 13px;
 
   /** Animations **/
   --animate-marquee: marquee var(--duration) infinite linear;
@@ -599,6 +698,19 @@
 
 /** Smooth scroll + mobile viewport **/
 html {
+  /*
+    The second half of P4. 15px, not the browser's 16px default: Tailwind's
+    spacing scale is rem, so this is the one declaration that tightens all of
+    `p-*`, `gap-*`, `m-*`, `size-*` and `h-*` at once — 6.25% off every gap in
+    the app, which is the density a desktop tool has and a web page does not.
+
+    It is safe here only because `--text-xs` and `--text-sm` are pinned to px in
+    `@theme` above. Left in rem they would have slid down onto `--text-2xs` and
+    flattened the badge-vs-label ladder, which is exactly why this line was not
+    written the first time round. `--radius` is pinned in px for the same
+    reason. Anything still in rem is meant to move with this.
+  */
+  font-size: 15px;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
@@ -1042,3 +1154,56 @@ nextjs-portal,
   animation: cursor-blink 0.8s infinite;
 }
 
+
+/* ==========================================================================
+   SignalMark — the 52hzAgents brand mark (components/brand/signal-mark.tsx)
+   ==========================================================================
+
+   These rules were an inline `<style>` child of the SVG, so every rendered
+   mark shipped its own copy of the sheet — five on an ordinary screen, one per
+   agent message in a long transcript — and each mount during a virtualised
+   scroll appended a fresh <style> node for the engine to absorb. Nothing here
+   varies per instance; the body colour that does is a CSS variable
+   (`--signal-mark-body`) read off <html>. One sheet is enough.
+   ========================================================================== */
+
+.signal-mark { display: block; overflow: visible; }
+
+/* A slow, continuous turn rather than a snap. Biologically an eye saccades, but
+   a mark that darts reads nervous in a sidebar you look at all day. The layers
+   deliberately do NOT share a duration: parts that start and stop together read
+   as one rigid object being driven by something. */
+.signal-mark .sm-face   { transition: transform 1150ms cubic-bezier(.42,0,.3,1); }
+.signal-mark .sm-mouth  { transition: transform 1290ms cubic-bezier(.42,0,.3,1); }
+.signal-mark .sm-jaw    { transform-box: fill-box; transform-origin: center;
+                          transition: transform 1240ms cubic-bezier(.42,0,.3,1); }
+.signal-mark .sm-turn   { transform-origin: 50px 62px;
+                          transition: transform 1420ms cubic-bezier(.42,0,.28,1); }
+.signal-mark .sm-socket { transform-box: fill-box; transform-origin: center;
+                          transition: transform 1200ms cubic-bezier(.42,0,.3,1); }
+.signal-mark .sm-flex   { transform-box: fill-box; transform-origin: center;
+                          transition: transform 240ms cubic-bezier(.3,1.35,.4,1); }
+.signal-mark .sm-pupil  { transform-box: fill-box; transform-origin: center;
+                          transition: transform 90ms ease-out; }
+.signal-mark.sm-blink .sm-pupil { transform: scaleY(.06); }
+
+/* Never perfectly still, on a deliberately unrounded period so it cannot
+   phase-lock with anything the driver does. */
+.signal-mark .sm-pod { animation: sm-bob 5.7s ease-in-out infinite; transform-origin: 50px 60px; }
+@keyframes sm-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.2px); } }
+
+.signal-mark .sm-spout { opacity: 0; transform: translateY(4px) scale(.4); transform-origin: 50px 20px; }
+.signal-mark.sm-jet .sm-spout  { animation: sm-spout 1.15s ease-out 1; }
+.signal-mark.sm-jet .sm-spout2 { animation-delay: .09s; }
+.signal-mark.sm-jet .sm-spout3 { animation-delay: .045s; }
+@keyframes sm-spout {
+  0%   { opacity: 0;  transform: translateY(4px) scale(.4); }
+  22%  { opacity: 1;  transform: translateY(-6px) scale(1); }
+  62%  { opacity: .5; transform: translateY(-13px) scale(.8); }
+  100% { opacity: 0;  transform: translateY(-18px) scale(.5); }
+}
+
+.signal-mark--still .sm-pod { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .signal-mark .sm-pod { animation: none; }
+}

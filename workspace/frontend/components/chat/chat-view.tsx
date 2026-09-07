@@ -985,66 +985,90 @@ export function ChatView() {
       {/* Messages */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {loading && displayMessages.length === 0 ? (
+          /*
+            `.event-running` — the app's ONE "still going" signal — instead of a
+            ring spinner. globals.css says not to add a second one, and this was
+            a second one: a 24px `animate-spin` in the middle of an otherwise
+            empty pane, which reads as a stalled page rather than a thread that
+            is a few hundred milliseconds from arriving.
+          */
           <div className="flex items-center justify-center flex-1">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="event-running text-xs text-foreground-muted">Loading conversation</span>
           </div>
         ) : displayMessages.length === 0 ? (
+          /*
+            The decoration that used to open this branch is gone: a 600×320
+            `blur-[110px]` sky/indigo/primary gradient "ambient lighting mesh"
+            and a masked radial dot-grid, stacked behind everything. Both are on
+            the explicit no-list for this app (no gradients, no glows, no
+            neon sky/violet) and this is the FIRST screen of an empty
+            workspace — the one place the look gets set. What remains is the
+            content that was already here.
+          */
           <div className="relative flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
-            {/* Linear-style Ambient Lighting Mesh */}
-            <div className="pointer-events-none absolute top-12 left-1/2 -translate-x-1/2 w-[600px] h-[320px] bg-gradient-to-tr from-primary/15 via-sky-500/10 to-indigo-500/10 blur-[110px] rounded-full opacity-60 dark:opacity-40" />
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-35 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_40%,#000_60%,transparent_100%)]" />
-
-            <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6 animate-[fadeIn_0.25s_ease-out]">
-              {/* Brand Status Pill Badge */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/80 bg-surface1/80 backdrop-blur-md shadow-2xs text-2xs font-medium text-foreground-muted">
-                <span className="relative flex h-2 w-2">
-                  <span className={cn("animate-ping absolute inline-flex h-full w-full rounded-full opacity-75", hasOnlineAgents ? "bg-emerald-400" : "bg-amber-400")} />
-                  <span className={cn("relative inline-flex rounded-full h-2 w-2", hasOnlineAgents ? "bg-emerald-500" : "bg-amber-500")} />
+            <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6">
+              {/*
+                Status line. Three things left: the `animate-ping` halo (on the
+                no-list, and it announced a state that was not changing), the
+                `backdrop-blur-md` (there is nothing behind this pill to blur —
+                it is a filter and a compositing layer for no effect), and
+                "System Standby · Awaiting Agent", which is the sci-fi register
+                this app does not use. It now reads as a count, because a count
+                is the fact.
+              */}
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-border bg-surface1 text-2xs font-medium text-foreground-muted">
+                <span
+                  className={cn(
+                    'size-1.5 rounded-full shrink-0',
+                    hasOnlineAgents ? 'bg-status-success' : 'bg-status-warning',
+                  )}
+                />
+                <span>
+                  {hasOnlineAgents
+                    ? `${onlineAgents.length} of ${agents.length} agents online`
+                    : 'No agents online'}
                 </span>
-                <span>{hasOnlineAgents ? `${onlineAgents.length} Agents Online & Ready` : "System Standby · Awaiting Agent"}</span>
-                <span className="text-foreground-extra-muted opacity-50">/</span>
-                <span className="font-mono text-3xs text-foreground-extra-muted">52hz Workspace</span>
               </div>
 
-              {/* Brand Emblem with breathing glow halo */}
-              <div className="relative group">
-                <div className="absolute -inset-2 bg-gradient-to-r from-sky-500/20 to-primary/20 rounded-full blur-xl opacity-60 group-hover:opacity-100 transition duration-500" />
-                <div className="relative">
-                  <SignalMark size={84} />
-                </div>
-              </div>
+              {/* The mark, with no halo behind it. It is a solid two-colour
+                  disc precisely so it does not need one. */}
+              <SignalMark size={84} />
 
-              {/* Title & Greeting */}
-              <div className="space-y-1.5 max-w-lg">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                  What can I help you build?
-                </h1>
-                <p className="text-xs sm:text-sm text-foreground-muted leading-relaxed">
-                  52hzAgents — autonomous multi-agent workspace. Deep reasoning, instant recall, and tool-augmented execution.
-                </p>
-              </div>
+              {/* One line, not a tagline under a headline. "autonomous
+                  multi-agent workspace. Deep reasoning, instant recall, and
+                  tool-augmented execution." was product-page copy in a tool the
+                  user has already bought and opened. */}
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground max-w-lg">
+                What can I help you build?
+              </h1>
 
               {!hasOnlineAgents ? (
                 <div className="w-full space-y-4">
                   {/* Hero Connection Card */}
-                  <div className="w-full p-5 rounded-2xl bg-surface1/90 border border-border/80 shadow-sm backdrop-blur-md flex flex-col items-center text-center space-y-3.5 transition-all hover:border-border-accent/60">
-                    <div className="size-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 dark:text-amber-400 shadow-2xs">
-                      <Radio className="size-5 animate-pulse" />
+                  {/* `amber-500/10` → `--status-warning`, which is the token
+                      that already means "attention" here; `animate-pulse` on
+                      the icon is on the no-list; `backdrop-blur-md` blurs a
+                      flat surface; `active:scale-[0.98]` is a web affordance;
+                      and `transition-all` on a card put its border, shadow and
+                      padding on one clock. */}
+                  <div className="w-full p-4 rounded-lg bg-surface1 border border-border shadow-sm flex flex-col items-center text-center space-y-3 transition-colors hover:border-border-accent/60">
+                    <div className="size-9 rounded-md bg-status-warning/10 border border-status-warning/20 flex items-center justify-center text-status-warning">
+                      <Radio className="size-4.5" />
                     </div>
                     <div className="space-y-1 max-w-md">
-                      <h2 className="text-sm font-semibold text-foreground">No Connected Agents Online</h2>
+                      <h2 className="text-sm font-semibold text-foreground">No agents online</h2>
                       <p className="text-xs text-foreground-muted leading-relaxed">
-                        Start the local connector CLI, or open the connect station to hook Claude, OpenClaw, or custom agents before initiating conversations.
+                        Start the local connector CLI, or open the connect station to hook up Claude, OpenClaw, or a custom agent.
                       </p>
                     </div>
-                    <div className="pt-1 flex flex-wrap items-center justify-center gap-2.5">
+                    <div className="pt-0.5 flex flex-wrap items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
                       >
                         <Plug className="size-3.5" />
-                        <span>Connect Agent</span>
+                        <span>Connect agent</span>
                       </button>
                       <button
                         type="button"
@@ -1053,11 +1077,11 @@ export function ChatView() {
                           navigator.clipboard.writeText(cmd);
                           toast.success('Connector CLI command copied to clipboard');
                         }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface2 hover:bg-surface3 border border-border/60 text-foreground text-xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 border border-border text-foreground text-xs font-medium transition-colors cursor-pointer"
                         title="Copy command to run agent connector locally"
                       >
                         <Copy className="size-3.5 text-foreground-muted" />
-                        <span>Copy CLI Command</span>
+                        <span>Copy CLI command</span>
                       </button>
                     </div>
                   </div>
@@ -1072,9 +1096,9 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('tasks')}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
                       >
-                        <div className="size-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-emerald-600 dark:text-emerald-400">
+                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <CheckCircle2 className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1096,9 +1120,9 @@ export function ChatView() {
                         onClick={() => {
                           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
                         }}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
                       >
-                        <div className="size-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-sky-600 dark:text-sky-400">
+                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Search className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1118,9 +1142,9 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
                       >
-                        <div className="size-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-indigo-600 dark:text-indigo-400">
+                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Activity className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1140,9 +1164,9 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => openSettings('general')}
-                        className="flex items-start gap-3 p-3 rounded-xl bg-surface1/70 hover:bg-surface2/80 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
                       >
-                        <div className="size-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-amber-600 dark:text-amber-400">
+                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Settings className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1173,9 +1197,9 @@ export function ChatView() {
                         handleDraftChange(item.prompt);
                         setFocusKey((k) => k + 1);
                       }}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-surface1/80 hover:bg-surface2/90 border border-border/60 hover:border-border-accent/80 transition-all duration-150 cursor-pointer group shadow-2xs hover:shadow-xs text-left"
+                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
                     >
-                      <div className="size-8 rounded-lg bg-surface2 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0">
                         <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-primary transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
