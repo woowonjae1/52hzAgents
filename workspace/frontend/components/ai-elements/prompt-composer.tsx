@@ -133,6 +133,12 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const [message, setMessage] = React.useState(draft ?? '');
   const [showMentions, setShowMentions] = React.useState(false);
+  /*
+    Which character opened the picker. `@` offers agents and knowledge docs;
+    `/` offers knowledge only. One popover, two entrances -- the placeholder
+    has promised both since it was written.
+  */
+  const [mentionTrigger, setMentionTrigger] = React.useState<'@' | '/'>('@');
   const [mentionFilter, setMentionFilter] = React.useState('');
   const [mentionIndex, setMentionIndex] = React.useState(0);
   const [pendingFiles, setPendingFiles] = React.useState<PendingFile[]>([]);
@@ -282,10 +288,24 @@ export function PromptComposer({
     return [...agentList, ...knowledgeList];
   }, [agents, knowledge]);
 
+  /*
+    `/` is a knowledge-only entrance, so it drops the agents rather than
+    ranking them lower: someone who typed `/` is looking for a document, and
+    a list that answers with eight agents first has not understood the
+    question. `@` keeps both groups.
+  */
+  const scopedMentionItems = React.useMemo(
+    () =>
+      mentionTrigger === '/'
+        ? mentionItems.filter((item) => item.type === 'knowledge')
+        : mentionItems,
+    [mentionItems, mentionTrigger],
+  );
+
   const filteredMentions = React.useMemo(() => {
-    if (!mentionFilter) return mentionItems;
+    if (!mentionFilter) return scopedMentionItems;
     const q = mentionFilter.toLowerCase();
-    return mentionItems.filter((item) => {
+    return scopedMentionItems.filter((item) => {
       if (item.type === 'agent') {
         return item.name.toLowerCase().includes(q) || item.agent.agentType?.toLowerCase().includes(q);
       }
@@ -295,7 +315,7 @@ export function PromptComposer({
         item.knowledge.slug?.toLowerCase().includes(q)
       );
     });
-  }, [mentionItems, mentionFilter]);
+  }, [scopedMentionItems, mentionFilter]);
 
   const mentionGroups = React.useMemo(() => {
     type AgentItem = { type: 'agent'; name: string; agent: WorkspaceAgent; isOnline: boolean };
@@ -314,7 +334,13 @@ export function PromptComposer({
     const val = message;
     const pos = ta?.selectionStart ?? val.length;
     const textBefore = val.slice(0, pos);
-    const atIdx = textBefore.lastIndexOf('@');
+    /*
+      Replace from whichever character opened the picker. What goes IN is
+      always `@name`: `/` is an entrance, not a second wire format, so
+      `extractMentionSegments` and the send path keep seeing one syntax.
+    */
+    const active = findActiveTrigger(textBefore);
+    const atIdx = active ? active.index : textBefore.lastIndexOf('@');
 
     const mentionText = `@${item.name} `;
     const updated = atIdx >= 0 ? val.slice(0, atIdx) + mentionText + val.slice(pos) : mentionText + val;
@@ -340,17 +366,13 @@ export function PromptComposer({
     onDraftChange?.(val);
 
     const pos = e.target.selectionStart;
-    const textBefore = val.slice(0, pos);
-    const atIdx = textBefore.lastIndexOf('@');
-
-    if (atIdx >= 0 && (atIdx === 0 || /\s/.test(val[atIdx - 1]))) {
-      const query = textBefore.slice(atIdx + 1);
-      if (!/\s/.test(query)) {
-        setMentionFilter(query);
-        setShowMentions(true);
-        setMentionIndex(0);
-        return;
-      }
+    const active = findActiveTrigger(val.slice(0, pos));
+    if (active) {
+      setMentionTrigger(active.char);
+      setMentionFilter(active.query);
+      setShowMentions(true);
+      setMentionIndex(0);
+      return;
     }
     setShowMentions(false);
   };
@@ -675,11 +697,16 @@ export function PromptComposer({
         {/* Bottom Control Row */}
         <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
           <div className="flex items-center gap-1.5 min-w-0">
-            <AgentModelSwitcher agentName={masterAgentName} sessionId={session?.sessionId} />
+            <AgentModelSwitcher
+              agentName={masterAgentName}
+              participants={session?.participants}
+              sessionId={session?.sessionId}
+            />
 
             <button
               type="button"
               onClick={() => {
+                setMentionTrigger('@');
                 setShowMentions((prev) => !prev);
                 textareaRef.current?.focus();
               }}
@@ -791,4 +818,33 @@ export function PromptComposer({
       )}
     </div>
   );
+}
+
+/**
+ * Which picker trigger the caret is sitting in, if any.
+ *
+ * `/` IS DELIBERATELY THE SAME STRICTNESS AS `@`, NOT LOOSER: it only counts at
+ * the very start of the message or straight after whitespace. `src/lib/foo`,
+ * `go test ./...` and `and/or` are all ordinary things to type into a message to
+ * an agent, and none of them should open a document picker. The check on the
+ * character BEFORE the trigger is what makes that hold.
+ *
+ * When both characters are present the later one wins, so typing
+ * `@claude look at /` opens knowledge rather than re-opening the agent list.
+ */
+function findActiveTrigger(
+  textBefore: string,
+): { char: '@' | '/'; index: number; query: string } | null {
+  let best: { char: '@' | '/'; index: number } | null = null;
+  for (const char of ['@', '/'] as const) {
+    const index = textBefore.lastIndexOf(char);
+    if (index < 0) continue;
+    if (index !== 0 && !/\s/.test(textBefore[index - 1])) continue;
+    if (!best || index > best.index) best = { char, index };
+  }
+  if (!best) return null;
+  const query = textBefore.slice(best.index + 1);
+  // Whitespace after the trigger means the thought moved on.
+  if (/\s/.test(query)) return null;
+  return { char: best.char, index: best.index, query };
 }

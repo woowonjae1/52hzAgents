@@ -10,6 +10,7 @@ import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
 import { ConnectAgentModal } from './connect-agent-modal';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 import { parseReportedModels } from '@/components/chat/agent-model-switcher';
+import { hydrateAgentModels } from '@/lib/agent-model-store';
 import {
   Users,
   PanelRight,
@@ -219,6 +220,10 @@ export function MissionControl() {
         const usage = await workspaceApi.getAgentUsage(name);
         const parsedModels = parseReportedModels(usage?.available_models);
         const parsedEfforts = parseReportedModels(usage?.available_efforts);
+        // This poll is the widest one in the app (every configured agent, not
+        // just the online ones), so it is the best place to keep the shared
+        // store warm for whichever surface reads it next.
+        hydrateAgentModels(name, { options: parsedModels, current: usage?.current_model });
         return {
           name,
           modelInfo: {

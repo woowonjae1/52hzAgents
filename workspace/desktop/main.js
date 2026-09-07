@@ -491,6 +491,32 @@ function createMainWindow() {
   mainWindow.on('move', saveState);
   mainWindow.on('maximize', saveState);
   mainWindow.on('unmaximize', saveState);
+
+  /*
+    Tell the renderer whenever the OS has rebuilt the window's non-client area.
+
+    `titleBarStyle: 'hidden'` means the ONLY thing that moves this window is the
+    `-webkit-app-region: drag` band the renderer draws. Chromium collects those
+    rectangles once and caches them, and a maximise / restore / re-show can
+    leave that cache pointing at the old frame — at which point the titlebar
+    looks the same and drags nothing. `AppTitlebar` listens for this and
+    re-asserts the region, which forces the collection to run again.
+
+    `show` is in the list because the close button hides the window to the tray
+    rather than destroying it, so the common path back into the app is a
+    `show()` rather than a fresh window.
+  */
+  const notifyWindowState = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window-state-changed');
+    }
+  };
+  mainWindow.on('maximize', notifyWindowState);
+  mainWindow.on('unmaximize', notifyWindowState);
+  mainWindow.on('restore', notifyWindowState);
+  mainWindow.on('show', notifyWindowState);
+  mainWindow.on('enter-full-screen', notifyWindowState);
+  mainWindow.on('leave-full-screen', notifyWindowState);
   // 'close' rather than 'closed': the window still has bounds to read here.
   mainWindow.on('close', () => persistWindowState(mainWindow));
 

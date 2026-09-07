@@ -29,6 +29,53 @@ export function AppTitlebar() {
   const { workspace } = useWorkspace();
   const { isSidebarOpen, sidebarToggle } = useLayout();
   const { resolvedTheme } = useTheme();
+  const bandRef = React.useRef<HTMLElement>(null);
+
+  /*
+    RE-ASSERT THE DRAG REGION AFTER EVERY WINDOW STATE CHANGE.
+
+    This band is the only thing that moves the window — `titleBarStyle:
+    'hidden'` leaves no native caption bar to grab. Chromium collects the
+    `-webkit-app-region: drag` rectangles from the layout and caches them, and
+    when the OS rebuilds the window's non-client area (maximise, restore from
+    minimised, re-show from the tray) that cache can keep describing the old
+    frame. The band still paints, still looks draggable, and drags nothing.
+
+    Flipping the property to `no-drag` and back on the next frame is what makes
+    the collection run again: it is a real change to the element's app-region,
+    so it cannot be coalesced away. One frame with the region off is not
+    reachable by a user — the event arrives while the window is still animating
+    into its new state.
+
+    If the cache was fine, this is two style writes and a no-op.
+  */
+  React.useEffect(() => {
+    const bridge = (window as unknown as {
+      electronBridge?: { onWindowStateChanged?: (cb: () => void) => () => void };
+    }).electronBridge;
+    if (!bridge?.onWindowStateChanged) return;
+
+    let frame = 0;
+    const reassert = () => {
+      const band = bandRef.current;
+      if (!band) return;
+      band.style.setProperty('-webkit-app-region', 'no-drag');
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        // Removing the override hands the element back to the stylesheet's
+        // `app-region: drag`, rather than pinning `drag` inline and shadowing
+        // the `:where(button, a, …)` no-drag rule for everything inside.
+        band.style.removeProperty('-webkit-app-region');
+      });
+    };
+
+    const unsubscribe = bridge.onWindowStateChanged(reassert);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      unsubscribe?.();
+    };
+  }, []);
 
   /*
     The caption buttons are drawn by the OS on top of this band, so CSS cannot
@@ -46,6 +93,7 @@ export function AppTitlebar() {
 
   return (
     <header
+      ref={bandRef}
       className="app-titlebar fixed top-0 start-0 end-0 z-50 flex items-center gap-2 bg-surface-sidebar border-b border-border"
       aria-label="Window titlebar"
     >

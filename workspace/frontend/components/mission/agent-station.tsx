@@ -24,6 +24,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { parseReportedModels, type AgentModelOption } from '@/components/chat/agent-model-switcher';
+import {
+  currentModelFor,
+  setCurrentModel as publishCurrentModel,
+  useAgentModels,
+} from '@/lib/agent-model-store';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
@@ -145,6 +150,17 @@ export function AgentStation({
     }
   }, [initialEffortInfo]);
 
+  /*
+    The shared model store wins over the prop.
+
+    `initialModelInfo` comes from Mission Control's own 5s usage poll, so a
+    switch made in the composer chip did not reach this row until that poll
+    came round -- two controls for one fact, disagreeing for up to five
+    seconds. The store is written the moment any surface switches.
+  */
+  const modelState = useAgentModels();
+  const effectiveModelId = currentModelFor(modelState, agent.agentName) ?? modelInfo.current;
+
   const handleSwitchEffort = async (level: string) => {
     if (!canConfigure) return;
     try {
@@ -162,6 +178,9 @@ export function AgentStation({
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
       setModelInfo((prev) => ({ ...prev, current: newModelId }));
+      // Publish to the shared store so the composer chip and the profile
+      // panel stop showing the pre-switch model.
+      publishCurrentModel(agent.agentName, newModelId);
       toast.success(`@${agent.agentName} switched to ${modelLabel}`);
       onRefreshUsage?.();
     } catch (e) {
@@ -490,7 +509,7 @@ export function AgentStation({
                   title={canConfigure ? 'Click to switch model' : offlineHint}
                 >
                   <span className="truncate max-w-[120px]">
-                    {modelInfo.models.find((m) => m.id === modelInfo.current)?.shortName || modelInfo.current || 'No model set'}
+                    {modelInfo.models.find((m) => m.id === effectiveModelId)?.shortName || effectiveModelId || 'No model set'}
                   </span>
                   <ChevronDown className={cn('size-2.5 shrink-0', canConfigure ? 'opacity-60' : 'opacity-30')} />
                 </button>
@@ -502,11 +521,11 @@ export function AgentStation({
                     onClick={() => handleSwitchModel(m.id, m.name)}
                     className={cn(
                       'flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer',
-                      modelInfo.current === m.id && 'font-bold text-primary bg-surface3'
+                      effectiveModelId === m.id && 'font-bold text-primary bg-surface3'
                     )}
                   >
                     <span className="truncate">{m.name}</span>
-                    {modelInfo.current === m.id && <Check className="size-3 text-primary ml-1" />}
+                    {effectiveModelId === m.id && <Check className="size-3 text-primary ml-1" />}
                   </DropdownMenuItem>
                 ))}
 
@@ -564,7 +583,7 @@ export function AgentStation({
                     onSelect={(e) => {
                       e.preventDefault();
                       setIsEnteringCustom(true);
-                      setCustomModelInput(modelInfo.current || '');
+                      setCustomModelInput(effectiveModelId || '');
                     }}
                     className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/30 mt-1"
                   >

@@ -13,6 +13,21 @@ contextBridge.exposeInMainWorld('electronBridge', {
   // The overlay is drawn by the OS, so CSS cannot reach it — without this the
   // buttons keep one fixed grey and go low-contrast in light mode.
   setTitleBarSymbolColor: (color) => ipcRenderer.send('window-titlebar-symbol-color', color),
+  /**
+   * Fires after the window is maximised, unmaximised, restored or re-shown.
+   *
+   * The renderer needs to know because Chromium caches the rectangles it
+   * collected from `-webkit-app-region: drag` and does not always recollect
+   * them when the OS changes the window's non-client area underneath it. When
+   * that cache goes stale the titlebar stops moving the window — see
+   * `AppTitlebar`, which re-asserts the region on this signal.
+   */
+  onWindowStateChanged: (handler) => {
+    if (typeof handler !== 'function') return () => {};
+    const listener = () => handler();
+    ipcRenderer.on('window-state-changed', listener);
+    return () => ipcRenderer.removeListener('window-state-changed', listener);
+  },
   hideQuickBar: () => ipcRenderer.send('quickbar-hide'),
   openMainWindow: (route) => ipcRenderer.send('main-window-open', route),
   getAutostart: () => ipcRenderer.invoke('app-get-autostart'),

@@ -8,6 +8,11 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { parseReportedModels, type AgentModelOption } from '@/components/chat/agent-model-switcher';
 import {
+  currentModelFor,
+  setCurrentModel as publishCurrentModel,
+  useAgentModels,
+} from '@/lib/agent-model-store';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -82,12 +87,26 @@ export function AgentProfilePanel() {
     }
   };
 
+  /*
+    Mirror a switch made on another surface into this panel's own state.
+    `currentModel` drives five render sites here; syncing the one value is
+    less invasive than threading the store through all of them.
+  */
+  const modelState = useAgentModels();
+  const sharedModel = agent ? currentModelFor(modelState, agent.agentName) : undefined;
+  useEffect(() => {
+    if (sharedModel && sharedModel !== currentModel) setCurrentModel(sharedModel);
+  }, [sharedModel, currentModel]);
+
   const handleSwitchModel = async (newModelId: string) => {
     if (!agent || switchingModel || !canConfigure) return;
     setSwitchingModel(true);
     try {
       await workspaceApi.sendAgentControl(agent.agentName, 'set_model', { model: newModelId });
       setCurrentModel(newModelId);
+      // And to the shared store, so the composer chip and the Mission
+      // Control station agree without waiting for their own polls.
+      publishCurrentModel(agent.agentName, newModelId);
       toast.success(`@${agent.agentName} model switched to ${newModelId}`);
     } catch (e) {
       toast.error(`Could not switch model: ${e instanceof Error ? e.message : String(e)}`);
