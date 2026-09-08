@@ -51,6 +51,51 @@ interface AgentModelSwitcherProps {
 
 const norm = (s: string) => s.toLowerCase();
 
+export function extractSubProvider(m: { id: string; provider?: string }): string {
+  let p = m.provider || '';
+  if (m.id.startsWith('kilo/') || m.id.startsWith('opencode/')) {
+    const parts = m.id.split('/');
+    if (parts.length > 2) {
+      p = parts[1];
+    } else if (m.id.startsWith('opencode/')) {
+      const sub = parts[1].split('-')[0].toLowerCase();
+      if (['mimo', 'nemotron', 'ling', 'muse', 'hy3'].includes(sub)) {
+        p = sub;
+      }
+    }
+  }
+  const clean = p.replace(/^~/, '').toLowerCase();
+  if (clean === 'kilo' || clean === 'opencode' || clean === 'free') return '';
+  return clean;
+}
+
+export function formatProviderName(cleanP: string): string {
+  if (!cleanP) return '';
+  switch (cleanP) {
+    case 'openai': return 'OpenAI';
+    case 'xai':
+    case 'x-ai': return 'xAI';
+    case 'anthropic': return 'Anthropic';
+    case 'deepseek': return 'DeepSeek';
+    case 'google': return 'Google';
+    case 'qwen': return 'Qwen';
+    case 'stepfun': return 'StepFun';
+    case 'minimax': return 'MiniMax';
+    case 'mistralai':
+    case 'mistral': return 'Mistral';
+    case 'meta-llama':
+    case 'meta': return 'Meta';
+    case 'bytedance-seed':
+    case 'seed': return 'ByteDance';
+    case 'mimo': return 'MiMo';
+    case 'nemotron': return 'Nvidia';
+    case 'ling': return 'Ling';
+    case 'muse': return 'Muse';
+    case 'hy3': return 'HY3';
+    default: return cleanP.charAt(0).toUpperCase() + cleanP.slice(1);
+  }
+}
+
 export function AgentModelSwitcher({
   agentName,
   participants,
@@ -222,35 +267,17 @@ export function AgentModelSwitcher({
 
     const providerMap: Record<string, { label: string; count: number }> = {};
     for (const m of activeModels) {
-      let p = m.provider || '';
-      if (m.id.startsWith('kilo/')) {
-        const parts = m.id.split('/');
-        if (parts.length > 2) p = parts[1];
-      }
-      const cleanP = p.replace(/^~/, '').toLowerCase();
-      if (cleanP && cleanP !== 'kilo' && cleanP !== 'free') {
+      const cleanP = extractSubProvider(m);
+      if (cleanP) {
         if (!providerMap[cleanP]) {
-          const formatted =
-            cleanP === 'openai' ? 'OpenAI'
-            : cleanP === 'xai' || cleanP === 'x-ai' ? 'xAI'
-            : cleanP === 'anthropic' ? 'Anthropic'
-            : cleanP === 'deepseek' ? 'DeepSeek'
-            : cleanP === 'google' ? 'Google'
-            : cleanP === 'qwen' ? 'Qwen'
-            : cleanP === 'stepfun' ? 'StepFun'
-            : cleanP === 'minimax' ? 'MiniMax'
-            : cleanP === 'mistralai' || cleanP === 'mistral' ? 'Mistral'
-            : cleanP === 'meta-llama' || cleanP === 'meta' ? 'Meta'
-            : cleanP === 'bytedance-seed' || cleanP === 'seed' ? 'ByteDance'
-            : cleanP.charAt(0).toUpperCase() + cleanP.slice(1);
-          providerMap[cleanP] = { label: formatted, count: 0 };
+          providerMap[cleanP] = { label: formatProviderName(cleanP), count: 0 };
         }
         providerMap[cleanP].count++;
       }
     }
 
     const sortedProviders = Object.entries(providerMap)
-      .filter(([_, data]) => data.count >= 2)
+      .filter(([_, data]) => data.count >= 1)
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 7);
 
@@ -270,14 +297,7 @@ export function AgentModelSwitcher({
         (m) => m.id.toLowerCase().includes('free') || m.name.toLowerCase().includes('free'),
       );
     } else if (activeCategory !== 'all') {
-      list = list.filter((m) => {
-        let p = (m.provider || '').replace(/^~/, '').toLowerCase();
-        if (m.id.startsWith('kilo/')) {
-          const parts = m.id.split('/');
-          if (parts.length > 2) p = parts[1].replace(/^~/, '').toLowerCase();
-        }
-        return p === activeCategory;
-      });
+      list = list.filter((m) => extractSubProvider(m) === activeCategory);
     }
 
     const q = searchQuery.trim().toLowerCase();
@@ -580,11 +600,15 @@ export function AgentModelSwitcher({
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                            {m.provider && (
-                              <span className="text-3xs font-normal text-muted-foreground/80">
-                                {m.provider}
-                              </span>
-                            )}
+                            {(() => {
+                              const subP = extractSubProvider(m);
+                              const label = formatProviderName(subP) || (m.provider && !['kilo', 'opencode'].includes(m.provider.toLowerCase()) ? m.provider : '');
+                              return label ? (
+                                <span className="text-3xs font-normal text-muted-foreground/80">
+                                  {label}
+                                </span>
+                              ) : null;
+                            })()}
                             {isSelected ? (
                               <Check className="size-3.5 text-primary" />
                             ) : (

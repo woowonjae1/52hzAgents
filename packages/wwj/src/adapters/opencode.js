@@ -60,6 +60,7 @@ const FLAVORS = {
     // outage) is written here and NOT to stdout, so this is the only place the
     // real reason exists when the CLI hangs instead of exiting.
     stateDir: path.join(os.homedir(), '.local', 'share', 'opencode'),
+    defaultModel: 'opencode/mimo-v2.5-free',
   },
   kilocode: {
     id: 'kilocode',
@@ -77,6 +78,7 @@ const FLAVORS = {
     configFiles: ['kilo.jsonc', 'kilo.json', 'config.json'],
     modelEnvVars: ['KILO_MODEL', 'KILOCODE_MODEL', 'LLM_MODEL'],
     stateDir: path.join(os.homedir(), '.local', 'share', 'kilo'),
+    defaultModel: 'kilo/openrouter/free',
   },
 };
 
@@ -837,7 +839,10 @@ class OpenCodeAdapter extends BaseAdapter {
       const v = (env[key] || '').trim();
       if (v) { model = v; break; }
     }
-    if (!model) return '';
+    if (!model) {
+      if (this.flavor.defaultModel) return this.flavor.defaultModel;
+      return '';
+    }
     // Already provider-qualified (e.g. "openai/gpt-4o", "anthropic/claude-â€?).
     if (model.includes('/')) return model;
     // Infer the provider from which key/base URL the env resolved to. The
@@ -1221,8 +1226,13 @@ class OpenCodeAdapter extends BaseAdapter {
     const model = this._resolveModel(channel);
     if (!model) return { ok: false, category: 'model_missing' };
 
+    const isFree =
+      model.toLowerCase().includes('free') ||
+      model.startsWith('opencode/') ||
+      model === 'opencode/big-pickle';
+
     const cred = this._credentialState();
-    if (cred === 'missing') return { ok: false, category: 'credential_missing' };
+    if (cred === 'missing' && !isFree) return { ok: false, category: 'credential_missing' };
 
     try {
       fs.accessSync(this.agentHome, fs.constants.R_OK | fs.constants.W_OK);
@@ -1293,11 +1303,13 @@ class OpenCodeAdapter extends BaseAdapter {
       try { return fs.existsSync(p) && fs.statSync(p).size > 0; } catch { return false; }
     };
     const stores = [
+      path.join(this.flavor.stateDir, 'auth.json'),
+      ...this.flavor.configFiles.map((f) => path.join(this.flavor.configDir, f)),
+      path.join(this.agentHome, `${this.flavor.id}.json`),
+      path.join(this.agentHome, `.${this.flavor.id}`, `${this.flavor.id}.json`),
       path.join(home, '.local', 'share', 'opencode', 'auth.json'),
       path.join(home, '.config', 'opencode', 'opencode.json'),
-      path.join(home, '.config', 'opencode', 'config.json'),
       path.join(this.agentHome, 'opencode.json'),
-      path.join(this.agentHome, '.opencode', 'opencode.json'),
     ];
     if (stores.some(fileNonEmpty)) return 'present';
 

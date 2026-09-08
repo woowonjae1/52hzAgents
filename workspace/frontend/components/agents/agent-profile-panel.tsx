@@ -456,8 +456,15 @@ export function AgentProfilePanel() {
                           currentModel === m.id && 'font-bold text-primary bg-surface3'
                         )}
                       >
-                        <span className="truncate">{m.name}</span>
-                        {currentModel === m.id && <Check className="size-3 text-primary ml-1" />}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="truncate">{m.name}</span>
+                          {(m.id.toLowerCase().includes('free') || m.name.toLowerCase().includes('free')) && (
+                            <span className="text-3xs px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold uppercase shrink-0">
+                              Free
+                            </span>
+                          )}
+                        </div>
+                        {currentModel === m.id && <Check className="size-3 text-primary ml-1 shrink-0" />}
                       </DropdownMenuItem>
                     ))}
 
