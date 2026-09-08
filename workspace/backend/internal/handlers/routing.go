@@ -115,6 +115,16 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 		}
 
 		instruction := strings.TrimSpace(content[instructionStart:instructionEnd])
+		instruction = strings.TrimPrefix(instruction, "：")
+		instruction = strings.TrimPrefix(instruction, ":")
+		instruction = strings.TrimSpace(instruction)
+
+		cleanText := strings.Trim(instruction, " 0123456789。，,.:：;；\r\n\t()-、")
+		if len([]rune(cleanText)) < 3 {
+			// Skip fragment mentions like "。\n2. " or "完成后 "
+			continue
+		}
+
 		segments = append(segments, models.PipelineStep{
 			Agent:       agentName,
 			Instruction: instruction,

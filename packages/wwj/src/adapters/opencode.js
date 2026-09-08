@@ -27,7 +27,7 @@ const IS_WINDOWS = process.platform === 'win32';
 const TIMEOUT_MS = 300000; // 5 minutes
 
 /**
- * Kilo Code's CLI is a fork of opencode �?same `run` subcommand, same
+ * Kilo Code's CLI is a fork of opencode â€?same `run` subcommand, same
  * `--format json` stream, same `-m/--model provider/model`, same `models`
  * subcommand (its own logs even identify the service as "opencode"). One
  * adapter therefore serves both, but they are NOT one agent type: the version
@@ -35,7 +35,7 @@ const TIMEOUT_MS = 300000; // 5 minutes
  * commands, config directories and credentials are all separate.
  *
  * Everything that differs between them lives here and nowhere else. Do NOT use
- * @latest in any install command �?this adapter parses the CLI's stream-json,
+ * @latest in any install command â€?this adapter parses the CLI's stream-json,
  * so an unbounded version floats the event schema out from under us.
  */
 const FLAVORS = {
@@ -70,7 +70,7 @@ const FLAVORS = {
     // 7.4.23 verified 2026-08-26 only as far as CLI behaviour: it accepted the
     // headless run and returned a well-formed `{"type":"error"}` event (the
     // stored provider key was 401). A successful assistant turn has NOT yet
-    // been captured on this line �?see scripts/diagnose-opencode.js.
+    // been captured on this line â€?see scripts/diagnose-opencode.js.
     pinnedVersion: '7.4.23',
     minVersion: '7.0.0',
     testedMaxVersion: '7.4.23',
@@ -109,7 +109,7 @@ const MODELS_CACHE_TTL_MS = 10 * 60 * 1000;
 // stderr) go to the daemon log, not to these.
 /**
  * Per-flavor user-facing messages. Built from the flavor so a Kilo user is
- * never told to `npm install -g opencode-ai` �?the old hardcoded hint sent them
+ * never told to `npm install -g opencode-ai` â€?the old hardcoded hint sent them
  * to the wrong package entirely.
  */
 function failureMessages(flavor) {
@@ -122,12 +122,12 @@ function failureMessages(flavor) {
   cli_not_executable: `${name} CLI was found but could not be started. Reinstall it, then retry.`,
   unsupported_version: `This ${name} CLI version is not supported (requires >= ${f.minVersion}). Reinstall \`${install}\` and retry.`,
   unverified_version: `This ${name} CLI version is newer than the highest version this adapter has been verified against (${f.testedMaxVersion}). Execution was blocked rather than risk a run that produces no output. Install \`${install}\`, or set WWJ_ALLOW_UNVERIFIED_CLI_VERSION=1 to run anyway.`,
-  // Names the path that actually works. The obvious advice �?"pick one in the
-  // TUI" �?is wrong on its own: the TUI persists its choice into an internal
+  // Names the path that actually works. The obvious advice â€?"pick one in the
+  // TUI" â€?is wrong on its own: the TUI persists its choice into an internal
   // database, not into the config file, so a TUI-only selection is invisible
   // here. Backticks around the path keep the chat renderer from eating the
   // Windows backslashes.
-  model_missing: `No model is configured for ${name}. Pick one from the model selector above this thread �?it offers exactly what \`${cli} models\` reports for your account �?or add a "model" key to \`${path.join(f.configDir, f.configFiles[0])}\`. Choosing a model only inside ${name}'s TUI is not enough: it stores that in an internal database this workspace does not read.`,
+  model_missing: `No model is configured for ${name}. Pick one from the model selector above this thread â€?it offers exactly what \`${cli} models\` reports for your account â€?or add a "model" key to \`${path.join(f.configDir, f.configFiles[0])}\`. Choosing a model only inside ${name}'s TUI is not enough: it stores that in an internal database this workspace does not read.`,
   credential_missing: `${name} has no API key or sign-in configured. Add an API key (LLM_API_KEY) or run \`${cli} auth login\`, then retry.`,
   auth_failed: `${name}'s provider rejected the credentials (authentication failed). Check the API key or sign-in and retry.`,
   provider_not_configured: `${name} has no usable provider configured. Configure a provider and model, then retry.`,
@@ -159,8 +159,8 @@ class OpenCodeAdapter extends BaseAdapter {
     // version scale or an install hint again.
     this.flavor = resolveFlavor(opts.agentType, this.agentName);
     this._messages = failureMessages(this.flavor);
-    // Per-run model overrides from the UI: channel �?model id. Deliberately
-    // NOT persisted and never written into the CLI's own config �?the CLI
+    // Per-run model overrides from the UI: channel â†?model id. Deliberately
+    // NOT persisted and never written into the CLI's own config â€?the CLI
     // remains the owner of the default, this only applies to the next turn.
     this._channelModels = {};
 
@@ -174,7 +174,7 @@ class OpenCodeAdapter extends BaseAdapter {
     this._loadSessions();
 
     // Process tracking for stop control
-    this._channelProcesses = {}; // channel �?child process
+    this._channelProcesses = {}; // channel â†?child process
     this._stoppingChannels = new Set();
 
     this._opencodeBinary = this._findOpencodeBinary();
@@ -388,7 +388,7 @@ class OpenCodeAdapter extends BaseAdapter {
       }
 
       // The only way _runOpencode resolves empty now is the stop path (handled
-      // above). Every real failure �?including exit 0 with no assistant text �?
+      // above). Every real failure â€?including exit 0 with no assistant text â€?
       // is thrown with a category and handled in catch, so we no longer post a
       // generic "produced no response" that misattributes everything to auth.
       if (responseText) {
@@ -485,7 +485,7 @@ class OpenCodeAdapter extends BaseAdapter {
    * The model's reasoning, if this event carries any.
    *
    * opencode's part union includes a `reasoning` type alongside `text`, and
-   * nothing here used to look at `part.type` at all �?`_extractTextFromEvent`
+   * nothing here used to look at `part.type` at all â€?`_extractTextFromEvent`
    * pulled `part.text` out of BOTH and the caller sent the result on as a reply
    * preview. So reasoning was not merely dropped, it was labelled as the answer:
    * once the real answer arrived, the workspace's de-duplication removed it as a
@@ -505,7 +505,7 @@ class OpenCodeAdapter extends BaseAdapter {
     const info = OpenCodeAdapter._partOf(event);
     if (info && info.type && info.type !== 'text') return null;
     // A nested `message.part.updated` keeps its increment in
-    // `properties.delta`, which the flat `event.part` read below cannot see �?
+    // `properties.delta`, which the flat `event.part` read below cannot see â€?
     // so a text part in the current event shape would come back empty.
     if (info && info.text) return info.text;
     // Control / tool / error events carry no user-visible assistant text. Match
@@ -591,7 +591,7 @@ class OpenCodeAdapter extends BaseAdapter {
     }
 
     // Reasoning first, and unflagged: it belongs in the Thought disclosure, and
-    // it must NOT be added to `finalText` �?it is not part of the answer.
+    // it must NOT be added to `finalText` â€?it is not part of the answer.
     const reasoning = OpenCodeAdapter._extractReasoningFromEvent(event);
     if (reasoning && reasoning.trim()) {
       try { await this.sendThinking(msgChannel, reasoning.trim()); } catch {}
@@ -639,7 +639,7 @@ class OpenCodeAdapter extends BaseAdapter {
 
   /**
    * True when `raw` is opencode JSON that carries ONLY control events
-   * (step_start / step_finish / tool_use) and no assistant text �?which is what
+   * (step_start / step_finish / tool_use) and no assistant text â€?which is what
    * opencode emits when no model/provider is configured. In that case
    * _extractTextFromJson falls back to returning the raw event JSON, which we
    * must NOT post to the channel as if it were a reply. Non-JSON output (real
@@ -687,7 +687,7 @@ class OpenCodeAdapter extends BaseAdapter {
    */
   stop() {
     this._stopAllProcesses(
-      'Task interrupted �?daemon restarting. Send another message to continue.'
+      'Task interrupted â€?daemon restarting. Send another message to continue.'
     ).catch(() => {});
     super.stop();
   }
@@ -697,7 +697,7 @@ class OpenCodeAdapter extends BaseAdapter {
    *
    * On Windows the direct child is `cmd.exe` wrapping the CLI, so signalling
    * only the child orphans the real process. Node's own `spawn({timeout})` does
-   * exactly that �?observed in the wild as `opencode.exe` still running ~4h
+   * exactly that â€?observed in the wild as `opencode.exe` still running ~4h
    * after this adapter's 5-minute timeout had "killed" the run, holding its
    * session state open. Every abandonment path must go through here.
    */
@@ -718,8 +718,8 @@ class OpenCodeAdapter extends BaseAdapter {
    * The CLI writes stream failures (rate limit, provider outage) to its log and
    * NOT to stdout, then keeps the process alive instead of exiting. Our timeout
    * is therefore the only signal we get, and without reading this the user is
-   * told "finished without producing a final reply" while the actual reason �?
-   * e.g. `AI_APICallError: Rate limit exceeded` �?sits on disk.
+   * told "finished without producing a final reply" while the actual reason â€?
+   * e.g. `AI_APICallError: Rate limit exceeded` â€?sits on disk.
    */
   _recentCliError(withinMs = 15 * 60 * 1000) {
     try {
@@ -735,7 +735,7 @@ class OpenCodeAdapter extends BaseAdapter {
         const line = lines[i];
         if (!line.includes('level=ERROR')) continue;
         const ts = (line.match(/timestamp=(\S+)/) || [])[1];
-        // Stop at the first error older than the window �?anything before it is
+        // Stop at the first error older than the window â€?anything before it is
         // from a previous run and would misattribute the failure.
         if (ts && Date.now() - Date.parse(ts) > withinMs) return '';
         const detail = (line.match(/error\.error="([^"]+)"/) || [])[1];
@@ -810,7 +810,7 @@ class OpenCodeAdapter extends BaseAdapter {
    * CRITICAL: opencode-ai does NOT read the OPENCODE_MODEL env var. When no
    * model is given on the command line AND none is set in opencode.json, the
    * non-interactive `run` command hangs forever waiting for interactive
-   * provider/model selection �?it emits zero output until the spawn timeout
+   * provider/model selection â€?it emits zero output until the spawn timeout
    * kills it with SIGTERM (surfaced as the misleading "exited with code null").
    * Passing `--model` explicitly is what makes headless runs actually work.
    */
@@ -843,10 +843,10 @@ class OpenCodeAdapter extends BaseAdapter {
       if (this.flavor.defaultModel) return this.flavor.defaultModel;
       return '';
     }
-    // Already provider-qualified (e.g. "openai/gpt-4o", "anthropic/claude-�?).
+    // Already provider-qualified (e.g. "openai/gpt-4o", "anthropic/claude-â€?).
     if (model.includes('/')) return model;
     // Infer the provider from which key/base URL the env resolved to. The
-    // registry maps LLM_* �?OPENAI_* for OpenAI-compatible endpoints, so
+    // registry maps LLM_* â†?OPENAI_* for OpenAI-compatible endpoints, so
     // "openai" is the right default; only switch for an Anthropic endpoint.
     const baseUrl = (env.OPENAI_BASE_URL || env.LLM_BASE_URL || '').toLowerCase();
     const provider = (env.ANTHROPIC_API_KEY || baseUrl.includes('anthropic'))
@@ -857,7 +857,7 @@ class OpenCodeAdapter extends BaseAdapter {
 
   /**
    * The model the user selected inside the CLI, read out of the CLI's own
-   * config. Strictly read-only �?this adapter never writes these files.
+   * config. Strictly read-only â€?this adapter never writes these files.
    *
    * opencode/kilo store it as a bare `"model": "provider/id"` at the config
    * root; a `provider` block may also declare models but does not say which one
@@ -868,7 +868,7 @@ class OpenCodeAdapter extends BaseAdapter {
       const file = path.join(this.flavor.configDir, name);
       try {
         if (!fs.existsSync(file)) continue;
-        // .jsonc �?strip line comments and trailing commas before parsing.
+        // .jsonc â€?strip line comments and trailing commas before parsing.
         const raw = fs.readFileSync(file, 'utf-8')
           .replace(/^\s*\/\/.*$/gm, '')
           .replace(/,(\s*[}\]])/g, '$1');
@@ -884,13 +884,13 @@ class OpenCodeAdapter extends BaseAdapter {
   }
 
   /**
-   * Every model this install can actually reach, from `<cli> models` �?the
+   * Every model this install can actually reach, from `<cli> models` â€?the
    * CLI's own answer, so there is no hardcoded list to drift. Returns [] when
    * the probe fails; an empty list must be reported as "unknown", never
    * substituted with a guess.
    */
   async _listModels() {
-    // `<cli> models` costs 2.1s (opencode) to 7.6s (kilo) �?measured. This is
+    // `<cli> models` costs 2.1s (opencode) to 7.6s (kilo) â€?measured. This is
     // called from the 30s heartbeat, so it must never block the event loop and
     // must not re-probe every tick: a spawn (not execFileSync) behind a TTL
     // cache. Everything downstream awaits.
@@ -1014,9 +1014,9 @@ class OpenCodeAdapter extends BaseAdapter {
     }
 
     const binary = this._opencodeBinary;
-    const cmd = [binary, 'run', '--format', 'json', '--dir', this.agentHome];
+    const cmd = [binary, 'run', '--format', 'json', '--dir', this.agentHome, '--auto'];
 
-    // Preflight guarantees a resolvable model; pin it explicitly �?without it
+    // Preflight guarantees a resolvable model; pin it explicitly â€?without it
     // opencode hangs waiting for interactive provider/model selection.
     const model = this._resolveModel(msgChannel);
     cmd.push('--model', model);
@@ -1032,14 +1032,14 @@ class OpenCodeAdapter extends BaseAdapter {
       fullPrompt = `${context}\n\n---\n\n${content}`;
     }
 
-    this._log(`CLI: ${binary} run --format json --dir �?--model ${model || '(none)'}`);
+    this._log(`CLI: ${binary} run --format json --dir â€?--model ${model || '(none)'}`);
 
     const spawnEnv = { ...(this.agentEnv || process.env) };
 
     let spawnBinary = cmd[0];
     let spawnArgs = cmd.slice(1);
     // Only the npm `.cmd` shim needs a cmd.exe host. The native opencode.exe
-    // (preferred by _findOpencodeBinary) is spawned directly �?no console host.
+    // (preferred by _findOpencodeBinary) is spawned directly â€?no console host.
     if (IS_WINDOWS && spawnBinary.toLowerCase().endsWith('.cmd')) {
       spawnArgs = ['/C', spawnBinary, ...spawnArgs];
       spawnBinary = process.env.COMSPEC || 'cmd.exe';
@@ -1051,12 +1051,12 @@ class OpenCodeAdapter extends BaseAdapter {
         env: spawnEnv,
         cwd: this.agentHome,
         // No `timeout:` here on purpose. Node's implementation signals only the
-        // direct child �?cmd.exe on Windows �?and orphans the CLI underneath it.
+        // direct child â€?cmd.exe on Windows â€?and orphans the CLI underneath it.
         // The explicit timer below tree-kills instead.
         detached: !IS_WINDOWS,
         // Never let a console window appear. Besides being ugly, an attached
         // console makes opencode start its interactive TUI and hang instead of
-        // running headless �?the root cause of "stuck on thinking�? on Windows.
+        // running headless â€?the root cause of "stuck on thinkingâ€? on Windows.
         windowsHide: true,
       });
 
@@ -1068,7 +1068,7 @@ class OpenCodeAdapter extends BaseAdapter {
       let reapedByUs = false;
       const reaper = setTimeout(() => {
         reapedByUs = true;
-        this._log(`opencode run exceeded ${TIMEOUT_MS / 1000}s �?tree-killing pid=${proc.pid}`);
+        this._log(`opencode run exceeded ${TIMEOUT_MS / 1000}s â€?tree-killing pid=${proc.pid}`);
         this._killTree(proc.pid);
       }, TIMEOUT_MS);
       proc.once('close', () => clearTimeout(reaper));
@@ -1112,14 +1112,14 @@ class OpenCodeAdapter extends BaseAdapter {
         try {
           proc.stdin.write(fullPrompt, 'utf-8');
           proc.stdin.end();
-        } catch { /* child gone �?the exit/error handler reports it */ }
+        } catch { /* child gone â€?the exit/error handler reports it */ }
       }
 
       proc.on('error', (err) => finish(reject, err));
       // 'close' (not 'exit') fires after stdout/stderr have fully drained, so we
       // never parse a truncated response. The handler receives (code, signal):
       // when the spawn timeout kills the child, code is null and signal is the
-      // signal name �?report that as a timeout rather than "exited with code null".
+      // signal name â€?report that as a timeout rather than "exited with code null".
       proc.on('close', async (code, signal) => {
         try { await pendingEvents; } catch {}
 
@@ -1157,7 +1157,7 @@ class OpenCodeAdapter extends BaseAdapter {
 
         if (code !== 0) {
           const cls = OpenCodeAdapter._classifyFailure({ code, signal, stdout, stderr, stdoutErr });
-          this._log(`opencode exited code ${code} �?[${cls.category}]: ${OpenCodeAdapter._redact(cls.diagnostic).slice(0, 300)}`);
+          this._log(`opencode exited code ${code} â†?[${cls.category}]: ${OpenCodeAdapter._redact(cls.diagnostic).slice(0, 300)}`);
           return finish(reject, this._failure(cls.category, cls.diagnostic, cls.detail));
         }
 
@@ -1167,15 +1167,15 @@ class OpenCodeAdapter extends BaseAdapter {
         if (text) return finish(resolve, text);
 
         // Exit 0 with no final assistant text. This is NOT proof of a missing
-        // provider �?it can be a structured error on stdout, an incomplete
+        // provider â€?it can be a structured error on stdout, an incomplete
         // stream, or a genuinely empty completion. Classify rather than guess.
         if (stdoutErr) {
           const cls = OpenCodeAdapter._classifyFailure({ code, signal, stdout, stderr, stdoutErr });
-          this._log(`opencode exit 0 with error event �?[${cls.category}]: ${OpenCodeAdapter._redact(cls.diagnostic).slice(0, 300)}`);
+          this._log(`opencode exit 0 with error event â†?[${cls.category}]: ${OpenCodeAdapter._redact(cls.diagnostic).slice(0, 300)}`);
           return finish(reject, this._failure(cls.category, cls.diagnostic, cls.detail));
         }
         const emptyCat = OpenCodeAdapter._emptyExitCategory(stdout);
-        this._log(`opencode exit 0, no final text �?[${emptyCat}]. stdout head: ${OpenCodeAdapter._redact(stdout).slice(0, 200)}`);
+        this._log(`opencode exit 0, no final text â†?[${emptyCat}]. stdout head: ${OpenCodeAdapter._redact(stdout).slice(0, 200)}`);
         return finish(reject, this._failure(emptyCat, `exit 0, no final assistant text; stdout head: ${stdout.slice(0, 200)}`));
       });
     });
@@ -1220,7 +1220,7 @@ class OpenCodeAdapter extends BaseAdapter {
           `${this.flavor.id}; blocked (set WWJ_ALLOW_UNVERIFIED_CLI_VERSION=1 to override)`,
       };
     }
-    // 'unknown' (unparseable version string) still runs �?never block on a
+    // 'unknown' (unparseable version string) still runs â€?never block on a
     // failure to read a version number.
 
     const model = this._resolveModel(channel);
@@ -1284,7 +1284,7 @@ class OpenCodeAdapter extends BaseAdapter {
   /**
    * Best-effort credential/provider presence. 'present' | 'unknown' | 'missing'.
    * 'unknown' (custom provider key, custom endpoint, or a config file we can't
-   * fully validate) is deliberately NOT blocked �?only a total absence of any
+   * fully validate) is deliberately NOT blocked â€?only a total absence of any
    * recognizable signal is 'missing'.
    */
   _credentialState() {
@@ -1343,7 +1343,7 @@ class OpenCodeAdapter extends BaseAdapter {
     const base = this._messages[category] || this._messages.unknown_error;
     const safe = detail ? OpenCodeAdapter._redact(detail).trim() : '';
     const body = safe ? `${base}\n\n> ${safe}` : base;
-    const content = `⚠️ **OpenCode couldn't run** �?${body}`;
+    const content = `âš ï¸� **OpenCode couldn't run** â€?${body}`;
     try {
       await this.client.sendMessage(this.workspaceId, channel, this.token, content, {
         senderType: 'agent',
@@ -1353,14 +1353,14 @@ class OpenCodeAdapter extends BaseAdapter {
         sessionId: this._sessionId,
       });
     } catch {
-      // Older backends may reject an unknown messageType/metadata �?fall back to
+      // Older backends may reject an unknown messageType/metadata â€?fall back to
       // the plain error path so the user still gets an actionable message.
       try { await this.sendError(channel, content); } catch {}
     }
   }
 
   // ------------------------------------------------------------------
-  // Static classifiers (pure �?unit tested)
+  // Static classifiers (pure â€?unit tested)
   // ------------------------------------------------------------------
 
   /** True when an event is a tool call, across opencode's version-varying shapes. */
@@ -1388,7 +1388,7 @@ class OpenCodeAdapter extends BaseAdapter {
     if (!ev || typeof ev !== 'object') return null;
     const type = String(ev.type || '').toLowerCase();
     const part = (ev.part && typeof ev.part === 'object') ? ev.part : null;
-    // Nested error objects carry the richest detail �?try them before the
+    // Nested error objects carry the richest detail â€?try them before the
     // wrapping event, whose only signal may be type === 'error'.
     const candidates = [];
     if (ev.error && typeof ev.error === 'object') candidates.push(ev.error);
@@ -1479,7 +1479,7 @@ class OpenCodeAdapter extends BaseAdapter {
   /** 'ok' | 'unverified' (newer than tested) | 'unsupported' (too old) | 'unknown'. */
   static _classifyVersion(version, flavor) {
     const f = flavor || FLAVORS.opencode;
-    // Non-semver (or unreadable) �?'unknown': allow the run, never block on it.
+    // Non-semver (or unreadable) â†?'unknown': allow the run, never block on it.
     if (!version || !/^\d+\.\d+/.test(String(version))) return 'unknown';
     if (OpenCodeAdapter._cmpVer(version, f.minVersion) < 0) return 'unsupported';
     if (f.testedMaxVersion && OpenCodeAdapter._cmpVer(version, f.testedMaxVersion) > 0) return 'unverified';

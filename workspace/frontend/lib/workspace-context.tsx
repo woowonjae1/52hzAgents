@@ -707,7 +707,24 @@ export function WorkspaceProvider({
         if (stillStopping.length > 0) void sendStop();
         return prevStopping;
       });
-    }, 3000);
+      // Safety timeout: after 2s more, unconditionally clear stopping state so UI never gets stuck
+      window.setTimeout(() => {
+        setStoppingSessionIds((prev) => {
+          const next = new Set(prev);
+          sessionIds.forEach((sid) => next.delete(sid));
+          return next;
+        });
+        setLastMessageBySession((prev) => {
+          const next = { ...prev };
+          sessionIds.forEach((sid) => {
+            if (next[sid]?.content === 'Stopping...') {
+              next[sid] = { senderName: 'system', content: 'Execution stopped by user.', isStatus: false };
+            }
+          });
+          return next;
+        });
+      }, 2000);
+    }, 2500);
   }, [activeSessionIds, agents, sessions]);
 
   // Claim the workspace id synchronously, during render. The effect below is
