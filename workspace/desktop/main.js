@@ -277,17 +277,17 @@ async function startProductionStack() {
     spawnConnector();
   }
 
-  // Subscribe to live SSE events for approval notifications
-  setTimeout(() => subscribeApprovalEvents(`http://127.0.0.1:${serverPort}`), 3000);
+  // Subscribe to live SSE events for workspace notifications and approvals
+  setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort}`), 3000);
 }
 
-function subscribeApprovalEvents(baseUrl) {
+function subscribeWorkspaceEvents(baseUrl) {
   try {
     const sseUrl = `${baseUrl}/v1/events/stream?network=default`;
     sseReq = http.get(sseUrl, (res) => {
       if (res.statusCode !== 200) {
         console.warn(`[52hzAgents Desktop] SSE stream returned HTTP ${res.statusCode}, retrying in 5s...`);
-        setTimeout(() => subscribeApprovalEvents(baseUrl), 5000);
+        setTimeout(() => subscribeWorkspaceEvents(baseUrl), 5000);
         return;
       }
       let buffer = '';
@@ -299,26 +299,81 @@ function subscribeApprovalEvents(baseUrl) {
           if (line.startsWith('data:')) {
             try {
               const event = JSON.parse(line.slice(5).trim());
-              if (event && event.type === 'workspace.agent.approval.requested') {
-                const payload = event.payload || {};
+              if (!event || !event.type) continue;
+
+              const payload = event.payload || {};
+              const targetChannel = (event.target && typeof event.target === 'string' && event.target.startsWith('channel/'))
+                ? event.target.replace(/^channel\//, '')
+                : 'general';
+
+              // 1. Approval requested
+              if (event.type === 'workspace.agent.approval.requested') {
                 const approvalId = payload.approval_id || payload.id || event.id;
                 const agentName = payload.agent_name || event.source || 'Agent';
                 const action = payload.action || payload.command || 'Sensitive Operation';
                 showApprovalNotification(agentName, action, approvalId);
+              }
+
+              // 2. Timer fired
+              if (event.type === 'workspace.timer.fired') {
+                const timer = payload.timer || {};
+                const message = timer.message || '定时提醒已到期';
+                const channel = timer.channel_name || targetChannel;
+                showDesktopNotification({
+                  title: '⏰ 定时提醒已到期',
+                  body: message,
+                  channel,
+                });
+              }
+
+              // 3. Routine triggered
+              if (event.type === 'workspace.routine.triggered') {
+                const routine = payload.routine || {};
+                const name = routine.name || '周期性计划任务';
+                const message = routine.message || '任务已开始自动执行';
+                const channel = routine.channel_name || targetChannel;
+                showDesktopNotification({
+                  title: `🔁 周期任务触发: ${name}`,
+                  body: message,
+                  channel,
+                });
+              }
+
+              // 4. Routine completed
+              if (event.type === 'workspace.routine.completed') {
+                const routine = payload.routine || {};
+                const name = routine.name || '周期性计划任务';
+                const channel = routine.channel_name || targetChannel;
+                showDesktopNotification({
+                  title: `✅ 周期任务已完成: ${name}`,
+                  body: `产出已发布至 #${channel} 频道`,
+                  channel,
+                });
+              }
+
+              // 5. In-app notifications
+              if (event.type === 'workspace.notification.created') {
+                const notif = payload.notification || {};
+                const channel = notif.channel_name || targetChannel;
+                showDesktopNotification({
+                  title: notif.title || '52hzAgents 消息提醒',
+                  body: notif.message || notif.content || '',
+                  channel,
+                });
               }
             } catch (err) {}
           }
         }
       });
       res.on('end', () => {
-        setTimeout(() => subscribeApprovalEvents(baseUrl), 3000);
+        setTimeout(() => subscribeWorkspaceEvents(baseUrl), 3000);
       });
       res.on('error', () => {
-        setTimeout(() => subscribeApprovalEvents(baseUrl), 5000);
+        setTimeout(() => subscribeWorkspaceEvents(baseUrl), 5000);
       });
     });
     sseReq.on('error', () => {
-      setTimeout(() => subscribeApprovalEvents(baseUrl), 5000);
+      setTimeout(() => subscribeWorkspaceEvents(baseUrl), 5000);
     });
   } catch (e) {}
 }
@@ -344,7 +399,7 @@ function ensureDevStackRunning() {
   checkServerReady(TARGET_URL, (ready) => {
     if (ready) {
       console.log('[52hzAgents Desktop] Connected to local server at 127.0.0.1:3005.');
-      subscribeApprovalEvents('http://127.0.0.1:8000');
+      subscribeWorkspaceEvents('http://127.0.0.1:8000');
       return;
     }
     if (devStackSpawned) return;
@@ -357,7 +412,7 @@ function ensureDevStackRunning() {
       stdio: 'ignore',
     });
     devServerProcess.unref();
-    setTimeout(() => subscribeApprovalEvents('http://127.0.0.1:8000'), 5000);
+    setTimeout(() => subscribeWorkspaceEvents('http://127.0.0.1:8000'), 5000);
   });
 }
 
@@ -841,7 +896,45 @@ function showApprovalNotification(agentName, action, approvalId) {
   notif.show();
 }
 
+// OS Native Notification for Tasks, Timers, Routines & Notifications
+function showDesktopNotification({ title, body, channel, silent = false }) {
+  if (!Notification.isSupported()) return;
+
+  const icoPath = getAssetPath('icon.ico');
+  const pngPath = getAssetPath('tray-icon.png');
+  let iconPath = undefined;
+  if (process.platform === 'win32' && fs.existsSync(icoPath)) {
+    iconPath = icoPath;
+  } else if (fs.existsSync(pngPath)) {
+    iconPath = pngPath;
+  }
+
+  const notif = new Notification({
+    title: title || '52hzAgents',
+    body: (body || '').slice(0, 300),
+    icon: iconPath,
+    silent: Boolean(silent),
+  });
+
+  notif.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      if (channel) {
+        mainWindow.webContents.send('navigate-to-channel', channel);
+      }
+    }
+  });
+
+  notif.show();
+}
+
 // IPC Handlers
+ipcMain.handle('show-os-notification', (event, opts) => {
+  showDesktopNotification(opts || {});
+  return true;
+});
 ipcMain.on('window-minimize', () => mainWindow?.minimize());
 ipcMain.on('window-maximize', () => {
   if (mainWindow?.isMaximized()) {

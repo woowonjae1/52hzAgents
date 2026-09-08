@@ -40,5 +40,12 @@ contextBridge.exposeInMainWorld('electronBridge', {
   browseFolder: (defaultPath) => ipcRenderer.invoke('dialog-open-folder', defaultPath),
   openPath: (pathStr) => ipcRenderer.invoke('shell-open-path', pathStr),
   showItemInFolder: (pathStr) => ipcRenderer.invoke('shell-show-item', pathStr),
+  showNotification: (opts) => ipcRenderer.invoke('show-os-notification', opts),
+  onNavigateToChannel: (handler) => {
+    if (typeof handler !== 'function') return () => {};
+    const listener = (event, channel) => handler(channel);
+    ipcRenderer.on('navigate-to-channel', listener);
+    return () => ipcRenderer.removeListener('navigate-to-channel', listener);
+  },
 });
 

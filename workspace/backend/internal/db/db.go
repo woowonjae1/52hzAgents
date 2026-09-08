@@ -98,6 +98,7 @@ func InitDB() {
 	DB.Exec("ALTER TABLE todos ADD COLUMN run_id TEXT")
 	DB.Exec("ALTER TABLE todos ADD COLUMN due_date DATETIME")
 	DB.Exec("ALTER TABLE todos ADD COLUMN completed_at DATETIME")
+	DB.Exec("ALTER TABLE todos ADD COLUMN error TEXT")
 
 	log.Println("Database auto-migration completed successfully.")
 }

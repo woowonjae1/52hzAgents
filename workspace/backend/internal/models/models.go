@@ -355,6 +355,8 @@ type TodoRecord struct {
 	// tracker writes it when an agent finishes a scheduled run; without the
 	// column those writes failed and every scheduled task stayed in_progress.
 	CompletedAt *time.Time `gorm:"" json:"completed_at,omitempty"`
+	// Error records the failure reason if the task failed or was cancelled due to an issue.
+	Error       *string    `gorm:"type:text" json:"error,omitempty"`
 	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }

@@ -252,10 +252,12 @@ func DeleteTimer(c *gin.Context) {
 	// 看板上那条任务跟着一起取消。不然取消了提醒，任务还留在「待办」里等一个
 	// 永远不会到来的触发。
 	cancelledAt := time.Now().UTC()
+	cancelReason := "定时提醒在触发前已被取消"
 	if err := db.DB.Model(&models.TodoRecord{}).
 		Where("timer_id = ? AND status IN ?", record.ID, []string{"pending", "in_progress"}).
 		Updates(map[string]interface{}{
 			"status":       "cancelled",
+			"error":        &cancelReason,
 			"completed_at": &cancelledAt,
 			"updated_at":   cancelledAt,
 		}).Error; err != nil {

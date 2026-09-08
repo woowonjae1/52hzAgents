@@ -46,6 +46,7 @@ type PutTodoItem struct {
 	// 丢弃它，于是每次保存都把整张列表的优先级重置成 none。
 	Priority string     `json:"priority"`
 	DueDate  *time.Time `json:"due_date"` // 可选截止时间
+	Error    *string    `json:"error"`    // 失败/取消原因
 }
 
 // validTodoStatuses / validTodoPriorities 是服务端唯一的真值来源。
@@ -205,6 +206,7 @@ func PutTodos(c *gin.Context) {
 			Priority:    item.Priority,
 			DueDate:     item.DueDate,
 			CompletedAt: completedAt,
+			Error:       item.Error,
 			Position:    i, // 依次赋予当前的排序索引。
 			CreatedAt:   now,
 			UpdatedAt:   now,
@@ -304,6 +306,7 @@ type CreateTodoRequest struct {
 	Priority string     `json:"priority"`
 	Assignee string     `json:"assignee"`
 	DueDate  *time.Time `json:"due_date"`
+	Error    *string    `json:"error"`
 }
 
 // CreateTodo 处理 POST /v1/todos，追加一条代办项。
@@ -387,6 +390,7 @@ func CreateTodo(c *gin.Context) {
 		Priority:    priority,
 		DueDate:     req.DueDate,
 		CompletedAt: completedAt,
+		Error:       req.Error,
 		Position:    position,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -414,6 +418,7 @@ type PatchTodoRequest struct {
 	Position *int       `json:"position"`
 	DueDate  *time.Time `json:"due_date"`
 	ClearDue bool       `json:"clear_due_date"`
+	Error    *string    `json:"error"`
 }
 
 // PatchTodo 处理 PATCH /v1/todos/:todo_id，只更新一条代办项。
@@ -501,6 +506,10 @@ func PatchTodo(c *gin.Context) {
 	} else if req.DueDate != nil {
 		record.DueDate = req.DueDate
 		updates["due_date"] = req.DueDate
+	}
+	if req.Error != nil {
+		record.Error = req.Error
+		updates["error"] = req.Error
 	}
 
 	record.UpdatedAt = now

@@ -95,6 +95,7 @@ interface StatusSelectorProps {
   disabled?: boolean;
   size?: 'sm' | 'default';
   className?: string;
+  failureReason?: string | null;
 }
 
 export function StatusSelector({
@@ -103,17 +104,23 @@ export function StatusSelector({
   disabled = false,
   size = 'default',
   className,
+  failureReason,
 }: StatusSelectorProps) {
   const [open, setOpen] = useState(false);
   const current = ALL_STATUSES.find((s) => s.id === status) || ALL_STATUSES[0];
   const Icon = current.icon;
+
+  const tooltipText = failureReason
+    ? `${current.name} (原因: ${failureReason})`
+    : `Status: ${current.name}`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>
         <button
           type="button"
-          aria-label={`Status: ${current.name}`}
+          aria-label={tooltipText}
+          title={tooltipText}
           className={cn(
             'inline-flex items-center justify-center rounded-md transition-colors hover:bg-surface3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             size === 'sm' ? 'size-6' : 'size-7',

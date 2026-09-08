@@ -1,15 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
+import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
 import { PrioritySelector } from './priority-selector';
 import { StatusSelector, StatusGlyph } from './status-selector';
 import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Trash2, User, Hash, Clock, CalendarClock } from 'lucide-react';
+import { Plus, Pencil, Trash2, User, Hash, Clock, CalendarClock, TriangleAlert } from 'lucide-react';
+import { getTaskFailureReason } from './tasks-view';
 
 interface TasksBoardProps {
   tasks: TodoItem[];
+  routines?: RoutineItem[];
   grouping: 'status' | 'assignee' | 'channel' | 'none';
   onUpdateStatus: (todo: TodoItem, newStatus: TodoStatus) => void;
   onUpdatePriority: (todo: TodoItem, newPriority: TodoPriority) => void;
@@ -42,6 +44,7 @@ interface BoardColumn {
 
 export function TasksBoard({
   tasks,
+  routines,
   grouping,
   onUpdateStatus,
   onUpdatePriority,
@@ -163,11 +166,13 @@ export function TasksBoard({
             ) : (
               col.tasks.map((task) => {
                 const overdue = isOverdue(task, now);
+                const failureReason = getTaskFailureReason(task, routines);
                 return (
                   <div
                     key={task.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
+                    title={failureReason ? `失败/取消原因: ${failureReason}` : undefined}
                     className={cn(
                       'group relative rounded-lg border border-border/70 bg-surface2/90 p-3 text-sm transition-all hover:border-border hover:shadow-xs cursor-grab active:cursor-grabbing',
                       draggedTaskId === task.id && 'opacity-40 border-dashed border-primary/50'
@@ -191,6 +196,7 @@ export function TasksBoard({
                       <StatusSelector
                         status={task.status}
                         size="sm"
+                        failureReason={failureReason}
                         onChange={(s) => onUpdateStatus(task, s)}
                       />
                     </div>
@@ -206,6 +212,17 @@ export function TasksBoard({
                     >
                       {task.content}
                     </p>
+
+                    {/* Failure / Cancellation Reason */}
+                    {failureReason && (
+                      <div
+                        className="mt-1.5 flex items-center gap-1 text-3xs text-destructive font-medium bg-destructive/10 border border-destructive/25 rounded px-1.5 py-0.5 cursor-help select-none"
+                        title={`失败/取消原因: ${failureReason}`}
+                      >
+                        <TriangleAlert className="size-2.5 shrink-0" />
+                        <span className="truncate">{failureReason}</span>
+                      </div>
+                    )}
 
                     {/* Bottom Row: Stacked Badges with Hover Fan-Out */}
                     <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between text-3xs text-foreground-extra-muted">

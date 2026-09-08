@@ -772,6 +772,28 @@ export function WorkspaceProvider({
     };
   }, [workspaceId, token, bearerToken]);
 
+  // Listen for desktop OS notification clicks navigating to a channel
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const bridge = (window as unknown as {
+      electronBridge?: {
+        onNavigateToChannel?: (cb: (channel: string) => void) => () => void;
+      };
+    }).electronBridge;
+
+    if (!bridge?.onNavigateToChannel) return;
+
+    return bridge.onNavigateToChannel((channel: string) => {
+      if (!channel) return;
+      const target = sessions.find((s) => s.sessionId === channel || s.title === channel);
+      if (target) {
+        setCurrentSessionId(target.sessionId);
+      } else {
+        setCurrentSessionId(channel);
+      }
+    });
+  }, [sessions, setCurrentSessionId]);
+
   const refreshWorkspace = useCallback(async () => {
     try {
       const ws = await workspaceApi.getWorkspace();

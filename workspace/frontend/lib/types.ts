@@ -393,6 +393,7 @@ export interface TodoItem {
   runId?: string | null;
   /** Set when this task is carried out by a one-off timer. */
   timerId?: string | null;
+  error?: string | null;
   dueDate?: string | null;
   completedAt?: string | null;
   createdAt: string | null;

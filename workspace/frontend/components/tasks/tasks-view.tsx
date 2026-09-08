@@ -29,7 +29,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { cn } from '@/lib/utils';
-import type { TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
+import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
 import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
 import { PrioritySelector } from './priority-selector';
 import { StatusSelector, StatusGlyph } from './status-selector';
@@ -77,6 +77,23 @@ function isOverdue(todo: TodoItem, now: number): boolean {
   if (todo.status === 'completed' || todo.status === 'cancelled') return false;
   const due = new Date(todo.dueDate).getTime();
   return Number.isFinite(due) && due < now;
+}
+
+/** Resolves failure or cancellation reason if a task is cancelled or has an error. */
+export function getTaskFailureReason(todo: TodoItem, routines?: RoutineItem[]): string | null {
+  if (todo.error && todo.error.trim()) {
+    return todo.error.trim();
+  }
+  if (todo.routineId && routines && routines.length > 0) {
+    const matched = routines.find((r) => r.id === todo.routineId);
+    if (matched?.lastRunError && matched.lastRunError.trim()) {
+      return matched.lastRunError.trim();
+    }
+  }
+  if (todo.status === 'cancelled') {
+    return todo.timerId ? '定时提醒在触发前已被取消' : '任务已被取消';
+  }
+  return null;
 }
 
 /** Short, stable reference for a row. */
@@ -563,6 +580,7 @@ export function TasksView() {
           {displaySettings.viewType === 'board' ? (
             <TasksBoard
               tasks={filteredTodos}
+              routines={routines}
               grouping={displaySettings.grouping}
               now={now}
               onUpdateStatus={(todo, newStatus) => void updateStatus(todo, newStatus)}
@@ -639,9 +657,11 @@ export function TasksView() {
                       <div className="overflow-hidden rounded-xl border border-border/80 bg-surface1/60 divide-y divide-border/60 shadow-xs">
                         {group.items.map((todo) => {
                           const overdue = isOverdue(todo, now);
+                          const failureReason = getTaskFailureReason(todo, routines);
                           return (
                             <div
                               key={todo.id}
+                              title={failureReason ? `失败/取消原因: ${failureReason}` : undefined}
                               className="group flex items-center gap-3 px-4 py-2.5 hover:bg-surface2/60 transition-colors"
                             >
                               <PrioritySelector
@@ -653,6 +673,7 @@ export function TasksView() {
                               <StatusSelector
                                 status={todo.status}
                                 size="sm"
+                                failureReason={failureReason}
                                 onChange={(s) => void updateStatus(todo, s)}
                               />
 
@@ -663,7 +684,7 @@ export function TasksView() {
                                 {taskRef(todo)}
                               </span>
 
-                              <div className="min-w-0 flex-1">
+                              <div className="min-w-0 flex-1 flex items-center gap-2">
                                 <p
                                   className={cn(
                                     'text-sm font-medium leading-snug truncate text-foreground',
@@ -674,6 +695,15 @@ export function TasksView() {
                                 >
                                   {todo.content}
                                 </p>
+                                {failureReason && (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/30 text-3xs font-medium shrink-0 cursor-help select-none"
+                                    title={`失败/取消原因: ${failureReason}`}
+                                  >
+                                    <TriangleAlert className="size-2.5 shrink-0" />
+                                    <span className="max-w-[200px] truncate">{failureReason}</span>
+                                  </span>
+                                )}
                               </div>
 
                               {/* Stacked badges, fanning out on hover */}
