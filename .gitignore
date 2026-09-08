@@ -377,6 +377,7 @@ cython_debug/
 
 .cursor/
 .claude/
+.zed/
 tmp/
 
 temp
