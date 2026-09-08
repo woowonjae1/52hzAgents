@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Search, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -186,6 +186,8 @@ export function AgentModelSwitcher({
     restoreForSession(sessionId, agentNamesKey.split(','));
   }, [sessionId, agentNamesKey]);
 
+  const [searchQuery, setSearchQuery] = React.useState('');
+
   const leadName = leadAgent?.agentName || agentName || 'agent';
   const leadCurrent = currentModelFor(modelState, leadName);
   const leadModels = modelsFor(modelState, leadName);
@@ -200,7 +202,7 @@ export function AgentModelSwitcher({
       (m) => m.id === leadCurrent || m.shortName === leadCurrent,
     );
     if (match) return match.shortName;
-    return leadCurrent.includes('/') ? leadCurrent.split('/')[1] : leadCurrent;
+    return leadCurrent.includes('/') ? leadCurrent.slice(leadCurrent.indexOf('/') + 1) : leadCurrent;
   }, [leadCurrent, leadModels, leadName]);
 
   /*
@@ -246,15 +248,36 @@ export function AgentModelSwitcher({
     }
   };
 
+  const totalModelCount = React.useMemo(() => {
+    return onlineAgents.reduce(
+      (acc, a) => acc + modelsFor(modelState, a.agentName).length,
+      0,
+    );
+  }, [onlineAgents, modelState]);
+
   const renderAgentGroup = (
     list: typeof onlineAgents,
     heading: string | null,
     keyPrefix: string,
-  ) =>
-    list.map((agentItem, idx) => {
+  ) => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return list.map((agentItem, idx) => {
       const models = modelsFor(modelState, agentItem.agentName);
       const currentSelectedId = currentModelFor(modelState, agentItem.agentName);
       const isLead = norm(agentItem.agentName) === norm(leadName);
+
+      const filteredModels = q
+        ? models.filter(
+            (m) =>
+              m.name.toLowerCase().includes(q) ||
+              m.id.toLowerCase().includes(q) ||
+              (m.provider && m.provider.toLowerCase().includes(q)) ||
+              (m.shortName && m.shortName.toLowerCase().includes(q)),
+          )
+        : models;
+
+      if (q && filteredModels.length === 0) return null;
 
       return (
         <div
@@ -273,8 +296,8 @@ export function AgentModelSwitcher({
             </span>
           </div>
 
-          {models.length > 0 ? (
-            models.map((m) => {
+          {filteredModels.length > 0 ? (
+            filteredModels.map((m) => {
               const isSelected =
                 !!currentSelectedId &&
                 (currentSelectedId === m.id || currentSelectedId === m.shortName);
@@ -310,9 +333,10 @@ export function AgentModelSwitcher({
         </div>
       );
     });
+  };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => { if (!open) setSearchQuery(''); }}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -345,8 +369,36 @@ export function AgentModelSwitcher({
 
       <DropdownMenuContent
         align="start"
-        className="w-64 p-1.5 shadow-lg border-border bg-surface1 max-h-[420px] overflow-y-auto"
+        className="w-72 sm:w-80 p-1.5 shadow-lg border-border bg-surface1 max-h-[460px] overflow-y-auto"
       >
+        {totalModelCount > 5 && (
+          <div className="p-1 pb-1.5 border-b border-border/50 sticky top-0 bg-surface1 z-10">
+            <div className="relative flex items-center">
+              <Search className="size-3.5 absolute left-2 text-muted-foreground/70 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search models... (e.g. free, claude)"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-7 pr-7 py-1 text-xs bg-surface2 rounded-md border border-border/60 focus:outline-none focus:ring-1 focus:ring-ring text-foreground placeholder:text-muted-foreground/60"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchQuery('');
+                  }}
+                  className="absolute right-2 text-muted-foreground/60 hover:text-foreground p-0.5 rounded cursor-pointer"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {renderAgentGroup(
           [...primary].sort((a, b) =>
             norm(a.agentName) === norm(leadName) ? -1 : norm(b.agentName) === norm(leadName) ? 1 : 0,

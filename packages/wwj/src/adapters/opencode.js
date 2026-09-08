@@ -918,7 +918,7 @@ class OpenCodeAdapter extends BaseAdapter {
     for (const line of out.split(/\r?\n/)) {
       const id = line.trim();
       // One `provider/model` per line. Skip banner art and stray log lines.
-      if (!/^[\w.@-]+\/[\w.:@-]+$/.test(id) || seen.has(id)) continue;
+      if (!/^[\w.@~-]+(?:\/[\w.:@~-]+)+$/.test(id) || seen.has(id)) continue;
       seen.add(id);
       const slash = id.indexOf('/');
       models.push({ id, provider: id.slice(0, slash), label: id.slice(slash + 1) });

@@ -446,7 +446,7 @@ export function AgentProfilePanel() {
                       <ChevronDown className="size-3 text-muted-foreground ml-1 shrink-0" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-64 p-1 bg-surface1/95 backdrop-blur-xl max-h-[320px] overflow-y-auto">
+                  <DropdownMenuContent align="start" className="w-72 sm:w-80 p-1 bg-surface1/95 backdrop-blur-xl max-h-[380px] overflow-y-auto">
                     {availableModels.map((m) => (
                       <DropdownMenuItem
                         key={m.id}
