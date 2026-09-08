@@ -129,7 +129,7 @@ export function ToolCall({
       </button>
 
       {open && hasContent && (
-        <div className="border-t border-border/60 bg-surface2/40 p-3 space-y-2.5">
+        <div className="bg-surface2/40 p-3 space-y-2.5">
           {requestStr && (
             <div className="space-y-1">
               <div className="flex items-center justify-between text-3xs font-mono uppercase tracking-wider text-foreground-extra-muted">

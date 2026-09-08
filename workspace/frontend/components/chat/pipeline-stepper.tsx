@@ -94,7 +94,7 @@ export function PipelineStepper({
   return (
     <div
       className={cn(
-        'px-4 py-2 bg-surface2/70 border-b border-border/80 flex items-center justify-between gap-3 text-xs shrink-0 select-none animate-in fade-in slide-in-from-top-1 duration-200',
+        'px-4 py-2 bg-surface2/70 flex items-center justify-between gap-3 text-xs shrink-0 select-none animate-in fade-in slide-in-from-top-1 duration-200',
         className
       )}
     >

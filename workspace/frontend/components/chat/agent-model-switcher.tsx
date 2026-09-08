@@ -259,7 +259,7 @@ export function AgentModelSwitcher({
       return (
         <div
           key={`${keyPrefix}-${agentItem.agentName}`}
-          className={cn('space-y-0.5', (idx > 0 || heading) && 'pt-2 border-t border-border/40 mt-1.5')}
+          className={cn('space-y-0.5', (idx > 0 || heading) && 'pt-2 mt-2')}
         >
           {heading && idx === 0 && (
             <div className="px-2 pb-1 text-3xs font-semibold tracking-wider text-foreground-extra-muted uppercase">

@@ -10,11 +10,26 @@ import { cn } from '@/lib/utils';
 
 type AgentState = 'working' | 'online' | 'offline';
 
-/** Ring colour per state. Working is the only one that moves. */
+/*
+  THE RING IS SEPARATION FIRST AND STATE SECOND.
+
+  Every live avatar used to carry `ring-status-success`, and with 2px rings on
+  20px discs overlapped by only 4px the rings of three online agents met and
+  read as ONE CONTINUOUS GREEN BAND — three copies of a fact the sentence
+  immediately beside them already states, drawn over the logos at exactly the
+  size where they stop being identifiable. Identifying who is live is the only
+  reason to show faces at all, so the ring's job here is the one an overlapping
+  stack actually needs: cut each avatar out of the one behind it. That is the
+  sidebar's own ground, not a colour.
+
+  Colour is then spent only where it says something the sentence cannot —
+  which agent is WORKING right now. One amber ring in a row of quiet ones is
+  legible; eight green ones are wallpaper.
+*/
 const RING: Record<AgentState, string> = {
   working: 'ring-status-warning',
-  online: 'ring-status-success',
-  offline: 'ring-border',
+  online: 'ring-surface-sidebar',
+  offline: 'ring-surface-sidebar',
 };
 
 /**
@@ -74,6 +89,14 @@ export function AgentStatusStrip() {
     ? `${workingCount} working`
     : `${onlineCount} of ${agents.length} online`;
 
+  /*
+    The trailing `+` is gone. It was a `<Plus>` drawn INSIDE this button rather
+    than a control of its own, so it looked like "add an agent" and did what
+    every other pixel of the row does — open the station. A plus that cannot be
+    clicked separately is a promise the row does not keep, and the two real
+    ways in (the Projects header below, the Agents button at the foot of the
+    sidebar) are both one row away.
+  */
   return (
     <button
       type="button"
@@ -81,7 +104,9 @@ export function AgentStatusStrip() {
       title="Open agent station"
       className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
     >
-      <div className="flex items-center -space-x-1 shrink-0 empty:hidden">
+      {/* -space-x-1.5, not -1: at 4px the discs merely touched, which reads as
+          a crowded row rather than a stack. */}
+      <div className="flex items-center -space-x-1.5 shrink-0 empty:hidden">
         {shown.map(({ agent, state }) => (
           <Tooltip key={agent.agentName}>
             <TooltipTrigger asChild>
@@ -115,8 +140,6 @@ export function AgentStatusStrip() {
       >
         {summary}
       </span>
-
-      <Plus className="size-3.5 shrink-0 text-foreground-extra-muted" />
     </button>
   );
 }

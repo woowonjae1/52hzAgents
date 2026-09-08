@@ -315,13 +315,13 @@ export function CommandPalette() {
               <X className="size-3.5" />
             </button>
           )}
-          <div className="flex items-center gap-1.5 shrink-0 pl-2 border-l border-border/60">
+          <div className="flex items-center gap-1.5 shrink-0 pl-3">
             <KeyBadge>ESC</KeyBadge>
           </div>
         </div>
 
         {/* Command List */}
-        <div ref={listRef} className="max-h-96 overflow-y-auto p-2 divide-y divide-border/30 space-y-1">
+        <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1">
           {filtered.length === 0 ? (
             <div className="py-12 text-center text-xs text-foreground-extra-muted">
               No matching commands found.

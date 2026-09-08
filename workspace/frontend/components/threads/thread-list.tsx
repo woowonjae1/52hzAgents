@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from 'sonner';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, History as HistoryIcon, CalendarClock, BookOpen, Sparkles } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
@@ -99,7 +99,7 @@ function DMSection({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mt-3 pt-3 border-t border-border">
+    <div className="mt-5">
       <button
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
@@ -822,13 +822,22 @@ export function ThreadList() {
             <Plus className="size-3.5 text-primary" />
             <span>New chat</span>
           </div>
-          <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted border border-border/50">
+          <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
             Ctrl+N
           </kbd>
         </button>
 
-        {/* Workspace Quick Navigation Items (Linear / Circle Style) */}
-        <div className="flex flex-col gap-0.5">
+        {/*
+          COMMANDS AND DESTINATIONS ARE NOT THE SAME KIND OF ROW.
+
+          `New chat` above and `Command Palette` below DO something; the two in
+          between GO somewhere. One undifferentiated column of four is why only
+          half the rows carried a shortcut badge and the right edge came out
+          ragged — the badge was quietly marking which rows were commands. The
+          grouping is spacing, not a rule: this sidebar already has enough
+          horizontal lines in it.
+        */}
+        <div className="mt-1.5 flex flex-col gap-0.5">
           {/* Chats & Threads */}
           <button
             type="button"
@@ -841,7 +850,7 @@ export function ThreadList() {
             )}
           >
             <div className="flex items-center gap-2">
-              <MessageSquare className="size-3.5 text-primary" />
+              <MessageSquare className="size-3.5 text-foreground-extra-muted" />
               <span>Chats & Threads</span>
             </div>
           </button>
@@ -858,29 +867,32 @@ export function ThreadList() {
             )}
           >
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="size-3.5 text-emerald-500" />
+              <CheckCircle2 className="size-3.5 text-foreground-extra-muted" />
               <span>Tasks & Issues</span>
             </div>
             {todos && todos.length > 0 && (
-              <span className="text-3xs font-mono px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="text-3xs px-1.5 py-0.2 rounded-full bg-status-success/10 text-status-success font-medium">
                 {todos.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length || todos.length}
               </span>
             )}
           </button>
 
-          {/* Command Palette (Ctrl+K) Trigger Button */}
+        </div>
+
+        {/* Command Palette (Ctrl+K) Trigger Button */}
+        <div className="mt-1.5 flex flex-col gap-0.5">
           <button
             type="button"
             onClick={() => {
               window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
             }}
-            className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
+            className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-2">
-              <Search className="size-3.5 text-foreground-extra-muted" />
+              <Command className="size-3.5 text-foreground-extra-muted" />
               <span>Command Palette</span>
             </div>
-            <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted border border-border/50">
+            <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
               Ctrl+K
             </kbd>
           </button>
@@ -1069,7 +1081,7 @@ export function ThreadList() {
 
           {/* Archived section */}
           {!isSearching && archivedSessions.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-border">
+            <div className="mt-5">
               <button
                 onClick={() => setShowArchived(!showArchived)}
                 className="flex items-center gap-1.5 px-1 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"

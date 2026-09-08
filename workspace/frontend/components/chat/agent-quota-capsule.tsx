@@ -219,7 +219,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
       <PopoverContent align="start" className="w-88 p-4 space-y-4 shadow-xl border-border/80 bg-surface1/95 backdrop-blur-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+        <div className="flex items-center justify-between pb-3">
           <div className="flex items-center gap-2">
             <div className="size-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
               <Gauge className="size-4" />
@@ -360,7 +360,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
         {/* Breakdown / Insights */}
         {(usage?.last_24h_summary || usage?.last_7d_summary) && (
-          <div className="space-y-1.5 pt-1 text-2xs text-foreground-muted border-t border-border/50">
+          <div className="space-y-1.5 pt-3 text-2xs text-foreground-muted">
             {usage.last_24h_summary && (
               <div className="flex items-start gap-1.5">
                 <Sparkles className="size-3 text-primary shrink-0 mt-0.5" />
@@ -378,7 +378,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
         {/* Raw output preview if unparsed or requested */}
         {isUnparsed && usage?.raw_text && (
-          <details className="pt-1 text-3xs text-foreground-muted border-t border-border/50">
+          <details className="pt-3 text-3xs text-foreground-muted">
             <summary className="cursor-pointer hover:text-foreground flex items-center gap-1 font-medium select-none">
               <FileText className="size-3 text-muted-foreground" />
               Raw CLI output

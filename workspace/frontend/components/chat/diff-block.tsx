@@ -91,7 +91,7 @@ export function DiffBlock({ code }: DiffBlockProps) {
   return (
     <div className="my-3 overflow-hidden rounded-xl border border-border bg-primary font-mono text-xs shadow-sm">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 h-9 border-b border-border bg-primary/60 select-none">
+      <div className="flex items-center gap-2 px-3 h-9 bg-primary/60 select-none">
         <button
           onClick={() => setCollapsed((v) => !v)}
           className="flex items-center gap-1.5 min-w-0 text-foreground-extra-muted hover:text-foreground-extra-muted transition-colors"

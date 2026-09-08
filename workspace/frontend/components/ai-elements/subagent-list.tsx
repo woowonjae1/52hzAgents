@@ -46,7 +46,7 @@ export function SubagentList({
       )}
     >
       {/* Header with counter */}
-      <div className="flex items-center justify-between gap-2 border-b border-border/60 pb-2.5">
+      <div className="flex items-center justify-between gap-2 pb-2.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Layers className="size-3.5" />

@@ -281,7 +281,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       // Modern IDE-grade Code Block (Optimized for both Light & Dark themes)
       return (
         <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono shadow-xs dark:shadow-md">
-          <div className="flex items-center justify-between px-3.5 py-2 border-b border-border/60 dark:border-white/[0.06] bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none">
+          <div className="flex items-center justify-between px-3.5 py-2 bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 mr-1 opacity-80">
                 <span className="size-2.5 rounded-full bg-[#ff5f56] inline-block" />

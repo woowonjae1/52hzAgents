@@ -47,7 +47,6 @@ export function SidebarContent() {
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  const activeAgentsCount = agents.length;
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-surface0">
@@ -98,13 +97,18 @@ export function SidebarContent() {
                   : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
               )}
             >
-              <Users className="size-3.5 text-primary" />
+              {/*
+                No count here any more. `AgentStatusStrip`, eight rows up the
+                same sidebar, already reads "3 of 8 online" — this badge showed
+                the other half of that same sentence, in a second place, on a
+                button that only navigates. One reading of one fact.
+
+                `text-primary` also went: in the light theme `--primary` is
+                #09090b, the same near-black as the label beside it, so the
+                "accent" was only ever an accent in the dark.
+              */}
+              <Users className="size-3.5 text-foreground-extra-muted" />
               <span>Agents</span>
-              {activeAgentsCount > 0 && (
-                <span className="text-3xs font-mono px-1.5 py-0.2 rounded-full bg-primary/10 text-primary shrink-0">
-                  {activeAgentsCount}
-                </span>
-              )}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top">Agent Management & Mission Control</TooltipContent>

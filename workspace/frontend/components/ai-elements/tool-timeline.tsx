@@ -120,7 +120,7 @@ export function ToolTimeline({
 
       {/* Expanded Timeline Steps */}
       {open && (
-        <div className="space-y-3 pt-1 border-t border-border/60">
+        <div className="space-y-3 pt-3">
           {/* Step list with tree rail */}
           <div className="space-y-1.5 border-l-2 border-primary/25 pl-3 ml-2.5">
             {displayedSteps.map((step, idx) => (

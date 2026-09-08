@@ -209,7 +209,7 @@ export function Wrapper() {
           ) : (
             <>
               {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
-              <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", shouldShowSidebar && "border-l border-border/60")}>
+              <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", undefined)}>
                 {!isSidebarOpen && !isSettings && viewMode !== 'threads' && (
                   <button
                     onClick={sidebarToggle}

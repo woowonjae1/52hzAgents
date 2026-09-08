@@ -582,9 +582,13 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
         ref={containerRef}
         className={cn('h-full overflow-y-auto', className)}
       >
+        {/* The last ring spinner in the transcript. globals.css says there is
+            one "still going" signal in this app and it is `.event-running`;
+            a rotating ring at the top of the scroller was a second one, in the
+            one place where the reader is already looking at running text. */}
         {loadingOlder && (
           <div className="flex items-center justify-center py-3">
-            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <span className="event-running text-2xs text-foreground-muted">Loading earlier messages</span>
           </div>
         )}
         {hasOlder && !loadingOlder && loadOlder && (

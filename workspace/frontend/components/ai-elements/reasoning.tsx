@@ -67,7 +67,7 @@ export function Reasoning({
     >
       {content ? (
         <div className="relative my-1 rounded-lg border border-border/50 bg-surface1/50 dark:bg-surface1/70 px-3.5 py-2.5 space-y-1.5 shadow-2xs">
-          <div className="flex items-center justify-between text-3xs font-mono text-foreground-extra-muted border-b border-border/40 pb-1 select-none">
+          <div className="flex items-center justify-between text-3xs font-mono text-foreground-extra-muted pb-2 select-none">
             <span className="flex items-center gap-1 font-medium">
               <Sparkles className="size-2.5 text-primary/70" />
               <span>Chain of Thought</span>

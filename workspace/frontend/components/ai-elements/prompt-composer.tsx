@@ -529,7 +529,7 @@ export function PromptComposer({
             )}
 
             {mentionGroups.knowledge.length > 0 && (
-              <div className={cn(mentionGroups.agents.length > 0 && 'border-t border-border/50 pt-1.5')}>
+              <div className={cn(mentionGroups.agents.length > 0 && 'pt-2.5')}>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-status-warning select-none">
                   <BookOpen className="size-3" />
                   <span>Knowledge ({mentionGroups.knowledge.length})</span>
@@ -594,7 +594,7 @@ export function PromptComposer({
       >
         {/* Compact Mode Hint (Macro orchestration is controlled via Header) */}
         {currentMode !== 'dynamic' && (
-          <div className="flex items-center justify-between gap-2 px-3.5 py-1.5 border-b border-border/40 text-3xs select-none bg-surface2/20 text-foreground-muted">
+          <div className="flex items-center justify-between gap-2 px-3.5 py-1.5 text-3xs select-none bg-surface2/20 text-foreground-muted">
             <div className="flex items-center gap-1.5">
               {currentMode === 'master' ? (
                 <>

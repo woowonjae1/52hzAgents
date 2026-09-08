@@ -308,7 +308,7 @@ export function AgentProfilePanel() {
         <div className="flex-1 overflow-y-auto px-3.5 space-y-3">
           {/* Description */}
           <div className="rounded-lg border overflow-hidden">
-            <div className="px-3.5 py-2.5 border-b flex items-center justify-between gap-2">
+            <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
               <span className="text-xs font-medium">Description</span>
               <button
                 onClick={handleGenerateDescription}
@@ -410,7 +410,7 @@ export function AgentProfilePanel() {
 
           {/* Model Configuration Card */}
           <div className="rounded-lg border overflow-hidden">
-            <div className="px-3.5 py-2.5 border-b flex items-center justify-between">
+            <div className="px-3.5 py-2.5 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Cpu className="size-3 text-primary" />
                 <span className="text-xs font-medium">Model Configuration</span>
@@ -463,7 +463,7 @@ export function AgentProfilePanel() {
 
                     {isEnteringCustom ? (
                       <div
-                        className="p-1.5 space-y-1.5 border-t border-border/30 mt-1"
+                        className="p-1.5 space-y-1.5 mt-2"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => e.stopPropagation()}
                       >
@@ -592,7 +592,7 @@ export function AgentProfilePanel() {
 
           {/* Runtime, approvals, and bridge diagnostics */}
           <div className="rounded-lg border overflow-hidden">
-            <div className="px-3.5 py-2.5 border-b flex items-center gap-1.5">
+            <div className="px-3.5 py-2.5 flex items-center gap-1.5">
               <Activity className="size-3 text-foreground-muted" />
               <span className="text-xs font-medium">Runtime & approvals</span>
               <button onClick={() => void refreshDiagnostics()} className="ml-auto text-muted-foreground hover:text-foreground" title="Refresh diagnostics">
@@ -678,7 +678,7 @@ export function AgentProfilePanel() {
             };
             return (
               <div className="rounded-lg border overflow-hidden">
-                <div className="px-3.5 py-2.5 border-b flex items-center gap-1.5">
+                <div className="px-3.5 py-2.5 flex items-center gap-1.5">
                   <Sparkles className="size-3 text-status-warning" />
                   <span className="text-xs font-medium">Installed Skills</span>
                   <span className="text-3xs text-muted-foreground ml-auto">{installed.length}</span>

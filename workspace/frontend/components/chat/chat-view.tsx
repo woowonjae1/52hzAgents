@@ -959,7 +959,7 @@ export function ChatView() {
         const missing = sessionAgents.filter((a) => !a.description || !a.description.trim());
         if (missing.length === 0) return null;
         return (
-          <div className="flex items-center gap-2 px-3 py-1.5 border-b shrink-0 overflow-x-auto bg-surface2 text-status-warning">
+          <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 overflow-x-auto bg-surface2 text-status-warning">
             <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
             <span className="text-2xs leading-snug shrink-0 font-medium">
               Routing may be less accurate — no description for:

@@ -144,7 +144,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
       {/* Expanded tasks card overlay */}
       {tasksExpanded && channelTodos.length > 0 && (
         <div className="mb-1 rounded-lg border border-border bg-card p-2 shadow-lg space-y-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="flex items-center justify-between px-1 pb-1 border-b border-border text-2xs font-medium text-muted-foreground">
+          <div className="flex items-center justify-between px-1 pb-2 text-2xs font-medium text-muted-foreground">
             <span>Current Tasks ({channelTodos.length})</span>
             <button
               type="button"
