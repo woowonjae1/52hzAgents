@@ -13,14 +13,22 @@ design system, and desktop client details.
 ### Windows native development (recommended while coding)
 
 ```powershell
-# From the repository root. Keeps only PostgreSQL in Docker.
+# From the repository root. SQLite only — nothing needs Docker.
+.\workspace\dev-sqlite.ps1
+```
+
+This runs the Go backend, the Next.js frontend and the `wwj` connector daemon
+locally at http://localhost:8000 and http://localhost:3005. Logs and process
+IDs are kept in `workspace/.dev-sqlite/`. Stop with
+`.\workspace\dev-sqlite.ps1 -Stop`.
+
+```powershell
+# PostgreSQL variant. Keeps only PostgreSQL in Docker; frontend on port 3000.
 .\workspace\dev.ps1
 ```
 
-This runs the Go backend and Next.js frontend locally at
-http://localhost:8000 and http://localhost:3000. Frontend edits refresh
-automatically; logs and process IDs are kept in `workspace/.dev/`. Stop the
-native processes with `./workspace/stop-dev.ps1`.
+Logs and process IDs for this variant live in `workspace/.dev/`. Stop the
+native processes with `.\workspace\stop-dev.ps1`.
 
 ### Docker integration / release verification
 
@@ -32,6 +40,18 @@ make dev
 # Backend: http://localhost:8000
 # Frontend: http://localhost:3000 (Docker)
 ```
+
+### Ports at a glance
+
+| Path | Backend | Frontend |
+|------|---------|----------|
+| `dev-sqlite.ps1`, `npm run dev` | 8000 | **3005** |
+| `dev.ps1` (PostgreSQL in Docker) | 8000 | **3000** |
+| `docker-compose.yml` | 8000 | **3000** |
+
+`CORS_ORIGINS` defaults to `http://localhost:3000,http://localhost:3001`, so a
+frontend on 3005 needs that variable set explicitly — `dev-sqlite.ps1` sets it
+to `*` for local development.
 
 ## Architecture
 
@@ -56,19 +76,53 @@ clients receive a `system.event.ack` frame. Retrying the same client ID returns
 the original `event_id` with `duplicate: true` and does not create a second
 message.
 
+### Multi-agent orchestration
+
+- `POST /v1/council/sessions`, `GET /v1/council/sessions/:session_id`,
+  `POST /v1/council/sessions/:session_id/acts` — structured deliberation.
+  A human message of the form `/rfc <topic>` in any channel is intercepted and
+  opens a session; speech acts (`PROPOSAL`, `CHALLENGE`, `DEFENSE`, `SUPPORT`,
+  `RESOLUTION`) are persisted as first-class blackboard entities, and a
+  heterogeneous-type agent is drafted as the mandatory challenger.
+- `GET /v1/channels/:channel_id/pipeline` plus `/halt`, `/pause`, `/resume` —
+  inspect and steer a running relay of agents. Each step's output is distilled
+  into a structured deliverable for the next hop
+  (`internal/evaluator/deliverable.go`).
+- `POST /v1/workspaces/:workspace_id/channels/:channel_name/compact`,
+  `GET .../summary`, `GET .../history/compacted` — channel history compaction.
+
+### Governance
+
+- `GET|PUT /v1/workspaces/:workspace_id/policy/exec` — workspace-level command
+  classifier and sandbox policy (`internal/execpolicy`). Commands outside the
+  policy land in `/v1/approvals`.
+- `GET /v1/git/turn-changes`, `POST /v1/git/turn-rollback` — list the files an
+  agent touched during one conversation turn, and roll the whole turn back.
+- `GET /v1/git/worktrees` — worktrees used to isolate parallel agents.
+- `GET|POST /v1/workspaces/:workspace_id/agents/:agent_name/usage`,
+  `GET /v1/browser/usage` — per-agent and browser usage accounting.
+- `GET|POST /v1/knowledge/search` — chunked knowledge retrieval, scoring both
+  whitespace tokens and individual Han characters.
+
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://postgres:dev@localhost:5432/openagents_workspace` | PostgreSQL connection |
+| `DATABASE_URL` | `postgresql://postgres:dev@localhost:5432/openagents_workspace` | Database connection. A `sqlite://<path>` URL, or any URL ending in `.db`, selects the pure-Go SQLite driver (WAL, 10s busy timeout); anything else is treated as PostgreSQL |
 | `AUTH_MODE` | `workspace_token` | Auth method: `workspace_token` or `firebase` |
 | `FILE_STORAGE_BACKEND` | `local` | File storage implementation |
 | `FILE_STORAGE_PATH` | `/tmp/openagents_files` | Local file storage directory |
 | `HOST` | `0.0.0.0` | Backend listen address |
 | `PORT` | `8000` | Backend listen port |
 | `AGENT_TIMEOUT_SECONDS` | `60` | Seconds before agent is considered offline |
+| `PIPELINE_STEP_TIMEOUT_SECONDS` | `1800` | Deadline for one pipeline step. Deliberately independent of `AGENT_TIMEOUT_SECONDS`: liveness is a question about seconds, a coding task is a question about tens of minutes |
 | `REQUESTS_PER_MINUTE` | `600` | Per-client-IP in-process API rate limit. Every agent connector and browser tab on a machine shares one IP, so budget ~50/min per tab and ~45/min per idle agent. Set an edge limit for multi-replica production |
 | `CORS_ORIGINS` | `http://localhost:3000,http://localhost:3001` | Comma-separated browser origins permitted to use credentialed CORS and WebSocket |
+| `ROUTER_LLM_ENABLED` | `true` | Enable LLM-assisted message routing. Falls back to mention → master agent → round-robin when disabled or unconfigured |
+| `ROUTER_LLM_PROVIDER` | `anthropic` | `anthropic` or `openai` |
+| `ROUTER_LLM_MODEL` | provider default | Model used for routing decisions only |
+| `ROUTER_LLM_API_KEY` | `ANTHROPIC_API_KEY` when provider is `anthropic` | Router credentials. The router is skipped entirely if this is empty |
+| `ROUTER_LLM_BASE_URL` | provider default | Override for OpenAI-compatible or proxied endpoints |
 
 ## Self-Hosting
 
@@ -101,7 +155,7 @@ wwj connect my-agent <TOKEN>
 cd workspace/frontend
 npm install
 NEXT_PUBLIC_API_URL=https://your-endpoint npm run dev
-# The standalone Next.js development server listens on http://localhost:3001.
+# The standalone Next.js development server listens on http://localhost:3005.
 ```
 
 ### Deploy Frontend to Vercel / Insforge
@@ -124,14 +178,18 @@ Set the environment variable `NEXT_PUBLIC_API_URL` to your backend URL (e.g. `ht
 # Run backend tests
 make test
 
-# Run database migrations
-make migrate
+# Lint
+make lint
 
-# Create new migration
-make migration msg="add_new_table"
+# Build the backend binary
+make build
 
-# Reset database
+# Reset the database volume
 make reset-db
+
+# Start / stop the Docker stack
+make dev
+make stop
 ```
 
 The backend runs additive GORM migrations on startup. Take a database backup
