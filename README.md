@@ -233,7 +233,7 @@ wwj down
 
 ### Go 版连接器 `agn`
 
-[`packages/agn_go`](packages/agn_go/README.md) 是同一连接器的 Go 重构实现,编译为单个静态二进制,无需 Node.js 运行时:
+[`packages/agn_go`](packages/agn_go) 是同一连接器的 Go 重构实现,编译为单个静态二进制,无需 Node.js 运行时:
 
 ```bash
 cd packages/agn_go
