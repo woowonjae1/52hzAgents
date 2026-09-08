@@ -751,6 +751,16 @@ class AntigravityAdapter extends BaseAdapter {
                 const seconds = scheduleDelaySeconds(params);
                 const text = scheduleMessage(params);
 
+                const finishHandoff = async () => {
+                  try {
+                    clearIdle();
+                    this._stoppingChannels.add(channel);
+                    await this._stopProcess(proc).catch(() => {});
+                    delete this._channelProcesses[channel];
+                    resolve();
+                  } catch {}
+                };
+
                 if (cron && this.client && this.workspaceId) {
                   const when = cron.interval_minutes != null
                     ? `每隔 ${cron.interval_minutes} 分钟`
@@ -767,9 +777,9 @@ class AntigravityAdapter extends BaseAdapter {
                       interval_minutes: cron.interval_minutes,
                       source: `52hz:${this.agentName}`,
                     })
-                    .then((routine) => {
+                    .then(async (routine) => {
                       const shortId = routine && (routine.short_id || routine.shortId || routine.id);
-                      return this.sendResponse(
+                      await this.sendResponse(
                         channel,
                         `已为您创建周期计划任务（${when}）：\n\n` +
                         `> ${text}\n\n` +
@@ -777,20 +787,22 @@ class AntigravityAdapter extends BaseAdapter {
                         `🕒 触发规则：${when}\n\n` +
                         `已自动登记到 **Tasks & Issues -> Schedules**，到期将自动执行并向频道汇报结果。`
                       );
+                      await finishHandoff();
                     })
-                    .catch((err) => {
+                    .catch(async (err) => {
                       console.error('Failed to create routine mirror:', err);
-                      return this.sendResponse(
+                      await this.sendResponse(
                         channel,
                         `已为您安排定时任务（${when}）：\n\n> ${text}\n\n后台调度器已开始监听。`
                       );
+                      await finishHandoff();
                     });
                 } else if (seconds && this.client && this.workspaceId) {
                   this.client
                     .createTimer(this.workspaceId, channel, this.token, seconds, text, {
                       source: `52hz:${this.agentName}`,
                     })
-                    .then((timer) => {
+                    .then(async (timer) => {
                       const at = timer && (timer.fires_at || timer.firesAt);
                       const when = at
                         ? new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -799,25 +811,27 @@ class AntigravityAdapter extends BaseAdapter {
                       // sleep after calling its own scheduling tool, so without
                       // this the user is left looking at one grey English line
                       // and an answer that never arrives.
-                      return this.sendResponse(
+                      await this.sendResponse(
                         channel,
                         `已为您设置提醒（${when}）：\n\n` +
                         `> ${text}\n\n` +
                         `这条安排已登记到工作区，到期将准时提醒。`
                       );
+                      await finishHandoff();
                     })
-                    .catch((err) => {
+                    .catch(async (err) => {
                       console.error('Failed to create timer mirror:', err);
-                      return this.sendResponse(
+                      await this.sendResponse(
                         channel,
                         `已为您安排提醒：\n\n> ${text}\n\n后台计时器已开始倒计时。`
                       );
+                      await finishHandoff();
                     });
                 } else {
                   this.sendResponse(
                     channel,
                     `已为您安排定时计划：\n\n> ${text}\n\n调度器已开始监听。`
-                  ).catch(() => {});
+                  ).then(finishHandoff).catch(finishHandoff);
                 }
               }
             }

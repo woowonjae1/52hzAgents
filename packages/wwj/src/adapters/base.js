@@ -1015,7 +1015,7 @@ class BaseAdapter {
       msg._queueId = queueId;
       this._channelQueues[channel].push(msg);
       try {
-        await this.sendStatus(channel, 'message queued �?will process after current task', {
+        await this.sendStatus(channel, 'message queued · will process after current task', {
           queued_message: (msg.content || '').slice(0, 200),
           queue_id: queueId,
         });
