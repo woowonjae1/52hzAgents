@@ -123,29 +123,29 @@ export function AgentModelSwitcher({
     [onlineAgents],
   );
 
+  const load = React.useCallback(async () => {
+    if (!agentNamesKey) return;
+    const names = agentNamesKey.split(',');
+    if (workspaceId) workspaceApi.setWorkspaceId(workspaceId);
+    await Promise.all(
+      names.map(async (name) => {
+        try {
+          const usage = await workspaceApi.getAgentUsage(name);
+          hydrateAgentModels(name, {
+            options: parseReportedModels(usage?.available_models),
+            current: usage?.current_model,
+          });
+        } catch {
+          // An agent that does not answer keeps whatever the store holds.
+        }
+      }),
+    );
+  }, [agentNamesKey, workspaceId]);
+
   // Heartbeat: fold each agent's reported model list into the shared store.
   React.useEffect(() => {
     if (!agentNamesKey) return;
-    const names = agentNamesKey.split(',');
     let cancelled = false;
-
-    const load = async () => {
-      if (workspaceId) workspaceApi.setWorkspaceId(workspaceId);
-      await Promise.all(
-        names.map(async (name) => {
-          try {
-            const usage = await workspaceApi.getAgentUsage(name);
-            if (cancelled) return;
-            hydrateAgentModels(name, {
-              options: parseReportedModels(usage?.available_models),
-              current: usage?.current_model,
-            });
-          } catch {
-            // An agent that does not answer keeps whatever the store holds.
-          }
-        }),
-      );
-    };
 
     let timer: ReturnType<typeof setInterval> | null = null;
     const stopTimer = () => {
@@ -157,19 +157,19 @@ export function AgentModelSwitcher({
     const startTimer = () => {
       if (timer !== null || cancelled) return;
       if (typeof document !== 'undefined' && document.hidden) return;
-      timer = setInterval(load, 30_000);
+      timer = setInterval(() => { void load(); }, 30_000);
     };
     const handleVisibilityChange = () => {
       if (typeof document === 'undefined') return;
       if (document.hidden) {
         stopTimer();
       } else {
-        load();
+        void load();
         startTimer();
       }
     };
 
-    load();
+    void load();
     startTimer();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
@@ -178,7 +178,7 @@ export function AgentModelSwitcher({
       stopTimer();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [agentNamesKey, workspaceId]);
+  }, [agentNamesKey, load]);
 
   // Saved per-thread choices, folded into the same store.
   React.useEffect(() => {
@@ -336,7 +336,7 @@ export function AgentModelSwitcher({
   };
 
   return (
-    <DropdownMenu onOpenChange={(open) => { if (!open) setSearchQuery(''); }}>
+    <DropdownMenu onOpenChange={(open) => { if (open) void load(); else setSearchQuery(''); }}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
