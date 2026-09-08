@@ -24,7 +24,7 @@ const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100, keepAlive
 /**
  * HTTP client for workspace API operations.
  *
- * Mirrors the Python SDK's WorkspaceClient â€?same endpoints, same
+ * Mirrors the Python SDK's WorkspaceClient â€”same endpoints, same
  * auth headers (X-Workspace-Token), same request/response shapes.
  */
 class WorkspaceClient {
@@ -261,7 +261,7 @@ class WorkspaceClient {
       type: 'workspace.message.posted',
       // Server-side pre-filter: only return events routed to this agent (plus
       // untargeted ones) instead of the whole network's traffic. Backward
-      // compatible â€?older backends ignore the unknown param and return
+      // compatible â€”older backends ignore the unknown param and return
       // everything, so the client-side filter below stays as the safety net.
       target_agents: agentName,
       limit: String(limit),
@@ -275,7 +275,7 @@ class WorkspaceClient {
     // Prefer the server's next_cursor: with server-side target filtering the
     // last returned event lags the stream tip, so advancing by it alone would
     // re-scan the same range every poll. next_cursor jumps past other agents'
-    // events once ours are drained. Older backends don't send it â€?fall back
+    // events once ours are drained. Older backends don't send it â€”fall back
     // to the last returned event id (they return the full stream, so that IS
     // the tip).
     let cursor = null;
@@ -291,11 +291,11 @@ class WorkspaceClient {
     // the server includes as a safe superset.
     //
     // target_agents semantics:
-    //   â€?absent            â†?legacy server with no routing decision
+    //   â€”absent            â†’legacy server with no routing decision
     //                         (broadcast for human messages, ignore for agents)
-    //   â€?[...agentNames]   â†?only listed agents should respond
-    //   â€?["__no_response__"]
-    //                       â†?routing happened and decided nobody
+    //   â€”[...agentNames]   â†’only listed agents should respond
+    //   â€”["__no_response__"]
+    //                       â†’routing happened and decided nobody
     //                         should respond. Sentinel is used instead
     //                         of [] because pre-0.2.106 clients treat
     //                         empty array as "broadcast" and every
@@ -340,7 +340,7 @@ class WorkspaceClient {
   /**
    * Get the workspace's top-level metadata via GET /v1/workspaces/{id}.
    *
-   * Returns the full data block from the backend â€?adapters care about
+   * Returns the full data block from the backend â€”adapters care about
    * `browserEnabled` today, but more keys may be surfaced over time. On
    * error, returns null so callers can fall back to defaults rather than
    * crashing.
@@ -366,7 +366,7 @@ class WorkspaceClient {
    *
    * The backend updates WorkspaceMember.enabled_skills.skill_status so the
    * Skill Hub UI can render installing / installed / failed states. Best
-   * effort â€?returns the updated payload or throws (caller decides).
+   * effort â€”returns the updated payload or throws (caller decides).
    */
   async reportSkillStatus(workspaceId, agentName, token, { skillId, state, path: installPath, error, partial } = {}) {
     const body = { skill_id: skillId, state };
@@ -396,7 +396,7 @@ class WorkspaceClient {
         title: result.title || channelName,
         // The API serialises snake_case (`json:"title_manually_set"` in
         // internal/models/models.go), so the camelCase read was always
-        // undefined and this collapsed to `false` unconditionally â€?leaving
+        // undefined and this collapsed to `false` unconditionally â€”leaving
         // `_autoTitleChannel`'s "don't touch a title the user set" guard dead
         // for as long as it has existed. Both spellings are accepted so the
         // fix does not depend on which shape a given build returns.
@@ -647,14 +647,29 @@ class WorkspaceClient {
     return data.data || data;
   }
 
-  async createTimer(workspaceId, channelName, token, delay, message, { source } = {}) {
+  /**
+   * Schedules a one-off timer.
+   *
+   * `delay` is seconds from now. Pass `firesAt` instead when the user named a
+   * clock time - letting the server resolve the moment avoids arithmetic that
+   * drifts if the request is slow.
+   *
+   * The server field is `delay_seconds`. This sent `delay`, which the server
+   * ignored, leaving `delay_seconds` at its zero value and failing the required
+   * check - so every timer created through this client returned 400.
+   */
+  async createTimer(workspaceId, channelName, token, delay, message, { source, firesAt } = {}) {
     const body = {
-      delay,
       message,
       network: workspaceId,
       channel: channelName,
       source: source || '52hz:unknown',
     };
+    if (firesAt) {
+      body.fires_at = firesAt instanceof Date ? firesAt.toISOString() : firesAt;
+    } else {
+      body.delay_seconds = delay;
+    }
     const data = await this._post('/v1/timers', body, this._wsHeaders(token));
     return data.data || data;
   }
@@ -834,7 +849,7 @@ class WorkspaceClient {
             // `@knowledge:slug` is knowledge-base syntax, not an agent address.
           // Scanned as-is it yields "knowledge", which lands in `mentions` and
           // makes the addressing filter in _dispatchMessage read the message as
-          // aimed at some other agent â€?every agent then backs off and a bare
+          // aimed at some other agent â€”every agent then backs off and a bare
           // "@knowledge:x <question>" is silently dropped. The same exclusion
           // exists on the text-derived mention paths (leadingMentions,
           // agentMentions); this is the third source feeding that decision.
@@ -880,7 +895,7 @@ class WorkspaceClient {
         headers,
         timeout,
         // Hard end-to-end deadline. The `timeout` option above is only a SOCKET
-        // inactivity timeout â€?it is NOT armed until a socket exists, so it does
+        // inactivity timeout â€”it is NOT armed until a socket exists, so it does
         // not bound DNS resolution or TCP connect. During a network partition a
         // request stuck in getaddrinfo/connect never fires 'timeout', so the
         // await never settles and the caller's single poll loop wedges forever

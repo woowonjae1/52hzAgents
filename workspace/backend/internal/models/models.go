@@ -337,9 +337,26 @@ type TodoRecord struct {
 	Assignee    string    `gorm:"type:text;not null" json:"assignee"`
 	Content     string    `gorm:"type:text;not null" json:"content"`
 	Status      string    `gorm:"type:text;not null;default:pending" json:"status"`
+	Priority    string    `gorm:"type:text;default:none" json:"priority,omitempty"`
+	RoutineID   *string   `gorm:"type:text;index" json:"routine_id,omitempty"`
+	RunID       *string   `gorm:"type:text;index" json:"run_id,omitempty"`
+	// TimerID links a task to the one-off timer that will carry it out.
+	//
+	// A recurring routine already had this (RoutineID/RunID) and so its runs
+	// showed up on the board; a timer had no such link, so "remind me at 16:11"
+	// left nothing anywhere in Tasks & Issues.
+	TimerID *string `gorm:"type:text;index" json:"timer_id,omitempty"`
 	Position    int       `gorm:"type:integer;not null;default:0" json:"position"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoCreateTime" json:"updated_at"`
+	// DueDate is the optional deadline a task is measured against. Todo lists
+	// without one cannot surface "overdue", which is the single most requested
+	// signal on a task board.
+	DueDate *time.Time `gorm:"" json:"due_date,omitempty"`
+	// CompletedAt records when the task reached a terminal state. The routine
+	// tracker writes it when an agent finishes a scheduled run; without the
+	// column those writes failed and every scheduled task stayed in_progress.
+	CompletedAt *time.Time `gorm:"" json:"completed_at,omitempty"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (TodoRecord) TableName() string {
@@ -365,6 +382,7 @@ func (TimerRecord) TableName() string {
 
 type RoutineRecord struct {
 	ID                      string     `gorm:"primaryKey;type:text" json:"id"`
+	ShortID                 string     `gorm:"type:text;index" json:"short_id"`
 	WorkspaceID             string     `gorm:"type:uuid;not null;index:idx_routines_workspace_channel" json:"workspace_id"`
 	ChannelName             string     `gorm:"type:text;not null;index:idx_routines_workspace_channel" json:"channel_name"`
 	ThreadID                *string    `gorm:"type:text" json:"thread_id"`
@@ -379,12 +397,37 @@ type RoutineRecord struct {
 	Timezone                string     `gorm:"type:text;default:UTC" json:"timezone"`
 	NextFiresAt             time.Time  `gorm:"not null;index:idx_routines_next_fires_status" json:"next_fires_at"`
 	LastFiredAt             *time.Time `gorm:"" json:"last_fired_at"`
+	RunCount                int        `gorm:"type:integer;not null;default:0" json:"run_count"`
+	LastRunID               *string    `gorm:"type:text" json:"last_run_id"`
+	LastRunStatus           string     `gorm:"type:text;default:scheduled" json:"last_run_status"`
+	LastRunError            *string    `gorm:"type:text" json:"last_run_error"`
 	Status                  string     `gorm:"type:text;not null;default:active;index:idx_routines_next_fires_status" json:"status"`
 	CreatedAt               time.Time  `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (RoutineRecord) TableName() string {
 	return "routines"
+}
+
+type RoutineRunRecord struct {
+	ID             string     `gorm:"primaryKey;type:text" json:"id"`
+	RoutineID      string     `gorm:"type:text;not null;index:idx_routine_runs_routine" json:"routine_id"`
+	RoutineShortID string     `gorm:"type:text;index" json:"routine_short_id"`
+	WorkspaceID    string     `gorm:"type:uuid;not null;index:idx_routine_runs_workspace" json:"workspace_id"`
+	RunNumber      int        `gorm:"type:integer;not null" json:"run_number"`
+	ChannelName    string     `gorm:"type:text;not null" json:"channel_name"`
+	ThreadID       *string    `gorm:"type:text" json:"thread_id"`
+	AgentName      string     `gorm:"type:text;not null" json:"agent_name"`
+	RoutineName    string     `gorm:"type:text;not null" json:"routine_name"`
+	TriggerMessage string     `gorm:"type:text;not null" json:"trigger_message"`
+	Status         string     `gorm:"type:text;not null;default:running" json:"status"`
+	StartedAt      time.Time  `gorm:"autoCreateTime" json:"started_at"`
+	CompletedAt    *time.Time `gorm:"" json:"completed_at"`
+	Error          *string    `gorm:"type:text" json:"error,omitempty"`
+}
+
+func (RoutineRunRecord) TableName() string {
+	return "routine_runs"
 }
 
 // ---------------------------------------------------------------------------

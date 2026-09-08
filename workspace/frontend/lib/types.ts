@@ -337,8 +337,24 @@ export interface NotificationItem {
   readAt: string | null;
 }
 
+export interface RoutineRunItem {
+  id: string;
+  routineId: string;
+  routineShortId: string;
+  runNumber: number;
+  channelName: string;
+  threadId: string | null;
+  agentName: string;
+  triggerMessage: string;
+  status: 'running' | 'completed' | 'failed';
+  startedAt: string;
+  completedAt: string | null;
+  error: string | null;
+}
+
 export interface RoutineItem {
   id: string;
+  shortId?: string;
   name: string;
   message: string;
   scheduleHour: number;
@@ -348,6 +364,10 @@ export interface RoutineItem {
   timezone: string;
   nextFiresAt: string;
   lastFiredAt: string | null;
+  runCount?: number;
+  lastRunId?: string | null;
+  lastRunStatus?: string | null;
+  lastRunError?: string | null;
   status: string;
   createdBy: string;
   channelName: string;
@@ -369,6 +389,12 @@ export interface TodoItem {
   channelName: string;
   threadId: string | null;
   position: number;
+  routineId?: string | null;
+  runId?: string | null;
+  /** Set when this task is carried out by a one-off timer. */
+  timerId?: string | null;
+  dueDate?: string | null;
+  completedAt?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 }

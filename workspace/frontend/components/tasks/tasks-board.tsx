@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react';
 import type { TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
-import { stripAddressPrefix } from '@/lib/types';
-import { PrioritySelector, PriorityGlyph } from './priority-selector';
-import { StatusSelector, StatusGlyph, ALL_STATUSES } from './status-selector';
+import { PrioritySelector } from './priority-selector';
+import { StatusSelector, StatusGlyph } from './status-selector';
+import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Trash2, User, Hash, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, User, Hash, Clock, CalendarClock } from 'lucide-react';
 
 interface TasksBoardProps {
   tasks: TodoItem[];
@@ -16,18 +16,21 @@ interface TasksBoardProps {
   onEdit: (todo: TodoItem) => void;
   onDelete: (todo: TodoItem) => void;
   onQuickCreate: (groupValue: string) => void;
-  manualSource: string;
+  /** Shared clock, so every card's relative time comes from one tick. */
+  now: number;
 }
 
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return '';
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+/** True for a task past its due date and not yet closed. */
+function isOverdue(todo: TodoItem, now: number): boolean {
+  if (!todo.dueDate) return false;
+  if (todo.status === 'completed' || todo.status === 'cancelled') return false;
+  const due = new Date(todo.dueDate).getTime();
+  return Number.isFinite(due) && due < now;
+}
+
+function taskRef(todo: TodoItem): string {
+  if (todo.id.startsWith('TASK-')) return todo.id.replace(/^TASK-/, '');
+  return todo.id.slice(-4).toUpperCase();
 }
 
 interface BoardColumn {
@@ -45,7 +48,7 @@ export function TasksBoard({
   onEdit,
   onDelete,
   onQuickCreate,
-  manualSource,
+  now,
 }: TasksBoardProps) {
   // Build columns based on grouping
   const columns: BoardColumn[] = React.useMemo(() => {
@@ -159,7 +162,7 @@ export function TasksBoard({
               </div>
             ) : (
               col.tasks.map((task) => {
-                const isManual = task.createdBy === manualSource;
+                const overdue = isOverdue(task, now);
                 return (
                   <div
                     key={task.id}
@@ -178,8 +181,11 @@ export function TasksBoard({
                           size="sm"
                           onChange={(p) => onUpdatePriority(task, p)}
                         />
-                        <span className="text-3xs font-mono font-medium text-foreground-extra-muted">
-                          #{task.position || task.id.slice(-4)}
+                        <span
+                          className="text-3xs font-mono font-medium text-foreground-extra-muted"
+                          title={task.id}
+                        >
+                          {taskRef(task)}
                         </span>
                       </div>
                       <StatusSelector
@@ -204,6 +210,20 @@ export function TasksBoard({
                     {/* Bottom Row: Stacked Badges with Hover Fan-Out */}
                     <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between text-3xs text-foreground-extra-muted">
                       <div className="flex items-center -space-x-3 hover:space-x-1.5 transition-all duration-200">
+                        {task.dueDate && (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border font-medium shrink-0',
+                              overdue
+                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                                : 'bg-surface3 text-foreground-muted border-border/60'
+                            )}
+                            title={`Due ${formatAbsolute(task.dueDate)}`}
+                          >
+                            <CalendarClock className="size-2.5 shrink-0" />
+                            {overdue ? 'Overdue' : 'Due'}
+                          </span>
+                        )}
                         {task.channelName && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface3 border border-border/60 font-medium text-foreground-muted truncate max-w-[100px]"
@@ -224,34 +244,43 @@ export function TasksBoard({
                         )}
                         <span
                           className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface3 border border-border/60 text-foreground-extra-muted shrink-0"
-                          title={task.createdAt ? new Date(task.createdAt).toLocaleString() : ''}
+                          title={formatAbsolute(task.updatedAt || task.createdAt)}
                         >
                           <Clock className="size-2.5 shrink-0" />
-                          {timeAgo(task.updatedAt || task.createdAt)}
+                          {timeAgo(task.updatedAt || task.createdAt, now)}
                         </span>
+                        {(task.routineId || task.timerId) && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-3xs font-medium shrink-0"
+                            title="Automated Routine Task"
+                          >
+                            <CalendarClock className="size-2.5 shrink-0" />
+                            Scheduled
+                          </span>
+                        )}
                       </div>
 
-                      {/* Quick Card Action Buttons */}
-                      {isManual && (
-                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            type="button"
-                            onClick={() => onEdit(task)}
-                            className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
-                            title="Edit"
-                          >
-                            <Pencil className="size-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(task)}
-                            className="p-1 rounded text-foreground-extra-muted hover:text-destructive hover:bg-surface3 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="size-3" />
-                          </button>
-                        </div>
-                      )}
+                      {/* Card actions. Previously gated to tasks the current
+                          user authored, which left every agent- and
+                          routine-created card read-only. */}
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={() => onEdit(task)}
+                          className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="size-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(task)}
+                          className="p-1 rounded text-foreground-extra-muted hover:text-destructive hover:bg-surface3 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

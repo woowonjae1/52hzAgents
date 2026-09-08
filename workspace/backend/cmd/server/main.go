@@ -8,6 +8,10 @@ import (
 	"os"            // 文件系统操作与路径探测
 	"path/filepath" // 文件路径处理
 	"strings"       // 字符串前缀判断
+	// 内嵌 IANA 时区库。Windows 没有 /usr/share/zoneinfo，缺了它
+	// time.LoadLocation("Asia/Shanghai") 会失败，所有定时任务都会静默退回
+	// UTC 执行 —— 用户设的"每天九点"会在下午五点跑。
+	_ "time/tzdata"
 
 	"github.com/gin-gonic/gin"                                             // Gin Web 核心路由与上下文。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"   // 环境变量加载包。
@@ -116,8 +120,11 @@ func main() { // 服务程序运行主入口函数。
 		v1.DELETE("/files/:file_id", handlers.DeleteFile)    // 逻辑删除文件及其物理存储。
 
 		// 注册规划辅助接口 (Todos/Timers/Routines) —— 新增：
-		v1.PUT("/todos", handlers.PutTodos) // 批量保存并重排序代办事项。
-		v1.GET("/todos", handlers.GetTodos) // 查询指定过滤条件下的代办项。
+		v1.PUT("/todos", handlers.PutTodos)               // 批量保存并重排序代办事项（整表替换，按来源分区）。
+		v1.POST("/todos", handlers.CreateTodo)            // 追加单条代办项。
+		v1.GET("/todos", handlers.GetTodos)               // 查询指定过滤条件下的代办项。
+		v1.PATCH("/todos/:todo_id", handlers.PatchTodo)   // 局部更新单条代办项（状态、优先级、指派…）。
+		v1.DELETE("/todos/:todo_id", handlers.DeleteTodo) // 删除单条代办项。
 
 		v1.POST("/timers", handlers.CreateTimer)             // 创建单次定时消息提醒计时器。
 		v1.GET("/timers", handlers.ListTimers)               // 列出活跃状态的计时器。
@@ -125,7 +132,11 @@ func main() { // 服务程序运行主入口函数。
 
 		v1.POST("/routines", handlers.CreateRoutine)               // 创建周期性循环执行任务。
 		v1.GET("/routines", handlers.ListRoutines)                 // 列出活跃中的循环任务。
+		v1.PATCH("/routines/:routine_id", handlers.UpdateRoutine)        // 就地编辑日程（保留短号与运行历史）。
+		v1.PATCH("/routines/:routine_id/toggle", handlers.ToggleRoutine) // 暂停或恢复周期任务。
+		v1.POST("/routines/:routine_id/run", handlers.TriggerRoutineNow) // 立即执行一次周期任务。
 		v1.DELETE("/routines/:routine_id", handlers.DeleteRoutine) // 撤销或取消周期任务。
+		v1.GET("/routine-runs", handlers.ListRoutineRuns)          // 查询任务执行记录。
 		v1.POST("/notifications", handlers.CreateNotification)
 		v1.GET("/notifications", handlers.ListNotifications)
 		v1.PATCH("/notifications/read-all", handlers.MarkAllNotificationsRead)

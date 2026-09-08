@@ -9,35 +9,8 @@ import { workspaceApi } from '@/lib/api';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from './create-routine-dialog';
 import { cn } from '@/lib/utils';
-import type { RoutineItem } from '@/lib/types';
 import { stripAddressPrefix } from '@/lib/types';
-
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-function formatSchedule(r: RoutineItem): string {
-  if (r.scheduleIntervalMinutes) {
-    const mins = r.scheduleIntervalMinutes;
-    if (mins >= 60) return `Every ${Math.floor(mins / 60)}h${mins % 60 ? ` ${mins % 60}m` : ''}`;
-    return `Every ${mins}m`;
-  }
-  const time = `${String(r.scheduleHour).padStart(2, '0')}:${String(r.scheduleMinute).padStart(2, '0')} UTC`;
-  if (!r.scheduleDays || r.scheduleDays.length === 7) return `Daily at ${time}`;
-  if (r.scheduleDays.length === 5 && [0, 1, 2, 3, 4].every((d) => r.scheduleDays!.includes(d))) return `Weekdays at ${time}`;
-  const dayLabels = r.scheduleDays.map((d: number) => DAY_NAMES[d] || `${d}`).join(', ');
-  return `${dayLabels} at ${time}`;
-}
-
-function timeUntil(dateStr: string): string {
-  const diff = new Date(dateStr).getTime() - Date.now();
-  if (diff < 0) return 'overdue';
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return '<1m';
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ${mins % 60}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
-}
+import { formatSchedule, timeUntil } from '@/lib/schedule-format';
 
 export function RoutineList() {
   const { routines, refreshRoutines, createRoutine, currentSessionId, setCurrentSessionId, agents } = useWorkspace();

@@ -73,6 +73,7 @@ func InitDB() {
 		&models.TodoRecord{},
 		&models.TimerRecord{},
 		&models.RoutineRecord{},
+		&models.RoutineRunRecord{},
 		&models.NotificationRecord{},
 		&models.AgentRuntimeRecord{},
 		&models.AgentUsageRecord{},
@@ -90,6 +91,13 @@ func InitDB() {
 	if err != nil {
 		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
+
+	// Ensure todos table has latest columns across all sqlite versions
+	DB.Exec("ALTER TABLE todos ADD COLUMN priority TEXT DEFAULT 'none'")
+	DB.Exec("ALTER TABLE todos ADD COLUMN routine_id TEXT")
+	DB.Exec("ALTER TABLE todos ADD COLUMN run_id TEXT")
+	DB.Exec("ALTER TABLE todos ADD COLUMN due_date DATETIME")
+	DB.Exec("ALTER TABLE todos ADD COLUMN completed_at DATETIME")
 
 	log.Println("Database auto-migration completed successfully.")
 }

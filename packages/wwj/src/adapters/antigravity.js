@@ -45,11 +45,11 @@ function stripAnsi(str) {
 //
 //   Condition met: 'any' (received message from '<uuid>')
 //   **Message from <uuid> (Claude Assistant)**:
-//   Hello! I have completed �?
+//   Hello! I have completed —
 //
 // That is plumbing, not an answer. Left in, the bubble opens with an opaque UUID
-// and a framework's internal vocabulary �?and worse, a reader sees "Message from
-// �?(Claude Assistant)" and reasonably concludes the workspace's @claude
+// and a framework's internal vocabulary — and worse, a reader sees "Message from
+// — (Claude Assistant)" and reasonably concludes the workspace's @claude
 // answered, when it was an internal sub-agent of Antigravity's own.
 //
 // Matched structurally (literal keyword plus a UUID) and only at the START of
@@ -59,7 +59,7 @@ function stripAnsi(str) {
 const SUBAGENT_FRAMING_PATTERNS = [
   // "Condition met: 'any' (received message from '<uuid>')"
   /^\s*Condition met:\s*'[^']*'\s*\(received message from\s*'[0-9a-fA-F-]{8,}'\)\s*/,
-  // "**Message from <uuid> (Some Name)**:" �?asterisks and the name optional
+  // "**Message from <uuid> (Some Name)**:" — asterisks and the name optional
   /^\s*\*{0,2}Message from\s+[0-9a-fA-F-]{8,}\s*(?:\([^)]*\))?\*{0,2}\s*:?\s*/,
 ];
 
@@ -129,6 +129,55 @@ const FILE_WRITING_TOOLS = new Set([
   'Write', 'Edit', 'NotebookEdit', 'write_to_file', 'replace_file_content',
   'multi_replace_file_content', 'sed_file', 'notebook_edit'
 ]);
+
+/**
+ * Antigravity's own scheduling tools.
+ *
+ * Instructing the model in the system prompt to "always use the workspace REST
+ * API" does not work, and had already failed once before this was written: a
+ * structured tool it can call directly beats prose telling it to assemble a
+ * curl command. So rather than argue with it, let it call its own tool and
+ * mirror the result into the workspace, where the schedule is visible under
+ * Tasks and outlives this CLI session.
+ */
+const SELF_SCHEDULE_TOOLS = new Set([
+  'schedule',
+  'schedulewakeup',
+  'schedule_wakeup',
+  'set_timer',
+  'settimer',
+  'create_timer',
+  'createtimer',
+  'remind',
+  'reminder',
+]);
+
+/** Pulls a delay in seconds out of whatever shape the tool used. */
+function scheduleDelaySeconds(params) {
+  const candidates = [
+    params.DurationSeconds, params.duration_seconds, params.durationSeconds,
+    params.DelaySeconds, params.delay_seconds, params.delaySeconds,
+    params.Seconds, params.seconds, params.delay,
+  ];
+  for (const value of candidates) {
+    const n = Number(value);
+    if (Number.isFinite(n) && n >= 1) return Math.round(n);
+  }
+  const rawMinutes = params.DurationMinutes !== undefined ? params.DurationMinutes
+    : params.minutes !== undefined ? params.minutes : params.Minutes;
+  const minutes = Number(rawMinutes);
+  if (Number.isFinite(minutes) && minutes > 0) return Math.round(minutes * 60);
+  return null;
+}
+
+/** Pulls the reminder text out of whatever shape the tool used. */
+function scheduleMessage(params) {
+  const candidates = [params.Prompt, params.prompt, params.Message, params.message, params.Text, params.text];
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return 'Scheduled reminder';
+}
 
 function formatToolPreview(toolName, params) {
   if (!params || typeof params !== 'object') return '';
@@ -614,9 +663,52 @@ class AntigravityAdapter extends BaseAdapter {
             if (!reportedSteps.has(stepKey)) {
               reportedSteps.add(stepKey);
               if (preview) {
-                try { await this.sendStatus(channel, `${toolName} �?${preview}`); } catch {}
+                try { await this.sendStatus(channel, `${toolName} \u00b7 ${preview}`); } catch {}
               } else {
                 try { await this.sendStatus(channel, `${toolName}`); } catch {}
+              }
+            }
+
+            // Mirror the CLI's local scheduling into the workspace, so the
+            // reminder appears under Tasks and still fires if this CLI session
+            // is gone by then. Keyed without `state` so one call registers one
+            // timer across its RUNNING and DONE updates.
+            if (SELF_SCHEDULE_TOOLS.has(String(toolName).toLowerCase())) {
+              const mirrorKey = `mirror:${su.step_index}:${toolName}`;
+              if (!reportedSteps.has(mirrorKey)) {
+                reportedSteps.add(mirrorKey);
+                const seconds = scheduleDelaySeconds(params);
+                if (seconds && this.client && this.workspaceId) {
+                  const text = scheduleMessage(params);
+                  this.client
+                    .createTimer(this.workspaceId, channel, this.token, seconds, text, {
+                      source: `52hz:${this.agentName}`,
+                    })
+                    .then((timer) => {
+                      const at = timer && (timer.fires_at || timer.firesAt);
+                      const when = at
+                        ? new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                        : `${Math.round(seconds / 60)} 分钟后`;
+                      // A reply, not a status line. The model goes straight to
+                      // sleep after calling its own scheduling tool, so without
+                      // this the user is left looking at one grey English line
+                      // and an answer that never arrives.
+                      return this.sendResponse(
+                        channel,
+                        `已安排：${when} 提醒你。
+
+> ${text}
+
+` +
+                        `这条安排已登记到工作区，` +
+                        `在 Tasks & Issues 里可以看到和取消。`
+                      );
+                    })
+                    .catch(() => {
+                      // The CLI's own timer still runs. Stay silent rather than
+                      // announcing a workspace timer that does not exist.
+                    });
+                }
               }
             }
 
@@ -660,7 +752,7 @@ class AntigravityAdapter extends BaseAdapter {
                   if (detectedAgents.length > 0) {
                     reportedSteps.add('text_subagent_detected');
                     try {
-                      await this.sendStatus(channel, `invoke_subagent �?${JSON.stringify(detectedAgents)}`);
+                      await this.sendStatus(channel, `invoke_subagent \u00b7 ${JSON.stringify(detectedAgents)}`);
                     } catch {}
                   }
                 }
@@ -686,7 +778,7 @@ class AntigravityAdapter extends BaseAdapter {
 
       // `agy` gets no timeout of its own, and a single-agent turn has no
       // pipeline sweeper behind it either, so a hung child left the channel
-      // sitting on "正在推理�?.." forever with nothing to report and no way
+      // sitting on "正在推理..." forever with nothing to report and no way
       // out. Reap on *silence* rather than total duration: a long task keeps
       // emitting stream-json, so any real work resets this.
       const IDLE_KILL_MS = Number(process.env.ANTIGRAVITY_IDLE_TIMEOUT_MS) || 5 * 60 * 1000;
@@ -795,7 +887,7 @@ class AntigravityAdapter extends BaseAdapter {
         clearIdle();
         delete this._channelProcesses[channel];
         this._log(`[spawn] event=error channel=${channel} msg=${err.message}`);
-        await this.sendError(channel, `�?启动 Antigravity 失败: ${err.message}`);
+        await this.sendError(channel, `启动 Antigravity 失败: ${err.message}`);
         resolve();
       });
     });

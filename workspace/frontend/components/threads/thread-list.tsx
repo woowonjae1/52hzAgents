@@ -146,12 +146,12 @@ function DMSection({
                 </div>
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm flex-1 min-w-0 truncate font-normal text-foreground">
+                    <span className="text-xs flex-1 min-w-0 truncate font-medium text-foreground">
                       {agentA} ↔ {agentB}
                     </span>
-                    <span className="text-xs text-muted-foreground shrink-0">{displayTime}</span>
+                    <span className="text-2xs text-muted-foreground shrink-0 tabular-nums">{displayTime}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{preview}</p>
+                  <p className="text-2xs text-muted-foreground truncate">{preview}</p>
                 </div>
               </div>
             );
@@ -432,15 +432,15 @@ const ThreadRow = memo(function ThreadRow({
               not a column of figures. Monospacing prose sets it in a second
               typeface for no alignment benefit, and at 10px the mono face is
               the widest thing in a row that is fighting for width. */}
-          <span className="text-3xs text-foreground-extra-muted shrink-0">
+          <span className="text-2xs text-foreground-extra-muted shrink-0 tabular-nums">
             {displayTime}
           </span>
         </div>
         {showPreview && (
           <p className={cn(
-            'text-3xs truncate leading-relaxed font-sans mt-1',
-            isSelected ? 'text-foreground/70' : 'text-foreground-muted',
-            previewIsStatus && 'italic text-foreground-muted'
+            'text-2xs truncate leading-relaxed font-sans mt-1',
+            isSelected ? 'text-foreground/75 font-normal' : 'text-foreground-muted/90',
+            previewIsStatus && 'text-foreground-muted'
           )}>
             {preview}
           </p>
@@ -1134,14 +1134,14 @@ export function ThreadList() {
                         </div>
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm flex-1 min-w-0 truncate font-normal text-foreground">
+                            <span className="text-xs flex-1 min-w-0 truncate font-normal text-foreground">
                               {getSmartSessionTitle(session, lastMsg)}
                             </span>
-                            <span className="text-xs text-muted-foreground shrink-0">
+                            <span className="text-2xs text-muted-foreground shrink-0 tabular-nums">
                               {displayTime}
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-2xs text-muted-foreground truncate">
                             {preview}
                           </p>
                         </div>

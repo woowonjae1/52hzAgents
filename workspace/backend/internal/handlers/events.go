@@ -269,6 +269,7 @@ func SendEvent(c *gin.Context) {
 	// Check if this event finishes an agent turn and should trigger the next pipeline step
 	if isAgentSource(req.Source) && messageType(req.Payload) == "chat" {
 		CheckAndTriggerNextPipelineStep(workspace.ID, req.Target, req.Source)
+		CompleteRoutineRunIfApplicable(workspace.ID, req.Target, req.Source)
 	}
 
 	// Intercept explicit /rfc command from human to initiate a council blackboard session
@@ -574,6 +575,11 @@ func StreamEventsWS(c *gin.Context) {
 			ChannelName: parsedReq.Target,
 			Payload:     string(fullEventBytes),
 		})
+
+		if isAgentSource(parsedReq.Source) && messageType(parsedReq.Payload) == "chat" {
+			CheckAndTriggerNextPipelineStep(workspace.ID, parsedReq.Target, parsedReq.Source)
+			CompleteRoutineRunIfApplicable(workspace.ID, parsedReq.Target, parsedReq.Source)
+		}
 
 		sendAck(gin.H{
 			"type":              "system.event.ack",

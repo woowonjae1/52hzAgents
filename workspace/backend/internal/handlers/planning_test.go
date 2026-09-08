@@ -10,10 +10,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	// The pure-Go driver, matching internal/scheduler's tests. gorm.io/driver/sqlite
+	// needs CGO, and without it every database-backed case in this file skipped —
+	// the package reported "ok" while testing nothing.
+	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -157,7 +160,7 @@ func TestTimerLifecycleAndWorkspaceScopedCancellation(t *testing.T) {
 
 	otherToken := "other-planning-token"
 	otherHash := hashWorkspaceToken(otherToken)
-	if err := db.DB.Create(&models.Workspace{ID: uuid.NewString(), Name: "Other", PasswordHash: &otherHash}).Error; err != nil {
+	if err := db.DB.Create(&models.Workspace{ID: uuid.NewString(), Name: "Other", Slug: uuid.NewString(), PasswordHash: &otherHash}).Error; err != nil {
 		t.Fatalf("create other workspace: %v", err)
 	}
 	if response = planningRequest(t, router, http.MethodDelete, "/v1/timers/"+timer.ID, otherToken, nil); response.Code != http.StatusUnauthorized {
@@ -203,7 +206,7 @@ func TestRoutineLifecycleValidationAndWorkspaceScopedCancellation(t *testing.T) 
 
 	otherToken := "other-routine-token"
 	otherHash := hashWorkspaceToken(otherToken)
-	if err := db.DB.Create(&models.Workspace{ID: uuid.NewString(), Name: "Other", PasswordHash: &otherHash}).Error; err != nil {
+	if err := db.DB.Create(&models.Workspace{ID: uuid.NewString(), Name: "Other", Slug: uuid.NewString(), PasswordHash: &otherHash}).Error; err != nil {
 		t.Fatalf("create other workspace: %v", err)
 	}
 	if response = planningRequest(t, router, http.MethodDelete, "/v1/routines/"+routine.ID, otherToken, nil); response.Code != http.StatusUnauthorized {

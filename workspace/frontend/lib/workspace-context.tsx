@@ -6,6 +6,7 @@ import { capture, group } from './analytics';
 import { useOpenAgentsAuth } from './openagents-auth-context';
 import { generateUserId, getStoredIdentity, storeIdentity } from './identity';
 import { networkAgentToWorkspaceAgent, networkChannelToSession } from './types';
+import type { TodoPatch, TodoWritePayload } from './api/planning';
 import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TimerItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
 import { stripAddressPrefix, isAgentAddress } from '@/lib/types';
 
@@ -231,8 +232,18 @@ interface WorkspaceContextValue {
     source: string;
     channel: string;
     threadId?: string;
-    todos: Array<Pick<TodoItem, 'content' | 'status' | 'assignee'>>;
+    todos: TodoWritePayload[];
   }) => Promise<void>;
+  /** Appends one task without rewriting the channel's whole list. */
+  createTodo: (params: {
+    source: string;
+    channel: string;
+    threadId?: string;
+    todo: TodoWritePayload;
+  }) => Promise<TodoItem>;
+  /** Updates a single task, applied optimistically and rolled back on failure. */
+  updateTodo: (todoId: string, patch: TodoPatch) => Promise<void>;
+  deleteTodo: (todoId: string) => Promise<void>;
   timers: TimerItem[];
   refreshTimers: () => Promise<void>;
   createTimer: (params: {
@@ -253,8 +264,27 @@ interface WorkspaceContextValue {
     minute?: number;
     days?: number[];
     interval_minutes?: number;
+    timezone?: string;
+    context?: string;
     conversation_history?: string;
   }) => Promise<void>;
+  updateRoutine: (
+    routineId: string,
+    patch: {
+      name?: string;
+      message?: string;
+      context?: string;
+      scheduleMode?: 'daily' | 'interval';
+      hour?: number;
+      minute?: number;
+      days?: number[];
+      intervalMinutes?: number;
+      timezone?: string;
+    }
+  ) => Promise<void>;
+  toggleRoutine: (routineId: string) => Promise<void>;
+  triggerRoutine: (routineId: string) => Promise<void>;
+  cancelRoutine: (routineId: string) => Promise<void>;
   knowledge: KnowledgeEntry[];
   refreshKnowledge: () => Promise<void>;
   createKnowledge: (params: { title: string; content: string; description?: string; category?: string }) => Promise<KnowledgeEntry>;
@@ -969,11 +999,59 @@ export function WorkspaceProvider({
     source: string;
     channel: string;
     threadId?: string;
-    todos: Array<Pick<TodoItem, 'content' | 'status' | 'assignee'>>;
+    todos: TodoWritePayload[];
   }) => {
     await workspaceApi.replaceTodos(params);
     await refreshTodos();
   }, [refreshTodos]);
+
+  const createTodo = useCallback(async (params: {
+    source: string;
+    channel: string;
+    threadId?: string;
+    todo: TodoWritePayload;
+  }) => {
+    const created = await workspaceApi.createTodo(params);
+    setTodos((prev) => [...prev.filter((t) => t.id !== created.id), created]);
+    return created;
+  }, []);
+
+  // Single-task edits apply locally first. A status or priority toggle should
+  // land on the row the moment it is clicked; waiting for the round trip plus a
+  // full list refetch made every click feel like a page load.
+  const updateTodo = useCallback(async (todoId: string, patch: TodoPatch) => {
+    let previous: TodoItem | undefined;
+    setTodos((prev) => {
+      previous = prev.find((t) => t.id === todoId);
+      return prev.map((t) => (t.id === todoId ? { ...t, ...patch } as TodoItem : t));
+    });
+    try {
+      const saved = await workspaceApi.updateTodo(todoId, patch);
+      setTodos((prev) => prev.map((t) => (t.id === todoId ? saved : t)));
+    } catch (err) {
+      // Put the row back exactly as it was rather than leaving a lie on screen.
+      if (previous) {
+        const restore = previous;
+        setTodos((prev) => prev.map((t) => (t.id === todoId ? restore : t)));
+      }
+      void refreshTodos();
+      throw err;
+    }
+  }, [refreshTodos]);
+
+  const deleteTodo = useCallback(async (todoId: string) => {
+    let previous: TodoItem[] = [];
+    setTodos((prev) => {
+      previous = prev;
+      return prev.filter((t) => t.id !== todoId);
+    });
+    try {
+      await workspaceApi.deleteTodo(todoId);
+    } catch (err) {
+      setTodos(previous);
+      throw err;
+    }
+  }, []);
 
   const refreshTimers = useCallback(async () => {
     try {
@@ -1017,11 +1095,59 @@ export function WorkspaceProvider({
     minute?: number;
     days?: number[];
     interval_minutes?: number;
+    timezone?: string;
+    context?: string;
     conversation_history?: string;
   }) => {
     await workspaceApi.createRoutine(params);
     await refreshRoutines();
   }, [refreshRoutines]);
+
+  const updateRoutine = useCallback(async (
+    routineId: string,
+    patch: {
+      name?: string;
+      message?: string;
+      context?: string;
+      scheduleMode?: 'daily' | 'interval';
+      hour?: number;
+      minute?: number;
+      days?: number[];
+      intervalMinutes?: number;
+      timezone?: string;
+    }
+  ) => {
+    const saved = await workspaceApi.updateRoutine(routineId, patch);
+    setRoutines((prev) => prev.map((r) => (r.id === routineId ? saved : r)));
+  }, []);
+
+  const toggleRoutine = useCallback(async (routineId: string) => {
+    // Pause/resume is a single visible state flip; show it immediately and let
+    // the server response correct the recomputed next-run time.
+    setRoutines((prev) =>
+      prev.map((r) =>
+        r.id === routineId ? { ...r, status: r.status === 'paused' ? 'active' : 'paused' } : r
+      )
+    );
+    try {
+      const saved = await workspaceApi.toggleRoutine(routineId);
+      setRoutines((prev) => prev.map((r) => (r.id === routineId ? saved : r)));
+    } catch (err) {
+      await refreshRoutines();
+      throw err;
+    }
+  }, [refreshRoutines]);
+
+  const triggerRoutine = useCallback(async (routineId: string) => {
+    await workspaceApi.triggerRoutine(routineId);
+    await refreshRoutines();
+    await refreshTodos();
+  }, [refreshRoutines, refreshTodos]);
+
+  const cancelRoutine = useCallback(async (routineId: string) => {
+    await workspaceApi.cancelRoutine(routineId);
+    setRoutines((prev) => prev.filter((r) => r.id !== routineId));
+  }, []);
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -1685,6 +1811,9 @@ export function WorkspaceProvider({
     todos,
     refreshTodos,
     replaceTodos,
+    createTodo,
+    updateTodo,
+    deleteTodo,
     timers,
     refreshTimers,
     createTimer,
@@ -1692,6 +1821,10 @@ export function WorkspaceProvider({
     routines,
     refreshRoutines,
     createRoutine,
+    updateRoutine,
+    toggleRoutine,
+    triggerRoutine,
+    cancelRoutine,
     knowledge,
     refreshKnowledge,
     createKnowledge,
@@ -1717,8 +1850,9 @@ export function WorkspaceProvider({
     refreshBrowserTabs, openBrowserTab, closeBrowserTab, navigateBrowserTab,
     reconnectBrowserTab, browserContexts, refreshBrowserContexts, persistBrowserTab,
     unpersistBrowserTab, deleteBrowserContext, openBrowserTabWithContext, dmConversations,
-    refreshDMConversations, todos, refreshTodos, replaceTodos, timers, refreshTimers,
-    createTimer, cancelTimer, routines, refreshRoutines, createRoutine, knowledge,
+    refreshDMConversations, todos, refreshTodos, replaceTodos, createTodo, updateTodo, deleteTodo,
+    timers, refreshTimers, createTimer, cancelTimer, routines, refreshRoutines,
+    createRoutine, updateRoutine, toggleRoutine, triggerRoutine, cancelRoutine, knowledge,
     refreshKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, notifications,
     unreadNotificationCount, refreshNotifications, markNotificationRead, markAllNotificationsRead,
     dismissNotification, notificationSound, setNotificationSound

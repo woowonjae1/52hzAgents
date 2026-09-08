@@ -70,11 +70,21 @@ func expireStaleAgents() {
 }
 
 func fireDueTimers() {
+	if db.DB == nil {
+		return
+	}
 	now := time.Now().UTC()            // 获取当前的 UTC 时刻。
 	var dueTimers []models.TimerRecord // 声明列表存放被捕获的到期定时器。
 
 	// 检索状态为 active 且 fires_at 小于等于当前时间的前 50 条记录。
-	err := db.DB.Where("status = ? AND fires_at <= ?", "active", now).Limit(50).Find(&dueTimers).Error
+	//
+	// 只按 UTC 比。这里曾经额外用本地时刻比了一遍，想把修复前存成本地时间的
+	// 旧 timer 接回来 —— 那是个严重的错误：新数据存的是 UTC，而本地时刻比 UTC
+	// 大一整个时区偏移（这里是 8 小时），于是任何 8 小时内的 timer 都会在创建
+	// 后的第一个 tick 立刻触发。宁可让那几条从来没工作过的旧记录继续躺着，
+	// 也不能让所有新提醒立即炸掉。
+	err := db.DB.Where("status = ? AND fires_at <= ?", "active", now).
+		Limit(50).Find(&dueTimers).Error
 	if err != nil {
 		return // 发生查询错误时安全跳过本周期。
 	}
@@ -93,11 +103,14 @@ func fireDueTimers() {
 			continue
 		}
 
-		// 解析创建智能体名字（去除 openagents: 前缀）。
-		agentName := timer.CreatedBy
-		if len(agentName) > 11 && agentName[:11] == "openagents:" {
-			agentName = agentName[11:]
-		}
+		// 解析创建智能体名字。
+		//
+		// 这里原本只剥离 openagents: 前缀，而 adapter 建 timer 时用的 source 是
+		// 52hz:<agent>。于是 target_agents 里放的是 "52hz:antigravity"，而 agent
+		// 侧比对的是裸名 "antigravity" —— 永远匹配不上。结果 timer 到期只是往
+		// 频道里发了条消息给人看，负责它的 agent 从来没被唤醒，也就从来不会去
+		// 真的执行那件事。
+		agentName := handlers.AgentNameFromSource(timer.CreatedBy)
 
 		// 格式化输出消息内容。
 		content := "⏰ Timer fired (set by @" + agentName + "): " + timer.Message
@@ -153,12 +166,29 @@ func fireDueTimers() {
 			"visibility": eventRec.Visibility,
 		})
 
-		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-			WorkspaceID: timer.WorkspaceID,
-			ChannelName: "channel/" + timer.ChannelName,
-			Payload:     string(fullEventBytes),
-		})
+		if hub.GlobalHub != nil {
+			hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+				WorkspaceID: timer.WorkspaceID,
+				ChannelName: "channel/" + timer.ChannelName,
+				Payload:     string(fullEventBytes),
+			})
+		}
 		timer.Status = "fired"
+
+		// 把看板上那条任务推进到 in_progress：定时已经把活交给 agent 了，
+		// 它现在确实是在进行中，而不是还在等。
+		if err := db.DB.Model(&models.TodoRecord{}).
+			Where("timer_id = ? AND status = ?", timer.ID, "pending").
+			Updates(map[string]interface{}{"status": "in_progress", "updated_at": time.Now()}).Error; err != nil {
+			log.Printf("Timer %s fired but its task could not be advanced: %v", timer.ID, err)
+		}
+		if err := handlers.PublishWorkspaceStateEvent(timer.WorkspaceID, "workspace.todos.updated", "system:timer", timer.ChannelName, map[string]interface{}{
+			"timer_id": timer.ID,
+			"status":   "in_progress",
+		}); err != nil {
+			log.Printf("Timer %s task advanced but its state event could not be published: %v", timer.ID, err)
+		}
+
 		if err := handlers.PublishWorkspaceStateEvent(timer.WorkspaceID, "workspace.timer.fired", "system:timer", timer.ChannelName, map[string]interface{}{"timer": timer}); err != nil {
 			log.Printf("Timer %s fired but its state event could not be published: %v", timer.ID, err)
 		}
@@ -169,6 +199,9 @@ func fireDueTimers() {
 
 // fireDueRoutines 扫描并触发周期性循环定时任务。
 func fireDueRoutines() {
+	if db.DB == nil {
+		return
+	}
 	now := time.Now().UTC()                // 当前 UTC 时间。
 	var dueRoutines []models.RoutineRecord // 存储临时结果。
 
@@ -183,15 +216,12 @@ func fireDueRoutines() {
 		// 计算下一次触发时刻。
 		var days []int
 		if len(r.ScheduleDays) > 0 {
-			_ = json.Unmarshal(r.ScheduleDays, &days) // 反序列化出周期星期数组。
+			_ = json.Unmarshal(r.ScheduleDays, &days)
 		}
-		nextFire := handlers.ComputeNextFiresAt(r.ScheduleHour, r.ScheduleMinute, days, r.ScheduleIntervalMinutes)
+		nextFire := handlers.ComputeNextFiresAt(r.ScheduleHour, r.ScheduleMinute, days, r.ScheduleIntervalMinutes, r.Timezone)
 
-		// 开启原子事务。
+		// 开启原子事务抢占 Tick，避免并发重复触发
 		tx := db.DB.Begin()
-
-		// 试图更新 next_fires_at 声明抢占此 Tick。
-		// 在高并发多副本运行下，只有 GORM 影响行数大于 0 的才算抢占成功，避免重复触发。
 		res := tx.Model(&r).Where("next_fires_at = ? AND status = ?", r.NextFiresAt, "active").
 			Updates(map[string]interface{}{
 				"next_fires_at": nextFire,
@@ -199,79 +229,19 @@ func fireDueRoutines() {
 			})
 
 		if res.Error != nil || res.RowsAffected == 0 {
-			tx.Rollback() // 抢占失败（已被其他工作线程更新），回滚跳过。
-			continue
-		}
-
-		// 拼接周期背景上下文和触发消息。
-		content := "Routine \"" + r.Name + "\" fired: " + r.Message
-		if r.Context != nil && *r.Context != "" {
-			content = "**Routine Context for \"" + r.Name + "\"**\n\n" + *r.Context + "\n\n---\n\n" + content
-		}
-
-		eventID := uuid.New().String()
-		nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
-
-		payloadData := map[string]interface{}{
-			"content":      content,
-			"message_type": "chat",
-		}
-		payloadBytes, _ := json.Marshal(payloadData)
-
-		metadataData := map[string]interface{}{
-			"target_agents": []string{r.CreatedBy},
-		}
-		metadataBytes, _ := json.Marshal(metadataData)
-
-		// 组装 EventRecord。
-		eventRec := models.EventRecord{
-			ID:         eventID,
-			NetworkID:  r.WorkspaceID,
-			Type:       "workspace.message.posted",
-			Source:     "system:routine",
-			Target:     "channel/" + r.ChannelName,
-			Payload:    payloadBytes,
-			Metadata:   metadataBytes,
-			Timestamp:  nowUnixMs,
-			Visibility: "channel",
-		}
-
-		// 写入事件表中持久化。
-		if err := tx.Create(&eventRec).Error; err != nil {
 			tx.Rollback()
 			continue
 		}
+		tx.Commit()
 
-		// 提交抢占成功后的所有数据写入。
-		if err := tx.Commit().Error; err != nil {
-			continue
+		// 统一调用执行器（生成 ShortID、RunID、运行状态、联动生成跟踪 Task 并广播事件）。
+		// nextFire 已经在上面的抢占里写进库了，把它一并传下去：让执行器自己再算
+		// 一次会在 interval 模式下得到一个晚几毫秒的时刻，并把刚写好的值覆盖掉。
+		if err := handlers.ExecuteRoutineTriggerWithNext(&r, false, &nextFire); err != nil {
+			log.Printf("Failed to execute routine trigger for %s: %v", r.ID, err)
+		} else {
+			log.Printf("Routine %s (%s, Name: %s) successfully triggered in channel: %s", r.ID, r.ShortID, r.Name, r.ChannelName)
 		}
-
-		// 广播给前端或 Agent 连接器。
-		fullEventBytes, _ := json.Marshal(map[string]interface{}{
-			"id":         eventRec.ID,
-			"network":    eventRec.NetworkID,
-			"type":       eventRec.Type,
-			"source":     eventRec.Source,
-			"target":     eventRec.Target,
-			"payload":    payloadData,
-			"metadata":   metadataData,
-			"timestamp":  eventRec.Timestamp,
-			"visibility": eventRec.Visibility,
-		})
-
-		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-			WorkspaceID: r.WorkspaceID,
-			ChannelName: "channel/" + r.ChannelName,
-			Payload:     string(fullEventBytes),
-		})
-		r.NextFiresAt = nextFire
-		r.LastFiredAt = &now
-		if err := handlers.PublishWorkspaceStateEvent(r.WorkspaceID, "workspace.routine.fired", "system:routine", r.ChannelName, map[string]interface{}{"routine": r}); err != nil {
-			log.Printf("Routine %s fired but its state event could not be published: %v", r.ID, err)
-		}
-
-		log.Printf("Routine %s (Name: %s) successfully fired in channel: %s", r.ID, r.Name, r.ChannelName)
 	}
 }
 
