@@ -318,7 +318,7 @@ export function AgentModelSwitcher({
           type="button"
           disabled={!anyOnline}
           className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-colors select-none shadow-2xs',
+            'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-2xs',
             anyOnline
               ? 'bg-surface2 hover:bg-surface3 border-border text-foreground cursor-pointer'
               : 'bg-surface2/40 border-border/40 text-muted-foreground/60 cursor-not-allowed',

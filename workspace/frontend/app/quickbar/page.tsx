@@ -148,11 +148,16 @@ export default function QuickBarPage() {
               className="bg-transparent outline-none text-xs text-white cursor-pointer pr-1"
             >
               {agents.length === 0 && <option value="">Auto Route</option>}
-              {agents.map((a) => (
-                <option key={a.agentName} value={a.agentName} className="bg-[#18181b] text-white">
-                  @{a.agentName}
-                </option>
-              ))}
+              {[...agents]
+                .sort((a, b) => {
+                  if (a.status !== b.status) return a.status === 'online' ? -1 : 1;
+                  return a.agentName.localeCompare(b.agentName);
+                })
+                .map((a) => (
+                  <option key={a.agentName} value={a.agentName} className="bg-[#18181b] text-white">
+                    @{a.agentName}{a.status === 'online' ? ' (Online)' : ''}
+                  </option>
+                ))}
             </select>
           </div>
 

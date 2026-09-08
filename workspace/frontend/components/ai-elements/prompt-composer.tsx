@@ -106,10 +106,10 @@ function isImageFile(file: File): boolean {
 
 /** 底部控制条上的紧凑胶囊按钮样式 */
 const pillButton = cn(
-  'inline-flex items-center gap-1.5 h-7 px-2 rounded-lg cursor-pointer',
-  'text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
-  'transition-colors duration-200',
-  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
+  'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full cursor-pointer select-none text-2xs font-medium',
+  'text-foreground-muted hover:text-foreground hover:bg-surface2',
+  'transition-colors duration-150',
+  'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40'
 );
 
 export function PromptComposer({
@@ -278,6 +278,20 @@ export function PromptComposer({
       }));
 
     const agentList = [...liveAgents, ...unconfigured];
+    agentList.sort((a, b) => {
+      // 1. Online agents first
+      if (a.isOnline !== b.isOnline) {
+        return a.isOnline ? -1 : 1;
+      }
+      // 2. Leader/master agent first among peers with same online status
+      const aIsMaster = a.agent.role === 'master' || (!!masterAgentName && a.name.toLowerCase() === masterAgentName.toLowerCase());
+      const bIsMaster = b.agent.role === 'master' || (!!masterAgentName && b.name.toLowerCase() === masterAgentName.toLowerCase());
+      if (aIsMaster !== bIsMaster) {
+        return aIsMaster ? -1 : 1;
+      }
+      // 3. Alphabetical order
+      return a.name.localeCompare(b.name);
+    });
 
     const knowledgeList: { type: 'knowledge'; name: string; knowledge: KnowledgeEntry }[] = knowledge.map((k) => ({
       type: 'knowledge',
@@ -286,7 +300,7 @@ export function PromptComposer({
     }));
 
     return [...agentList, ...knowledgeList];
-  }, [agents, knowledge]);
+  }, [agents, knowledge, masterAgentName]);
 
   /*
     `/` is a knowledge-only entrance, so it drops the agents rather than
@@ -449,9 +463,17 @@ export function PromptComposer({
           >
             {mentionGroups.agents.length > 0 && (
               <div>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  <AtSign className="size-3 text-primary" />
-                  <span>Agents ({mentionGroups.agents.length})</span>
+                <div className="flex items-center justify-between px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-muted-foreground select-none">
+                  <div className="flex items-center gap-1.5">
+                    <AtSign className="size-3 text-primary" />
+                    <span>Agents ({mentionGroups.agents.length})</span>
+                  </div>
+                  {mentionGroups.agents.some((a) => a.isOnline) && (
+                    <span className="text-3xs font-mono font-normal text-status-success lowercase flex items-center gap-1">
+                      <span className="size-1.5 rounded-full bg-status-success" />
+                      {mentionGroups.agents.filter((a) => a.isOnline).length} online
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-0.5">
                   {mentionGroups.agents.map((item) => {
@@ -464,29 +486,39 @@ export function PromptComposer({
                         data-selected={isSelected ? 'true' : undefined}
                         onClick={() => insertMention(item)}
                         className={cn(
-                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group',
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group select-none',
                           isSelected
-                            ? 'bg-primary text-primary-foreground font-medium'
-                            : 'hover:bg-surface2 text-foreground'
+                            ? 'bg-surface3 text-foreground font-medium ring-1 ring-border/60'
+                            : 'hover:bg-surface2/80 text-foreground'
                         )}
                       >
                         <AgentAvatar
                           name={item.name}
                           agentType={item.agent.agentType}
                           size={22}
-                          status={item.agent.status}
+                          status={item.isOnline ? 'online' : 'offline'}
+                          showStatus={true}
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="truncate font-medium">@{item.name}</span>
-                            <span
-                              className={cn(
-                                'text-3xs px-1 rounded font-mono',
-                                isSelected ? 'bg-white/20 text-white' : 'bg-surface2 text-muted-foreground'
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="truncate font-medium text-foreground">
+                              @{item.name}
+                              {item.agent.role === 'master' && (
+                                <span className="ml-1.5 text-3xs font-normal text-status-warning font-sans">
+                                  leader
+                                </span>
                               )}
-                            >
-                              {item.isOnline ? 'Online' : 'Not connected'}
                             </span>
+                            {item.isOnline ? (
+                              <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded-full font-mono bg-status-success/15 text-status-success border border-status-success/30 shrink-0 font-medium">
+                                <span className="size-1.5 rounded-full bg-status-success" />
+                                Online
+                              </span>
+                            ) : (
+                              <span className="text-3xs px-1.5 py-0.5 rounded-full font-mono text-muted-foreground/60 bg-surface2 border border-border/30 shrink-0">
+                                Not connected
+                              </span>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -498,7 +530,7 @@ export function PromptComposer({
 
             {mentionGroups.knowledge.length > 0 && (
               <div className={cn(mentionGroups.agents.length > 0 && 'border-t border-border/50 pt-1.5')}>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-3xs font-semibold uppercase tracking-wider text-status-warning">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-status-warning select-none">
                   <BookOpen className="size-3" />
                   <span>Knowledge ({mentionGroups.knowledge.length})</span>
                 </div>
@@ -513,10 +545,10 @@ export function PromptComposer({
                         data-selected={isSelected ? 'true' : undefined}
                         onClick={() => insertMention(item)}
                         className={cn(
-                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group',
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group select-none',
                           isSelected
-                            ? 'bg-surface3 text-foreground font-medium'
-                            : 'hover:bg-surface2 text-foreground'
+                            ? 'bg-surface3 text-foreground font-medium ring-1 ring-border/60'
+                            : 'hover:bg-surface2/80 text-foreground'
                         )}
                       >
                         <BookOpen className="size-3.5 text-foreground-extra-muted shrink-0" />
@@ -696,12 +728,14 @@ export function PromptComposer({
 
         {/* Bottom Control Row */}
         <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1 min-w-0">
             <AgentModelSwitcher
               agentName={masterAgentName}
               participants={session?.participants}
               sessionId={session?.sessionId}
             />
+
+            <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0" />
 
             <button
               type="button"
@@ -710,20 +744,27 @@ export function PromptComposer({
                 setShowMentions((prev) => !prev);
                 textareaRef.current?.focus();
               }}
-              className={cn(pillButton, showMentions && 'bg-surface3 text-foreground')}
-              title="Mention an agent or knowledge doc (@)"
+              className={cn(
+                pillButton,
+                showMentions && 'bg-surface3 text-foreground font-medium border border-border/70'
+              )}
+              title="Mention an agent (@)"
             >
-              <AtSign className="size-3.5" />
-              <span className="text-2xs font-medium hidden sm:inline">Context (@)</span>
+              <AtSign className="size-3.5 shrink-0 text-foreground-extra-muted" />
+              <span className="hidden sm:inline">Agent</span>
             </button>
 
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className={cn(pillButton, 'px-0 w-7 justify-center')}
-              title="Attach a file or image"
+              className={cn(
+                pillButton,
+                'size-7 px-0 justify-center',
+                pendingFiles.length > 0 && 'bg-surface3 text-foreground font-medium border border-border/70'
+              )}
+              title="Attach files or images"
             >
-              <Paperclip className="size-3.5" />
+              <Paperclip className="size-3.5 shrink-0 text-foreground-extra-muted" />
             </button>
             <input
               ref={fileInputRef}
@@ -745,8 +786,8 @@ export function PromptComposer({
                 className={pillButton}
                 title="Create a scheduled task"
               >
-                <CalendarClock className="size-3.5" />
-                <span className="text-2xs font-medium hidden md:inline">Schedule</span>
+                <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                <span className="hidden md:inline">Schedule</span>
               </button>
             )}
           </div>
@@ -770,27 +811,15 @@ export function PromptComposer({
               onClick={isWorking ? onStop : handleSend}
               disabled={isWorking ? stopping : !canSend}
               className={cn(
-                /*
-                 * Send was a blue-to-indigo GRADIENT with a coloured drop
-                 * shadow, a 5% hover scale and a 5% active squash. Four effects
-                 * on the single most-used control in the app, in two hues no
-                 * token defines. It is the primary action, so it uses the
-                 * primary accent — which on this theme is already the highest
-                 * contrast pairing available (light fill, dark glyph). Nothing
-                 * needs to be added to make it the obvious target.
-                 *
-                 * `hover:scale` in particular: a control that grows under the
-                 * cursor is a control whose hit area moved while you were aiming
-                 * at it.
-                 */
                 'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                'transition-opacity duration-150 cursor-pointer',
+                'transition-all duration-150 cursor-pointer select-none',
                 isWorking
-                  ? 'bg-destructive text-destructive-foreground hover:opacity-90'
+                  ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-xs'
                   : canSend
-                  ? 'bg-primary text-primary-foreground hover:opacity-90'
-                  : 'bg-surface3 text-foreground-extra-muted cursor-not-allowed'
+                  ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs active:scale-95'
+                  : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/30'
               )}
+              title={isWorking ? 'Stop response' : 'Send message (Enter)'}
             >
               <AnimatePresence mode="wait" initial={false}>
                 {isWorking ? (

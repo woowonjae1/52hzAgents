@@ -233,7 +233,18 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
   }, [open, initialValue]);
 
   const filteredAgents = React.useMemo(
-    () => agents.filter((a) => a.agentName.toLowerCase().includes(mentionFilter.toLowerCase())),
+    () =>
+      agents
+        .filter((a) => a.agentName.toLowerCase().includes(mentionFilter.toLowerCase()))
+        .sort((a, b) => {
+          if (a.status !== b.status) {
+            return a.status === 'online' ? -1 : 1;
+          }
+          if ((a.role === 'master') !== (b.role === 'master')) {
+            return a.role === 'master' ? -1 : 1;
+          }
+          return a.agentName.localeCompare(b.agentName);
+        }),
     [agents, mentionFilter],
   );
 

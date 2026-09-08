@@ -230,7 +230,14 @@ export function CommandPalette() {
       },
     ];
 
-    const agentItems: CommandItem[] = agents.map((agent) => ({
+    const sortedAgents = [...agents].sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'online' ? -1 : 1;
+      }
+      return a.agentName.localeCompare(b.agentName);
+    });
+
+    const agentItems: CommandItem[] = sortedAgents.map((agent) => ({
       id: `agent-${agent.agentName}`,
       category: 'Agents',
       title: `@${agent.agentName}`,
