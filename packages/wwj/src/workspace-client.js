@@ -707,7 +707,7 @@ class WorkspaceClient {
 
   // ── Routines ──
 
-  async createRoutine(workspaceId, channelName, token, { name, message, context, hour, minute, days, interval_minutes, source } = {}) {
+  async createRoutine(workspaceId, channelName, token, { name, message, context, hour, minute, days, interval_minutes, timezone, source } = {}) {
     const body = {
       name,
       message,
@@ -715,6 +715,7 @@ class WorkspaceClient {
       network: workspaceId,
       channel: channelName,
       source: source || '52hz:unknown',
+      timezone: timezone || (typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Asia/Shanghai') || 'Asia/Shanghai',
     };
     if (interval_minutes != null) {
       body.interval_minutes = interval_minutes;

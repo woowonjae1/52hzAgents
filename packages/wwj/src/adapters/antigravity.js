@@ -179,6 +179,76 @@ function scheduleMessage(params) {
   return 'Scheduled reminder';
 }
 
+/** Pulls a cron schedule out of CronExpression parameter if present. */
+function parseCronSchedule(params) {
+  if (!params || typeof params !== 'object') return null;
+  const cron = params.CronExpression || params.cron_expression || params.cronExpression || params.cron;
+  if (!cron || typeof cron !== 'string') return null;
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length < 5) return null;
+  const [minPart, hourPart, domPart, monPart, dowPart] = parts;
+
+  // Case 1: interval minutes, e.g. */5 * * * * or 0/15 * * * *
+  const intervalMatch = minPart.match(/^(?:\*|0)\/(\d+)$/);
+  if (intervalMatch && hourPart === '*' && domPart === '*' && monPart === '*') {
+    const interval_minutes = parseInt(intervalMatch[1], 10);
+    if (Number.isFinite(interval_minutes) && interval_minutes > 0) {
+      return { interval_minutes };
+    }
+  }
+
+  // Case 2: daily or weekly at fixed time, e.g. 0 10 * * * or 30 9 * * 1-5
+  const minute = parseInt(minPart, 10);
+  const hour = parseInt(hourPart, 10);
+  if (
+    Number.isFinite(minute) && Number.isFinite(hour) &&
+    minute >= 0 && minute <= 59 && hour >= 0 && hour <= 23 &&
+    domPart === '*' && monPart === '*'
+  ) {
+    let days = undefined;
+    if (dowPart && dowPart !== '*') {
+      const parsedDays = [];
+      const tokens = dowPart.split(',');
+      for (const token of tokens) {
+        if (token.includes('-')) {
+          const [startStr, endStr] = token.split('-');
+          const start = parseInt(startStr, 10);
+          const end = parseInt(endStr, 10);
+          if (Number.isFinite(start) && Number.isFinite(end)) {
+            for (let d = start; d <= end; d++) {
+              // Map cron dow (1=Mon..6=Sat, 0 or 7=Sun) to our 0=Mon..6=Sun
+              const mapped = d === 0 || d === 7 ? 6 : d - 1;
+              if (mapped >= 0 && mapped <= 6) parsedDays.push(mapped);
+            }
+          }
+        } else {
+          const d = parseInt(token, 10);
+          if (Number.isFinite(d)) {
+            const mapped = d === 0 || d === 7 ? 6 : d - 1;
+            if (mapped >= 0 && mapped <= 6) parsedDays.push(mapped);
+          }
+        }
+      }
+      if (parsedDays.length > 0) {
+        days = Array.from(new Set(parsedDays)).sort((a, b) => a - b);
+      }
+    }
+    return { hour, minute, days };
+  }
+
+  return null;
+}
+
+function deriveRoutineName(prompt, scheduleText) {
+  if (!prompt) return `定时任务 (${scheduleText})`;
+  let clean = prompt.replace(/^(?:每天(?:上午|下午|晚上)?\d+点)?(?:定时任务(?:触发)?[:：]?\s*)/i, '').trim();
+  clean = clean.replace(/^(?:获取并|请|帮我|提醒我)/i, '').trim();
+  if (clean.length > 24) {
+    clean = clean.slice(0, 24) + '...';
+  }
+  return clean ? `${clean} (${scheduleText})` : `定时任务 (${scheduleText})`;
+}
+
 function formatToolPreview(toolName, params) {
   if (!params || typeof params !== 'object') return '';
   if (toolName === 'invoke_subagent' || toolName === 'subagent') {
@@ -677,9 +747,45 @@ class AntigravityAdapter extends BaseAdapter {
               const mirrorKey = `mirror:${su.step_index}:${toolName}`;
               if (!reportedSteps.has(mirrorKey)) {
                 reportedSteps.add(mirrorKey);
+                const cron = parseCronSchedule(params);
                 const seconds = scheduleDelaySeconds(params);
-                if (seconds && this.client && this.workspaceId) {
-                  const text = scheduleMessage(params);
+                const text = scheduleMessage(params);
+
+                if (cron && this.client && this.workspaceId) {
+                  const when = cron.interval_minutes != null
+                    ? `每隔 ${cron.interval_minutes} 分钟`
+                    : `每天 ${String(cron.hour).padStart(2, '0')}:${String(cron.minute).padStart(2, '0')}`;
+                  const routineName = deriveRoutineName(text, when);
+
+                  this.client
+                    .createRoutine(this.workspaceId, channel, this.token, {
+                      name: routineName,
+                      message: text,
+                      hour: cron.hour,
+                      minute: cron.minute,
+                      days: cron.days,
+                      interval_minutes: cron.interval_minutes,
+                      source: `52hz:${this.agentName}`,
+                    })
+                    .then((routine) => {
+                      const shortId = routine && (routine.short_id || routine.shortId || routine.id);
+                      return this.sendResponse(
+                        channel,
+                        `已为您创建周期计划任务（${when}）：\n\n` +
+                        `> ${text}\n\n` +
+                        `📌 任务编号：\`${shortId || 'RTN'}\`\n` +
+                        `🕒 触发规则：${when}\n\n` +
+                        `已自动登记到 **Tasks & Issues -> Schedules**，到期将自动执行并向频道汇报结果。`
+                      );
+                    })
+                    .catch((err) => {
+                      console.error('Failed to create routine mirror:', err);
+                      return this.sendResponse(
+                        channel,
+                        `已为您安排定时任务（${when}）：\n\n> ${text}\n\n后台调度器已开始监听。`
+                      );
+                    });
+                } else if (seconds && this.client && this.workspaceId) {
                   this.client
                     .createTimer(this.workspaceId, channel, this.token, seconds, text, {
                       source: `52hz:${this.agentName}`,
@@ -695,19 +801,23 @@ class AntigravityAdapter extends BaseAdapter {
                       // and an answer that never arrives.
                       return this.sendResponse(
                         channel,
-                        `已安排：${when} 提醒你。
-
-> ${text}
-
-` +
-                        `这条安排已登记到工作区，` +
-                        `在 Tasks & Issues 里可以看到和取消。`
+                        `已为您设置提醒（${when}）：\n\n` +
+                        `> ${text}\n\n` +
+                        `这条安排已登记到工作区，到期将准时提醒。`
                       );
                     })
-                    .catch(() => {
-                      // The CLI's own timer still runs. Stay silent rather than
-                      // announcing a workspace timer that does not exist.
+                    .catch((err) => {
+                      console.error('Failed to create timer mirror:', err);
+                      return this.sendResponse(
+                        channel,
+                        `已为您安排提醒：\n\n> ${text}\n\n后台计时器已开始倒计时。`
+                      );
                     });
+                } else {
+                  this.sendResponse(
+                    channel,
+                    `已为您安排定时计划：\n\n> ${text}\n\n调度器已开始监听。`
+                  ).catch(() => {});
                 }
               }
             }
