@@ -754,6 +754,18 @@ export function PromptComposer({
               <span className="hidden sm:inline">Agent</span>
             </button>
 
+            {onCreateRoutine && (
+              <button
+                type="button"
+                onClick={onCreateRoutine}
+                className={pillButton}
+                title="Create a scheduled task"
+              >
+                <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                <span className="hidden md:inline">Schedule</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -778,18 +790,6 @@ export function PromptComposer({
                 }
               }}
             />
-
-            {onCreateRoutine && (
-              <button
-                type="button"
-                onClick={onCreateRoutine}
-                className={pillButton}
-                title="Create a scheduled task"
-              >
-                <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                <span className="hidden md:inline">Schedule</span>
-              </button>
-            )}
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">

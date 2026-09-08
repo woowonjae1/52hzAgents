@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Waypoints, Crown, Sparkles, Check, ShieldCheck } from 'lucide-react';
+import { Waypoints, Crown, Sparkles, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -66,7 +66,6 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
   const mode = (session.orchestrationMode || 'dynamic') as Mode;
   const active = MODES.find((m) => m.value === mode) || MODES[0];
   const [planOpen, setPlanOpen] = React.useState(false);
-  const [qualityGateOpen, setQualityGateOpen] = React.useState(false);
 
   const selectMode = (next: Mode) => {
     if (next === 'workflow') {
@@ -121,29 +120,6 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
           </DropdownMenuItem>
         </>
       )}
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        onSelect={(e) => {
-          e.preventDefault();
-          setQualityGateOpen(true);
-        }}
-        className="flex items-start gap-2 py-2 cursor-pointer"
-      >
-        <ShieldCheck className="size-3.5 mt-0.5 shrink-0 text-primary" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium">Verification command…</span>
-            {session.verificationCmd && (
-              <span className="text-3xs px-1.5 py-0.2 rounded bg-primary/10 text-primary font-mono truncate max-w-[100px]">
-                {session.verificationCmd}
-              </span>
-            )}
-          </div>
-          <p className="text-2xs text-muted-foreground leading-snug">
-            The command to run when a turn ends, e.g. go test or npm test
-          </p>
-        </div>
-      </DropdownMenuItem>
     </>
   );
 
@@ -184,13 +160,6 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
         agents={agents}
         initialValue={session.orchestrationInstruction || ''}
         onSave={(instruction) => onChange({ mode: 'workflow', instruction: instruction || null })}
-      />
-
-      <QualityGateDialog
-        open={qualityGateOpen}
-        onOpenChange={setQualityGateOpen}
-        initialValue={session.verificationCmd || ''}
-        onSave={(cmd) => onChange({ verificationCmd: cmd || null })}
       />
     </>
   );
@@ -367,69 +336,6 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
           </Button>
           <Button size="sm" onClick={save}>
             Save plan
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Quality Gate Verification Command Dialog
-export interface QualityGateDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  initialValue: string;
-  onSave: (command: string) => void;
-}
-
-export function QualityGateDialog({ open, onOpenChange, initialValue, onSave }: QualityGateDialogProps) {
-  const [value, setValue] = React.useState(initialValue);
-
-  React.useEffect(() => {
-    if (open) {
-      setValue(initialValue);
-    }
-  }, [open, initialValue]);
-
-  const save = () => {
-    onSave(value.trim());
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="size-4 text-primary" />
-            <DialogTitle>Verification command</DialogTitle>
-          </div>
-          <DialogDescription>
-            The command this thread actually compiles and tests with — <code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">go test ./...</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">npm test</code>、<code className="font-mono text-2xs bg-surface2 px-1 py-0.5 rounded">pytest</code>.
-            A baseline is recorded before the agent starts and diffed against the result at the end, so self-repair only fires on a <strong>new error or a regression</strong>.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-2 py-2">
-          <label className="text-xs font-medium text-foreground">Verification command</label>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            autoFocus
-            placeholder="e.g. go test ./... or npm test"
-            className="w-full rounded-md border bg-transparent px-3 py-2 text-sm font-mono outline-none focus:border-primary"
-          />
-          <p className="text-3xs text-muted-foreground">Leave empty to turn real verification off and fall back to reading the agent’s own prose.</p>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={save}>
-            Save
           </Button>
         </DialogFooter>
       </DialogContent>
