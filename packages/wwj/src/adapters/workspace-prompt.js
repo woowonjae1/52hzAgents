@@ -1278,20 +1278,23 @@ function buildGuardrails() {
 
     'The to-do list lets the user track your progress in real time.\n' +
 
-    '\nIMPORTANT: Do NOT use built-in scheduling tools (CronCreate, CronDelete, ' +
+    '\nCRITICAL SCHEDULE RULE: When the user requests a scheduled, delayed, or recurring task (e.g. "每天10点给我推送...", "半小时后提醒我...", "定时任务..."), you MUST DIRECTLY AND IMMEDIATELY invoke your scheduling tool (such as `schedule` with DurationSeconds or CronExpression, or workspace_create_routine / workspace_create_timer). ' +
 
-    'CronList, ScheduleWakeup). For timers, routines, and recurring tasks, ' +
+    'The workspace automatically synchronizes it into Tasks & Issues Schedules and Timers!\n' +
 
-    'ALWAYS use the workspace REST API (curl commands in your skill instructions). ' +
+    'RULES:\n' +
 
-    'Built-in scheduling is local-only and won\'t appear in the workspace.\n' +
-    '\nCRITICAL SCHEDULE RULE: When the user asks for anything that should happen later, ' +
-    'you MUST register it with the workspace scheduling API. Choose by shape:\n' +
-    '  - Repeats on a cadence ("every day at 9am", "every 30 minutes", \u6bcf\u5929, \u6bcf\u9694, \u5faa\u73af\u4efb\u52a1) -> `POST /v1/routines` (`workspace_create_routine`).\n' +
-    '  - Happens once after a delay ("in 10 minutes", \u534a\u5c0f\u65f6\u540e, \u7a0d\u540e\u63d0\u9192\u6211) -> `POST /v1/timers` with `delay_seconds`.\n' +
-    '  - Happens once at a named clock time ("today at 15:16", "tomorrow 9am", \u4eca\u5929 15:16 \u63d0\u9192\u6211, \u660e\u5929\u4e0a\u5348\u4e5d\u70b9, \u901a\u77e5\u6211...\u5f00\u4f1a) -> `POST /v1/timers` with `fires_at`. A daily Routine is the WRONG tool for this: it would fire again every day.\n' +
-    'Do NOT just create a static TodoList checkbox for scheduled work - static to-dos need manual user action and will never fire.\n' +
-    'NEVER say a reminder is set unless the API call actually succeeded, and never write out the reminder text as though the moment had already arrived. If the call fails, say so and show the error. An imagined reminder is worse than an admitted failure, because the user stops watching the clock.\n'
+    '  1. IMMEDIATE ACTION: Directly invoke the schedule tool in your first turn. Do NOT ask "是否需要我为您创建" (never ask for confirmation), and do NOT recommend /schedule slash commands.\n' +
+
+    '  2. RECURRING vs ONE-SHOT:\n' +
+
+    '     - For recurring schedules ("每天10点", "每隔30分钟", 每天, 每隔): use CronExpression (e.g. "0 10 * * *" or "*/30 * * * *") or `workspace_create_routine`.\n' +
+
+    '     - For one-shot delay/reminders ("10分钟后", "今天15:16提醒我", 半小时后): use DurationSeconds or `workspace_create_timer`.\n' +
+
+    '  3. Do NOT just create a static TodoList checkbox for scheduled work - static to-dos need manual user action and will never fire automatically.\n' +
+
+    '  4. NEVER say a reminder is set unless the tool call actually succeeded.\n'
 
   );
 
