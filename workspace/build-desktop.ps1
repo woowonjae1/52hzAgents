@@ -8,6 +8,10 @@ param (
 $ErrorActionPreference = "Stop"
 $WorkspaceRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
+# Set domestic fast mirror for Electron binary downloads
+$env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+$env:ELECTRON_BUILDER_BINARIES_MIRROR = "https://npmmirror.com/mirrors/electron-builder-binaries/"
+
 Write-Host "=================================================" -ForegroundColor Cyan
 Write-Host "  52hzAgents Zero-Config Desktop Build Pipeline  " -ForegroundColor Cyan
 Write-Host "=================================================" -ForegroundColor Cyan
@@ -97,7 +101,7 @@ try {
 # 5. Package Electron Desktop App
 Write-Host "`n[4/4] Packaging Electron Desktop App (Target: $Target)..." -ForegroundColor Yellow
 try {
-    Get-Process | Where-Object { $_.ProcessName -match "52hz|electron" } | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process -Name 52hzAgents, electron -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 } catch {}
 Start-Sleep -Milliseconds 800
 
