@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState } from 'react';
 import { FileCode2, Undo2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -136,15 +137,16 @@ export function TurnChangesCapsule({
             </button>
           </span>
         ) : (
-          <button
-            type="button"
-            onClick={() => setShowConfirm(true)}
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
-            title="Roll back this agent turn's changes without affecting manual user edits"
-          >
-            <Undo2 className="size-2.5" />
-            <span>Roll back</span>
-          </button>
+          <Hint label="Roll back this agent turn's changes without affecting manual user edits">
+            <button
+              type="button"
+              onClick={() => setShowConfirm(true)}
+              className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+            >
+              <Undo2 className="size-2.5" />
+              <span>Roll back</span>
+            </button>
+          </Hint>
         )
       }
     >

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -28,11 +29,11 @@ export function InProgressStatusIcon({ className }: { className?: string }) {
       height="14"
       viewBox="0 0 14 14"
       fill="none"
-      className={cn('shrink-0', className)}
+      className={cn('shrink-0 text-foreground', className)}
       aria-label="In Progress"
     >
-      <rect x="1" y="1" width="12" height="12" rx="6" stroke="#facc15" strokeWidth="1.5" />
-      <path fill="#facc15" stroke="none" d="M 3.5,3.5 L3.5,0 A3.5,3.5 0 0,1 7.0000,3.5000 z" transform="translate(3.5,3.5)" />
+      <rect x="1" y="1" width="12" height="12" rx="6" stroke="currentColor" strokeWidth="1.5" />
+      <path fill="currentColor" stroke="none" d="M 3.5,3.5 L3.5,0 A3.5,3.5 0 0,1 7.0000,3.5000 z" transform="translate(3.5,3.5)" />
     </svg>
   );
 }
@@ -44,7 +45,7 @@ export function CompletedStatusIcon({ className }: { className?: string }) {
       height="14"
       viewBox="0 0 14 14"
       fill="none"
-      className={cn('shrink-0 text-emerald-500', className)}
+      className={cn('shrink-0 text-status-success', className)}
       aria-label="Completed"
     >
       <circle cx="7" cy="7" r="6" fill="currentColor" />
@@ -78,8 +79,8 @@ export interface StatusOption {
 
 export const ALL_STATUSES: StatusOption[] = [
   { id: 'pending', name: 'Todo', color: 'text-foreground-extra-muted', icon: BacklogStatusIcon },
-  { id: 'in_progress', name: 'In Progress', color: 'text-yellow-500', icon: InProgressStatusIcon },
-  { id: 'completed', name: 'Completed', color: 'text-emerald-500', icon: CompletedStatusIcon },
+  { id: 'in_progress', name: 'In Progress', color: 'text-foreground', icon: InProgressStatusIcon },
+  { id: 'completed', name: 'Completed', color: 'text-status-success', icon: CompletedStatusIcon },
   { id: 'cancelled', name: 'Cancelled', color: 'text-foreground-extra-muted', icon: CancelledStatusIcon },
 ];
 
@@ -111,25 +112,26 @@ export function StatusSelector({
   const Icon = current.icon;
 
   const tooltipText = failureReason
-    ? `${current.name} (原因: ${failureReason})`
+    ? `${current.name} — ${failureReason}`
     : `Status: ${current.name}`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>
-        <button
-          type="button"
-          aria-label={tooltipText}
-          title={tooltipText}
-          className={cn(
-            'inline-flex items-center justify-center rounded-md transition-colors hover:bg-surface3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
-            size === 'sm' ? 'size-6' : 'size-7',
-            disabled && 'pointer-events-none opacity-60',
-            className
-          )}
-        >
-          <Icon className={size === 'sm' ? 'size-3.5' : 'size-4'} />
-        </button>
+        <Hint label={tooltipText}>
+          <button
+            type="button"
+            aria-label={tooltipText}
+            className={cn(
+              'inline-flex items-center justify-center rounded-md transition-colors hover:bg-surface3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+              size === 'sm' ? 'size-6' : 'size-7',
+              disabled && 'pointer-events-none opacity-60',
+              className
+            )}
+          >
+            <Icon className={size === 'sm' ? 'size-3.5' : 'size-4'} />
+          </button>
+        </Hint>
       </PopoverTrigger>
       <PopoverContent
         align="start"

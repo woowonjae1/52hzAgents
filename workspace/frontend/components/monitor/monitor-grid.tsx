@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
@@ -219,13 +220,14 @@ export function MonitorGrid() {
 
         {/* Search FAB — bottom right */}
         {!searchOpen && (
-          <button
-            onClick={() => { setSearchOpen(true); setSearchQuery(''); }}
-            className="absolute bottom-3 right-3 size-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors z-10"
-            title="Search threads (/)"
-          >
-            <Search className="size-4" />
-          </button>
+          <Hint label="Search threads (/)">
+            <button
+              onClick={() => { setSearchOpen(true); setSearchQuery(''); }}
+              className="absolute bottom-3 right-3 size-10 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90 transition-colors z-10"
+            >
+              <Search className="size-4" />
+            </button>
+          </Hint>
         )}
 
         {/* Search panel — bottom right overlay */}

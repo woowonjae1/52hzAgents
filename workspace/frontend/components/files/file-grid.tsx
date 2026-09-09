@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useRef, useState, useMemo, useCallback } from 'react';
 import {
   Search, Upload, FolderOpen, Folder, ChevronRight, FolderPlus, Trash2,
@@ -206,21 +207,23 @@ export function FileGrid() {
         </div>
 
         {/* Actions */}
-        <button
-          onClick={handleCreateFolder}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
-          title="New Folder"
-        >
-          <FolderPlus className="size-4" />
-        </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={uploading}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
-          title={currentPath ? `Upload to ${currentPath}` : 'Upload File'}
-        >
-          <Upload className="size-4" />
-        </button>
+        <Hint label="New Folder">
+          <button
+            onClick={handleCreateFolder}
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
+          >
+            <FolderPlus className="size-4" />
+          </button>
+        </Hint>
+        <Hint label={currentPath ? `Upload to ${currentPath}` : 'Upload File'}>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+          >
+            <Upload className="size-4" />
+          </button>
+        </Hint>
         <input
           ref={fileInputRef}
           type="file"
@@ -306,13 +309,14 @@ export function FileGrid() {
                   </span>
 
                   {/* Delete button on hover */}
-                  <button
-                    onClick={(e) => handleDelete(e, file.id, file.filename)}
-                    className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-all shadow-sm"
-                    title="Delete"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
+                  <Hint label="Delete">
+                    <button
+                      onClick={(e) => handleDelete(e, file.id, file.filename)}
+                      className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-all shadow-sm"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </Hint>
                 </div>
               );
             })}

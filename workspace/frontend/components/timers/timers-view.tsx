@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState } from 'react';
 import { Clock3, Loader2, Plus, RefreshCw, Timer, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -101,7 +102,9 @@ export function TimersView() {
           <p className="text-xs text-muted-foreground">Schedule one-time reminders for an agent</p>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" mode="icon" size="sm" onClick={() => void refreshTimers()} title="Refresh timers"><RefreshCw className="size-4" /></Button>
+          <Hint label="Refresh timers">
+            <Button variant="ghost" mode="icon" size="sm" onClick={() => void refreshTimers()}><RefreshCw className="size-4" /></Button>
+          </Hint>
           <Button size="sm" onClick={openCreate} disabled={!availableAgents.length}><Plus className="mr-1 size-3.5" />New timer</Button>
         </div>
       </header>
@@ -127,9 +130,11 @@ export function TimersView() {
                     <span title={formatDate(timer.firesAt)}>{timeUntil(timer.firesAt)}</span>
                   </div>
                 </div>
-                <Button variant="ghost" mode="icon" size="sm" onClick={() => void cancelTimer(timer.id)} title="Cancel timer">
-                  <X className="size-4" />
-                </Button>
+                <Hint label="Cancel timer">
+                  <Button variant="ghost" mode="icon" size="sm" onClick={() => void cancelTimer(timer.id)}>
+                    <X className="size-4" />
+                  </Button>
+                </Hint>
               </div>
             ))}
           </div>

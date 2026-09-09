@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Sheet,
@@ -60,7 +61,7 @@ export function RoutineHistoryDrawer({
   }, [open, routine, fetchRuns]);
 
   const formatDuration = (start: string, end: string | null) => {
-    if (!end) return '执行中...';
+    if (!end) return 'Running';
     const s = new Date(start).getTime();
     const e = new Date(end).getTime();
     const diff = Math.max(0, e - s);
@@ -98,24 +99,25 @@ export function RoutineHistoryDrawer({
               </div>
               <div className="min-w-0">
                 <SheetTitle className="truncate">
-                  {routine ? routine.name : '执行历史'}
+                  {routine ? routine.name : 'Run history'}
                 </SheetTitle>
                 <SheetDescription className="truncate">
-                  任务 ID: {routine?.shortId || routine?.id?.slice(0, 8)} · 历史运行记录与执行追踪
+                  Task {routine?.shortId || routine?.id?.slice(0, 8)} · past runs and execution traces
                 </SheetDescription>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchRuns}
-              disabled={loading}
-              className="h-8 px-2.5 gap-1.5 shrink-0 rounded-lg"
-              title="刷新记录"
-            >
-              <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
-              <span className="text-xs">刷新</span>
-            </Button>
+            <Hint label="Refresh">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchRuns}
+                disabled={loading}
+                className="h-8 px-2.5 gap-1.5 shrink-0 rounded-lg"
+              >
+                <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
+                <span className="text-xs">Refresh</span>
+              </Button>
+            </Hint>
           </div>
         </SheetHeader>
 
@@ -123,14 +125,14 @@ export function RoutineHistoryDrawer({
           {loading && runs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
               <Loader2 className="size-6 animate-spin text-primary" />
-              <span className="text-sm">正在加载执行历史...</span>
+              <span className="text-sm">Loading run history…</span>
             </div>
           ) : runs.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-56 gap-2 text-muted-foreground">
               <Clock className="size-8 opacity-40" />
-              <p className="text-sm font-medium">暂无历史执行记录</p>
+              <p className="text-sm font-medium">No runs yet</p>
               <p className="text-xs text-muted-foreground/70">
-                点击任务卡片上的「Run Now」或等待下一次定时触发后，即可在此查看日志。
+                Trigger it with Run Now on the task card, or wait for the next scheduled fire — logs land here.
               </p>
             </div>
           ) : (
@@ -152,27 +154,27 @@ export function RoutineHistoryDrawer({
                         </span>
 
                         {isRunning && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface2 text-foreground-muted border border-border">
                             <Loader2 className="size-3 animate-spin" />
-                            正在运行
+                            Running
                           </span>
                         )}
                         {isSuccess && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-status-muted-success text-status-success border border-status-success/30">
                             <CheckCircle2 className="size-3" />
-                            执行完成
+                            Completed
                           </span>
                         )}
                         {isFailed && (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-status-muted-danger text-status-danger border border-status-danger/30">
                             <AlertCircle className="size-3" />
-                            执行中断/失败
+                            Failed
                           </span>
                         )}
                       </div>
 
                       <span className="text-xs text-muted-foreground font-mono">
-                        耗时: {formatDuration(run.startedAt, run.completedAt)}
+                        {formatDuration(run.startedAt, run.completedAt)}
                       </span>
                     </div>
 
@@ -185,8 +187,8 @@ export function RoutineHistoryDrawer({
 
                     {/* Failure details callout */}
                     {isFailed && run.error && (
-                      <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs leading-relaxed">
-                        <span className="font-semibold">错误信息：</span>
+                      <div className="p-2.5 rounded-lg bg-status-muted-danger border border-status-danger/30 text-status-danger text-xs leading-relaxed">
+                        <span className="font-semibold">Error: </span>
                         {run.error}
                       </div>
                     )}
@@ -208,7 +210,7 @@ export function RoutineHistoryDrawer({
                           }}
                           className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium cursor-pointer"
                         >
-                          <span>查看会话记录</span>
+                          <span>Open thread</span>
                           <ArrowUpRight className="size-3" />
                         </button>
                       )}

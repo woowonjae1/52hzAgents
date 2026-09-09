@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
@@ -91,7 +92,7 @@ export function getTaskFailureReason(todo: TodoItem, routines?: RoutineItem[]): 
     }
   }
   if (todo.status === 'cancelled') {
-    return todo.timerId ? '定时提醒在触发前已被取消' : '任务已被取消';
+    return todo.timerId ? 'Reminder cancelled before it fired' : 'Task cancelled';
   }
   return null;
 }
@@ -378,15 +379,16 @@ export function TasksView() {
           is the one element allowed to give up width. */}
       <div className="app-header justify-between px-6">
         <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => setViewMode('threads')}
-            className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface2/60 text-foreground-muted hover:bg-surface2 hover:text-foreground transition-colors"
-            title="Back to Chats"
-            aria-label="Back to Chats"
-          >
-            <ArrowLeft className="size-3.5" />
-          </button>
+          <Hint label="Back to Chats">
+            <button
+              type="button"
+              onClick={() => setViewMode('threads')}
+              className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface2/60 text-foreground-muted hover:bg-surface2 hover:text-foreground transition-colors"
+              aria-label="Back to Chats"
+            >
+              <ArrowLeft className="size-3.5" />
+            </button>
+          </Hint>
           <ScreenTitle>Tasks &amp; Issues</ScreenTitle>
 
           {/* Sub-tab Navigation */}
@@ -466,67 +468,71 @@ export function TasksView() {
             {/* Scope: everything in the workspace, or just the focused chat. */}
             {activeChannel && (
               <div className="flex shrink-0 items-center p-0.5 bg-surface2/80 rounded-lg border border-border/60">
-                <button
-                  type="button"
-                  onClick={() => setScope('workspace')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
-                    scope === 'workspace'
-                      ? 'bg-background text-foreground shadow-xs font-semibold'
-                      : 'text-foreground-muted hover:text-foreground'
-                  )}
-                  title="Show every task in this workspace"
-                >
-                  <Globe className="size-3.5" />
-                  <span>All</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setScope('channel')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
-                    scope === 'channel'
-                      ? 'bg-background text-foreground shadow-xs font-semibold'
-                      : 'text-foreground-muted hover:text-foreground'
-                  )}
-                  title={`Show only tasks from ${activeChannel}`}
-                >
-                  <MessageSquare className="size-3.5" />
-                  <span>This chat</span>
-                </button>
+                <Hint label="Show every task in this workspace">
+                  <button
+                    type="button"
+                    onClick={() => setScope('workspace')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                      scope === 'workspace'
+                        ? 'bg-background text-foreground shadow-xs font-semibold'
+                        : 'text-foreground-muted hover:text-foreground'
+                    )}
+                  >
+                    <Globe className="size-3.5" />
+                    <span>All</span>
+                  </button>
+                </Hint>
+                <Hint label={`Show only tasks from ${activeChannel}`}>
+                  <button
+                    type="button"
+                    onClick={() => setScope('channel')}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                      scope === 'channel'
+                        ? 'bg-background text-foreground shadow-xs font-semibold'
+                        : 'text-foreground-muted hover:text-foreground'
+                    )}
+                  >
+                    <MessageSquare className="size-3.5" />
+                    <span>This chat</span>
+                  </button>
+                </Hint>
               </div>
             )}
 
             {/* Direct List / Board Segmented Switcher */}
             <div className="flex shrink-0 items-center p-0.5 bg-surface2/80 rounded-lg border border-border/60">
-              <button
-                type="button"
-                onClick={() => setDisplaySettings((prev) => ({ ...prev, viewType: 'list' }))}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
-                  displaySettings.viewType === 'list'
-                    ? 'bg-background text-foreground shadow-xs font-semibold'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-                title="List view"
-              >
-                <LayoutList className="size-3.5" />
-                <span>List</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDisplaySettings((prev) => ({ ...prev, viewType: 'board' }))}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
-                  displaySettings.viewType === 'board'
-                    ? 'bg-background text-foreground shadow-xs font-semibold'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-                title="Board view"
-              >
-                <LayoutGrid className="size-3.5" />
-                <span>Board</span>
-              </button>
+              <Hint label="List view">
+                <button
+                  type="button"
+                  onClick={() => setDisplaySettings((prev) => ({ ...prev, viewType: 'list' }))}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                    displaySettings.viewType === 'list'
+                      ? 'bg-background text-foreground shadow-xs font-semibold'
+                      : 'text-foreground-muted hover:text-foreground'
+                  )}
+                >
+                  <LayoutList className="size-3.5" />
+                  <span>List</span>
+                </button>
+              </Hint>
+              <Hint label="Board view">
+                <button
+                  type="button"
+                  onClick={() => setDisplaySettings((prev) => ({ ...prev, viewType: 'board' }))}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                    displaySettings.viewType === 'board'
+                      ? 'bg-background text-foreground shadow-xs font-semibold'
+                      : 'text-foreground-muted hover:text-foreground'
+                  )}
+                >
+                  <LayoutGrid className="size-3.5" />
+                  <span>Board</span>
+                </button>
+              </Hint>
             </div>
 
             {/* Display Popover */}
@@ -538,15 +544,16 @@ export function TasksView() {
             />
 
             {/* Refresh Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void refreshTodos()}
-              className="h-8 w-8 shrink-0 p-0 bg-surface1/60 hover:bg-surface2"
-              title="Refresh tasks"
-            >
-              <RefreshCw className="size-3.5 text-foreground-muted" />
-            </Button>
+            <Hint label="Refresh tasks">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void refreshTodos()}
+                className="h-8 w-8 shrink-0 p-0 bg-surface1/60 hover:bg-surface2"
+              >
+                <RefreshCw className="size-3.5 text-foreground-muted" />
+              </Button>
+            </Hint>
 
             {/* New Task Button */}
             <Button
@@ -597,7 +604,7 @@ export function TasksView() {
           ) : (
             <div className="max-w-5xl mx-auto p-4 sm:p-6 space-y-6">
               {overdueCount > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
+                <div className="flex items-center gap-2 rounded-lg border border-status-warning/30 bg-status-muted-warning px-3 py-2 text-xs text-status-warning">
                   <TriangleAlert className="size-3.5 shrink-0" />
                   <span>
                     {overdueCount === 1
@@ -638,19 +645,20 @@ export function TasksView() {
                             {group.items.length}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            openCreate(
-                              displaySettings.grouping === 'channel' ? group.id : undefined,
-                              displaySettings.grouping === 'status' ? (group.id as TodoStatus) : undefined
-                            )
-                          }
-                          className="p-1 text-foreground-extra-muted hover:text-foreground hover:bg-surface2 rounded transition-colors"
-                          title={`Add task to ${group.title}`}
-                        >
-                          <Plus className="size-3.5" />
-                        </button>
+                        <Hint label={`Add task to ${group.title}`}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openCreate(
+                                displaySettings.grouping === 'channel' ? group.id : undefined,
+                                displaySettings.grouping === 'status' ? (group.id as TodoStatus) : undefined
+                              )
+                            }
+                            className="p-1 text-foreground-extra-muted hover:text-foreground hover:bg-surface2 rounded transition-colors"
+                          >
+                            <Plus className="size-3.5" />
+                          </button>
+                        </Hint>
                       </div>
 
                       {/* Issue rows */}
@@ -661,8 +669,8 @@ export function TasksView() {
                           return (
                             <div
                               key={todo.id}
-                              title={failureReason ? `失败/取消原因: ${failureReason}` : undefined}
-                              className="group flex items-center gap-3 px-4 py-2.5 hover:bg-surface2/60 transition-colors"
+                              title={failureReason ? `Reason: ${failureReason}` : undefined}
+                              className="group skip-offscreen-row flex items-center gap-3 px-4 py-2.5 hover:bg-surface2/60 transition-colors"
                             >
                               <PrioritySelector
                                 priority={todo.priority}
@@ -698,7 +706,7 @@ export function TasksView() {
                                 {failureReason && (
                                   <span
                                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/30 text-3xs font-medium shrink-0 cursor-help select-none"
-                                    title={`失败/取消原因: ${failureReason}`}
+                                    title={`Reason: ${failureReason}`}
                                   >
                                     <TriangleAlert className="size-2.5 shrink-0" />
                                     <span className="max-w-[200px] truncate">{failureReason}</span>
@@ -713,7 +721,7 @@ export function TasksView() {
                                     className={cn(
                                       'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-3xs font-medium shrink-0',
                                       overdue
-                                        ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                                        ? 'bg-status-muted-warning text-status-warning border-status-warning/30'
                                         : 'bg-surface2 text-foreground-muted border-border/60'
                                     )}
                                     title={`Due ${formatAbsolute(todo.dueDate)}`}
@@ -748,7 +756,7 @@ export function TasksView() {
                                 </span>
                                 {(todo.routineId || todo.timerId) && (
                                   <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-3xs font-medium shrink-0"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border text-3xs font-medium shrink-0"
                                     title="Created by a scheduled routine"
                                   >
                                     <CalendarClock className="size-2.5 shrink-0" />
@@ -763,42 +771,46 @@ export function TasksView() {
                                   routine-created tasks with no way to be renamed
                                   or removed. Single-row writes make that safe. */}
                               <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  type="button"
-                                  onClick={() => openEdit(todo)}
-                                  className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
-                                  title="Edit task"
-                                >
-                                  <Pencil className="size-3.5" />
-                                </button>
+                                <Hint label="Edit task">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEdit(todo)}
+                                    className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </button>
+                                </Hint>
                                 {displaySettings.ordering === 'position' && (
                                   <>
-                                    <button
-                                      type="button"
-                                      onClick={() => void reorderTask(todo, -1)}
-                                      className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
-                                      title="Move up"
-                                    >
-                                      <ArrowUp className="size-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void reorderTask(todo, 1)}
-                                      className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
-                                      title="Move down"
-                                    >
-                                      <ArrowDown className="size-3.5" />
-                                    </button>
+                                    <Hint label="Move up">
+                                      <button
+                                        type="button"
+                                        onClick={() => void reorderTask(todo, -1)}
+                                        className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                      >
+                                        <ArrowUp className="size-3.5" />
+                                      </button>
+                                    </Hint>
+                                    <Hint label="Move down">
+                                      <button
+                                        type="button"
+                                        onClick={() => void reorderTask(todo, 1)}
+                                        className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                      >
+                                        <ArrowDown className="size-3.5" />
+                                      </button>
+                                    </Hint>
                                   </>
                                 )}
-                                <button
-                                  type="button"
-                                  onClick={() => void removeTask(todo)}
-                                  className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-destructive transition-colors"
-                                  title="Delete task"
-                                >
-                                  <Trash2 className="size-3.5" />
-                                </button>
+                                <Hint label="Delete task">
+                                  <button
+                                    type="button"
+                                    onClick={() => void removeTask(todo)}
+                                    className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-destructive transition-colors"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </Hint>
                               </div>
                             </div>
                           );

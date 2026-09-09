@@ -95,6 +95,7 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
                     <Button
                       variant="ghost"
                       size="icon"
+                      aria-label="Agent actions"
                       className="size-6 opacity-0 group-hover:opacity-100 transition-opacity"
                       disabled={busy}
                     >

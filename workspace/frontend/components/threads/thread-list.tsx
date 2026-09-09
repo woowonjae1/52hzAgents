@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from 'sonner';
@@ -914,13 +915,14 @@ export function ThreadList() {
           {/* New Project / Quick Start Dropdown Menu (Image 2) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                disabled={browsingFolder}
-                className="p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
-                title="New Project / Quick Start"
-              >
-                {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <FolderPlus className="size-3.5" />}
-              </button>
+              <Hint label="New Project / Quick Start">
+                <button
+                  disabled={browsingFolder}
+                  className="p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <FolderPlus className="size-3.5" />}
+                </button>
+              </Hint>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1">
               <DropdownMenuItem onClick={addProjectFolder} className="gap-2.5 py-2 px-2.5 text-xs cursor-pointer rounded-lg">
@@ -985,13 +987,14 @@ export function ThreadList() {
                       <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
                         {item.count}
                       </span>
-                      <button
-                        onClick={() => startChannel(item.dir)}
-                        title={item.dir ? `New channel in ${item.dir}` : 'New direct chat'}
-                        className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
-                      >
-                        <Plus className="size-3" />
-                      </button>
+                      <Hint label={item.dir ? `New channel in ${item.dir}` : 'New direct chat'}>
+                        <button
+                          onClick={() => startChannel(item.dir)}
+                          className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+                        >
+                          <Plus className="size-3" />
+                        </button>
+                      </Hint>
                     </div>
                   ) : (
                     <ThreadRow

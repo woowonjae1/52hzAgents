@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import { Waypoints, Crown, Sparkles, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -136,15 +137,16 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
       ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 h-7 text-xs font-medium"
-              title="Collaboration mode"
-            >
-              <ActiveIcon className="size-3.5" />
-              <span className="hidden lg:inline">{active.label}</span>
-            </Button>
+            <Hint label="Collaboration mode">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 h-7 text-xs font-medium"
+              >
+                <ActiveIcon className="size-3.5" />
+                <span className="hidden lg:inline">{active.label}</span>
+              </Button>
+            </Hint>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72">
             <DropdownMenuLabel>Collaboration mode</DropdownMenuLabel>

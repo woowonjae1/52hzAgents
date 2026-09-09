@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
@@ -258,14 +259,15 @@ export function SettingsView() {
       {/* Header Bar */}
       <div className="app-header justify-between px-6">
         <div className="flex items-center gap-3">
-          <button
-            onClick={() => setViewMode('threads')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-2xs"
-            title="Back to chat"
-          >
-            <ArrowLeft className="size-3.5" />
-            <span>Back to chat</span>
-          </button>
+          <Hint label="Back to chat">
+            <button
+              onClick={() => setViewMode('threads')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>Back to chat</span>
+            </button>
+          </Hint>
           <div className="h-4 w-px bg-border/50" />
           <div>
             <h1 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
@@ -459,30 +461,30 @@ export function SettingsView() {
                       {MARK_COLOR_PRESETS.map((preset) => {
                         const active = markColor === preset.value;
                         return (
-                          <button
-                            key={preset.value}
-                            type="button"
-                            onClick={() => setMarkColor(preset.value)}
-                            title={preset.label}
-                            aria-label={preset.label}
-                            aria-pressed={active}
-                            className={cn(
-                              'relative size-9 rounded-full cursor-pointer transition-all duration-150',
-                              // The ring sits OUTSIDE the swatch so selecting one
-                              // does not change its apparent colour area — with
-                              // an inset ring the active chip reads as a
-                              // different shade than the colour it applies.
-                              'ring-offset-2 ring-offset-surface1',
-                              active
-                                ? 'ring-2 ring-foreground scale-105'
-                                : 'ring-1 ring-border/60 hover:ring-foreground-muted hover:scale-105',
-                            )}
-                            style={{ backgroundColor: preset.value }}
-                          >
-                            {active && (
-                              <Check className="absolute inset-0 m-auto size-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
-                            )}
-                          </button>
+                          <Hint key={preset.value} label={preset.label}>
+                            <button
+                              type="button"
+                              onClick={() => setMarkColor(preset.value)}
+                              aria-label={preset.label}
+                              aria-pressed={active}
+                              className={cn(
+                                'relative size-9 rounded-full cursor-pointer transition-all duration-150',
+                                // The ring sits OUTSIDE the swatch so selecting one
+                                // does not change its apparent colour area — with
+                                // an inset ring the active chip reads as a
+                                // different shade than the colour it applies.
+                                'ring-offset-2 ring-offset-surface1',
+                                active
+                                  ? 'ring-2 ring-foreground scale-105'
+                                  : 'ring-1 ring-border/60 hover:ring-foreground-muted hover:scale-105',
+                              )}
+                              style={{ backgroundColor: preset.value }}
+                            >
+                              {active && (
+                                <Check className="absolute inset-0 m-auto size-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+                              )}
+                            </button>
+                          </Hint>
                         );
                       })}
                     </div>
@@ -686,20 +688,21 @@ export function SettingsView() {
                               </div>
 
                               <div className="flex items-center gap-1.5 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleAgentAutostart(agent.agentName, !!agent.autostart)}
-                                  className={cn(
-                                    'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer border',
-                                    agent.autostart
-                                      ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
-                                      : 'bg-surface2/60 border-border/40 text-foreground-extra-muted hover:text-foreground-muted'
-                                  )}
-                                  title={agent.autostart ? 'Connects on launch — click to turn off' : 'Does not connect on launch — click to turn on'}
-                                >
-                                  <Power className="size-2.5" />
-                                  <span>{agent.autostart ? 'Auto' : 'Manual'}</span>
-                                </button>
+                                <Hint label={agent.autostart ? 'Connects on launch — click to turn off' : 'Does not connect on launch — click to turn on'}>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleAgentAutostart(agent.agentName, !!agent.autostart)}
+                                    className={cn(
+                                      'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer border',
+                                      agent.autostart
+                                        ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
+                                        : 'bg-surface2/60 border-border/40 text-foreground-extra-muted hover:text-foreground-muted'
+                                    )}
+                                  >
+                                    <Power className="size-2.5" />
+                                    <span>{agent.autostart ? 'Auto' : 'Manual'}</span>
+                                  </button>
+                                </Hint>
 
                                 <span className={cn(
                                   'text-3xs px-2 py-0.5 rounded-full font-medium',
@@ -717,17 +720,18 @@ export function SettingsView() {
                             <div className="pt-2 border-t border-border/30 flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5">
                                 {currentSessionId && (
-                                  <button
-                                    onClick={() => setSessionMaster(currentSessionId, agent.agentName)}
-                                    className={cn(
-                                      'px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1',
-                                      isMaster ? 'bg-status-warning/15 text-status-warning font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
-                                    )}
-                                    title="Make this the leader of the thread"
-                                  >
-                                    <Crown className="size-3" />
-                                    <span>{isMaster ? 'Leader' : 'Make leader'}</span>
-                                  </button>
+                                  <Hint label="Make this the leader of the thread">
+                                    <button
+                                      onClick={() => setSessionMaster(currentSessionId, agent.agentName)}
+                                      className={cn(
+                                        'px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1',
+                                        isMaster ? 'bg-status-warning/15 text-status-warning font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
+                                      )}
+                                    >
+                                      <Crown className="size-3" />
+                                      <span>{isMaster ? 'Leader' : 'Make leader'}</span>
+                                    </button>
+                                  </Hint>
                                 )}
 
                                 {currentSessionId && (

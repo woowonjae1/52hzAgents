@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState } from 'react';
 import { Globe, Plus, X, Monitor, Lock, Play, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -113,14 +114,15 @@ export function BrowserTabList() {
             <Monitor className="size-3.5" />
             <span className="text-xs font-medium">Browser</span>
           </div>
-          <button
-            onClick={handleOpen}
-            disabled={opening}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
-            title="Open New Tab"
-          >
-            <Plus className="size-3.5" />
-          </button>
+          <Hint label="Open New Tab">
+            <button
+              onClick={handleOpen}
+              disabled={opening}
+              className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </Hint>
         </div>
       </div>
 
@@ -164,13 +166,14 @@ export function BrowserTabList() {
                         {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                       </p>
                     </div>
-                    <button
-                      onClick={(e) => handleClose(e, tab.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
-                      title="Close tab"
-                    >
-                      <X className="size-3.5" />
-                    </button>
+                    <Hint label="Close tab">
+                      <button
+                        onClick={(e) => handleClose(e, tab.id)}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </Hint>
                   </div>
                 );
               })}
@@ -190,21 +193,23 @@ export function BrowserTabList() {
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
-                    <button
-                      onClick={(e) => handleOpenWithContext(e, ctx.id)}
-                      disabled={opening}
-                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-success transition-colors disabled:opacity-50"
-                      title="Open tab with this session"
-                    >
-                      <Play className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteContext(e, ctx.id, ctx.name)}
-                      className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-colors"
-                      title="Delete saved session"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <Hint label="Open tab with this session">
+                      <button
+                        onClick={(e) => handleOpenWithContext(e, ctx.id)}
+                        disabled={opening}
+                        className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-success transition-colors disabled:opacity-50"
+                      >
+                        <Play className="size-3.5" />
+                      </button>
+                    </Hint>
+                    <Hint label="Delete saved session">
+                      <button
+                        onClick={(e) => handleDeleteContext(e, ctx.id, ctx.name)}
+                        className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-colors"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </Hint>
                   </div>
                 </div>
               ))}
@@ -243,13 +248,14 @@ export function BrowserTabList() {
                       {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                     </p>
                   </div>
-                  <button
-                    onClick={(e) => handleClose(e, tab.id)}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
-                    title="Close tab"
-                  >
-                    <X className="size-3.5" />
-                  </button>
+                  <Hint label="Close tab">
+                    <button
+                      onClick={(e) => handleClose(e, tab.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </Hint>
                 </div>
               ))}
             </>

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -85,9 +86,11 @@ export function InvitationDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" mode="icon" size="sm" title="Invite agent">
-          <UserPlus className="size-4" />
-        </Button>
+        <Hint label="Invite agent">
+          <Button variant="ghost" mode="icon" size="sm">
+            <UserPlus className="size-4" />
+          </Button>
+        </Hint>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -134,18 +137,19 @@ export function InvitationDialog() {
                       </p>
                     </div>
                     {inv.status === 'pending' && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        onClick={() => handleCopyToken(inv.inviteToken)}
-                        title="Copy invite token"
-                      >
-                        {copiedToken === inv.inviteToken
-                          ? <Check className="size-3.5" />
-                          : <Copy className="size-3.5" />
-                        }
-                      </Button>
+                      <Hint label="Copy invite token">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7"
+                          onClick={() => handleCopyToken(inv.inviteToken)}
+                        >
+                          {copiedToken === inv.inviteToken
+                            ? <Check className="size-3.5" />
+                            : <Copy className="size-3.5" />
+                          }
+                        </Button>
+                      </Hint>
                     )}
                   </div>
                 ))}

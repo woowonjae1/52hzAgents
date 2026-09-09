@@ -82,6 +82,7 @@ function SessionItem({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Thread actions"
             className="ms-auto opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity size-6 -me-1"
             onClick={(e) => e.stopPropagation()}
           >

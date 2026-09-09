@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import {
   Users,
@@ -63,9 +64,11 @@ export function SidebarContent() {
               {user.email[0].toUpperCase()}
             </div>
             <span className="text-2xs text-muted-foreground truncate flex-1">{user.email}</span>
-            <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer" title="Sign out">
-              <LogOut className="size-3" />
-            </button>
+            <Hint label="Sign out">
+              <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                <LogOut className="size-3" />
+              </button>
+            </Hint>
           </div>
         </div>
       )}

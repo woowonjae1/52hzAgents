@@ -1,3 +1,4 @@
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useState } from 'react';
 import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, ExternalLink, Music, Film, FileCode, Maximize2, Minimize2 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -203,16 +204,17 @@ export function FilePreview() {
     <div className={cn("flex flex-col h-full bg-card", isFullscreen && "fixed inset-0 z-50 bg-background animate-in fade-in duration-150")}>
       {/* Header */}
       <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-3 border-b shrink-0 bg-background/50">
-        <button
-          onClick={() => {
-            if (isMobile) openMobileList();
-            else setSelectedFileId(null);
-          }}
-          className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 cursor-pointer"
-          title="Back to files"
-        >
-          <ChevronLeft className="size-5" />
-        </button>
+        <Hint label="Back to files">
+          <button
+            onClick={() => {
+              if (isMobile) openMobileList();
+              else setSelectedFileId(null);
+            }}
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 cursor-pointer"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+        </Hint>
         <FileText className="size-4 text-muted-foreground shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate text-foreground">{file.filename.split('/').pop() || file.filename}</p>
@@ -225,38 +227,42 @@ export function FilePreview() {
         </div>
 
         {content !== null && (
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
-            title="Copy content"
-          >
-            {copied ? <Check className="size-4 text-status-success" /> : <Copy className="size-4" />}
-          </button>
+          <Hint label="Copy content">
+            <button
+              onClick={handleCopy}
+              className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+            >
+              {copied ? <Check className="size-4 text-status-success" /> : <Copy className="size-4" />}
+            </button>
+          </Hint>
         )}
 
-        <button
-          onClick={() => setIsFullscreen((prev) => !prev)}
-          className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}
-        >
-          {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-        </button>
+        <Hint label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}>
+          <button
+            onClick={() => setIsFullscreen((prev) => !prev)}
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+          </button>
+        </Hint>
 
-        <button
-          onClick={handleDownload}
-          className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
-          title="Open in new tab / Download"
-        >
-          <ExternalLink className="size-4" />
-        </button>
+        <Hint label="Open in new tab / Download">
+          <button
+            onClick={handleDownload}
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+          >
+            <ExternalLink className="size-4" />
+          </button>
+        </Hint>
 
-        <button
-          onClick={handleDelete}
-          className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
-          title="Delete"
-        >
-          <Trash2 className="size-4" />
-        </button>
+        <Hint label="Delete">
+          <button
+            onClick={handleDelete}
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </Hint>
       </div>
 
       {/* Content Body */}

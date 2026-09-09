@@ -552,7 +552,7 @@ export function AgentModelSwitcher({
                               isActive
                                 ? 'bg-foreground text-background font-semibold shadow-2xs'
                                 : cat.isFree
-                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/20'
+                                  ? 'bg-status-muted-success text-status-success hover:bg-status-success/25 border border-status-success/30'
                                   : 'bg-surface2 hover:bg-surface3 text-muted-foreground hover:text-foreground border border-border/40',
                             )}
                           >
@@ -593,7 +593,7 @@ export function AgentModelSwitcher({
                           <div className="flex items-center gap-1.5 min-w-0">
                             <span className="truncate">{m.name}</span>
                             {isFree && (
-                              <span className="text-3xs px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold uppercase shrink-0">
+                              <span className="text-3xs px-1.5 py-0.2 rounded-full bg-status-muted-success text-status-success font-bold uppercase shrink-0">
                                 Free
                               </span>
                             )}

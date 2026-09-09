@@ -51,7 +51,7 @@ export function TasksDisplayOptions({
           <span>Display</span>
           {!isDefault && (
             <span
-              className="absolute -top-1 -right-1 size-2 rounded-full bg-amber-500 ring-2 ring-background"
+              className="absolute -top-1 -right-1 size-2 rounded-full bg-status-warning ring-2 ring-background"
               aria-label="Custom display filters active"
             />
           )}

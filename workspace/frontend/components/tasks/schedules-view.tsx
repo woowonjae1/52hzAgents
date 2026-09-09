@@ -1,3 +1,4 @@
+import { Hint } from '@/components/ui/hint';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CalendarClock,
@@ -151,10 +152,10 @@ export function SchedulesView() {
   const handleStopRun = async (routine: RoutineItem) => {
     try {
       await stopAllAgents(routine.channelName);
-      toast.success(`已向 @${routine.createdBy} 发送终止指令`);
+      toast.success(`Stop signal sent to @${routine.createdBy}`);
       await refreshRoutines();
     } catch {
-      toast.error('未能中止当前执行');
+      toast.error('The run could not be stopped');
     }
   };
 
@@ -194,15 +195,16 @@ export function SchedulesView() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void refreshSchedules()}
-            className="h-8 w-8 p-0 bg-surface1/60 hover:bg-surface2"
-            title="Refresh schedules"
-          >
-            <RefreshCw className="size-3.5 text-foreground-muted" />
-          </Button>
+          <Hint label="Refresh schedules">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void refreshSchedules()}
+              className="h-8 w-8 p-0 bg-surface1/60 hover:bg-surface2"
+            >
+              <RefreshCw className="size-3.5 text-foreground-muted" />
+            </Button>
+          </Hint>
           <Button
             size="sm"
             onClick={() => { setEditingRoutine(null); setShowCreateDialog(true); }}
@@ -247,7 +249,7 @@ export function SchedulesView() {
                       key={timer.id}
                       className="group flex items-center gap-3 px-4 py-2.5 hover:bg-surface2/60 transition-colors"
                     >
-                      <Timer className="size-3.5 shrink-0 text-amber-400" />
+                      <Timer className="size-3.5 shrink-0 text-status-warning" />
                       <p className="min-w-0 flex-1 text-sm text-foreground truncate">{timer.message}</p>
                       <div className="flex shrink-0 items-center gap-3 text-xs text-foreground-extra-muted">
                         <span className="inline-flex items-center gap-1.5">
@@ -255,20 +257,21 @@ export function SchedulesView() {
                           <span className="hidden sm:inline text-foreground-muted">{timer.createdBy}</span>
                         </span>
                         <span
-                          className="font-medium text-amber-400"
+                          className="font-medium text-status-warning"
                           title={formatAbsolute(timer.firesAt)}
                         >
                           {timeUntil(timer.firesAt, now)}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void runAction(() => cancelTimer(timer.id))}
-                          className="h-7 w-7 p-0 text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Cancel this reminder"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
+                        <Hint label="Cancel this reminder">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void runAction(() => cancelTimer(timer.id))}
+                            className="h-7 w-7 p-0 text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </Hint>
                       </div>
                     </div>
                   ))}
@@ -313,7 +316,7 @@ export function SchedulesView() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
                     {/* Top Meta info */}
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-surface2 text-foreground-muted border border-border">
                         {routine.shortId || 'RTN'}
                       </span>
                       <h3 className="text-sm font-semibold text-foreground tracking-tight">
@@ -324,12 +327,12 @@ export function SchedulesView() {
                           Paused
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-medium bg-status-muted-success text-status-success border border-status-success/30">
                           Active
                         </span>
                       )}
                       {isRunning && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-surface2 text-foreground-muted border border-border">
                           <Loader2 className="size-2.5 animate-spin" />
                           Running
                         </span>
@@ -339,99 +342,106 @@ export function SchedulesView() {
                     {/* Quick Action Buttons */}
                     <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
                       {isRunning ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void handleStopRun(routine)}
-                          className="h-7 px-2 text-xs gap-1 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/60 bg-rose-500/5"
-                          title="停止当前运行"
-                        >
-                          <Square className="size-2.5 fill-current" />
-                          <span>Stop</span>
-                        </Button>
+                        <Hint label="Stop the current run">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleStopRun(routine)}
+                            className="h-7 px-2 text-xs gap-1 border-status-danger/30 text-status-danger hover:bg-status-muted-danger hover:border-status-danger/30 bg-status-muted-danger"
+                          >
+                            <Square className="size-2.5 fill-current" />
+                            <span>Stop</span>
+                          </Button>
+                        </Hint>
                       ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void handleRunNow(routine)}
-                          disabled={runningRoutineId === routine.id}
-                          className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
-                          title="立即触发一次"
-                        >
-                          {runningRoutineId === routine.id ? (
-                            <Loader2 className="size-3 animate-spin text-foreground-muted" />
-                          ) : (
-                            <Play className="size-3 text-emerald-400" />
-                          )}
-                          <span>Run Now</span>
-                        </Button>
+                        <Hint label="Trigger one run now">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void handleRunNow(routine)}
+                            disabled={runningRoutineId === routine.id}
+                            className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
+                          >
+                            {runningRoutineId === routine.id ? (
+                              <Loader2 className="size-3 animate-spin text-foreground-muted" />
+                            ) : (
+                              <Play className="size-3 text-status-success" />
+                            )}
+                            <span>Run Now</span>
+                          </Button>
+                        </Hint>
                       )}
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setHistoryRoutine(routine)}
-                        className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-status-merged hover:text-status-merged"
-                        title="查看历史执行记录与日志"
-                      >
-                        <History className="size-3" />
-                        <span>History</span>
-                      </Button>
+                      <Hint label="Run history and logs">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setHistoryRoutine(routine)}
+                          className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-status-merged hover:text-status-merged"
+                        >
+                          <History className="size-3" />
+                          <span>History</span>
+                        </Button>
+                      </Hint>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void runAction(() => toggleRoutine(routine.id))}
-                        className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
-                        title={isPaused ? 'Resume schedule' : 'Pause schedule'}
-                      >
-                        {isPaused ? (
-                          <>
-                            <Play className="size-3 text-blue-400" />
-                            <span>Resume</span>
-                          </>
-                        ) : (
-                          <>
-                            <Pause className="size-3 text-amber-400" />
-                            <span>Pause</span>
-                          </>
-                        )}
-                      </Button>
+                      <Hint label={isPaused ? 'Resume schedule' : 'Pause schedule'}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void runAction(() => toggleRoutine(routine.id))}
+                          className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
+                        >
+                          {isPaused ? (
+                            <>
+                              <Play className="size-3 text-foreground-muted" />
+                              <span>Resume</span>
+                            </>
+                          ) : (
+                            <>
+                              <Pause className="size-3 text-status-warning" />
+                              <span>Pause</span>
+                            </>
+                          )}
+                        </Button>
+                      </Hint>
 
                       {/* Editing a schedule used to mean deleting it and
                           starting over, which threw away its id, run count and
                           entire run history. */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => { setEditingRoutine(routine); setShowCreateDialog(false); }}
-                        className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
-                        title="Edit schedule"
-                      >
-                        <Pencil className="size-3" />
-                        <span>Edit</span>
-                      </Button>
+                      <Hint label="Edit schedule">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => { setEditingRoutine(routine); setShowCreateDialog(false); }}
+                          className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
+                        >
+                          <Pencil className="size-3" />
+                          <span>Edit</span>
+                        </Button>
+                      </Hint>
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleOpenThread(routine.channelName)}
-                        className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-foreground-muted hover:text-foreground"
-                        title="View Routine Thread"
-                      >
-                        <ExternalLink className="size-3" />
-                        <span>Thread</span>
-                      </Button>
+                      <Hint label="View Routine Thread">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenThread(routine.channelName)}
+                          className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-foreground-muted hover:text-foreground"
+                        >
+                          <ExternalLink className="size-3" />
+                          <span>Thread</span>
+                        </Button>
+                      </Hint>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingRoutine(routine)}
-                        className="h-7 w-7 p-0 text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10"
-                        title="Delete schedule"
-                      >
-                        <Trash2 className="size-3" />
-                      </Button>
+                      <Hint label="Delete schedule">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeletingRoutine(routine)}
+                          className="h-7 w-7 p-0 text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </Hint>
                     </div>
                   </div>
 
@@ -468,7 +478,7 @@ export function SchedulesView() {
                           <span className="text-foreground-extra-muted">Paused</span>
                         ) : (
                           <span
-                            className="font-medium text-blue-400"
+                            className="font-medium text-foreground-muted"
                             title={formatAbsolute(routine.nextFiresAt)}
                           >
                             Next run: {timeUntil(routine.nextFiresAt, now)}
@@ -480,11 +490,11 @@ export function SchedulesView() {
                       {routine.runCount !== undefined && routine.runCount > 0 && (
                         <div className="flex items-center gap-1" title={formatAbsolute(routine.lastFiredAt)}>
                           {routine.lastRunStatus === 'completed' ? (
-                            <CheckCircle2 className="size-3 text-emerald-400" />
+                            <CheckCircle2 className="size-3 text-status-success" />
                           ) : hasFailed ? (
-                            <AlertCircle className="size-3 text-red-400" />
+                            <AlertCircle className="size-3 text-status-danger" />
                           ) : (
-                            <Loader2 className="size-3 text-blue-400 animate-spin" />
+                            <Loader2 className="size-3 text-foreground-muted animate-spin" />
                           )}
                           <span>
                             Run #{routine.runCount} ({routine.lastRunStatus || 'completed'})
@@ -520,14 +530,14 @@ export function SchedulesView() {
       <Dialog open={Boolean(deletingRoutine)} onOpenChange={(open) => !open && setDeletingRoutine(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>删除定时任务</DialogTitle>
+            <DialogTitle>Delete schedule</DialogTitle>
             <DialogDescription>
-              确定要删除定时任务「{deletingRoutine?.name}」吗？删除后将停止所有后续调度并清理相关配置，此操作无法撤销。
+              Delete “{deletingRoutine?.name}”? All future runs stop and its configuration is removed. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" size="sm" onClick={() => setDeletingRoutine(null)}>
-              取消
+              Cancel
             </Button>
             <Button
               variant="destructive"
@@ -539,7 +549,7 @@ export function SchedulesView() {
                 }
               }}
             >
-              确认删除
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

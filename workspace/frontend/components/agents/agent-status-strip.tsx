@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -98,48 +99,49 @@ export function AgentStatusStrip() {
     sidebar) are both one row away.
   */
   return (
-    <button
-      type="button"
-      onClick={() => setViewMode('mission')}
-      title="Open agent station"
-      className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
-    >
-      {/* -space-x-1.5, not -1: at 4px the discs merely touched, which reads as
-          a crowded row rather than a stack. */}
-      <div className="flex items-center -space-x-1.5 shrink-0 empty:hidden">
-        {shown.map(({ agent, state }) => (
-          <Tooltip key={agent.agentName}>
-            <TooltipTrigger asChild>
-              <span
-                className={cn(
-                  'rounded-full ring-2 bg-surface0 transition-colors',
-                  RING[state],
-                  state === 'offline' && 'opacity-50',
-                )}
-              >
-                <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={20} />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={6}>
-              {agent.agentName} · {state}
-            </TooltipContent>
-          </Tooltip>
-        ))}
-        {overflow > 0 && (
-          <span className="h-5 min-w-5 px-1 rounded-full ring-2 ring-border bg-surface2 text-[9px] font-mono font-medium tracking-tighter text-foreground-muted flex items-center justify-center leading-none select-none">
-            +{overflow}
-          </span>
-        )}
-      </div>
-
-      <span
-        className={cn(
-          'text-2xs truncate flex-1 min-w-0',
-          workingCount > 0 ? 'text-foreground' : 'text-foreground-extra-muted',
-        )}
+    <Hint label="Open agent station">
+      <button
+        type="button"
+        onClick={() => setViewMode('mission')}
+        className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
       >
-        {summary}
-      </span>
-    </button>
+        {/* -space-x-1.5, not -1: at 4px the discs merely touched, which reads as
+            a crowded row rather than a stack. */}
+        <div className="flex items-center -space-x-1.5 shrink-0 empty:hidden">
+          {shown.map(({ agent, state }) => (
+            <Tooltip key={agent.agentName}>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn(
+                    'rounded-full ring-2 bg-surface0 transition-colors',
+                    RING[state],
+                    state === 'offline' && 'opacity-50',
+                  )}
+                >
+                  <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={20} />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={6}>
+                {agent.agentName} · {state}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+          {overflow > 0 && (
+            <span className="h-5 min-w-5 px-1 rounded-full ring-2 ring-border bg-surface2 text-[9px] font-mono font-medium tracking-tighter text-foreground-muted flex items-center justify-center leading-none select-none">
+              +{overflow}
+            </span>
+          )}
+        </div>
+
+        <span
+          className={cn(
+            'text-2xs truncate flex-1 min-w-0',
+            workingCount > 0 ? 'text-foreground' : 'text-foreground-extra-muted',
+          )}
+        >
+          {summary}
+        </span>
+      </button>
+    </Hint>
   );
 }

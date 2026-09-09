@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { FolderClock } from 'lucide-react';
@@ -129,15 +130,15 @@ export function ProjectFolderPicker({ value, onChange, placeholder, helperText }
         <div className="mt-1.5 flex flex-wrap items-center gap-1">
           <FolderClock className="size-3 text-foreground-extra-muted shrink-0" />
           {suggestions.map((dir) => (
-            <button
-              key={dir}
-              type="button"
-              onClick={() => onChange(dir)}
-              title={dir}
-              className="max-w-[12rem] truncate rounded-md border border-border/60 px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:border-border-accent hover:text-foreground"
-            >
-              {basename(dir)}
-            </button>
+            <Hint key={dir} label={dir}>
+              <button
+                type="button"
+                onClick={() => onChange(dir)}
+                className="max-w-[12rem] truncate rounded-md border border-border/60 px-1.5 py-0.5 text-2xs text-muted-foreground transition-colors hover:border-border-accent hover:text-foreground"
+              >
+                {basename(dir)}
+              </button>
+            </Hint>
           ))}
         </div>
       )}

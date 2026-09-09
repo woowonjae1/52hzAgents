@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import { Terminal, Check, Copy, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -87,7 +88,8 @@ export function TerminalBlock({
             </span>
           )}
 
-          <button
+          <Hint label="Copy command and output">
+            <button
             type="button"
             onClick={() => {
               const fullText = `$ ${command}\n${lines.join('\n')}`;
@@ -100,10 +102,10 @@ export function TerminalBlock({
               'p-1 rounded transition-colors cursor-pointer',
               isInk ? 'hover:bg-neutral-800 text-neutral-400' : 'hover:bg-surface3 text-foreground-muted'
             )}
-            title="Copy command and output"
           >
             {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
           </button>
+          </Hint>
         </div>
       </div>
 

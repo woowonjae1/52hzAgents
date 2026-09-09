@@ -11,6 +11,7 @@
  * - Graceful offline & auto-detection state when localhost server is not yet running.
  */
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import {
   ArrowLeft, ArrowRight, RefreshCw, ExternalLink, Monitor,
@@ -160,33 +161,36 @@ export function LocalPreview() {
       <div className="flex items-center gap-1.5 px-2.5 py-2 border-b border-border/60 bg-surface0 shrink-0 select-none">
         {/* Navigation controls */}
         <div className="flex items-center gap-0.5 shrink-0">
-          <button
-            onClick={() => webviewRef.current?.goBack()}
-            disabled={!isDesktop}
-            title="Back"
-            className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
-          >
-            <ArrowLeft className="size-3.5" />
-          </button>
-          <button
-            onClick={() => webviewRef.current?.goForward()}
-            disabled={!isDesktop}
-            title="Forward"
-            className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
-          >
-            <ArrowRight className="size-3.5" />
-          </button>
-          <button
-            onClick={reload}
-            title="Reload"
-            className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
-          >
-            {isLoading ? (
-              <Loader2 className="size-3.5 animate-spin text-primary" />
-            ) : (
-              <RefreshCw className="size-3.5" />
-            )}
-          </button>
+          <Hint label="Back">
+            <button
+              onClick={() => webviewRef.current?.goBack()}
+              disabled={!isDesktop}
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
+            >
+              <ArrowLeft className="size-3.5" />
+            </button>
+          </Hint>
+          <Hint label="Forward">
+            <button
+              onClick={() => webviewRef.current?.goForward()}
+              disabled={!isDesktop}
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
+            >
+              <ArrowRight className="size-3.5" />
+            </button>
+          </Hint>
+          <Hint label="Reload">
+            <button
+              onClick={reload}
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+            >
+              {isLoading ? (
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+              ) : (
+                <RefreshCw className="size-3.5" />
+              )}
+            </button>
+          </Hint>
         </div>
 
         {/* Spacious Address Bar */}
@@ -210,26 +214,26 @@ export function LocalPreview() {
           {QUICK_PORTS.map((port) => {
             const isCurrent = url.includes(`:${port}`);
             return (
-              <button
-                key={port}
-                type="button"
-                onClick={() => {
-                  const targetUrl = `http://localhost:${port}`;
-                  setDraft(targetUrl);
-                  setUrl(targetUrl);
-                  setLoadError(null);
-                  if (!isDesktop) setIframeNonce((n) => n + 1);
-                }}
-                className={cn(
-                  "px-1.5 py-0.5 rounded text-3xs font-mono transition-colors cursor-pointer",
-                  isCurrent
-                    ? "bg-primary text-primary-foreground font-semibold"
-                    : "bg-surface2 text-muted-foreground hover:text-foreground hover:bg-surface3"
-                )}
-                title={`Switch to :${port}`}
-              >
-                :{port}
-              </button>
+              <Hint key={port} label={`Switch to :${port}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetUrl = `http://localhost:${port}`;
+                    setDraft(targetUrl);
+                    setUrl(targetUrl);
+                    setLoadError(null);
+                    if (!isDesktop) setIframeNonce((n) => n + 1);
+                  }}
+                  className={cn(
+                    "px-1.5 py-0.5 rounded text-3xs font-mono transition-colors cursor-pointer",
+                    isCurrent
+                      ? "bg-primary text-primary-foreground font-semibold"
+                      : "bg-surface2 text-muted-foreground hover:text-foreground hover:bg-surface3"
+                  )}
+                >
+                  :{port}
+                </button>
+              </Hint>
             );
           })}
         </div>
@@ -237,47 +241,51 @@ export function LocalPreview() {
         {/* Responsive Viewport & External */}
         <div className="flex items-center gap-1 shrink-0">
           <div className="flex items-center gap-0.5 rounded-lg bg-surface2/70 p-0.5">
-            <button
-              onClick={() => setViewport('desktop')}
-              title="Desktop viewport"
-              className={cn(
-                'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
-                viewport === 'desktop' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Monitor className="size-3" />
-            </button>
-            <button
-              onClick={() => setViewport('mobile')}
-              title="Mobile viewport (375px)"
-              className={cn(
-                'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
-                viewport === 'mobile' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              <Smartphone className="size-3" />
-            </button>
+            <Hint label="Desktop viewport">
+              <button
+                onClick={() => setViewport('desktop')}
+                className={cn(
+                  'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
+                  viewport === 'desktop' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Monitor className="size-3" />
+              </button>
+            </Hint>
+            <Hint label="Mobile viewport (375px)">
+              <button
+                onClick={() => setViewport('mobile')}
+                className={cn(
+                  'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
+                  viewport === 'mobile' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Smartphone className="size-3" />
+              </button>
+            </Hint>
           </div>
 
           {isDesktop && (
-            <button
-              onClick={() => webviewRef.current?.openDevTools()}
-              title="Open DevTools"
-              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
-            >
-              <Terminal className="size-3.5" />
-            </button>
+            <Hint label="Open DevTools">
+              <button
+                onClick={() => webviewRef.current?.openDevTools()}
+                className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+              >
+                <Terminal className="size-3.5" />
+              </button>
+            </Hint>
           )}
 
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open in system browser"
-            className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
-          >
-            <ExternalLink className="size-3.5" />
-          </a>
+          <Hint label="Open in system browser">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+            >
+              <ExternalLink className="size-3.5" />
+            </a>
+          </Hint>
         </div>
       </div>
 

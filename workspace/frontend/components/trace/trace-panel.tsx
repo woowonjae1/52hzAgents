@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   Activity,
@@ -317,18 +318,19 @@ export function TracePanel() {
 
         {/* Action icons */}
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => setIsAutoScroll((v) => !v)}
-            className={cn(
-              'size-6.5 flex items-center justify-center rounded-lg border transition-colors cursor-pointer',
-              isAutoScroll
-                ? 'text-status-success border-status-success/30 bg-surface2'
-                : 'text-foreground-muted border-border hover:text-foreground'
-            )}
-            title={isAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
-          >
-            <ArrowDownToLine className="size-3" />
-          </button>
+          <Hint label={isAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}>
+            <button
+              onClick={() => setIsAutoScroll((v) => !v)}
+              className={cn(
+                'size-6.5 flex items-center justify-center rounded-lg border transition-colors cursor-pointer',
+                isAutoScroll
+                  ? 'text-status-success border-status-success/30 bg-surface2'
+                  : 'text-foreground-muted border-border hover:text-foreground'
+              )}
+            >
+              <ArrowDownToLine className="size-3" />
+            </button>
+          </Hint>
         </div>
       </div>
 
@@ -347,11 +349,13 @@ export function TracePanel() {
           </div>
 
           <div className="flex items-center gap-1 text-3xs font-mono text-foreground-extra-muted shrink-0">
-            <span className="px-1.5 py-0.5 rounded bg-surface2 border border-border/40">
-              ⚡ {stats.tools}
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface2 border border-border/40">
+              <Wrench className="size-2.5 shrink-0" aria-hidden />
+              {stats.tools}
             </span>
-            <span className="px-1.5 py-0.5 rounded bg-surface2 border border-border/40">
-              💭 {stats.thinking}
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface2 border border-border/40">
+              <Brain className="size-2.5 shrink-0" aria-hidden />
+              {stats.thinking}
             </span>
           </div>
         </div>

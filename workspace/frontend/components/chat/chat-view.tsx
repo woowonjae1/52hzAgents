@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
@@ -817,13 +818,14 @@ export function ChatView() {
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
-            <button
-              onClick={sidebarToggle}
-              className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1 cursor-pointer"
-              title="Expand Sidebar"
-            >
-              <PanelLeft className="size-4" />
-            </button>
+            <Hint label="Expand Sidebar">
+              <button
+                onClick={sidebarToggle}
+                className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1 cursor-pointer"
+              >
+                <PanelLeft className="size-4" />
+              </button>
+            </Hint>
           )}
           {isDM ? (
             <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
@@ -904,26 +906,28 @@ export function ChatView() {
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
           {/* Quick Panels / Preview toggle */}
-          <button
-            onClick={() => setActiveRightTab(activeRightTab ? null : 'preview')}
-            className={cn(
-              'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
-              activeRightTab ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
-            )}
-            title={activeRightTab ? 'Close Side Panel' : 'Open Side Panel'}
-          >
-            <PanelRight className="size-4" />
-          </button>
+          <Hint label={activeRightTab ? 'Close Side Panel' : 'Open Side Panel'}>
+            <button
+              onClick={() => setActiveRightTab(activeRightTab ? null : 'preview')}
+              className={cn(
+                'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+                activeRightTab ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <PanelRight className="size-4" />
+            </button>
+          </Hint>
 
           {/* More Actions Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-                title="More actions"
-              >
-                <MoreHorizontal className="size-4" />
-              </button>
+              <Hint label="More actions">
+                <button
+                  className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </Hint>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
@@ -966,24 +970,25 @@ export function ChatView() {
             </span>
             <div className="flex items-center gap-1.5 shrink-0">
               {missing.map((a) => (
-                <button
-                  key={a.agentName}
-                  onClick={() => setSelectedAgentName(a.agentName)}
-                  className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors cursor-pointer text-foreground"
-                  title={`Add a description for ${a.agentName}`}
-                >
-                  <Sparkles className="size-2.5 text-status-warning" />
-                  {a.agentName}
-                </button>
+                <Hint key={a.agentName} label={`Add a description for ${a.agentName}`}>
+                  <button
+                    onClick={() => setSelectedAgentName(a.agentName)}
+                    className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors cursor-pointer text-foreground"
+                  >
+                    <Sparkles className="size-2.5 text-status-warning" />
+                    {a.agentName}
+                  </button>
+                </Hint>
               ))}
             </div>
-            <button
-              onClick={() => setDismissedRoutingWarning(true)}
-              className="ml-auto p-1 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
-              title="Dismiss warning"
-            >
-              <X className="size-3.5" />
-            </button>
+            <Hint label="Dismiss warning">
+              <button
+                onClick={() => setDismissedRoutingWarning(true)}
+                className="ml-auto p-1 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+              >
+                <X className="size-3.5" />
+              </button>
+            </Hint>
           </div>
         );
       })()}
@@ -1079,19 +1084,20 @@ export function ChatView() {
                         <Plug className="size-3.5" />
                         <span>Connect agent</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const cmd = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=${getApiBaseUrl()}`;
-                          navigator.clipboard.writeText(cmd);
-                          toast.success('Connector CLI command copied to clipboard');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 border border-border text-foreground text-xs font-medium transition-colors cursor-pointer"
-                        title="Copy command to run agent connector locally"
-                      >
-                        <Copy className="size-3.5 text-foreground-muted" />
-                        <span>Copy CLI command</span>
-                      </button>
+                      <Hint label="Copy command to run agent connector locally">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const cmd = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=${getApiBaseUrl()}`;
+                            navigator.clipboard.writeText(cmd);
+                            toast.success('Connector CLI command copied to clipboard');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 border border-border text-foreground text-xs font-medium transition-colors cursor-pointer"
+                        >
+                          <Copy className="size-3.5 text-foreground-muted" />
+                          <span>Copy CLI command</span>
+                        </button>
+                      </Hint>
                     </div>
                   </div>
 

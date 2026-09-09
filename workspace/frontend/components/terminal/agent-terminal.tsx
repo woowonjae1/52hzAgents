@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
@@ -257,23 +258,25 @@ export function AgentTerminal() {
               onClick={(e) => e.stopPropagation()}
             />
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); setClearedBefore(localLines.length); }}
-            className="size-6 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground-extra-muted hover:bg-primary/60 transition-colors"
-            title="Clear console"
-          >
-            <Eraser className="size-3.5" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setIsAutoScroll((v) => !v); }}
-            className={cn(
-              'size-6 flex items-center justify-center rounded-md border transition-colors',
-              isAutoScroll ? 'text-status-success border-status-success/30 bg-surface2' : 'text-foreground-muted border-border hover:text-foreground-extra-muted',
-            )}
-            title={isAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}
-          >
-            <ArrowDownToLine className="size-3.5" />
-          </button>
+          <Hint label="Clear console">
+            <button
+              onClick={(e) => { e.stopPropagation(); setClearedBefore(localLines.length); }}
+              className="size-6 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground-extra-muted hover:bg-primary/60 transition-colors"
+            >
+              <Eraser className="size-3.5" />
+            </button>
+          </Hint>
+          <Hint label={isAutoScroll ? 'Auto-scroll on' : 'Auto-scroll off'}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setIsAutoScroll((v) => !v); }}
+              className={cn(
+                'size-6 flex items-center justify-center rounded-md border transition-colors',
+                isAutoScroll ? 'text-status-success border-status-success/30 bg-surface2' : 'text-foreground-muted border-border hover:text-foreground-extra-muted',
+              )}
+            >
+              <ArrowDownToLine className="size-3.5" />
+            </button>
+          </Hint>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { formatDistanceToNow } from 'date-fns';
 import {
   ArrowLeft,
@@ -397,15 +398,16 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       <div className="app-header px-4">
         <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              type="button"
-              onClick={() => setViewMode('threads')}
-              className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-              title="Back to conversation"
-            >
-              <ArrowLeft className="size-3.5" />
-              <span>Back</span>
-            </button>
+            <Hint label="Back to conversation">
+              <button
+                type="button"
+                onClick={() => setViewMode('threads')}
+                className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Back</span>
+              </button>
+            </Hint>
             <div className="h-3.5 w-px bg-border/80" />
             <div className="flex items-center gap-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface2 text-foreground-muted">
@@ -559,6 +561,15 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 className={cn(
                   CARD,
                   'group relative p-3 cursor-pointer select-none',
+                  /*
+                   * Only PAST the staggered intro. `content-visibility` creates
+                   * a containment context, so a row the browser decides to skip
+                   * while its entry transform is still running stops mid-flight.
+                   * The stagger caps at index 8, so rows 9+ are never animating
+                   * when they first come into view -- and they are also the only
+                   * ones far enough down the list to be worth skipping.
+                   */
+                  index > 8 && 'skip-offscreen-card',
                   active
                     ? 'border-primary/50 bg-surface2/90 shadow-xs ring-1 ring-primary/20'
                     : 'hover:border-border-accent/80 hover:bg-surface2/50'
@@ -610,39 +621,42 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
 
                 {/* Hover Quick Actions */}
                 <div className="absolute right-2.5 top-2.5 flex items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copySlugDirective(entry.slug);
-                    }}
-                    className="p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
-                    title="Copy the @knowledge citation"
-                  >
-                    {copiedSlug === entry.slug ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(entry);
-                    }}
-                    className="p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
-                    title="Edit"
-                  >
-                    <Pencil className="size-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(entry);
-                    }}
-                    className="p-1 rounded-md text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    title="Delete"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
+                  <Hint label="Copy the @knowledge citation">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copySlugDirective(entry.slug);
+                      }}
+                      className="p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
+                    >
+                      {copiedSlug === entry.slug ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+                    </button>
+                  </Hint>
+                  <Hint label="Edit">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(entry);
+                      }}
+                      className="p-1 rounded-md text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
+                    >
+                      <Pencil className="size-3" />
+                    </button>
+                  </Hint>
+                  <Hint label="Delete">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(entry);
+                      }}
+                      className="p-1 rounded-md text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </Hint>
                 </div>
               </motion.div>
             );
@@ -676,15 +690,16 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             </div>
 
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-foreground-muted">
-              <button
-                type="button"
-                onClick={() => copySlugDirective(selectedEntry.slug)}
-                className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors cursor-pointer"
-                title="Copy the @ citation"
-              >
-                <span>@knowledge:{selectedEntry.slug}</span>
-                {copiedSlug === selectedEntry.slug ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5 text-foreground-extra-muted" />}
-              </button>
+              <Hint label="Copy the @ citation">
+                <button
+                  type="button"
+                  onClick={() => copySlugDirective(selectedEntry.slug)}
+                  className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+                >
+                  <span>@knowledge:{selectedEntry.slug}</span>
+                  {copiedSlug === selectedEntry.slug ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5 text-foreground-extra-muted" />}
+                </button>
+              </Hint>
               <MetaDot />
               <span className="text-3xs text-foreground-muted font-medium flex items-center gap-1">
                 <Bot className="size-3" />

@@ -60,7 +60,7 @@ export function Reasoning({
       actions={
         content ? (
           <EventLineAction onClick={handleCopy} title="Copy reasoning text">
-            {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+            {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
           </EventLineAction>
         ) : undefined
       }

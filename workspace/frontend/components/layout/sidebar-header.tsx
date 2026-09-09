@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { PanelLeft } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { SignalMark } from '@/components/brand/signal-mark';
@@ -34,13 +35,14 @@ export function SidebarHeader() {
 
       {/* Right: Sidebar Collapse Toggle */}
       <div className="flex items-center gap-1.5 shrink-0">
-        <button
-          onClick={sidebarToggle}
-          className="size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-          title="Collapse Sidebar"
-        >
-          <PanelLeft className="size-3.5" />
-        </button>
+        <Hint label="Collapse Sidebar">
+          <button
+            onClick={sidebarToggle}
+            className="size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <PanelLeft className="size-3.5" />
+          </button>
+        </Hint>
       </div>
     </div>
   );

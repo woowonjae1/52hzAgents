@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, ArrowRight, CornerDownLeft, Maximize2, Loader2, X } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
@@ -183,31 +184,34 @@ export default function QuickBarPage() {
                 <span className="text-2xs font-medium">Working</span>
               </div>
             ) : (
-              <button
-                onClick={handleSend}
-                disabled={!prompt.trim()}
-                className="size-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white disabled:opacity-30 transition-all cursor-pointer"
-                title="Send Command (Enter)"
-              >
-                <CornerDownLeft className="size-3.5" />
-              </button>
+              <Hint label="Send Command (Enter)">
+                <button
+                  onClick={handleSend}
+                  disabled={!prompt.trim()}
+                  className="size-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white disabled:opacity-30 transition-all cursor-pointer"
+                >
+                  <CornerDownLeft className="size-3.5" />
+                </button>
+              </Hint>
             )}
 
-            <button
-              onClick={handleOpenFull}
-              className="size-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
-              title="Open full workspace"
-            >
-              <Maximize2 className="size-3.5" />
-            </button>
+            <Hint label="Open full workspace">
+              <button
+                onClick={handleOpenFull}
+                className="size-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+              >
+                <Maximize2 className="size-3.5" />
+              </button>
+            </Hint>
 
-            <button
-              onClick={handleDismiss}
-              className="size-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
-              title="Dismiss (Esc)"
-            >
-              <X className="size-3.5" />
-            </button>
+            <Hint label="Dismiss (Esc)">
+              <button
+                onClick={handleDismiss}
+                className="size-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="size-3.5" />
+              </button>
+            </Hint>
           </div>
         </div>
 

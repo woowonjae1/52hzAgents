@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Sparkles, Search, ExternalLink, Star, ArrowRight, ArrowLeft, Check, Plus, Loader2, AlertCircle, Upload, Package, LayoutGrid, Brain, Palette, Server, Database, Rocket, FlaskConical, Lock, Link2, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -394,14 +395,15 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                       <div key={agent.agentName} className="flex items-center gap-2 rounded-md bg-background border border-status-danger/30 px-3 py-2">
                         <AgentAvatar name={agent.agentName} size={20} status={agent.status} showStatus />
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
-                        <button
-                          onClick={() => handleInstall(agent.agentName)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-status-danger/10 text-status-danger hover:bg-surface30/20 transition-colors"
-                          title="Installation failed — click to retry"
-                        >
-                          <AlertCircle className="size-3" />
-                          Failed · Retry
-                        </button>
+                        <Hint label="Installation failed — click to retry">
+                          <button
+                            onClick={() => handleInstall(agent.agentName)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-status-danger/10 text-status-danger hover:bg-surface30/20 transition-colors"
+                          >
+                            <AlertCircle className="size-3" />
+                            Failed · Retry
+                          </button>
+                        </Hint>
                       </div>
                     );
                   }
@@ -556,15 +558,16 @@ export function SkillsView() {
           their own band below rather than stretching the header to 3 rows. */}
       <div className="app-header px-5">
         <div className="flex flex-1 items-center gap-2 min-w-0">
-          <button
-            type="button"
-            onClick={() => setViewMode('threads')}
-            className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-            title="Back to chats"
-          >
-            <ArrowLeft className="size-3.5" />
-            <span>Back</span>
-          </button>
+          <Hint label="Back to chats">
+            <button
+              type="button"
+              onClick={() => setViewMode('threads')}
+              className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span>Back</span>
+            </button>
+          </Hint>
           <div className="h-3.5 w-px bg-border/60" />
           <Sparkles className="size-4 text-status-warning" />
           <ScreenTitle>Skill Hub</ScreenTitle>
@@ -647,7 +650,9 @@ export function SkillsView() {
               )}
               <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">
                 {filtered.map(skill => (
-                  <SkillCard key={skill.id} skill={skill} onSelect={setSelectedSkill} />
+                  <div key={skill.id} className="skip-offscreen-card">
+                    <SkillCard skill={skill} onSelect={setSelectedSkill} />
+                  </div>
                 ))}
               </div>
             </div>

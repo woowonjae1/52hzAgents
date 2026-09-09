@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useRef, useState, useMemo } from 'react';
 import { Search, Upload, FolderOpen, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -84,14 +85,15 @@ export function FileList() {
               className="text-xs bg-transparent outline-none flex-1 text-foreground placeholder:text-muted-foreground"
             />
           </div>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
-            title="Upload File"
-          >
-            <Upload className="size-3.5" />
-          </button>
+          <Hint label="Upload File">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+            >
+              <Upload className="size-3.5" />
+            </button>
+          </Hint>
           <input
             ref={fileInputRef}
             type="file"
@@ -152,13 +154,14 @@ export function FileList() {
                   {file.createdAt && ` · ${timeAgo(file.createdAt)}`}
                 </p>
               </div>
-              <button
-                onClick={(e) => handleDelete(e, file.id, file.filename)}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
-                title="Delete"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
+              <Hint label="Delete">
+                <button
+                  onClick={(e) => handleDelete(e, file.id, file.filename)}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </Hint>
             </div>
           ))}
         </div>

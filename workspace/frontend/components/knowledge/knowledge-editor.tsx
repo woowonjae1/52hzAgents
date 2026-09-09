@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   FileText,
@@ -177,48 +178,51 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
 
             {/* View Mode Switcher */}
             <div className="flex items-center bg-surface2/80 rounded-lg p-0.5 border border-border/60 shrink-0">
-              <button
-                type="button"
-                onClick={() => setViewMode('edit')}
-                className={cn(
-                  'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
-                  viewMode === 'edit'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-                title="Editor only"
-              >
-                <Edit3 className="size-3" />
-                <span className="hidden sm:inline">Editor</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('split')}
-                className={cn(
-                  'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
-                  viewMode === 'split'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-                title="Split live preview"
-              >
-                <Columns2 className="size-3" />
-                <span className="hidden sm:inline">Split</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('preview')}
-                className={cn(
-                  'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
-                  viewMode === 'preview'
-                    ? 'bg-surface1 text-foreground shadow-xs font-semibold'
-                    : 'text-foreground-muted hover:text-foreground'
-                )}
-                title="Preview only"
-              >
-                <Eye className="size-3" />
-                <span className="hidden sm:inline">Preview</span>
-              </button>
+              <Hint label="Editor only">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('edit')}
+                  className={cn(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                    viewMode === 'edit'
+                      ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                      : 'text-foreground-muted hover:text-foreground'
+                  )}
+                >
+                  <Edit3 className="size-3" />
+                  <span className="hidden sm:inline">Editor</span>
+                </button>
+              </Hint>
+              <Hint label="Split live preview">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('split')}
+                  className={cn(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                    viewMode === 'split'
+                      ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                      : 'text-foreground-muted hover:text-foreground'
+                  )}
+                >
+                  <Columns2 className="size-3" />
+                  <span className="hidden sm:inline">Split</span>
+                </button>
+              </Hint>
+              <Hint label="Preview only">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('preview')}
+                  className={cn(
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                    viewMode === 'preview'
+                      ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                      : 'text-foreground-muted hover:text-foreground'
+                  )}
+                >
+                  <Eye className="size-3" />
+                  <span className="hidden sm:inline">Preview</span>
+                </button>
+              </Hint>
             </div>
           </div>
         </DialogHeader>
@@ -280,96 +284,107 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
             {/* Markdown Toolbar */}
             <div className="flex items-center justify-between border-b border-border/70 px-3 py-1.5 bg-surface2/60 shrink-0">
               <div className="flex items-center gap-0.5 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('**', '**', 'bold text')}
-                  className={toolBtnClass}
-                  title="Bold (**text**)"
-                >
-                  <Bold className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('*', '*', 'italic text')}
-                  className={toolBtnClass}
-                  title="Italic (*text*)"
-                >
-                  <Italic className="size-3.5" />
-                </button>
+                <Hint label="Bold (**text**)">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('**', '**', 'bold text')}
+                    className={toolBtnClass}
+                  >
+                    <Bold className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Italic (*text*)">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('*', '*', 'italic text')}
+                    className={toolBtnClass}
+                  >
+                    <Italic className="size-3.5" />
+                  </button>
+                </Hint>
                 <div className="h-3 w-px bg-border/80 mx-1" />
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('# ', '', 'Heading 1')}
-                  className={toolBtnClass}
-                  title="Heading 1"
-                >
-                  <Heading1 className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('## ', '', 'Heading 2')}
-                  className={toolBtnClass}
-                  title="Heading 2"
-                >
-                  <Heading2 className="size-3.5" />
-                </button>
+                <Hint label="Heading 1">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('# ', '', 'Heading 1')}
+                    className={toolBtnClass}
+                  >
+                    <Heading1 className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Heading 2">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('## ', '', 'Heading 2')}
+                    className={toolBtnClass}
+                  >
+                    <Heading2 className="size-3.5" />
+                  </button>
+                </Hint>
                 <div className="h-3 w-px bg-border/80 mx-1" />
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('`', '`', 'code')}
-                  className={toolBtnClass}
-                  title="Inline Code"
-                >
-                  <Code className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('```ts\n', '\n```', '// code snippet')}
-                  className={toolBtnClass}
-                  title="Code Block"
-                >
-                  <FileText className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('> [!NOTE]\n> ', '', 'Important note for agents')}
-                  className={toolBtnClass}
-                  title="Callout Box"
-                >
-                  <Quote className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('- ', '', 'List item')}
-                  className={toolBtnClass}
-                  title="Bullet List"
-                >
-                  <List className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('| Column 1 | Column 2 |\n|---|---|\n| Item 1 | Item 2 |\n', '', '')}
-                  className={toolBtnClass}
-                  title="Markdown Table"
-                >
-                  <Table className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('[', '](https://...)', 'Link title')}
-                  className={toolBtnClass}
-                  title="Link"
-                >
-                  <Link className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => insertFormatting('```mermaid\ngraph TD\n  A[Client] --> B[Server]\n```\n', '', '')}
-                  className={toolBtnClass}
-                  title="Mermaid Diagram"
-                >
-                  <Layers className="size-3.5" />
-                </button>
+                <Hint label="Inline Code">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('`', '`', 'code')}
+                    className={toolBtnClass}
+                  >
+                    <Code className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Code Block">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('```ts\n', '\n```', '// code snippet')}
+                    className={toolBtnClass}
+                  >
+                    <FileText className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Callout Box">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('> [!NOTE]\n> ', '', 'Important note for agents')}
+                    className={toolBtnClass}
+                  >
+                    <Quote className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Bullet List">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('- ', '', 'List item')}
+                    className={toolBtnClass}
+                  >
+                    <List className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Markdown Table">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('| Column 1 | Column 2 |\n|---|---|\n| Item 1 | Item 2 |\n', '', '')}
+                    className={toolBtnClass}
+                  >
+                    <Table className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Link">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('[', '](https://...)', 'Link title')}
+                    className={toolBtnClass}
+                  >
+                    <Link className="size-3.5" />
+                  </button>
+                </Hint>
+                <Hint label="Mermaid Diagram">
+                  <button
+                    type="button"
+                    onClick={() => insertFormatting('```mermaid\ngraph TD\n  A[Client] --> B[Server]\n```\n', '', '')}
+                    className={toolBtnClass}
+                  >
+                    <Layers className="size-3.5" />
+                  </button>
+                </Hint>
               </div>
 
               <div className="flex items-center gap-2 text-3xs font-mono text-foreground-extra-muted tabular-nums shrink-0 pl-2">

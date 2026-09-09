@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useState, useCallback } from 'react';
 import {
   CheckCircle2,
@@ -155,16 +156,17 @@ export function PipelineStepper({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={handleHalt}
-          disabled={halting}
-          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-medium bg-surface3 hover:bg-status-danger/10 text-foreground-muted hover:text-status-danger transition-colors cursor-pointer border border-border/60"
-          title="Stop running pipeline"
-        >
-          {halting ? <Loader2 className="size-2.5 animate-spin" /> : <Square className="size-2.5" />}
-          Stop
-        </button>
+        <Hint label="Stop running pipeline">
+          <button
+            type="button"
+            onClick={handleHalt}
+            disabled={halting}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-medium bg-surface3 hover:bg-status-danger/10 text-foreground-muted hover:text-status-danger transition-colors cursor-pointer border border-border/60"
+          >
+            {halting ? <Loader2 className="size-2.5 animate-spin" /> : <Square className="size-2.5" />}
+            Stop
+          </button>
+        </Hint>
       </div>
     </div>
   );

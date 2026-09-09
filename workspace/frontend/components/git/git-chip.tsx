@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useRef, useState } from 'react';
 import {
   GitBranch,
@@ -57,24 +58,26 @@ function FileRow({
       </span>
       <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
         {onViewDiff && (
-          <button
-            type="button"
-            onClick={() => onViewDiff(file.path)}
-            className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title="View Diff"
-          >
-            <FileDiff className="size-3" />
-          </button>
+          <Hint label="View Diff">
+            <button
+              type="button"
+              onClick={() => onViewDiff(file.path)}
+              className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <FileDiff className="size-3" />
+            </button>
+          </Hint>
         )}
         {onDiscard && !file.staged && (
-          <button
-            type="button"
-            onClick={() => onDiscard(file.path)}
-            className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors cursor-pointer"
-            title="Discard Changes"
-          >
-            <Undo2 className="size-3" />
-          </button>
+          <Hint label="Discard Changes">
+            <button
+              type="button"
+              onClick={() => onDiscard(file.path)}
+              className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Undo2 className="size-3" />
+            </button>
+          </Hint>
         )}
       </div>
     </div>
@@ -301,15 +304,16 @@ export function GitChip({
                 </span>
               )}
             </div>
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/50"
-              title="git fetch --prune, then re-read status"
-            >
-              <RefreshCw className={cn("size-2.5 text-muted-foreground", syncing && "animate-spin")} />
-              Sync
-            </button>
+            <Hint label="git fetch --prune, then re-read status">
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/50"
+              >
+                <RefreshCw className={cn("size-2.5 text-muted-foreground", syncing && "animate-spin")} />
+                Sync
+              </button>
+            </Hint>
           </div>
 
           {/* File list */}
@@ -386,24 +390,26 @@ export function GitChip({
                 the sync above runs, so hiding them on those counts would hide
                 the push you just made a commit for. */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={handlePull}
-                disabled={pulling || !channelId}
-                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
-                title="git pull --ff-only"
-              >
-                {pulling ? <Loader2 className="size-3 animate-spin" /> : <ArrowDownToLine className="size-3 text-foreground-muted" />}
-                Pull{status.behind > 0 ? ` (${status.behind})` : ''}
-              </button>
-              <button
-                onClick={handlePush}
-                disabled={pushing || !channelId}
-                className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
-                title="git push -u origin <current branch>"
-              >
-                {pushing ? <Loader2 className="size-3 animate-spin" /> : <ArrowUpFromLine className="size-3 text-foreground-muted" />}
-                Push{status.ahead > 0 ? ` (${status.ahead})` : ''}
-              </button>
+              <Hint label="git pull --ff-only">
+                <button
+                  onClick={handlePull}
+                  disabled={pulling || !channelId}
+                  className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                >
+                  {pulling ? <Loader2 className="size-3 animate-spin" /> : <ArrowDownToLine className="size-3 text-foreground-muted" />}
+                  Pull{status.behind > 0 ? ` (${status.behind})` : ''}
+                </button>
+              </Hint>
+              <Hint label="git push -u origin <current branch>">
+                <button
+                  onClick={handlePush}
+                  disabled={pushing || !channelId}
+                  className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                >
+                  {pushing ? <Loader2 className="size-3 animate-spin" /> : <ArrowUpFromLine className="size-3 text-foreground-muted" />}
+                  Push{status.ahead > 0 ? ` (${status.ahead})` : ''}
+                </button>
+              </Hint>
             </div>
           </div>
         </div>

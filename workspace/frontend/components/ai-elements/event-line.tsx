@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { useElapsedFrom } from '@/lib/use-elapsed';
@@ -344,18 +345,19 @@ export function EventLineAction({
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        'inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1 py-0.5',
-        'text-3xs text-foreground-extra-muted transition-colors',
-        'hover:bg-surface2 hover:text-foreground',
-        'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2'
-      )}
-    >
-      {children}
-    </button>
+    <Hint label={title}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1 py-0.5',
+          'text-3xs text-foreground-extra-muted transition-colors',
+          'hover:bg-surface2 hover:text-foreground',
+          'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2'
+        )}
+      >
+        {children}
+      </button>
+    </Hint>
   );
 }

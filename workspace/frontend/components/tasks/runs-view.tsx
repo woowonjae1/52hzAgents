@@ -1,3 +1,4 @@
+import { Hint } from '@/components/ui/hint';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   History,
@@ -109,15 +110,16 @@ export function RunsView() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void fetchRuns()}
-            className="h-8 w-8 p-0 bg-surface1/60 hover:bg-surface2"
-            title="Refresh runs"
-          >
-            <RefreshCw className={cn('size-3.5 text-foreground-muted', loading && 'animate-spin')} />
-          </Button>
+          <Hint label="Refresh runs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void fetchRuns()}
+              className="h-8 w-8 p-0 bg-surface1/60 hover:bg-surface2"
+            >
+              <RefreshCw className={cn('size-3.5 text-foreground-muted', loading && 'animate-spin')} />
+            </Button>
+          </Hint>
         </div>
       </div>
 
@@ -160,11 +162,11 @@ export function RunsView() {
                     {/* Status Icon */}
                     <div className="shrink-0 pt-0.5 sm:pt-0">
                       {isRunning ? (
-                        <Loader2 className="size-4 text-blue-400 animate-spin" />
+                        <Loader2 className="size-4 text-foreground-muted animate-spin" />
                       ) : isFailed ? (
-                        <AlertCircle className="size-4 text-red-400" />
+                        <AlertCircle className="size-4 text-status-danger" />
                       ) : (
-                        <CheckCircle2 className="size-4 text-emerald-400" />
+                        <CheckCircle2 className="size-4 text-status-success" />
                       )}
                     </div>
 
@@ -183,17 +185,17 @@ export function RunsView() {
                         </div>
 
                         {isRunning && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-3xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-3xs font-medium bg-surface2 text-foreground-muted border border-border">
                             Running
                           </span>
                         )}
                         {isCompleted && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-3xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-3xs font-medium bg-status-muted-success text-status-success border border-status-success/30">
                             Completed
                           </span>
                         )}
                         {isFailed && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-3xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-3xs font-medium bg-status-muted-danger text-status-danger border border-status-danger/30">
                             Failed
                           </span>
                         )}
@@ -228,16 +230,17 @@ export function RunsView() {
                       </div>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenThread(run.channelName)}
-                      className="h-7 px-2.5 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-foreground-muted hover:text-foreground"
-                      title="Open conversation thread"
-                    >
-                      <ExternalLink className="size-3" />
-                      <span>Thread</span>
-                    </Button>
+                    <Hint label="Open conversation thread">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenThread(run.channelName)}
+                        className="h-7 px-2.5 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-foreground-muted hover:text-foreground"
+                      >
+                        <ExternalLink className="size-3" />
+                        <span>Thread</span>
+                      </Button>
+                    </Hint>
                   </div>
                 </div>
               );

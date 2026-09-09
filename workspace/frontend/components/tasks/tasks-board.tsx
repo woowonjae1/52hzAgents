@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useState } from 'react';
 import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
 import { PrioritySelector } from './priority-selector';
@@ -147,14 +148,15 @@ export function TasksBoard({
                 {col.tasks.length}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={() => onQuickCreate(col.id)}
-              className="p-1 text-foreground-muted hover:text-foreground hover:bg-surface2 rounded-md transition-colors"
-              title={`Add task to ${col.title}`}
-            >
-              <Plus className="size-3.5" />
-            </button>
+            <Hint label={`Add task to ${col.title}`}>
+              <button
+                type="button"
+                onClick={() => onQuickCreate(col.id)}
+                className="p-1 text-foreground-muted hover:text-foreground hover:bg-surface2 rounded-md transition-colors"
+              >
+                <Plus className="size-3.5" />
+              </button>
+            </Hint>
           </div>
 
           {/* Cards List */}
@@ -172,9 +174,9 @@ export function TasksBoard({
                     key={task.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, task.id)}
-                    title={failureReason ? `失败/取消原因: ${failureReason}` : undefined}
+                    title={failureReason ? `Reason: ${failureReason}` : undefined}
                     className={cn(
-                      'group relative rounded-lg border border-border/70 bg-surface2/90 p-3 text-sm transition-all hover:border-border hover:shadow-xs cursor-grab active:cursor-grabbing',
+                      'group skip-offscreen-card relative rounded-lg border border-border/70 bg-surface2/90 p-3 text-sm transition-all hover:border-border hover:shadow-xs cursor-grab active:cursor-grabbing',
                       draggedTaskId === task.id && 'opacity-40 border-dashed border-primary/50'
                     )}
                   >
@@ -217,7 +219,7 @@ export function TasksBoard({
                     {failureReason && (
                       <div
                         className="mt-1.5 flex items-center gap-1 text-3xs text-destructive font-medium bg-destructive/10 border border-destructive/25 rounded px-1.5 py-0.5 cursor-help select-none"
-                        title={`失败/取消原因: ${failureReason}`}
+                        title={`Reason: ${failureReason}`}
                       >
                         <TriangleAlert className="size-2.5 shrink-0" />
                         <span className="truncate">{failureReason}</span>
@@ -232,7 +234,7 @@ export function TasksBoard({
                             className={cn(
                               'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border font-medium shrink-0',
                               overdue
-                                ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                                ? 'bg-status-muted-warning text-status-warning border-status-warning/30'
                                 : 'bg-surface3 text-foreground-muted border-border/60'
                             )}
                             title={`Due ${formatAbsolute(task.dueDate)}`}
@@ -268,7 +270,7 @@ export function TasksBoard({
                         </span>
                         {(task.routineId || task.timerId) && (
                           <span
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-3xs font-medium shrink-0"
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border text-3xs font-medium shrink-0"
                             title="Automated Routine Task"
                           >
                             <CalendarClock className="size-2.5 shrink-0" />
@@ -281,22 +283,24 @@ export function TasksBoard({
                           user authored, which left every agent- and
                           routine-created card read-only. */}
                       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(task)}
-                          className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="size-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(task)}
-                          className="p-1 rounded text-foreground-extra-muted hover:text-destructive hover:bg-surface3 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="size-3" />
-                        </button>
+                        <Hint label="Edit">
+                          <button
+                            type="button"
+                            onClick={() => onEdit(task)}
+                            className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
+                          >
+                            <Pencil className="size-3" />
+                          </button>
+                        </Hint>
+                        <Hint label="Delete">
+                          <button
+                            type="button"
+                            onClick={() => onDelete(task)}
+                            className="p-1 rounded text-foreground-extra-muted hover:text-destructive hover:bg-surface3 transition-colors"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </Hint>
                       </div>
                     </div>
                   </div>

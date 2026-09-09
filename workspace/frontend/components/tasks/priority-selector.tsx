@@ -20,7 +20,7 @@ export function UrgentPriorityIcon({ className }: { className?: string }) {
       height="14"
       viewBox="0 0 16 16"
       fill="currentColor"
-      className={cn('text-rose-500 shrink-0', className)}
+      className={cn('text-status-danger shrink-0', className)}
       aria-label="Urgent Priority"
     >
       <path d="M3 1C1.91067 1 1 1.91067 1 3V13C1 14.0893 1.91067 15 3 15H13C14.0893 15 15 14.0893 15 13V3C15 1.91067 14.0893 1 13 1H3ZM7 4L9 4L8.75391 8.99836H7.25L7 4ZM9 11C9 11.5523 8.55228 12 8 12C7.44772 12 7 11.5523 7 11C7 10.4477 7.44772 10 8 10C8.55228 10 9 10.4477 9 11Z" />
@@ -35,7 +35,7 @@ export function HighPriorityIcon({ className }: { className?: string }) {
       height="14"
       viewBox="0 0 16 16"
       fill="currentColor"
-      className={cn('text-amber-500 shrink-0', className)}
+      className={cn('text-foreground shrink-0', className)}
       aria-label="High Priority"
     >
       <rect x="2" y="10" width="3" height="4" rx="0.5" />
@@ -52,7 +52,7 @@ export function MediumPriorityIcon({ className }: { className?: string }) {
       height="14"
       viewBox="0 0 16 16"
       fill="currentColor"
-      className={cn('text-yellow-500 shrink-0', className)}
+      className={cn('text-foreground-muted shrink-0', className)}
       aria-label="Medium Priority"
     >
       <rect x="2" y="10" width="3" height="4" rx="0.5" />
@@ -69,7 +69,7 @@ export function LowPriorityIcon({ className }: { className?: string }) {
       height="14"
       viewBox="0 0 16 16"
       fill="currentColor"
-      className={cn('text-blue-400 shrink-0', className)}
+      className={cn('text-foreground-extra-muted shrink-0', className)}
       aria-label="Low Priority"
     >
       <rect x="2" y="10" width="3" height="4" rx="0.5" />
@@ -98,10 +98,10 @@ export function NoPriorityIcon({ className }: { className?: string }) {
 }
 
 export const PRIORITIES: PriorityOption[] = [
-  { id: 'urgent', name: 'Urgent', color: 'text-rose-500', icon: UrgentPriorityIcon },
-  { id: 'high', name: 'High', color: 'text-amber-500', icon: HighPriorityIcon },
-  { id: 'medium', name: 'Medium', color: 'text-yellow-500', icon: MediumPriorityIcon },
-  { id: 'low', name: 'Low', color: 'text-blue-400', icon: LowPriorityIcon },
+  { id: 'urgent', name: 'Urgent', color: 'text-status-danger', icon: UrgentPriorityIcon },
+  { id: 'high', name: 'High', color: 'text-foreground', icon: HighPriorityIcon },
+  { id: 'medium', name: 'Medium', color: 'text-foreground-muted', icon: MediumPriorityIcon },
+  { id: 'low', name: 'Low', color: 'text-foreground-extra-muted', icon: LowPriorityIcon },
   { id: 'none', name: 'No priority', color: 'text-foreground-extra-muted', icon: NoPriorityIcon },
 ];
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { memo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
@@ -320,22 +321,23 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
                         <span>Ready</span>
                       </span>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(agent.prompt);
-                        setCopiedId(agent.index ?? i);
-                        setTimeout(() => setCopiedId(null), 2000);
-                      }}
-                      className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
-                      title="Copy subagent prompt"
-                    >
-                      {copiedId === (agent.index ?? i) ? (
-                        <Check className="size-3 text-status-success" />
-                      ) : (
-                        <Copy className="size-3" />
-                      )}
-                    </button>
+                    <Hint label="Copy subagent prompt">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(agent.prompt);
+                          setCopiedId(agent.index ?? i);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+                      >
+                        {copiedId === (agent.index ?? i) ? (
+                          <Check className="size-3 text-status-success" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                      </button>
+                    </Hint>
                   </div>
                 </div>
 
@@ -505,7 +507,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
               }}
               title="Copy parameters"
             >
-              {copied ? <Check className="size-3 text-emerald-500" /> : <Copy className="size-3" />}
+              {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
             </EventLineAction>
           ) : undefined
         }
@@ -944,15 +946,16 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
               <ActivityIndicator
                 startTime={steps[0]?.createdAt ? new Date(steps[0].createdAt).getTime() : undefined}
               />
-              <button
-                type="button"
-                onClick={() => setActiveRightTab('trace')}
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
-                title="Open Trace Panel"
-              >
-                <Activity className="size-2.5" />
-                <span>Trace</span>
-              </button>
+              <Hint label="Open Trace Panel">
+                <button
+                  type="button"
+                  onClick={() => setActiveRightTab('trace')}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                >
+                  <Activity className="size-2.5" />
+                  <span>Trace</span>
+                </button>
+              </Hint>
             </div>
           )}
         </div>

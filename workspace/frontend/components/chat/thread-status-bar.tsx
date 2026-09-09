@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Circle, Loader2, Timer, MessageSquareMore, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -196,34 +197,36 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
         <div className="flex items-center gap-2.5">
           {(inProgressCount > 0 || pendingCount > 0) && (
             <span className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setTasksExpanded((prev) => !prev)}
-                className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer group"
-                title="Click to view all task details"
-              >
-                {inProgressCount > 0 && (
-                  <>
-                    <Loader2 className="size-3 text-foreground-muted animate-spin" />
-                    <span className="group-hover:underline">{inProgressCount} in progress</span>
-                  </>
-                )}
-                {inProgressCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
-                {pendingCount > 0 && (
-                  <>
-                    <Circle className="size-3" />
-                    <span className="group-hover:underline">{pendingCount} pending</span>
-                  </>
-                )}
-                {tasksExpanded ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
-              </button>
-              <button
-                onClick={handleCancelTodos}
-                className="ml-1 p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
-                title="Cancel all tasks"
-              >
-                <X className="size-3" />
-              </button>
+              <Hint label="Click to view all task details">
+                <button
+                  type="button"
+                  onClick={() => setTasksExpanded((prev) => !prev)}
+                  className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer group"
+                >
+                  {inProgressCount > 0 && (
+                    <>
+                      <Loader2 className="size-3 text-foreground-muted animate-spin" />
+                      <span className="group-hover:underline">{inProgressCount} in progress</span>
+                    </>
+                  )}
+                  {inProgressCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
+                  {pendingCount > 0 && (
+                    <>
+                      <Circle className="size-3" />
+                      <span className="group-hover:underline">{pendingCount} pending</span>
+                    </>
+                  )}
+                  {tasksExpanded ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
+                </button>
+              </Hint>
+              <Hint label="Cancel all tasks">
+                <button
+                  onClick={handleCancelTodos}
+                  className="ml-1 p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
+                >
+                  <X className="size-3" />
+                </button>
+              </Hint>
             </span>
           )}
           {activeTimers.map((t) => {
@@ -234,13 +237,14 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                 <Timer className="size-3 text-status-warning" />
                 <span>{msg.length > 30 ? msg.slice(0, 30) + '…' : msg}</span>
                 {firesAt ? <TimerCountdown firesAt={firesAt} /> : null}
-                <button
-                  onClick={() => handleCancelTimer(t.id)}
-                  className="p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
-                  title="Cancel timer"
-                >
-                  <X className="size-3" />
-                </button>
+                <Hint label="Cancel timer">
+                  <button
+                    onClick={() => handleCancelTimer(t.id)}
+                    className="p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Hint>
               </span>
             );
           })}
@@ -254,13 +258,14 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
           <span className="truncate">
             Queued: {q.content.length > 60 ? q.content.slice(0, 60) + '…' : q.content}
           </span>
-          <button
-            onClick={() => handleCancelQueued(q.queueId)}
-            className="shrink-0 p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
-            title="Cancel queued message"
-          >
-            <X className="size-3" />
-          </button>
+          <Hint label="Cancel queued message">
+            <button
+              onClick={() => handleCancelQueued(q.queueId)}
+              className="shrink-0 p-0.5 rounded hover:bg-surface3 dark:hover:bg-primary transition-colors"
+            >
+              <X className="size-3" />
+            </button>
+          </Hint>
         </div>
       ))}
     </div>

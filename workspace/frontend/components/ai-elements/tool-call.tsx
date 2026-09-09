@@ -1,5 +1,6 @@
 ﻿'use client';
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import {
   Wrench,
@@ -134,18 +135,19 @@ export function ToolCall({
             <div className="space-y-1">
               <div className="flex items-center justify-between text-3xs font-mono uppercase tracking-wider text-foreground-extra-muted">
                 <span>Request Parameters</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(requestStr);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="hover:text-foreground transition-colors p-0.5 rounded cursor-pointer"
-                  title="Copy request"
-                >
-                  {copied ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5" />}
-                </button>
+                <Hint label="Copy request">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(requestStr);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="hover:text-foreground transition-colors p-0.5 rounded cursor-pointer"
+                  >
+                    {copied ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5" />}
+                  </button>
+                </Hint>
               </div>
               <pre className="text-2xs font-mono p-2.5 rounded-lg bg-surface1 border border-border/60 text-foreground-muted overflow-x-auto whitespace-pre-wrap leading-relaxed max-h-48">
                 {requestStr}

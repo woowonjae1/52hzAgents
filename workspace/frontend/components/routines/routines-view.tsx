@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -54,13 +55,14 @@ export function RoutinesView() {
           )}
         </div>
         <div className="flex items-center gap-0.5">
-          <button
-            onClick={() => setShowCreateDialog(true)}
-            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
-            title="Create routine"
-          >
-            <Plus className="size-3.5" />
-          </button>
+          <Hint label="Create routine">
+            <button
+              onClick={() => setShowCreateDialog(true)}
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </Hint>
           <button
             onClick={refreshRoutines}
             className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
@@ -123,13 +125,14 @@ export function RoutinesView() {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleCancel(routine.id); }}
-                      className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
-                      title="Cancel routine"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <Hint label="Cancel routine">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleCancel(routine.id); }}
+                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </Hint>
                   </div>
                 </div>
               );

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import {
   Sheet,
   SheetBody,
@@ -79,13 +80,14 @@ export function MobileHeader() {
           </div>
 
           {/* Right: new thread button */}
-          <button
-            onClick={handleNewThread}
-            className="size-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"
-            title="New Channel"
-          >
-            <Plus className="size-4" />
-          </button>
+          <Hint label="New Channel">
+            <button
+              onClick={handleNewThread}
+              className="size-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"
+            >
+              <Plus className="size-4" />
+            </button>
+          </Hint>
         </div>
       </header>
 

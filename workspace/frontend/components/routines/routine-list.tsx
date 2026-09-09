@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, Trash2, Plus, ArrowLeft, History } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -65,15 +66,16 @@ export function RoutineList() {
       {/* Header with Back Navigation */}
       <div className="shrink-0 px-3 py-2.5 border-b border-border flex items-center justify-between bg-surface1/40">
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('threads')}
-            className="p-1 -ml-1 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
-            title="Back to chats"
-          >
-            <ArrowLeft className="size-3.5" />
-            <span className="text-xs font-medium">Back</span>
-          </button>
+          <Hint label="Back to chats">
+            <button
+              type="button"
+              onClick={() => setViewMode('threads')}
+              className="p-1 -ml-1 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <ArrowLeft className="size-3.5" />
+              <span className="text-xs font-medium">Back</span>
+            </button>
+          </Hint>
           <div className="h-3.5 w-px bg-border/60" />
           <CalendarClock className="size-3.5 text-status-merged" />
           <ScreenTitle>Scheduled tasks</ScreenTitle>
@@ -82,22 +84,24 @@ export function RoutineList() {
           )}
         </div>
         <div className="flex items-center gap-0.5">
-          <button
-            type="button"
-            onClick={() => setShowCreateDialog(true)}
-            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
-            title="Create a scheduled task"
-          >
-            <Plus className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={refreshRoutines}
-            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
-            title="Refresh"
-          >
-            <RefreshCw className="size-3.5" />
-          </button>
+          <Hint label="Create a scheduled task">
+            <button
+              type="button"
+              onClick={() => setShowCreateDialog(true)}
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </Hint>
+          <Hint label="Refresh">
+            <button
+              type="button"
+              onClick={refreshRoutines}
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          </Hint>
         </div>
       </div>
 
@@ -136,22 +140,24 @@ export function RoutineList() {
                     </div>
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setHistoryRoutine(routine); }}
-                      className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-merged transition-colors"
-                      title="查看历史记录"
-                    >
-                      <History className="size-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setDeletingRoutine(routine); }}
-                      className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors"
-                      title="删除任务"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
+                    <Hint label="Run history">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setHistoryRoutine(routine); }}
+                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-merged transition-colors"
+                      >
+                        <History className="size-3.5" />
+                      </button>
+                    </Hint>
+                    <Hint label="Delete schedule">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setDeletingRoutine(routine); }}
+                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </Hint>
                   </div>
                 </button>
               );
@@ -177,14 +183,14 @@ export function RoutineList() {
       <Dialog open={Boolean(deletingRoutine)} onOpenChange={(open) => !open && setDeletingRoutine(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>删除定时任务</DialogTitle>
+            <DialogTitle>Delete schedule</DialogTitle>
             <DialogDescription>
-              确定要删除定时任务「{deletingRoutine?.name}」吗？此操作将停止该任务的后续所有自动化触发。
+              Delete “{deletingRoutine?.name}”? Every future automated trigger for it stops.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="outline" size="sm" onClick={() => setDeletingRoutine(null)}>
-              取消
+              Cancel
             </Button>
             <Button
               variant="destructive"
@@ -196,7 +202,7 @@ export function RoutineList() {
                 }
               }}
             >
-              确认删除
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

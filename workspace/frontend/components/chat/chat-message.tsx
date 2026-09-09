@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown } from 'lucide-react';
@@ -130,27 +131,29 @@ function Attachments({ items }: { items: Attachment[] }) {
                 key={file.fileId}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs group"
               >
-                <button
-                  type="button"
-                  onClick={() => openPreview(file.fileId)}
-                  className="inline-flex items-center gap-2 cursor-pointer text-foreground hover:text-primary transition-colors"
-                  title="View in Files"
-                >
-                  {previewable ? (
-                    <Eye className="size-3.5 text-primary shrink-0" />
-                  ) : (
-                    <FileIcon className="size-3.5 text-muted-foreground shrink-0" />
-                  )}
-                  <span className="truncate max-w-[200px]">{file.filename}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDownload(file.url, file.filename)}
-                  className="size-5 rounded hover:bg-surface1 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
-                  title="Download file"
-                >
-                  <Download className="size-3" />
-                </button>
+                <Hint label="View in Files">
+                  <button
+                    type="button"
+                    onClick={() => openPreview(file.fileId)}
+                    className="inline-flex items-center gap-2 cursor-pointer text-foreground hover:text-primary transition-colors"
+                  >
+                    {previewable ? (
+                      <Eye className="size-3.5 text-primary shrink-0" />
+                    ) : (
+                      <FileIcon className="size-3.5 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="truncate max-w-[200px]">{file.filename}</span>
+                  </button>
+                </Hint>
+                <Hint label="Download file">
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(file.url, file.filename)}
+                    className="size-5 rounded hover:bg-surface1 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
+                  >
+                    <Download className="size-3" />
+                  </button>
+                </Hint>
               </div>
             );
           })}
@@ -475,18 +478,19 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
           </div>
 
           {/* Minimalist Hover Copy Button */}
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(message.content);
-              toast.success('Message copied');
-            }}
-            className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-start mt-1.5"
-            title="Copy message"
-            aria-label="Copy message"
-          >
-            <Copy className="size-3.5" />
-          </button>
+          <Hint label="Copy message">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(message.content);
+                toast.success('Message copied');
+              }}
+              className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-start mt-1.5"
+              aria-label="Copy message"
+            >
+              <Copy className="size-3.5" />
+            </button>
+          </Hint>
         </div>
       </div>
     );

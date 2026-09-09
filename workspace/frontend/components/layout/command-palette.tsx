@@ -91,13 +91,29 @@ export function CommandPalette() {
 
   // Build command list
   const allCommands: CommandItem[] = useMemo(() => {
+    /*
+     * EVERY ICON IN HERE IS `text-foreground-muted`. Do not tint them again.
+     *
+     * The palette used to hand each row its own hue — emerald Tasks, blue
+     * Mission Control, yellow Skills, amber Files, purple Knowledge, cyan
+     * Browser, rose Routines, orange Timers, indigo Inbox — thirteen colours
+     * down one column. None of them encoded anything: the destination is named
+     * in the title beside it, and the icon already distinguishes the rows by
+     * SHAPE. What the colours actually did was make a list the user scans by
+     * reading into a list the user has to look past.
+     *
+     * Four of them (`-400` steps with no light counterpart) were also authored
+     * against the dark theme only. And `text-primary`, on the three rows that
+     * used it, is not an accent at all in the light theme — `--primary` is
+     * #09090b there, the same near-black as the label next to it.
+     */
     const nav: CommandItem[] = [
       {
         id: 'nav-threads',
         category: 'Navigation',
         title: 'Threads & Conversations',
         subtitle: 'Switch to chat and multi-agent channels',
-        icon: <MessageSquare className="size-4 text-primary" />,
+        icon: <MessageSquare className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'T'],
         action: () => setViewMode('threads'),
       },
@@ -106,7 +122,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Tasks & Issues',
         subtitle: 'Linear-style task tracking and Kanban board',
-        icon: <CheckSquare className="size-4 text-emerald-500" />,
+        icon: <CheckSquare className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'A'],
         action: () => setViewMode('tasks'),
       },
@@ -115,7 +131,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Mission Control',
         subtitle: 'Agent radar and orchestration topology',
-        icon: <Compass className="size-4 text-blue-500" />,
+        icon: <Compass className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'M'],
         action: () => setViewMode('mission'),
       },
@@ -124,7 +140,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Skills & Capabilities',
         subtitle: 'Manage agent tools and capabilities',
-        icon: <Sparkles className="size-4 text-yellow-500" />,
+        icon: <Sparkles className="size-4 text-foreground-muted" />,
         action: () => setViewMode('skills'),
       },
       {
@@ -132,7 +148,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Files & Workspace Artifacts',
         subtitle: 'Browse files and diffs',
-        icon: <Folder className="size-4 text-amber-500" />,
+        icon: <Folder className="size-4 text-foreground-muted" />,
         action: () => setViewMode('files'),
       },
       {
@@ -140,7 +156,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Knowledge Base',
         subtitle: 'Manage workspace memories and documents',
-        icon: <BookOpen className="size-4 text-purple-500" />,
+        icon: <BookOpen className="size-4 text-foreground-muted" />,
         action: () => setViewMode('knowledge'),
       },
       {
@@ -148,7 +164,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Agent Browser',
         subtitle: 'Watch and control automated browser instances',
-        icon: <Globe className="size-4 text-cyan-500" />,
+        icon: <Globe className="size-4 text-foreground-muted" />,
         action: () => setViewMode('browser'),
       },
       {
@@ -156,7 +172,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Routines & Automation',
         subtitle: 'Scheduled and recurring cron tasks',
-        icon: <Repeat className="size-4 text-rose-500" />,
+        icon: <Repeat className="size-4 text-foreground-muted" />,
         action: () => setViewMode('routines'),
       },
       {
@@ -164,7 +180,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Timers & Reminders',
         subtitle: 'One-shot agent timers',
-        icon: <Timer className="size-4 text-orange-400" />,
+        icon: <Timer className="size-4 text-foreground-muted" />,
         action: () => setViewMode('timers'),
       },
       {
@@ -172,7 +188,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Inbox & Approvals',
         subtitle: 'Review agent notifications and approvals',
-        icon: <Inbox className="size-4 text-indigo-400" />,
+        icon: <Inbox className="size-4 text-foreground-muted" />,
         action: () => setViewMode('inbox'),
       },
       {
@@ -180,7 +196,7 @@ export function CommandPalette() {
         category: 'Navigation',
         title: 'Connect Agents',
         subtitle: 'Add CLI agents (Claude Code, OpenClaw, Pi, etc.)',
-        icon: <Radio className="size-4 text-emerald-400" />,
+        icon: <Radio className="size-4 text-foreground-muted" />,
         action: () => setViewMode('connect'),
       },
       {
@@ -200,7 +216,7 @@ export function CommandPalette() {
         category: 'Actions',
         title: 'New Thread',
         subtitle: 'Start a new multi-agent conversation',
-        icon: <Plus className="size-4 text-primary" />,
+        icon: <Plus className="size-4 text-foreground-muted" />,
         shortcut: ['C'],
         action: () => openNewThread(),
       },
@@ -209,7 +225,7 @@ export function CommandPalette() {
         category: 'Actions',
         title: 'Create Task',
         subtitle: 'Add a new deliverable to Tasks & Issues',
-        icon: <CheckSquare className="size-4 text-emerald-500" />,
+        icon: <CheckSquare className="size-4 text-foreground-muted" />,
         action: () => setViewMode('tasks'),
       },
       {
@@ -217,7 +233,7 @@ export function CommandPalette() {
         category: 'Actions',
         title: `Switch Theme to ${theme === 'dark' ? 'Light' : 'Dark'}`,
         subtitle: 'Toggle workspace appearance',
-        icon: theme === 'dark' ? <Sun className="size-4 text-yellow-400" /> : <Moon className="size-4 text-indigo-400" />,
+        icon: theme === 'dark' ? <Sun className="size-4 text-foreground-muted" /> : <Moon className="size-4 text-foreground-muted" />,
         action: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
       },
       {
@@ -242,7 +258,7 @@ export function CommandPalette() {
       category: 'Agents',
       title: `@${agent.agentName}`,
       subtitle: `${agent.status === 'online' ? '● Online' : '○ Offline'} — ${agent.description || 'AI Agent'}`,
-      icon: <Bot className="size-4 text-primary" />,
+      icon: <Bot className="size-4 text-foreground-muted" />,
       action: () => {
         openNewThread();
       },

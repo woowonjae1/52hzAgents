@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -133,13 +134,15 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
                 readOnly
                 className="text-xs font-mono"
               />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => copyUrl(workspaceUrl)}
-              >
-                {urlCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              </Button>
+              <Hint label={urlCopied ? 'Copied' : 'Copy workspace URL'}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyUrl(workspaceUrl)}
+                >
+                  {urlCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+              </Hint>
             </div>
           </div>
 
@@ -152,13 +155,15 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
                 readOnly
                 className="text-xs font-mono"
               />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => copyToken(workspace.workspaceId)}
-              >
-                {tokenCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
-              </Button>
+              <Hint label={tokenCopied ? 'Copied' : 'Copy workspace ID'}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => copyToken(workspace.workspaceId)}
+                >
+                  {tokenCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+              </Hint>
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useCallback } from 'react';
 import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight, Cpu, ChevronDown } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
@@ -276,13 +277,14 @@ export function AgentProfilePanel() {
       )}>
         {/* Close button */}
         <div className="flex items-center justify-end px-3 pt-3">
-          <button
-            onClick={() => setSelectedAgentName(null)}
-            className="size-7 flex items-center justify-center rounded-md hover:bg-surface3/60 dark:hover:bg-primary text-muted-foreground transition-colors"
-            title="Close"
-          >
-            <X className="size-4" />
-          </button>
+          <Hint label="Close">
+            <button
+              onClick={() => setSelectedAgentName(null)}
+              className="size-7 flex items-center justify-center rounded-md hover:bg-surface3/60 dark:hover:bg-primary text-muted-foreground transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </Hint>
         </div>
 
         {/* Profile header */}
@@ -310,17 +312,18 @@ export function AgentProfilePanel() {
           <div className="rounded-lg border overflow-hidden">
             <div className="px-3.5 py-2.5 flex items-center justify-between gap-2">
               <span className="text-xs font-medium">Description</span>
-              <button
-                onClick={handleGenerateDescription}
-                disabled={generatingDesc}
-                className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors shrink-0"
-                title="Auto-generate a description from this agent's activity and skills"
-              >
-                {generatingDesc
-                  ? <RefreshCw className="size-3 animate-spin" />
-                  : <Sparkles className="size-3 text-status-warning" />}
-                {generatingDesc ? 'Generating…' : 'Auto-generate'}
-              </button>
+              <Hint label="Auto-generate a description from this agent's activity and skills">
+                <button
+                  onClick={handleGenerateDescription}
+                  disabled={generatingDesc}
+                  className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors shrink-0"
+                >
+                  {generatingDesc
+                    ? <RefreshCw className="size-3 animate-spin" />
+                    : <Sparkles className="size-3 text-status-warning" />}
+                  {generatingDesc ? 'Generating…' : 'Auto-generate'}
+                </button>
+              </Hint>
             </div>
             <div className="p-3">
               <textarea
@@ -368,13 +371,14 @@ export function AgentProfilePanel() {
                       {item.value}
                     </span>
                     {item.copyable && (
-                      <button
-                        className="size-6 shrink-0 flex items-center justify-center rounded hover:bg-surface2 text-muted-foreground transition-colors mt-px"
-                        title={`Copy ${item.label}`}
-                        onClick={() => copyToClipboard(item.value)}
-                      >
-                        {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-                      </button>
+                      <Hint label={`Copy ${item.label}`}>
+                        <button
+                          className="size-6 shrink-0 flex items-center justify-center rounded hover:bg-surface2 text-muted-foreground transition-colors mt-px"
+                          onClick={() => copyToClipboard(item.value)}
+                        >
+                          {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                        </button>
+                      </Hint>
                     )}
                   </div>
                 </div>
@@ -392,19 +396,20 @@ export function AgentProfilePanel() {
                   <div className="text-3xs text-muted-foreground mt-0.5">Start and connect this agent when the app opens.</div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleToggleAutostart}
-                disabled={togglingAutostart}
-                className="text-primary hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
-                title={agent.autostart ? 'Click to turn off' : 'Click to turn on'}
-              >
-                {agent.autostart ? (
-                  <ToggleRight className="size-6 text-primary" />
-                ) : (
-                  <ToggleLeft className="size-6 text-foreground-muted" />
-                )}
-              </button>
+              <Hint label={agent.autostart ? 'Click to turn off' : 'Click to turn on'}>
+                <button
+                  type="button"
+                  onClick={handleToggleAutostart}
+                  disabled={togglingAutostart}
+                  className="text-primary hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  {agent.autostart ? (
+                    <ToggleRight className="size-6 text-primary" />
+                  ) : (
+                    <ToggleLeft className="size-6 text-foreground-muted" />
+                  )}
+                </button>
+              </Hint>
             </div>
           </div>
 
@@ -428,23 +433,24 @@ export function AgentProfilePanel() {
               <div className="pt-1">
                 <DropdownMenu onOpenChange={(open) => { if (!open) { setIsEnteringCustom(false); setCustomModelInput(''); } }}>
                   <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      disabled={switchingModel || !canConfigure}
-                      title={canConfigure ? undefined : offlineHint}
-                      className={cn(
-                        'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors',
-                        canConfigure
-                          ? 'bg-surface2/60 hover:bg-surface2 text-foreground cursor-pointer'
-                          : 'bg-surface2/30 text-muted-foreground/60 cursor-not-allowed',
-                        'disabled:opacity-50'
-                      )}
-                    >
-                      <span className="truncate">
-                        {availableModels.find((m) => m.id === currentModel)?.name || currentModel || 'Choose a model…'}
-                      </span>
-                      <ChevronDown className="size-3 text-muted-foreground ml-1 shrink-0" />
-                    </button>
+                    <Hint label={canConfigure ? undefined : offlineHint}>
+                      <button
+                        type="button"
+                        disabled={switchingModel || !canConfigure}
+                        className={cn(
+                          'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors',
+                          canConfigure
+                            ? 'bg-surface2/60 hover:bg-surface2 text-foreground cursor-pointer'
+                            : 'bg-surface2/30 text-muted-foreground/60 cursor-not-allowed',
+                          'disabled:opacity-50'
+                        )}
+                      >
+                        <span className="truncate">
+                          {availableModels.find((m) => m.id === currentModel)?.name || currentModel || 'Choose a model…'}
+                        </span>
+                        <ChevronDown className="size-3 text-muted-foreground ml-1 shrink-0" />
+                      </button>
+                    </Hint>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-72 sm:w-80 p-1 bg-surface1/95 backdrop-blur-xl max-h-[380px] overflow-y-auto">
                     {availableModels.map((m) => (
@@ -459,7 +465,7 @@ export function AgentProfilePanel() {
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className="truncate">{m.name}</span>
                           {(m.id.toLowerCase().includes('free') || m.name.toLowerCase().includes('free')) && (
-                            <span className="text-3xs px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-bold uppercase shrink-0">
+                            <span className="text-3xs px-1.5 py-0.2 rounded-full bg-status-muted-success text-status-success font-bold uppercase shrink-0">
                               Free
                             </span>
                           )}
@@ -602,9 +608,11 @@ export function AgentProfilePanel() {
             <div className="px-3.5 py-2.5 flex items-center gap-1.5">
               <Activity className="size-3 text-foreground-muted" />
               <span className="text-xs font-medium">Runtime & approvals</span>
-              <button onClick={() => void refreshDiagnostics()} className="ml-auto text-muted-foreground hover:text-foreground" title="Refresh diagnostics">
-                <RefreshCw className={cn('size-3', loadingDiagnostics && 'animate-spin')} />
-              </button>
+              <Hint label="Refresh diagnostics">
+                <button onClick={() => void refreshDiagnostics()} className="ml-auto text-muted-foreground hover:text-foreground">
+                  <RefreshCw className={cn('size-3', loadingDiagnostics && 'animate-spin')} />
+                </button>
+              </Hint>
             </div>
             <div className="divide-y">
               <div className="px-3.5 py-2.5 text-xs flex items-center justify-between gap-3">
@@ -729,14 +737,15 @@ export function AgentProfilePanel() {
               Start a Channel
             </button>
             {isCloud && (
-              <button
-                onClick={handleRemoveCloudAgent}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border-accent text-status-danger hover:bg-surface3 transition-colors"
-                title="Remove cloud agent"
-              >
-                <Trash2 className="size-3" />
-                Remove
-              </button>
+              <Hint label="Remove cloud agent">
+                <button
+                  onClick={handleRemoveCloudAgent}
+                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border-accent text-status-danger hover:bg-surface3 transition-colors"
+                >
+                  <Trash2 className="size-3" />
+                  Remove
+                </button>
+              </Hint>
             )}
           </div>
         </div>

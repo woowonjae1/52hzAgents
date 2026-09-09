@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/workspace-client';
@@ -36,13 +37,14 @@ function CodeBlock({ code, className = '' }: { code: string; className?: string 
       <pre className="bg-primary text-primary-foreground rounded-lg px-4 py-3 text-sm font-mono leading-relaxed overflow-x-auto">
         <code>{code}</code>
       </pre>
-      <button
-        className="absolute top-2 right-2 size-7 flex items-center justify-center rounded-md bg-primary/80 hover:bg-primary text-foreground-extra-muted hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-        title="Copy"
-        onClick={() => copyToClipboard(code)}
-      >
-        {isCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      </button>
+      <Hint label="Copy">
+        <button
+          className="absolute top-2 right-2 size-7 flex items-center justify-center rounded-md bg-primary/80 hover:bg-primary text-foreground-extra-muted hover:text-white opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+          onClick={() => copyToClipboard(code)}
+        >
+          {isCopied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        </button>
+      </Hint>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useMemo } from 'react';
 import { X, Copy, Check, ExternalLink, Loader2, Terminal, Cloud, Trash2, MessageSquare, Image as ImageIcon, Volume2, Key, ChevronRight } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
@@ -233,13 +234,14 @@ export function ConnectAgentView() {
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 shrink-0">
         <h2 className="text-2xs font-medium text-foreground-muted">Connect Agents</h2>
-        <button
-          onClick={() => setViewMode('threads')}
-          className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
-          title="Close"
-        >
-          <X className="size-4" />
-        </button>
+        <Hint label="Close">
+          <button
+            onClick={() => setViewMode('threads')}
+            className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
+          >
+            <X className="size-4" />
+          </button>
+        </Hint>
       </div>
 
       {/* Tab bar — Paseo segmented control on surface1, replacing the two
@@ -748,13 +750,14 @@ function CloudAgentsTab({
                   <div className="text-3xs font-mono text-foreground-extra-muted mt-0.5">{agent.model}</div>
                 </div>
                 <span className="text-3xs text-foreground-extra-muted font-mono pr-2">{apiKey}</span>
-                <button
-                  onClick={() => onRemove(name)}
-                  className="size-6 flex items-center justify-center rounded-lg hover:bg-status-danger/10 text-foreground-extra-muted hover:text-status-danger transition-colors"
-                  title="Remove"
-                >
-                  <Trash2 className="size-3.5" />
-                </button>
+                <Hint label="Remove">
+                  <button
+                    onClick={() => onRemove(name)}
+                    className="size-6 flex items-center justify-center rounded-lg hover:bg-status-danger/10 text-foreground-extra-muted hover:text-status-danger transition-colors"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </Hint>
               </div>
             );
           })}

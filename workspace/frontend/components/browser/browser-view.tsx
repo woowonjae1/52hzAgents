@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useRef, useState } from 'react';
 import { Globe, X, RefreshCw, Users, ChevronLeft, Lock, Unlock, Maximize2, Minimize2 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -290,51 +291,56 @@ export function BrowserView() {
         </span>
 
         {tab.contextId ? (
-          <button
-            onClick={handleUnpersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-status-success hover:bg-surface2 hover:text-status-warning transition-colors shrink-0"
-            title="Remove persistent state — revert to temporal tab"
-          >
-            <Lock className="size-3" />
-            {browserContexts.find((c) => c.id === tab.contextId)?.name || 'persistent'}
-          </button>
+          <Hint label="Remove persistent state — revert to temporal tab">
+            <button
+              onClick={handleUnpersist}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-status-success hover:bg-surface2 hover:text-status-warning transition-colors shrink-0"
+            >
+              <Lock className="size-3" />
+              {browserContexts.find((c) => c.id === tab.contextId)?.name || 'persistent'}
+            </button>
+          </Hint>
         ) : (
-          <button
-            onClick={handlePersist}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-muted-foreground hover:bg-surface2 hover:text-status-success transition-colors shrink-0"
-            title="Make persistent — preserve login state for agents to reuse"
-          >
-            <Lock className="size-3" />
-            Make Persistent
-          </button>
+          <Hint label="Make persistent — preserve login state for agents to reuse">
+            <button
+              onClick={handlePersist}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-muted-foreground hover:bg-surface2 hover:text-status-success transition-colors shrink-0"
+            >
+              <Lock className="size-3" />
+              Make Persistent
+            </button>
+          </Hint>
         )}
 
-        <button
-          onClick={handleReconnect}
-          disabled={reconnecting}
-          className="p-1 rounded hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
-          title="Reconnect — create a new browser session"
-        >
-          <RefreshCw className={cn("size-4", reconnecting && "animate-spin")} />
-        </button>
+        <Hint label="Reconnect — create a new browser session">
+          <button
+            onClick={handleReconnect}
+            disabled={reconnecting}
+            className="p-1 rounded hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
+          >
+            <RefreshCw className={cn("size-4", reconnecting && "animate-spin")} />
+          </button>
+        </Hint>
 
         {!isMobile && (
-          <button
-            onClick={toggleDetailExpanded}
-            className="p-1 rounded hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
-            title={isDetailExpanded ? 'Restore size' : 'Expand to full page'}
-          >
-            {isDetailExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </button>
+          <Hint label={isDetailExpanded ? 'Restore size' : 'Expand to full page'}>
+            <button
+              onClick={toggleDetailExpanded}
+              className="p-1 rounded hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
+            >
+              {isDetailExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </button>
+          </Hint>
         )}
 
-        <button
-          onClick={handleClose}
-          className="p-1 rounded hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
-          title="Close tab"
-        >
-          <X className="size-4" />
-        </button>
+        <Hint label="Close tab">
+          <button
+            onClick={handleClose}
+            className="p-1 rounded hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors shrink-0"
+          >
+            <X className="size-4" />
+          </button>
+        </Hint>
       </div>
 
       {/* Browser view area */}

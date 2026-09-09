@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   X,
@@ -200,40 +201,44 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
 
         {/* Action icons & Aligned Close Button */}
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-            title="Copy content"
-          >
-            {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
-          </button>
-          <button
-            type="button"
-            onClick={handleDownload}
-            className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-            title="Download document"
-          >
-            <Download className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsFullscreen((prev) => !prev)}
-            className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-          >
-            {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-          </button>
+          <Hint label="Copy content">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+            >
+              {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
+            </button>
+          </Hint>
+          <Hint label="Download document">
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+            >
+              <Download className="size-3.5" />
+            </button>
+          </Hint>
+          <Hint label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+            >
+              {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            </button>
+          </Hint>
 
           {/* Symmetrical, Aligned Close Button */}
-          <button
-            type="button"
-            onClick={closeCanvas}
-            className="size-7 rounded-lg border border-border/50 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-            title="Close Canvas (Esc)"
-          >
-            <PanelRightClose className="size-3.5" />
-          </button>
+          <Hint label="Close Canvas (Esc)">
+            <button
+              type="button"
+              onClick={closeCanvas}
+              className="size-7 rounded-lg border border-border/50 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+            >
+              <PanelRightClose className="size-3.5" />
+            </button>
+          </Hint>
         </div>
       </div>
 

@@ -60,7 +60,7 @@ export function SubagentList({
         </div>
 
         {isAllComplete && (
-          <span className="inline-flex items-center gap-1 text-3xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+          <span className="inline-flex items-center gap-1 text-3xs font-medium text-status-success bg-status-muted-success px-2 py-0.5 rounded-full">
             <Check className="size-2.5" />
             <span>All done</span>
           </span>
@@ -128,7 +128,7 @@ export function SubagentList({
                         <span>Running</span>
                       </span>
                     ) : isDone ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="text-status-success font-medium">
                         Complete
                       </span>
                     ) : (

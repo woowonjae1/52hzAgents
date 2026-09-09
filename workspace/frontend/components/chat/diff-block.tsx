@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -103,9 +104,11 @@ export function DiffBlock({ code }: DiffBlockProps) {
         <div className="ml-auto flex items-center gap-2 shrink-0">
           {adds > 0 && <span className="text-3xs font-medium text-status-success tabular-nums">+{adds}</span>}
           {dels > 0 && <span className="text-3xs font-medium text-status-danger tabular-nums">−{dels}</span>}
-          <button onClick={copy} className="text-foreground-muted hover:text-foreground-extra-muted transition-colors" title="Copy diff">
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          </button>
+          <Hint label="Copy diff">
+            <button onClick={copy} className="text-foreground-muted hover:text-foreground-extra-muted transition-colors">
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            </button>
+          </Hint>
         </div>
       </div>
 

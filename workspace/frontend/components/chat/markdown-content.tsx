@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import { memo, type ReactNode, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
@@ -327,19 +328,20 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
       if (isInternalFile) {
         return (
-          <button
-            type="button"
-            onClick={() => {
-              const a = document.createElement('a');
-              a.href = href!;
-              a.download = '';
-              a.click();
-            }}
-            title={href}
-            className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
-          >
-            {children}
-          </button>
+          <Hint label={href}>
+            <button
+              type="button"
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = href!;
+                a.download = '';
+                a.click();
+              }}
+              className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
+            >
+              {children}
+            </button>
+          </Hint>
         );
       }
 
@@ -399,14 +401,15 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         };
 
         return (
-          <button
-            type="button"
-            onClick={() => void openLocal()}
-            title={href}
-            className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
-          >
-            {children}
-          </button>
+          <Hint label={href}>
+            <button
+              type="button"
+              onClick={() => void openLocal()}
+              className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
+            >
+              {children}
+            </button>
+          </Hint>
         );
       }
 

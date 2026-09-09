@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import {
   ArrowUp,
@@ -14,6 +15,7 @@ import {
   Crown,
   Waypoints,
   ChevronDown,
+  ChevronRight,
   FileEdit,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -678,7 +680,12 @@ export function PromptComposer({
                 <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto py-0.5 flex-1">
                   {activePipelineSegments.map((seg, idx) => (
                     <React.Fragment key={idx}>
-                      {idx > 0 && <span className="text-primary/60 font-bold shrink-0">➔</span>}
+                      {idx > 0 && (
+                        <ChevronRight
+                          className="size-3 shrink-0 text-foreground-extra-muted"
+                          aria-hidden
+                        />
+                      )}
                       <div
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground max-w-[220px]"
                         title={seg.instruction ? `@${seg.agent}: ${seg.instruction}` : `@${seg.agent}`}
@@ -737,47 +744,50 @@ export function PromptComposer({
 
             <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0" />
 
-            <button
-              type="button"
-              onClick={() => {
-                setMentionTrigger('@');
-                setShowMentions((prev) => !prev);
-                textareaRef.current?.focus();
-              }}
-              className={cn(
-                pillButton,
-                showMentions && 'bg-surface3 text-foreground font-medium border border-border/70'
-              )}
-              title="Mention an agent (@)"
-            >
-              <AtSign className="size-3.5 shrink-0 text-foreground-extra-muted" />
-              <span className="hidden sm:inline">Agent</span>
-            </button>
-
-            {onCreateRoutine && (
+            <Hint label="Mention an agent (@)">
               <button
                 type="button"
-                onClick={onCreateRoutine}
-                className={pillButton}
-                title="Create a scheduled task"
+                onClick={() => {
+                  setMentionTrigger('@');
+                  setShowMentions((prev) => !prev);
+                  textareaRef.current?.focus();
+                }}
+                className={cn(
+                  pillButton,
+                  showMentions && 'bg-surface3 text-foreground font-medium border border-border/70'
+                )}
               >
-                <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                <span className="hidden md:inline">Schedule</span>
+                <AtSign className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                <span className="hidden sm:inline">Agent</span>
               </button>
+            </Hint>
+
+            {onCreateRoutine && (
+              <Hint label="Create a scheduled task">
+                <button
+                  type="button"
+                  onClick={onCreateRoutine}
+                  className={pillButton}
+                >
+                  <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                  <span className="hidden md:inline">Schedule</span>
+                </button>
+              </Hint>
             )}
 
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                pillButton,
-                'size-7 px-0 justify-center',
-                pendingFiles.length > 0 && 'bg-surface3 text-foreground font-medium border border-border/70'
-              )}
-              title="Attach files or images"
-            >
-              <Paperclip className="size-3.5 shrink-0 text-foreground-extra-muted" />
-            </button>
+            <Hint label="Attach files or images">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  pillButton,
+                  'size-7 px-0 justify-center',
+                  pendingFiles.length > 0 && 'bg-surface3 text-foreground font-medium border border-border/70'
+                )}
+              >
+                <Paperclip className="size-3.5 shrink-0 text-foreground-extra-muted" />
+              </button>
+            </Hint>
             <input
               ref={fileInputRef}
               type="file"
@@ -806,29 +816,30 @@ export function PromptComposer({
               )}
             </AnimatePresence>
 
-            <button
-              type="button"
-              onClick={isWorking ? onStop : handleSend}
-              disabled={isWorking ? stopping : !canSend}
-              className={cn(
-                'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                'transition-all duration-150 cursor-pointer select-none',
-                isWorking
-                  ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-xs'
-                  : canSend
-                  ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs active:scale-95'
-                  : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/30'
-              )}
-              title={isWorking ? 'Stop response' : 'Send message (Enter)'}
-            >
-              <AnimatePresence mode="wait" initial={false}>
-                {isWorking ? (
-                  <Square className="size-3 fill-current" />
-                ) : (
-                  <ArrowUp className="size-4" />
+            <Hint label={isWorking ? 'Stop response' : 'Send message (Enter)'}>
+              <button
+                type="button"
+                onClick={isWorking ? onStop : handleSend}
+                disabled={isWorking ? stopping : !canSend}
+                className={cn(
+                  'relative flex items-center justify-center size-8 rounded-full shrink-0',
+                  'transition-all duration-150 cursor-pointer select-none',
+                  isWorking
+                    ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-xs'
+                    : canSend
+                    ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs active:scale-95'
+                    : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/30'
                 )}
-              </AnimatePresence>
-            </button>
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {isWorking ? (
+                    <Square className="size-3 fill-current" />
+                  ) : (
+                    <ArrowUp className="size-4" />
+                  )}
+                </AnimatePresence>
+              </button>
+            </Hint>
           </div>
         </div>
       </div>

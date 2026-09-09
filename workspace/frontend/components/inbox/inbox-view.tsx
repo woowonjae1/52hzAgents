@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight } from 'lucide-react';
@@ -97,16 +98,17 @@ function NotificationCard({
           )}
         </div>
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDismiss(notification.id);
-        }}
-        className="p-1 rounded-md hover:bg-surface3 dark:hover:bg-primary text-muted-foreground transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-        title="Dismiss"
-      >
-        <X className="size-3" />
-      </button>
+      <Hint label="Dismiss">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDismiss(notification.id);
+          }}
+          className="p-1 rounded-md hover:bg-surface3 dark:hover:bg-primary text-muted-foreground transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+        >
+          <X className="size-3" />
+        </button>
+      </Hint>
     </div>
   );
 }
@@ -215,21 +217,23 @@ export function InboxView() {
         </div>
         <div className="flex items-center gap-0.5">
           {unreadNotificationCount > 0 && (
-            <button
-              onClick={markAllNotificationsRead}
-              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
-              title="Mark all as read"
-            >
-              <CheckCheck className="size-3.5" />
-            </button>
+            <Hint label="Mark all as read">
+              <button
+                onClick={markAllNotificationsRead}
+                className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
+              >
+                <CheckCheck className="size-3.5" />
+              </button>
+            </Hint>
           )}
-          <button
-            onClick={refreshNotifications}
-            className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
-            title="Refresh"
-          >
-            <RefreshCw className="size-3.5" />
-          </button>
+          <Hint label="Refresh">
+            <button
+              onClick={refreshNotifications}
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
+            >
+              <RefreshCw className="size-3.5" />
+            </button>
+          </Hint>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import { Gauge, RefreshCw, Zap, Clock, Calendar, Sparkles, AlertCircle, FileText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -166,55 +167,56 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
       }}
     >
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
-            'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
-            isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
-            className
-          )}
-          title={`View ${agentLabel} usage and refresh state`}
-        >
-          <span className="relative flex size-2 shrink-0 items-center justify-center">
-            <span
-              className={cn(
-                'absolute inline-flex size-full rounded-full opacity-0',
-                isUnparsed
-                  ? 'bg-status-warning'
-                  : sessionPercent >= 85
-                  ? 'bg-status-danger'
-                  : sessionPercent >= 60
-                  ? 'bg-status-warning'
-                  : 'bg-status-success'
-              )}
-            />
-            <span
-              className={cn(
-                'relative inline-flex size-1.5 rounded-full',
-                isUnparsed
-                  ? 'bg-status-warning'
-                  : sessionPercent >= 85
-                  ? 'bg-status-danger'
-                  : sessionPercent >= 60
-                  ? 'bg-status-warning'
-                  : 'bg-status-success'
-              )}
-            />
-          </span>
-          <span className="text-foreground-muted font-normal">5h</span>
-          <span
+        <Hint label={`View ${agentLabel} usage and refresh state`}>
+          <button
+            type="button"
             className={cn(
-              'font-semibold tabular-nums',
-              isUnparsed ? 'text-status-warning' : sessionPercent >= 85 ? 'text-status-danger' : sessionPercent >= 60 ? 'text-status-warning' : 'text-foreground'
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
+              'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
+              isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
+              className
             )}
           >
-            {sessionPercent}%
-          </span>
-          <span className="text-foreground-extra-muted">·</span>
-          <span className="text-foreground-muted font-normal">Week</span>
-          <span className="font-semibold tabular-nums text-foreground">{weekPercent}%</span>
-        </button>
+            <span className="relative flex size-2 shrink-0 items-center justify-center">
+              <span
+                className={cn(
+                  'absolute inline-flex size-full rounded-full opacity-0',
+                  isUnparsed
+                    ? 'bg-status-warning'
+                    : sessionPercent >= 85
+                    ? 'bg-status-danger'
+                    : sessionPercent >= 60
+                    ? 'bg-status-warning'
+                    : 'bg-status-success'
+                )}
+              />
+              <span
+                className={cn(
+                  'relative inline-flex size-1.5 rounded-full',
+                  isUnparsed
+                    ? 'bg-status-warning'
+                    : sessionPercent >= 85
+                    ? 'bg-status-danger'
+                    : sessionPercent >= 60
+                    ? 'bg-status-warning'
+                    : 'bg-status-success'
+                )}
+              />
+            </span>
+            <span className="text-foreground-muted font-normal">5h</span>
+            <span
+              className={cn(
+                'font-semibold tabular-nums',
+                isUnparsed ? 'text-status-warning' : sessionPercent >= 85 ? 'text-status-danger' : sessionPercent >= 60 ? 'text-status-warning' : 'text-foreground'
+              )}
+            >
+              {sessionPercent}%
+            </span>
+            <span className="text-foreground-extra-muted">·</span>
+            <span className="text-foreground-muted font-normal">Week</span>
+            <span className="font-semibold tabular-nums text-foreground">{weekPercent}%</span>
+          </button>
+        </Hint>
       </PopoverTrigger>
 
       <PopoverContent align="start" className="w-88 p-4 space-y-4 shadow-xl border-border/80 bg-surface1/95 backdrop-blur-xl">
@@ -239,17 +241,18 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               </p>
             </div>
           </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              fetchUsage();
-            }}
-            disabled={loading}
-            className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50"
-            title="Refresh usage"
-          >
-            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
-          </button>
+          <Hint label="Refresh usage">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                fetchUsage();
+              }}
+              disabled={loading}
+              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
+            </button>
+          </Hint>
         </div>
 
         {/* Agent 切换器：有多个可展示用量的 Agent 时出现，离线项保留但不可选 */}
@@ -258,34 +261,34 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
             {quotaAgents.map((a) => {
               const active = a.name === selected.name;
               return (
-                <button
-                  key={a.name}
-                  type="button"
-                  disabled={!a.online}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setManualAgent(a.name);
-                    fetchUsage(a.name);
-                  }}
-                  className={cn(
-                    'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium transition-colors truncate border',
-                    active
-                      ? 'bg-surface1 text-foreground border-border/60 shadow-2xs'
-                      : 'text-foreground-muted hover:text-foreground border-transparent',
-                    !a.online && 'opacity-40 cursor-not-allowed hover:text-foreground-muted'
-                  )}
-                  title={a.online ? `View ${a.name} usage` : `${a.name} is offline — usage shows once it connects`}
-                >
-                  <span className="inline-flex items-center gap-1 max-w-full">
-                    <span
-                      className={cn(
-                        'size-1.5 rounded-full shrink-0',
-                        a.online ? 'bg-status-success' : 'bg-foreground-extra-muted'
-                      )}
-                    />
-                    <span className="truncate">{a.name}</span>
-                  </span>
-                </button>
+                <Hint key={a.name} label={a.online ? `View ${a.name} usage` : `${a.name} is offline — usage shows once it connects`}>
+                  <button
+                    type="button"
+                    disabled={!a.online}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setManualAgent(a.name);
+                      fetchUsage(a.name);
+                    }}
+                    className={cn(
+                      'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium transition-colors truncate border',
+                      active
+                        ? 'bg-surface1 text-foreground border-border/60 shadow-2xs'
+                        : 'text-foreground-muted hover:text-foreground border-transparent',
+                      !a.online && 'opacity-40 cursor-not-allowed hover:text-foreground-muted'
+                    )}
+                  >
+                    <span className="inline-flex items-center gap-1 max-w-full">
+                      <span
+                        className={cn(
+                          'size-1.5 rounded-full shrink-0',
+                          a.online ? 'bg-status-success' : 'bg-foreground-extra-muted'
+                        )}
+                      />
+                      <span className="truncate">{a.name}</span>
+                    </span>
+                  </button>
+                </Hint>
               );
             })}
           </div>
