@@ -186,9 +186,9 @@ NEXT_PUBLIC_API_URL=https://your-endpoint npm run dev
 
 ### Deploy Frontend to Vercel / Insforge
 
-The frontend uses `output: 'standalone'` in `next.config.mjs` for Docker deployments.
-When deploying to Vercel or Insforge, remove that setting before deploying so the
-platform can handle the build natively:
+The frontend sets `output: 'export'` in `next.config.mjs` (static export into `out/`,
+`trailingSlash: true`, unoptimized images). When deploying to Vercel or Insforge,
+remove that setting so the platform can handle the build natively:
 
 ```js
 // next.config.mjs — for Vercel/Insforge deployment

@@ -12,7 +12,11 @@
 
 </div>
 
-<!-- TODO: 放一张主界面截图和一段 /rfc 议事的 GIF,替换掉这两行注释。 -->
+<div align="center">
+<img src="assets/mission-control.png" alt="Mission control — 一键接入的 Agent 名册" width="900">
+</div>
+
+<!-- TODO: 再补一张频道对话截图和一段 /rfc 议事的 GIF。 -->
 
 ---
 
