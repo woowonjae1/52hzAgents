@@ -6,8 +6,25 @@ import { X } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
+/*
+ * THE FLOATING-SURFACE RECIPE — the same four classes in dialog, sheet,
+ * dropdown, popover and tooltip:
+ *
+ *   border border-border  bg-surface-overlay/95  backdrop-blur-xl  shadow-xl
+ *
+ * What was here instead: a hardcoded `dark:bg-[#131317]/95`, a hand-rolled
+ * `dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_50px_-12px_rgba(0,0,0,0.8)]`,
+ * and a `dark:border-white/10`. All three were reinventing something that
+ * already exists: `--surface-overlay` is the ground, `--elevation-5` (reached
+ * through `shadow-xl`) is the lift, and dark `--border` IS `rgb(255 255 255 /
+ * 0.08)` — the override restated the token it was overriding.
+ *
+ * `border-border` at full strength rather than `/80`: an overlay is the one
+ * surface that sits over arbitrary content, so its edge cannot be as quiet as a
+ * card's.
+ */
 const dialogContentVariants = cva(
-  'flex flex-col fixed outline-0 z-50 border border-border/80 dark:border-white/10 bg-surface1/95 dark:bg-[#131317]/95 backdrop-blur-2xl p-6 shadow-2xl dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_50px_-12px_rgba(0,0,0,0.8)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-2xl',
+  'flex flex-col fixed outline-0 z-50 border border-border bg-surface-overlay/95 backdrop-blur-xl p-6 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-2xl',
   {
     variants: {
       variant: {

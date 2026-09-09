@@ -73,7 +73,7 @@ function DropdownMenuSubContent({
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
       className={cn(
-        'space-y-0.5 z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border/80 dark:border-white/10 bg-surface1/95 dark:bg-[#15151b]/95 backdrop-blur-xl p-1.5 text-foreground shadow-2xl dark:shadow-[0_12px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+        'space-y-0.5 z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-surface-overlay/95 backdrop-blur-xl p-1.5 text-foreground shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
         className,
       )}
       {...props}
@@ -92,7 +92,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          'space-y-0.5 z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border/80 dark:border-white/10 bg-surface1/95 dark:bg-[#15151b]/95 backdrop-blur-xl p-1.5 text-foreground shadow-2xl dark:shadow-[0_12px_32px_rgba(0,0,0,0.6),0_0_0_1px_rgba(255,255,255,0.08)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+          'space-y-0.5 z-50 min-w-[8rem] overflow-hidden rounded-xl border border-border bg-surface-overlay/95 backdrop-blur-xl p-1.5 text-foreground shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
           className,
         )}
         {...props}
@@ -145,7 +145,7 @@ function DropdownMenuCheckboxItem({
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       className={cn(
-        'relative flex cursor-default select-none items-center rounded-md py-1.5 ps-8 pe-2 text-sm outline-hidden transition-colors focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+        'text-foreground relative flex cursor-default select-none items-center rounded-lg py-2 ps-8 pe-3 text-[13.5px] font-medium outline-hidden transition-colors focus:bg-surface2 dark:focus:bg-white/10 data-[active=true]:bg-surface2 dark:data-[active=true]:bg-white/10 data-disabled:pointer-events-none data-disabled:opacity-50',
         className,
       )}
       checked={checked}
@@ -170,7 +170,7 @@ function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       className={cn(
-        'relative flex cursor-default select-none items-center rounded-md py-1.5 ps-6 pe-2 text-sm outline-hidden transition-colors focus:bg-accent focus:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50',
+        'text-foreground relative flex cursor-default select-none items-center rounded-lg py-2 ps-6 pe-3 text-[13.5px] font-medium outline-hidden transition-colors focus:bg-surface2 dark:focus:bg-white/10 data-[active=true]:bg-surface2 dark:data-[active=true]:bg-white/10 data-disabled:pointer-events-none data-disabled:opacity-50',
         className,
       )}
       {...props}

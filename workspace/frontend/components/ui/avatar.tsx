@@ -12,7 +12,7 @@ const avatarStatusVariants = cva(
       variant: {
         online: 'bg-status-success',
         offline: 'bg-foreground-extra-muted',
-        busy: 'bg-yellow-600',
+        busy: 'bg-status-warning',
         away: 'bg-surface2',
       },
     },

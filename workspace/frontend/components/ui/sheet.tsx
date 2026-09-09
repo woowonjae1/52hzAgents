@@ -45,7 +45,8 @@ function SheetOverlay({
 }
 
 const sheetVariants = cva(
-  'flex flex-col items-strech fixed z-50 gap-4 bg-surface1/95 dark:bg-[#131317]/95 backdrop-blur-2xl border-border/80 dark:border-white/10 p-6 shadow-2xl transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400',
+  // The floating-surface recipe — see the note in dialog.tsx.
+  'flex flex-col items-strech fixed z-50 gap-4 bg-surface-overlay/95 backdrop-blur-xl border-border p-6 shadow-xl transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400',
   {
     variants: {
       side: {

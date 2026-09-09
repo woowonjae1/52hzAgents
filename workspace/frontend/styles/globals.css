@@ -28,6 +28,22 @@
   --surface-sidebar: #f4f4f6;
   --surface-sidebar-hover: #eaecef;
   --surface-workspace: #fafafa;
+  /*
+   * THE ONE GROUND FOR ANYTHING THAT FLOATS — dialog, sheet, dropdown, popover,
+   * tooltip, toast.
+   *
+   * Those six had each hardcoded their own near-black for the dark theme:
+   * #131317, #15151b, #16161c, #141419 and #1c1c22, five different values
+   * expressing one concept, and none of them reachable from a token. Worse,
+   * three were written WITHOUT a `dark:` prefix, so the toast and the tooltip
+   * were dark-on-light in the light theme.
+   *
+   * A floating layer needs to read as lifted off the page, which in the light
+   * theme means brighter than `--surface1` (the page) and in the dark theme
+   * means a step up from `--surface0`. That is not the same value in both, so it
+   * is a token, not a constant.
+   */
+  --surface-overlay: #ffffff;
 
   /* Text */
   --foreground: #09090b;
@@ -160,6 +176,8 @@
   --surface-sidebar: #0d0d10;
   --surface-sidebar-hover: #17171e;
   --surface-workspace: #09090b;
+  /* The value the five hardcoded overlay hexes were all groping for. */
+  --surface-overlay: #16161c;
 
   /* Text */
   --foreground: #f4f4f6;
@@ -284,6 +302,7 @@
   --color-surface-sidebar: var(--surface-sidebar);
   --color-surface-sidebar-hover: var(--surface-sidebar-hover);
   --color-surface-workspace: var(--surface-workspace);
+  --color-surface-overlay: var(--surface-overlay);
 
   /** Paseo — text tiers **/
   --color-foreground-muted: var(--foreground-muted);
@@ -1206,4 +1225,42 @@ nextjs-portal,
 .signal-mark--still .sm-pod { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .signal-mark .sm-pod { animation: none; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   OFF-SCREEN ROWS THE BROWSER IS ALLOWED TO SKIP.
+
+   Four views render every row they have: the task list and Kanban board, the
+   knowledge list and the skills grid. Only the transcript and the thread list
+   are virtualised (`@tanstack/react-virtual`), and the honest reason the other
+   four are not is that virtualisation is the wrong tool for them:
+
+     - It breaks find-in-page. A knowledge base whose entries cannot be found
+       with Ctrl+F has lost more than the render cost it saved.
+     - The task list is grouped and collapsible and the board is drag-and-drop,
+       so both would need a flattened index and a measurement cache — a lot of
+       new state for a list that is realistically tens to low hundreds of rows.
+
+   `content-visibility: auto` gets most of the win with none of that: the
+   browser skips layout, paint and style work for rows outside the viewport,
+   the DOM stays whole, and Chromium still searches and reveals skipped content
+   (this ships in Electron, so support is not in question).
+
+   `contain-intrinsic-size` IS REQUIRED. Without it a skipped row measures 0
+   and the scrollbar collapses to nothing, then thrashes as rows enter view.
+   The value is a PLACEHOLDER height, so it wants to be the typical row — not
+   the smallest, or the scroll position jumps as real heights replace guesses.
+
+   Do not put this on a row that is animating in: `content-visibility` creates
+   a containment context, and a row whose transform is mid-flight when the
+   browser decides to skip it stops mid-flight.
+   ────────────────────────────────────────────────────────────────────────── */
+@utility skip-offscreen-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
+}
+
+@utility skip-offscreen-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 132px;
 }
