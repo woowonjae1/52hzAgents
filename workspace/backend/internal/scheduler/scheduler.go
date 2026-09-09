@@ -40,6 +40,7 @@ func StartScheduler() {
 				expirePendingApprovals()
 				expireStalePipelineSteps()
 				expireStaleCouncilSessions()
+				expireStaleRoutineRuns()
 				fireDueTimers()   // 执行到期 Timers 触发扫描。
 				fireDueRoutines() // 执行到期 Routines 触发扫描。
 
@@ -467,3 +468,119 @@ func expireStaleCouncilSessions() {
 		}
 	}
 }
+
+// expireStaleRoutineRuns 扫描并回收超时的 Routine 运行实例与僵尸 Timer 任务。
+func expireStaleRoutineRuns() {
+	if db.DB == nil {
+		return
+	}
+	now := time.Now().UTC()
+
+	// 1. 回收运行中的 Routine 运行记录 (RoutineRunRecord)
+	var runningRuns []models.RoutineRunRecord
+	if err := db.DB.Where("status = ?", "running").Find(&runningRuns).Error; err == nil && len(runningRuns) > 0 {
+		for _, run := range runningRuns {
+			isTimeout := run.StartedAt.Before(now.Add(-15 * time.Minute))
+
+			// 检测对应智能体是否离线（提供 2 分钟宽限期）
+			agentOffline := false
+			if run.StartedAt.Before(now.Add(-2 * time.Minute)) {
+				var member models.WorkspaceMember
+				if err := db.DB.Where("workspace_id = ? AND agent_name = ?", run.WorkspaceID, run.AgentName).First(&member).Error; err == nil {
+					if member.Status == "offline" {
+						agentOffline = true
+					}
+				} else {
+					agentOffline = true
+				}
+			}
+
+			if isTimeout || agentOffline {
+				failReason := "执行超时 (15分钟无响应)"
+				if agentOffline {
+					failReason = fmt.Sprintf("智能体 @%s 处于离线状态或异常退出", run.AgentName)
+				}
+
+				// 将运行记录标记为 failed 并记录错误
+				db.DB.Model(&models.RoutineRunRecord{}).Where("id = ? AND status = ?", run.ID, "running").Updates(map[string]interface{}{
+					"status":       "failed",
+					"error":        &failReason,
+					"completed_at": &now,
+				})
+
+				// 将 Routine 本身的最后运行状态同步为 failed
+				db.DB.Model(&models.RoutineRecord{}).Where("id = ?", run.RoutineID).Updates(map[string]interface{}{
+					"last_run_status": "failed",
+					"last_run_error":  &failReason,
+				})
+
+				// 将关联的看板待办 (TodoRecord) 置为 cancelled 并持久化错误原因
+				db.DB.Model(&models.TodoRecord{}).Where("run_id = ? AND status = ?", run.ID, "in_progress").Updates(map[string]interface{}{
+					"status":       "cancelled",
+					"error":        &failReason,
+					"completed_at": &now,
+					"updated_at":   now,
+				})
+
+				// 广播 Routine 失败事件与看板更新事件
+				_ = handlers.PublishWorkspaceStateEvent(run.WorkspaceID, "workspace.routine.failed", "system:routine", run.ChannelName, map[string]interface{}{
+					"run_id":       run.ID,
+					"routine_id":   run.RoutineID,
+					"routine_name": run.RoutineName,
+					"channel_name": run.ChannelName,
+					"status":       "failed",
+					"error":        failReason,
+				})
+				_ = handlers.PublishWorkspaceStateEvent(run.WorkspaceID, "workspace.todos.updated", "system:routine", run.ChannelName, map[string]interface{}{
+					"run_id": run.ID,
+					"status": "cancelled",
+					"error":  failReason,
+				})
+
+				log.Printf("Routine run %s marked failed: %s", run.ID, failReason)
+			}
+		}
+	}
+
+	// 2. 回收处于 in_progress 的僵尸一次性定时器待办 (TodoRecord with timer_id)
+	var staleTimerTodos []models.TodoRecord
+	if err := db.DB.Where("timer_id IS NOT NULL AND status = ?", "in_progress").Find(&staleTimerTodos).Error; err == nil && len(staleTimerTodos) > 0 {
+		for _, todo := range staleTimerTodos {
+			isTimeout := todo.UpdatedAt.Before(now.Add(-15 * time.Minute))
+			agentOffline := false
+			if todo.UpdatedAt.Before(now.Add(-2 * time.Minute)) {
+				var member models.WorkspaceMember
+				if err := db.DB.Where("workspace_id = ? AND agent_name = ?", todo.WorkspaceID, todo.Assignee).First(&member).Error; err == nil {
+					if member.Status == "offline" {
+						agentOffline = true
+					}
+				} else {
+					agentOffline = true
+				}
+			}
+
+			if isTimeout || agentOffline {
+				failReason := "定时任务执行超时"
+				if agentOffline {
+					failReason = fmt.Sprintf("智能体 @%s 处于离线状态", todo.Assignee)
+				}
+
+				db.DB.Model(&models.TodoRecord{}).Where("id = ? AND status = ?", todo.ID, "in_progress").Updates(map[string]interface{}{
+					"status":       "cancelled",
+					"error":        &failReason,
+					"completed_at": &now,
+					"updated_at":   now,
+				})
+
+				_ = handlers.PublishWorkspaceStateEvent(todo.WorkspaceID, "workspace.todos.updated", "system:timer", todo.ChannelName, map[string]interface{}{
+					"todo_id": todo.ID,
+					"status":  "cancelled",
+					"error":   failReason,
+				})
+
+				log.Printf("Timer todo %s marked cancelled due to: %s", todo.ID, failReason)
+			}
+		}
+	}
+}
+

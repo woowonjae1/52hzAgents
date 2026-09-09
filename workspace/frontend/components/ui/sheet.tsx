@@ -36,7 +36,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-black/30 [backdrop-filter:blur(4px)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        'fixed inset-0 z-50 bg-black/60 [backdrop-filter:blur(6px)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200',
         className,
       )}
       {...props}
@@ -45,7 +45,7 @@ function SheetOverlay({
 }
 
 const sheetVariants = cva(
-  'flex flex-col items-strech fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400',
+  'flex flex-col items-strech fixed z-50 gap-4 bg-surface1/95 dark:bg-[#131317]/95 backdrop-blur-2xl border-border/80 dark:border-white/10 p-6 shadow-2xl transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-400',
   {
     variants: {
       side: {
@@ -54,7 +54,7 @@ const sheetVariants = cva(
           'inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         left: 'inset-y-0 start-0 h-full w-3/4 border-e data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm rtl:data-[state=closed]:slide-out-to-right rtl:data-[state=open]:slide-in-from-right',
         right:
-          'inset-y-0 end-0 h-full w-3/4  border-s data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm rtl:data-[state=closed]:slide-out-to-left rtl:data-[state=open]:slide-in-from-left',
+          'inset-y-0 end-0 h-full w-3/4 border-s data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm rtl:data-[state=closed]:slide-out-to-left rtl:data-[state=open]:slide-in-from-left',
       },
     },
     defaultVariants: {
@@ -89,7 +89,7 @@ function SheetContent({
         {close && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="cursor-pointer absolute end-5 top-4 rounded-sm opacity-60 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary"
+            className="cursor-pointer absolute end-4 top-4 rounded-full p-1.5 opacity-60 ring-offset-background transition-all hover:opacity-100 hover:bg-surface3/80 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary"
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
@@ -143,7 +143,7 @@ function SheetTitle({
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn('text-base font-semibold text-foreground', className)}
+      className={cn('text-[17px] sm:text-lg font-semibold text-foreground', className)}
       {...props}
     />
   );
@@ -156,7 +156,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-[13.5px] text-muted-foreground leading-relaxed mt-1', className)}
       {...props}
     />
   );

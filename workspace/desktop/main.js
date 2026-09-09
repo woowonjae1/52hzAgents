@@ -342,11 +342,24 @@ function subscribeWorkspaceEvents(baseUrl) {
               // 4. Routine completed
               if (event.type === 'workspace.routine.completed') {
                 const routine = payload.routine || {};
-                const name = routine.name || '周期性计划任务';
-                const channel = routine.channel_name || targetChannel;
+                const name = payload.routine_name || routine.name || '周期性计划任务';
+                const channel = payload.channel_name || routine.channel_name || targetChannel;
                 showDesktopNotification({
                   title: `✅ 周期任务已完成: ${name}`,
                   body: `产出已发布至 #${channel} 频道`,
+                  channel,
+                });
+              }
+
+              // 5. Routine failed
+              if (event.type === 'workspace.routine.failed') {
+                const routine = payload.routine || {};
+                const name = payload.routine_name || routine.name || '周期性计划任务';
+                const errMsg = payload.error || '执行异常或超时中断';
+                const channel = payload.channel_name || routine.channel_name || targetChannel;
+                showDesktopNotification({
+                  title: `❌ 周期任务执行失败: ${name}`,
+                  body: errMsg,
                   channel,
                 });
               }

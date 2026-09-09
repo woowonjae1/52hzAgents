@@ -615,6 +615,12 @@ func TriggerRoutineNow(c *gin.Context) {
 		return
 	}
 
+	var member models.WorkspaceMember
+	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, record.CreatedBy).First(&member).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("智能体 @%s 不是该工作区成员", record.CreatedBy)})
+		return
+	}
+
 	if err := ExecuteRoutineTrigger(&record, true); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -852,6 +858,30 @@ func DeleteRoutine(c *gin.Context) {
 		return
 	}
 	record.Status = "cancelled"
+
+	// 同步清理取消当前 Routine 下仍处于 running / in_progress 的在途运行与待办
+	cancelledAt := time.Now().UTC()
+	cancelReason := "周期任务已被用户删除取消"
+	db.DB.Model(&models.RoutineRunRecord{}).
+		Where("routine_id = ? AND status = ?", record.ID, "running").
+		Updates(map[string]interface{}{
+			"status":       "failed",
+			"error":        &cancelReason,
+			"completed_at": &cancelledAt,
+		})
+	db.DB.Model(&models.TodoRecord{}).
+		Where("routine_id = ? AND status = ?", record.ID, "in_progress").
+		Updates(map[string]interface{}{
+			"status":       "cancelled",
+			"error":        &cancelReason,
+			"completed_at": &cancelledAt,
+			"updated_at":   cancelledAt,
+		})
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.todos.updated", record.CreatedBy, record.ChannelName, gin.H{
+		"routine_id": record.ID,
+		"status":     "cancelled",
+	})
+
 	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.routine.cancelled", record.CreatedBy, record.ChannelName, gin.H{"routine": record}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish routine update"})
 		return
@@ -940,9 +970,14 @@ func CompleteRoutineRunIfApplicable(workspaceID string, target string, source st
 		}
 
 		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.routine.completed", source, run.ChannelName, gin.H{
-			"run_id":     run.ID,
-			"routine_id": run.RoutineID,
-			"status":     "completed",
+			"run_id":       run.ID,
+			"routine_id":   run.RoutineID,
+			"routine_name": run.RoutineName,
+			"routine": gin.H{
+				"id":   run.RoutineID,
+				"name": run.RoutineName,
+			},
+			"status": "completed",
 		})
 		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.todos.updated", source, run.ChannelName, gin.H{
 			"run_id": run.ID,
@@ -950,4 +985,71 @@ func CompleteRoutineRunIfApplicable(workspaceID string, target string, source st
 		})
 	}
 }
+
+// StopActiveRoutineRunsAndTasks 在用户主动停止智能体或会话时，将关联的进行中 Routine 和待办置为已停止/取消。
+func StopActiveRoutineRunsAndTasks(workspaceID, agentName, channelName string) {
+	if db.DB == nil {
+		return
+	}
+	now := time.Now().UTC()
+	stopReason := "用户手动停止了执行"
+
+	// 1. 查找并取消处于 running 状态的 RoutineRunRecord
+	runQuery := db.DB.Model(&models.RoutineRunRecord{}).Where("workspace_id = ? AND status = ?", workspaceID, "running")
+	if agentName != "" {
+		runQuery = runQuery.Where("agent_name = ?", agentName)
+	}
+	if channelName != "" {
+		runQuery = runQuery.Where("channel_name = ?", channelName)
+	}
+	var affectedRuns []models.RoutineRunRecord
+	runQuery.Find(&affectedRuns)
+
+	for _, run := range affectedRuns {
+		db.DB.Model(&models.RoutineRunRecord{}).Where("id = ?", run.ID).Updates(map[string]interface{}{
+			"status":       "failed",
+			"error":        &stopReason,
+			"completed_at": &now,
+		})
+		db.DB.Model(&models.RoutineRecord{}).Where("id = ?", run.RoutineID).Updates(map[string]interface{}{
+			"last_run_status": "failed",
+			"last_run_error":  &stopReason,
+		})
+		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.routine.failed", "system:user_stop", run.ChannelName, gin.H{
+			"run_id":       run.ID,
+			"routine_id":   run.RoutineID,
+			"routine_name": run.RoutineName,
+			"channel_name": run.ChannelName,
+			"status":       "failed",
+			"error":        stopReason,
+		})
+	}
+
+	// 2. 查找并取消处于 in_progress 状态的 TodoRecord
+	todoQuery := db.DB.Model(&models.TodoRecord{}).Where("workspace_id = ? AND status = ?", workspaceID, "in_progress")
+	if agentName != "" {
+		todoQuery = todoQuery.Where("assignee = ?", agentName)
+	}
+	if channelName != "" {
+		todoQuery = todoQuery.Where("channel_name = ?", channelName)
+	}
+	var affectedTodos []models.TodoRecord
+	todoQuery.Find(&affectedTodos)
+
+	for _, todo := range affectedTodos {
+		db.DB.Model(&models.TodoRecord{}).Where("id = ?", todo.ID).Updates(map[string]interface{}{
+			"status":       "cancelled",
+			"error":        &stopReason,
+			"completed_at": &now,
+			"updated_at":   now,
+		})
+		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.todos.updated", "system:user_stop", todo.ChannelName, gin.H{
+			"todo_id": todo.ID,
+			"run_id":  todo.RunID,
+			"status":  "cancelled",
+			"error":   stopReason,
+		})
+	}
+}
+
 

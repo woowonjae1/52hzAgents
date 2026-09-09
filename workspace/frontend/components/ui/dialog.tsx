@@ -7,7 +7,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 import { cn } from '@/lib/utils';
 
 const dialogContentVariants = cva(
-  'flex flex-col fixed outline-0 z-50 border border-border bg-background p-6 shadow-lg shadow-black/5 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg',
+  'flex flex-col fixed outline-0 z-50 border border-border/80 dark:border-white/10 bg-surface1/95 dark:bg-[#131317]/95 backdrop-blur-2xl p-6 shadow-2xl dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_50px_-12px_rgba(0,0,0,0.8)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-2xl',
   {
     variants: {
       variant: {
@@ -54,7 +54,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'fixed inset-0 z-50 bg-black/30 [backdrop-filter:blur(4px)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        'fixed inset-0 z-50 bg-black/60 [backdrop-filter:blur(6px)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 duration-200',
         className,
       )}
       {...props}
@@ -84,7 +84,7 @@ function DialogContent({
       >
         {children}
         {showCloseButton && (
-          <DialogClose className="cursor-pointer outline-0 absolute end-5 top-5 rounded-sm opacity-60 ring-offset-background transition-opacity hover:opacity-100 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <DialogClose className="cursor-pointer outline-0 absolute end-4 top-4 rounded-full p-1.5 opacity-60 ring-offset-background transition-all hover:opacity-100 hover:bg-surface3/80 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
             <X className="size-4" />
             <span className="sr-only">Close</span>
           </DialogClose>
@@ -132,7 +132,7 @@ function DialogTitle({
     <DialogPrimitive.Title
       data-slot="dialog-title"
       className={cn(
-        'text-lg font-semibold leading-none tracking-tight',
+        'text-[17px] sm:text-lg font-semibold leading-snug tracking-normal text-foreground',
         className,
       )}
       {...props}
@@ -154,7 +154,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn('text-sm text-muted-foreground', className)}
+      className={cn('text-[13.5px] text-muted-foreground leading-relaxed mt-1.5', className)}
       {...props}
     />
   );

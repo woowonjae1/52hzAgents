@@ -330,6 +330,7 @@ func HaltChannelPipeline(c *gin.Context) {
 	var channel models.Channel
 	if err := db.DB.Where("id = ?", channelID).First(&channel).Error; err == nil {
 		RelayPipelineAlert(workspace.ID, "channel/"+channel.Name, "Pipeline execution was stopped by user.")
+		StopActiveRoutineRunsAndTasks(workspace.ID, "", channel.Name)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "halted", "finished_at": nowMs})

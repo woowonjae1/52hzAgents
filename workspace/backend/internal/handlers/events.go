@@ -272,6 +272,18 @@ func SendEvent(c *gin.Context) {
 		CompleteRoutineRunIfApplicable(workspace.ID, req.Target, req.Source)
 	}
 
+	// Intercept workspace.agent.control stop to cancel in-flight routine runs and tasks
+	if req.Type == "workspace.agent.control" {
+		if action, ok := req.Payload["action"].(string); ok && action == "stop" {
+			agentName := agentNameFromSource(req.Target)
+			channelName := ""
+			if ch, ok := req.Payload["channel"].(string); ok {
+				channelName = strings.TrimPrefix(ch, "channel/")
+			}
+			StopActiveRoutineRunsAndTasks(workspace.ID, agentName, channelName)
+		}
+	}
+
 	// Intercept explicit /rfc command from human to initiate a council blackboard session
 	if isHumanSource(req.Source) && messageType(req.Payload) == "chat" {
 		if content, ok := req.Payload["content"].(string); ok {
@@ -579,6 +591,17 @@ func StreamEventsWS(c *gin.Context) {
 		if isAgentSource(parsedReq.Source) && messageType(parsedReq.Payload) == "chat" {
 			CheckAndTriggerNextPipelineStep(workspace.ID, parsedReq.Target, parsedReq.Source)
 			CompleteRoutineRunIfApplicable(workspace.ID, parsedReq.Target, parsedReq.Source)
+		}
+
+		if parsedReq.Type == "workspace.agent.control" {
+			if action, ok := parsedReq.Payload["action"].(string); ok && action == "stop" {
+				agentName := agentNameFromSource(parsedReq.Target)
+				channelName := ""
+				if ch, ok := parsedReq.Payload["channel"].(string); ok {
+					channelName = strings.TrimPrefix(ch, "channel/")
+				}
+				StopActiveRoutineRunsAndTasks(workspace.ID, agentName, channelName)
+			}
 		}
 
 		sendAck(gin.H{

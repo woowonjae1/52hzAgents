@@ -27,6 +27,9 @@ func setupTestDB(t *testing.T) {
 		&models.EventRecord{},
 		&models.CouncilSession{},
 		&models.SpeechActRecord{},
+		&models.RoutineRecord{},
+		&models.RoutineRunRecord{},
+		&models.TodoRecord{},
 	)
 	if err != nil {
 		t.Fatalf("failed to auto migrate: %v", err)
@@ -229,4 +232,101 @@ func TestExpireStaleCouncilSessions(t *testing.T) {
 		t.Fatalf("expected alert event from system:council, got error: %v", err)
 	}
 }
+
+func TestExpireStaleRoutineRuns(t *testing.T) {
+	setupTestDB(t)
+
+	wsID := uuid.NewString()
+	rtnID := uuid.NewString()
+	runID := uuid.NewString()
+	todoID := uuid.NewString()
+
+	// Routine created and running
+	rtn := models.RoutineRecord{
+		ID:            rtnID,
+		ShortID:       "RTN-001",
+		WorkspaceID:   wsID,
+		ChannelName:   "routines:coder",
+		CreatedBy:     "coder",
+		Name:          "Nightly Check",
+		Message:       "Run test",
+		NextFiresAt:   time.Now().Add(1 * time.Hour),
+		LastRunID:     &runID,
+		LastRunStatus: "running",
+		Status:        "active",
+	}
+	db.DB.Create(&rtn)
+
+	// Run started 20 minutes ago (exceeds 15m timeout)
+	run := models.RoutineRunRecord{
+		ID:             runID,
+		RoutineID:      rtnID,
+		RoutineShortID: "RTN-001",
+		WorkspaceID:    wsID,
+		RunNumber:      1,
+		ChannelName:    "routines:coder",
+		AgentName:      "coder",
+		RoutineName:    "Nightly Check",
+		TriggerMessage: "Run test",
+		Status:         "running",
+		StartedAt:      time.Now().Add(-20 * time.Minute),
+	}
+	db.DB.Create(&run)
+
+	// Linked in_progress todo
+	todo := models.TodoRecord{
+		ID:          todoID,
+		WorkspaceID: wsID,
+		ChannelName: "routines:coder",
+		CreatedBy:   "system:routine",
+		Assignee:    "coder",
+		Content:     "⏰ [Nightly Check] Run test (Run #1)",
+		Status:      "in_progress",
+		RoutineID:   &rtnID,
+		RunID:       &runID,
+		CreatedAt:   time.Now().Add(-20 * time.Minute),
+		UpdatedAt:   time.Now().Add(-20 * time.Minute),
+	}
+	db.DB.Create(&todo)
+
+	// Run sweeper
+	expireStaleRoutineRuns()
+
+	// 1. Verify RoutineRunRecord marked failed with error
+	var freshRun models.RoutineRunRecord
+	if err := db.DB.Where("id = ?", runID).First(&freshRun).Error; err != nil {
+		t.Fatalf("run not found: %v", err)
+	}
+	if freshRun.Status != "failed" {
+		t.Fatalf("expected run status to be failed, got %s", freshRun.Status)
+	}
+	if freshRun.Error == nil || *freshRun.Error == "" {
+		t.Fatalf("expected run error to be populated")
+	}
+
+	// 2. Verify RoutineRecord last_run_status is failed
+	var freshRtn models.RoutineRecord
+	if err := db.DB.Where("id = ?", rtnID).First(&freshRtn).Error; err != nil {
+		t.Fatalf("routine not found: %v", err)
+	}
+	if freshRtn.LastRunStatus != "failed" {
+		t.Fatalf("expected routine last_run_status to be failed, got %s", freshRtn.LastRunStatus)
+	}
+	if freshRtn.LastRunError == nil || *freshRtn.LastRunError == "" {
+		t.Fatalf("expected routine last_run_error to be populated")
+	}
+
+	// 3. Verify TodoRecord status is cancelled and error is set
+	var freshTodo models.TodoRecord
+	if err := db.DB.Where("id = ?", todoID).First(&freshTodo).Error; err != nil {
+		t.Fatalf("todo not found: %v", err)
+	}
+	if freshTodo.Status != "cancelled" {
+		t.Fatalf("expected todo status to be cancelled, got %s", freshTodo.Status)
+	}
+	if freshTodo.Error == nil || *freshTodo.Error == "" {
+		t.Fatalf("expected todo error to be populated")
+	}
+}
+
 
