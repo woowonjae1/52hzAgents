@@ -13,10 +13,12 @@
 </div>
 
 <div align="center">
-<img src="assets/mission-control.png" alt="Mission control — 一键接入的 Agent 名册" width="900">
+  <img src="assets/mission-control.png" alt="Mission control — 一键接入的 Agent 名册" width="900">
+  <p align="center"><em>Mission Control — 统一纳管 Claude Code、Codex、Cursor 等本地与远程 Agent</em></p>
+  <br>
+  <img src="assets/channel-chat.png" alt="协作频道 — 多 Agent 协同与上下文共享" width="900">
+  <p align="center"><em>协作频道 — 人与多个 Agent 共享同一条消息流、终端输出与代码改动</em></p>
 </div>
-
-<!-- TODO: 再补一张频道对话截图和一段 /rfc 议事的 GIF。 -->
 
 ---
 
@@ -39,6 +41,11 @@
 ## 能做什么
 
 **一起议事。** 在频道里发 `/rfc <主题>`,几个 Agent 会真的吵起来。提案、质询、辩护、支持、结论都作为结构化条目落库成一块「黑板」,而不是散在聊天记录里。系统会强制拉一个**不同类型**的 Agent 当质询者——不让两个同型 Agent 互相点头。
+
+<div align="center">
+  <img src="assets/rfc-deliberation.gif" alt="/rfc 多 Agent 议事与共识收敛演示" width="880">
+  <p align="center"><em>/rfc 议事全过程 — Claude 提案、Codex 质询、Cursor 支持、Supervisor 总结共识</em></p>
+</div>
 
 **接力干活。** 一条任务链可以在多个 Agent 之间传递,每一步的产出被提炼成结构化交付物交给下一棒,而不是把上一段聊天原样贴过去。跑歪了随时暂停、恢复或中止。
 
