@@ -34,12 +34,29 @@ interface ActivityTimelineProps {
   className?: string;
 }
 
+/*
+ * ALSO STRIPS LEADING EMOJI, because in this feed they come from the SERVER.
+ *
+ * The frontend's own emoji were removed, but the Council Supervisor's messages
+ * arrive already decorated -- a warning sign before "[Council Alert] Challenger
+ * Timeout", a classical-building glyph before "Council Session Initiated" --
+ * so the activity feed was the one surface still showing them, and the fix
+ * cannot live at a call site the frontend controls.
+ *
+ * Only a LEADING run is removed, and only pictographs. An emoji inside a
+ * sentence is content a person or an agent wrote on purpose; a badge glued to
+ * the front of a status line is the sender styling our UI for us.
+ */
+const LEADING_EMOJI =
+  /^(?:[\u{1F300}-\u{1FAFF}\u{1F900}-\u{1F9FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}]|\uFE0F|\u200D)+\s*/u;
+
 function stripMarkdown(text: string): string {
   return text
     .replace(/```[\s\S]*?```/g, '[code block]')
     .replace(/\*\*/g, '')
     .replace(/`{1,3}/g, '')
     .replace(/\n+/g, ' ')
+    .replace(LEADING_EMOJI, '')
     .trim();
 }
 
@@ -197,7 +214,7 @@ export function ActivityTimeline({
       </div>
 
       {/* Timeline Stream */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-3 space-y-2.5">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-3 divide-y divide-border/40">
         {loading && events.length === 0 ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -210,12 +227,32 @@ export function ActivityTimeline({
             <span className="text-xs">No activity yet</span>
           </div>
         ) : (
+          /* One hairline between rows, in place of a box around each. */
           groupedTimeline.map((group) => {
             return (
               <div
                 key={group.key}
                 onClick={() => onOpenThread(group.channelId)}
-                className="group p-2.5 rounded-xl bg-surface1/60 hover:bg-surface2/80 border border-border/20 hover:border-border/50 transition-all cursor-pointer shadow-2xs space-y-1.5"
+                /*
+                  A FEED ROW IS A ROW, NOT A CARD.
+
+                  This was `rounded-xl` + `bg-surface1/60` + `border
+                  border-border/20` + `shadow-2xs` on EVERY entry, so a
+                  chronological list of six things rendered as six stacked
+                  bordered boxes -- which is most of what "too many dividers"
+                  means on this screen. A border, a fill and a shadow are three
+                  simultaneous answers to one question ("where does this item
+                  end?"), and stacked vertically they read as six unrelated
+                  panels rather than one stream in time order.
+
+                  The same decision is already written down in `EventLine`: a
+                  fill alone is enough separation, and adding a border is what
+                  turns a chip into a card. Here even the resting fill goes --
+                  the rows are separated by their own rhythm (`divide-y` on the
+                  list, one hairline instead of four sides), and the fill
+                  arrives on hover to say "this one is clickable".
+                */
+                className="group px-3.5 py-2.5 hover:bg-surface2/60 transition-colors cursor-pointer space-y-1.5"
               >
                 {/* Group Sender Header */}
                 <div className="flex items-center justify-between gap-1 text-2xs">

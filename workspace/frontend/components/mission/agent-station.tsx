@@ -341,28 +341,46 @@ export function AgentStation({
       ) : !isCatalogPlaceholder ? (
         /* Configured Agent: 3 Micro Metrics Grid + Activity */
         <div className="my-2 space-y-1.5 flex-1 flex flex-col justify-start">
-          <div className="grid grid-cols-3 gap-1 p-1.5 rounded-xl bg-surface2/50 text-3xs">
-            <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Tokens</span>
-              <span className="font-semibold font-mono text-foreground truncate">
-                {fmtTokens(tokenCount)}
-              </span>
-            </div>
+          {/*
+            NOT A SCOREBOARD. This was a three-column grid of uppercase mono
+            micro-labels over big figures in its own tinted, rounded box --
+            TOKENS 0 / CHANNEL 1 / SKILLS 0 on a fresh workspace. Three
+            problems, all really the same problem:
 
-            <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Channel</span>
-              <span className="font-semibold font-mono text-foreground truncate">
-                {threads.length}
-              </span>
-            </div>
+            1. TWO OF THE THREE WERE USUALLY ZERO, and a zero set at the same
+               weight as a real value costs the reader a fixation to learn
+               nothing. A count of 0 is not news, it is the absence of news,
+               and it should be absent.
+            2. The grid-of-labelled-figures form is a telemetry HUD, which is
+               the one thing this workspace is explicitly not. It made a card
+               about a colleague read like a server dashboard.
+            3. Its own box (`rounded-xl bg-surface2/50`) put a second frame
+               inside a card that is already a frame.
 
-            <div className="flex flex-col min-w-0 px-1 text-center">
-              <span className="text-3xs uppercase font-mono text-muted-foreground truncate">Skills</span>
-              <span className="font-semibold font-mono text-foreground truncate">
-                {skillCount}
-              </span>
+            Now: one quiet line, carrying only the parts that have a value.
+            Tokens lead because that is the number that actually moves, and the
+            separator is a middot rather than a column because these are three
+            facts about one agent, not three independent readings.
+          */}
+          {(tokenCount > 0 || threads.length > 0 || skillCount > 0) && (
+            <div className="flex items-center gap-1.5 px-1 text-3xs text-muted-foreground">
+              {tokenCount > 0 && (
+                <span className="font-mono tabular-nums">{fmtTokens(tokenCount)} tokens</span>
+              )}
+              {tokenCount > 0 && (threads.length > 0 || skillCount > 0) && <span aria-hidden>&middot;</span>}
+              {threads.length > 0 && (
+                <span className="font-mono tabular-nums">
+                  {threads.length} {threads.length === 1 ? 'channel' : 'channels'}
+                </span>
+              )}
+              {threads.length > 0 && skillCount > 0 && <span aria-hidden>&middot;</span>}
+              {skillCount > 0 && (
+                <span className="font-mono tabular-nums">
+                  {skillCount} {skillCount === 1 ? 'skill' : 'skills'}
+                </span>
+              )}
             </div>
-          </div>
+          )}
 
           <div className="flex items-center gap-1 text-2xs text-muted-foreground px-1 truncate">
             {isWorking ? (
@@ -411,25 +429,36 @@ export function AgentStation({
           </button>
         )}
 
+        {/*
+          A CONNECTED AGENT GETS NO BUTTON AT ALL.
+
+          "Connected" was rendered as a filled, tinted, shadowed button beside
+          "Chat", taking an equal `flex-1` share of the row -- so the card's
+          action row held one real action and one disabled label wearing an
+          action's clothes, and the label was the louder of the two. The state
+          is already on the card twice (the status dot and the "Ready" badge in
+          the header), so repeating it as the widest control spent the row's
+          most valuable position on a fact the reader had at a glance.
+
+          Dropping it lets `Chat` -- the thing you came here to do -- take the
+          full width, and it means every button still in this row is one you
+          can actually press.
+        */}
+        {status === 'ready' && !isHeartbeatTimeout ? null : (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             onPairAgent?.();
           }}
-          disabled={status === 'ready' && !isHeartbeatTimeout}
           className={cn(
-            'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all shadow-2xs',
-            status === 'ready' && !isHeartbeatTimeout
-              ? 'bg-status-success/10 text-status-success cursor-default'
-              : isHeartbeatTimeout
+            'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all',
+            isHeartbeatTimeout
               ? 'bg-status-warning/15 text-status-warning hover:bg-status-warning/25 cursor-pointer font-semibold'
               : 'bg-surface2/80 hover:bg-surface3 text-foreground cursor-pointer'
           )}
         >
-          {status === 'ready' && !isHeartbeatTimeout ? (
-            <span>Connected</span>
-          ) : isHeartbeatTimeout ? (
+          {isHeartbeatTimeout ? (
             <>
               <RotateCw className="size-3" />
               <span>Reconnect</span>
@@ -443,6 +472,7 @@ export function AgentStation({
             </>
           )}
         </button>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { Hint } from '@/components/ui/hint';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -476,23 +477,24 @@ export function MissionControl() {
 
             <span className="mx-1 h-4 w-px bg-border/60" aria-hidden />
 
-            <button
-              type="button"
-              onClick={() => setShowActivity((prev) => !prev)}
-              aria-pressed={showActivity}
-              title={showActivity ? 'Hide live activity' : 'Show live activity'}
-              className={cn(
-                'inline-flex size-7 items-center justify-center rounded-md transition-colors cursor-pointer',
-                showActivity
-                  ? 'bg-surface2 text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-surface2/60',
-              )}
-            >
-              <PanelRight className="size-3.5" />
-              <span className="sr-only">
-                {showActivity ? 'Hide live activity' : 'Show live activity'}
-              </span>
-            </button>
+            <Hint label={showActivity ? 'Hide live activity' : 'Show live activity'}>
+              <button
+                type="button"
+                onClick={() => setShowActivity((prev) => !prev)}
+                aria-pressed={showActivity}
+                className={cn(
+                  'inline-flex size-7 items-center justify-center rounded-md transition-colors cursor-pointer',
+                  showActivity
+                    ? 'bg-surface2 text-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-surface2/60',
+                )}
+              >
+                <PanelRight className="size-3.5" />
+                <span className="sr-only">
+                  {showActivity ? 'Hide live activity' : 'Show live activity'}
+                </span>
+              </button>
+            </Hint>
           </div>
         </div>
       </div>
@@ -548,8 +550,19 @@ export function MissionControl() {
             {/* Section 1: My Configured Agents */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                  <Users className="size-3.5 text-primary" />
+                {/*
+                  SENTENCE CASE, PROPORTIONAL FACE, NO TRACKING.
+
+                  `uppercase tracking-wider font-mono` on a section heading is
+                  the machine-console idiom, and it made "MY AGENTS" cost more
+                  attention than the agent names underneath -- which are the
+                  actual content. The icon also drops `text-primary`: in the
+                  light theme `--primary` is #09090b, the same near-black as the
+                  text beside it, so the tint did nothing there while claiming
+                  the eye in the dark theme for a decorative glyph.
+                */}
+                <div className="flex items-center gap-2 text-xs font-medium text-foreground-muted">
+                  <Users className="size-3.5 text-foreground-extra-muted" />
                   <span>My agents ({filteredMyStations.length})</span>
                   {filterTab !== 'all' && (
                     <button
@@ -611,7 +624,7 @@ export function MissionControl() {
                 <button
                   type="button"
                   onClick={() => setShowIntegrations((prev) => !prev)}
-                  className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono hover:text-foreground transition-colors cursor-pointer select-none"
+                  className="flex items-center gap-2 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer select-none"
                 >
                   <span>Available integrations ({integrationStations.length})</span>
                   {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
