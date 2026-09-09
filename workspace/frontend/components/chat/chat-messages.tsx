@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { ChatMessage } from './chat-message';
 import { IntermediateSteps } from './intermediate-steps';
 import { ThinkingMessage } from './thinking-message';
+import { SpeechActEvent } from './speech-act-event';
 import { WorkingIndicator } from './working-indicator';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Button } from '@/components/ui/button';
@@ -747,45 +748,11 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     );
                   })()
                 ) : group.type === 'speech_act' ? (
-                  <div className={`my-2 p-3.5 rounded-xl border shadow-sm transition-colors ${
-                    group.actType === 'RESOLUTION'
-                      ? 'border-teal-500/30 bg-teal-50/40 dark:bg-teal-950/20 dark:border-teal-500/30'
-                      : 'border-border/80 bg-card dark:bg-card/60 dark:border-border/60'
-                  }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded tracking-wider uppercase border ${
-                        group.actType === 'PROPOSAL'
-                          ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/60'
-                          : group.actType === 'CHALLENGE'
-                          ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60'
-                          : group.actType === 'DEFENSE'
-                          ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/50 dark:text-purple-300 dark:border-purple-800/60'
-                          : group.actType === 'SUPPORT'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
-                          : group.actType === 'RESOLUTION'
-                          ? 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/60 dark:text-teal-200 dark:border-teal-700 font-extrabold ring-1 ring-teal-500/20'
-                          : 'bg-muted text-muted-foreground border-border'
-                      }`}>
-                        {group.actType === 'RESOLUTION' ? '📜 ' : '🏛️ '}{group.actType}
-                      </span>
-                      <span className="text-xs font-semibold text-foreground">
-                        {group.message.senderName || 'Council Supervisor'}
-                      </span>
-                      {group.message.createdAt && (
-                        <span className="text-[10px] text-muted-foreground ml-auto">
-                          {new Date(group.message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
-                    {group.summary && (
-                      <div className="text-xs font-semibold text-foreground mb-1.5 leading-snug">
-                        {group.summary}
-                      </div>
-                    )}
-                    <div className="text-xs text-foreground/85 dark:text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                      {group.message.content}
-                    </div>
-                  </div>
+                  <SpeechActEvent
+                    message={group.message}
+                    actType={group.actType}
+                    summary={group.summary}
+                  />
                 ) : group.type === 'thinking' ? (
                   <ThinkingMessage
                     sender={group.sender}
