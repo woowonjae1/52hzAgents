@@ -55,10 +55,21 @@ function SharedMessage({ message }: { message: SharedSnapshotMessage }) {
 }
 
 export function ShareClient({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = use(params);
+  const { token: initialToken } = use(params);
+  const [token, setToken] = useState(initialToken);
   const [snapshot, setSnapshot] = useState<SnapshotData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && initialToken === 'default') {
+      const segments = window.location.pathname.split('/').filter(Boolean);
+      const shareIdx = segments.indexOf('share');
+      if (shareIdx !== -1 && segments[shareIdx + 1]) {
+        setToken(segments[shareIdx + 1]);
+      }
+    }
+  }, [initialToken]);
 
   useEffect(() => {
     async function load() {

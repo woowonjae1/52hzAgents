@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { WorkspaceContent, WorkspaceLoadingSplash } from './[workspaceId]/workspace-client';
+import { ShareClient } from './share/[token]/share-client';
 import Image from 'next/image';
 import { SignalMark } from '@/components/brand/signal-mark';
 import {
@@ -688,11 +689,40 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
 // Page Root
 // ---------------------------------------------------------------------------
 
+function getInitialClientRoute(): { type: 'share'; token: string } | { type: 'workspace'; slug: string } {
+  if (typeof window === 'undefined') return { type: 'workspace', slug: '52hz' };
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const search = new URLSearchParams(window.location.search);
+
+  // 1. Share route: /share/:token
+  if (pathname.startsWith('/share/')) {
+    const token = pathname.replace(/^\/share\//, '').split('/')[0];
+    if (token) return { type: 'share', token };
+  }
+
+  // 2. Query param ?workspace=:slug or ?ws=:slug
+  const querySlug = search.get('workspace') || search.get('ws');
+  if (querySlug) {
+    return { type: 'workspace', slug: querySlug };
+  }
+
+  // 3. Direct path slug: /:slug
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 1 && !['share', 'quickbar', 'api', '_next', 'default'].includes(segments[0])) {
+    return { type: 'workspace', slug: segments[0] };
+  }
+
+  const saved = localStorage.getItem('last_workspace_slug') || '52hz';
+  return { type: 'workspace', slug: saved };
+}
+
 export default function HomePage() {
   const { user, loading } = useAuth();
   const openAgentsAuth = useOpenAgentsAuth();
+  const [routeInfo, setRouteInfo] = useState(() => getInitialClientRoute());
 
   useEffect(() => {
+    setRouteInfo(getInitialClientRoute());
     console.log('[52hzAgents Monitor] [HomePage] Mounted at', new Date().toISOString(), {
       href: typeof window !== 'undefined' ? window.location.href : '',
       referrer: typeof window !== 'undefined' ? document.referrer : '',
@@ -704,15 +734,32 @@ export default function HomePage() {
     return <WorkspaceLoadingSplash />;
   }
 
+  // Render share route if landed here via SPA fallback
+  if (routeInfo.type === 'share') {
+    return <ShareClient params={Promise.resolve({ token: routeInfo.token })} />;
+  }
+
   // Bypass landing page and dashboard redirect chain on local/custom domains (desktop app, self-host).
   // Immediately render WorkspaceContent for instant 0-redirect load.
   if (!openAgentsAuth.isOpenAgentsDomain) {
-    const slug = (typeof window !== 'undefined' && localStorage.getItem('last_workspace_slug')) || '52hz';
     return (
       <Suspense fallback={<WorkspaceLoadingSplash />}>
-        <WorkspaceContent workspaceId={slug} />
+        <WorkspaceContent workspaceId={routeInfo.slug} />
       </Suspense>
     );
+  }
+
+  // On openagents.com domain: if a specific workspace slug was requested in the URL path, enter that workspace
+  if (routeInfo.slug && routeInfo.slug !== '52hz') {
+    const pathname = typeof window !== 'undefined' ? window.location.pathname.replace(/\/+$/, '') : '';
+    const segments = pathname.split('/').filter(Boolean);
+    if (segments.length === 1 && !['share', 'quickbar', 'api', '_next', 'default'].includes(segments[0])) {
+      return (
+        <Suspense fallback={<WorkspaceLoadingSplash />}>
+          <WorkspaceContent workspaceId={routeInfo.slug} />
+        </Suspense>
+      );
+    }
   }
 
   if (user || openAgentsAuth.user) return <Dashboard />;

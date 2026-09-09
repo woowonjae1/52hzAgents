@@ -159,7 +159,23 @@ export function WorkspaceClient({
 }: {
   params: Promise<{ workspaceId: string }>;
 }) {
-  const { workspaceId } = use(params);
+  const { workspaceId: initialWorkspaceId } = use(params);
+  const [workspaceId, setWorkspaceId] = useState(initialWorkspaceId);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && initialWorkspaceId === 'default') {
+      const search = new URLSearchParams(window.location.search);
+      const wsParam = search.get('workspace') || search.get('ws');
+      if (wsParam) {
+        setWorkspaceId(wsParam);
+        return;
+      }
+      const segments = window.location.pathname.split('/').filter(Boolean);
+      if (segments.length > 0 && segments[0] !== 'default' && segments[0] !== 'share' && segments[0] !== 'quickbar') {
+        setWorkspaceId(segments[0]);
+      }
+    }
+  }, [initialWorkspaceId]);
 
   return (
     <Suspense fallback={<WorkspaceLoadingSplash />}>
