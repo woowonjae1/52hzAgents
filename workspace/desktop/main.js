@@ -225,6 +225,7 @@ async function startProductionStack() {
       backendProcess = spawn(serverBin, [], {
         env: {
           ...process.env,
+          PARENT_PID: `${process.pid}`,
           CGO_ENABLED: '0',
           PORT: `${serverPort}`,
           DATABASE_URL: `sqlite://${dbPath.replace(/\\/g, '/')}`,

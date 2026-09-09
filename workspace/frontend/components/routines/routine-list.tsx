@@ -1,14 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, RefreshCw, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { CalendarClock, RefreshCw, Trash2, Plus, ArrowLeft, History } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from './create-routine-dialog';
+import { RoutineHistoryDrawer } from './routine-history-drawer';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import type { RoutineItem } from '@/lib/types';
 import { stripAddressPrefix } from '@/lib/types';
 import { formatSchedule, timeUntil } from '@/lib/schedule-format';
 
@@ -16,6 +27,8 @@ export function RoutineList() {
   const { routines, refreshRoutines, createRoutine, currentSessionId, setCurrentSessionId, agents } = useWorkspace();
   const { isMobile, openMobileDetail, setViewMode } = useLayout();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [historyRoutine, setHistoryRoutine] = useState<RoutineItem | null>(null);
+  const [deletingRoutine, setDeletingRoutine] = useState<RoutineItem | null>(null);
 
   useEffect(() => {
     refreshRoutines();
@@ -122,13 +135,24 @@ export function RoutineList() {
                       next: {routine.nextFiresAt ? timeUntil(routine.nextFiresAt) : 'N/A'}
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleCancel(routine.id); }}
-                    className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
-                    title="Cancel routine"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
+                  <div className="flex items-center gap-0.5 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setHistoryRoutine(routine); }}
+                      className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-merged transition-colors"
+                      title="查看历史记录"
+                    >
+                      <History className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setDeletingRoutine(routine); }}
+                      className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors"
+                      title="删除任务"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </div>
                 </button>
               );
             })}
@@ -142,6 +166,41 @@ export function RoutineList() {
         agents={agents}
         onCreateRoutine={createRoutine}
       />
+
+      <RoutineHistoryDrawer
+        routine={historyRoutine}
+        open={Boolean(historyRoutine)}
+        onOpenChange={(open) => !open && setHistoryRoutine(null)}
+        onOpenThread={handleSelect}
+      />
+
+      <Dialog open={Boolean(deletingRoutine)} onOpenChange={(open) => !open && setDeletingRoutine(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除定时任务</DialogTitle>
+            <DialogDescription>
+              确定要删除定时任务「{deletingRoutine?.name}」吗？此操作将停止该任务的后续所有自动化触发。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setDeletingRoutine(null)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => {
+                if (deletingRoutine) {
+                  await handleCancel(deletingRoutine.id);
+                  setDeletingRoutine(null);
+                }
+              }}
+            >
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

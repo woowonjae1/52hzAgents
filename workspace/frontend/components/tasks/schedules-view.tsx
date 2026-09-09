@@ -15,8 +15,20 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Square,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { RoutineHistoryDrawer } from '@/components/routines/routine-history-drawer';
+import { toast } from 'sonner';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
@@ -53,6 +65,7 @@ export function SchedulesView() {
     toggleRoutine,
     triggerRoutine,
     cancelRoutine,
+    stopAllAgents,
     timers,
     refreshTimers,
     cancelTimer,
@@ -65,6 +78,8 @@ export function SchedulesView() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState<RoutineItem | null>(null);
   const [runningRoutineId, setRunningRoutineId] = useState<string | null>(null);
+  const [historyRoutine, setHistoryRoutine] = useState<RoutineItem | null>(null);
+  const [deletingRoutine, setDeletingRoutine] = useState<RoutineItem | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -130,6 +145,16 @@ export function SchedulesView() {
       setActionError(err instanceof Error ? err.message : 'The routine could not be triggered');
     } finally {
       setRunningRoutineId(null);
+    }
+  };
+
+  const handleStopRun = async (routine: RoutineItem) => {
+    try {
+      await stopAllAgents(routine.channelName);
+      toast.success(`已向 @${routine.createdBy} 发送终止指令`);
+      await refreshRoutines();
+    } catch {
+      toast.error('未能中止当前执行');
     }
   };
 
@@ -313,20 +338,44 @@ export function SchedulesView() {
 
                     {/* Quick Action Buttons */}
                     <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                      {isRunning ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleStopRun(routine)}
+                          className="h-7 px-2 text-xs gap-1 border-rose-500/40 text-rose-400 hover:bg-rose-500/10 hover:border-rose-500/60 bg-rose-500/5"
+                          title="停止当前运行"
+                        >
+                          <Square className="size-2.5 fill-current" />
+                          <span>Stop</span>
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleRunNow(routine)}
+                          disabled={runningRoutineId === routine.id}
+                          className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
+                          title="立即触发一次"
+                        >
+                          {runningRoutineId === routine.id ? (
+                            <Loader2 className="size-3 animate-spin text-foreground-muted" />
+                          ) : (
+                            <Play className="size-3 text-emerald-400" />
+                          )}
+                          <span>Run Now</span>
+                        </Button>
+                      )}
+
                       <Button
                         variant="outline"
                         size="sm"
-                        disabled={isRunning}
-                        onClick={() => void handleRunNow(routine)}
-                        className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2"
-                        title="Trigger run immediately"
+                        onClick={() => setHistoryRoutine(routine)}
+                        className="h-7 px-2 text-xs gap-1 bg-surface2/60 hover:bg-surface2 text-status-merged hover:text-status-merged"
+                        title="查看历史执行记录与日志"
                       >
-                        {isRunning ? (
-                          <Loader2 className="size-3 animate-spin text-foreground-muted" />
-                        ) : (
-                          <Play className="size-3 text-emerald-400" />
-                        )}
-                        <span>Run Now</span>
+                        <History className="size-3" />
+                        <span>History</span>
                       </Button>
 
                       <Button
@@ -377,9 +426,9 @@ export function SchedulesView() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => void runAction(() => cancelRoutine(routine.id))}
+                        onClick={() => setDeletingRoutine(routine)}
                         className="h-7 w-7 p-0 text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10"
-                        title="Cancel routine"
+                        title="Delete schedule"
                       >
                         <Trash2 className="size-3" />
                       </Button>
@@ -460,6 +509,41 @@ export function SchedulesView() {
         onCreateRoutine={createRoutine}
         onUpdateRoutine={updateRoutine}
       />
+
+      <RoutineHistoryDrawer
+        routine={historyRoutine}
+        open={Boolean(historyRoutine)}
+        onOpenChange={(open) => !open && setHistoryRoutine(null)}
+        onOpenThread={handleOpenThread}
+      />
+
+      <Dialog open={Boolean(deletingRoutine)} onOpenChange={(open) => !open && setDeletingRoutine(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除定时任务</DialogTitle>
+            <DialogDescription>
+              确定要删除定时任务「{deletingRoutine?.name}」吗？删除后将停止所有后续调度并清理相关配置，此操作无法撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setDeletingRoutine(null)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={async () => {
+                if (deletingRoutine) {
+                  await runAction(() => cancelRoutine(deletingRoutine.id));
+                  setDeletingRoutine(null);
+                }
+              }}
+            >
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

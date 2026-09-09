@@ -1,271 +1,102 @@
 <div align="center">
 
-# 52hzAgents Workspace
+# 52hzAgents
 
-**52hzAgents Workspace** 是一个本地优先(Local-First)、可自托管的多智能体协作平台:人类与多个 AI 编码 Agent(Claude Code、Codex、OpenClaw、Cursor、Copilot、DeepSeek、Pi 等)在同一个工作区里共享会话、文件、终端、Git 与浏览器控制权,类似 Slack / Cursor 的桌面协作体验。
+**把 Claude Code、Codex、Cursor 放进同一个工作区,和你共享同一套文件、终端、Git 和浏览器。**
+
+本地优先,可自托管,开箱是一个 Slack 式的桌面客户端。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Agent E2E Smoke Test](https://github.com/woowonjae1/52hzAgents/actions/workflows/agent-e2e-smoke.yml/badge.svg)](https://github.com/woowonjae1/52hzAgents/actions/workflows/agent-e2e-smoke.yml)
 [![Test CLI Install](https://github.com/woowonjae1/52hzAgents/actions/workflows/test-cli.yml/badge.svg)](https://github.com/woowonjae1/52hzAgents/actions/workflows/test-cli.yml)
 
-[快速开始](#快速开始) · [核心能力](#核心能力) · [架构](#架构) · [代码库地图](#代码库地图) · [接入-agent](#接入-agent) · [自托管](#自托管与配置)
-
 </div>
+
+<!-- TODO: 放一张主界面截图和一段 /rfc 议事的 GIF,替换掉这两行注释。 -->
 
 ---
 
-## 这是什么
-
-一个工作区里可以同时挂多个 AI 编码 Agent,它们和人类共享:
-
-- **同一个会话上下文** —— 消息、线程、`@` 提及路由到具体 Agent;没有提及时可选走 LLM 语义路由,否则按频道 Master Agent 或在线成员轮询分发
-- **同一套文件** —— 内置代码高亮、Markdown、PDF、音视频预览的文件沙箱
-- **同一套工具面** —— 终端执行、Git 操作、浏览器控制、知识库、Skills 均由后端统一提供,人和 Agent 调用同一批 API
-- **同一套运行时** —— Go 后端(Gin + GORM,支持无 CGO 的纯 Go SQLite 或 PostgreSQL)+ WebSocket/SSE 实时事件管道
-- **同一套治理面** —— 命令执行策略、按回合的代码回滚、流水线结果验证、上下文压缩与用量统计
-
-前端是桌面风格的 Next.js 16 + React 19 界面,可作为 Web 应用直接访问,也可通过 `workspace/desktop` 的 Electron 外壳作为原生桌面客户端运行(自定义标题栏、系统托盘、`Alt+Space` 全局唤起)。内置一套分层的深/浅色主题系统(`surface0`~`surface4` + 多套配色)。
-
-## 核心能力
-
-### 协作层 —— 人与多个 Agent 怎么在同一个频道里议事
-
-| 能力 | 说明 | 后端入口 |
-|------|------|----------|
-| 事件协议 | 统一事件流,消息在数据库落库后才确认;`client_message_id` 幂等去重,重试返回原 `event_id` + `duplicate: true` | `/v1/events`、`/v1/events/stream`(SSE)、`/v1/events/ws`(WebSocket) |
-| 消息路由 | `@` 提及优先 → 可选的 LLM 语义路由 → 频道 Master Agent → 在线成员轮询;Agent 之间不显式提及不会互相唤醒 | `internal/handlers/routing.go`、`routing_llm.go` |
-| 议会(Council) | 在频道里发 `/rfc <主题>` 开启结构化议事:`PROPOSAL` / `CHALLENGE` / `DEFENSE` / `SUPPORT` / `RESOLUTION` 五类言语行为作为一等实体落库成「黑板」,并强制指派一个**异构类型**的 Agent 担任质询者,避免同型 Agent 互相附和 | `/v1/council/sessions`、`/:session_id/acts` |
-| 流水线 | 多 Agent 接力执行一条任务链,每一步产出结构化 deliverable 交给下一棒;人可随时暂停 / 恢复 / 中止 | `/v1/channels/:channel_id/pipeline`、`/halt`、`/pause`、`/resume` |
-| Agent 生命周期 | 加入/退出网络、心跳保活、运行时上报、一键拉起、日志与审批 | `/v1/join`、`/v1/presence`、`/v1/agents/:name/launch`、`/v1/approvals` |
-| Agent 目录 | 一键接入的 Agent 名册,前后端共用同一份定义,避免各页面名册漂移 | `/v1/agent-catalog` |
-| 云端 Agent | 多家 LLM 提供方与模型清单、云端 Agent 挂载 | `/v1/cloud-agents/providers`、`/v1/cloud-agents` |
-| 协作者 | 工作区成员管理、Token 领取与轮换 | `/v1/workspaces/:id/collaborators`、`/rotate-token` |
-| 通知 | 持久化通知收件箱 | `/v1/notifications` |
-
-### 工具层 —— 人和 Agent 调用完全相同的 API
-
-| 能力 | 说明 | 后端入口 |
-|------|------|----------|
-| 文件沙箱 | multipart 与 Base64(面向 Agent)双通道上传、分页列表、流式下载 | `/v1/files` |
-| 终端 | 工作区内命令执行,输出回流到会话,受执行策略约束 | `/v1/terminal/execute` |
-| Git | 状态、分支、日志、diff、暂存、提交、切换、丢弃、fetch/pull/push,以及供多 Agent 并行隔离的 worktree | `/v1/git/*`、`/v1/git/worktrees` |
-| 浏览器控制 | 标签页开启/导航/点击/输入/按键/求值/截图/快照/分享/持久化 | `/v1/browser/*` |
-| 知识库 | 工作区知识条目 + 分块索引与检索(英文分词与中文分字双通道打分) | `/v1/knowledge`、`/v1/knowledge/search` |
-| Skills | Skill 目录、按成员安装/卸载、自定义 Skill 注册 | `/v1/workspaces/skill-catalog`、`/v1/workspaces/:id/members/:name/skills/*` |
-| 调度 | 一次性 Timer 与周期性 Routine 后台任务、Todos | `/v1/timers`、`/v1/routines`、`/v1/todos` |
-| 分享 | 公开分享链接 | `/v1/shares`、`/v1/shares/public/:share_token` |
-
-### 治理层 —— 让多 Agent 跑起来不失控
-
-| 能力 | 说明 | 后端入口 |
-|------|------|----------|
-| 执行策略 | 工作区级命令分类器 + 沙箱,决定哪些终端命令可直接执行、哪些进入审批队列 | `/v1/workspaces/:id/policy/exec`、`/v1/approvals`、`internal/execpolicy` |
-| 回合变更与回滚 | 按「一轮对话」记录 Agent 改动的文件,可整轮回滚,不必手工挑 diff | `/v1/git/turn-changes`、`/v1/git/turn-rollback` |
-| 结果验证 | 流水线每一步跑验证命令,跨 Go / Node·TS / Python / Rust / Shell / Git 抽取错误行,失败结果回灌给 Agent 自我修正 | `internal/evaluator` |
-| 上下文压缩 | 频道历史摘要与压缩,长会话不撑爆 Agent 上下文 | `/channels/:name/compact`、`/summary`、`/history/compacted` |
-| 用量统计 | 每个 Agent 的调用用量与浏览器用量 | `/v1/workspaces/:id/agents/:name/usage`、`/v1/browser/usage` |
-
-## 架构
-
-```
-┌──────────────────────────────┐   ┌──────────────────────────────┐
-│  Electron 桌面客户端外壳       │   │  独立 Web 客户端(实验)        │
-│   (workspace/desktop)        │   │   (packages/go/web)          │
-└──────────────┬───────────────┘   └──────────────┬───────────────┘
-               │ (内嵌 BrowserWindow / 本地 HTTP)   │ (REST / SSE)
-               ▼                                   │
-        ┌──────────────────────────────┐           │
-        │      Next.js 前端 UI          │◄──────────┘
-        │   (workspace/frontend)       │
-        └──────────────┬───────────────┘
-                       │ (HTTP / SSE / WebSocket)
-                       ▼
-        ┌──────────────────────────────┐
-        │      Go 后端服务              │
-        │   (workspace/backend)        │
-        └──────────────┬───────────────┘
-                       │ (SQLite 纯 Go / PostgreSQL)
-                       ▼
-        ┌──────────────────────────────┐
-        │   持久化数据库 / 文件沙箱       │
-        └──────────────────────────────┘
-                       ▲
-                       │ (HTTP join + WebSocket / Agent stdin↔stdout)
-┌──────────────────────┴───────────────────────────────────────────┐
-│         Agent 连接器守护进程                                       │
-│         `wwj` (packages/wwj, Node.js) · `agn` (packages/agn_go)   │
-│                                                                   │
-│  Claude Code · Codex/ChatGPT · OpenClaw · Cursor · Copilot ·      │
-│  Antigravity · DeepSeek · Kimi · Gemini · Goose · Cline · Amp ·   │
-│  Pi · Hermes · OpenCode · Kilo Code · NanoClaw · 自定义命令        │
-└───────────────────────────────────────────────────────────────────┘
-```
-
-## 代码库地图
-
-```
-52hzAgents/
-├── workspace/
-│   ├── backend/              # Go 1.21 后端 (Gin + GORM)
-│   │   ├── cmd/server/       # 服务入口与路由注册
-│   │   └── internal/
-│   │       ├── handlers/     # 事件、路由、议会、流水线、文件、终端、Git、
-│   │       │                 #   浏览器、Agent 目录/运行时、知识库、Skills、分享
-│   │       ├── hub/          # WebSocket / SSE 事件广播
-│   │       ├── evaluator/    # 流水线步骤验证与结构化交付物抽取
-│   │       ├── execpolicy/   # 命令分类器与执行沙箱策略
-│   │       ├── compaction/   # 频道历史摘要与上下文压缩
-│   │       ├── scheduler/    # Routine / Timer 后台调度
-│   │       ├── middleware/   # 鉴权与请求中间件
-│   │       ├── models/       # GORM 数据模型(含议会黑板 SpeechActRecord)
-│   │       ├── config/       # 环境变量与运行配置
-│   │       └── db/           # SQLite (纯 Go) / PostgreSQL 驱动
-│   ├── frontend/             # Next.js 16 + React 19 前端(dev 端口 3005)
-│   │   ├── app/              # App Router
-│   │   ├── components/       # chat / files / terminal / git / browser / canvas /
-│   │   │                     #   mission / monitor / trace / connect / skills / knowledge …
-│   │   ├── styles/           # 主题变量 (globals.css)
-│   │   └── lib/              # API 客户端、Agent 目录、每 Agent 模型选择、主题、身份色
-│   ├── desktop/              # Electron 桌面外壳(托盘、全局热键、自定义标题栏)
-│   ├── dev-sqlite.ps1        # 一键本地开发栈(SQLite,推荐)
-│   ├── dev.ps1               # 本地开发栈(PostgreSQL in Docker)
-│   └── docker-compose*.yml   # Docker 集成 / 生产编排
-├── packages/
-│   ├── wwj/                  # Agent 连接器守护进程与 CLI(Node.js,`wwj`)
-│   ├── agn_go/               # 同一连接器的 Go 重构版(单文件二进制 `agn`)
-│   └── go/web/               # 独立 Web 客户端(实验性,可单独部署到 Vercel)
-└── .github/workflows/        # CI:连接器测试、E2E smoke、CLI 安装、提交检查
-```
-
-> `docs/` 目录仅存放本地设计笔记,不纳入版本管理。
-
-## 快速开始
-
-### 一键启动(Windows,推荐)
+## 30 秒跑起来
 
 ```powershell
-# 启动 Go 后端 (localhost:8000)、前端 (localhost:3005) 与 wwj 连接器守护进程
 .\workspace\dev-sqlite.ps1
 ```
 
-首次运行时 `go run` 冷编译约需 1 分钟。启动完成后访问 <http://localhost:3005>。
+后端、前端、Agent 连接器一起拉起来,然后打开 <http://localhost:3005>。首次运行 `go run` 冷编译约一分钟,之后就快了。想要原生桌面窗口就跑 `.\workspace\start-desktop.ps1`。
 
-```powershell
-# 停止
-.\workspace\dev-sqlite.ps1 -Stop
-```
+停止:`.\workspace\dev-sqlite.ps1 -Stop`。不用 Docker,数据落在本地 SQLite 里。
 
-日志与进程号写入 `workspace/.dev-sqlite/`。若需要 PostgreSQL 而非 SQLite,使用 `.\workspace\dev.ps1`(仅数据库跑在 Docker 里,前端监听 3000),对应停止脚本为 `.\workspace\stop-dev.ps1`。
+## 它解决什么
 
-### 桌面客户端
+同时开三个 AI 编码终端的时候,它们互相看不见。Claude 改过的文件 Codex 不知道,Cursor 跑过的命令没人记得,你自己在三个窗口之间当人肉消息总线,还得记住哪个改动是谁干的、怎么撤。
 
-```powershell
-# 检测本地栈是否在线,未启动则自动拉起,然后打开 Electron 客户端
-.\workspace\start-desktop.ps1
-```
+52hzAgents 把它们放进同一个工作区:同一条消息流、同一套文件、同一个终端和 Git 视图。人和 Agent 调用的是完全相同的一套后端能力——Agent 能做的事你都能在界面上做,反过来也一样。
 
-### 手动启动
+## 能做什么
 
-```bash
-# 后端
-cd workspace/backend
-go run ./cmd/server            # http://localhost:8000
+**一起议事。** 在频道里发 `/rfc <主题>`,几个 Agent 会真的吵起来。提案、质询、辩护、支持、结论都作为结构化条目落库成一块「黑板」,而不是散在聊天记录里。系统会强制拉一个**不同类型**的 Agent 当质询者——不让两个同型 Agent 互相点头。
 
-# 前端(另一个终端)
-cd workspace/frontend
-npm install
-npm run dev                    # http://localhost:3005
-```
+**接力干活。** 一条任务链可以在多个 Agent 之间传递,每一步的产出被提炼成结构化交付物交给下一棒,而不是把上一段聊天原样贴过去。跑歪了随时暂停、恢复或中止。
 
-> 端口说明:前端 `npm run dev` 与 `dev-sqlite.ps1` 走 **3005**,`dev.ps1` 与 Docker 编排走 **3000**。后端 `CORS_ORIGINS` 默认只放行 `http://localhost:3000,http://localhost:3001`,换端口时记得一并设置。
+**每步都验一下。** 流水线的每个步骤跑完会执行验证命令,从 Go / Node·TS / Python / Rust / Shell / Git 的输出里挑出错误行,失败结果回灌给 Agent 让它自己改,而不是把一堆红字丢给你。
 
-完整的 Docker / PostgreSQL 集成方式、环境变量表与自托管部署说明见 [`workspace/README.md`](workspace/README.md);Windows 手动步骤见 [`workspace/QUICKSTART-WINDOWS.md`](workspace/QUICKSTART-WINDOWS.md)。
+**改崩了整轮回滚。** 系统按「一轮对话」记录每个 Agent 动过哪些文件。哪一轮跑歪了,整轮还原,不用手工挑 diff。
 
-## 接入 Agent
+**不让它乱跑。** 工作区级的命令执行策略决定哪些终端命令可以直接跑、哪些要先经过你审批。多个 Agent 并行时用 Git worktree 隔开,不会互相踩。
 
-### 方式一:在界面里连接(推荐)
+**聊久了不爆炸。** 频道历史可以压缩成摘要再喂给 Agent,长会话不至于撑爆上下文。
 
-打开工作区的 **Overview** 面板,在 Agent 名册里点 **Connect** 即可。名册来自后端 `/v1/agent-catalog`,前后端共用同一份定义([`workspace/frontend/lib/agent-catalog.ts`](workspace/frontend/lib/agent-catalog.ts) ↔ `backend/internal/handlers/agents_catalog.go`)。一键卡片包含 Claude Code、OpenClaw、Hermes、Pi Agent、ChatGPT / Codex,以及用于挂接任意命令的 **Custom**。卡片只有在配置完成并连接成功后才会出现 **Open** 按钮。
+除此之外还有文件沙箱(代码高亮 / Markdown / PDF / 音视频预览)、浏览器控制、可检索的知识库(中英文都能搜)、Skills 安装、定时与周期任务、通知收件箱。
 
-### 方式二:命令行 `wwj`
+## 接上你的 Agent
 
-本地守护进程 `wwj`(详见 [`packages/wwj`](packages/wwj/README.md))负责安装运行时、管理 Agent 子进程,并把它们的 stdin/stdout 双向桥接到工作区:
+最省事的是在界面的 **Overview** 面板里点 **Connect**。要用命令行就装 `wwj`——它负责装运行时、管子进程,把 Agent 的 stdin/stdout 双向桥接到工作区:
 
 ```bash
-# 安装 CLI
 npm install -g ./packages/wwj
 
-# 启动守护进程(默认后台常驻)
-wwj up
-
-# 浏览可接入的 Agent 名册
-wwj search
-
-# 安装运行时并创建 Agent
-wwj install claude
+wwj up                                  # 启动守护进程
+wwj install claude                      # 装运行时
 wwj create my-agent --type claude
-
-# 配置密钥(按 Agent 类型设置对应环境变量)
-wwj env claude --set LLM_API_KEY=sk-...
-wwj test-llm claude
-
-# 连接到自托管的 Workspace,双向桥接其 stdin/stdout
-wwj connect my-agent <workspace-token-or-id>
-
-# 状态 / 日志 / 断开 / 停机
-wwj status          # 交互式终端下直接 `wwj` 会进入 TUI
-wwj logs
-wwj disconnect my-agent
-wwj down
+wwj connect my-agent <workspace-token>  # 接进工作区
 ```
 
-其他常用子命令:`restart`、`start`/`stop <name>`、`runtimes`、`skills`、`tool-mode`(`mcp` 或 `skills`)、`autostart`、`workspace create|join|list`、`mcp-server`(以 stdio 暴露工作区工具给 Claude Code 等 MCP 客户端)、`update`。完整列表见 `wwj help`。
+内置适配器:`claude` · `codex`(即 `chatgpt` / `openai`)· `openclaw` · `opencode` · `kilocode` · `nanoclaw` · `cursor` · `hermes` · `gemini` · `antigravity` · `deepseek` · `kimi` · `goose` · `copilot` · `cline` · `amp` · `pi` · `custom`。
 
-### 支持的运行时
+其中 `deepseek` 和 `kimi` 走直连 API,**不需要本地装 CLI**,配个 Key 就能用;`custom` 用来挂任意本地命令。
 
-内置适配器([`packages/wwj/src/adapters`](packages/wwj/src/adapters)):
+嫌 Node.js 重的话,[`packages/agn_go`](packages/agn_go) 是同一个连接器的 Go 重写版,编译成单个静态二进制。
 
-`claude` · `codex`(别名 `chatgpt` / `openai`) · `openclaw` · `opencode` · `kilocode`(别名 `kilo`) · `nanoclaw` · `cursor` · `hermes` · `gemini` · `antigravity`(别名 `agy`) · `deepseek` · `kimi` · `goose` · `copilot` · `cline` · `amp` · `pi` · `custom`
+## 长什么样
 
-其中 `deepseek` 与 `kimi` 走共享的直连 LLM 适配器(OpenAI 兼容的 chat completions + SSE 流式),**不需要本地 CLI**,配好 API Key 即可接入。
-
-`custom` 用于挂接任意本地命令(自研 Agent 等),通过 `wwj create my-agent --type custom --command <exe> --args "<a> <b>"` 或界面上的 Custom 卡片配置。
-
-### Go 版连接器 `agn`
-
-[`packages/agn_go`](packages/agn_go) 是同一连接器的 Go 重构实现,编译为单个静态二进制,无需 Node.js 运行时:
-
-```bash
-cd packages/agn_go
-go build -o agn .        # Linux / macOS;Windows 用 -o agn.exe
-./agn up
+```
+      Electron 桌面外壳  /  浏览器
+                 │
+        Next.js 前端 (workspace/frontend)
+                 │  HTTP · SSE · WebSocket
+         Go 后端 (workspace/backend)
+                 │
+        SQLite (纯 Go,无 CGO) 或 PostgreSQL
+                 ▲
+                 │  join + WebSocket / stdin↔stdout
+       Agent 连接器  wwj (Node) · agn (Go)
+                 │
+   Claude Code · Codex · Cursor · Copilot · DeepSeek · …
 ```
 
-注册表通过 `go:embed` 打进二进制,配置目录默认 `~/.52hzagents/`。
+仓库分三块:`workspace/`(后端 + 前端 + Electron 外壳)、`packages/`(两个 Agent 连接器和一个实验性的独立 Web 客户端)、`.github/workflows/`(CI)。
 
-## 自托管与配置
+后端是 Go 1.21 + Gin + GORM,前端是 Next.js 16 + React 19 + Tailwind 4,桌面壳是 Electron。
 
-后端配置项(`DATABASE_URL`、`AUTH_MODE`、`FILE_STORAGE_*`、`CORS_ORIGINS`、`REQUESTS_PER_MINUTE`、`PIPELINE_STEP_TIMEOUT_SECONDS`、`ROUTER_LLM_*` 等)、Docker 编排、Vercel 部署与数据库迁移流程,全部记录在 [`workspace/README.md`](workspace/README.md)。
+## 想深入
 
-创建工作区并拿到接入 Token:
-
-```bash
-curl -X POST http://localhost:8000/v1/workspaces \
-  -H "Content-Type: application/json" \
-  -d '{"name": "my-workspace"}'
-# 返回扁平对象,含 token / slug / workspaceId / url
-```
-
-## 技术栈
-
-| 层 | 技术 |
-|----|------|
-| 后端 | Go 1.21、Gin、GORM、纯 Go SQLite(`glebarez/sqlite`,无需 CGO)或 PostgreSQL |
-| 实时 | WebSocket(`gorilla/websocket`)+ Server-Sent Events |
-| 前端 | Next.js 16、React 19、TypeScript 5.9、Tailwind CSS 4、Motion、Mermaid |
-| 桌面 | Electron(`workspace/desktop`) |
-| 连接器 | Node.js ≥18(`packages/wwj`)/ Go 1.21(`packages/agn_go`) |
+| 文档 | 内容 |
+|------|------|
+| [`workspace/README.md`](workspace/README.md) | 事件协议、完整 API、环境变量、Docker 与自托管部署 |
+| [`workspace/QUICKSTART-WINDOWS.md`](workspace/QUICKSTART-WINDOWS.md) | Windows 手动启动步骤 |
+| [`packages/wwj/README.md`](packages/wwj/README.md) | 连接器 CLI 的全部子命令 |
+| [`packages/agn_go`](packages/agn_go) | Go 版连接器源码(`go build -o agn .`,注册表 `go:embed` 进二进制) |
 
 ## 许可证
 
-本项目采用 [MIT License](LICENSE) 开源。
+[MIT](LICENSE)

@@ -7,7 +7,9 @@ import (
 	"net/http"      // 包含标准 HTTP 状态码定义。
 	"os"            // 文件系统操作与路径探测
 	"path/filepath" // 文件路径处理
+	"strconv"       // 进程 ID 转换
 	"strings"       // 字符串前缀判断
+	"time"          // 监控定时器
 	// 内嵌 IANA 时区库。Windows 没有 /usr/share/zoneinfo，缺了它
 	// time.LoadLocation("Asia/Shanghai") 会失败，所有定时任务都会静默退回
 	// UTC 执行 —— 用户设的"每天九点"会在下午五点跑。
@@ -22,8 +24,27 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/scheduler" // 后台定时与周期任务调度包（新增）。
 )
 
+func startParentWatchdog(ppid int) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		if !isParentAlive(ppid) {
+			log.Printf("[52hz-server] Parent process (PID %d) has exited. Cleanly shutting down server...", ppid)
+			os.Exit(0)
+		}
+	}
+}
+
 func main() { // 服务程序运行主入口函数。
 	log.Println("Initializing 52hzAgents Workspace Server (Go Edition)...") // 打印初始化提示日志。
+
+	// Parent watchdog: if launched by desktop shell, terminate cleanly if parent dies
+	if ppidStr := os.Getenv("PARENT_PID"); ppidStr != "" {
+		if ppid, err := strconv.Atoi(ppidStr); err == nil && ppid > 0 {
+			log.Printf("[52hz-server] Attached to parent process PID %d with watchdog", ppid)
+			go startParentWatchdog(ppid)
+		}
+	}
 
 	// Load configuration
 	config.LoadConfig()                                               // 调用并加载所有的环境变量配置。

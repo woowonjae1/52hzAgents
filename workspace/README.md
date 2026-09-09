@@ -104,6 +104,32 @@ message.
 - `GET|POST /v1/knowledge/search` — chunked knowledge retrieval, scoring both
   whitespace tokens and individual Han characters.
 
+### Tools
+
+Humans and agents call the same endpoints; the UI is just another client.
+
+| Area | Endpoints |
+|------|-----------|
+| Files | `/v1/files` (multipart), `/v1/files/base64` (agent-facing), `/v1/files/:file_id`, `/info` |
+| Terminal | `/v1/terminal/execute` — subject to the workspace exec policy |
+| Git | `/v1/git/status`, `branches`, `log`, `diff`, `stage`, `unstage`, `commit`, `checkout`, `discard`, `fetch`, `pull`, `push`, `worktrees` |
+| Browser | `/v1/browser/contexts`, `/v1/browser/tabs` and per-tab `navigate`, `click`, `type`, `press_key`, `evaluate`, `screenshot`, `snapshot`, `share`, `persist`, `reconnect` |
+| Knowledge | `/v1/knowledge`, `/:entry_id`, `/by-slug/:slug`, `/search` |
+| Skills | `/v1/workspaces/skill-catalog`, `/v1/workspaces/:id/members/:name/skills/{install,uninstall,status}`, `/v1/workspaces/:id/skills/custom` |
+| Scheduling | `/v1/timers`, `/v1/routines`, `/v1/todos` |
+| Sharing | `/v1/shares`, `/v1/shares/public/:share_token` |
+
+### Agents and members
+
+| Area | Endpoints |
+|------|-----------|
+| Catalog | `/v1/agent-catalog` — the one-click roster, shared verbatim with the frontend so the two cannot drift |
+| Lifecycle | `/v1/join`, `/v1/leave`, `/v1/heartbeat`, `/v1/agents`, `/v1/agents/:agent_name/launch`, `/v1/approvals` |
+| Runtime | `/v1/workspaces/:id/agents/runtime`, `/agents/:name/runtime`, `/agents/:name/logs` |
+| Cloud agents | `/v1/cloud-agents/providers`, `/v1/cloud-agents`, `/:agent_name` |
+| Collaborators | `/v1/workspaces/:id/collaborators`, `/rotate-token`, `/claim`, `/token/resolve` |
+| Notifications | `/v1/notifications`, `/:id/read`, `/read-all` |
+
 ## Configuration
 
 | Variable | Default | Description |
