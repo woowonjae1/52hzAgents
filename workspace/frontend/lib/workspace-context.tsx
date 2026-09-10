@@ -1562,6 +1562,132 @@ export function WorkspaceProvider({
     return () => clearTimeout(timeout);
   }, [refreshDiscovery]);
 
+  // Workspace-level SSE event subscription for instantaneous agent status & state synchronization
+  useEffect(() => {
+    if (!workspaceId || typeof window === 'undefined') return;
+
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = 1000;
+    let isMounted = true;
+
+    const connect = () => {
+      try {
+        const sseUrl = workspaceApi.getSSEUrl('');
+        eventSource = new EventSource(sseUrl);
+
+        eventSource.onopen = () => {
+          backoffMs = 1000;
+        };
+
+        eventSource.onmessage = (ev) => {
+          if (!isMounted) return;
+          try {
+            const event = JSON.parse(ev.data);
+            if (!event || !event.type) return;
+
+            switch (event.type) {
+              case 'workspace.member.status': {
+                const payload = event.payload as {
+                  agent_name?: string;
+                  status?: string;
+                  last_heartbeat?: number;
+                  reason?: string;
+                };
+                if (!payload || !payload.agent_name) break;
+
+                setAgents((prev) => {
+                  let found = false;
+                  const next = prev.map((a) => {
+                    if (a.agentName === payload.agent_name) {
+                      found = true;
+                      return {
+                        ...a,
+                        status: payload.status || a.status,
+                        lastHeartbeatAt: payload.last_heartbeat
+                          ? new Date(payload.last_heartbeat).toISOString()
+                          : a.lastHeartbeatAt,
+                      };
+                    }
+                    return a;
+                  });
+                  if (!found) {
+                    void refreshDiscovery();
+                  }
+                  return next;
+                });
+                break;
+              }
+
+              case 'workspace.member.removed': {
+                const payload = event.payload as { agent_name?: string };
+                if (payload?.agent_name) {
+                  setAgents((prev) => prev.filter((a) => a.agentName !== payload.agent_name));
+                }
+                break;
+              }
+
+              case 'workspace.routine.failed':
+              case 'workspace.routine.completed':
+              case 'workspace.routine.created':
+              case 'workspace.routine.updated': {
+                void refreshRoutines();
+                break;
+              }
+
+              case 'workspace.todos.updated':
+              case 'workspace.todos.deleted': {
+                void refreshTodos();
+                break;
+              }
+
+              case 'workspace.timer.created':
+              case 'workspace.timer.fired': {
+                void refreshTimers();
+                break;
+              }
+
+              case 'workspace.notification.created':
+              case 'workspace.notification.read':
+              case 'workspace.notification.dismissed': {
+                void refreshNotifications();
+                break;
+              }
+            }
+          } catch {
+            // Ignore malformed event frame
+          }
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          if (isMounted) {
+            reconnectTimeout = setTimeout(() => {
+              backoffMs = Math.min(backoffMs * 2, 30_000);
+              connect();
+            }, backoffMs);
+          }
+        };
+      } catch {
+        if (isMounted) {
+          reconnectTimeout = setTimeout(connect, 5000);
+        }
+      }
+    };
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (eventSource) eventSource.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, [workspaceId, refreshDiscovery, refreshRoutines, refreshTodos, refreshTimers, refreshNotifications]);
+
+
   const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string }) => {
     // Only set a channel leader when one is explicitly requested (e.g. the
     // single-agent DM path). The default "dynamic" orchestration mode needs no

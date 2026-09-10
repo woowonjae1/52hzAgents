@@ -137,8 +137,16 @@ func (h *EventHub) run() {
 					sendToBucket(globalBucket)
 				}
 
-				// 2. 发送给指定频道的订阅者 (当目标频道非空时)
-				if targetCh != "" {
+				// 2. 路由分发：
+				// 如果是工作区级广播 (targetCh 为空)，广播给该工作区下的所有频道订阅者
+				if targetCh == "" {
+					for chName, chBucket := range wsMap {
+						if chName != "" {
+							sendToBucket(chBucket)
+						}
+					}
+				} else {
+					// 发送给指定频道的订阅者 (当目标频道非空时)
 					if chBucket, ok := wsMap[targetCh]; ok {
 						sendToBucket(chBucket)
 					}

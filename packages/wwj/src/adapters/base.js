@@ -348,6 +348,11 @@ class BaseAdapter {
         this._log(`CRITICAL: ${msg}`);
         this._setExitInfo(REASON.ADAPTER_CRASHED, msg);
         this._reportStatus(REASON.ADAPTER_CRASHED, msg);
+        if (this._sessionId) {
+          try {
+            await this.client.heartbeat(this.workspaceId, this.agentName, this.token, this._sessionId, 'crashed', msg);
+          } catch {}
+        }
       }
     } catch (e) {
       if (!this._stopRequested) {
@@ -355,6 +360,11 @@ class BaseAdapter {
         this._log(`CRITICAL: ${msg}`);
         this._setExitInfo(REASON.ADAPTER_CRASHED, msg);
         this._reportStatus(REASON.ADAPTER_CRASHED, msg);
+        if (this._sessionId) {
+          try {
+            await this.client.heartbeat(this.workspaceId, this.agentName, this.token, this._sessionId, 'crashed', msg);
+          } catch {}
+        }
       }
       throw e;
     } finally {

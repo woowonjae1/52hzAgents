@@ -119,17 +119,21 @@ class WorkspaceClient {
    *   If the server's current session for this agent differs, _post()
    *   throws SessionRevokedError and the caller should stop its adapter.
    */
-  async heartbeat(workspaceId, agentName, token, sessionId) {
+  async heartbeat(workspaceId, agentName, token, sessionId, status = 'online', reason = '') {
     if (!sessionId) {
       throw new Error('session_id is required for workspace presence updates');
     }
+    const body = {
+      agent_name: agentName,
+      session_id: sessionId,
+      status: status || 'online',
+    };
+    if (reason) {
+      body.reason = reason;
+    }
     const data = await this._post(
       `/v1/workspaces/${encodeURIComponent(workspaceId)}/presence`,
-      {
-        agent_name: agentName,
-        session_id: sessionId,
-        status: 'online',
-      },
+      body,
       this._wsHeaders(token),
     );
     return data.data || data;

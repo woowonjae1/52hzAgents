@@ -159,6 +159,15 @@ func JoinNetwork(c *gin.Context) {
 		Payload:     string(fullEventBytes),
 	})
 
+	// 实时广播成员上线状态事件至工作区各客户端
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.member.status", "52hz:"+req.AgentName, "", gin.H{
+		"agent_name":     req.AgentName,
+		"status":         "online",
+		"last_heartbeat": nowUnixMs,
+		"role":           member.Role,
+		"agent_type":     req.AgentType,
+	})
+
 	// 返回接入成功的握手详情。
 	c.JSON(http.StatusOK, JoinResponse{
 		NetworkID: workspace.ID,
@@ -245,6 +254,13 @@ func LeaveNetwork(c *gin.Context) {
 		Payload:     string(fullEventBytes),
 	})
 
+	// 实时广播成员下线状态事件至工作区各客户端
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.member.status", "52hz:"+req.AgentName, "", gin.H{
+		"agent_name":     req.AgentName,
+		"status":         "offline",
+		"last_heartbeat": nowUnixMs,
+	})
+
 	// 返回成功。
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
@@ -253,7 +269,8 @@ func LeaveNetwork(c *gin.Context) {
 type PresenceRequest struct {
 	AgentName string `json:"agent_name" binding:"required"` // 智能体名称 (必选)
 	SessionID string `json:"session_id" binding:"required"` // 连接会话 ID (必选)
-	Status    string `json:"status"`                        // 状态: online
+	Status    string `json:"status"`                        // 状态: online / crashed / idle / busy / offline
+	Reason    string `json:"reason"`                        // 诊断信息或异常原因
 }
 
 // UpdatePresence 处理 POST /v1/workspaces/:workspace_id/presence 接口，接收心跳更新活跃状态。
@@ -285,6 +302,8 @@ func UpdatePresence(c *gin.Context) {
 		return
 	}
 
+	oldStatus := member.Status
+
 	// 刷新成员的最后一次心跳及状态。
 	now := time.Now()
 	member.LastHeartbeat = &now
@@ -303,6 +322,18 @@ func UpdatePresence(c *gin.Context) {
 	// 同样向工作区最后活跃时间刷新。
 	db.DB.Model(workspace).Update("last_activity_at", now)
 
+	// 当状态发生变化（例如 offline/launching -> online，或 online -> crashed），或明确报告异常时，实时广播成员状态事件
+	if oldStatus != member.Status || member.Status == "crashed" || req.Reason != "" {
+		_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.member.status", "52hz:"+req.AgentName, "", gin.H{
+			"agent_name":      req.AgentName,
+			"status":          member.Status,
+			"previous_status": oldStatus,
+			"last_heartbeat":  now.UnixMilli(),
+			"reason":          req.Reason,
+		})
+	}
+
 	// 渲染返回成功。
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
+

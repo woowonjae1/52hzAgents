@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -328,5 +329,143 @@ func TestExpireStaleRoutineRuns(t *testing.T) {
 		t.Fatalf("expected todo error to be populated")
 	}
 }
+
+func TestExpireStaleAgents_Watchdog(t *testing.T) {
+	setupTestDB(t)
+
+	wsID := uuid.NewString()
+	sess := "sess-active"
+	// Agent timed out 100 seconds ago (cutoff is 5 seconds in test)
+	staleHeartbeat := time.Now().Add(-100 * time.Second)
+	freshHeartbeat := time.Now()
+
+	staleMember := models.WorkspaceMember{
+		WorkspaceID:   wsID,
+		AgentName:     "stale-agent",
+		Role:          "member",
+		Status:        "online",
+		LastHeartbeat: &staleHeartbeat,
+		SessionID:     &sess,
+	}
+	db.DB.Create(&staleMember)
+
+	freshMember := models.WorkspaceMember{
+		WorkspaceID:   wsID,
+		AgentName:     "fresh-agent",
+		Role:          "member",
+		Status:        "online",
+		LastHeartbeat: &freshHeartbeat,
+		SessionID:     &sess,
+	}
+	db.DB.Create(&freshMember)
+
+	// Run watchdog sweeper
+	expireStaleAgents()
+
+	// Verify stale agent is marked offline with cleared session_id
+	var updatedStale models.WorkspaceMember
+	db.DB.Where("workspace_id = ? AND agent_name = ?", wsID, "stale-agent").First(&updatedStale)
+	if updatedStale.Status != "offline" {
+		t.Errorf("expected stale-agent status to be offline, got %s", updatedStale.Status)
+	}
+	if updatedStale.SessionID != nil {
+		t.Errorf("expected stale-agent session_id to be nil, got %v", *updatedStale.SessionID)
+	}
+
+	// Verify fresh agent remains online
+	var updatedFresh models.WorkspaceMember
+	db.DB.Where("workspace_id = ? AND agent_name = ?", wsID, "fresh-agent").First(&updatedFresh)
+	if updatedFresh.Status != "online" {
+		t.Errorf("expected fresh-agent status to remain online, got %s", updatedFresh.Status)
+	}
+
+	// Verify workspace.member.status event was published for stale agent
+	var events []models.EventRecord
+	db.DB.Where("network_id = ? AND type = ?", wsID, "workspace.member.status").Find(&events)
+	if len(events) == 0 {
+		t.Fatalf("expected workspace.member.status event to be published by watchdog")
+	}
+	var payload map[string]interface{}
+	json.Unmarshal(events[0].Payload, &payload)
+	if payload["agent_name"] != "stale-agent" || payload["status"] != "offline" {
+		t.Errorf("unexpected event payload: %+v", payload)
+	}
+}
+
+func TestExpireStaleRoutineRuns_ImmediateCrash(t *testing.T) {
+	setupTestDB(t)
+
+	wsID := uuid.NewString()
+	runID := uuid.NewString()
+	rtnID := uuid.NewString()
+	todoID := uuid.NewString()
+	now := time.Now().UTC()
+
+	// Create member with 'crashed' status
+	crashMember := models.WorkspaceMember{
+		WorkspaceID: wsID,
+		AgentName:   "crashed-agent",
+		Role:        "member",
+		Status:      "crashed",
+	}
+	db.DB.Create(&crashMember)
+
+	// Routine run started just 10 seconds ago (normally would have 2 minute grace period for offline, but crashed should fail IMMEDIATELY)
+	recentStart := now.Add(-10 * time.Second)
+	run := models.RoutineRunRecord{
+		ID:          runID,
+		WorkspaceID: wsID,
+		RoutineID:   rtnID,
+		RoutineName: "Crash Recovery Test",
+		ChannelName: "general",
+		AgentName:   "crashed-agent",
+		Status:      "running",
+		StartedAt:   recentStart,
+	}
+	db.DB.Create(&run)
+
+	routine := models.RoutineRecord{
+		ID:            rtnID,
+		WorkspaceID:   wsID,
+		Name:          "Crash Recovery Test",
+		LastRunStatus: "running",
+	}
+	db.DB.Create(&routine)
+
+	todo := models.TodoRecord{
+		ID:          todoID,
+		WorkspaceID: wsID,
+		RunID:       &runID,
+		Status:      "in_progress",
+		Assignee:    "crashed-agent",
+		UpdatedAt:   recentStart,
+	}
+	db.DB.Create(&todo)
+
+	// Run sweeper
+	expireStaleRoutineRuns()
+
+	// Verify run failed immediately due to crash
+	var freshRun models.RoutineRunRecord
+	db.DB.Where("id = ?", runID).First(&freshRun)
+	if freshRun.Status != "failed" {
+		t.Fatalf("expected run status to be failed immediately on crash, got %s", freshRun.Status)
+	}
+	if freshRun.Error == nil || !containsStr(*freshRun.Error, "崩溃") {
+		t.Fatalf("expected crash error message, got: %v", freshRun.Error)
+	}
+
+	// Verify todo was cancelled
+	var freshTodo models.TodoRecord
+	db.DB.Where("id = ?", todoID).First(&freshTodo)
+	if freshTodo.Status != "cancelled" {
+		t.Fatalf("expected todo to be cancelled, got %s", freshTodo.Status)
+	}
+}
+
+func containsStr(s, substr string) bool {
+	return strings.Contains(s, substr)
+}
+
 
 

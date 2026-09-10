@@ -65,9 +65,28 @@ func expireStaleAgents() {
 	}
 	cutoff := time.Now().Add(-time.Duration(timeoutSec) * time.Second)
 	cutoffUTC := time.Now().UTC().Add(-time.Duration(timeoutSec) * time.Second)
-	db.DB.Model(&models.WorkspaceMember{}).
-		Where("status IN ? AND (last_heartbeat IS NULL OR last_heartbeat < ? OR last_heartbeat < ?)", []string{"online", "launching"}, cutoff, cutoffUTC).
-		Updates(map[string]interface{}{"status": "offline", "session_id": nil})
+
+	var staleMembers []models.WorkspaceMember
+	err := db.DB.Where("status IN ? AND (last_heartbeat IS NULL OR last_heartbeat < ? OR last_heartbeat < ?)",
+		[]string{"online", "launching"}, cutoff, cutoffUTC).Find(&staleMembers).Error
+	if err != nil || len(staleMembers) == 0 {
+		return
+	}
+
+	nowMs := time.Now().UnixMilli()
+	for _, m := range staleMembers {
+		db.DB.Model(&models.WorkspaceMember{}).Where("workspace_id = ? AND agent_name = ?", m.WorkspaceID, m.AgentName).
+			Updates(map[string]interface{}{"status": "offline", "session_id": nil})
+
+		_ = handlers.PublishWorkspaceStateEvent(m.WorkspaceID, "workspace.member.status", "system:watchdog", "", map[string]interface{}{
+			"agent_name":      m.AgentName,
+			"status":          "offline",
+			"previous_status": m.Status,
+			"last_heartbeat":  nowMs,
+			"reason":          fmt.Sprintf("Agent heartbeat timed out after %ds silence", timeoutSec),
+		})
+		log.Printf("scheduler: agent @%s timed out after %ds without heartbeat, marked offline", m.AgentName, timeoutSec)
+	}
 }
 
 func fireDueTimers() {
@@ -482,22 +501,25 @@ func expireStaleRoutineRuns() {
 		for _, run := range runningRuns {
 			isTimeout := run.StartedAt.Before(now.Add(-15 * time.Minute))
 
-			// 检测对应智能体是否离线（提供 2 分钟宽限期）
+			// 检测对应智能体是否离线或崩溃
+			agentCrashed := false
 			agentOffline := false
-			if run.StartedAt.Before(now.Add(-2 * time.Minute)) {
-				var member models.WorkspaceMember
-				if err := db.DB.Where("workspace_id = ? AND agent_name = ?", run.WorkspaceID, run.AgentName).First(&member).Error; err == nil {
-					if member.Status == "offline" {
-						agentOffline = true
-					}
-				} else {
+			var member models.WorkspaceMember
+			if err := db.DB.Where("workspace_id = ? AND agent_name = ?", run.WorkspaceID, run.AgentName).First(&member).Error; err == nil {
+				if member.Status == "crashed" {
+					agentCrashed = true
+				} else if member.Status == "offline" && run.StartedAt.Before(now.Add(-2*time.Minute)) {
 					agentOffline = true
 				}
+			} else if run.StartedAt.Before(now.Add(-2 * time.Minute)) {
+				agentOffline = true
 			}
 
-			if isTimeout || agentOffline {
+			if isTimeout || agentCrashed || agentOffline {
 				failReason := "执行超时 (15分钟无响应)"
-				if agentOffline {
+				if agentCrashed {
+					failReason = fmt.Sprintf("智能体 @%s 异常崩溃退出", run.AgentName)
+				} else if agentOffline {
 					failReason = fmt.Sprintf("智能体 @%s 处于离线状态或异常退出", run.AgentName)
 				}
 
@@ -547,21 +569,24 @@ func expireStaleRoutineRuns() {
 	if err := db.DB.Where("timer_id IS NOT NULL AND status = ?", "in_progress").Find(&staleTimerTodos).Error; err == nil && len(staleTimerTodos) > 0 {
 		for _, todo := range staleTimerTodos {
 			isTimeout := todo.UpdatedAt.Before(now.Add(-15 * time.Minute))
+			agentCrashed := false
 			agentOffline := false
-			if todo.UpdatedAt.Before(now.Add(-2 * time.Minute)) {
-				var member models.WorkspaceMember
-				if err := db.DB.Where("workspace_id = ? AND agent_name = ?", todo.WorkspaceID, todo.Assignee).First(&member).Error; err == nil {
-					if member.Status == "offline" {
-						agentOffline = true
-					}
-				} else {
+			var member models.WorkspaceMember
+			if err := db.DB.Where("workspace_id = ? AND agent_name = ?", todo.WorkspaceID, todo.Assignee).First(&member).Error; err == nil {
+				if member.Status == "crashed" {
+					agentCrashed = true
+				} else if member.Status == "offline" && todo.UpdatedAt.Before(now.Add(-2*time.Minute)) {
 					agentOffline = true
 				}
+			} else if todo.UpdatedAt.Before(now.Add(-2 * time.Minute)) {
+				agentOffline = true
 			}
 
-			if isTimeout || agentOffline {
+			if isTimeout || agentCrashed || agentOffline {
 				failReason := "定时任务执行超时"
-				if agentOffline {
+				if agentCrashed {
+					failReason = fmt.Sprintf("智能体 @%s 异常崩溃退出", todo.Assignee)
+				} else if agentOffline {
 					failReason = fmt.Sprintf("智能体 @%s 处于离线状态", todo.Assignee)
 				}
 
