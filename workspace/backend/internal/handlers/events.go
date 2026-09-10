@@ -693,6 +693,7 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 			TotalPromptTokens:     promptTokens,
 			TotalCompletionTokens: completionTokens,
 			TotalTokens:           totalDelta,
+			LastPromptTokens:      promptTokens,
 			ContextWindowSize:     compaction.UnknownWindow,
 		}
 		_ = db.DB.Create(&record).Error
@@ -701,6 +702,11 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 			"total_prompt_tokens":     record.TotalPromptTokens + promptTokens,
 			"total_completion_tokens": record.TotalCompletionTokens + completionTokens,
 			"total_tokens":            record.TotalTokens + totalDelta,
+		}
+		// Replaced, not accumulated: this is "how big was the last prompt",
+		// which is the only one of these numbers that can go down.
+		if promptTokens > 0 {
+			updates["last_prompt_tokens"] = promptTokens
 		}
 		// A window may still be DERIVED from a reported model name -- that is a
 		// statement about the model, not about the agent's label -- but never

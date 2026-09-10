@@ -1,6 +1,11 @@
 package compaction
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
+)
 
 /*
 CONTEXT BUDGETING — the arithmetic, separated from the database.
@@ -206,4 +211,54 @@ func ModelContextWindow(model string) int {
 		// NOT 128000. See UnknownWindow.
 		return UnknownWindow
 	}
+}
+
+/*
+ChannelWindow exposes the channel's real budget to callers that need to SHOW
+it, rather than making them reconstruct it.
+
+The token-stats handler used to derive the window back out of the threshold:
+
+	minWindow := cfg.TokenThreshold * 4 // inverse of 0.25 safety margin
+
+Three things were wrong with that. The comment said 0.25 while the code that
+produced the threshold used 0.20, so the inverse was wrong from the start. The
+threshold is now a subtraction rather than a percentage, so no single
+multiplier inverts it at all. And most of all, the real number was already
+computed a line earlier and thrown away -- the handler had the answer and
+reconstructed an approximation of it instead. That reconstructed value is what
+the context-health panel showed the user as "context capacity".
+*/
+func ChannelWindow(workspaceID, channelName string) int {
+	rawName := strings.TrimPrefix(channelName, "channel/")
+	return ChannelBudget(agentBudgetsForChannel(workspaceID, rawName))
+}
+
+/*
+ChannelLoad reports the MEASURED size of the largest recent prompt among the
+channel's participants, and whether anything was actually measured.
+
+This is what "how full is the context" means: the biggest prompt any agent
+most recently sent. It is reported by the agents themselves on every turn. The
+alternative the handler used -- summing a character heuristic over the last
+100 message bodies -- misses tool payloads (usually the bulk of a prompt),
+saturates at 100 messages, and is an estimate standing in for a measurement
+that was already arriving.
+*/
+func ChannelLoad(workspaceID, channelName string) (tokens int, measured bool) {
+	rawName := strings.TrimPrefix(channelName, "channel/")
+	for _, b := range agentBudgetsForChannel(workspaceID, rawName) {
+		if db.DB == nil {
+			break
+		}
+		var usage models.AgentUsageRecord
+		if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, b.AgentName).First(&usage).Error; err != nil {
+			continue
+		}
+		if usage.LastPromptTokens > 0 && int(usage.LastPromptTokens) > tokens {
+			tokens = int(usage.LastPromptTokens)
+			measured = true
+		}
+	}
+	return tokens, measured
 }

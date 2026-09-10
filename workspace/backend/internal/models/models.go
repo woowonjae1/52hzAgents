@@ -509,6 +509,18 @@ type AgentUsageRecord struct {
 	TotalPromptTokens     int64     `gorm:"type:bigint;not null;default:0" json:"total_prompt_tokens"`
 	TotalCompletionTokens int64     `gorm:"type:bigint;not null;default:0" json:"total_completion_tokens"`
 	TotalTokens           int64     `gorm:"type:bigint;not null;default:0" json:"total_tokens"`
+	// The size of the agent's MOST RECENT prompt, as the agent reported it.
+	//
+	// The cumulative totals above answer "what has this cost"; they say nothing
+	// about how full the context is right now, because they only ever grow. The
+	// context-health panel needs the latter, and was estimating it by summing a
+	// character heuristic over the last 100 channel messages -- which ignores
+	// tool payloads (usually the bulk), saturates at 100 messages, and is an
+	// estimate where a measurement was already arriving on every turn.
+	//
+	// Zero means no agent has reported a prompt size yet, which the panel must
+	// show as unknown rather than as 0%.
+	LastPromptTokens      int64     `gorm:"type:bigint;not null;default:0" json:"last_prompt_tokens"`
 	ContextWindowSize     int       `gorm:"type:integer;not null;default:0" json:"context_window_size"`
 	UpdatedAt             time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

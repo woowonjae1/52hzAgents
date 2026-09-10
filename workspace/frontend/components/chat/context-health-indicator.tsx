@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import * as React from 'react';
-import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle, ArrowDownRight } from 'lucide-react';
+import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -71,10 +71,16 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
       }>(`/v1/workspaces/${workspaceId}/channels/${encodeURIComponent(rawChannel)}/compact`, {
         method: 'POST',
       });
-      if (res?.saved_tokens !== undefined) {
-        setLastCompactedResult(`Saved ${fmtTokens(res.saved_tokens)} tokens (${res.compacted_count || 0} msgs compressed)`);
+      // Reports WHAT HAPPENED, not what was "saved". The compaction endpoint
+      // still returns saved_tokens; the count of messages folded into the
+      // summary is the fact the user can check, and it is the one that tells
+      // them whether the action did anything at all.
+      if (res?.compacted_count) {
+        setLastCompactedResult(
+          `Compacted ${res.compacted_count} message${res.compacted_count === 1 ? '' : 's'} into a summary`
+        );
       } else {
-        setLastCompactedResult('Compaction completed');
+        setLastCompactedResult('Nothing to compact yet');
       }
       await fetchStats();
     } catch (e: any) {
@@ -84,10 +90,27 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
     }
   };
 
-  const status = channelHealth?.health_status || 'optimal';
-  const budgetPct = Math.min(Math.round(channelHealth?.token_budget_percent || 0), 100);
-  const estTokens = channelHealth?.estimated_tokens || 0;
-  const minWindow = channelHealth?.min_context_window || 64000;
+  /*
+    NO INVENTED FALLBACKS IN HERE.
+
+    `min_context_window || 64000` substituted a made-up window whenever the
+    backend reported that it did not know one -- so a channel whose agents had
+    never declared their capacity still showed a confident percentage, computed
+    against a number the frontend picked. That is the same failure the backend
+    had (its model table answered every unknown agent with 128k), and fixing it
+    on one side only moves the fiction across the wire.
+
+    Missing data now renders as 'unknown', which the badge has a real
+    presentation for.
+  */
+  const status = channelHealth?.health_status ?? 'unknown';
+  const minWindow = channelHealth?.min_context_window ?? 0;
+  const knownWindow = minWindow > 0;
+  const budgetPct = knownWindow
+    ? Math.min(Math.round(channelHealth?.token_budget_percent || 0), 100)
+    : 0;
+  const estTokens = channelHealth?.context_tokens || 0;
+  const measured = channelHealth?.measured ?? false;
 
   const statusBadge = {
     optimal: {
@@ -107,6 +130,22 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
       textClass: 'text-status-danger',
       label: 'Critical',
       pillClass: 'border-status-danger/40 bg-status-muted-danger text-status-danger',
+    },
+    /*
+      UNKNOWN IS UNCOLOURED, and that is the point.
+
+      No participant has reported a context window, so there is no percentage
+      to be optimal or critical about. Giving it green would claim health we
+      cannot see; giving it amber would claim a problem that may not exist.
+      The neutral treatment says exactly what is true -- we do not know yet --
+      and it is the state a fresh channel legitimately sits in until its first
+      turn reports a prompt size.
+    */
+    unknown: {
+      dotClass: 'bg-foreground-extra-muted',
+      textClass: 'text-foreground-muted',
+      label: 'Unknown',
+      pillClass: 'border-border/60 text-foreground-muted',
     },
   }[status];
 
@@ -137,10 +176,16 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
             </span>
             <span className="text-foreground-muted font-normal">Ctx</span>
             <span className="font-mono font-semibold tabular-nums">{fmtTokens(estTokens)}</span>
-            <span className="text-foreground-extra-muted">·</span>
-            <span className={cn('font-mono font-medium tabular-nums', statusBadge.textClass)}>
-              {budgetPct}%
-            </span>
+            {/* A percentage needs a denominator. Without a known window the
+                pill shows the load alone rather than a number over nothing. */}
+            {knownWindow && (
+              <>
+                <span className="text-foreground-extra-muted">·</span>
+                <span className={cn('font-mono font-medium tabular-nums', statusBadge.textClass)}>
+                  {budgetPct}%
+                </span>
+              </>
+            )}
           </button>
         </Hint>
       </PopoverTrigger>
@@ -179,9 +224,18 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
         {/* Context Capacity Gauge */}
         <div className="space-y-2 bg-surface2/50 border border-border/40 rounded-xl p-3">
           <div className="flex items-center justify-between text-2xs">
-            <span className="font-medium text-foreground">Active Context Window</span>
+            <span className="font-medium text-foreground">
+              Active Context Window
+              {/* Says which of the two numbers this is. The load is measured
+                  from the agents' own reported prompt sizes when they have
+                  reported any, and estimated from message text when they have
+                  not -- those deserve different confidence, so they say so. */}
+              {!measured && (
+                <span className="ml-1 font-normal text-foreground-extra-muted">(estimated)</span>
+              )}
+            </span>
             <span className="font-mono tabular-nums text-foreground">
-              {fmtTokens(estTokens)} / {fmtTokens(minWindow)}
+              {fmtTokens(estTokens)} / {knownWindow ? fmtTokens(minWindow) : 'unknown'}
             </span>
           </div>
 
@@ -209,13 +263,13 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
               {channelHealth?.compaction_count || 0} runs
             </div>
           </div>
-          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
-            <div className="text-3xs text-foreground-muted mb-0.5">Workspace Saved</div>
-            <div className="font-semibold font-mono tabular-nums text-status-success flex items-center gap-1">
-              <ArrowDownRight className="size-3 shrink-0" />
-              {fmtTokens(stats?.compaction_saved_tokens || 0)}
-            </div>
-          </div>
+          {/*
+            "Workspace Saved" was removed rather than re-sourced. Compaction
+            does not save tokens, it DISCARDS context, and the figure behind it
+            was the difference between two runs of a character heuristic --
+            shown in green, beside genuinely measured totals, in the same
+            typeface. It answered no question the reader actually had.
+          */}
         </div>
 
         {/* Compact Action */}

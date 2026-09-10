@@ -484,10 +484,19 @@ export interface AgentTokenStat {
 export interface ChannelContextHealth {
   channel_name: string;
   message_count: number;
-  estimated_tokens: number;
+  /**
+   * The largest recent prompt among the channel's participants when `measured`
+   * is true, and a character-heuristic estimate otherwise. Was
+   * `estimated_tokens`, which described the fallback as though it were the
+   * only case -- the agents report their real prompt sizes on every turn.
+   */
+  context_tokens: number;
+  measured: boolean;
+  /** 0 when no participant has reported a window. NOT a default -- see below. */
   min_context_window: number;
   token_budget_percent: number;
-  health_status: 'optimal' | 'warning' | 'critical';
+  /** 'unknown' is a real state: nobody has told us how big the window is. */
+  health_status: 'optimal' | 'warning' | 'critical' | 'unknown';
   last_compacted_at?: string | null;
   compaction_count: number;
 }
@@ -497,7 +506,9 @@ export interface WorkspaceTokenStats {
   total_tokens: number;
   total_prompt_tokens: number;
   total_completion_tokens: number;
-  compaction_saved_tokens: number;
+  // `compaction_saved_tokens` was removed from the API: compaction discards
+  // context rather than saving tokens, and the figure was a difference between
+  // two runs of a character heuristic presented as a precise total.
   compaction_runs: number;
   agents: AgentTokenStat[];
   channels: ChannelContextHealth[];
