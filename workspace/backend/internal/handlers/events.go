@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"     // Gin 框架的核心上下文及路由引擎。
 	"github.com/google/uuid"       // 用于生成客户端唯一的 Session ID。
 	"github.com/gorilla/websocket" // 业界主流的 WebSocket 升级和协议工具。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 本地 GORM 数据库连接包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 自研的内存级多路复用广播 Hub。
@@ -260,16 +261,23 @@ func SendEvent(c *gin.Context) {
 	}
 
 	// 将序列化的 JSON 写入全局 EventHub 中广播给当前所有订阅长连接的客户端。
-	hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-		WorkspaceID: workspace.ID,
-		ChannelName: req.Target, // 精确路由到目标会话通道。
-		Payload:     string(fullEventBytes),
-	})
+	if hub.GlobalHub != nil {
+		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+			WorkspaceID: workspace.ID,
+			ChannelName: req.Target, // 精确路由到目标会话通道。
+			Payload:     string(fullEventBytes),
+		})
+	}
 
 	// Check if this event finishes an agent turn and should trigger the next pipeline step
 	if isAgentSource(req.Source) && messageType(req.Payload) == "chat" {
 		CheckAndTriggerNextPipelineStep(workspace.ID, req.Target, req.Source)
 		CompleteRoutineRunIfApplicable(workspace.ID, req.Target, req.Source)
+	}
+
+	// Track agent token consumption for governance & dashboard
+	if isAgentSource(req.Source) {
+		recordAgentMessageTokenUsage(workspace.ID, req.Source, req.Payload, req.Metadata)
 	}
 
 	// Intercept workspace.agent.control stop to cancel in-flight routine runs and tasks
@@ -582,15 +590,22 @@ func StreamEventsWS(c *gin.Context) {
 		}
 		fullEventBytes, _ := json.Marshal(fullEvent)
 		// 广播至全局。
-		hub.GlobalHub.Broadcast(hub.BroadcastMsg{
-			WorkspaceID: workspace.ID,
-			ChannelName: parsedReq.Target,
-			Payload:     string(fullEventBytes),
-		})
+		if hub.GlobalHub != nil {
+			hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+				WorkspaceID: workspace.ID,
+				ChannelName: parsedReq.Target,
+				Payload:     string(fullEventBytes),
+			})
+		}
 
 		if isAgentSource(parsedReq.Source) && messageType(parsedReq.Payload) == "chat" {
 			CheckAndTriggerNextPipelineStep(workspace.ID, parsedReq.Target, parsedReq.Source)
 			CompleteRoutineRunIfApplicable(workspace.ID, parsedReq.Target, parsedReq.Source)
+		}
+
+		// Track agent token consumption for governance & dashboard
+		if isAgentSource(parsedReq.Source) {
+			recordAgentMessageTokenUsage(workspace.ID, parsedReq.Source, parsedReq.Payload, parsedReq.Metadata)
 		}
 
 		if parsedReq.Type == "workspace.agent.control" {
@@ -612,5 +627,73 @@ func StreamEventsWS(c *gin.Context) {
 			"timestamp":         eventRec.Timestamp,
 			"duplicate":         false,
 		})
+	}
+}
+
+// recordAgentMessageTokenUsage accumulates prompt and completion tokens for any agent emitting messages.
+func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata map[string]interface{}) {
+	agentName := agentNameFromSource(source)
+	if agentName == "" || db.DB == nil {
+		return
+	}
+
+	var completionTokens int64
+	var promptTokens int64
+
+	// 1. Check metadata for explicit token counts
+	if metadata != nil {
+		if ct, ok := metadata["completion_tokens"].(float64); ok && ct > 0 {
+			completionTokens = int64(ct)
+		} else if ct, ok := metadata["output_tokens"].(float64); ok && ct > 0 {
+			completionTokens = int64(ct)
+		}
+		if pt, ok := metadata["prompt_tokens"].(float64); ok && pt > 0 {
+			promptTokens = int64(pt)
+		} else if pt, ok := metadata["input_tokens"].(float64); ok && pt > 0 {
+			promptTokens = int64(pt)
+		}
+	}
+
+	// 2. Fallback to estimation from content if not provided
+	if completionTokens == 0 && payload != nil {
+		if content, ok := payload["content"].(string); ok && content != "" {
+			completionTokens = int64(compaction.EstimateTokens(content))
+		}
+	}
+
+	if completionTokens == 0 && promptTokens == 0 {
+		return
+	}
+
+	totalDelta := completionTokens + promptTokens
+
+	var record models.AgentUsageRecord
+	err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, agentName).First(&record).Error
+	if err != nil {
+		// Create initial usage record
+		windowSize := compaction.ModelContextWindow(agentName)
+		record = models.AgentUsageRecord{
+			WorkspaceID:           workspaceID,
+			AgentName:             agentName,
+			TotalPromptTokens:     promptTokens,
+			TotalCompletionTokens: completionTokens,
+			TotalTokens:           totalDelta,
+			ContextWindowSize:     windowSize,
+		}
+		_ = db.DB.Create(&record).Error
+	} else {
+		updates := map[string]interface{}{
+			"total_prompt_tokens":     record.TotalPromptTokens + promptTokens,
+			"total_completion_tokens": record.TotalCompletionTokens + completionTokens,
+			"total_tokens":           record.TotalTokens + totalDelta,
+		}
+		if record.ContextWindowSize == 0 {
+			model := agentName
+			if record.CurrentModel != nil && *record.CurrentModel != "" {
+				model = *record.CurrentModel
+			}
+			updates["context_window_size"] = compaction.ModelContextWindow(model)
+		}
+		_ = db.DB.Model(&record).Updates(updates).Error
 	}
 }

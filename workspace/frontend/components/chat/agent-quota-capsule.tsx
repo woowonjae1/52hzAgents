@@ -1,153 +1,126 @@
-'use client';
+﻿'use client';
 
-import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
-import { Gauge, RefreshCw, Zap, Clock, Calendar, Sparkles, AlertCircle, FileText } from 'lucide-react';
+import { Gauge, RefreshCw, Zap, Clock, Calendar, Sparkles, AlertCircle, FileText, Cpu, Coins } from 'lucide-react';
+import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
-import type { AgentUsage } from '@/lib/types';
+import type { AgentUsage, AgentTokenStat, WorkspaceTokenStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 interface AgentQuotaCapsuleProps {
-  /** 外部建议展示的 agent（通常是当前选中模型所属的），用户可在面板内切换到其他 agent。 */
+  /** 建议展示的 agent 名（通常为当前选中模型所属），面板内可切换到其他 agent */
   agentName?: string;
   className?: string;
 }
 
-type QuotaKind = 'claude';
-
-interface QuotaAgent {
-  name: string;
-  kind: QuotaKind;
-  online: boolean;
+function fmtTokens(n: number): string {
+  if (!n || n <= 0) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
 }
 
-/** 判断某个 agent 是否有可展示的用量面板，以及属于哪一类。 */
-function quotaKindOf(name?: string | null, agentType?: string | null): QuotaKind | null {
-  const lower = (name || '').toLowerCase();
-  const typeLower = (agentType || '').toLowerCase();
-  if (lower.includes('claude') || typeLower === 'claude') return 'claude';
-  return null;
+function fmtContextLimit(window: number): string {
+  if (!window || window <= 0) return '64k';
+  if (window >= 1_000_000) return `${(window / 1_000_000).toFixed(1)}M`;
+  return `${Math.round(window / 1024)}k`;
 }
 
 export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsuleProps) {
   const { workspaceId, agents } = useWorkspace();
-  // 按 agent 名缓存用量，切换时不会闪回空白。
+  const [tokenStats, setTokenStats] = React.useState<WorkspaceTokenStats | null>(null);
   const [usageByAgent, setUsageByAgent] = React.useState<Record<string, AgentUsage>>({});
   const [loadingAgent, setLoadingAgent] = React.useState<string | null>(null);
   const [isOpen, setIsOpen] = React.useState(false);
-  // 用户在面板里手动选择的 agent；为空时跟随外部传入的当前模型。
   const [manualAgent, setManualAgent] = React.useState<string | null>(null);
 
-  const quotaAgents = React.useMemo<QuotaAgent[]>(
-    () =>
-      agents
-        .map((a) => {
-          const kind = quotaKindOf(a.agentName, a.agentType);
-          return kind ? { name: a.agentName, kind, online: a.status === 'online' } : null;
-        })
-        .filter((a): a is QuotaAgent => a !== null),
-    [agents]
-  );
+  // Available agent candidates
+  const candidateAgents = React.useMemo(() => {
+    return agents.map((a) => ({
+      name: a.agentName,
+      online: a.status === 'online',
+    }));
+  }, [agents]);
 
-  const onlineAgents = React.useMemo(() => quotaAgents.filter((a) => a.online), [quotaAgents]);
-
-  // 选中优先级：手动切换 > 外部传入的当前模型（若支持配额） > 若未指定外部模型则取第一个在线配额 Agent
-  const selected = React.useMemo<QuotaAgent | null>(() => {
+  // Selected agent resolution: manualAgent > agentName > first candidate
+  const selectedAgent = React.useMemo(() => {
     if (manualAgent) {
-      const match = onlineAgents.find((a) => a.name.toLowerCase() === manualAgent.toLowerCase());
+      const match = candidateAgents.find((a) => a.name.toLowerCase() === manualAgent.toLowerCase());
       if (match) return match;
     }
-
     if (agentName) {
-      const targetAgentObj = agents.find((a) => a.agentName.toLowerCase() === agentName.toLowerCase());
-      const kind = quotaKindOf(agentName, targetAgentObj?.agentType);
-      if (!kind) {
-        // Explicitly targeted an agent without quota (e.g. OpenClaw / Antigravity) — do not pollute with other agent's quota
-        return null;
-      }
-      return onlineAgents.find((a) => a.name.toLowerCase() === agentName.toLowerCase()) ||
-             onlineAgents.find((a) => a.kind === kind) ||
-             null;
+      const match = candidateAgents.find((a) => a.name.toLowerCase() === agentName.toLowerCase());
+      if (match) return match;
     }
+    return candidateAgents[0] ?? null;
+  }, [manualAgent, agentName, candidateAgents]);
 
-    return onlineAgents[0] ?? null;
-  }, [manualAgent, agentName, onlineAgents, agents]);
+  const selectedName = selectedAgent?.name;
 
-  const selectedName = selected?.name;
+  const fetchUsageAndStats = React.useCallback(async (target?: string) => {
+    const name = target ?? selectedName;
+    if (!workspaceId) return;
 
-  const fetchUsage = React.useCallback(
-    async (target?: string) => {
-      const name = target ?? selectedName;
-      if (!name) return;
-      try {
-        setLoadingAgent(name);
-        if (workspaceId) {
-          workspaceApi.setWorkspaceId(workspaceId);
-        }
-        const data = await workspaceApi.getAgentUsage(name);
-        if (data && (data.session_used_percent !== undefined || data.week_used_percent !== undefined || data.raw_text)) {
-          setUsageByAgent((prev) => ({ ...prev, [name]: data }));
-        }
-      } catch {
-        // silently ignore
-      } finally {
-        setLoadingAgent((cur) => (cur === name ? null : cur));
+    try {
+      if (name) setLoadingAgent(name);
+      workspaceApi.setWorkspaceId(workspaceId);
+
+      const [statsRes, usageRes] = await Promise.all([
+        workspaceApi.getWorkspaceTokenStats(),
+        name ? workspaceApi.getAgentUsage(name) : Promise.resolve(null),
+      ]);
+
+      if (statsRes) {
+        setTokenStats(statsRes);
       }
-    },
-    [workspaceId, selectedName]
-  );
+      if (name && usageRes) {
+        setUsageByAgent((prev) => ({ ...prev, [name]: usageRes }));
+      }
+    } catch {
+      // ignore
+    } finally {
+      if (name) setLoadingAgent((cur) => (cur === name ? null : cur));
+    }
+  }, [workspaceId, selectedName]);
 
   React.useEffect(() => {
-    if (!selectedName) return;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    let cancelled = false;
-
-    const stopTimer = () => {
-      if (timer !== null) {
-        clearInterval(timer);
-        timer = null;
+    fetchUsageAndStats(selectedName);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchUsageAndStats(selectedName);
       }
-    };
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchUsageAndStats, selectedName]);
 
-    const startTimer = () => {
-      if (timer !== null || cancelled) return;
-      if (typeof document !== 'undefined' && document.hidden) return;
-      timer = setInterval(() => fetchUsage(selectedName), 30_000);
-    };
+  if (!selectedAgent) return null;
 
-    const handleVisibilityChange = () => {
-      if (typeof document === 'undefined') return;
-      if (document.hidden) {
-        stopTimer();
-      } else {
-        fetchUsage(selectedName);
-        startTimer();
-      }
-    };
+  const usage = selectedName ? usageByAgent[selectedName] ?? null : null;
+  const agentStat = React.useMemo<AgentTokenStat | null>(() => {
+    if (!tokenStats?.agents || !selectedName) return null;
+    return tokenStats.agents.find((a) => a.agent_name.toLowerCase() === selectedName.toLowerCase()) || null;
+  }, [tokenStats, selectedName]);
 
-    fetchUsage(selectedName);
-    startTimer();
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+  const loading = loadingAgent === selectedName;
 
-    return () => {
-      cancelled = true;
-      stopTimer();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [fetchUsage, selectedName]);
+  // Determine if this agent has Claude-style subscription quotas
+  const isClaudeQuota = Boolean(
+    (usage && (usage.session_used_percent > 0 || usage.week_used_percent > 0 || usage.raw_text)) ||
+    (agentStat && (agentStat.session_used_percent > 0 || agentStat.week_used_percent > 0)) ||
+    selectedName.toLowerCase().includes('claude')
+  );
 
-  // 只有在没有任何可展示用量的 agent 在线时才完全隐藏。
-  if (!selected) return null;
-
-  const usage = usageByAgent[selected.name] ?? null;
-  const loading = loadingAgent === selected.name;
-
-  const sessionPercent = usage?.session_used_percent ?? 0;
-  const weekPercent = usage?.week_used_percent ?? 0;
+  const sessionPercent = usage?.session_used_percent ?? agentStat?.session_used_percent ?? 0;
+  const weekPercent = usage?.week_used_percent ?? agentStat?.week_used_percent ?? 0;
   const isUnparsed = (usage as any)?.parse_status === 'unparsed';
-  const isEstimated = Boolean((usage as any)?.is_estimated);
+
+  const totalTokens = agentStat?.total_tokens ?? usage?.total_tokens ?? 0;
+  const promptTokens = agentStat?.total_prompt_tokens ?? usage?.total_prompt_tokens ?? 0;
+  const completionTokens = agentStat?.total_completion_tokens ?? usage?.total_completion_tokens ?? 0;
+  const contextWindow = agentStat?.context_window_size ?? usage?.context_window_size ?? 64000;
+  const activeModel = agentStat?.current_model ?? usage?.current_model ?? selectedName;
 
   const getBarColor = (pct: number) => {
     if (pct >= 85) return 'bg-status-danger';
@@ -155,19 +128,16 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
     return 'bg-status-success';
   };
 
-  const agentLabel = 'Claude';
-  const badgeLabel = isUnparsed ? 'Parse failed' : 'Pro / Max';
-
   return (
     <Popover
       open={isOpen}
       onOpenChange={(open) => {
         setIsOpen(open);
-        if (open) fetchUsage();
+        if (open) fetchUsageAndStats(selectedName);
       }}
     >
       <PopoverTrigger asChild>
-        <Hint label={`View ${agentLabel} usage and refresh state`}>
+        <Hint label={`View ${selectedName} token governance & usage`}>
           <button
             type="button"
             className={cn(
@@ -177,19 +147,8 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               className
             )}
           >
+            {/* Status Dot */}
             <span className="relative flex size-2 shrink-0 items-center justify-center">
-              <span
-                className={cn(
-                  'absolute inline-flex size-full rounded-full opacity-0',
-                  isUnparsed
-                    ? 'bg-status-warning'
-                    : sessionPercent >= 85
-                    ? 'bg-status-danger'
-                    : sessionPercent >= 60
-                    ? 'bg-status-warning'
-                    : 'bg-status-success'
-                )}
-              />
               <span
                 className={cn(
                   'relative inline-flex size-1.5 rounded-full',
@@ -203,49 +162,64 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                 )}
               />
             </span>
-            <span className="text-foreground-muted font-normal">5h</span>
-            <span
-              className={cn(
-                'font-semibold tabular-nums',
-                isUnparsed ? 'text-status-warning' : sessionPercent >= 85 ? 'text-status-danger' : sessionPercent >= 60 ? 'text-status-warning' : 'text-foreground'
-              )}
-            >
-              {sessionPercent}%
-            </span>
-            <span className="text-foreground-extra-muted">·</span>
-            <span className="text-foreground-muted font-normal">Week</span>
-            <span className="font-semibold tabular-nums text-foreground">{weekPercent}%</span>
+
+            {/* Display: Claude 5h/week or Cumulative Tokens */}
+            {isClaudeQuota && (sessionPercent > 0 || weekPercent > 0) ? (
+              <>
+                <span className="text-foreground-muted font-normal">5h</span>
+                <span
+                  className={cn(
+                    'font-mono font-semibold tabular-nums',
+                    sessionPercent >= 85
+                      ? 'text-status-danger'
+                      : sessionPercent >= 60
+                      ? 'text-status-warning'
+                      : 'text-foreground'
+                  )}
+                >
+                  {sessionPercent}%
+                </span>
+                <span className="text-foreground-extra-muted">·</span>
+                <span className="text-foreground-muted font-normal">Wk</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">{weekPercent}%</span>
+              </>
+            ) : (
+              <>
+                <span className="text-foreground-muted font-normal">{selectedName}</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {fmtTokens(totalTokens)} tok
+                </span>
+              </>
+            )}
           </button>
         </Hint>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-88 p-4 space-y-4 shadow-xl border-border/80 bg-surface1/95 backdrop-blur-xl">
+      <PopoverContent
+        align="start"
+        className="w-88 p-4 space-y-4 shadow-xl border-border/70 bg-surface1/95 backdrop-blur-xl rounded-2xl"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3">
+        <div className="flex items-center justify-between pb-3 border-b border-border/40">
           <div className="flex items-center gap-2">
-            <div className="size-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-              <Gauge className="size-4" />
+            <div className="size-7 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center text-foreground">
+              <Gauge className="size-3.5" />
             </div>
             <div>
               <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                {agentLabel} usage
-                <span className={cn(
-                  'text-3xs font-normal px-1.5 py-0.2 rounded border',
-                  isUnparsed ? 'bg-status-muted-warning border-status-warning/30 text-status-warning' : 'bg-surface3 border-border text-foreground-muted'
-                )}>
-                  {badgeLabel}
+                {selectedName}
+                <span className="text-3xs font-mono font-normal px-1.5 py-0.5 rounded-full bg-surface3 border border-border/60 text-foreground-muted">
+                  {activeModel}
                 </span>
               </div>
-              <p className="text-3xs text-foreground-muted">
-                {isEstimated ? 'Estimated activity — not a live quota' : 'Live quota and reset window'}
-              </p>
+              <p className="text-3xs text-foreground-muted">Token governance & context health</p>
             </div>
           </div>
           <Hint label="Refresh usage">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                fetchUsage();
+                fetchUsageAndStats(selectedName);
               }}
               disabled={loading}
               className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50"
@@ -255,133 +229,146 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           </Hint>
         </div>
 
-        {/* Agent 切换器：有多个可展示用量的 Agent 时出现，离线项保留但不可选 */}
-        {quotaAgents.length > 1 && (
-          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface2/70 border border-border/50">
-            {quotaAgents.map((a) => {
-              const active = a.name === selected.name;
+        {/* Multi-Agent Switcher */}
+        {candidateAgents.length > 1 && (
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface2/70 border border-border/40">
+            {candidateAgents.map((a) => {
+              const active = a.name === selectedName;
               return (
-                <Hint key={a.name} label={a.online ? `View ${a.name} usage` : `${a.name} is offline — usage shows once it connects`}>
-                  <button
-                    type="button"
-                    disabled={!a.online}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setManualAgent(a.name);
-                      fetchUsage(a.name);
-                    }}
-                    className={cn(
-                      'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium transition-colors truncate border',
-                      active
-                        ? 'bg-surface1 text-foreground border-border/60 shadow-2xs'
-                        : 'text-foreground-muted hover:text-foreground border-transparent',
-                      !a.online && 'opacity-40 cursor-not-allowed hover:text-foreground-muted'
-                    )}
-                  >
-                    <span className="inline-flex items-center gap-1 max-w-full">
-                      <span
-                        className={cn(
-                          'size-1.5 rounded-full shrink-0',
-                          a.online ? 'bg-status-success' : 'bg-foreground-extra-muted'
-                        )}
-                      />
-                      <span className="truncate">{a.name}</span>
-                    </span>
-                  </button>
-                </Hint>
+                <button
+                  key={a.name}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setManualAgent(a.name);
+                    fetchUsageAndStats(a.name);
+                  }}
+                  className={cn(
+                    'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium transition-all truncate border cursor-pointer',
+                    active
+                      ? 'bg-surface1 text-foreground border-border/60 shadow-2xs'
+                      : 'text-foreground-muted hover:text-foreground border-transparent'
+                  )}
+                >
+                  <span className="inline-flex items-center gap-1 max-w-full">
+                    <span
+                      className={cn(
+                        'size-1.5 rounded-full shrink-0',
+                        a.online ? 'bg-status-success' : 'bg-foreground-extra-muted'
+                      )}
+                    />
+                    <span className="truncate">{a.name}</span>
+                  </span>
+                </button>
               );
             })}
           </div>
         )}
 
+        {/* Token Metrics Cards */}
+        <div className="grid grid-cols-3 gap-2 text-2xs">
+          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
+            <div className="text-3xs text-foreground-muted mb-0.5">Total Tokens</div>
+            <div className="font-semibold font-mono tabular-nums text-foreground">
+              {fmtTokens(totalTokens)}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
+            <div className="text-3xs text-foreground-muted mb-0.5">Context Limit</div>
+            <div className="font-semibold font-mono tabular-nums text-foreground">
+              {fmtContextLimit(contextWindow)}
+            </div>
+          </div>
+          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
+            <div className="text-3xs text-foreground-muted mb-0.5">Prompt / Comp</div>
+            <div className="font-mono text-3xs tabular-nums text-foreground-muted truncate">
+              {fmtTokens(promptTokens)} / {fmtTokens(completionTokens)}
+            </div>
+          </div>
+        </div>
+
+        {/* Claude Subscription Progress Bars (if available) */}
+        {isClaudeQuota && (
+          <div className="space-y-2.5">
+            {/* 5-Hour Session */}
+            <div className="space-y-1.5 bg-surface2/50 border border-border/40 rounded-xl p-2.5">
+              <div className="flex items-center justify-between text-2xs">
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Clock className="size-3 text-primary" />
+                  <span>5-hour session limit</span>
+                </div>
+                <span
+                  className={cn(
+                    'font-semibold font-mono tabular-nums text-2xs',
+                    sessionPercent >= 85
+                      ? 'text-status-danger'
+                      : sessionPercent >= 60
+                      ? 'text-status-warning'
+                      : 'text-status-success'
+                  )}
+                >
+                  {sessionPercent}%
+                </span>
+              </div>
+
+              <div className="h-1.5 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-500', getBarColor(sessionPercent))}
+                  style={{ width: `${Math.min(Math.max(sessionPercent, 2), 100)}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-3xs text-foreground-muted">
+                <span>Resets</span>
+                <span className="font-medium text-foreground/80">
+                  {usage?.session_resets_at || agentStat?.session_resets_at || '--'}
+                </span>
+              </div>
+            </div>
+
+            {/* Weekly Limit */}
+            <div className="space-y-1.5 bg-surface2/50 border border-border/40 rounded-xl p-2.5">
+              <div className="flex items-center justify-between text-2xs">
+                <div className="flex items-center gap-1.5 font-medium text-foreground">
+                  <Calendar className="size-3 text-primary" />
+                  <span>Weekly limit</span>
+                </div>
+                <span className="font-semibold font-mono tabular-nums text-2xs text-foreground">
+                  {weekPercent}%
+                </span>
+              </div>
+
+              <div className="h-1.5 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
+                <div
+                  className={cn('h-full rounded-full transition-all duration-500', getBarColor(weekPercent))}
+                  style={{ width: `${Math.min(Math.max(weekPercent, 2), 100)}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-3xs text-foreground-muted">
+                <span>Resets</span>
+                <span className="font-medium text-foreground/80">
+                  {usage?.week_resets_at || agentStat?.week_resets_at || '--'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Unparsed warning alert */}
         {isUnparsed && (
-          <div className="flex items-start gap-2 p-2.5 rounded-base bg-status-muted-warning border border-status-warning/30 text-status-warning text-2xs">
+          <div className="flex items-start gap-2 p-2.5 rounded-xl bg-status-muted-warning border border-status-warning/30 text-status-warning text-2xs">
             <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-medium">Could not parse a percentage from the CLI output</div>
-              <div className="text-3xs text-status-warning/80">Raw /usage output below — expand to check.</div>
+            <div className="space-y-0.5">
+              <div className="font-medium">Raw CLI output returned</div>
+              <div className="text-3xs text-status-warning/80">Check expandable details below.</div>
             </div>
           </div>
         )}
 
-        {/* 5-Hour / Session Limit */}
-        <div className="space-y-2 bg-surface2/50 border border-border/50 rounded-xl p-3">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <Clock className="size-3.5 text-primary" />
-              <span>5-hour session limit</span>
-            </div>
-            <span className={cn('font-semibold tabular-nums text-xs', sessionPercent >= 85 ? 'text-status-danger' : sessionPercent >= 60 ? 'text-status-warning' : 'text-status-success')}>
-              {sessionPercent}% {isEstimated ? 'active' : 'used'}
-            </span>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="h-2 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
-            <div
-              className={cn('h-full rounded-full transition-all duration-500', getBarColor(sessionPercent))}
-              style={{ width: `${Math.min(Math.max(sessionPercent, 2), 100)}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-2xs text-foreground-muted pt-0.5">
-            <span>{isEstimated ? 'Method' : 'Resets'}</span>
-            <span className="font-medium text-foreground/90">
-              {usage?.session_resets_at || (loading ? 'Loading…' : '--')}
-            </span>
-          </div>
-        </div>
-
-        {/* Weekly Quota / 7-Day Activity */}
-        <div className="space-y-2 bg-surface2/50 border border-border/50 rounded-xl p-3">
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <Calendar className="size-3.5 text-primary" />
-              <span>Weekly limit (all models)</span>
-            </div>
-            <span className="font-semibold tabular-nums text-xs text-foreground">
-              {weekPercent}% {isEstimated ? 'active' : 'used'}
-            </span>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="h-2 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
-            <div
-              className={cn('h-full rounded-full transition-all duration-500', getBarColor(weekPercent))}
-              style={{ width: `${Math.min(Math.max(weekPercent, 2), 100)}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-2xs text-foreground-muted pt-0.5">
-            <span>{isEstimated ? 'Scope' : 'Resets'}</span>
-            <span className="font-medium text-foreground/90">
-              {usage?.week_resets_at || (loading ? 'Loading…' : '--')}
-            </span>
-          </div>
-        </div>
-
-        {/* Breakdown / Insights */}
-        {(usage?.last_24h_summary || usage?.last_7d_summary) && (
-          <div className="space-y-1.5 pt-3 text-2xs text-foreground-muted">
-            {usage.last_24h_summary && (
-              <div className="flex items-start gap-1.5">
-                <Sparkles className="size-3 text-primary shrink-0 mt-0.5" />
-                <span>Last 24h: {usage.last_24h_summary}</span>
-              </div>
-            )}
-            {usage.last_7d_summary && (
-              <div className="flex items-start gap-1.5">
-                <Zap className="size-3 text-muted-foreground shrink-0 mt-0.5" />
-                <span>Engine: {usage.last_7d_summary}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Raw output preview if unparsed or requested */}
+        {/* Raw output preview if unparsed */}
         {isUnparsed && usage?.raw_text && (
-          <details className="pt-3 text-3xs text-foreground-muted">
+          <details className="pt-1 text-3xs text-foreground-muted">
             <summary className="cursor-pointer hover:text-foreground flex items-center gap-1 font-medium select-none">
               <FileText className="size-3 text-muted-foreground" />
               Raw CLI output
@@ -392,9 +379,9 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           </details>
         )}
 
-        {/* Tip */}
+        {/* Footer Note */}
         <div className="text-3xs text-foreground-extra-muted leading-relaxed pt-1">
-          Usage syncs on the 30s background heartbeat and whenever you send a message.
+          Auto-synchronized with backend token governance and multi-agent compaction engine.
         </div>
       </PopoverContent>
     </Popover>

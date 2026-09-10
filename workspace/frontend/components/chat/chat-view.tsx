@@ -36,6 +36,7 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
+import { ContextHealthIndicator } from './context-health-indicator';
 import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { PipelineStepper } from './pipeline-stepper';
@@ -899,8 +900,11 @@ export function ChatView() {
             />
           )}
 
-          {/* Agent Quota & Usage Capsule (Claude) */}
+          {/* Agent Quota & Multi-Agent Token Dashboard */}
           <AgentQuotaCapsule agentName={activeModelAgentName} />
+
+          {/* Channel Context Window Health & Compaction */}
+          <ContextHealthIndicator channelName={currentSessionId} />
 
           {/* Git chip */}
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />

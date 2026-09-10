@@ -460,7 +460,47 @@ export interface AgentUsage {
   current_effort?: string | null;
   available_efforts?: string | null;
   raw_text: string | null;
+  total_prompt_tokens?: number;
+  total_completion_tokens?: number;
+  total_tokens?: number;
+  context_window_size?: number;
   updated_at: string;
+}
+
+export interface AgentTokenStat {
+  agent_name: string;
+  current_model: string;
+  context_window_size: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  total_tokens: number;
+  session_used_percent: number;
+  week_used_percent: number;
+  session_resets_at?: string | null;
+  week_resets_at?: string | null;
+  status: string;
+}
+
+export interface ChannelContextHealth {
+  channel_name: string;
+  message_count: number;
+  estimated_tokens: number;
+  min_context_window: number;
+  token_budget_percent: number;
+  health_status: 'optimal' | 'warning' | 'critical';
+  last_compacted_at?: string | null;
+  compaction_count: number;
+}
+
+export interface WorkspaceTokenStats {
+  workspace_id: string;
+  total_tokens: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  compaction_saved_tokens: number;
+  compaction_runs: number;
+  agents: AgentTokenStat[];
+  channels: ChannelContextHealth[];
 }
 
 export interface ApiResponse<T = unknown> {

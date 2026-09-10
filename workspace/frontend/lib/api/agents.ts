@@ -10,6 +10,7 @@ import type {
   NetworkDiscovery,
   NetworkProfile,
   WorkspaceAgent,
+  WorkspaceTokenStats,
 } from '../types';
 import { networkAgentToWorkspaceAgent } from '../types';
 import { BaseWorkspaceApi } from './base';
@@ -247,6 +248,14 @@ export class AgentsApi extends BaseWorkspaceApi {
   async getAgentUsage(agentName: string): Promise<AgentUsage | null> {
     try {
       return await this.request<AgentUsage>(`/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentName)}/usage`);
+    } catch {
+      return null;
+    }
+  }
+
+  async getWorkspaceTokenStats(): Promise<WorkspaceTokenStats | null> {
+    try {
+      return await this.request<WorkspaceTokenStats>(`/v1/workspaces/${this.workspaceId}/tokens/stats`);
     } catch {
       return null;
     }

@@ -197,6 +197,29 @@ var pendingCues = []string{
 	"待办", "待定", "下一步", "未完成", "阻塞", "还需", "未解决",
 }
 
+var handoffCues = []string{
+	"handoff", "hand-off", "handing off", "handing over", "assigned to", "delegated to",
+	"assigning to", "routing to", "transferred to", "calling agent",
+	"转交", "指派给", "交给", "由", "协同", "委托", "交接",
+}
+
+func isFileOrCommandActivity(line string) bool {
+	lower := strings.ToLower(line)
+	// Check file extension patterns
+	for _, ext := range []string{".go", ".ts", ".tsx", ".js", ".jsx", ".py", ".rs", ".json", ".md", ".yaml", ".yml", ".css", ".sql", ".sh", ".ps1"} {
+		if strings.Contains(lower, ext) {
+			return true
+		}
+	}
+	// Check command patterns
+	for _, cmd := range []string{"git ", "go test", "go build", "npm ", "pnpm ", "yarn ", "cargo ", "docker ", "powershell", "curl "} {
+		if strings.Contains(lower, cmd) {
+			return true
+		}
+	}
+	return false
+}
+
 func matchesAnyCue(lowerLine string, cues []string) bool {
 	for _, cue := range cues {
 		if strings.Contains(lowerLine, cue) {
@@ -262,6 +285,7 @@ func GenerateDeterministicSummary(previousSummary string, messages []MessageItem
 	var actions []string
 	var decisions []string
 	var pending []string
+	var handoffs []string
 	var latestAgentNotes []string
 	participants := make(map[string]bool)
 
@@ -287,22 +311,24 @@ func GenerateDeterministicSummary(previousSummary string, messages []MessageItem
 			latestAgentNotes = append(latestAgentNotes, fmt.Sprintf("- %s: %s", source, firstLine))
 		}
 
-		// Sections 2 and 4 are extracted from any line, not just the opener: a
-		// decision or a TODO is usually stated mid-message.
+		// Sections 2, 3 and 4 are extracted from any line, not just the opener:
+		// a decision, handoff or TODO is usually stated mid-message.
 		for _, line := range lines {
 			trimmed := strings.TrimSpace(line)
 			if trimmed == "" {
 				continue
 			}
 			lower := strings.ToLower(trimmed)
-			// A line goes to exactly one section. Emitting it into several restates
-			// the same text two or three times and wipes out the token saving that
-			// is the whole point of a checkpoint.
+			// A line goes to at most one specific section.
 			switch {
+			case matchesAnyCue(lower, handoffCues) || (strings.Contains(trimmed, "@") && (strings.Contains(lower, "agent") || strings.Contains(lower, "claude") || strings.Contains(lower, "codex") || strings.Contains(lower, "antigravity"))):
+				handoffs = append(handoffs, fmt.Sprintf("- %s: %s", source, clipLine(trimmed, 110)))
 			case matchesAnyCue(lower, decisionCues):
 				decisions = append(decisions, fmt.Sprintf("- %s: %s", source, clipLine(trimmed, 110)))
 			case matchesAnyCue(lower, pendingCues):
 				pending = append(pending, fmt.Sprintf("- %s: %s", source, clipLine(trimmed, 110)))
+			case isFileOrCommandActivity(trimmed):
+				actions = append(actions, fmt.Sprintf("- %s: %s", source, clipLine(trimmed, 110)))
 			}
 		}
 	}
@@ -332,16 +358,17 @@ func GenerateDeterministicSummary(previousSummary string, messages []MessageItem
 	sb.WriteString("\n\n")
 
 	sb.WriteString("### 2. Key Decisions & Consensus\n")
-	if len(decisions) > 0 {
-		sb.WriteString(strings.Join(tailOf(dedupe(decisions), 5), "\n"))
+	combinedDecisions := append(decisions, handoffs...)
+	if len(combinedDecisions) > 0 {
+		sb.WriteString(strings.Join(tailOf(dedupe(combinedDecisions), 6), "\n"))
 	} else {
 		sb.WriteString("- No explicit decision or consensus statement detected in this window.")
 	}
 	sb.WriteString("\n\n")
 
 	sb.WriteString("### 3. Actions & Modifications\n")
-	claimed := make(map[string]bool, len(decisions)+len(pending))
-	for _, line := range append(append([]string{}, decisions...), pending...) {
+	claimed := make(map[string]bool, len(decisions)+len(pending)+len(handoffs))
+	for _, line := range append(append(append([]string{}, decisions...), pending...), handoffs...) {
 		claimed[line] = true
 	}
 	actions = withoutClaimed(dedupe(actions), claimed)
@@ -351,7 +378,7 @@ func GenerateDeterministicSummary(previousSummary string, messages []MessageItem
 	} else if len(latestAgentNotes) > 0 {
 		sb.WriteString(strings.Join(tailOf(latestAgentNotes, 4), "\n"))
 	} else {
-		if len(decisions) > 0 || len(pending) > 0 {
+		if len(decisions) > 0 || len(pending) > 0 || len(handoffs) > 0 {
 			sb.WriteString("- File and command activity is stated inline in the sections above.")
 		} else {
 			sb.WriteString("- No file or command activity recorded in this window.")

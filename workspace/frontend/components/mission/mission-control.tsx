@@ -164,6 +164,19 @@ export function MissionControl() {
       })
     );
 
+    try {
+      const tokenStats = await workspaceApi.getWorkspaceTokenStats();
+      if (tokenStats?.agents) {
+        for (const a of tokenStats.agents) {
+          if (a.total_tokens > 0) {
+            tokens[a.agent_name] = a.total_tokens;
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     setLastMessageBySession(updates);
     setAgentTokens(tokens);
     setPendingApprovals(approvals);

@@ -31,6 +31,112 @@ func DefaultCompactorConfig() *CompactorConfig {
 	}
 }
 
+// ModelContextWindow returns the safe context window token limit for a given model or agent identifier.
+func ModelContextWindow(model string) int {
+	m := strings.ToLower(strings.TrimSpace(model))
+	switch {
+	case strings.Contains(m, "gemini-1.5") || strings.Contains(m, "gemini-2") || strings.Contains(m, "antigravity"):
+		return 1000000
+	case strings.Contains(m, "claude-3") || strings.Contains(m, "claude"):
+		return 200000
+	case strings.Contains(m, "gpt-4o") || strings.Contains(m, "gpt-4.5") || strings.Contains(m, "o1") || strings.Contains(m, "o3") || strings.Contains(m, "codex"):
+		return 128000
+	case strings.Contains(m, "deepseek"):
+		return 64000
+	case strings.Contains(m, "qwen") || strings.Contains(m, "llama-3"):
+		return 32768
+	case strings.Contains(m, "mistral") || strings.Contains(m, "ollama") || strings.Contains(m, "local"):
+		return 16384
+	default:
+		return 64000
+	}
+}
+
+// ResolveChannelAdaptiveCompactorConfig dynamically computes optimal compaction thresholds
+// based on the lowest context window among the channel's participating agents and participant count.
+func ResolveChannelAdaptiveCompactorConfig(workspaceID, channelName string) *CompactorConfig {
+	rawName := strings.TrimPrefix(channelName, "channel/")
+	minWindow := 64000
+	participantCount := 1
+
+	if db.DB != nil {
+		var channel models.Channel
+		if err := db.DB.Where("workspace_id = ? AND name = ?", workspaceID, rawName).First(&channel).Error; err == nil {
+			var agentNames []string
+			if channel.MasterAgent != nil && *channel.MasterAgent != "" {
+				agentNames = append(agentNames, *channel.MasterAgent)
+			}
+			var cmList []models.ChannelMember
+			if err := db.DB.Where("channel_id = ?", channel.ID).Find(&cmList).Error; err == nil && len(cmList) > 0 {
+				for _, cm := range cmList {
+					if cm.AgentName != "" {
+						agentNames = append(agentNames, cm.AgentName)
+					}
+				}
+			}
+			if len(agentNames) == 0 {
+				var members []models.WorkspaceMember
+				if err := db.DB.Where("workspace_id = ? AND status = ?", workspaceID, "online").Find(&members).Error; err == nil && len(members) > 0 {
+					for _, m := range members {
+						agentNames = append(agentNames, m.AgentName)
+					}
+				}
+			}
+
+			if len(agentNames) > 0 {
+				participantCount = len(agentNames)
+				for _, name := range agentNames {
+					var usage models.AgentUsageRecord
+					if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, name).First(&usage).Error; err == nil && usage.CurrentModel != nil && *usage.CurrentModel != "" {
+						w := ModelContextWindow(*usage.CurrentModel)
+						if w < minWindow {
+							minWindow = w
+						}
+					} else {
+						w := ModelContextWindow(name)
+						if w < minWindow {
+							minWindow = w
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 1. Keep chat history under 25% of the most restrictive agent's context window
+	tokenThreshold := int(float64(minWindow) * 0.25)
+	if tokenThreshold < 4000 {
+		tokenThreshold = 4000
+	}
+	if tokenThreshold > 16000 {
+		tokenThreshold = 16000
+	}
+
+	// 2. Scale message count with participant density (multi-agent conversations flow faster)
+	msgThreshold := 15 + participantCount*5
+	if msgThreshold < 20 {
+		msgThreshold = 20
+	}
+	if msgThreshold > 50 {
+		msgThreshold = 50
+	}
+
+	// 3. Keep recent verbatim scaled so every agent's latest turn remains intact
+	keepVerbatim := participantCount * 3
+	if keepVerbatim < 6 {
+		keepVerbatim = 6
+	}
+	if keepVerbatim > 15 {
+		keepVerbatim = 15
+	}
+
+	return &CompactorConfig{
+		MessageThreshold:   msgThreshold,
+		TokenThreshold:     tokenThreshold,
+		KeepRecentVerbatim: keepVerbatim,
+	}
+}
+
 // CompactResult contains metrics and the created compaction record.
 type CompactResult struct {
 	Record         *models.ChannelCompactionRecord `json:"record"`
@@ -76,7 +182,7 @@ func ExtractMessageItems(records []models.EventRecord) []MessageItem {
 // CompactChannel executes a compaction cycle on a specific workspace channel.
 func CompactChannel(workspaceID, channelName string, customCfg *CompactorConfig) (*CompactResult, error) {
 	if customCfg == nil {
-		customCfg = DefaultCompactorConfig()
+		customCfg = ResolveChannelAdaptiveCompactorConfig(workspaceID, channelName)
 	}
 
 	target := "channel/" + strings.TrimPrefix(channelName, "channel/")

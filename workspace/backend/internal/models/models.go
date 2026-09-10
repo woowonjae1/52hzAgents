@@ -505,6 +505,11 @@ type AgentUsageRecord struct {
 	CurrentEffort      *string   `gorm:"type:text" json:"current_effort"`
 	AvailableEfforts   *string   `gorm:"type:text" json:"available_efforts"`
 	RawText            *string   `gorm:"type:text" json:"raw_text"`
+	// Cumulative token metrics across all turns & sessions
+	TotalPromptTokens     int64     `gorm:"type:bigint;not null;default:0" json:"total_prompt_tokens"`
+	TotalCompletionTokens int64     `gorm:"type:bigint;not null;default:0" json:"total_completion_tokens"`
+	TotalTokens           int64     `gorm:"type:bigint;not null;default:0" json:"total_tokens"`
+	ContextWindowSize     int       `gorm:"type:integer;not null;default:0" json:"context_window_size"`
 	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
