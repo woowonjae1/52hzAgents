@@ -1,4 +1,4 @@
-﻿package handlers
+package handlers
 
 import (
 	"encoding/json"
@@ -83,8 +83,12 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 	// Populate from members
 	for _, m := range members {
 		u, hasUsage := usageMap[m.AgentName]
-		model := m.AgentName
-		window := compaction.ModelContextWindow(model)
+		// `model` starts EMPTY, not as the agent's name. Seeding it with the
+		// name meant ModelContextWindow was asked to size "rfc-bot", which it
+		// answered with its default -- a window the agent never claimed, then
+		// reported to the dashboard as though it had been measured.
+		model := ""
+		window := compaction.UnknownWindow
 		var pTokens, cTokens, tTokens int64
 		var sPct, wPct int
 		var sResets, wResets *string

@@ -170,14 +170,20 @@ func ReportAgentUsage(c *gin.Context) {
 		record.TotalTokens = record.TotalPromptTokens + record.TotalCompletionTokens
 	}
 
+	/*
+		Capacity, in order of how much it can be trusted: what the agent's own
+		CLI reported, then what its reported MODEL implies, then nothing.
+
+		The `else` branch used to start `model := agentName` -- so an agent that
+		reported no model had its user-chosen label passed to the model table,
+		matched nothing, and was persisted with the table's old 128k default.
+		Downstream code cannot tell a measured window from that, which is how a
+		guess became the denominator of the context-health percentage.
+	*/
 	if req.ContextWindowSize != nil && *req.ContextWindowSize > 0 {
 		record.ContextWindowSize = *req.ContextWindowSize
-	} else if record.ContextWindowSize == 0 {
-		model := agentName
-		if req.CurrentModel != nil && *req.CurrentModel != "" {
-			model = *req.CurrentModel
-		}
-		record.ContextWindowSize = compaction.ModelContextWindow(model)
+	} else if record.ContextWindowSize == 0 && req.CurrentModel != nil && *req.CurrentModel != "" {
+		record.ContextWindowSize = compaction.ModelContextWindow(*req.CurrentModel)
 	}
 
 	var err error

@@ -670,29 +670,46 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 	var record models.AgentUsageRecord
 	err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, agentName).First(&record).Error
 	if err != nil {
-		// Create initial usage record
-		windowSize := compaction.ModelContextWindow(agentName)
+		/*
+			NO WINDOW IS GUESSED HERE ANY MORE.
+
+			This used to seed the record with
+			`compaction.ModelContextWindow(agentName)` -- the AGENT NAME, not a
+			model. Agent names are user-chosen ("worker-1", "rfc-bot"), so they
+			matched nothing in the table and every agent was persisted with the
+			old 128k default. That number then flowed into
+			`ContextWindowSize`, which everything downstream -- the context
+			health percentage, the compaction threshold, the quota capsule --
+			treats as a MEASURED capacity. A guess laundered into a fact is
+			exactly why the dashboard numbers were wrong.
+
+			Zero means unknown. `UpsertAgentRuntime` fills this in when the
+			agent's CLI reports its real window, and the compaction budget
+			skips participants it does not know rather than inventing one.
+		*/
 		record = models.AgentUsageRecord{
 			WorkspaceID:           workspaceID,
 			AgentName:             agentName,
 			TotalPromptTokens:     promptTokens,
 			TotalCompletionTokens: completionTokens,
 			TotalTokens:           totalDelta,
-			ContextWindowSize:     windowSize,
+			ContextWindowSize:     compaction.UnknownWindow,
 		}
 		_ = db.DB.Create(&record).Error
 	} else {
 		updates := map[string]interface{}{
 			"total_prompt_tokens":     record.TotalPromptTokens + promptTokens,
 			"total_completion_tokens": record.TotalCompletionTokens + completionTokens,
-			"total_tokens":           record.TotalTokens + totalDelta,
+			"total_tokens":            record.TotalTokens + totalDelta,
 		}
-		if record.ContextWindowSize == 0 {
-			model := agentName
-			if record.CurrentModel != nil && *record.CurrentModel != "" {
-				model = *record.CurrentModel
+		// A window may still be DERIVED from a reported model name -- that is a
+		// statement about the model, not about the agent's label -- but never
+		// from the agent name, and never to a made-up default: an unrecognised
+		// model leaves this at zero.
+		if record.ContextWindowSize == 0 && record.CurrentModel != nil && *record.CurrentModel != "" {
+			if w := compaction.ModelContextWindow(*record.CurrentModel); w > 0 {
+				updates["context_window_size"] = w
 			}
-			updates["context_window_size"] = compaction.ModelContextWindow(model)
 		}
 		_ = db.DB.Model(&record).Updates(updates).Error
 	}

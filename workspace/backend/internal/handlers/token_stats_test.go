@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
+
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
@@ -160,7 +162,13 @@ func TestRecordAgentMessageTokenUsage(t *testing.T) {
 	if usage.TotalCompletionTokens <= 0 || usage.TotalTokens <= 0 {
 		t.Errorf("expected completion tokens > 0, got %d", usage.TotalCompletionTokens)
 	}
-	if usage.ContextWindowSize != 1000000 {
-		t.Errorf("expected antigravity context window 1000000, got %d", usage.ContextWindowSize)
+	// The agent posted a message but never reported a model or a window, so
+	// the window must stay UNKNOWN. This assertion used to demand 1000000,
+	// which the code produced by passing the AGENT NAME "antigravity" to the
+	// model table -- a guess the dashboard then rendered as a measured
+	// capacity. A test pinning that value made correcting it look like a
+	// regression, which is why it survived.
+	if usage.ContextWindowSize != compaction.UnknownWindow {
+		t.Errorf("unreported agent should have an unknown window, got %d", usage.ContextWindowSize)
 	}
 }

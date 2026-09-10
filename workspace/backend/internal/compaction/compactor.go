@@ -31,110 +31,86 @@ func DefaultCompactorConfig() *CompactorConfig {
 	}
 }
 
-// ModelContextWindow returns the safe context window token limit for a given model or agent identifier.
-func ModelContextWindow(model string) int {
-	m := strings.ToLower(strings.TrimSpace(model))
-	switch {
-	case strings.Contains(m, "gemini-1.5") || strings.Contains(m, "gemini-2") || strings.Contains(m, "antigravity"):
-		return 1000000
-	case strings.Contains(m, "claude-3") || strings.Contains(m, "claude"):
-		return 200000
-	case strings.Contains(m, "gpt-4o") || strings.Contains(m, "gpt-4.5") || strings.Contains(m, "o1") || strings.Contains(m, "o3") || strings.Contains(m, "codex"):
-		return 128000
-	case strings.Contains(m, "deepseek"):
-		return 64000
-	case strings.Contains(m, "qwen") || strings.Contains(m, "llama-3"):
-		return 32768
-	case strings.Contains(m, "mistral") || strings.Contains(m, "ollama") || strings.Contains(m, "local"):
-		return 16384
-	default:
-		return 64000
-	}
-}
+/*
+ResolveChannelAdaptiveCompactorConfig reads the channel's participants and
+sizes compaction to fit the SMALLEST of them.
 
-// ResolveChannelAdaptiveCompactorConfig dynamically computes optimal compaction thresholds
-// based on the lowest context window among the channel's participating agents and participant count.
+This function used to do the arithmetic inline too, and got it backwards --
+see the note at the top of budget.go. It now does only what genuinely needs a
+database (who is in this channel, and what has each one told us about itself)
+and hands plain numbers to ChannelBudget/ResolveConfig, which are unit-tested.
+
+Capacity is read in order of trustworthiness:
+
+ 1. `ContextWindowSize` reported by the agent's own CLI. This field already
+    existed and was never read here -- the old code went straight to guessing
+    from the model string even when the agent had told us the answer.
+ 2. The static table, from the reported model name.
+ 3. UnknownWindow. NOT 128k, and NOT a guess from the agent's name: agent
+    names are user-chosen, so passing one to the model table (as the old code
+    did) matched nothing and silently produced 128k for every agent that had
+    not reported a model. That invented denominator is what made the context
+    health percentages wrong.
+*/
 func ResolveChannelAdaptiveCompactorConfig(workspaceID, channelName string) *CompactorConfig {
 	rawName := strings.TrimPrefix(channelName, "channel/")
-	minWindow := 64000
-	participantCount := 1
+	budgets := agentBudgetsForChannel(workspaceID, rawName)
 
-	if db.DB != nil {
-		var channel models.Channel
-		if err := db.DB.Where("workspace_id = ? AND name = ?", workspaceID, rawName).First(&channel).Error; err == nil {
-			var agentNames []string
-			if channel.MasterAgent != nil && *channel.MasterAgent != "" {
-				agentNames = append(agentNames, *channel.MasterAgent)
-			}
-			var cmList []models.ChannelMember
-			if err := db.DB.Where("channel_id = ?", channel.ID).Find(&cmList).Error; err == nil && len(cmList) > 0 {
-				for _, cm := range cmList {
-					if cm.AgentName != "" {
-						agentNames = append(agentNames, cm.AgentName)
-					}
-				}
-			}
-			if len(agentNames) == 0 {
-				var members []models.WorkspaceMember
-				if err := db.DB.Where("workspace_id = ? AND status = ?", workspaceID, "online").Find(&members).Error; err == nil && len(members) > 0 {
-					for _, m := range members {
-						agentNames = append(agentNames, m.AgentName)
-					}
-				}
-			}
+	participantCount := len(budgets)
+	if participantCount == 0 {
+		participantCount = 1
+	}
+	return ResolveConfig(ChannelBudget(budgets), participantCount)
+}
 
-			if len(agentNames) > 0 {
-				participantCount = len(agentNames)
-				for _, name := range agentNames {
-					var usage models.AgentUsageRecord
-					if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, name).First(&usage).Error; err == nil && usage.CurrentModel != nil && *usage.CurrentModel != "" {
-						w := ModelContextWindow(*usage.CurrentModel)
-						if w < minWindow {
-							minWindow = w
-						}
-					} else {
-						w := ModelContextWindow(name)
-						if w < minWindow {
-							minWindow = w
-						}
-					}
-				}
+// agentBudgetsForChannel resolves who is in the channel and what each one can
+// hold. Returns nil when the channel or the DB is unavailable, which
+// ResolveConfig handles as "use the conservative default".
+func agentBudgetsForChannel(workspaceID, rawName string) []AgentBudget {
+	if db.DB == nil {
+		return nil
+	}
+	var channel models.Channel
+	if err := db.DB.Where("workspace_id = ? AND name = ?", workspaceID, rawName).First(&channel).Error; err != nil {
+		return nil
+	}
+
+	var agentNames []string
+	if channel.MasterAgent != nil && *channel.MasterAgent != "" {
+		agentNames = append(agentNames, *channel.MasterAgent)
+	}
+	var cmList []models.ChannelMember
+	if err := db.DB.Where("channel_id = ?", channel.ID).Find(&cmList).Error; err == nil {
+		for _, cm := range cmList {
+			if cm.AgentName != "" {
+				agentNames = append(agentNames, cm.AgentName)
+			}
+		}
+	}
+	if len(agentNames) == 0 {
+		var members []models.WorkspaceMember
+		if err := db.DB.Where("workspace_id = ? AND status = ?", workspaceID, "online").Find(&members).Error; err == nil {
+			for _, m := range members {
+				agentNames = append(agentNames, m.AgentName)
 			}
 		}
 	}
 
-	// 1. Keep chat history under 25% of the most restrictive agent's context window
-	tokenThreshold := int(float64(minWindow) * 0.25)
-	if tokenThreshold < 4000 {
-		tokenThreshold = 4000
+	budgets := make([]AgentBudget, 0, len(agentNames))
+	for _, name := range agentNames {
+		b := AgentBudget{AgentName: name, Window: UnknownWindow}
+		var usage models.AgentUsageRecord
+		if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, name).First(&usage).Error; err == nil {
+			if usage.ContextWindowSize > 0 {
+				b.Window = usage.ContextWindowSize
+				b.Reported = true
+			} else if usage.CurrentModel != nil {
+				b.Window = ModelContextWindow(*usage.CurrentModel)
+			}
+		}
+		budgets = append(budgets, b)
 	}
-	if tokenThreshold > 16000 {
-		tokenThreshold = 16000
-	}
-
-	// 2. Scale message count with participant density (multi-agent conversations flow faster)
-	msgThreshold := 15 + participantCount*5
-	if msgThreshold < 20 {
-		msgThreshold = 20
-	}
-	if msgThreshold > 50 {
-		msgThreshold = 50
-	}
-
-	// 3. Keep recent verbatim scaled so every agent's latest turn remains intact
-	keepVerbatim := participantCount * 3
-	if keepVerbatim < 6 {
-		keepVerbatim = 6
-	}
-	if keepVerbatim > 15 {
-		keepVerbatim = 15
-	}
-
-	return &CompactorConfig{
-		MessageThreshold:   msgThreshold,
-		TokenThreshold:     tokenThreshold,
-		KeepRecentVerbatim: keepVerbatim,
-	}
+	return budgets
 }
 
 // CompactResult contains metrics and the created compaction record.
@@ -427,4 +403,36 @@ func GetCompactedChannelHistory(workspaceID, channelName string, recentLimit int
 
 	recentMessages := ExtractMessageItems(eventRecords)
 	return summary, recentMessages, nil
+}
+
+// GetCompactedChannelHistoryForAgent serves tailored context window to a specific agent:
+// Gemini / Claude 3.7 (1M~2M) gets 150+ full recent messages without truncation;
+// Claude 3.5 / GPT-4o (128k~200k) gets 80 recent messages; smaller models get safe 25 messages.
+func GetCompactedChannelHistoryForAgent(workspaceID, channelName, agentName string) (string, []MessageItem, error) {
+	window := 128000
+	if db.DB != nil && agentName != "" {
+		var usage models.AgentUsageRecord
+		if db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, agentName).First(&usage).Error == nil {
+			if usage.ContextWindowSize > 0 {
+				window = usage.ContextWindowSize
+			} else if usage.CurrentModel != nil && *usage.CurrentModel != "" {
+				window = ModelContextWindow(*usage.CurrentModel)
+			}
+		}
+		// No `else` guessing from agentName: an agent with no usage record
+		// has told us nothing, and inventing a window for it is what put wrong
+		// denominators on the dashboard. `window` stays at its caller default.
+	}
+
+	var recentLimit int
+	switch {
+	case window >= 1000000:
+		recentLimit = 150
+	case window >= 128000:
+		recentLimit = 80
+	default:
+		recentLimit = 25
+	}
+
+	return GetCompactedChannelHistory(workspaceID, channelName, recentLimit)
 }

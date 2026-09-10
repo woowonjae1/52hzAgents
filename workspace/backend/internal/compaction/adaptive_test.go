@@ -1,34 +1,25 @@
-﻿package compaction
+package compaction
 
 import (
 	"strings"
 	"testing"
 )
 
-func TestModelContextWindow(t *testing.T) {
-	cases := []struct {
-		model    string
-		expected int
-	}{
-		{"gemini-1.5-pro", 1000000},
-		{"antigravity-deepmind", 1000000},
-		{"claude-3-7-sonnet", 200000},
-		{"gpt-4o", 128000},
-		{"codex-o3", 128000},
-		{"deepseek-r1", 64000},
-		{"qwen-2.5-coder", 32768},
-		{"llama-3.3-70b", 32768},
-		{"local-mistral-7b", 16384},
-		{"unknown-model", 64000},
-	}
+/*
+TestModelContextWindow USED TO LIVE HERE AND IT ASSERTED THE BUG.
 
-	for _, tc := range cases {
-		got := ModelContextWindow(tc.model)
-		if got != tc.expected {
-			t.Errorf("ModelContextWindow(%s) = %d; want %d", tc.model, got, tc.expected)
-		}
-	}
-}
+Its table encoded the three fabricated entries as expectations --
+claude-3-7-sonnet => 1000000 (Claude 3.7 is 200k; no 1M variant exists),
+antigravity-deepmind => 1000000 (antigravity is an agent, not a model), and
+unknown-model => 128000 (the invented denominator behind the wrong dashboard
+percentages). A test that pins a wrong value is worse than no test: it makes
+correcting the value look like a regression.
+
+The corrected coverage is TestModelContextWindowCorrectsTheFabricatedEntries
+and TestModelContextWindowReturnsUnknownRatherThanGuessing in budget_test.go,
+alongside the channel-budget tests that the old DB-coupled design made
+impossible to write at all.
+*/
 
 func TestDeterministicSummaryHandoffsAndFiles(t *testing.T) {
 	messages := []MessageItem{
