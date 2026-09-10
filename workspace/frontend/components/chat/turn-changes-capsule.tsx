@@ -19,7 +19,7 @@ interface TurnChangesCapsuleProps {
 /**
  * Everything one agent turn changed on disk, and the way to undo it.
  *
- * This was its own card — `rounded-xl` + border + `shadow-2xs` + a tinted header
+ * This was its own card — `rounded-xl` + border + `shadow-xs` + a tinted header
  * bar + its own chevron — sitting directly beneath a transcript whose every
  * other event had by then become a plain line. It now draws through `EventLine`
  * like the rest, so the summary of a turn's edits reads as one more event in the

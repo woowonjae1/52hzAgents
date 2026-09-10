@@ -110,7 +110,7 @@ function Attachments({ items }: { items: Attachment[] }) {
               key={img.fileId}
               type="button"
               onClick={() => openPreview(img.fileId)}
-              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md transition-all max-w-sm cursor-pointer text-left shadow-2xs"
+              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md transition-all max-w-sm cursor-pointer text-left shadow-xs"
             >
               <img
                 src={img.url}
@@ -129,7 +129,7 @@ function Attachments({ items }: { items: Attachment[] }) {
             return (
               <div
                 key={file.fileId}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs group"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-xs group"
               >
                 <Hint label="View in Files">
                   <button

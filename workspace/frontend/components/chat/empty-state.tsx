@@ -97,7 +97,7 @@ export function EmptyState() {
             key={agent.agentName}
             onClick={() => toggleParticipant(agent.agentName)}
             className={cn(
-              'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs',
+              'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-xs',
               isSelected
                 ? 'border-border-accent bg-surface2 text-foreground'
                 : 'border-border bg-surface2/60 text-muted-foreground hover:text-foreground hover:bg-surface2'

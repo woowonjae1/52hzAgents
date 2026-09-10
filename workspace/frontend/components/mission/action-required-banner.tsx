@@ -170,7 +170,7 @@ export function ActionRequiredBanner({
           return (
             <div
               key={item.id}
-              className="flex flex-col justify-between p-3 rounded-xl bg-surface1/95 border border-status-warning/25 shadow-2xs space-y-2"
+              className="flex flex-col justify-between p-3 rounded-xl bg-surface1/95 border border-status-warning/25 shadow-xs space-y-2"
             >
               {/* Top info */}
               <div className="flex items-start justify-between gap-2">

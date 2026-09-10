@@ -72,7 +72,7 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`knowledge-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-base bg-surface2 border border-border text-status-success font-mono text-2xs font-medium align-baseline shadow-2xs"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-base bg-surface2 border border-border text-status-success font-mono text-2xs font-medium align-baseline shadow-xs"
             >
               <BookOpen className="size-3 shrink-0" />
               <span>{slug}</span>
@@ -86,7 +86,7 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`mention-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs align-baseline shadow-2xs"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs align-baseline shadow-xs"
               style={{ color }}
             >
               <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
@@ -174,7 +174,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     ),
     li: ({ children }) => <li className="pl-0.5">{renderMentions(children, agentNames)}</li>,
     blockquote: ({ children }) => (
-      <blockquote className="border-l-[3px] border-primary/50 bg-surface1/60 dark:bg-surface2/50 rounded-r-lg pl-3.5 pr-3 py-2 my-3 text-foreground/85 not-italic text-[13px] leading-[1.75] shadow-2xs">
+      <blockquote className="border-l-[3px] border-primary/50 bg-surface1/60 dark:bg-surface2/50 rounded-r-lg pl-3.5 pr-3 py-2 my-3 text-foreground/85 not-italic text-[13px] leading-[1.75] shadow-xs">
         {children}
       </blockquote>
     ),
@@ -182,7 +182,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
     // Tables
     table: ({ children }) => (
-      <div className="overflow-x-auto my-3.5 rounded-lg border border-border shadow-2xs">
+      <div className="overflow-x-auto my-3.5 rounded-lg border border-border shadow-xs">
         <table className="w-full text-xs text-left border-collapse">{children}</table>
       </div>
     ),
@@ -198,7 +198,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       if (isInline) {
         return (
           <code
-            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal shadow-2xs mx-0.5"
+            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal shadow-xs mx-0.5"
             {...props}
           >
             {children}

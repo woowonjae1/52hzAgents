@@ -262,7 +262,7 @@ export function SettingsView() {
           <Hint label="Back to chat">
             <button
               onClick={() => setViewMode('threads')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs"
             >
               <ArrowLeft className="size-3.5" />
               <span>Back to chat</span>
@@ -312,7 +312,7 @@ export function SettingsView() {
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all cursor-pointer',
                   active
-                    ? 'bg-surface2 text-foreground font-medium shadow-2xs'
+                    ? 'bg-surface2 text-foreground font-medium shadow-xs'
                     : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
                 )}
               >

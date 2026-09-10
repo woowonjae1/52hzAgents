@@ -165,7 +165,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
             type="button"
             className={cn(
               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
-              'bg-surface2/80 hover:bg-surface3/90 shadow-2xs',
+              'bg-surface2/80 hover:bg-surface3/90 shadow-xs',
               statusBadge.pillClass,
               className
             )}

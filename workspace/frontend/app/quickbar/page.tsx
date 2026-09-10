@@ -137,7 +137,7 @@ export default function QuickBarPage() {
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-transparent p-2 select-none overflow-hidden font-sans">
-      <div className="flex flex-col w-full bg-[#121215]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden [app-region:drag]">
+      <div className="flex flex-col w-full bg-[#121215]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden [app-region:drag]">
         {/* Main Input Row */}
         <div className="flex items-center gap-2.5 px-3.5 py-3.5 [app-region:no-drag]">
           {/* Agent Picker Pill */}

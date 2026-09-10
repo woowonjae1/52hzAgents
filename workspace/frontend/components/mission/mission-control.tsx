@@ -539,7 +539,7 @@ export function MissionControl() {
 
           {/* All Offline Wakeup Callout Banner */}
           {isAllOffline && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 rounded-2xl bg-surface1/90 border border-primary/20 shadow-2xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 p-3.5 rounded-2xl bg-surface1/90 border border-primary/20 shadow-xs">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   <Play className="size-3.5 fill-current ml-0.5" />

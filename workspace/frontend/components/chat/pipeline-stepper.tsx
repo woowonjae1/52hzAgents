@@ -120,7 +120,7 @@ export function PipelineStepper({
                     isDone
                       ? 'bg-surface3/80 text-foreground-muted border-border/60'
                       : isRunning
-                        ? 'bg-primary/10 text-primary border-primary/30 font-semibold shadow-2xs'
+                        ? 'bg-primary/10 text-primary border-primary/30 font-semibold shadow-xs'
                         : isRetrying
                           ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
                           : 'bg-surface2 text-foreground-extra-muted border-border/60'

@@ -306,7 +306,7 @@ export function CommandPalette() {
       />
 
       {/* Palette Container */}
-      <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-surface1 text-foreground shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+      <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-surface1 text-foreground shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
         {/* Search Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface1/95">
           <Search className="size-4 text-foreground-extra-muted shrink-0" />

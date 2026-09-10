@@ -422,7 +422,7 @@ export function AgentStation({
           <button
             type="button"
             onClick={onOpenAgent}
-            className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-2xs"
+            className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-xs"
           >
             <MessageSquare className="size-3 text-muted-foreground" />
             <span>Chat</span>

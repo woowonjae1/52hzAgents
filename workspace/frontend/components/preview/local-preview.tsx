@@ -246,7 +246,7 @@ export function LocalPreview() {
                 onClick={() => setViewport('desktop')}
                 className={cn(
                   'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
-                  viewport === 'desktop' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
+                  viewport === 'desktop' ? 'bg-surface0 text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 <Monitor className="size-3" />
@@ -257,7 +257,7 @@ export function LocalPreview() {
                 onClick={() => setViewport('mobile')}
                 className={cn(
                   'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
-                  viewport === 'mobile' ? 'bg-surface0 text-foreground shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
+                  viewport === 'mobile' ? 'bg-surface0 text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 <Smartphone className="size-3" />
@@ -315,7 +315,7 @@ export function LocalPreview() {
           {/* Friendly Overlay when service is not reachable */}
           {loadError && (
             <div className="absolute inset-0 z-20 bg-surface0 flex flex-col items-center justify-center p-6 text-center select-none animate-[fadeIn_0.15s_ease-out]">
-              <div className="size-13 rounded-2xl bg-surface2 border border-border flex items-center justify-center mb-3 shadow-2xs">
+              <div className="size-13 rounded-2xl bg-surface2 border border-border flex items-center justify-center mb-3 shadow-xs">
                 <Globe className="size-6 text-foreground-extra-muted" />
               </div>
               <h3 className="text-sm font-semibold text-foreground mb-1">No local server running</h3>
@@ -333,7 +333,7 @@ export function LocalPreview() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={reload}
-                  className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <RefreshCw className="size-3" />
                   <span>Check again</span>

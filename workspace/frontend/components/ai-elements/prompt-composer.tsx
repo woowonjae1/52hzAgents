@@ -634,7 +634,7 @@ export function PromptComposer({
               {pendingFiles.map((pf, idx) => (
                 <div
                   key={idx}
-                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/80 border border-border/60 shadow-2xs backdrop-blur-xs"
+                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/80 border border-border/60 shadow-xs backdrop-blur-xs"
                 >
                   {pf.preview ? (
                     <img
@@ -653,7 +653,7 @@ export function PromptComposer({
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className="size-4 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 cursor-pointer shadow-2xs"
+                    className="size-4 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 cursor-pointer shadow-xs"
                   >
                     <X className="size-2.5" />
                   </button>

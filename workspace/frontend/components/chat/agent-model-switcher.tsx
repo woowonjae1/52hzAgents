@@ -373,7 +373,7 @@ export function AgentModelSwitcher({
         className={cn(
           'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer select-none',
           isSelected
-            ? 'bg-surface3 text-foreground font-medium ring-1 ring-border shadow-2xs'
+            ? 'bg-surface3 text-foreground font-medium ring-1 ring-border shadow-xs'
             : 'text-foreground-muted hover:text-foreground hover:bg-surface2/70',
         )}
       >
@@ -408,7 +408,7 @@ export function AgentModelSwitcher({
           type="button"
           disabled={!anyOnline}
           className={cn(
-            'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-2xs',
+            'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-xs',
             anyOnline
               ? 'bg-surface2 hover:bg-surface3 border-border text-foreground cursor-pointer'
               : 'bg-surface2/40 border-border/60 text-muted-foreground/60 cursor-not-allowed',
@@ -436,7 +436,7 @@ export function AgentModelSwitcher({
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="p-0 w-[580px] sm:w-[680px] h-[480px] max-h-[85vh] rounded-xl border border-border bg-surface1 shadow-2xl overflow-hidden flex flex-col"
+        className="p-0 w-[580px] sm:w-[680px] h-[480px] max-h-[85vh] rounded-xl border border-border bg-surface1 shadow-xl overflow-hidden flex flex-col"
       >
         {/* Header Bar */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border/60 bg-surface2/40 shrink-0">
@@ -550,7 +550,7 @@ export function AgentModelSwitcher({
                             className={cn(
                               'px-2 py-0.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer select-none font-medium',
                               isActive
-                                ? 'bg-foreground text-background font-semibold shadow-2xs'
+                                ? 'bg-foreground text-background font-semibold shadow-xs'
                                 : cat.isFree
                                   ? 'bg-status-muted-success text-status-success hover:bg-status-success/25 border border-status-success/30'
                                   : 'bg-surface2 hover:bg-surface3 text-muted-foreground hover:text-foreground border border-border/60',

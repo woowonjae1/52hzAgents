@@ -237,7 +237,7 @@ export function ActivityTimeline({
                   A FEED ROW IS A ROW, NOT A CARD.
 
                   This was `rounded-xl` + `bg-surface1/60` + `border
-                  border-border/60` + `shadow-2xs` on EVERY entry, so a
+                  border-border/60` + `shadow-xs` on EVERY entry, so a
                   chronological list of six things rendered as six stacked
                   bordered boxes -- which is most of what "too many dividers"
                   means on this screen. A border, a fill and a shadow are three

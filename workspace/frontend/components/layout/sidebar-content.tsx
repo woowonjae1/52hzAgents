@@ -96,7 +96,7 @@ export function SidebarContent() {
               className={cn(
                 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
                 viewMode === 'mission'
-                  ? 'bg-surface2 text-foreground font-semibold shadow-2xs'
+                  ? 'bg-surface2 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
               )}
             >

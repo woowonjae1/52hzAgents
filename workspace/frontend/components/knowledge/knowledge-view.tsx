@@ -486,7 +486,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search knowledge…"
-            className="h-8.5 w-full rounded-xl border border-border bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted shadow-2xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="h-8.5 w-full rounded-xl border border-border bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted shadow-xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           />
           {query && (
             <button
@@ -728,7 +728,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={copyFullContent}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-xs"
               >
                 {copiedContent ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5 text-foreground-muted" />}
                 <span className="hidden sm:inline">Copy</span>
@@ -742,7 +742,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={() => exportAsMarkdown(selectedEntry, selectedContent)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-xs"
               >
                 <Download className="size-3.5 text-foreground-muted" />
                 <span className="hidden sm:inline">Export</span>

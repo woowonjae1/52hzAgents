@@ -369,7 +369,7 @@ export function TracePanel() {
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
                 filterType === 'all'
-                  ? 'bg-surface0 text-foreground font-semibold shadow-2xs'
+                  ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
               )}
             >
@@ -380,7 +380,7 @@ export function TracePanel() {
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1',
                 filterType === 'tools'
-                  ? 'bg-surface0 text-foreground font-semibold shadow-2xs'
+                  ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
               )}
             >
@@ -392,7 +392,7 @@ export function TracePanel() {
               className={cn(
                 'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1',
                 filterType === 'thinking'
-                  ? 'bg-surface0 text-foreground font-semibold shadow-2xs'
+                  ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
               )}
             >
@@ -405,7 +405,7 @@ export function TracePanel() {
                 className={cn(
                   'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1',
                   filterType === 'subagents'
-                    ? 'bg-surface0 text-foreground font-semibold shadow-2xs'
+                    ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                     : 'text-foreground-muted hover:text-foreground'
                 )}
               >

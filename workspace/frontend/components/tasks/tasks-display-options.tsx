@@ -60,7 +60,7 @@ export function TasksDisplayOptions({
       <PopoverContent
         align="end"
         sideOffset={6}
-        className="w-72 p-3 rounded-xl border border-border bg-surface1 text-foreground shadow-2xl space-y-3"
+        className="w-72 p-3 rounded-xl border border-border bg-surface1 text-foreground shadow-xl space-y-3"
       >
         {/* List / Board Switch */}
         <div className="flex items-center justify-between pb-2 border-b border-border/60">

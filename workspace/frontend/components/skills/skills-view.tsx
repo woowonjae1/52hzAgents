@@ -317,7 +317,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
-      <div className="fixed inset-x-4 top-[5%] bottom-[5%] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[480px] bg-background rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden border border-border">
+      <div className="fixed inset-x-4 top-[5%] bottom-[5%] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[480px] bg-background rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden border border-border">
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <div className="flex items-start gap-3">
             <div className="size-12 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">

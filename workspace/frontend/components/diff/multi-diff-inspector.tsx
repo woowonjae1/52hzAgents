@@ -187,7 +187,7 @@ export function MultiDiffInspector({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-150">
       <div
-        className="w-full max-w-6xl h-[88vh] flex flex-col rounded-2xl bg-surface1 border border-border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+        className="w-full max-w-6xl h-[88vh] flex flex-col rounded-2xl bg-surface1 border border-border shadow-xl overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -309,7 +309,7 @@ export function MultiDiffInspector({
                     className={cn(
                       'w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer font-mono',
                       isSelected
-                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-2xs font-medium'
+                        ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs font-medium'
                         : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
                     )}
                   >

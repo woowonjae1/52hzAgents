@@ -134,7 +134,7 @@ export function TokenDashboardPanel() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Workspace Summary Cards */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-2xs">
+          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-xs">
             <div className="text-3xs font-medium uppercase tracking-wider text-foreground-muted">Total Usage</div>
             <div className="mt-1 text-base font-bold font-mono tabular-nums text-foreground">
               {totalTokens > 0 ? fmtTokens(totalTokens) : '—'}
@@ -144,7 +144,7 @@ export function TokenDashboardPanel() {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-2xs">
+          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-xs">
             <div className="text-3xs font-medium uppercase tracking-wider text-foreground-muted">Compaction Checkpoints</div>
             <div className="mt-1 text-base font-bold font-mono tabular-nums text-foreground">
               {compactionRuns}
@@ -187,7 +187,7 @@ export function TokenDashboardPanel() {
                     className={cn(
                       'p-3 rounded-xl border transition-all duration-150',
                       isCurrent
-                        ? 'border-primary/40 bg-surface1 ring-1 ring-primary/20 shadow-2xs'
+                        ? 'border-primary/40 bg-surface1 ring-1 ring-primary/20 shadow-xs'
                         : 'border-border/60 bg-surface1/60 hover:bg-surface1/90'
                     )}
                   >
@@ -278,7 +278,7 @@ export function TokenDashboardPanel() {
                         onClick={() => handleCompact(ch.channel_name)}
                         disabled={isCompactingThis}
                         className={cn(
-                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium transition-all duration-150 cursor-pointer shadow-2xs',
+                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium transition-all duration-150 cursor-pointer shadow-xs',
                           'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed'
                         )}
                       >
