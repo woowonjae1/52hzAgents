@@ -343,7 +343,7 @@ export function AgentProfilePanel() {
             </div>
             <div className="p-3">
               <textarea
-                className="w-full text-sm leading-relaxed bg-transparent resize-none outline-none placeholder:text-muted-foreground/50 min-h-[60px]"
+                className="w-full text-sm leading-relaxed bg-transparent resize-none placeholder:text-muted-foreground/50 min-h-[60px]"
                 placeholder={`Describe what ${agent.agentName} does so other agents know when to delegate work...`}
                 value={description}
                 onChange={(e) => {
@@ -512,7 +512,7 @@ export function AgentProfilePanel() {
                             }
                           }}
                           placeholder="Model ID, e.g. gpt-4o"
-                          className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 outline-none focus:ring-1 focus:ring-primary/40 text-foreground"
+                          className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 focus:ring-1 focus:ring-primary/40 text-foreground"
                           autoFocus
                         />
                         <div className="flex gap-1 justify-end">
@@ -640,7 +640,7 @@ export function AgentProfilePanel() {
                         value={newApiKey}
                         onChange={(e) => setNewApiKey(e.target.value)}
                         placeholder="New API key..."
-                        className="flex-1 min-w-0 px-2 py-1.5 text-xs font-mono rounded border bg-transparent outline-none focus:ring-1 focus:ring-foreground/20"
+                        className="flex-1 min-w-0 px-2 py-1.5 text-xs font-mono rounded border bg-transparent focus:ring-1 focus:ring-foreground/20"
                         autoFocus
                       />
                       <button

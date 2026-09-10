@@ -412,7 +412,7 @@ const ThreadRow = memo(function ThreadRow({
                 if (trimmed) onSaveEdit(session.sessionId, trimmed);
                 onCancelEdit();
               }}
-              className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary outline-none"
+              className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary"
             />
           ) : (
             <span

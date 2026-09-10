@@ -82,7 +82,7 @@ export function FileList() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search files..."
-              className="text-xs bg-transparent outline-none flex-1 text-foreground placeholder:text-muted-foreground"
+              className="text-xs bg-transparent flex-1 text-foreground placeholder:text-muted-foreground"
             />
           </div>
           <Hint label="Upload File">

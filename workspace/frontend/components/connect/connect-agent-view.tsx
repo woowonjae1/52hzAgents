@@ -30,53 +30,44 @@ function reportLoadFailure(what: string, reason: unknown) {
 // ---------------------------------------------------------------------------
 // Brand colours for local agents and cloud providers.
 //
-// `text-white` IS ONLY CORRECT ON A DARK, SATURATED FILL. Eleven of these
-// entries paired it with `bg-surface2`, which is #ffffff in the light theme --
-// white letters on a white disc, invisible. `cursor` had the mirror bug:
-// `bg-primary` + `text-white`, and --primary is #f4f4f6 in the DARK theme, so
-// it disappeared there instead. Both fallbacks did the same on
-// `bg-foreground-muted`, a mid-grey in either theme.
+// Semantic tokens (--status-warning, --status-success, --status-danger,
+// --status-merged) are strictly reserved for operational health, process
+// lifecycle, and alert states. They must never be spent on brand fills:
+//   1. It dilutes the semantic signal (e.g. goose looked like a warning alert).
+//   2. White text on --status-warning (#f59e0b) yields an inaccessible ~2.1:1 contrast.
 //
-// The correct pattern was already in this file -- PROVIDER_BRANDS pairs
-// `bg-primary` with `text-primary-foreground` -- it simply was not applied
-// consistently. Surface fills now take `text-foreground`, which flips with
-// the theme; only genuinely dark saturated fills keep `text-white`.
-//
-// STILL WORTH A LOOK, deliberately not changed: `goose` and `openhands` sit
-// on `bg-status-warning` with white text, roughly 2.1:1 against #f59e0b --
-// legible-ish but under any contrast bar. Fixing it needs an "on-warning"
-// foreground token that does not exist. Underneath that is a second
-// question: --status-warning MEANS "warning", and spending a semantic token
-// on a brand fill is how that meaning gets diluted.
+// All agent badges follow a unified, theme-adaptive palette:
+//   - Neutral surfaces: `bg-surface2` + `text-foreground` (contrast > 10:1 in both themes)
+//   - Monochromatic primary: `bg-primary` + `text-primary-foreground`
 // ---------------------------------------------------------------------------
 
 const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
-  claude:      { bg: 'bg-surface2',  text: 'text-foreground' },
-  antigravity: { bg: 'bg-surface2',    text: 'text-foreground' },
-  agy:         { bg: 'bg-surface2',    text: 'text-foreground' },
-  codex:       { bg: 'bg-status-success',   text: 'text-white' },
-  gemini:      { bg: 'bg-surface2',    text: 'text-foreground' },
-  openclaw:  { bg: 'bg-status-merged',  text: 'text-white' },
-  amp:       { bg: 'bg-status-danger',    text: 'text-white' },
-  goose:     { bg: 'bg-status-warning',   text: 'text-white' },
-  cline:     { bg: 'bg-surface2',    text: 'text-foreground' },
-  copilot:   { bg: 'bg-surface2',  text: 'text-foreground' },
-  opencode:  { bg: 'bg-surface2',    text: 'text-foreground' },
-  nanoclaw:  { bg: 'bg-pink-500',    text: 'text-white' },
-  cursor:    { bg: 'bg-primary',    text: 'text-primary-foreground' },
-  hermes:    { bg: 'bg-yellow-500',  text: 'text-white' },
-  kimi:      { bg: 'bg-surface2',     text: 'text-foreground' },
-  pi:        { bg: 'bg-status-success', text: 'text-white' },
-  kilo:      { bg: 'bg-surface2',  text: 'text-foreground' },
-  openhands: { bg: 'bg-status-warning',   text: 'text-white' },
-  deepseek:  { bg: 'bg-surface2',    text: 'text-foreground' },
+  claude:      { bg: 'bg-surface2', text: 'text-foreground' },
+  antigravity: { bg: 'bg-surface2', text: 'text-foreground' },
+  agy:         { bg: 'bg-surface2', text: 'text-foreground' },
+  codex:       { bg: 'bg-primary',  text: 'text-primary-foreground' },
+  gemini:      { bg: 'bg-surface2', text: 'text-foreground' },
+  openclaw:    { bg: 'bg-surface2', text: 'text-foreground' },
+  amp:         { bg: 'bg-surface2', text: 'text-foreground' },
+  goose:       { bg: 'bg-surface2', text: 'text-foreground' },
+  cline:       { bg: 'bg-surface2', text: 'text-foreground' },
+  copilot:     { bg: 'bg-surface2', text: 'text-foreground' },
+  opencode:    { bg: 'bg-surface2', text: 'text-foreground' },
+  nanoclaw:    { bg: 'bg-surface2', text: 'text-foreground' },
+  cursor:      { bg: 'bg-primary',  text: 'text-primary-foreground' },
+  hermes:      { bg: 'bg-surface2', text: 'text-foreground' },
+  kimi:        { bg: 'bg-surface2', text: 'text-foreground' },
+  pi:          { bg: 'bg-surface2', text: 'text-foreground' },
+  kilo:        { bg: 'bg-surface2', text: 'text-foreground' },
+  openhands:   { bg: 'bg-surface2', text: 'text-foreground' },
+  deepseek:    { bg: 'bg-surface2', text: 'text-foreground' },
 };
 
 const PROVIDER_BRANDS: Record<string, { bg: string; text: string; accent: string }> = {
-  openai:    { bg: 'bg-primary', text: 'text-primary-foreground', accent: 'border-border-accent' },
-  google:    { bg: 'bg-surface2',    text: 'text-foreground', accent: 'border-border-accent' },
-  xai:       { bg: 'bg-primary', text: 'text-primary-foreground', accent: 'border-border-accent' },
-  deepseek:  { bg: 'bg-surface2',    text: 'text-foreground', accent: 'border-border-accent' },
+  openai:    { bg: 'bg-primary',  text: 'text-primary-foreground', accent: 'border-border-accent' },
+  google:    { bg: 'bg-surface2', text: 'text-foreground',         accent: 'border-border-accent' },
+  xai:       { bg: 'bg-primary',  text: 'text-primary-foreground', accent: 'border-border-accent' },
+  deepseek:  { bg: 'bg-surface2', text: 'text-foreground',         accent: 'border-border-accent' },
 };
 
 function getAgentBrand(name: string) {
@@ -361,7 +352,6 @@ function LocalAgentsTab({
       {/* Agent grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {catalog.map((entry) => {
-          const brand = getAgentBrand(entry.name);
           const isSelected = selectedAgent === entry.name;
           return (
             <button

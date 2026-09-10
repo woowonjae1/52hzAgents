@@ -251,7 +251,7 @@ export function MonitorGrid() {
                   }
                 }}
                 placeholder="Search threads..."
-                className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                className="flex-1 text-sm bg-transparent placeholder:text-muted-foreground"
               />
               <button
                 onClick={() => { setSearchOpen(false); setSearchQuery(''); }}

@@ -365,7 +365,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
                 <select
                   value={selectedAgent}
                   onChange={(e) => setSelectedAgent(e.target.value)}
-                  className="px-2 py-1 rounded bg-surface2 border border-border text-2xs text-foreground outline-none cursor-pointer"
+                  className="px-2 py-1 rounded bg-surface2 border border-border text-2xs text-foreground cursor-pointer"
                 >
                   <option value="claude">@claude (Reviewer)</option>
                   <option value="antigravity">@antigravity (Architect)</option>
@@ -379,7 +379,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a review note, suggestion, or critique for this artifact..."
                   rows={2}
-                  className="flex-1 p-2.5 rounded-xl bg-surface2 border border-border text-xs text-foreground outline-none resize-none focus:border-primary/50"
+                  className="flex-1 p-2.5 rounded-xl bg-surface2 border border-border text-xs text-foreground resize-none focus:border-primary/50"
                 />
                 <button
                   type="submit"

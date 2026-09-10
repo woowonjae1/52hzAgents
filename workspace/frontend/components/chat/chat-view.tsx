@@ -846,7 +846,7 @@ export function ChatView() {
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}
-              className="text-sm font-semibold tracking-tight bg-surface2/50 border-b-2 border-border-accent px-2 py-0.5 rounded-t outline-none min-w-0 max-w-[300px] text-foreground h-7"
+              className="text-sm font-semibold tracking-tight bg-surface2/50 border-b-2 border-border-accent px-2 py-0.5 rounded-t min-w-0 max-w-[300px] text-foreground h-7"
               autoFocus
             />
           ) : (

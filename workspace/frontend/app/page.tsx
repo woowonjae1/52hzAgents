@@ -24,6 +24,7 @@ import { timeAgo } from '@/lib/helpers';
 import { capture, group } from '@/lib/analytics';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { DEFAULT_AGENT_CATALOG } from '@/lib/agent-catalog';
+import { AgentIcon } from '@/components/icons/agent-icons';
 
 // ---------------------------------------------------------------------------
 // Copyable Code Block
@@ -59,19 +60,11 @@ function LandingPage() {
   // Same six as the workspace roster (lib/agent-catalog.ts) — a landing page
   // advertising agents the Overview does not offer sends people looking for
   // cards that aren't there.
-  const AGENT_COLORS: Record<string, string> = {
-    claude: 'bg-status-warning',
-    openclaw: 'bg-status-merged',
-    hermes: 'bg-status-warning',
-    pi: 'bg-status-success',
-    chatgpt: 'bg-foreground-extra-muted',
-    custom: 'bg-foreground-muted',
-  };
   const agents = DEFAULT_AGENT_CATALOG.map((entry) => ({
+    id: entry.name,
     name: entry.label,
     status: 'supported',
     command: entry.install_command,
-    color: AGENT_COLORS[entry.name] || 'bg-foreground-muted',
   }));
 
   return (
@@ -174,15 +167,15 @@ function LandingPage() {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {agents.map((agent) => (
               <div
-                key={agent.name}
+                key={agent.id}
                 className="rounded-lg border bg-card p-4 hover:border-border-accent transition-colors"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className={`size-8 rounded-lg ${agent.color} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
-                    {agent.name[0]}
+                  <div className="size-8 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center shrink-0">
+                    <AgentIcon name={agent.id} size={22} />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">{agent.name}</p>
+                    <p className="font-medium text-sm text-foreground">{agent.name}</p>
                   </div>
                 </div>
                 <CodeBlock code={agent.command} />

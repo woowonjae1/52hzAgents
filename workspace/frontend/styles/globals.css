@@ -601,8 +601,23 @@
     @apply border-border;
   }
 
+  /*
+    THE KEYBOARD FOCUS RING MUST NOT RESHAPE WHAT IT LANDS ON.
+
+    This rule used to `@apply rounded-xs shadow-none` alongside the outline —
+    and both of those act on the ELEMENT, not on the ring. Tabbing onto a
+    `rounded-full` pill therefore snapped it to a near-square corner and
+    dropped its shadow for as long as it held focus, so keyboard navigation
+    made the interface twitch at every step. Chromium (which is all Electron
+    runs) has followed `border-radius` with `outline` since Chrome 94, so the
+    ring already takes the shape of whatever it surrounds without help.
+
+    `transition-none!` stays: the ring has to appear on the same frame as the
+    Tab press. Inheriting a 200ms colour transition from the element makes
+    fast tabbing look like the focus is trailing behind the key.
+  */
   *:focus-visible {
-    @apply outline-ring rounded-xs shadow-none outline-2 outline-offset-3 transition-none!;
+    @apply outline-ring outline-2 outline-offset-3 transition-none!;
   }
 
   /**
