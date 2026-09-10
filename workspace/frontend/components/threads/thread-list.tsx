@@ -907,7 +907,18 @@ export function ThreadList() {
 
       {/* Projects Section Header & Create Dropdown (Antigravity 2.0 style) */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1 shrink-0 select-none">
-        <span className="text-2xs font-semibold text-foreground-extra-muted uppercase tracking-wider">
+        {/*
+          THE SAME LABEL TREATMENT AS THE GROUPS ABOVE IT.
+
+          This was the only `uppercase tracking-wider` label in the sidebar,
+          sitting at the same level as "Chats & Threads", which is sentence
+          case at normal tracking. Two heading systems in one column is what
+          made this sidebar look cut into zones -- not rules, of which there
+          are none between these groups, but type. Uppercase plus letter
+          spacing is the machine-console idiom; it was removed from the Mission
+          Control section headings for the same reason.
+        */}
+        <span className="text-xs font-semibold text-foreground">
           Projects
         </span>
 

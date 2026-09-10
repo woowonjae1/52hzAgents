@@ -1277,7 +1277,23 @@ export function ChatView() {
             <div className="mx-auto w-full max-w-(--chat-column)">
               {/* Offline Warning Banner / Agent Selector */}
               {!hasOnlineAgents ? (
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-warning/10 border border-status-warning/25 text-status-warning text-xs">
+                /*
+                  A TINT, NOT A BOX.
+
+                  This carried a warning fill AND a warning border AND warning
+                  text -- three simultaneous statements of one fact, stacked
+                  directly above a composer that has its own border and below a
+                  message list with its own. On a screen already dense with
+                  seams, a bordered alert is the "boxed callout" look; the fill
+                  alone separates it from the page perfectly well, which is the
+                  same reasoning `EventLine` uses for its detail chip.
+
+                  The icon keeps the hue because it is the signal. The sentence
+                  goes back to `text-foreground` because it is information, and
+                  a whole line set in amber is harder to read while telling you
+                  nothing the icon has not already said.
+                */
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-muted-warning text-foreground text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
                     <span className="truncate">No agents are online — connect one before starting a conversation</span>
@@ -1292,7 +1308,7 @@ export function ChatView() {
                   </button>
                 </div>
               ) : isMissingParticipant ? (
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-warning/10 border border-status-warning/25 text-status-warning text-xs">
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-muted-warning text-foreground text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
                     <span className="truncate">
