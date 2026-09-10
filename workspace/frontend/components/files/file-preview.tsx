@@ -7,6 +7,7 @@ import { workspaceApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { FileGrid } from './file-grid';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { stripAddressPrefix } from '@/lib/types';
 
@@ -76,6 +77,7 @@ export function FilePreview() {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const file = files.find((f) => f.id === selectedFileId);
 
@@ -257,7 +259,7 @@ export function FilePreview() {
 
         <Hint label="Delete">
           <button
-            onClick={handleDelete}
+            onClick={() => setShowDeleteConfirm(true)}
             className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
           >
             <Trash2 className="size-4" />
@@ -334,6 +336,21 @@ export function FilePreview() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete file?"
+        targetName={file.filename}
+        description="will be permanently deleted from the workspace. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          await handleDelete();
+          setSelectedFileId(null);
+          if (isMobile) openMobileList();
+        }}
+      />
     </div>
   );
 }

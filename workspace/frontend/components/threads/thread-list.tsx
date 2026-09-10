@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { stripAddressPrefix } from '@/lib/types';
 
 /*
@@ -568,9 +569,19 @@ export function ThreadList() {
     updateSession(sessionId, { starred });
   }, [updateSession]);
 
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<{ id: string; title: string } | null>(null);
+
   const handleUpdateStatus = useCallback((sessionId: string, status: 'active' | 'archived' | 'deleted') => {
+    if (status === 'deleted') {
+      const target = sessions.find((s) => s.sessionId === sessionId);
+      setPendingDeleteSession({
+        id: sessionId,
+        title: target?.title || 'Untitled conversation',
+      });
+      return;
+    }
     updateSession(sessionId, { status });
-  }, [updateSession]);
+  }, [sessions, updateSession]);
 
   // Debounced content search
   useEffect(() => {
@@ -1183,7 +1194,10 @@ export function ThreadList() {
                               className="text-destructive focus:text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                updateSession(session.sessionId, { status: 'deleted' });
+                                setPendingDeleteSession({
+                                  id: session.sessionId,
+                                  title: session.title || 'Untitled conversation',
+                                });
                               }}
                             >
                               <Trash2 className="size-4" />
@@ -1200,6 +1214,22 @@ export function ThreadList() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(pendingDeleteSession)}
+        onOpenChange={(open) => !open && setPendingDeleteSession(null)}
+        title="Delete conversation?"
+        targetName={pendingDeleteSession?.title}
+        description="will be permanently deleted along with all its messages and history. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          if (pendingDeleteSession) {
+            updateSession(pendingDeleteSession.id, { status: 'deleted' });
+            setPendingDeleteSession(null);
+          }
+        }}
+      />
     </div>
   );
 }

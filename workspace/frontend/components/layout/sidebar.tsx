@@ -168,6 +168,7 @@ export function Sidebar() {
           aria-valuenow={sidebarWidth}
           aria-valuemin={MIN_SIDEBAR_WIDTH}
           aria-valuemax={MAX_SIDEBAR_WIDTH}
+          suppressHydrationWarning
           tabIndex={0}
           onMouseDown={startResize}
           onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}

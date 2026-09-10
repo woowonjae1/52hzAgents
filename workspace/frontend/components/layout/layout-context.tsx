@@ -92,12 +92,7 @@ const LayoutContext = createContext<LayoutState | undefined>(undefined);
 export function LayoutProvider({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  // Start at the default and hydrate from storage after mount — reading
-  // localStorage in the initializer would desync from the server-rendered markup.
-  const [sidebarWidth, setSidebarWidthState] = useState(DEFAULT_SIDEBAR_WIDTH);
-  useEffect(() => {
-    setSidebarWidthState(readStoredSidebarWidth());
-  }, []);
+  const [sidebarWidth, setSidebarWidthState] = useState(() => readStoredSidebarWidth());
   const setSidebarWidth = useCallback((width: number) => {
     const clamped = clampSidebarWidth(width);
     setSidebarWidthState(clamped);

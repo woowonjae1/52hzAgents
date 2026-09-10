@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { AgentCatalogEntry, CloudAgentConfig, CloudAgentProvider } from '@/lib/types';
 import { AgentIcon, ProviderIcon } from '@/components/icons/agent-icons';
 import { getApiBaseUrl } from '@/lib/config';
@@ -105,6 +106,7 @@ export function ConnectAgentView() {
   const [cloudProviders, setCloudProviders] = useState<CloudAgentProvider[]>([]);
   const [cloudAgents, setCloudAgents] = useState<CloudAgentConfig[]>([]);
   const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
+  const [agentToDisconnect, setAgentToDisconnect] = useState<string | null>(null);
 
   // Cloud config form
   const [cfgModel, setCfgModel] = useState('');
@@ -311,10 +313,26 @@ export function ConnectAgentView() {
             setShowAdvanced={setShowAdvanced}
             saving={saving}
             onAdd={handleAddCloudAgent}
-            onRemove={handleRemoveCloudAgent}
+            onRemove={setAgentToDisconnect}
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(agentToDisconnect)}
+        onOpenChange={(open) => !open && setAgentToDisconnect(null)}
+        title="Disconnect agent?"
+        targetName={agentToDisconnect ? `@${agentToDisconnect}` : undefined}
+        description="will be disconnected and its stored API key will be deleted. You will need to re-enter your credentials to connect it again."
+        confirmLabel="Disconnect"
+        variant="destructive"
+        onConfirm={async () => {
+          if (agentToDisconnect) {
+            await handleRemoveCloudAgent(agentToDisconnect);
+            setAgentToDisconnect(null);
+          }
+        }}
+      />
     </div>
   );
 }

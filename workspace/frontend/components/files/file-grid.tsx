@@ -1,17 +1,21 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
-import { useRef, useState, useMemo, useCallback } from 'react';
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Search, Upload, FolderOpen, Folder, ChevronRight, FolderPlus, Trash2,
+  Download, X,
 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { FileEntry } from './file-utils';
 import { formatSize, getFileIconLarge, timeAgo, basename, getEntriesAtPath } from './file-utils';
+import type { WorkspaceFile } from '@/lib/types';
 
 /** Image thumbnail using the workspace file download URL */
 function ImageThumbnail({ fileId, filename }: { fileId: string; filename: string }) {
@@ -43,6 +47,15 @@ export function FileGrid() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Multi-selection state
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+
+  // Confirmation dialogs
+  const [singleDeleteTarget, setSingleDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+  const [deletingBatch, setDeletingBatch] = useState(false);
+
   // This panel opens from a thread's header, so it shows what THAT thread
   // produced, not every file in the workspace — shadow `files` so the rest of
   // the component (folder tree, search, entries) doesn't need to know.
@@ -65,6 +78,29 @@ export function FileGrid() {
     }
     return getEntriesAtPath(files, currentPath);
   }, [files, currentPath, search]);
+
+  // Extract all file entries for range selection and batch actions
+  const fileEntries = useMemo(
+    () => entries.filter((e): e is { type: 'file'; file: WorkspaceFile; displayName: string } => e.type === 'file'),
+    [entries]
+  );
+
+  // Clear multi-selection on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedFileIds.size > 0) {
+        setSelectedFileIds(new Set());
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedFileIds.size]);
+
+  // Clear multi-selection when changing folder or search
+  useEffect(() => {
+    setSelectedFileIds(new Set());
+    setLastClickedIndex(null);
+  }, [currentPath, search]);
 
   const breadcrumbs = useMemo(() => {
     if (!currentPath) return [];
@@ -123,13 +159,97 @@ export function FileGrid() {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, fileId: string, filename: string) => {
+  const handleCardClick = (e: React.MouseEvent, file: WorkspaceFile, fileIndex: number) => {
+    if (e.shiftKey && lastClickedIndex !== null) {
+      const start = Math.min(lastClickedIndex, fileIndex);
+      const end = Math.max(lastClickedIndex, fileIndex);
+      const next = new Set(selectedFileIds);
+      for (let i = start; i <= end; i++) {
+        if (fileEntries[i]) next.add(fileEntries[i].file.id);
+      }
+      setSelectedFileIds(next);
+      return;
+    }
+
+    if (e.metaKey || e.ctrlKey) {
+      const next = new Set(selectedFileIds);
+      if (next.has(file.id)) {
+        next.delete(file.id);
+      } else {
+        next.add(file.id);
+      }
+      setSelectedFileIds(next);
+      setLastClickedIndex(fileIndex);
+      return;
+    }
+
+    // Normal click
+    if (selectedFileIds.size > 0) {
+      setSelectedFileIds(new Set());
+    }
+    setSelectedFileId(file.id);
+    setLastClickedIndex(fileIndex);
+    if (isMobile) openMobileDetail();
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent, fileId: string, fileIndex: number) => {
     e.stopPropagation();
+    const next = new Set(selectedFileIds);
+    if (next.has(fileId)) {
+      next.delete(fileId);
+    } else {
+      next.add(fileId);
+    }
+    setSelectedFileIds(next);
+    setLastClickedIndex(fileIndex);
+  };
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedFileIds.size === fileEntries.length) {
+      setSelectedFileIds(new Set());
+    } else {
+      setSelectedFileIds(new Set(fileEntries.map((e) => e.file.id)));
+    }
+  }, [fileEntries, selectedFileIds.size]);
+
+  const handleBatchDownload = () => {
+    const targets = fileEntries.filter((e) => selectedFileIds.has(e.file.id));
+    if (targets.length === 0) return;
+    targets.forEach((e) => {
+      const url = workspaceApi.getFileUrl(e.file.id);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = basename(e.file.filename);
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+    toast.success(`Downloading ${targets.length} file${targets.length > 1 ? 's' : ''}`);
+  };
+
+  const handleConfirmBatchDelete = async () => {
+    const ids = Array.from(selectedFileIds);
+    if (ids.length === 0) return;
+    setDeletingBatch(true);
+    let successCount = 0;
     try {
-      await deleteFile(fileId);
-      toast.success(`Deleted ${basename(filename)}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Delete failed');
+      for (const id of ids) {
+        try {
+          await deleteFile(id);
+          successCount++;
+        } catch {
+          // Continue
+        }
+      }
+      toast.success(`Deleted ${successCount} file${successCount > 1 ? 's' : ''}`);
+      if (selectedFileId && selectedFileIds.has(selectedFileId)) {
+        setSelectedFileId(null);
+      }
+      setSelectedFileIds(new Set());
+    } finally {
+      setDeletingBatch(false);
+      setBatchDeleteConfirmOpen(false);
     }
   };
 
@@ -233,6 +353,57 @@ export function FileGrid() {
         />
       </div>
 
+      {/* Batch toolbar when files are selected */}
+      {selectedFileIds.size > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 bg-surface2 border-b border-border shadow-xs text-xs animate-in fade-in duration-100 shrink-0">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selectedFileIds.size === fileEntries.length && fileEntries.length > 0}
+              onCheckedChange={handleSelectAll}
+            />
+            <span className="font-medium text-foreground">
+              {selectedFileIds.size} of {fileEntries.length} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="px-2.5 py-1 rounded text-2xs hover:bg-surface3 text-foreground-muted hover:text-foreground transition-colors"
+            >
+              {selectedFileIds.size === fileEntries.length ? 'Deselect all' : 'Select all'}
+            </button>
+            <Hint label="Download selected">
+              <button
+                type="button"
+                onClick={handleBatchDownload}
+                className="size-7 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Download className="size-3.5" />
+              </button>
+            </Hint>
+            <Hint label="Delete selected">
+              <button
+                type="button"
+                onClick={() => setBatchDeleteConfirmOpen(true)}
+                className="size-7 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </Hint>
+            <Hint label="Clear selection (Esc)">
+              <button
+                type="button"
+                onClick={() => setSelectedFileIds(new Set())}
+                className="size-7 flex items-center justify-center rounded hover:bg-surface3 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="size-3.5" />
+              </button>
+            </Hint>
+          </div>
+        </div>
+      )}
+
       {/* Grid content */}
       {entries.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -273,22 +444,36 @@ export function FileGrid() {
 
               const { file, displayName } = entry;
               const isImage = (file.contentType || '').startsWith('image/');
+              const isBatchSelected = selectedFileIds.has(file.id);
               const isSelected = selectedFileId === file.id;
+              const fileIdx = fileEntries.findIndex((e) => e.file.id === file.id);
 
               return (
                 <div
                   key={file.id}
                   className={cn(
-                    'relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors cursor-pointer group',
-                    isSelected
+                    'relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors cursor-pointer group select-none',
+                    isBatchSelected
+                      ? 'bg-primary/10 ring-2 ring-primary/40'
+                      : isSelected
                       ? 'bg-primary/10 ring-2 ring-primary/30'
                       : 'hover:bg-surface2/60'
                   )}
-                  onClick={() => {
-                    setSelectedFileId(file.id);
-                    if (isMobile) openMobileDetail();
-                  }}
+                  onClick={(e) => handleCardClick(e, file, fileIdx)}
                 >
+                  {/* Selection checkbox */}
+                  <div
+                    onClick={(e) => handleCheckboxClick(e, file.id, fileIdx)}
+                    className={cn(
+                      'absolute top-2 left-2 z-10 transition-opacity',
+                      isBatchSelected || selectedFileIds.size > 0
+                        ? 'opacity-100'
+                        : 'opacity-0 group-hover:opacity-100'
+                    )}
+                  >
+                    <Checkbox checked={isBatchSelected} />
+                  </div>
+
                   {/* Thumbnail or icon */}
                   <div className="size-16 flex items-center justify-center">
                     {isImage
@@ -311,8 +496,12 @@ export function FileGrid() {
                   {/* Delete button on hover */}
                   <Hint label="Delete">
                     <button
-                      onClick={(e) => handleDelete(e, file.id, file.filename)}
-                      className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-all shadow-sm"
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSingleDeleteTarget({ id: file.id, name: basename(file.filename) });
+                      }}
+                      className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-surface3 text-muted-foreground hover:text-destructive transition-all shadow-sm"
                     >
                       <Trash2 className="size-3" />
                     </button>
@@ -323,6 +512,47 @@ export function FileGrid() {
           </div>
         </div>
       )}
+
+      {/* Single file delete confirmation dialog */}
+      <ConfirmDialog
+        open={Boolean(singleDeleteTarget)}
+        onOpenChange={(open) => !open && setSingleDeleteTarget(null)}
+        title="Delete file?"
+        targetName={singleDeleteTarget?.name}
+        description="will be permanently deleted from this workspace. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!singleDeleteTarget) return;
+          try {
+            await deleteFile(singleDeleteTarget.id);
+            toast.success(`Deleted ${singleDeleteTarget.name}`);
+            if (selectedFileId === singleDeleteTarget.id) {
+              setSelectedFileId(null);
+            }
+            if (selectedFileIds.has(singleDeleteTarget.id)) {
+              const next = new Set(selectedFileIds);
+              next.delete(singleDeleteTarget.id);
+              setSelectedFileIds(next);
+            }
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Delete failed');
+          }
+        }}
+      />
+
+      {/* Batch delete confirmation dialog */}
+      <ConfirmDialog
+        open={batchDeleteConfirmOpen}
+        onOpenChange={setBatchDeleteConfirmOpen}
+        title={`Delete ${selectedFileIds.size} files?`}
+        targetName={`${selectedFileIds.size} selected files`}
+        description="will be permanently deleted from this workspace. This action cannot be undone."
+        confirmLabel={`Delete ${selectedFileIds.size} files`}
+        variant="destructive"
+        isLoading={deletingBatch}
+        onConfirm={handleConfirmBatchDelete}
+      />
     </div>
   );
 }
