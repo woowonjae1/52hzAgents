@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { FileText, Code2, Sparkles, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { FileText, Code2, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AgentAvatar } from '../agents/agent-avatar';
 import { useArtifacts, type ArtifactItem } from '@/lib/artifacts-context';
@@ -15,6 +15,32 @@ export function ArtifactInlineCard({
 }) {
   const { openArtifact, activeArtifact, isCanvasOpen } = useArtifacts();
   const isActive = isCanvasOpen && activeArtifact?.id === artifact.id;
+
+  /*
+   * The first two lines of prose, with the markdown taken off.
+   *
+   * The heading is dropped because it is already the card's title -- repeating
+   * it as the preview would spend both lines saying the same thing. Fences,
+   * table rules and list bullets go too: this is a one-line summary in a 10px
+   * face, and `| --- | --- |` renders there as noise, not as a table.
+   */
+  const preview = React.useMemo(() => {
+    const lines = artifact.content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(
+        (l) =>
+          l &&
+          !/^#{1,6}\s/.test(l) &&
+          !/^```/.test(l) &&
+          !/^\|?\s*:?-{2,}/.test(l) &&
+          !/^[-*+]\s*$/.test(l)
+      )
+      .map((l) => l.replace(/^[-*+]\s+/, '').replace(/[*`_>#|]/g, '').trim())
+      .filter(Boolean);
+    const text = lines.slice(0, 2).join(' ');
+    return text.length > 180 ? `${text.slice(0, 180)}…` : text || `${artifact.content.length} characters`;
+  }, [artifact.content]);
 
   return (
     <div
@@ -52,8 +78,16 @@ export function ArtifactInlineCard({
               )}
             </div>
 
-            <p className="text-2xs text-muted-foreground line-clamp-1 mt-0.5">
-              {artifact.filePath ? `Path: ${artifact.filePath}` : `${artifact.content.length} chars · Structured deliverable and findings`}
+            {/*
+              A REAL PREVIEW, because this card now stands in for the document
+              rather than heading it. "Structured deliverable and findings" was
+              boilerplate printed identically on every artifact -- fine when
+              the full text was rendered immediately below, useless once the
+              card is the only thing in the transcript. The reader needs enough
+              to decide whether to open it, so they get the opening lines.
+            */}
+            <p className="text-2xs text-muted-foreground line-clamp-2 mt-0.5 leading-snug">
+              {artifact.filePath ? `Path: ${artifact.filePath}` : preview}
             </p>
           </div>
         </div>

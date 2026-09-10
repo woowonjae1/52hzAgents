@@ -583,7 +583,21 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
                 </div>
               </div>
             </div>
-          ) : cleanContent ? (
+          ) : cleanContent && !inferredArtifact ? (
+            /*
+              THE CARD REPLACES THE BODY. It used to sit ABOVE it, as a
+              sibling with no `else` -- so a 1300-character deliverable was
+              rendered in full directly beneath a card inviting you to open it
+              in the canvas, and a third time in the canvas itself. Three
+              copies of one artifact, two of them on screen at once.
+
+              That is also what made the canvas look pointless: its whole job
+              is to take a long document OUT of the conversation flow, and
+              nothing was taking it out. `inferredArtifact.content` IS
+              `cleanContent` (see the memo above), so skipping the inline
+              render here drops a duplicate rather than hiding anything -- the
+              card carries a preview and the canvas carries the text.
+            */
             <div className="text-sm leading-7 text-foreground font-normal">
               <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
             </div>
