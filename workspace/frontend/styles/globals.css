@@ -829,7 +829,22 @@ html {
   gap: 0.5rem;
   padding-inline: 1.25rem;
   border-bottom: 1px solid var(--border);
-  background: var(--surface0);
+  /*
+    CHROME COLOUR, NOT CONTENT COLOUR.
+
+    This was `--surface0`, which is also the workspace background -- so the
+    view header wore the exact tone of the content beneath it and was told
+    apart from it only by the hairline, while sitting under a titlebar in
+    `--surface-sidebar` that it differs from by 6/255. The header is chrome; it
+    was painted as content.
+
+    On `--surface-sidebar` the titlebar, the sidebar and every view header
+    become ONE continuous chrome region, with no internal seams at all, and the
+    single border below is the one boundary that matters: chrome against
+    content. That is also what makes dropping the titlebar's own border read as
+    intentional rather than as a missing line.
+  */
+  background: var(--surface-sidebar);
   user-select: none;
   -webkit-user-select: none;
 }

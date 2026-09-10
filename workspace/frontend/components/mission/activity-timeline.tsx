@@ -153,7 +153,7 @@ export function ActivityTimeline({
     >
       {/* Title bar — `.app-header` so this panel's first divider sits on the
           same baseline as the main pane's and the sidebar's. */}
-      <div className="app-header px-3.5 bg-surface1">
+      <div className="app-header px-3.5">
         <span className="text-xs font-semibold tracking-tight text-foreground">
           Live activity
         </span>

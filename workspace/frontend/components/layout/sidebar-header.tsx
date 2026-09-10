@@ -21,7 +21,7 @@ export function SidebarHeader() {
   if (isDesktop) return null;
 
   return (
-    <div className="app-header justify-between bg-surface-sidebar px-4">
+    <div className="app-header justify-between px-4">
       {/* Left: Brand logo with status dot */}
       <div className="flex items-center gap-3 min-w-0">
         <SignalMark size={22} className="shrink-0" title="52hzAgents" />
