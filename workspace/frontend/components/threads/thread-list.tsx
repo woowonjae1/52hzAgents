@@ -138,7 +138,7 @@ function DMSection({
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors cursor-pointer relative',
                   isSelected
-                    ? 'bg-white dark:bg-surface2 text-foreground font-medium border border-black/10 dark:border-white/10 shadow-xs before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+                    ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
                     : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground'
                 )}
               >
@@ -362,7 +362,7 @@ const ThreadRow = memo(function ThreadRow({
       className={cn(
         'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors relative group cursor-pointer select-none',
         isSelected
-          ? 'bg-white dark:bg-surface2 text-foreground font-medium border border-black/10 dark:border-white/10 shadow-xs before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+          ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
           : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
         'has-data-[state=open]:bg-surface2/60',
         isActive && 'thread-wip',
@@ -846,7 +846,7 @@ export function ThreadList() {
             className={cn(
               'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
               viewMode === 'threads'
-                ? 'bg-surface2 text-foreground font-semibold shadow-2xs'
+                ? 'bg-surface2 text-foreground font-semibold'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
             )}
           >
@@ -863,7 +863,7 @@ export function ThreadList() {
             className={cn(
               'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
               viewMode === 'tasks'
-                ? 'bg-surface2 text-foreground font-semibold shadow-2xs'
+                ? 'bg-surface2 text-foreground font-semibold'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
             )}
           >
@@ -1136,7 +1136,7 @@ export function ThreadList() {
                         className={cn(
                           'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative group cursor-pointer',
                           isSelected
-                            ? 'bg-white dark:bg-surface2 text-foreground font-medium border border-black/10 dark:border-white/10 shadow-xs before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+                            ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
                             : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
                           'has-data-[state=open]:bg-surface2/60'
                         )}

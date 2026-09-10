@@ -1275,39 +1275,35 @@ export function ChatView() {
           <div className="px-4 lg:px-8 py-3 lg:py-4">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
-              {/* Offline Warning Banner / Agent Selector */}
-              {!hasOnlineAgents ? (
-                /*
-                  A TINT, NOT A BOX.
+              {/*
+                THE "NO AGENTS ONLINE" BANNER WAS DELETED, not restyled.
 
-                  This carried a warning fill AND a warning border AND warning
-                  text -- three simultaneous statements of one fact, stacked
-                  directly above a composer that has its own border and below a
-                  message list with its own. On a screen already dense with
-                  seams, a bordered alert is the "boxed callout" look; the fill
-                  alone separates it from the page perfectly well, which is the
-                  same reasoning `EventLine` uses for its detail chip.
+                It said "No agents are online -- connect one before starting a
+                conversation" in an amber box. Twelve pixels below it the
+                composer's own placeholder says "Connect an agent to start
+                chatting...", and twenty pixels below THAT the agent switcher
+                reads "Offline" and opens a picker that lists the unconfigured
+                agents you would connect. One fact, three statements, one
+                screenful apart -- and the banner was the only one of the three
+                that could not act on it directly.
 
-                  The icon keeps the hue because it is the signal. The sentence
-                  goes back to `text-foreground` because it is information, and
-                  a whole line set in amber is harder to read while telling you
-                  nothing the icon has not already said.
-                */
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-muted-warning text-foreground text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
-                    <span className="truncate">No agents are online — connect one before starting a conversation</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('mission')}
-                    className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors cursor-pointer"
-                  >
-                    <span>Go to connect</span>
-                    <ArrowRight className="size-3" />
-                  </button>
-                </div>
-              ) : isMissingParticipant ? (
+                Amber was also the wrong register. Nothing has gone wrong here:
+                you have not connected an agent yet, which is the ordinary
+                first-run state of a fresh workspace. Spending the warning
+                colour on a normal precondition is how users learn to ignore
+                amber where it does mean something.
+
+                What is lost is the "Go to connect" shortcut into Mission
+                Control. The switcher below reaches the same agents in one
+                click without leaving the thread, so that is a shorter path,
+                not a missing one.
+
+                The `isMissingParticipant` banner below stays: an agent that
+                WAS in this thread having gone offline is genuinely unexpected,
+                nothing else on screen says it, and there is no control in the
+                composer that fixes it.
+              */}
+              {isMissingParticipant ? (
                 <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-muted-warning text-foreground text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
