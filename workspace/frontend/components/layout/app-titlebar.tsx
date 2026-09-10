@@ -91,10 +91,29 @@ export function AppTitlebar() {
     bridge?.setTitleBarSymbolColor?.(resolvedTheme === 'dark' ? '#8a8a8a' : '#52525b');
   }, [resolvedTheme]);
 
+  /*
+    NO BOTTOM BORDER ON THIS BAND.
+
+    The top of the window carried TWO full-strength hairlines stacked one
+    header-height apart -- this one and `.app-header`'s -- and each already came
+    with a fill change of its own. Two rules and two tonal steps for what is, at
+    most, one boundary; the double rule that produced is a classic way for a
+    window to read as cheap.
+
+    There is only one real boundary up here: chrome against content, and
+    `.app-header` draws it. The titlebar and the view header are both chrome, so
+    a rule between them separates things that belong together.
+
+    On the sidebar side this border was the only thing between the app name and
+    "New chat" -- they share `--surface-sidebar`, so dropping it lets the name
+    sit at the head of the sidebar as one continuous column, which is what it
+    is. On the main-pane side the step from `--surface-sidebar` to `--surface0`
+    marks the change on its own.
+  */
   return (
     <header
       ref={bandRef}
-      className="app-titlebar fixed top-0 start-0 end-0 z-50 flex items-center gap-2 bg-surface-sidebar border-b border-border"
+      className="app-titlebar fixed top-0 start-0 end-0 z-50 flex items-center gap-2 bg-surface-sidebar"
       aria-label="Window titlebar"
     >
       <Tooltip>
