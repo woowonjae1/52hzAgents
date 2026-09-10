@@ -124,6 +124,9 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 				window = u.ContextWindowSize
 			} else {
 				window = compaction.ModelContextWindow(model)
+				if window <= 0 && u.AvailableModels != nil && (strings.Contains(*u.AvailableModels, "[1m]") || strings.Contains(*u.AvailableModels, "opus-5") || strings.Contains(*u.AvailableModels, "sonnet-5")) {
+					window = 1000000
+				}
 			}
 			pTokens = u.TotalPromptTokens
 			cTokens = u.TotalCompletionTokens
@@ -136,6 +139,17 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 			wPct = u.WeekUsedPercent
 			sResets = u.SessionResetsAt
 			wResets = u.WeekResetsAt
+		}
+
+		if model == "" {
+			if m.AgentType != nil && *m.AgentType != "" {
+				model = *m.AgentType
+			} else {
+				model = m.AgentName
+			}
+		}
+		if window <= 0 {
+			window = compaction.ModelContextWindow(model)
 		}
 
 		totalPrompt += pTokens
@@ -168,6 +182,9 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 			window := u.ContextWindowSize
 			if window == 0 {
 				window = compaction.ModelContextWindow(model)
+				if window == 0 && u.AvailableModels != nil && (strings.Contains(*u.AvailableModels, "[1m]") || strings.Contains(*u.AvailableModels, "opus-5") || strings.Contains(*u.AvailableModels, "sonnet-5")) {
+					window = 1000000
+				}
 			}
 			tTokens := u.TotalTokens
 			if tTokens == 0 && (u.TotalPromptTokens > 0 || u.TotalCompletionTokens > 0) {

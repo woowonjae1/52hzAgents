@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Gauge, RefreshCw, Zap, Clock, Calendar, Sparkles, AlertCircle, FileText, Cpu, Coins, ChevronRight } from 'lucide-react';
+import { Gauge, RefreshCw, ChevronRight, AlertCircle, FileText } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -25,8 +25,77 @@ function fmtTokens(n: number): string {
 
 function fmtContextLimit(window?: number | null): string {
   if (!window || window <= 0) return 'unknown';
-  if (window >= 1_000_000) return `${(window / 1_000_000).toFixed(1)}M`;
-  return `${Math.round(window / 1024)}k`;
+  if (window >= 1_000_000) return `${(window / 1_000_000).toFixed(0)}M`;
+  if (window >= 1_000) return `${Math.round(window / 1000)}k`;
+  return String(window);
+}
+
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+  jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+};
+
+function parseClaudeDate(raw: string): Date | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/\s*\([^)]*\)/g, '').trim();
+  const direct = new Date(cleaned);
+  if (!isNaN(direct.getTime())) return direct;
+
+  // Pattern: "Sep 9, 7:39pm" or "Sep 13, 1:00pm"
+  const m = cleaned.match(/([A-Za-z]{3,})\s+(\d+),?\s*(\d+):(\d+)\s*(am|pm)/i);
+  if (m) {
+    const monthStr = m[1].slice(0, 3).toLowerCase();
+    const month = MONTH_MAP[monthStr];
+    if (month !== undefined) {
+      const day = parseInt(m[2], 10);
+      let hour = parseInt(m[3], 10);
+      const min = parseInt(m[4], 10);
+      const ampm = m[5].toLowerCase();
+      if (ampm === 'pm' && hour < 12) hour += 12;
+      if (ampm === 'am' && hour === 12) hour = 0;
+
+      const now = new Date();
+      const candidate = new Date(now.getFullYear(), month, day, hour, min, 0);
+      if (!isNaN(candidate.getTime())) return candidate;
+    }
+  }
+  return null;
+}
+
+function formatResetCountdown(raw?: string | null): string {
+  if (!raw || raw === '--') return '';
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('Resets in ') || trimmed.startsWith('Resets Sat') || trimmed.startsWith('Resets Sun')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('in ')) {
+    return `Resets ${trimmed}`;
+  }
+
+  const target = parseClaudeDate(trimmed);
+  if (target) {
+    const diffMs = target.getTime() - Date.now();
+    if (diffMs <= 0) return 'Reset completed';
+    const mins = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMs / 3600000);
+
+    if (hours < 1) {
+      return mins <= 1 ? 'Resets in < 1 min' : `Resets in ${mins} min`;
+    }
+    if (hours < 24) {
+      const remMins = mins % 60;
+      return remMins > 0 ? `Resets in ${hours} hr ${remMins} min` : `Resets in ${hours} hr`;
+    }
+    try {
+      const weekday = target.toLocaleDateString('en-US', { weekday: 'short' });
+      const timeStr = target.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `Resets ${weekday} ${timeStr}`;
+    } catch {
+      return `Resets ${trimmed}`;
+    }
+  }
+
+  return trimmed.startsWith('Resets') ? trimmed : `Resets ${trimmed}`;
 }
 
 export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsuleProps) {
@@ -116,13 +185,37 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
   const sessionPercent = usage?.session_used_percent ?? agentStat?.session_used_percent ?? 0;
   const weekPercent = usage?.week_used_percent ?? agentStat?.week_used_percent ?? 0;
+  const sessionResetsAt = usage?.session_resets_at || agentStat?.session_resets_at;
+  const weekResetsAt = usage?.week_resets_at || agentStat?.week_resets_at;
   const isUnparsed = (usage as any)?.parse_status === 'unparsed';
 
   const totalTokens = agentStat?.total_tokens ?? usage?.total_tokens ?? 0;
   const promptTokens = agentStat?.total_prompt_tokens ?? usage?.total_prompt_tokens ?? 0;
   const completionTokens = agentStat?.total_completion_tokens ?? usage?.total_completion_tokens ?? 0;
-  const contextWindow = agentStat?.context_window_size ?? usage?.context_window_size ?? 0;
-  const activeModel = agentStat?.current_model ?? usage?.current_model ?? selectedName;
+
+  const rawWindow = agentStat?.context_window_size ?? usage?.context_window_size ?? 0;
+  const activeModel = agentStat?.current_model ?? usage?.current_model ?? selectedName ?? '';
+  const isClaude = (selectedName && selectedName.toLowerCase().includes('claude')) || (activeModel && activeModel.toLowerCase().includes('claude'));
+  const is1M = activeModel.toLowerCase().includes('[1m]') || activeModel.toLowerCase().includes('1m') || activeModel.toLowerCase().includes('fable');
+
+  const contextWindow = rawWindow > 0
+    ? rawWindow
+    : isClaude
+    ? (is1M ? 1_000_000 : 200_000)
+    : 0;
+
+  const contextTokens =
+    agentStat?.last_prompt_tokens && agentStat.last_prompt_tokens > 0
+      ? agentStat.last_prompt_tokens
+      : usage?.last_prompt_tokens && usage.last_prompt_tokens > 0
+      ? usage.last_prompt_tokens
+      : tokenStats?.channels && tokenStats.channels.length > 0 && tokenStats.channels[0].context_tokens > 0
+      ? tokenStats.channels[0].context_tokens
+      : 0;
+
+  const contextPct = contextWindow > 0 && contextTokens > 0
+    ? Math.min(100, Math.round((contextTokens / contextWindow) * 100))
+    : 0;
 
   const getBarColor = (pct: number) => {
     if (pct >= 85) return 'bg-status-danger';
@@ -199,22 +292,19 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
       <PopoverContent
         align="start"
-        className="w-88 p-4 space-y-4 shadow-xl border-border/70 bg-surface1/95 backdrop-blur-xl rounded-2xl"
+        className="w-80 p-3.5 space-y-3.5 shadow-xl border-border/70 bg-surface1/95 backdrop-blur-xl rounded-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-border/40">
-          <div className="flex items-center gap-2">
-            <div className="size-7 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center text-foreground">
-              <Gauge className="size-3.5" />
+        <div className="flex items-center justify-between pb-2.5 border-b border-border/40">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="size-6 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center text-foreground shrink-0">
+              <Gauge className="size-3" />
             </div>
-            <div>
-              <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                {selectedName}
-                <span className="text-3xs font-mono font-normal px-1.5 py-0.5 rounded-full bg-surface3 border border-border/60 text-foreground-muted">
-                  {activeModel}
-                </span>
-              </div>
-              <p className="text-3xs text-foreground-muted">Token governance & context health</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs font-semibold text-foreground truncate">{selectedName}</span>
+              <span className="text-3xs font-mono font-normal px-1.5 py-0.5 rounded-md bg-surface3 border border-border/50 text-foreground-muted truncate max-w-[140px]">
+                {activeModel}
+              </span>
             </div>
           </div>
           <Hint label="Refresh usage">
@@ -224,14 +314,14 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                 fetchUsageAndStats(selectedName);
               }}
               disabled={loading}
-              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50"
+              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
             >
               <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
             </button>
           </Hint>
         </div>
 
-        {/* Multi-Agent Switcher */}
+        {/* Multi-Agent Switcher (if workspace has multiple agents) */}
         {candidateAgents.length > 1 && (
           <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface2/70 border border-border/40">
             {candidateAgents.map((a) => {
@@ -267,133 +357,172 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           </div>
         )}
 
-        {/* Token Metrics Cards */}
-        <div className="grid grid-cols-3 gap-2 text-2xs">
-          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
-            <div className="text-3xs text-foreground-muted mb-0.5">Total Tokens</div>
-            <div className="font-semibold font-mono tabular-nums text-foreground">
-              {totalTokens > 0 ? fmtTokens(totalTokens) : '—'}
-            </div>
+        {/* Context Window Row & Sleek Progress Bar (Image 2 Top Section) */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-foreground">Context window</span>
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setActiveRightTab('tokens');
+              }}
+              className="inline-flex items-center gap-1 font-mono text-2xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer group"
+            >
+              {contextWindow > 0 ? (
+                <>
+                  <span>
+                    {fmtTokens(contextTokens)} / {fmtContextLimit(contextWindow)}
+                  </span>
+                  <span className="text-foreground-extra-muted">({contextPct}%)</span>
+                </>
+              ) : (
+                <span className="font-sans">Unknown capacity</span>
+              )}
+              <ChevronRight className="size-3 text-foreground-muted group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
+            </button>
           </div>
-          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
-            <div className="text-3xs text-foreground-muted mb-0.5">Context Limit</div>
-            <div className="font-semibold font-mono tabular-nums text-foreground">
-              {fmtContextLimit(contextWindow)}
-            </div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
-            <div className="text-3xs text-foreground-muted mb-0.5">Prompt / Comp</div>
-            <div className="font-mono text-3xs tabular-nums text-foreground-muted truncate">
-              {promptTokens > 0 || completionTokens > 0 ? `${fmtTokens(promptTokens)} / ${fmtTokens(completionTokens)}` : '—'}
-            </div>
+          <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-500',
+                contextPct >= 85 ? 'bg-status-danger' : contextPct >= 60 ? 'bg-status-warning' : 'bg-primary'
+              )}
+              style={{ width: `${Math.min(Math.max(contextPct, contextTokens > 0 ? 3 : 0), 100)}%` }}
+            />
           </div>
         </div>
 
-        {/* Claude Subscription Progress Bars (if available) */}
-        {isClaudeQuota && (
-          <div className="space-y-2.5">
-            {/* 5-Hour Session */}
-            <div className="space-y-1.5 bg-surface2/50 border border-border/40 rounded-xl p-2.5">
-              <div className="flex items-center justify-between text-2xs">
-                <div className="flex items-center gap-1.5 font-medium text-foreground">
-                  <Clock className="size-3 text-primary" />
-                  <span>5-hour session limit</span>
-                </div>
-                <span
-                  className={cn(
-                    'font-semibold font-mono tabular-nums text-2xs',
-                    sessionPercent >= 85
-                      ? 'text-status-danger'
-                      : sessionPercent >= 60
-                      ? 'text-status-warning'
-                      : 'text-status-success'
-                  )}
-                >
-                  {sessionPercent}%
-                </span>
-              </div>
+        <div className="h-px bg-border/40" />
 
-              <div className="h-1.5 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
+        {/* Middle Section: Usage Limits or Cumulative Tokens (Image 2 Middle Section) */}
+        {isClaudeQuota ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+              <div className="flex items-center gap-1.5">
+                <span>Your usage limits</span>
+                <span className="text-foreground-muted font-normal">·</span>
+                <span className="text-foreground-muted font-normal">Subscription</span>
+              </div>
+            </div>
+
+            {/* 5-Hour Session Limit */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-foreground">5-hour limit</span>
+                <div className="flex items-center gap-2">
+                  {sessionResetsAt && (
+                    <span className="text-2xs text-foreground-muted">
+                      {formatResetCountdown(sessionResetsAt)}
+                    </span>
+                  )}
+                  <span
+                    className={cn(
+                      'font-semibold font-mono tabular-nums text-xs',
+                      sessionPercent >= 85
+                        ? 'text-status-danger'
+                        : sessionPercent >= 60
+                        ? 'text-status-warning'
+                        : 'text-foreground'
+                    )}
+                  >
+                    {sessionPercent}%
+                  </span>
+                </div>
+              </div>
+              <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
                 <div
                   className={cn('h-full rounded-full transition-all duration-500', getBarColor(sessionPercent))}
-                  style={{ width: `${Math.min(Math.max(sessionPercent, 2), 100)}%` }}
+                  style={{ width: `${Math.min(Math.max(sessionPercent, sessionPercent > 0 ? 3 : 0), 100)}%` }}
                 />
-              </div>
-
-              <div className="flex items-center justify-between text-3xs text-foreground-muted">
-                <span>Resets</span>
-                <span className="font-medium text-foreground/80">
-                  {usage?.session_resets_at || agentStat?.session_resets_at || '--'}
-                </span>
               </div>
             </div>
 
             {/* Weekly Limit */}
-            <div className="space-y-1.5 bg-surface2/50 border border-border/40 rounded-xl p-2.5">
-              <div className="flex items-center justify-between text-2xs">
-                <div className="flex items-center gap-1.5 font-medium text-foreground">
-                  <Calendar className="size-3 text-primary" />
-                  <span>Weekly limit</span>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-foreground">Weekly · all models</span>
+                <div className="flex items-center gap-2">
+                  {weekResetsAt && (
+                    <span className="text-2xs text-foreground-muted">
+                      {formatResetCountdown(weekResetsAt)}
+                    </span>
+                  )}
+                  <span className="font-semibold font-mono tabular-nums text-xs text-foreground">
+                    {weekPercent}%
+                  </span>
                 </div>
-                <span className="font-semibold font-mono tabular-nums text-2xs text-foreground">
-                  {weekPercent}%
-                </span>
               </div>
-
-              <div className="h-1.5 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
+              <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
                 <div
                   className={cn('h-full rounded-full transition-all duration-500', getBarColor(weekPercent))}
-                  style={{ width: `${Math.min(Math.max(weekPercent, 2), 100)}%` }}
+                  style={{ width: `${Math.min(Math.max(weekPercent, weekPercent > 0 ? 3 : 0), 100)}%` }}
                 />
               </div>
-
-              <div className="flex items-center justify-between text-3xs text-foreground-muted">
-                <span>Resets</span>
-                <span className="font-medium text-foreground/80">
-                  {usage?.week_resets_at || agentStat?.week_resets_at || '--'}
+            </div>
+          </div>
+        ) : (
+          /* Non-Claude Pay-Per-Token cumulative metrics */
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+              <div className="flex items-center gap-1.5">
+                <span>Token usage</span>
+                <span className="text-foreground-muted font-normal">·</span>
+                <span className="text-foreground-muted font-normal">Cumulative</span>
+              </div>
+            </div>
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-foreground-muted">Total tokens</span>
+                <span className="font-mono font-semibold tabular-nums text-foreground">
+                  {fmtTokens(totalTokens)} tok
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-2xs">
+                <span className="text-foreground-muted">Prompt / Completion</span>
+                <span className="font-mono tabular-nums text-foreground-muted">
+                  {fmtTokens(promptTokens)} / {fmtTokens(completionTokens)}
                 </span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Unparsed warning alert */}
+        {/* Unparsed warning alert (if raw output returned) */}
         {isUnparsed && (
           <div className="flex items-start gap-2 p-2.5 rounded-xl bg-status-muted-warning border border-status-warning/30 text-status-warning text-2xs">
             <AlertCircle className="size-3.5 shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <div className="font-medium">Raw CLI output returned</div>
-              <div className="text-3xs text-status-warning/80">Check expandable details below.</div>
+              {usage?.raw_text && (
+                <details className="pt-1 text-3xs text-foreground-muted">
+                  <summary className="cursor-pointer hover:text-foreground flex items-center gap-1 font-medium select-none">
+                    <FileText className="size-3 text-muted-foreground" />
+                    Show output
+                  </summary>
+                  <pre className="mt-1.5 p-2 rounded-md bg-surface2 text-3xs text-foreground-muted overflow-x-auto whitespace-pre-wrap max-h-32 font-mono">
+                    {usage.raw_text}
+                  </pre>
+                </details>
+              )}
             </div>
           </div>
         )}
 
-        {/* Raw output preview if unparsed */}
-        {isUnparsed && usage?.raw_text && (
-          <details className="pt-1 text-3xs text-foreground-muted">
-            <summary className="cursor-pointer hover:text-foreground flex items-center gap-1 font-medium select-none">
-              <FileText className="size-3 text-muted-foreground" />
-              Raw CLI output
-            </summary>
-            <pre className="mt-1.5 p-2 rounded-md bg-surface2 text-3xs text-foreground-muted overflow-x-auto whitespace-pre-wrap max-h-32 font-mono">
-              {usage.raw_text}
-            </pre>
-          </details>
-        )}
+        <div className="h-px bg-border/40" />
 
-        {/* Footer Note and Link */}
-        <div className="pt-2 border-t border-border/40 flex items-center justify-between">
+        {/* Footer Link (Image 2 Bottom Section) */}
+        <div>
           <button
             type="button"
             onClick={() => {
               setIsOpen(false);
               setActiveRightTab('tokens');
             }}
-            className="text-3xs text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+            className="w-full flex items-center justify-between text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer py-0.5 group"
           >
-            <Coins className="size-3" />
-            <span>Open Token Governance Dashboard</span>
-            <ChevronRight className="size-2.5" />
+            <span>See detailed breakdown</span>
+            <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5 text-foreground-muted group-hover:text-foreground" />
           </button>
         </div>
       </PopoverContent>

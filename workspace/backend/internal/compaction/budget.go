@@ -193,10 +193,9 @@ func ModelContextWindow(model string) int {
 		return 2000000
 	case strings.Contains(m, "gemini"):
 		return 1000000
+	case strings.Contains(m, "[1m]") || strings.Contains(m, "opus-5") || strings.Contains(m, "sonnet-5") || strings.Contains(m, "fable"):
+		return 1000000
 	case strings.Contains(m, "claude"):
-		// Every generally available Claude model is 200k. The 1M variants are
-		// opt-in betas on specific models; when one is in use the agent
-		// reports it, and a reported window overrides this table.
 		return 200000
 	case strings.Contains(m, "gpt-4o"), strings.Contains(m, "gpt-4.1"),
 		strings.Contains(m, "gpt-5"), strings.Contains(m, "codex"):

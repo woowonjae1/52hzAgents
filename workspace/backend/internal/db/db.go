@@ -100,5 +100,12 @@ func InitDB() {
 	DB.Exec("ALTER TABLE todos ADD COLUMN completed_at DATETIME")
 	DB.Exec("ALTER TABLE todos ADD COLUMN error TEXT")
 
+	// Ensure agent_usages table has latest token and window columns across all sqlite versions
+	DB.Exec("ALTER TABLE agent_usages ADD COLUMN total_prompt_tokens BIGINT NOT NULL DEFAULT 0")
+	DB.Exec("ALTER TABLE agent_usages ADD COLUMN total_completion_tokens BIGINT NOT NULL DEFAULT 0")
+	DB.Exec("ALTER TABLE agent_usages ADD COLUMN total_tokens BIGINT NOT NULL DEFAULT 0")
+	DB.Exec("ALTER TABLE agent_usages ADD COLUMN last_prompt_tokens BIGINT NOT NULL DEFAULT 0")
+	DB.Exec("ALTER TABLE agent_usages ADD COLUMN context_window_size INTEGER NOT NULL DEFAULT 0")
+
 	log.Println("Database auto-migration completed successfully.")
 }
