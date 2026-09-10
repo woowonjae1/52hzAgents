@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -290,8 +291,17 @@ export function TasksView() {
   const updatePriority = (todo: TodoItem, nextPriority: TodoPriority) =>
     mutate('The priority could not be saved', () => updateTodo(todo.id, { priority: nextPriority }));
 
-  const removeTask = (todo: TodoItem) =>
-    mutate('The task could not be deleted', () => deleteTodo(todo.id));
+  const [taskToDelete, setTaskToDelete] = useState<TodoItem | null>(null);
+
+  const removeTask = (todo: TodoItem) => {
+    setTaskToDelete(todo);
+  };
+
+  const executeDeleteTask = async () => {
+    if (!taskToDelete) return;
+    await mutate('The task could not be deleted', () => deleteTodo(taskToDelete.id));
+    setTaskToDelete(null);
+  };
 
   /**
    * Swaps a task with its neighbour inside the same author's list.
@@ -940,6 +950,24 @@ export function TasksView() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(taskToDelete)}
+        onOpenChange={(open) => {
+          if (!open) setTaskToDelete(null);
+        }}
+        title="Delete Task"
+        description={
+          taskToDelete ? (
+            <>
+              Are you sure you want to delete <span className="font-semibold text-foreground">“{taskToDelete.content}”</span>? This action cannot be undone.
+            </>
+          ) : undefined
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={executeDeleteTask}
+      />
     </div>
   );
 }

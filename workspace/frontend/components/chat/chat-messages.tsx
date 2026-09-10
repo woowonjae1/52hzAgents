@@ -239,9 +239,11 @@ interface ChatMessagesProps {
   loadingOlder?: boolean;
   /** Current session working directory for resolving local path links */
   workingDir?: string;
+  onRegenerate?: (message: WorkspaceMessage) => void;
+  onQuoteReply?: (message: WorkspaceMessage) => void;
 }
 
-export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, workingDir }: ChatMessagesProps) {
+export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, workingDir, onRegenerate, onQuoteReply }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
@@ -744,6 +746,8 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         hideHeader={group.continuesFrom}
                         isDecisionAnswered={isDecisionAnswered}
                         workingDir={workingDir}
+                        onRegenerate={onRegenerate}
+                        onQuoteReply={onQuoteReply}
                       />
                     );
                   })()

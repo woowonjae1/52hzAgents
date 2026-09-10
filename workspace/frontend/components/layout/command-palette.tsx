@@ -27,8 +27,12 @@ import {
   CornerDownLeft,
   X,
   Sparkles,
+  FileText,
+  FileCode,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { workspaceApi } from '@/lib/api';
 
 function KeyBadge({ children }: { children: React.ReactNode }) {
   return (
@@ -40,7 +44,7 @@ function KeyBadge({ children }: { children: React.ReactNode }) {
 
 interface CommandItem {
   id: string;
-  category: 'Navigation' | 'Actions' | 'Agents';
+  category: 'Navigation' | 'Actions' | 'Agents' | 'Threads' | 'Files' | 'Tasks';
   title: string;
   subtitle?: string;
   icon: React.ReactNode;
@@ -55,8 +59,8 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const { setViewMode, openSettings, openNewThread, setActiveRightTab } = useLayout();
-  const { agents, currentSessionId, currentUser } = useWorkspace();
+  const { setViewMode, openSettings, openNewThread, setActiveRightTab, isMobile, openMobileDetail } = useLayout();
+  const { agents, currentSessionId, currentUser, sessions, files, todos, setCurrentSessionId, setSelectedFileId, workspaceId } = useWorkspace();
   const { theme, setTheme } = useTheme();
 
   // Open/close keyboard shortcut: ⌘K or Ctrl+K
@@ -90,7 +94,7 @@ export function CommandPalette() {
   }, []);
 
   // Build command list
-  const allCommands: CommandItem[] = useMemo(() => {
+  const { allCommands, defaultCommands } = useMemo(() => {
     /*
      * EVERY ICON IN HERE IS `text-foreground-muted`. Do not tint them again.
      *
@@ -229,6 +233,45 @@ export function CommandPalette() {
         action: () => setViewMode('tasks'),
       },
       {
+        id: 'act-compact-context',
+        category: 'Actions',
+        title: 'Compact Context',
+        subtitle: currentSessionId
+          ? `Summarize & compact context for #${currentSessionId.replace(/^channel\//, '')}`
+          : 'Compact active channel context window',
+        icon: <Sparkles className="size-4 text-foreground-muted" />,
+        action: async () => {
+          if (!currentSessionId) {
+            toast.error('Open a chat thread first to compact its context');
+            return;
+          }
+          const raw = currentSessionId.replace(/^channel\//, '');
+          try {
+            toast.info(`Compacting context for #${raw}...`);
+            const res = await workspaceApi.request<{ compacted_count?: number }>(
+              `/v1/workspaces/${workspaceId || 'default'}/channels/${encodeURIComponent(raw)}/compact`,
+              { method: 'POST' }
+            );
+            if (res?.compacted_count) {
+              toast.success(`Compacted ${res.compacted_count} messages into a summary`);
+            } else {
+              toast.info('Context is already compact — nothing to summarize');
+            }
+          } catch (e: any) {
+            toast.error(e?.message || 'Failed to compact context');
+          }
+        },
+      },
+      {
+        id: 'act-token-dashboard',
+        category: 'Actions',
+        title: 'Token Dashboard',
+        subtitle: 'Inspect workspace token consumption, limits & channel health',
+        icon: <Activity className="size-4 text-foreground-muted" />,
+        shortcut: ['G', 'L'],
+        action: () => setActiveRightTab('tokens'),
+      },
+      {
         id: 'act-toggle-theme',
         category: 'Actions',
         title: `Switch Theme to ${theme === 'dark' ? 'Light' : 'Dark'}`,
@@ -245,6 +288,58 @@ export function CommandPalette() {
         action: () => setActiveRightTab('terminal'),
       },
     ];
+
+    const threadItems: CommandItem[] = (sessions || []).map((s) => {
+      const channelTag = s.sessionId.replace(/^channel\//, '');
+      const participantsStr = s.participants?.length ? ` • ${s.participants.map((p) => `@${p}`).join(', ')}` : '';
+      return {
+        id: `thread-${s.sessionId}`,
+        category: 'Threads',
+        title: s.title || `Thread #${channelTag}`,
+        subtitle: `#${channelTag}${participantsStr}`,
+        icon: <MessageSquare className="size-4 text-foreground-muted" />,
+        action: () => {
+          setCurrentSessionId(s.sessionId);
+          setViewMode('threads');
+          if (isMobile) openMobileDetail();
+        },
+      };
+    });
+
+    const fileItems: CommandItem[] = (files || []).map((f) => {
+      const isCode = /\.(js|ts|tsx|jsx|py|go|rs|json|yaml|yml|sh|css|html|md)$/i.test(f.filename);
+      const sizeKb = f.size > 0 ? `${(f.size / 1024).toFixed(1)} KB` : '';
+      const channelInfo = f.channelName ? ` in #${f.channelName}` : '';
+      return {
+        id: `file-${f.id}`,
+        category: 'Files',
+        title: f.filename,
+        subtitle: `${sizeKb || 'Workspace file'}${channelInfo}`,
+        icon: isCode ? <FileCode className="size-4 text-foreground-muted" /> : <FileText className="size-4 text-foreground-muted" />,
+        action: () => {
+          setSelectedFileId(f.id);
+          setViewMode('files');
+          if (isMobile) openMobileDetail();
+        },
+      };
+    });
+
+    const taskItems: CommandItem[] = (todos || []).map((t) => {
+      const statusLabel = t.status.replace('_', ' ');
+      const priorityLabel = t.priority ? ` • ${t.priority}` : '';
+      const channelInfo = t.channelName ? ` in #${t.channelName}` : '';
+      return {
+        id: `task-${t.id}`,
+        category: 'Tasks',
+        title: t.content,
+        subtitle: `${t.id} • ${statusLabel}${priorityLabel}${channelInfo}`,
+        icon: <CheckSquare className="size-4 text-foreground-muted" />,
+        action: () => {
+          setViewMode('tasks');
+          if (isMobile) openMobileDetail();
+        },
+      };
+    });
 
     const sortedAgents = [...agents].sort((a, b) => {
       if (a.status !== b.status) {
@@ -264,12 +359,32 @@ export function CommandPalette() {
       },
     }));
 
-    return [...actions, ...nav, ...agentItems];
-  }, [setViewMode, openSettings, openNewThread, setActiveRightTab, theme, setTheme, agents]);
+    return {
+      allCommands: [...actions, ...threadItems, ...fileItems, ...taskItems, ...nav, ...agentItems],
+      defaultCommands: [...actions, ...threadItems.slice(0, 4), ...fileItems.slice(0, 4), ...taskItems.slice(0, 4), ...nav, ...agentItems],
+    };
+  }, [
+    setViewMode,
+    openSettings,
+    openNewThread,
+    setActiveRightTab,
+    theme,
+    setTheme,
+    agents,
+    sessions,
+    files,
+    todos,
+    currentSessionId,
+    workspaceId,
+    setCurrentSessionId,
+    setSelectedFileId,
+    isMobile,
+    openMobileDetail,
+  ]);
 
   // Filter commands by query
   const filtered = useMemo(() => {
-    if (!query.trim()) return allCommands;
+    if (!query.trim()) return defaultCommands;
     const q = query.toLowerCase();
     return allCommands.filter(
       (item) =>
@@ -277,7 +392,7 @@ export function CommandPalette() {
         (item.subtitle && item.subtitle.toLowerCase().includes(q)) ||
         item.category.toLowerCase().includes(q)
     );
-  }, [allCommands, query]);
+  }, [allCommands, defaultCommands, query]);
 
   // Handle arrow keys and enter
   const handleKeyDown = (e: React.KeyboardEvent) => {

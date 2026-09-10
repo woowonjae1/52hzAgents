@@ -746,6 +746,24 @@ export function ChatView() {
     [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive, updateLastMessage, recordUserMessageSent]
   );
 
+  const handleRegenerateMessage = useCallback(async (msg: WorkspaceMessage) => {
+    if (!currentSessionId) return;
+    const agentName = msg.senderName;
+    const prompt = `@${agentName} please regenerate your previous response with improvements`;
+    toast.info(`Regenerating response from @${agentName}...`);
+    await handleSend(prompt, [agentName]);
+  }, [currentSessionId, handleSend]);
+
+  const handleQuoteReply = useCallback((msg: WorkspaceMessage) => {
+    const lines = msg.content.trim().split('\n');
+    const quoteSnippet = lines.slice(0, 4).map((l) => `> ${l}`).join('\n') + (lines.length > 4 ? '\n> ...' : '');
+    const prefix = `@${msg.senderName} `;
+    const next = currentDraft ? `${currentDraft}\n\n${quoteSnippet}\n\n${prefix}` : `${quoteSnippet}\n\n${prefix}`;
+    handleDraftChange(next);
+    setFocusKey((k) => k + 1);
+    toast.success(`Quoted @${msg.senderName}'s message into composer`);
+  }, [currentDraft, handleDraftChange]);
+
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');
 
   if (!currentSessionId) {
@@ -1266,6 +1284,8 @@ export function ChatView() {
             hasOlder={hasOlder}
             loadingOlder={loadingOlder}
             workingDir={currentSessionWorkingDir}
+            onRegenerate={handleRegenerateMessage}
+            onQuoteReply={handleQuoteReply}
             className="flex-1 overflow-y-auto px-4 lg:px-8 py-4"
           />
         )}

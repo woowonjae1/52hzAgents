@@ -3,10 +3,11 @@
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown } from 'lucide-react';
+import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown, Quote, FileCode, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { SignalMark } from '@/components/brand/signal-mark';
@@ -185,6 +186,8 @@ interface ChatMessageProps {
   isDecisionAnswered?: boolean;
   /** Current session working directory for resolving local path links */
   workingDir?: string;
+  onRegenerate?: (message: WorkspaceMessage) => void;
+  onQuoteReply?: (message: WorkspaceMessage) => void;
 }
 
 function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: string; name: string }): boolean {
@@ -197,7 +200,18 @@ function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: str
   return Boolean(currentUserName && senderName === currentUserName);
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, agents = [], isApproved, isRejected, steps, hideHeader = false, isDecisionAnswered = false, workingDir }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({
+  message,
+  agents = [],
+  isApproved,
+  isRejected,
+  steps,
+  hideHeader = false,
+  isDecisionAnswered = false,
+  workingDir,
+  onRegenerate,
+  onQuoteReply,
+}: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
@@ -412,93 +426,156 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     );
   }
 
+  const handleCopyPlain = useCallback(() => {
+    const raw = cleanContent || message.content;
+    const plain = raw
+      .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-z]*\n?/gi, '').replace(/```/g, ''))
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, '$1')
+      .replace(/^#+\s+/gm, '')
+      .replace(/^>\s+/gm, '')
+      .trim();
+    navigator.clipboard.writeText(plain || raw);
+    toast.success('Plain text copied');
+  }, [cleanContent, message.content]);
+
+  const handleCopyMarkdown = useCallback(() => {
+    navigator.clipboard.writeText(message.content);
+    toast.success('Markdown source copied');
+  }, [message.content]);
+
+  const handleQuote = useCallback(() => {
+    if (onQuoteReply) {
+      onQuoteReply(message);
+    } else {
+      navigator.clipboard.writeText(`> ${message.content.slice(0, 200)}...\n\n@${message.senderName} `);
+      toast.success('Quote copied to clipboard');
+    }
+  }, [onQuoteReply, message]);
+
+  const handleRegenerate = useCallback(async () => {
+    if (onRegenerate) {
+      onRegenerate(message);
+    } else {
+      const agentName = message.senderName;
+      try {
+        toast.info(`Regenerating response from @${agentName}...`);
+        await workspaceApi.sendMessage(
+          message.sessionId,
+          `@${agentName} please regenerate your previous response with improvements`,
+          currentUser.name || 'user',
+          [agentName]
+        );
+      } catch {
+        toast.error('Failed to trigger regenerate');
+      }
+    }
+  }, [onRegenerate, message, currentUser.name]);
+
   // ── User Messages (Modern AI Floating Bubble) ──
   if (isHuman) {
     const isCurrentUser = isCurrentHumanMessage(message, currentUser);
 
     return (
-      <div className="py-2.5 flex justify-end group/usermsg select-text">
-        <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
-          {/*
-            Your mark mirrors the agent avatar across the transcript, so it has
-            to match it: 28px (AgentAvatar's size, and the size-7 spacer used
-            when a header is suppressed) and a gap-3 gutter. It was 30px at
-            gap-2.5, which read as subtly off on both axes.
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="py-2.5 flex justify-end group/usermsg select-text">
+            <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
+              {/*
+                Your mark mirrors the agent avatar across the transcript, so it has
+                to match it: 28px (AgentAvatar's size, and the size-7 spacer used
+                when a header is suppressed) and a gap-3 gutter. It was 30px at
+                gap-2.5, which read as subtly off on both axes.
 
-            Vertically it centres on the bubble's FIRST TEXT LINE rather than
-            the bubble's top edge — the agent avatar aligns to a bare text row,
-            while this one sits beside a padded bubble, so matching the raw top
-            offset would ride high by the bubble's padding. The box below is the
-            bubble's top padding (py-2.5) plus one line box, and it inherits the
-            bubble's own type so it survives the pending root/type rescale.
-          */}
-          <div
-            className="flex shrink-0 items-center text-sm leading-relaxed"
-            style={{ height: 'calc(1.25rem + 1lh)' }}
-          >
-            <SignalMark size={28} still={false} />
-          </div>
-          {/* Refined AI User Bubble */}
-          {/*
-            The bubble sits directly on the transcript, not above it, so the drop
-            shadow and the 12px backdrop blur it carried were both drawing depth
-            that is not there. An opaque surface and one hairline is what actually
-            reads as a solid object.
-          */}
-          <div className="relative text-sm leading-relaxed text-foreground bg-surface2 border border-border px-4 py-2.5 rounded-2xl rounded-tr-sm break-words inline-block max-w-full">
-            <MarkdownContent content={message.content} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
-            <Attachments items={attachments} />
+                Vertically it centres on the bubble's FIRST TEXT LINE rather than
+                the bubble's top edge — the agent avatar aligns to a bare text row,
+                while this one sits beside a padded bubble, so matching the raw top
+                offset would ride high by the bubble's padding. The box below is the
+                bubble's top padding (py-2.5) plus one line box, and it inherits the
+                bubble's own type so it survives the pending root/type rescale.
+              */}
+              <div
+                className="flex shrink-0 items-center text-sm leading-relaxed"
+                style={{ height: 'calc(1.25rem + 1lh)' }}
+              >
+                <SignalMark size={28} still={false} />
+              </div>
+              {/* Refined AI User Bubble */}
+              {/*
+                The bubble sits directly on the transcript, not above it, so the drop
+                shadow and the 12px backdrop blur it carried were both drawing depth
+                that is not there. An opaque surface and one hairline is what actually
+                reads as a solid object.
+              */}
+              <div className="relative text-sm leading-relaxed text-foreground bg-surface2 border border-border px-4 py-2.5 rounded-2xl rounded-tr-sm break-words inline-block max-w-full">
+                <MarkdownContent content={message.content} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
+                <Attachments items={attachments} />
 
-            {isCurrentUser && message.deliveryStatus && (
-              /*
-                Delivery state, in words. "Sending" lost its `animate-ping` blue
-                dot — an expanding ring is how a map pin announces itself, and
-                blue was a hue no token defines. "Sent" keeps no colour either;
-                it is the expected outcome. Only a failure is coloured, because
-                only a failure asks the reader to do something.
-              */
-              <div className="flex items-baseline justify-end gap-1.5 mt-1.5 text-3xs font-mono">
-                {message.deliveryStatus === 'sending' && (
-                  <span className="event-running text-foreground-extra-muted">Sending…</span>
-                )}
-                {message.deliveryStatus === 'confirmed' && (
-                  <span className="text-foreground-extra-muted inline-flex items-baseline gap-1">
-                    <Check className="size-2.5 translate-y-px" />
-                    <span>Sent</span>
-                  </span>
-                )}
-                {message.deliveryStatus === 'failed' && (
-                  <span className="text-destructive font-medium inline-flex items-baseline gap-1">
-                    <X className="size-2.5 translate-y-px" />
-                    <span>Failed</span>
-                  </span>
+                {isCurrentUser && message.deliveryStatus && (
+                  /*
+                    Delivery state, in words. "Sending" lost its `animate-ping` blue
+                    dot — an expanding ring is how a map pin announces itself, and
+                    blue was a hue no token defines. "Sent" keeps no colour either;
+                    it is the expected outcome. Only a failure is coloured, because
+                    only a failure asks the reader to do something.
+                  */
+                  <div className="flex items-baseline justify-end gap-1.5 mt-1.5 text-3xs font-mono">
+                    {message.deliveryStatus === 'sending' && (
+                      <span className="event-running text-foreground-extra-muted">Sending…</span>
+                    )}
+                    {message.deliveryStatus === 'confirmed' && (
+                      <span className="text-foreground-extra-muted inline-flex items-baseline gap-1">
+                        <Check className="size-2.5 translate-y-px" />
+                        <span>Sent</span>
+                      </span>
+                    )}
+                    {message.deliveryStatus === 'failed' && (
+                      <span className="text-destructive font-medium inline-flex items-baseline gap-1">
+                        <X className="size-2.5 translate-y-px" />
+                        <span>Failed</span>
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Minimalist Hover Copy Button */}
-          <Hint label="Copy message">
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(message.content);
-                toast.success('Message copied');
-              }}
-              className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-start mt-1.5"
-              aria-label="Copy message"
-            >
-              <Copy className="size-3.5" />
-            </button>
-          </Hint>
-        </div>
-      </div>
+              {/* Minimalist Hover Copy Button */}
+              <Hint label="Copy message">
+                <button
+                  type="button"
+                  onClick={handleCopyMarkdown}
+                  className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-start mt-1.5"
+                  aria-label="Copy message"
+                >
+                  <Copy className="size-3.5" />
+                </button>
+              </Hint>
+            </div>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-56">
+          <ContextMenuItem onClick={handleCopyPlain}>
+            <Copy className="size-4 mr-2 text-muted-foreground" />
+            <span>Copy Plain Text</span>
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleCopyMarkdown}>
+            <FileCode className="size-4 mr-2 text-muted-foreground" />
+            <span>Copy Markdown Source</span>
+          </ContextMenuItem>
+          <ContextMenuItem onClick={handleQuote}>
+            <Quote className="size-4 mr-2 text-muted-foreground" />
+            <span>Quote Reply</span>
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     );
   }
 
   // ── AI Agent Messages (Modern Clean AI Layout) ──
   return (
-    <div className={cn('group/agentmsg', hideHeader ? 'pb-3.5' : 'py-3.5')}>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className={cn('group/agentmsg', hideHeader ? 'pb-3.5' : 'py-3.5')}>
       <div className="flex items-start gap-3">
         {hideHeader ? (
           <div className="size-7 shrink-0" aria-hidden />
@@ -703,14 +780,38 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
               senderType="agent"
               variant="toolbar"
               onOpenCanvas={inferredArtifact ? () => openArtifact(inferredArtifact) : undefined}
-              onRegenerate={() => {
-                navigator.clipboard.writeText(`@${message.senderName} please regenerate your last answer`);
-                toast.success('Regenerate instruction copied');
-              }}
+              onRegenerate={handleRegenerate}
             />
           </div>
         </div>
       </div>
     </div>
+    </ContextMenuTrigger>
+    <ContextMenuContent className="w-60">
+      <ContextMenuItem onClick={handleCopyPlain}>
+        <Copy className="size-4 mr-2 text-muted-foreground" />
+        <span>Copy Plain Text</span>
+      </ContextMenuItem>
+      <ContextMenuItem onClick={handleCopyMarkdown}>
+        <FileCode className="size-4 mr-2 text-muted-foreground" />
+        <span>Copy Markdown Source</span>
+      </ContextMenuItem>
+      <ContextMenuItem onClick={handleQuote}>
+        <Quote className="size-4 mr-2 text-muted-foreground" />
+        <span>Quote Reply</span>
+      </ContextMenuItem>
+      {inferredArtifact && (
+        <ContextMenuItem onClick={() => openArtifact(inferredArtifact)}>
+          <Sparkles className="size-4 mr-2 text-primary" />
+          <span>Open in Canvas</span>
+        </ContextMenuItem>
+      )}
+      <ContextMenuSeparator />
+      <ContextMenuItem onClick={handleRegenerate}>
+        <RotateCw className="size-4 mr-2 text-primary" />
+        <span>Regenerate Response</span>
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenu>
   );
 });
