@@ -46,10 +46,17 @@ export class GitApi extends BaseWorkspaceApi {
     });
   }
 
-  async getGitDiff(channelId: string, filePath?: string): Promise<{ status: string; diff: string; path?: string }> {
+  async getGitDiff(
+    channelId: string,
+    filePath?: string,
+    turnId?: string
+  ): Promise<{ status: string; diff: string; path?: string; file?: string; base?: string; turn_id?: string }> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelId });
     if (filePath) params.set('path', filePath);
-    return this.request<{ status: string; diff: string; path?: string }>(`/v1/git/diff?${params}`);
+    if (turnId) params.set('turn_id', turnId);
+    return this.request<{ status: string; diff: string; path?: string; file?: string; base?: string; turn_id?: string }>(
+      `/v1/git/diff?${params}`
+    );
   }
 
   async discardGitChanges(channelId: string, files: string[]): Promise<void> {

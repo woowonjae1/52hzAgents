@@ -400,10 +400,26 @@ func GetGitDiff(c *gin.Context) {
 
 	staged := c.Query("staged") == "true"
 	filePath := c.Query("file")
+	if filePath == "" {
+		filePath = c.Query("path")
+	}
+
+	turnID := c.Query("turn_id")
+	var baseRef string
+	if turnID != "" {
+		var turn models.AgentTurnChange
+		if err := db.DB.Where("id = ?", turnID).First(&turn).Error; err == nil && turn.BaseCommit != "" {
+			baseRef = turn.BaseCommit
+		}
+	} else if base := c.Query("base"); base != "" {
+		baseRef = base
+	}
 
 	args := []string{"diff"}
 	if staged {
 		args = append(args, "--staged")
+	} else if baseRef != "" {
+		args = append(args, baseRef)
 	}
 	if filePath != "" {
 		cleanPath, err := sanitizeGitFilePath(dir, filePath)
@@ -421,9 +437,11 @@ func GetGitDiff(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"diff":   output,
-		"staged": staged,
-		"file":   filePath,
+		"diff":    output,
+		"staged":  staged,
+		"file":    filePath,
+		"base":    baseRef,
+		"turn_id": turnID,
 	})
 }
 

@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
 import { type GitStatus } from '@/lib/use-git-status';
 import { toast } from 'sonner';
-import { DiffBlock } from '../chat/diff-block';
+import { MultiDiffInspector } from '@/components/diff/multi-diff-inspector';
 
 function StatusLetter({ letter }: { letter: string }) {
   const tone =
@@ -104,9 +104,8 @@ export function GitChip({
   // after it, they only ran on the renders that got past it, so the first render
   // where git status arrived called more hooks than the one before it and React
   // tore down the whole tree.
-  const [diffModalFile, setDiffModalFile] = useState<string | null>(null);
-  const [diffContent, setDiffContent] = useState<string>('');
-  const [loadingDiff, setLoadingDiff] = useState(false);
+  const [selectedDiffFile, setSelectedDiffFile] = useState<string | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -212,18 +211,10 @@ export function GitChip({
     }
   };
 
-  const handleViewDiff = async (filePath: string) => {
+  const handleViewDiff = (filePath: string) => {
     if (!channelId) return;
-    setDiffModalFile(filePath);
-    setLoadingDiff(true);
-    try {
-      const res = await workspaceApi.getGitDiff(channelId, filePath);
-      setDiffContent(res.diff || 'No changes detected in working tree against HEAD');
-    } catch (e) {
-      setDiffContent(`Error loading diff: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setLoadingDiff(false);
-    }
+    setSelectedDiffFile(filePath);
+    setInspectorOpen(true);
   };
 
   const handleDiscard = async (filePath: string) => {
@@ -255,41 +246,16 @@ export function GitChip({
         <ChevronDown className={cn('size-2.5 text-foreground-muted transition-transform', open && 'rotate-180')} />
       </button>
 
-      {/* File Diff Modal */}
-      {diffModalFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-surface1 border border-border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface2/60">
-              <div className="flex items-center gap-2 min-w-0">
-                <FileDiff className="size-4 text-foreground-muted shrink-0" />
-                <span className="font-semibold text-xs text-foreground truncate">{diffModalFile}</span>
-                <span className="text-3xs text-foreground-extra-muted font-mono">Working Tree vs HEAD</span>
-              </div>
-              <button
-                onClick={() => setDiffModalFile(null)}
-                className="size-7 rounded-lg hover:bg-surface3 flex items-center justify-center text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4 max-h-[70vh]">
-              {loadingDiff ? (
-                <div className="flex items-center justify-center py-12 text-xs text-foreground-muted gap-2">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading diff...
-                </div>
-              ) : diffContent ? (
-                <DiffBlock code={diffContent} />
-              ) : (
-                <p className="text-center py-8 text-xs text-foreground-extra-muted">No changes found</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Multi-file Diff Inspector */}
+      <MultiDiffInspector
+        isOpen={inspectorOpen}
+        onClose={() => setInspectorOpen(false)}
+        channelId={channelId}
+        files={status.files}
+        initialFilePath={selectedDiffFile || undefined}
+        title="Working Tree Changes"
+        subtitle={`${status.branch || 'detached'} @ ${status.dir}`}
+      />
 
       {open && (
         <div className="absolute top-full right-0 mt-1.5 w-[320px] z-50 rounded-xl bg-surface2 border border-border-accent shadow-xl overflow-hidden">

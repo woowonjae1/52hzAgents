@@ -2,11 +2,12 @@
 
 import { Hint } from '@/components/ui/hint';
 import { useState } from 'react';
-import { FileCode2, Undo2 } from 'lucide-react';
+import { FileCode2, Undo2, FileDiff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 import { EventLine } from '@/components/ai-elements/event-line';
+import { MultiDiffInspector } from '@/components/diff/multi-diff-inspector';
 import type { TurnChangesMetadata } from '@/lib/types';
 
 interface TurnChangesCapsuleProps {
@@ -67,6 +68,8 @@ export function TurnChangesCapsule({
   const [rollingBack, setRollingBack] = useState(false);
   const [rolledBack, setRolledBack] = useState(turnChanges?.status === 'rolled_back');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectFilePath, setInspectFilePath] = useState<string | undefined>();
 
   const handleRollback = async () => {
     if (!channelId || !turnChanges?.turn_id || rollingBack || rolledBack) return;
@@ -105,78 +108,115 @@ export function TurnChangesCapsule({
   );
 
   return (
-    <EventLine
-      className={cn('mt-1', rolledBack && 'opacity-60', className)}
-      icon={<FileCode2 />}
-      label={rolledBack ? 'Changes rolled back' : `${fileCount} ${fileCount === 1 ? 'file' : 'files'} changed`}
-      meta={rolledBack ? undefined : counts}
-      actions={
-        rolledBack ? undefined : showConfirm ? (
-          <span className="inline-flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={handleRollback}
-              disabled={rollingBack}
-              className={cn(
-                'cursor-pointer rounded-base bg-destructive px-2 py-0.5 text-3xs font-medium',
-                'text-destructive-foreground transition-opacity hover:opacity-90',
-                'disabled:cursor-default disabled:opacity-50'
-              )}
-            >
-              {/* No spinner. The disabled state plus the changed word is the
-                  feedback; a spinner inside a 20px button is decoration. */}
-              {rollingBack ? 'Rolling back…' : 'Confirm'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowConfirm(false)}
-              disabled={rollingBack}
-              className="cursor-pointer rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
-            >
-              Cancel
-            </button>
-          </span>
-        ) : (
-          <Hint label="Roll back this agent turn's changes without affecting manual user edits">
-            <button
-              type="button"
-              onClick={() => setShowConfirm(true)}
-              className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
-            >
-              <Undo2 className="size-2.5" />
-              <span>Roll back</span>
-            </button>
-          </Hint>
-        )
-      }
-    >
-      {files.length > 0 && (
-        <div className="max-h-48 overflow-y-auto py-0.5">
-          {files.map((file) => (
-            <div
-              key={file.path}
-              className="-mx-1 flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2"
-            >
-              <span className="flex min-w-0 items-baseline gap-2">
-                <ChangeMark status={file.status} />
-                <span className="truncate text-foreground-muted" title={file.path}>
-                  {file.path}
+    <>
+      <EventLine
+        className={cn('mt-1', rolledBack && 'opacity-60', className)}
+        icon={<FileCode2 />}
+        label={rolledBack ? 'Changes rolled back' : `${fileCount} ${fileCount === 1 ? 'file' : 'files'} changed`}
+        meta={rolledBack ? undefined : counts}
+        actions={
+          rolledBack ? undefined : (
+            <span className="inline-flex shrink-0 items-center gap-1.5">
+              <Hint label="Inspect file diffs side-by-side (J/K to navigate)">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectFilePath(files[0]?.path);
+                    setInspectorOpen(true);
+                  }}
+                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                >
+                  <FileDiff className="size-2.5" />
+                  <span>Inspect diff</span>
+                </button>
+              </Hint>
+
+              {showConfirm ? (
+                <span className="inline-flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleRollback}
+                    disabled={rollingBack}
+                    className={cn(
+                      'cursor-pointer rounded-base bg-destructive px-2 py-0.5 text-3xs font-medium',
+                      'text-destructive-foreground transition-opacity hover:opacity-90',
+                      'disabled:cursor-default disabled:opacity-50'
+                    )}
+                  >
+                    {rollingBack ? 'Rolling back…' : 'Confirm'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(false)}
+                    disabled={rollingBack}
+                    className="cursor-pointer rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
                 </span>
-                {file.pre_existing && (
-                  <span className="shrink-0 text-3xs text-foreground-extra-muted">
-                    pre-existing
+              ) : (
+                <Hint label="Roll back this agent turn's changes without affecting manual user edits">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(true)}
+                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                  >
+                    <Undo2 className="size-2.5" />
+                    <span>Roll back</span>
+                  </button>
+                </Hint>
+              )}
+            </span>
+          )
+        }
+      >
+        {files.length > 0 && (
+          <div className="max-h-48 overflow-y-auto py-0.5">
+            {files.map((file) => (
+              <button
+                key={file.path}
+                type="button"
+                onClick={() => {
+                  setInspectFilePath(file.path);
+                  setInspectorOpen(true);
+                }}
+                className="-mx-1 w-[calc(100%+8px)] flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2 text-left cursor-pointer group"
+                title="Click to inspect diff"
+              >
+                <span className="flex min-w-0 items-baseline gap-2">
+                  <ChangeMark status={file.status} />
+                  <span className="truncate text-foreground-muted group-hover:text-foreground group-hover:underline decoration-foreground-extra-muted" title={file.path}>
+                    {file.path}
                   </span>
-                )}
-              </span>
-              <span className="shrink-0 tabular-nums text-3xs">
-                {file.additions > 0 && <span className="text-diff-addition">+{file.additions}</span>}
-                {file.additions > 0 && file.deletions > 0 && ' '}
-                {file.deletions > 0 && <span className="text-diff-deletion">−{file.deletions}</span>}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </EventLine>
+                  {file.pre_existing && (
+                    <span className="shrink-0 text-3xs text-foreground-extra-muted">
+                      pre-existing
+                    </span>
+                  )}
+                </span>
+                <span className="shrink-0 tabular-nums text-3xs">
+                  {file.additions > 0 && <span className="text-diff-addition">+{file.additions}</span>}
+                  {file.additions > 0 && file.deletions > 0 && ' '}
+                  {file.deletions > 0 && <span className="text-diff-deletion">−{file.deletions}</span>}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </EventLine>
+
+      <MultiDiffInspector
+        isOpen={inspectorOpen}
+        onClose={() => setInspectorOpen(false)}
+        channelId={channelId}
+        files={files}
+        turnId={turnChanges?.turn_id}
+        initialFilePath={inspectFilePath}
+        title={`Turn Changes (${fileCount} ${fileCount === 1 ? 'file' : 'files'})`}
+        onRollback={handleRollback}
+        isRollingBack={rollingBack}
+        isRolledBack={rolledBack}
+      />
+    </>
   );
 }
