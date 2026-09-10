@@ -28,44 +28,63 @@ function reportLoadFailure(what: string, reason: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// Brand colors for local agents and cloud providers
+// Brand colours for local agents and cloud providers.
+//
+// `text-white` IS ONLY CORRECT ON A DARK, SATURATED FILL. Eleven of these
+// entries paired it with `bg-surface2`, which is #ffffff in the light theme --
+// white letters on a white disc, invisible. `cursor` had the mirror bug:
+// `bg-primary` + `text-white`, and --primary is #f4f4f6 in the DARK theme, so
+// it disappeared there instead. Both fallbacks did the same on
+// `bg-foreground-muted`, a mid-grey in either theme.
+//
+// The correct pattern was already in this file -- PROVIDER_BRANDS pairs
+// `bg-primary` with `text-primary-foreground` -- it simply was not applied
+// consistently. Surface fills now take `text-foreground`, which flips with
+// the theme; only genuinely dark saturated fills keep `text-white`.
+//
+// STILL WORTH A LOOK, deliberately not changed: `goose` and `openhands` sit
+// on `bg-status-warning` with white text, roughly 2.1:1 against #f59e0b --
+// legible-ish but under any contrast bar. Fixing it needs an "on-warning"
+// foreground token that does not exist. Underneath that is a second
+// question: --status-warning MEANS "warning", and spending a semantic token
+// on a brand fill is how that meaning gets diluted.
 // ---------------------------------------------------------------------------
 
 const AGENT_BRANDS: Record<string, { bg: string; text: string }> = {
-  claude:      { bg: 'bg-surface2',  text: 'text-white' },
-  antigravity: { bg: 'bg-surface2',    text: 'text-white' },
-  agy:         { bg: 'bg-surface2',    text: 'text-white' },
+  claude:      { bg: 'bg-surface2',  text: 'text-foreground' },
+  antigravity: { bg: 'bg-surface2',    text: 'text-foreground' },
+  agy:         { bg: 'bg-surface2',    text: 'text-foreground' },
   codex:       { bg: 'bg-status-success',   text: 'text-white' },
-  gemini:      { bg: 'bg-surface2',    text: 'text-white' },
+  gemini:      { bg: 'bg-surface2',    text: 'text-foreground' },
   openclaw:  { bg: 'bg-status-merged',  text: 'text-white' },
   amp:       { bg: 'bg-status-danger',    text: 'text-white' },
   goose:     { bg: 'bg-status-warning',   text: 'text-white' },
-  cline:     { bg: 'bg-surface2',    text: 'text-white' },
-  copilot:   { bg: 'bg-surface2',  text: 'text-white' },
-  opencode:  { bg: 'bg-surface2',    text: 'text-white' },
+  cline:     { bg: 'bg-surface2',    text: 'text-foreground' },
+  copilot:   { bg: 'bg-surface2',  text: 'text-foreground' },
+  opencode:  { bg: 'bg-surface2',    text: 'text-foreground' },
   nanoclaw:  { bg: 'bg-pink-500',    text: 'text-white' },
-  cursor:    { bg: 'bg-primary',    text: 'text-white' },
+  cursor:    { bg: 'bg-primary',    text: 'text-primary-foreground' },
   hermes:    { bg: 'bg-yellow-500',  text: 'text-white' },
-  kimi:      { bg: 'bg-surface2',     text: 'text-white' },
+  kimi:      { bg: 'bg-surface2',     text: 'text-foreground' },
   pi:        { bg: 'bg-status-success', text: 'text-white' },
-  kilo:      { bg: 'bg-surface2',  text: 'text-white' },
+  kilo:      { bg: 'bg-surface2',  text: 'text-foreground' },
   openhands: { bg: 'bg-status-warning',   text: 'text-white' },
-  deepseek:  { bg: 'bg-surface2',    text: 'text-white' },
+  deepseek:  { bg: 'bg-surface2',    text: 'text-foreground' },
 };
 
 const PROVIDER_BRANDS: Record<string, { bg: string; text: string; accent: string }> = {
   openai:    { bg: 'bg-primary', text: 'text-primary-foreground', accent: 'border-border-accent' },
-  google:    { bg: 'bg-surface2',    text: 'text-white', accent: 'border-border-accent' },
+  google:    { bg: 'bg-surface2',    text: 'text-foreground', accent: 'border-border-accent' },
   xai:       { bg: 'bg-primary', text: 'text-primary-foreground', accent: 'border-border-accent' },
-  deepseek:  { bg: 'bg-surface2',    text: 'text-white', accent: 'border-border-accent' },
+  deepseek:  { bg: 'bg-surface2',    text: 'text-foreground', accent: 'border-border-accent' },
 };
 
 function getAgentBrand(name: string) {
-  return AGENT_BRANDS[name] || { bg: 'bg-foreground-muted', text: 'text-white' };
+  return AGENT_BRANDS[name] || { bg: 'bg-surface3', text: 'text-foreground' };
 }
 
 function getProviderBrand(name: string) {
-  return PROVIDER_BRANDS[name] || { bg: 'bg-foreground-muted', text: 'text-white', accent: 'border-border-accent' };
+  return PROVIDER_BRANDS[name] || { bg: 'bg-surface3', text: 'text-foreground', accent: 'border-border-accent' };
 }
 
 function CategoryIcon({ category, className }: { category: string; className?: string }) {
@@ -413,7 +432,7 @@ function LocalAgentsTab({
                 {`wwj connect my-${selectedEntry.name} ${displayToken}`}
               </pre>
               <button
-                className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-primary hover:bg-primary text-foreground-extra-muted hover:text-white transition-colors"
+                className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-surface2 hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors"
                 onClick={() => copyToClipboard(`wwj connect my-${selectedEntry.name} ${displayToken}`)}
               >
                 {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
@@ -673,7 +692,7 @@ function CloudAgentsTab({
             <Button
               onClick={onAdd}
               disabled={saving || !cfgName || !cfgKey || !cfgModel || (isCustomProvider && !cfgBaseUrl)}
-              className="w-full bg-primary hover:bg-primary text-white dark:hover:bg-surface3 font-semibold h-9 rounded-lg shadow-xs"
+              className="w-full bg-primary hover:opacity-90 text-primary-foreground font-semibold h-9 rounded-lg shadow-xs"
               size="sm"
             >
               {saving && <Loader2 className="size-3.5 animate-spin mr-1.5" />}
