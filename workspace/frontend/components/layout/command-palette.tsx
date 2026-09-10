@@ -32,7 +32,7 @@ import { cn } from '@/lib/utils';
 
 function KeyBadge({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded border border-border/80 bg-surface2 font-mono text-3xs text-foreground-extra-muted">
+    <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded border border-border bg-surface2 font-mono text-3xs text-foreground-extra-muted">
       {children}
     </kbd>
   );
@@ -306,9 +306,9 @@ export function CommandPalette() {
       />
 
       {/* Palette Container */}
-      <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border/80 bg-surface1 text-foreground shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+      <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-surface1 text-foreground shadow-2xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
         {/* Search Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/70 bg-surface1/95">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface1/95">
           <Search className="size-4 text-foreground-extra-muted shrink-0" />
           <input
             ref={inputRef}
@@ -356,7 +356,7 @@ export function CommandPalette() {
                   )}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="p-1.5 rounded-lg bg-surface3 border border-border/50 shrink-0">
+                    <div className="p-1.5 rounded-lg bg-surface3 border border-border/60 shrink-0">
                       {item.icon}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -380,7 +380,7 @@ export function CommandPalette() {
                         ))}
                       </div>
                     ) : (
-                      <span className="text-3xs text-foreground-extra-muted px-1.5 py-0.5 rounded bg-surface3 border border-border/40">
+                      <span className="text-3xs text-foreground-extra-muted px-1.5 py-0.5 rounded bg-surface3 border border-border/60">
                         {item.category}
                       </span>
                     )}

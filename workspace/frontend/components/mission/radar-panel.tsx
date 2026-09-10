@@ -122,7 +122,7 @@ export function RadarPanel() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-surface1">
       {/* Header */}
-      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 pl-4 pr-12">
+      <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border pl-4 pr-12">
         <Users className="size-4 text-foreground-muted" />
         <span className="text-sm font-semibold tracking-tight text-foreground">Agents</span>
         <span className="ml-auto rounded-full bg-surface2 px-1.5 py-0.5 text-3xs font-medium tabular-nums text-foreground-muted">
@@ -131,7 +131,7 @@ export function RadarPanel() {
       </div>
 
       {/* Agent selector list */}
-      <div className="max-h-44 shrink-0 space-y-0.5 overflow-y-auto border-b border-border/70 p-2">
+      <div className="max-h-44 shrink-0 space-y-0.5 overflow-y-auto border-b border-border p-2">
         {panelAgents.map((r, idx) => {
           const isSel = r.agent.agentName === selected;
           const c = STATUS_COLOR[r.status];
@@ -145,7 +145,7 @@ export function RadarPanel() {
               className={cn(
                 'flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-200',
                 isSel
-                  ? 'border-border/70 bg-surface2'
+                  ? 'border-border bg-surface2'
                   : 'border-transparent hover:bg-surface2/60',
               )}
             >
@@ -208,7 +208,7 @@ export function RadarPanel() {
                 'rounded-xl border p-3 transition-colors duration-200',
                 current.status === 'working'
                   ? 'border-status-warning/20 bg-status-warning/[0.06]'
-                  : 'border-border/70 bg-surface2/50',
+                  : 'border-border bg-surface2/50',
               )}
             >
               <div className="flex items-center gap-1.5">

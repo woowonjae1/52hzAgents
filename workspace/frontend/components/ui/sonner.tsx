@@ -53,7 +53,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
            * to work in both.
            */
           toast:
-            'group toast group-[.toaster]:bg-surface-overlay/95 group-[.toaster]:text-foreground group-[.toaster]:border-border/80 group-[.toaster]:shadow-xl group-[.toaster]:backdrop-blur-xl group-[.toaster]:rounded-full group-[.toaster]:px-5 group-[.toaster]:py-2.5 group-[.toaster]:min-h-0 group-[.toaster]:w-auto group-[.toaster]:max-w-lg group-[.toaster]:gap-3 group-[.toaster]:text-[14px] group-[.toaster]:font-medium transition-all duration-200',
+            'group toast group-[.toaster]:bg-surface-overlay/95 group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-xl group-[.toaster]:backdrop-blur-xl group-[.toaster]:rounded-full group-[.toaster]:px-5 group-[.toaster]:py-2.5 group-[.toaster]:min-h-0 group-[.toaster]:w-auto group-[.toaster]:max-w-lg group-[.toaster]:gap-3 group-[.toaster]:text-[14px] group-[.toaster]:font-medium transition-all duration-200',
           title: 'group-[.toast]:font-medium group-[.toast]:text-[14px] group-[.toast]:leading-snug group-[.toast]:text-foreground group-[.toast]:tracking-normal',
           description: 'group-[.toast]:text-muted-foreground group-[.toast]:text-xs group-[.toast]:leading-normal group-[.toast]:mt-0.5',
           actionButton:

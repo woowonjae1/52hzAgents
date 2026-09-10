@@ -143,16 +143,16 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
   };
 
   const fieldClass =
-    'h-9 rounded-lg border-border/70 bg-surface1 text-sm text-foreground shadow-xs transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+    'h-9 rounded-lg border-border bg-surface1 text-sm text-foreground shadow-xs transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
 
   const toolBtnClass =
     'p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer text-xs';
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden border-border/80 shadow-2xl">
+      <DialogContent className="sm:max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden border-border shadow-2xl">
         {/* Header */}
-        <DialogHeader className="shrink-0 mb-0 border-b border-border/70 pl-6 pr-14 py-3.5 bg-surface1/80 backdrop-blur-md">
+        <DialogHeader className="shrink-0 mb-0 border-b border-border pl-6 pr-14 py-3.5 bg-surface1/80 backdrop-blur-md">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <span
@@ -280,9 +280,9 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
           </div>
 
           {/* Main Editor / Preview Container */}
-          <div className="flex-1 min-h-[380px] flex flex-col rounded-xl border border-border/80 bg-surface1/60 shadow-xs overflow-hidden">
+          <div className="flex-1 min-h-[380px] flex flex-col rounded-xl border border-border bg-surface1/60 shadow-xs overflow-hidden">
             {/* Markdown Toolbar */}
-            <div className="flex items-center justify-between border-b border-border/70 px-3 py-1.5 bg-surface2/60 shrink-0">
+            <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-surface2/60 shrink-0">
               <div className="flex items-center gap-0.5 overflow-x-auto">
                 <Hint label="Bold (**text**)">
                   <button
@@ -402,7 +402,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
               {(viewMode === 'edit' || viewMode === 'split') && (
                 <div className={cn(
                   'h-full flex flex-col bg-background/50',
-                  viewMode === 'split' ? 'w-1/2 border-r border-border/70' : 'w-full'
+                  viewMode === 'split' ? 'w-1/2 border-r border-border' : 'w-full'
                 )}>
                   <textarea
                     ref={textareaRef}
@@ -439,7 +439,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
         </div>
 
         {/* Footer */}
-        <DialogFooter className="shrink-0 items-center border-t border-border/70 bg-surface1/80 px-6 py-3.5 sm:justify-between">
+        <DialogFooter className="shrink-0 items-center border-t border-border bg-surface1/80 px-6 py-3.5 sm:justify-between">
           <div className="flex items-center gap-2 text-start">
             {isDirty ? (
               <>

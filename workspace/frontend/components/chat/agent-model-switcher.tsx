@@ -411,7 +411,7 @@ export function AgentModelSwitcher({
             'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-2xs',
             anyOnline
               ? 'bg-surface2 hover:bg-surface3 border-border text-foreground cursor-pointer'
-              : 'bg-surface2/40 border-border/40 text-muted-foreground/60 cursor-not-allowed',
+              : 'bg-surface2/40 border-border/60 text-muted-foreground/60 cursor-not-allowed',
             className,
           )}
           title={
@@ -446,7 +446,7 @@ export function AgentModelSwitcher({
             <span className="text-3xs text-muted-foreground hidden sm:inline">· Configure AI model per agent</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface3 text-muted-foreground border border-border/40">
+            <span className="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface3 text-muted-foreground border border-border/60">
               {onlineAgents.length} online
             </span>
             <button
@@ -475,7 +475,7 @@ export function AgentModelSwitcher({
             )}
 
             {secondary.length > 0 && (
-              <div className="space-y-1 pt-1 border-t border-border/40">
+              <div className="space-y-1 pt-1 border-t border-border/60">
                 <div className="px-2 pt-1 pb-0.5 text-3xs font-semibold text-foreground-extra-muted uppercase tracking-wider">
                   Other agents
                 </div>
@@ -489,7 +489,7 @@ export function AgentModelSwitcher({
             {activeAgent ? (
               <>
                 {/* Active Agent Info Header */}
-                <div className="px-3.5 py-2.5 border-b border-border/50 flex items-center justify-between gap-2 shrink-0 bg-surface1">
+                <div className="px-3.5 py-2.5 border-b border-border/60 flex items-center justify-between gap-2 shrink-0 bg-surface1">
                   <div className="flex items-center gap-2 min-w-0">
                     <AgentAvatar
                       name={activeAgent.agentName}
@@ -506,7 +506,7 @@ export function AgentModelSwitcher({
                   <div className="text-3xs text-muted-foreground shrink-0 flex items-center gap-1">
                     <span>Current:</span>
                     <span
-                      className="font-medium text-foreground bg-surface2 px-1.5 py-0.5 rounded border border-border/40 truncate max-w-[150px]"
+                      className="font-medium text-foreground bg-surface2 px-1.5 py-0.5 rounded border border-border/60 truncate max-w-[150px]"
                       title={activeCurrentModel || 'Default'}
                     >
                       {activeCurrentModel
@@ -517,7 +517,7 @@ export function AgentModelSwitcher({
                 </div>
 
                 {/* Search & Category Chips */}
-                <div className="p-2.5 border-b border-border/50 space-y-2 shrink-0 bg-surface1">
+                <div className="p-2.5 border-b border-border/60 space-y-2 shrink-0 bg-surface1">
                   <div className="relative flex items-center">
                     <Search className="size-3.5 absolute left-2.5 text-muted-foreground/70 pointer-events-none" />
                     <input
@@ -553,7 +553,7 @@ export function AgentModelSwitcher({
                                 ? 'bg-foreground text-background font-semibold shadow-2xs'
                                 : cat.isFree
                                   ? 'bg-status-muted-success text-status-success hover:bg-status-success/25 border border-status-success/30'
-                                  : 'bg-surface2 hover:bg-surface3 text-muted-foreground hover:text-foreground border border-border/40',
+                                  : 'bg-surface2 hover:bg-surface3 text-muted-foreground hover:text-foreground border border-border/60',
                             )}
                           >
                             {cat.isFree && <Sparkles className="size-2.5" />}

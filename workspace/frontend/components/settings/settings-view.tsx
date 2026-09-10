@@ -294,7 +294,7 @@ export function SettingsView() {
       {/* Main Split: Settings Sidebar + Content Panel */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Settings Navigation Sidebar */}
-        <div className="w-56 lg:w-60 shrink-0 border-r border-border/40 bg-surface1/30 p-3 flex flex-col gap-1 select-none overflow-y-auto">
+        <div className="w-56 lg:w-60 shrink-0 border-r border-border/60 bg-surface1/30 p-3 flex flex-col gap-1 select-none overflow-y-auto">
           <div className="px-2.5 py-1.5 text-2xs font-medium text-foreground-extra-muted uppercase tracking-wider">
             Settings
           </div>
@@ -343,8 +343,8 @@ export function SettingsView() {
           {settingsTab === 'general' && (
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-8 animate-[fadeIn_0.15s_ease-out]">
               {/* Section 1: General Workspace Profile */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/30 pb-3">
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Folder className="size-4 text-primary" />
                     Workspace
@@ -375,14 +375,14 @@ export function SettingsView() {
                     </button>
 
                     {showAdvanced && (
-                      <div className="mt-3 p-4 rounded-xl bg-surface0/70 border border-border/40 grid grid-cols-1 md:grid-cols-2 gap-4 animate-[fadeIn_0.15s_ease-out]">
+                      <div className="mt-3 p-4 rounded-xl bg-surface0/70 border border-border/60 grid grid-cols-1 md:grid-cols-2 gap-4 animate-[fadeIn_0.15s_ease-out]">
                         <div className="space-y-1.5">
                           <Label className="text-xs font-medium text-foreground-muted">Workspace ID</Label>
                           <div className="flex items-center gap-2">
                             <Input
                               readOnly
                               value={workspace?.workspaceId || '52hz'}
-                              className="bg-surface0 border-border/40 font-mono text-xs text-foreground-muted h-9 select-all"
+                              className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
                             />
                             <Button
                               variant="outline"
@@ -403,7 +403,7 @@ export function SettingsView() {
                               readOnly
                               type="password"
                               value={token || ''}
-                              className="bg-surface0 border-border/40 font-mono text-xs text-foreground-muted h-9 select-all"
+                              className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
                             />
                             <Button
                               variant="outline"
@@ -428,8 +428,8 @@ export function SettingsView() {
               </div>
 
               {/* Section 2: Brand Mark Colour */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/30 pb-3">
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Palette className="size-4 text-primary" />
                     Brand mark
@@ -449,7 +449,7 @@ export function SettingsView() {
                 <div className="flex flex-col sm:flex-row sm:items-center gap-5">
                   {/* Live preview. The mark reads the same CSS variable the
                       swatches write, so this needs no props to stay in sync. */}
-                  <div className="shrink-0 size-24 rounded-xl bg-surface0 border border-border/40 flex items-center justify-center">
+                  <div className="shrink-0 size-24 rounded-xl bg-surface0 border border-border/60 flex items-center justify-center">
                     <SignalMark size={56} title="Mark preview" />
                   </div>
 
@@ -496,8 +496,8 @@ export function SettingsView() {
               </div>
 
               {/* Section 3: Desktop & System Integration */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/30 pb-3">
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Monitor className="size-4 text-primary" />
                     Desktop & shortcuts
@@ -508,7 +508,7 @@ export function SettingsView() {
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface0 border border-border/40">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface0 border border-border/60">
                     <div>
                       <p className="text-sm font-medium text-foreground">Launch at login</p>
                       <p className="text-xs text-foreground-muted mt-0.5">Start 52hzAgents in the system tray when the computer boots.</p>
@@ -522,7 +522,7 @@ export function SettingsView() {
                     </button>
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-surface0 border border-border/40 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl bg-surface0 border border-border/60 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-foreground">Quick Bar shortcut</p>
                       <p className="text-xs text-foreground-muted mt-0.5">Summon the command bar from anywhere in the system.</p>
@@ -535,8 +535,8 @@ export function SettingsView() {
               </div>
 
               {/* Section 4: Team Collaborators */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/30 pb-3">
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
                   <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
                     <Users className="size-4 text-primary" />
                     Members
@@ -562,7 +562,7 @@ export function SettingsView() {
                     </Button>
                   </div>
 
-                  <div className="divide-y divide-border/30 rounded-xl bg-surface0 border border-border/40 overflow-hidden">
+                  <div className="divide-y divide-border/60 rounded-xl bg-surface0 border border-border/60 overflow-hidden">
                     {collaborators.length === 0 ? (
                       <div className="p-4 text-center text-xs text-foreground-muted">
                         No other members yet
@@ -608,13 +608,13 @@ export function SettingsView() {
                       <span>Back to agents</span>
                     </button>
                   </div>
-                  <div className="rounded-2xl border border-border/40 bg-surface1 p-6">
+                  <div className="rounded-2xl border border-border/60 bg-surface1 p-6">
                     <ConnectAgentView />
                   </div>
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between p-6 rounded-2xl bg-surface1 border border-border/40 shadow-sm">
+                  <div className="flex items-center justify-between p-6 rounded-2xl bg-surface1 border border-border/60 shadow-sm">
                     <div>
                       <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                         <Users className="size-5 text-primary" />
@@ -636,7 +636,7 @@ export function SettingsView() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {agents.length === 0 ? (
-                      <div className="col-span-2 p-10 rounded-2xl bg-surface1 border border-border/40 text-center space-y-3">
+                      <div className="col-span-2 p-10 rounded-2xl bg-surface1 border border-border/60 text-center space-y-3">
                         <div className="size-12 rounded-2xl bg-surface2 mx-auto flex items-center justify-center text-foreground-muted">
                           <Bot className="size-6" />
                         </div>
@@ -661,7 +661,7 @@ export function SettingsView() {
                         return (
                           <div
                             key={agent.agentName}
-                            className="p-4 rounded-2xl bg-surface1 border border-border/40 shadow-xs flex flex-col justify-between space-y-3 hover:border-border/80 transition-colors"
+                            className="p-4 rounded-2xl bg-surface1 border border-border/60 shadow-xs flex flex-col justify-between space-y-3 hover:border-border transition-colors"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0">
@@ -696,7 +696,7 @@ export function SettingsView() {
                                       'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer border',
                                       agent.autostart
                                         ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
-                                        : 'bg-surface2/60 border-border/40 text-foreground-extra-muted hover:text-foreground-muted'
+                                        : 'bg-surface2/60 border-border/60 text-foreground-extra-muted hover:text-foreground-muted'
                                     )}
                                   >
                                     <Power className="size-2.5" />
@@ -717,7 +717,7 @@ export function SettingsView() {
                               {agent.description || 'No description. Use the role settings below to give this agent a prompt and a remit.'}
                             </p>
 
-                            <div className="pt-2 border-t border-border/30 flex items-center justify-between gap-2">
+                            <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5">
                                 {currentSessionId && (
                                   <Hint label="Make this the leader of the thread">
@@ -774,7 +774,7 @@ export function SettingsView() {
           {/* Tab 3: Panels & Display Configuration */}
           {settingsTab === 'panels' && (
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 shadow-sm space-y-2">
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 shadow-sm space-y-2">
                 <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                   <PanelRight className="size-5 text-primary" />
                   Side panels
@@ -785,7 +785,7 @@ export function SettingsView() {
               </div>
 
               {/* Split Browser Toggle */}
-              <div className="p-5 rounded-2xl bg-surface1 border border-border/40 shadow-xs flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-surface1 border border-border/60 shadow-xs flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Globe className="size-4 text-primary" />
@@ -820,7 +820,7 @@ export function SettingsView() {
                         'p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-4 shadow-xs',
                         isActive
                           ? 'bg-surface2/60 border-primary/40 ring-1 ring-primary/20'
-                          : 'bg-surface1 border-border/40 hover:border-border/80'
+                          : 'bg-surface1 border-border/60 hover:border-border'
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -848,7 +848,7 @@ export function SettingsView() {
                         {panel.desc}
                       </p>
 
-                      <div className="pt-2 border-t border-border/30 flex items-center justify-between">
+                      <div className="pt-2 border-t border-border/60 flex items-center justify-between">
                         <span className="text-2xs text-foreground-extra-muted">Side panel</span>
                         <Button
                           variant={isActive ? 'primary' : 'outline'}
@@ -872,7 +872,7 @@ export function SettingsView() {
           {/* Tab 4: Export & Share */}
           {settingsTab === 'export' && (
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/40 shadow-sm space-y-2">
+              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 shadow-sm space-y-2">
                 <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                   <Download className="size-5 text-primary" />
                   Export & share
@@ -884,7 +884,7 @@ export function SettingsView() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Export Markdown */}
-                <div className="p-5 rounded-2xl bg-surface1 border border-border/40 shadow-xs space-y-4 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 shadow-xs space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                       <FileText className="size-5" />
@@ -906,7 +906,7 @@ export function SettingsView() {
                 </div>
 
                 {/* Public Share Link */}
-                <div className="p-5 rounded-2xl bg-surface1 border border-border/40 shadow-xs space-y-4 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 shadow-xs space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="size-10 rounded-xl bg-status-success/10 text-status-success flex items-center justify-center">
                       <Share2 className="size-5" />
@@ -922,7 +922,7 @@ export function SettingsView() {
                       <Input
                         readOnly
                         value={workspaceShareUrl}
-                        className="bg-surface0 border-border/40 font-mono text-xs text-foreground-muted h-9 select-all"
+                        className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
                       />
                       <Button
                         variant="outline"

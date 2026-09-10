@@ -255,7 +255,7 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
   if (!subagents || subagents.length === 0) return null;
 
   return (
-    <div className="my-2 rounded-xl border border-border/80 bg-surface1/70 backdrop-blur-md p-3 shadow-2xs">
+    <div className="my-2 rounded-xl border border-border bg-surface1/70 backdrop-blur-md p-3 shadow-2xs">
       {/* Root Header */}
       <button
         type="button"
@@ -342,7 +342,7 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
                 </div>
 
                 {agent.prompt && (
-                  <div className="text-2xs font-mono text-foreground-muted bg-surface1/80 border border-border/40 p-2 rounded-md whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
+                  <div className="text-2xs font-mono text-foreground-muted bg-surface1/80 border border-border/60 p-2 rounded-md whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
                     {agent.prompt}
                   </div>
                 )}

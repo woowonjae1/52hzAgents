@@ -140,11 +140,11 @@ export function TasksBoard({
           className="flex flex-col w-80 shrink-0 rounded-xl bg-surface1/60 border border-border/60 overflow-hidden"
         >
           {/* Column Header */}
-          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border/50 bg-surface1">
+          <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border/60 bg-surface1">
             <div className="flex items-center gap-2">
               {col.glyph}
               <span className="text-xs font-semibold text-foreground tracking-tight">{col.title}</span>
-              <span className="text-2xs font-mono text-foreground-extra-muted bg-surface2 px-1.5 py-0.5 rounded-full border border-border/40">
+              <span className="text-2xs font-mono text-foreground-extra-muted bg-surface2 px-1.5 py-0.5 rounded-full border border-border/60">
                 {col.tasks.length}
               </span>
             </div>
@@ -162,7 +162,7 @@ export function TasksBoard({
           {/* Cards List */}
           <div className="flex-1 p-2 space-y-2 overflow-y-auto">
             {col.tasks.length === 0 ? (
-              <div className="flex items-center justify-center h-28 border border-dashed border-border/50 rounded-lg text-3xs text-foreground-extra-muted">
+              <div className="flex items-center justify-center h-28 border border-dashed border-border/60 rounded-lg text-3xs text-foreground-extra-muted">
                 Drop tasks here
               </div>
             ) : (
@@ -176,7 +176,7 @@ export function TasksBoard({
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     title={failureReason ? `Reason: ${failureReason}` : undefined}
                     className={cn(
-                      'group skip-offscreen-card relative rounded-lg border border-border/70 bg-surface2/90 p-3 text-sm transition-all hover:border-border hover:shadow-xs cursor-grab active:cursor-grabbing',
+                      'group skip-offscreen-card relative rounded-lg border border-border bg-surface2/90 p-3 text-sm transition-all hover:border-border hover:shadow-xs cursor-grab active:cursor-grabbing',
                       draggedTaskId === task.id && 'opacity-40 border-dashed border-primary/50'
                     )}
                   >
@@ -227,7 +227,7 @@ export function TasksBoard({
                     )}
 
                     {/* Bottom Row: Stacked Badges with Hover Fan-Out */}
-                    <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between text-3xs text-foreground-extra-muted">
+                    <div className="mt-3 pt-2 border-t border-border/60 flex items-center justify-between text-3xs text-foreground-extra-muted">
                       <div className="flex items-center -space-x-3 hover:space-x-1.5 transition-all duration-200">
                         {task.dueDate && (
                           <span

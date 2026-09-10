@@ -125,7 +125,7 @@ export function DiffBlock({ code }: DiffBlockProps) {
                   <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-2xs select-none', s.num)}>
                     {r.oldNo ?? ''}
                   </span>
-                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-2xs select-none border-r border-border/80', s.num)}>
+                  <span className={cn('shrink-0 w-10 px-1.5 text-right tabular-nums text-2xs select-none border-r border-border', s.num)}>
                     {r.newNo ?? ''}
                   </span>
                   {/* sign */}

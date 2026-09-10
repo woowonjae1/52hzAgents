@@ -243,7 +243,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             variant="outline"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="border border-border/80 text-foreground hover:bg-surface2 hover:text-foreground font-medium"
+            className="border border-border text-foreground hover:bg-surface2 hover:text-foreground font-medium"
           >
             Cancel
           </Button>

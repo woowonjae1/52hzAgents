@@ -463,7 +463,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           `.app-header` so the header row stays one shared height. */}
       <div className="shrink-0 px-4 py-2.5 border-b border-border space-y-2.5">
         {/* Global Agent Broadcast Strip */}
-        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface2/60 border border-border/50 text-3xs text-foreground-muted">
+        <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface2/60 border border-border/60 text-3xs text-foreground-muted">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="size-1.5 rounded-full bg-status-success shrink-0" aria-hidden />
             <span className="font-medium text-foreground truncate">Shared with every agent</span>
@@ -486,7 +486,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search knowledge…"
-            className="h-8.5 w-full rounded-xl border border-border/70 bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted shadow-2xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            className="h-8.5 w-full rounded-xl border border-border bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted shadow-2xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           />
           {query && (
             <button
@@ -572,7 +572,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   index > 8 && 'skip-offscreen-card',
                   active
                     ? 'border-primary/50 bg-surface2/90 shadow-xs ring-1 ring-primary/20'
-                    : 'hover:border-border-accent/80 hover:bg-surface2/50'
+                    : 'hover:border-border-accent hover:bg-surface2/50'
                 )}
                 onClick={() => handleSelect(entry)}
               >
@@ -728,7 +728,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={copyFullContent}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border/70 bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
               >
                 {copiedContent ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5 text-foreground-muted" />}
                 <span className="hidden sm:inline">Copy</span>
@@ -742,7 +742,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={() => exportAsMarkdown(selectedEntry, selectedContent)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border/70 bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer shadow-2xs"
               >
                 <Download className="size-3.5 text-foreground-muted" />
                 <span className="hidden sm:inline">Export</span>
@@ -839,7 +839,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     mobileDetail && selectedEntry ? EntryDetail : EntryList
   ) : (
     <div className="h-full flex w-full overflow-hidden">
-      <div className="w-[320px] xl:w-[380px] shrink-0 border-r border-border/70 overflow-hidden">
+      <div className="w-[320px] xl:w-[380px] shrink-0 border-r border-border overflow-hidden">
         {EntryList}
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">

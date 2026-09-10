@@ -91,7 +91,7 @@ export function RoutineHistoryDrawer({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-xl w-full flex flex-col p-0">
-        <SheetHeader className="px-6 py-5 border-b border-border/80 shrink-0">
+        <SheetHeader className="px-6 py-5 border-b border-border shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <div className="size-8 rounded-lg bg-status-merged/10 text-status-merged flex items-center justify-center shrink-0">
@@ -145,7 +145,7 @@ export function RoutineHistoryDrawer({
                 return (
                   <div
                     key={run.id}
-                    className="p-4 rounded-xl border border-border/80 bg-surface2/50 hover:bg-surface2/80 transition-colors space-y-2.5"
+                    className="p-4 rounded-xl border border-border bg-surface2/50 hover:bg-surface2/80 transition-colors space-y-2.5"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export function RoutineHistoryDrawer({
 
                     {/* Trigger prompt text */}
                     {run.triggerMessage && (
-                      <div className="text-xs font-mono bg-surface1/80 border border-border/40 rounded-lg p-2.5 text-foreground-muted leading-relaxed line-clamp-3">
+                      <div className="text-xs font-mono bg-surface1/80 border border-border/60 rounded-lg p-2.5 text-foreground-muted leading-relaxed line-clamp-3">
                         {run.triggerMessage}
                       </div>
                     )}

@@ -192,9 +192,9 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
         </Hint>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80 p-4 space-y-3.5 shadow-xl border-border/70 bg-surface1/95 backdrop-blur-xl rounded-2xl">
+      <PopoverContent align="end" className="w-80 p-4 space-y-3.5 shadow-xl border-border bg-surface1/95 backdrop-blur-xl rounded-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-border/40">
+        <div className="flex items-center justify-between pb-2 border-b border-border/60">
           <div className="flex items-center gap-2">
             <div className="size-7 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center text-foreground">
               <Layers className="size-3.5" />
@@ -224,7 +224,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
         </div>
 
         {/* Context Capacity Gauge */}
-        <div className="space-y-2 bg-surface2/50 border border-border/40 rounded-xl p-3">
+        <div className="space-y-2 bg-surface2/50 border border-border/60 rounded-xl p-3">
           <div className="flex items-center justify-between text-2xs">
             <span className="font-medium text-foreground">
               Active Context Window
@@ -259,7 +259,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
 
         {/* Multi-agent disparity notice */}
         {channelHealth?.has_disparity && channelHealth?.bottleneck_agent && (
-          <div className="p-2 rounded-lg bg-surface2/60 border border-border/40 text-3xs text-foreground-muted flex items-start gap-1.5">
+          <div className="p-2 rounded-lg bg-surface2/60 border border-border/60 text-3xs text-foreground-muted flex items-start gap-1.5">
             <AlertTriangle className="size-3 text-status-warning shrink-0 mt-0.5" />
             <span className="leading-snug">
               Threshold constrained by <span className="font-semibold text-foreground">@{channelHealth.bottleneck_agent}</span> ({fmtTokens(minWindow)}) to prevent context overflow.
@@ -269,7 +269,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
 
         {/* Historical Savings */}
         <div className="grid grid-cols-2 gap-2 text-2xs">
-          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
+          <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/60">
             <div className="text-3xs text-foreground-muted mb-0.5">Compactions</div>
             <div className="font-semibold font-mono tabular-nums text-foreground">
               {channelHealth?.compaction_count || 0} runs
@@ -298,7 +298,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
             </p>
           )}
 
-          <div className="pt-1.5 border-t border-border/40 flex items-center justify-between">
+          <div className="pt-1.5 border-t border-border/60 flex items-center justify-between">
             <button
               type="button"
               onClick={() => {

@@ -51,7 +51,7 @@ export function StatusBadge({
           ? 'bg-status-muted-merged/10 border-status-muted-merged/20 text-status-muted-merged'
           : 'bg-status-merged/10 border-status-merged/20 text-status-merged'),
         variant === 'info' && 'bg-accent/10 border-accent/20 text-accent-bright',
-        variant === 'muted' && 'bg-surface3/40 border-border/80 text-foreground-muted',
+        variant === 'muted' && 'bg-surface3/40 border-border text-foreground-muted',
         className
       )}
       {...props}

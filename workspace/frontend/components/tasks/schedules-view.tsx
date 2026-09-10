@@ -181,7 +181,7 @@ export function SchedulesView() {
             placeholder="Search scheduled routines by name, prompt, ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border/70 bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+            className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
           />
           {searchQuery && (
             <button
@@ -237,11 +237,11 @@ export function SchedulesView() {
               <div className="flex items-center gap-2 px-1">
                 <Timer className="size-3.5 text-foreground-muted" />
                 <h3 className="text-xs font-semibold text-foreground tracking-tight">One-off</h3>
-                <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/40">
+                <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/60">
                   {pendingTimers.length}
                 </span>
               </div>
-              <div className="overflow-hidden rounded-xl border border-border/80 bg-surface1/60 divide-y divide-border/60 shadow-xs">
+              <div className="overflow-hidden rounded-xl border border-border bg-surface1/60 divide-y divide-border/60 shadow-xs">
                 {[...pendingTimers]
                   .sort((a, b) => new Date(a.firesAt).getTime() - new Date(b.firesAt).getTime())
                   .map((timer) => (
@@ -280,7 +280,7 @@ export function SchedulesView() {
           )}
 
           {filteredRoutines.length === 0 && pendingTimers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border/70 p-8 space-y-3">
+            <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border p-8 space-y-3">
               <CalendarClock className="size-8 text-foreground-extra-muted opacity-60" />
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">No scheduled routines</p>
@@ -310,10 +310,10 @@ export function SchedulesView() {
                   key={routine.id}
                   className={cn(
                     'group relative rounded-xl border bg-surface1/60 p-4 transition-all shadow-xs hover:border-border hover:bg-surface1/80',
-                    isPaused ? 'border-border/40 opacity-75' : 'border-border/80'
+                    isPaused ? 'border-border/60 opacity-75' : 'border-border'
                   )}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/50">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
                     {/* Top Meta info */}
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-surface2 text-foreground-muted border border-border">
@@ -447,7 +447,7 @@ export function SchedulesView() {
 
                   {/* Body Content */}
                   <div className="pt-3 space-y-2.5">
-                    <p className="text-xs text-foreground-muted leading-relaxed font-mono bg-surface2/40 rounded-lg p-2.5 border border-border/40">
+                    <p className="text-xs text-foreground-muted leading-relaxed font-mono bg-surface2/40 rounded-lg p-2.5 border border-border/60">
                       {routine.message}
                     </p>
 

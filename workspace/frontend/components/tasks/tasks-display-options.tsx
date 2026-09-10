@@ -67,7 +67,7 @@ export function TasksDisplayOptions({
           <span className="text-xs font-semibold text-foreground-extra-muted uppercase tracking-wider">
             Layout
           </span>
-          <div className="grid grid-cols-2 gap-1 p-0.5 bg-surface2/80 rounded-lg border border-border/50">
+          <div className="grid grid-cols-2 gap-1 p-0.5 bg-surface2/80 rounded-lg border border-border/60">
             <button
               type="button"
               onClick={() => onChange({ viewType: 'list' })}

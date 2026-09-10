@@ -832,7 +832,7 @@ export function ChatView() {
             <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
               <MessageSquare className="size-4 text-muted-foreground" />
               <span>{currentSessionId!.slice(3).split(',').map(stripAddressPrefix).join(' ↔ ')}</span>
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface3/80 text-muted-foreground border border-border/40 font-mono">
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface3/80 text-muted-foreground border border-border/60 font-mono">
                 read-only
               </span>
             </h2>
@@ -1086,7 +1086,7 @@ export function ChatView() {
                       flat surface; `active:scale-[0.98]` is a web affordance;
                       and `transition-all` on a card put its border, shadow and
                       padding on one clock. */}
-                  <div className="w-full p-4 rounded-lg bg-surface1 border border-border shadow-sm flex flex-col items-center text-center space-y-3 transition-colors hover:border-border-accent/60">
+                  <div className="w-full p-4 rounded-lg bg-surface1 border border-border shadow-sm flex flex-col items-center text-center space-y-3 transition-colors hover:border-border-accent">
                     <div className="size-9 rounded-md bg-status-warning/10 border border-status-warning/20 flex items-center justify-center text-status-warning">
                       <Radio className="size-4.5" />
                     </div>
@@ -1132,7 +1132,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('tasks')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <CheckCircle2 className="size-4" />
@@ -1156,7 +1156,7 @@ export function ChatView() {
                         onClick={() => {
                           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
                         }}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Search className="size-4" />
@@ -1164,7 +1164,7 @@ export function ChatView() {
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
                             <span>Command Palette</span>
-                            <kbd className="text-3xs font-mono text-foreground-extra-muted bg-surface3 px-1.5 py-0.2 rounded border border-border/50">
+                            <kbd className="text-3xs font-mono text-foreground-extra-muted bg-surface3 px-1.5 py-0.2 rounded border border-border/60">
                               Ctrl+K
                             </kbd>
                           </div>
@@ -1178,7 +1178,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Activity className="size-4" />
@@ -1200,7 +1200,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => openSettings('general')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Settings className="size-4" />
@@ -1233,7 +1233,7 @@ export function ChatView() {
                         handleDraftChange(item.prompt);
                         setFocusKey((k) => k + 1);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent/70 transition-colors cursor-pointer group shadow-xs text-left"
+                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
                     >
                       <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0">
                         <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-primary transition-colors" />
@@ -1333,7 +1333,7 @@ export function ChatView() {
                         onClick={() => {
                           if (currentSessionId) addParticipant(currentSessionId, agent.agentName);
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/50 text-2xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/60 text-2xs font-medium transition-colors cursor-pointer"
                       >
                         <AgentAvatar name={agent.agentName} size={14} />
                         <span>@{agent.agentName}</span>

@@ -237,7 +237,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
             type="button"
             className={cn(
               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
-              'bg-surface2/80 hover:bg-surface3/90 border-border/70 hover:border-border text-foreground shadow-2xs',
+              'bg-surface2/80 hover:bg-surface3/90 border-border hover:border-border text-foreground shadow-2xs',
               isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
               className
             )}
@@ -292,17 +292,17 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
       <PopoverContent
         align="start"
-        className="w-80 p-3.5 space-y-3.5 shadow-xl border-border/70 bg-surface1/95 backdrop-blur-xl rounded-2xl"
+        className="w-80 p-3.5 space-y-3.5 shadow-xl border-border bg-surface1/95 backdrop-blur-xl rounded-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-2.5 border-b border-border/40">
+        <div className="flex items-center justify-between pb-2.5 border-b border-border/60">
           <div className="flex items-center gap-2 min-w-0">
             <div className="size-6 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center text-foreground shrink-0">
               <Gauge className="size-3" />
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-xs font-semibold text-foreground truncate">{selectedName}</span>
-              <span className="text-3xs font-mono font-normal px-1.5 py-0.5 rounded-md bg-surface3 border border-border/50 text-foreground-muted truncate max-w-[140px]">
+              <span className="text-3xs font-mono font-normal px-1.5 py-0.5 rounded-md bg-surface3 border border-border/60 text-foreground-muted truncate max-w-[140px]">
                 {activeModel}
               </span>
             </div>
@@ -323,7 +323,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
 
         {/* Multi-Agent Switcher (if workspace has multiple agents) */}
         {candidateAgents.length > 1 && (
-          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface2/70 border border-border/40">
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-surface2/70 border border-border/60">
             {candidateAgents.map((a) => {
               const active = a.name === selectedName;
               return (

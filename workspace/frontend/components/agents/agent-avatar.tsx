@@ -76,7 +76,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
           'flex items-center justify-center shrink-0 overflow-hidden',
           !hasBrandMark && [
             square ? 'rounded-xl' : 'rounded-full',
-            'border border-border/80 dark:border-white/[0.1] bg-surface2/90 dark:bg-surface2/80',
+            'border border-border dark:border-white/[0.1] bg-surface2/90 dark:bg-surface2/80',
           ],
         )}
         style={{ width: size, height: size }}

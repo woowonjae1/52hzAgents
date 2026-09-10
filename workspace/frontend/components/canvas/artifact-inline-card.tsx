@@ -49,7 +49,7 @@ export function ArtifactInlineCard({
         'my-2.5 p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer group select-none shadow-2xs hover:shadow-xs',
         isActive
           ? 'bg-primary/10 border-primary/40 shadow-xs'
-          : 'bg-surface1/90 hover:bg-surface2/90 border-border/80 hover:border-border-accent'
+          : 'bg-surface1/90 hover:bg-surface2/90 border-border hover:border-border-accent'
       )}
     >
       <div className="flex items-center justify-between gap-3">

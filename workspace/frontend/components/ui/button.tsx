@@ -17,9 +17,9 @@ const buttonVariants = cva(
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/90 data-[state=open]:bg-secondary/90',
         outline:
-          'bg-background text-foreground border border-border/80 hover:bg-surface2 hover:text-foreground data-[state=open]:bg-surface2',
+          'bg-background text-foreground border border-border hover:bg-surface2 hover:text-foreground data-[state=open]:bg-surface2',
         dashed:
-          'text-foreground border border-border/80 border-dashed bg-background hover:bg-surface2 hover:text-foreground data-[state=open]:text-foreground',
+          'text-foreground border border-border border-dashed bg-background hover:bg-surface2 hover:text-foreground data-[state=open]:text-foreground',
         ghost:
           'text-foreground-muted hover:text-foreground hover:bg-surface2 data-[state=open]:bg-surface2 data-[state=open]:text-foreground',
         dim: 'text-muted-foreground hover:text-foreground data-[state=open]:text-foreground',

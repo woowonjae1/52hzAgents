@@ -100,7 +100,7 @@ export function EmptyState() {
               'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-2xs',
               isSelected
                 ? 'border-border-accent bg-surface2 text-foreground'
-                : 'border-border/70 bg-surface2/60 text-muted-foreground hover:text-foreground hover:bg-surface2'
+                : 'border-border bg-surface2/60 text-muted-foreground hover:text-foreground hover:bg-surface2'
             )}
           >
             <AgentAvatar name={agent.agentName} size={20} />
@@ -184,7 +184,7 @@ export function EmptyState() {
           </div>
 
           {/* Manual pairing command */}
-          <div className="w-full bg-surface1/60 border border-border/80 rounded-xl p-3 mt-3 text-left">
+          <div className="w-full bg-surface1/60 border border-border rounded-xl p-3 mt-3 text-left">
             <div className="text-2xs text-foreground-extra-muted font-mono mb-1 flex items-center justify-between">
               <span>Or connect from the command line:</span>
               <button

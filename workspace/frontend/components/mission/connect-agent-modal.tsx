@@ -144,7 +144,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
           </div>
 
           {/* Section 2: Remote Pairing Command */}
-          <div className="space-y-2.5 pt-2 border-t border-border/80">
+          <div className="space-y-2.5 pt-2 border-t border-border">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-medium text-foreground-muted flex items-center gap-1.5">
                 <Globe className="size-3.5" />

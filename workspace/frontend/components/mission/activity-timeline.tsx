@@ -147,7 +147,7 @@ export function ActivityTimeline({
   return (
     <aside
       className={cn(
-        'flex flex-col h-full bg-surface1 border-l border-border/40 overflow-hidden',
+        'flex flex-col h-full bg-surface1 border-l border-border/60 overflow-hidden',
         className
       )}
     >
@@ -214,7 +214,7 @@ export function ActivityTimeline({
       </div>
 
       {/* Timeline Stream */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-3 divide-y divide-border/40">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-3 divide-y divide-border/60">
         {loading && events.length === 0 ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -237,7 +237,7 @@ export function ActivityTimeline({
                   A FEED ROW IS A ROW, NOT A CARD.
 
                   This was `rounded-xl` + `bg-surface1/60` + `border
-                  border-border/20` + `shadow-2xs` on EVERY entry, so a
+                  border-border/60` + `shadow-2xs` on EVERY entry, so a
                   chronological list of six things rendered as six stacked
                   bordered boxes -- which is most of what "too many dividers"
                   means on this screen. A border, a fill and a shadow are three

@@ -110,7 +110,7 @@ function Attachments({ items }: { items: Attachment[] }) {
               key={img.fileId}
               type="button"
               onClick={() => openPreview(img.fileId)}
-              className="block rounded-xl overflow-hidden border border-border/70 hover:border-primary/40 hover:shadow-md transition-all max-w-sm cursor-pointer text-left shadow-2xs"
+              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md transition-all max-w-sm cursor-pointer text-left shadow-2xs"
             >
               <img
                 src={img.url}
@@ -129,7 +129,7 @@ function Attachments({ items }: { items: Attachment[] }) {
             return (
               <div
                 key={file.fileId}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border/80 bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs group"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface2 hover:bg-surface3 transition-colors text-xs font-medium shadow-2xs group"
               >
                 <Hint label="View in Files">
                   <button
@@ -401,7 +401,7 @@ export const ChatMessage = memo(function ChatMessage({ message, agents = [], isA
     return (
       <div className="flex justify-center py-2">
         <span className={cn(
-          'text-xs font-mono px-3 py-0.5 rounded-full border border-border/40 bg-surface1/60',
+          'text-xs font-mono px-3 py-0.5 rounded-full border border-border/60 bg-surface1/60',
           isQueued
             ? 'text-foreground-muted'
             : 'text-muted-foreground'

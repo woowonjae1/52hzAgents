@@ -86,7 +86,7 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`mention-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border/70 text-foreground font-medium text-2xs align-baseline shadow-2xs"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs align-baseline shadow-2xs"
               style={{ color }}
             >
               <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
@@ -150,7 +150,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
   const components: Components = useMemo(() => ({
     // Block elements
     h1: ({ children }) => (
-      <h1 className="text-[18px] font-semibold mt-6 mb-3 pb-1.5 border-b border-border/50 first:mt-0 tracking-tight text-foreground">{children}</h1>
+      <h1 className="text-[18px] font-semibold mt-6 mb-3 pb-1.5 border-b border-border/60 first:mt-0 tracking-tight text-foreground">{children}</h1>
     ),
     h2: ({ children }) => (
       <h2 className="text-[16px] font-semibold mt-5 mb-2.5 first:mt-0 tracking-tight text-foreground">{children}</h2>
@@ -182,12 +182,12 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
     // Tables
     table: ({ children }) => (
-      <div className="overflow-x-auto my-3.5 rounded-lg border border-border/80 shadow-2xs">
+      <div className="overflow-x-auto my-3.5 rounded-lg border border-border shadow-2xs">
         <table className="w-full text-xs text-left border-collapse">{children}</table>
       </div>
     ),
-    thead: ({ children }) => <thead className="bg-surface2/90 text-foreground font-semibold border-b border-border/80">{children}</thead>,
-    tbody: ({ children }) => <tbody className="divide-y divide-border/40 bg-surface1/40">{children}</tbody>,
+    thead: ({ children }) => <thead className="bg-surface2/90 text-foreground font-semibold border-b border-border">{children}</thead>,
+    tbody: ({ children }) => <tbody className="divide-y divide-border/60 bg-surface1/40">{children}</tbody>,
     tr: ({ children }) => <tr className="hover:bg-surface2/50 transition-colors">{children}</tr>,
     th: ({ children }) => <th className="px-3.5 py-2.5 text-xs font-semibold text-foreground tracking-tight">{children}</th>,
     td: ({ children }) => <td className="px-3.5 py-2 text-xs text-foreground/90 leading-relaxed">{children}</td>,
@@ -198,7 +198,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       if (isInline) {
         return (
           <code
-            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border/70 inline align-baseline font-normal shadow-2xs mx-0.5"
+            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal shadow-2xs mx-0.5"
             {...props}
           >
             {children}
@@ -281,7 +281,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
       // Modern IDE-grade Code Block (Optimized for both Light & Dark themes)
       return (
-        <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border/80 dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono shadow-xs dark:shadow-md">
+        <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono shadow-xs dark:shadow-md">
           <div className="flex items-center justify-between px-3.5 py-2 bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 mr-1 opacity-80">

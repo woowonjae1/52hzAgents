@@ -546,7 +546,7 @@ export function AgentProfilePanel() {
                           setIsEnteringCustom(true);
                           setCustomModelInput(currentModel || '');
                         }}
-                        className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/30 mt-1"
+                        className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/60 mt-1"
                       >
                         <span>Custom model…</span>
                       </DropdownMenuItem>
@@ -560,7 +560,7 @@ export function AgentProfilePanel() {
 
           {/* Token Usage & Context Capacity Card */}
           <div className="rounded-lg border overflow-hidden">
-            <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-border/40">
+            <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-border/60">
               <div className="flex items-center gap-1.5">
                 <Coins className="size-3 text-primary" />
                 <span className="text-xs font-medium">Token Usage & Context</span>
@@ -579,13 +579,13 @@ export function AgentProfilePanel() {
             </div>
             <div className="p-3.5 space-y-2.5">
               <div className="grid grid-cols-2 gap-2 text-2xs">
-                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/60">
                   <div className="text-3xs text-muted-foreground">Context Window</div>
                   <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
                     {fmtWindow(usage?.context_window_size)}
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/60">
                   <div className="text-3xs text-muted-foreground">Last Prompt</div>
                   <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
                     {usage?.last_prompt_tokens ? fmtTokens(usage.last_prompt_tokens) : '—'}
@@ -594,13 +594,13 @@ export function AgentProfilePanel() {
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-2xs">
-                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/60">
                   <div className="text-3xs text-muted-foreground">Total Tokens</div>
                   <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
                     {usage?.total_tokens ? fmtTokens(usage.total_tokens) : '—'}
                   </div>
                 </div>
-                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/60">
                   <div className="text-3xs text-muted-foreground">Prompt / Comp</div>
                   <div className="font-mono text-3xs tabular-nums text-muted-foreground mt-0.5 truncate">
                     {usage?.total_prompt_tokens || usage?.total_completion_tokens

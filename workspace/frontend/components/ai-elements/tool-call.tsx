@@ -75,7 +75,7 @@ export function ToolCall({
   return (
     <div
       className={cn(
-        'my-1.5 rounded-xl border border-border/70 bg-surface1/60 overflow-hidden shadow-2xs transition-all',
+        'my-1.5 rounded-xl border border-border bg-surface1/60 overflow-hidden shadow-2xs transition-all',
         className
       )}
     >
@@ -108,7 +108,7 @@ export function ToolCall({
           </span>
 
           {query && (
-            <span className="font-mono text-2xs px-2 py-0.5 rounded-md bg-surface2 text-foreground-muted truncate max-w-xs border border-border/50">
+            <span className="font-mono text-2xs px-2 py-0.5 rounded-md bg-surface2 text-foreground-muted truncate max-w-xs border border-border/60">
               {query}
             </span>
           )}

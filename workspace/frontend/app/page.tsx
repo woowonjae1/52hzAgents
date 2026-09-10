@@ -486,7 +486,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 
   return (
     <Card
-      className="cursor-pointer border border-border/80 dark:border-border/80 bg-card hover:border-border-accent hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
+      className="cursor-pointer border border-border dark:border-border bg-card hover:border-border-accent hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
       onClick={() => enterWorkspace(workspace, router)}
     >
       <CardContent className="p-4 space-y-4">
@@ -497,7 +497,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
               ID: {workspace.slug}
             </p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-border/50 dark:border-border/40 bg-surface1/50">
+          <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-full border border-border/60 dark:border-border/60 bg-surface1/50">
             <span className={`size-1.5 rounded-full ${workspace.status === 'active' ? 'bg-status-success' : 'bg-foreground-muted'}`} />
             <span className="text-3xs font-medium text-foreground-muted capitalize">{workspace.status}</span>
           </div>
@@ -628,7 +628,7 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
       {/* Content */}
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         {/* Actions bar */}
-        <div className="flex items-center justify-between border-b border-border/40 dark:border-border/40 pb-4">
+        <div className="flex items-center justify-between border-b border-border/60 dark:border-border/60 pb-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">Manage Workspaces</h2>
             <p className="text-xs text-muted-foreground mt-0.5">

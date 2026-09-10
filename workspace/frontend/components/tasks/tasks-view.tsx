@@ -405,7 +405,7 @@ export function TasksView() {
             >
               <ListTodo className="size-3.5" />
               <span>Tasks</span>
-              <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/50">
+              <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/60">
                 {filteredTodos.length}
               </span>
             </button>
@@ -421,7 +421,7 @@ export function TasksView() {
             >
               <CalendarClock className="size-3.5" />
               <span>Schedules</span>
-              <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/50">
+              <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/60">
                 {routines.length}
               </span>
             </button>
@@ -452,7 +452,7 @@ export function TasksView() {
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border/70 bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+                className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
               />
               {searchQuery && (
                 <button
@@ -615,7 +615,7 @@ export function TasksView() {
               )}
 
               {filteredTodos.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border/70 p-8 space-y-2">
+                <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border p-8 space-y-2">
                   <p className="text-sm font-medium text-foreground">No tasks found</p>
                   <p className="text-xs text-foreground-extra-muted max-w-sm">
                     {searchQuery
@@ -641,7 +641,7 @@ export function TasksView() {
                           <h3 className="text-xs font-semibold text-foreground tracking-tight">
                             {group.title}
                           </h3>
-                          <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/40">
+                          <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/60">
                             {group.items.length}
                           </span>
                         </div>
@@ -662,7 +662,7 @@ export function TasksView() {
                       </div>
 
                       {/* Issue rows */}
-                      <div className="overflow-hidden rounded-xl border border-border/80 bg-surface1/60 divide-y divide-border/60 shadow-xs">
+                      <div className="overflow-hidden rounded-xl border border-border bg-surface1/60 divide-y divide-border/60 shadow-xs">
                         {group.items.map((todo) => {
                           const overdue = isOverdue(todo, now);
                           const failureReason = getTaskFailureReason(todo, routines);
@@ -862,7 +862,7 @@ export function TasksView() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="font-medium text-foreground-muted">Priority</label>
-                  <div className="flex items-center gap-1.5 p-1 rounded-lg border border-border/70 bg-surface2/60">
+                  <div className="flex items-center gap-1.5 p-1 rounded-lg border border-border bg-surface2/60">
                     <PrioritySelector priority={priority} onChange={setPriority} />
                     <span className="text-xs font-medium text-foreground capitalize">{priority}</span>
                   </div>
@@ -870,7 +870,7 @@ export function TasksView() {
 
                 <div className="space-y-1">
                   <label className="font-medium text-foreground-muted">Status</label>
-                  <div className="flex items-center gap-1.5 p-1 rounded-lg border border-border/70 bg-surface2/60">
+                  <div className="flex items-center gap-1.5 p-1 rounded-lg border border-border bg-surface2/60">
                     <StatusSelector status={status} onChange={setStatus} />
                     <span className="text-xs font-medium text-foreground">{STATUS_LABEL[status]}</span>
                   </div>
@@ -904,7 +904,7 @@ export function TasksView() {
               <div className="space-y-1">
                 <label className="font-medium text-foreground-muted">Channel / Session</label>
                 {editing ? (
-                  <p className="h-8 flex items-center px-2 rounded-lg border border-border/50 bg-surface2/30 text-xs text-foreground-muted">
+                  <p className="h-8 flex items-center px-2 rounded-lg border border-border/60 bg-surface2/30 text-xs text-foreground-muted">
                     {channel || 'general'}
                   </p>
                 ) : (

@@ -41,7 +41,7 @@ export function SubagentList({
   return (
     <div
       className={cn(
-        'my-2 rounded-2xl border border-border/80 bg-surface1/75 backdrop-blur-md p-3.5 shadow-xs space-y-3 transition-all',
+        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3.5 shadow-xs space-y-3 transition-all',
         className
       )}
     >
@@ -79,7 +79,7 @@ export function SubagentList({
               key={index}
               onClick={() => onAgentClick?.(agent, index)}
               className={cn(
-                'group flex flex-col justify-between rounded-xl border border-border/70 bg-surface2/70 p-3 transition-all duration-200',
+                'group flex flex-col justify-between rounded-xl border border-border bg-surface2/70 p-3 transition-all duration-200',
                 isRunning && 'border-primary/40 shadow-xs shadow-primary/5',
                 onAgentClick && 'cursor-pointer hover:border-border hover:bg-surface2'
               )}
@@ -158,7 +158,7 @@ export function SubagentList({
 
       {/* Summary Agent Card (Optional) */}
       {(showSummary || summaryAgent) && (
-        <div className="rounded-xl border border-border/80 bg-primary/5 p-3 flex items-center justify-between gap-3">
+        <div className="rounded-xl border border-border bg-primary/5 p-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
               <Sparkles className="size-3.5" />

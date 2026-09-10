@@ -73,7 +73,7 @@ export function ToolTimeline({
   return (
     <div
       className={cn(
-        'my-2 rounded-2xl border border-border/80 bg-surface1/75 backdrop-blur-md p-3 shadow-xs space-y-2.5 transition-all',
+        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3 shadow-xs space-y-2.5 transition-all',
         className
       )}
     >
@@ -130,7 +130,7 @@ export function ToolTimeline({
                     {renderStepIcon(step.icon)}
                   </span>
                   <span className="font-semibold text-foreground">{step.verb}</span>
-                  <span className="font-mono text-2xs px-2 py-0.5 rounded-md bg-surface2 text-foreground-muted border border-border/50 truncate">
+                  <span className="font-mono text-2xs px-2 py-0.5 rounded-md bg-surface2 text-foreground-muted border border-border/60 truncate">
                     {step.chip}
                   </span>
                 </div>

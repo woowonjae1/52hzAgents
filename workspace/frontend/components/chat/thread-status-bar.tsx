@@ -155,7 +155,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
               <X className="size-3" />
             </button>
           </div>
-          <div className="max-h-48 overflow-y-auto divide-y divide-border/50">
+          <div className="max-h-48 overflow-y-auto divide-y divide-border/60">
             {channelTodos.map((todo) => (
               <div key={todo.id || todo.content} className="flex items-start gap-2 py-1.5 px-1">
                 {todo.status === 'in_progress' ? (

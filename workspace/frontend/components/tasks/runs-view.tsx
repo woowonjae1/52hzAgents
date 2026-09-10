@@ -96,7 +96,7 @@ export function RunsView() {
             placeholder="Search execution runs by ID, agent, trigger..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border/70 bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+            className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
           />
           {searchQuery && (
             <button
@@ -136,7 +136,7 @@ export function RunsView() {
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="max-w-5xl mx-auto space-y-3">
           {filteredRuns.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border/70 p-8 space-y-2">
+            <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border p-8 space-y-2">
               <History className="size-8 text-foreground-extra-muted opacity-60" />
               <p className="text-sm font-medium text-foreground">
                 {loading ? 'Loading execution records…' : 'No execution records found'}
@@ -156,7 +156,7 @@ export function RunsView() {
               return (
                 <div
                   key={run.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border/80 bg-surface1/60 hover:bg-surface1 hover:border-border transition-all shadow-xs"
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface1/60 hover:bg-surface1 hover:border-border transition-all shadow-xs"
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {/* Status Icon */}
@@ -173,7 +173,7 @@ export function RunsView() {
                     {/* Run ID & Details */}
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-surface2 border border-border/70 text-foreground">
+                        <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-surface2 border border-border text-foreground">
                           TASK-{run.routineShortId}.#{run.runNumber}
                         </span>
 
@@ -215,7 +215,7 @@ export function RunsView() {
                   </div>
 
                   {/* Right Side: Timestamps & Action */}
-                  <div className="flex items-center gap-4 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-border/40">
+                  <div className="flex items-center gap-4 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
                     <div className="text-right text-3xs text-foreground-extra-muted space-y-0.5">
                       <div
                         className="flex items-center justify-end gap-1"

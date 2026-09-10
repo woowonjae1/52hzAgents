@@ -229,7 +229,7 @@ export function AgentTerminal() {
       `}</style>
 
       {/* Header */}
-      <div className="relative z-10 flex items-center justify-between pl-3.5 pr-12 h-11 shrink-0 border-b border-border/70 bg-primary/40 backdrop-blur-md select-none">
+      <div className="relative z-10 flex items-center justify-between pl-3.5 pr-12 h-11 shrink-0 border-b border-border bg-primary/40 backdrop-blur-md select-none">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="size-2.5 rounded-full bg-[#ff5f57]" />
@@ -248,7 +248,7 @@ export function AgentTerminal() {
           </span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-primary/70 border border-border/70 focus-within:border-border-accent transition-colors">
+          <div className="flex items-center gap-1.5 px-2 h-6 rounded-md bg-primary/70 border border-border focus-within:border-border-accent transition-colors">
             <Search className="size-3 text-foreground-muted" />
             <input
               value={filter}
@@ -317,7 +317,7 @@ export function AgentTerminal() {
                     {line.type === 'command' ? highlightCommand(line.content) : line.content}
                   </span>
                   {line.commandArgs && (
-                    <pre className="mt-1 mb-0.5 p-2 rounded-md bg-black/40 border border-border/70 text-3xs text-foreground-muted overflow-x-auto max-h-40 whitespace-pre scrollbar-thin">
+                    <pre className="mt-1 mb-0.5 p-2 rounded-md bg-black/40 border border-border text-3xs text-foreground-muted overflow-x-auto max-h-40 whitespace-pre scrollbar-thin">
                       {line.commandArgs}
                     </pre>
                   )}
@@ -331,15 +331,15 @@ export function AgentTerminal() {
 
       {/* Working banner */}
       {sending && (
-        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent/50 text-status-warning text-3xs select-none">
+        <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 bg-primary/40 border-t border-border-accent text-status-warning text-3xs select-none">
           <RefreshCw className="size-3 animate-spin" />
           <span>executing on workspace host…</span>
         </div>
       )}
 
       {/* Prompt */}
-      <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-border/70 bg-primary/40 backdrop-blur-md">
-        <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-primary/80 border border-border/70 focus-within:border-border-accent transition-colors">
+      <div className="relative z-10 shrink-0 px-3 py-2.5 border-t border-border bg-primary/40 backdrop-blur-md">
+        <div className="flex items-center gap-2 px-2.5 h-9 rounded-lg bg-primary/80 border border-border focus-within:border-border-accent transition-colors">
           <span className="shrink-0 select-none font-medium text-2xs text-status-success">
             52hz@agents
           </span>

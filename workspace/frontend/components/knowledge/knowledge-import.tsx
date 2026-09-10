@@ -270,7 +270,7 @@ function StatusChip({ doc }: { doc: ParsedDoc }) {
 /** Skeleton row matching the parsed-document card while files are read. */
 function DocSkeleton() {
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-border/70 bg-surface1 p-4 shadow-sm">
+    <div className="flex items-start gap-3 rounded-xl border border-border bg-surface1 p-4 shadow-sm">
       <div className="size-8 shrink-0 rounded-lg bg-surface3 animate-pulse" />
       <div className="min-w-0 flex-1 space-y-2">
         <div className="h-3.5 w-1/3 rounded bg-surface3 animate-pulse" />
@@ -412,12 +412,12 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
   const errorCount = docs.filter((d) => d.error).length;
 
   const selectClass =
-    'cursor-pointer rounded-lg border border-border/70 bg-surface1 px-2 py-1 text-xs text-foreground shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+    'cursor-pointer rounded-lg border border-border bg-surface1 px-2 py-1 text-xs text-foreground shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v && !importing) onClose(); }}>
       <DialogContent className="sm:max-w-2xl gap-0 p-0 overflow-hidden">
-        <DialogHeader className="mb-0 border-b border-border/70 px-6 py-4">
+        <DialogHeader className="mb-0 border-b border-border px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface2 text-foreground-muted">
               <BookOpen className="size-4" />
@@ -452,7 +452,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                         'flex items-start gap-3 rounded-xl border bg-surface1 p-4 shadow-sm transition-all duration-200 hover:shadow-md',
                         doc.error
                           ? 'border-status-danger/25'
-                          : 'border-border/70',
+                          : 'border-border',
                       )}
                     >
                       <span
@@ -553,7 +553,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
           )}
         </div>
 
-        <DialogFooter className="border-t border-border/70 bg-surface2/50 px-6 py-4 pt-4">
+        <DialogFooter className="border-t border-border bg-surface2/50 px-6 py-4 pt-4">
           <Button variant="ghost" onClick={onClose} disabled={importing}>Cancel</Button>
           <Button onClick={handleImport} disabled={importing || parsing || importable.length === 0}>
             {importing ? 'Importing...' : `Import ${importable.length || ''}`.trim()}

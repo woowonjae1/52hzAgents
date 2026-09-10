@@ -151,7 +151,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
     <div
       style={{ width: isFullscreen ? '100vw' : `${canvasWidth}px` }}
       className={cn(
-        'relative flex flex-col bg-surface1 border-l border-border/80 h-full select-text transition-all duration-75 z-20 shrink-0',
+        'relative flex flex-col bg-surface1 border-l border-border h-full select-text transition-all duration-75 z-20 shrink-0',
         /* Stops at the titlebar rather than covering it: the window stays
            draggable and the native caption buttons stay reachable while the
            canvas is expanded, which is also why the header below no longer
@@ -171,7 +171,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
           {/* Subtle Hover Glow Line */}
           <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
           {/* Central Grip Indicator */}
-          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border/80 shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
+          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
             <div className="size-1 rounded-full bg-foreground-extra-muted" />
             <div className="size-1 rounded-full bg-foreground-extra-muted" />
             <div className="size-1 rounded-full bg-foreground-extra-muted" />
@@ -205,7 +205,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={handleCopy}
-              className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             >
               {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
             </button>
@@ -214,7 +214,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={handleDownload}
-              className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             >
               <Download className="size-3.5" />
             </button>
@@ -223,7 +223,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={() => setIsFullscreen((prev) => !prev)}
-              className="size-7 rounded-lg border border-border/50 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             >
               {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
@@ -234,7 +234,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={closeCanvas}
-              className="size-7 rounded-lg border border-border/50 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer shadow-2xs"
             >
               <PanelRightClose className="size-3.5" />
             </button>
@@ -243,7 +243,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
       </div>
 
       {/* ── Mode Navigation Tabs ── */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-surface1 text-2xs shrink-0 gap-2 flex-nowrap overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 text-2xs shrink-0 gap-2 flex-nowrap overflow-hidden">
         <div className="flex items-center gap-1 shrink-0 overflow-x-auto no-scrollbar">
           <button
             type="button"
@@ -305,7 +305,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
         )}
 
         {activeTab === 'raw' && (
-          <div className="font-mono text-2xs leading-relaxed bg-surface2/60 p-4 rounded-xl border border-border/70 overflow-x-auto whitespace-pre select-all text-foreground">
+          <div className="font-mono text-2xs leading-relaxed bg-surface2/60 p-4 rounded-xl border border-border overflow-x-auto whitespace-pre select-all text-foreground">
             {activeArtifact.content}
           </div>
         )}
@@ -329,7 +329,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
                 {annotations.map((ann) => (
                   <div
                     key={ann.id}
-                    className="p-3.5 rounded-xl bg-surface2/80 border border-border/70 shadow-2xs space-y-2"
+                    className="p-3.5 rounded-xl bg-surface2/80 border border-border shadow-2xs space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
@@ -365,7 +365,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
                 <select
                   value={selectedAgent}
                   onChange={(e) => setSelectedAgent(e.target.value)}
-                  className="px-2 py-1 rounded bg-surface2 border border-border/70 text-2xs text-foreground outline-none cursor-pointer"
+                  className="px-2 py-1 rounded bg-surface2 border border-border text-2xs text-foreground outline-none cursor-pointer"
                 >
                   <option value="claude">@claude (Reviewer)</option>
                   <option value="antigravity">@antigravity (Architect)</option>
@@ -379,7 +379,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a review note, suggestion, or critique for this artifact..."
                   rows={2}
-                  className="flex-1 p-2.5 rounded-xl bg-surface2 border border-border/70 text-xs text-foreground outline-none resize-none focus:border-primary/50"
+                  className="flex-1 p-2.5 rounded-xl bg-surface2 border border-border text-xs text-foreground outline-none resize-none focus:border-primary/50"
                 />
                 <button
                   type="submit"

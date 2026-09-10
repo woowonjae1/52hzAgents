@@ -46,7 +46,7 @@ export function TerminalBlock({
         'my-2 rounded-2xl overflow-hidden border shadow-xs transition-all font-mono',
         isInk
           ? 'bg-neutral-950 text-neutral-200 border-neutral-800'
-          : 'bg-surface1/90 text-foreground border-border/80 backdrop-blur-md',
+          : 'bg-surface1/90 text-foreground border-border backdrop-blur-md',
         className
       )}
     >

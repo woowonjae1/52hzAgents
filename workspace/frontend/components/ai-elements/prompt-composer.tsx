@@ -461,7 +461,7 @@ export function PromptComposer({
             animate={{ opacity: 1, y: 0 }}
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 6 }}
             transition={{ duration: 0.15 }}
-            className="absolute bottom-full left-0 right-0 mb-2 z-50 rounded-2xl bg-surface1/95 backdrop-blur-xl border border-border/80 shadow-xl max-h-72 overflow-y-auto p-1.5 space-y-1"
+            className="absolute bottom-full left-0 right-0 mb-2 z-50 rounded-2xl bg-surface1/95 backdrop-blur-xl border border-border shadow-xl max-h-72 overflow-y-auto p-1.5 space-y-1"
           >
             {mentionGroups.agents.length > 0 && (
               <div>
@@ -517,7 +517,7 @@ export function PromptComposer({
                                 Online
                               </span>
                             ) : (
-                              <span className="text-3xs px-1.5 py-0.5 rounded-full font-mono text-muted-foreground/60 bg-surface2 border border-border/30 shrink-0">
+                              <span className="text-3xs px-1.5 py-0.5 rounded-full font-mono text-muted-foreground/60 bg-surface2 border border-border/60 shrink-0">
                                 Not connected
                               </span>
                             )}
@@ -640,10 +640,10 @@ export function PromptComposer({
                     <img
                       src={pf.preview}
                       alt={pf.file.name}
-                      className="size-7 rounded-lg object-cover border border-border/50 shrink-0"
+                      className="size-7 rounded-lg object-cover border border-border/60 shrink-0"
                     />
                   ) : (
-                    <span className="size-7 rounded-lg bg-surface1 border border-border/50 flex items-center justify-center shrink-0 text-muted-foreground">
+                    <span className="size-7 rounded-lg bg-surface1 border border-border/60 flex items-center justify-center shrink-0 text-muted-foreground">
                       <FileIcon className="size-3.5" />
                     </span>
                   )}
@@ -754,7 +754,7 @@ export function PromptComposer({
                 }}
                 className={cn(
                   pillButton,
-                  showMentions && 'bg-surface3 text-foreground font-medium border border-border/70'
+                  showMentions && 'bg-surface3 text-foreground font-medium border border-border'
                 )}
               >
                 <AtSign className="size-3.5 shrink-0 text-foreground-extra-muted" />
@@ -782,7 +782,7 @@ export function PromptComposer({
                 className={cn(
                   pillButton,
                   'size-7 px-0 justify-center',
-                  pendingFiles.length > 0 && 'bg-surface3 text-foreground font-medium border border-border/70'
+                  pendingFiles.length > 0 && 'bg-surface3 text-foreground font-medium border border-border'
                 )}
               >
                 <Paperclip className="size-3.5 shrink-0 text-foreground-extra-muted" />
@@ -828,7 +828,7 @@ export function PromptComposer({
                     ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-xs'
                     : canSend
                     ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs active:scale-95'
-                    : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/30'
+                    : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/60'
                 )}
               >
                 <AnimatePresence mode="wait" initial={false}>

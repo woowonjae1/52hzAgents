@@ -123,7 +123,7 @@ export function PipelineStepper({
                         ? 'bg-primary/10 text-primary border-primary/30 font-semibold shadow-2xs'
                         : isRetrying
                           ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
-                          : 'bg-surface2 text-foreground-extra-muted border-border/40'
+                          : 'bg-surface2 text-foreground-extra-muted border-border/60'
                   )}
                   title={step.instruction || `@${step.agent}`}
                 >

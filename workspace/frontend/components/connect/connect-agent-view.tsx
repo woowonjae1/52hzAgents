@@ -352,7 +352,7 @@ function LocalAgentsTab({
                 'flex items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all shadow-xs',
                 isSelected
                   ? 'border-primary bg-surface1/50'
-                  : 'border-border/80 dark:border-border/80 hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10',
+                  : 'border-border dark:border-border hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10',
               )}
             >
               <div className="size-8 shrink-0 flex items-center justify-center">
@@ -401,7 +401,7 @@ function LocalAgentsTab({
           {/* Connection methods */}
           <div className="p-6 flex flex-col items-center text-center space-y-6">
             {/* Agent Large Cover Image */}
-            <div className="size-20 flex items-center justify-center rounded-2xl bg-card shadow-md border border-border/60 dark:border-border/80 p-3 relative group overflow-hidden">
+            <div className="size-20 flex items-center justify-center rounded-2xl bg-card shadow-md border border-border/60 dark:border-border p-3 relative group overflow-hidden">
               <AgentIcon name={selectedEntry.name} size={52} />
             </div>
 
@@ -522,7 +522,7 @@ function CloudAgentsTab({
           All providers
         </button>
 
-        <div className="rounded-xl border border-border/80 dark:border-border/80 bg-card overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="rounded-xl border border-border dark:border-border bg-card overflow-hidden shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="px-4 py-3.5 border-b border-border/60/40 bg-surface1/40">
             <div className="flex items-center gap-2.5">
               <div className="size-8 flex items-center justify-center shrink-0">
@@ -614,9 +614,9 @@ function CloudAgentsTab({
                   <span className="ms-auto text-3xs font-mono px-1.5 py-0.5 rounded bg-surface3 text-foreground-muted">Coming Soon</span>
                 </button>
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 border-t border-border/50" />
+                  <div className="flex-1 border-t border-border/60" />
                   <span className="text-2xs font-mono font-medium text-muted-foreground">or use API key</span>
-                  <div className="flex-1 border-t border-border/50" />
+                  <div className="flex-1 border-t border-border/60" />
                 </div>
               </>
             )}
@@ -697,7 +697,7 @@ function CloudAgentsTab({
           <div key={group.label}>
             <div className="flex items-center gap-2 mb-1.5 px-0.5">
               <span className="text-3xs font-medium text-foreground-extra-muted ">{group.label}</span>
-              <div className="flex-1 border-t border-border/50" />
+              <div className="flex-1 border-t border-border/60" />
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {groupProviders.map((p) => {
@@ -705,7 +705,7 @@ function CloudAgentsTab({
                   <button
                     key={p.name}
                     onClick={() => onSelectProvider(p.name)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border/80 dark:border-border/80 hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10 text-left transition-all shadow-xs"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border dark:border-border hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10 text-left transition-all shadow-xs"
                   >
                     <div className="size-6 shrink-0 flex items-center justify-center">
                       <ProviderIcon name={p.name} size={22} />
@@ -727,7 +727,7 @@ function CloudAgentsTab({
         <div className="space-y-2 mt-5">
           <div className="flex items-center gap-2 px-1">
             <span className="text-3xs font-medium text-foreground-extra-muted ">Connected</span>
-            <div className="flex-1 border-t border-border/50" />
+            <div className="flex-1 border-t border-border/60" />
           </div>
           {cloudAgents.map((agent) => {
             const name = agent.agentName || 'agent';
@@ -737,7 +737,7 @@ function CloudAgentsTab({
             return (
               <div
                 key={name}
-                className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border border-border/80 dark:border-border/80 bg-card shadow-xs"
+                className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border border-border dark:border-border bg-card shadow-xs"
               >
                 <div className="size-7 flex items-center justify-center shrink-0">
                   <ProviderIcon name={providerName} size={28} />

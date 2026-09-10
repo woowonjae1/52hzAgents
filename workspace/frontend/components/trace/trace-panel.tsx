@@ -294,7 +294,7 @@ export function TracePanel() {
   return (
     <div className="flex flex-col h-full bg-surface0 text-foreground text-xs select-text overflow-hidden">
       {/* ── Top Header Bar ── */}
-      <div className="flex items-center justify-between pl-4 pr-12 py-2.5 border-b border-border/70 bg-surface1/60 backdrop-blur-md shrink-0 select-none">
+      <div className="flex items-center justify-between pl-4 pr-12 py-2.5 border-b border-border bg-surface1/60 backdrop-blur-md shrink-0 select-none">
         <div className="flex items-center gap-2 min-w-0">
           <div className="size-6.5 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Activity className="size-3.5" />
@@ -335,7 +335,7 @@ export function TracePanel() {
       </div>
 
       {/* ── Filter & Search Toolbar ── */}
-      <div className="flex flex-col gap-2 p-3 border-b border-border/50 bg-surface1/30 shrink-0">
+      <div className="flex flex-col gap-2 p-3 border-b border-border/60 bg-surface1/30 shrink-0">
         {/* Search input + Stats Pills */}
         <div className="flex items-center gap-2">
           <div className="flex-1 flex items-center gap-1.5 px-2.5 h-7 rounded-lg bg-surface2/80 border border-border/60 focus-within:border-border-accent transition-colors">
@@ -349,11 +349,11 @@ export function TracePanel() {
           </div>
 
           <div className="flex items-center gap-1 text-3xs font-mono text-foreground-extra-muted shrink-0">
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface2 border border-border/40">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface2 border border-border/60">
               <Wrench className="size-2.5 shrink-0" aria-hidden />
               {stats.tools}
             </span>
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface2 border border-border/40">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface2 border border-border/60">
               <Brain className="size-2.5 shrink-0" aria-hidden />
               {stats.thinking}
             </span>
@@ -420,7 +420,7 @@ export function TracePanel() {
             <select
               value={agentFilter}
               onChange={(e) => setAgentFilter(e.target.value)}
-              className="px-2 py-0.5 rounded-lg bg-surface2 border border-border/70 text-3xs font-medium text-foreground outline-none cursor-pointer max-w-[110px] truncate"
+              className="px-2 py-0.5 rounded-lg bg-surface2 border border-border text-3xs font-medium text-foreground outline-none cursor-pointer max-w-[110px] truncate"
             >
               <option value="all">@All Agents</option>
               {traceAgents.map((agentName) => (
@@ -452,7 +452,7 @@ export function TracePanel() {
       >
         {filteredSteps.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-foreground-muted select-none">
-            <div className="size-10 rounded-2xl bg-surface2 border border-border/80 flex items-center justify-center mb-2.5">
+            <div className="size-10 rounded-2xl bg-surface2 border border-border flex items-center justify-center mb-2.5">
               <Activity className="size-5 text-foreground-extra-muted" />
             </div>
             <p className="text-xs font-semibold text-foreground">No trace events found</p>
@@ -576,7 +576,7 @@ function TraceStepCard({ step, agents }: { step: WorkspaceMessage; agents?: Work
   }
 
   return (
-    <div className="rounded-xl border border-border/40 bg-surface1/40 p-2 text-3xs flex items-center justify-between">
+    <div className="rounded-xl border border-border/60 bg-surface1/40 p-2 text-3xs flex items-center justify-between">
       <div className="flex items-center gap-1.5 text-foreground-muted min-w-0">
         <AgentAvatar name={step.senderName} size={12} />
         <span className="font-semibold text-foreground shrink-0">@{step.senderName}</span>

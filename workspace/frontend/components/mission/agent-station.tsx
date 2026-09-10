@@ -234,7 +234,7 @@ export function AgentStation({
         */
         !isCatalogPlaceholder && 'min-h-[220px]',
         'bg-surface1 transition-colors duration-150',
-        'border border-border/30 hover:border-border/60 hover:shadow-xs',
+        'border border-border/60 hover:border-border/60 hover:shadow-xs',
         isBlocked && 'ring-2 ring-status-warning/20 bg-status-warning/[0.02]',
         isStalled && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
         isHeartbeatTimeout && 'border-status-warning/30',

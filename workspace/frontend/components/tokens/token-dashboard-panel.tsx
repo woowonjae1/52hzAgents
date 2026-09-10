@@ -134,7 +134,7 @@ export function TokenDashboardPanel() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Workspace Summary Cards */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="p-3 rounded-xl bg-surface1/80 border border-border/50 shadow-2xs">
+          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-2xs">
             <div className="text-3xs font-medium uppercase tracking-wider text-foreground-muted">Total Usage</div>
             <div className="mt-1 text-base font-bold font-mono tabular-nums text-foreground">
               {totalTokens > 0 ? fmtTokens(totalTokens) : '—'}
@@ -144,7 +144,7 @@ export function TokenDashboardPanel() {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-surface1/80 border border-border/50 shadow-2xs">
+          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-2xs">
             <div className="text-3xs font-medium uppercase tracking-wider text-foreground-muted">Compaction Checkpoints</div>
             <div className="mt-1 text-base font-bold font-mono tabular-nums text-foreground">
               {compactionRuns}
@@ -168,7 +168,7 @@ export function TokenDashboardPanel() {
           </div>
 
           {(!stats?.channels || stats.channels.length === 0) ? (
-            <div className="p-4 rounded-xl border border-border/40 bg-surface1/40 text-center text-xs text-foreground-muted">
+            <div className="p-4 rounded-xl border border-border/60 bg-surface1/40 text-center text-xs text-foreground-muted">
               No active channels yet. Start chatting to inspect context health.
             </div>
           ) : (
@@ -188,7 +188,7 @@ export function TokenDashboardPanel() {
                       'p-3 rounded-xl border transition-all duration-150',
                       isCurrent
                         ? 'border-primary/40 bg-surface1 ring-1 ring-primary/20 shadow-2xs'
-                        : 'border-border/50 bg-surface1/60 hover:bg-surface1/90'
+                        : 'border-border/60 bg-surface1/60 hover:bg-surface1/90'
                     )}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -259,7 +259,7 @@ export function TokenDashboardPanel() {
 
                     {/* Disparity & Bottleneck Notice */}
                     {ch.has_disparity && ch.bottleneck_agent && (
-                      <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-surface2/60 border border-border/40 text-3xs text-foreground-muted">
+                      <div className="mt-2 flex items-start gap-1.5 p-2 rounded-lg bg-surface2/60 border border-border/60 text-3xs text-foreground-muted">
                         <Info className="size-3 text-status-warning shrink-0 mt-0.5" />
                         <span className="leading-snug">
                           Auto-compaction constrained by <span className="font-semibold text-foreground">@{ch.bottleneck_agent}</span> ({fmtWindow(minWin)}) to prevent context overflow. Extended archive remains available to larger models.
@@ -268,7 +268,7 @@ export function TokenDashboardPanel() {
                     )}
 
                     {/* Compact Context Now Button */}
-                    <div className="mt-2.5 flex items-center justify-between gap-2 pt-1 border-t border-border/30">
+                    <div className="mt-2.5 flex items-center justify-between gap-2 pt-1 border-t border-border/60">
                       <span className="text-3xs text-foreground-muted">
                         {ch.compaction_count} compaction{ch.compaction_count === 1 ? '' : 's'} run
                       </span>
@@ -312,7 +312,7 @@ export function TokenDashboardPanel() {
           </div>
 
           {(!stats?.agents || stats.agents.length === 0) ? (
-            <div className="p-4 rounded-xl border border-border/40 bg-surface1/40 text-center text-xs text-foreground-muted">
+            <div className="p-4 rounded-xl border border-border/60 bg-surface1/40 text-center text-xs text-foreground-muted">
               No agent token usage recorded yet.
             </div>
           ) : (
@@ -327,7 +327,7 @@ export function TokenDashboardPanel() {
                 return (
                   <div
                     key={agent.agent_name}
-                    className="p-3 rounded-xl border border-border/50 bg-surface1/60 space-y-2"
+                    className="p-3 rounded-xl border border-border/60 bg-surface1/60 space-y-2"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -350,7 +350,7 @@ export function TokenDashboardPanel() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/30 text-3xs">
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border/60 text-3xs">
                       <div className="p-2 rounded-lg bg-surface2/40">
                         <div className="text-foreground-muted">Last Prompt</div>
                         <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
@@ -373,7 +373,7 @@ export function TokenDashboardPanel() {
         </div>
 
         {/* Informational Architecture Note */}
-        <div className="p-3 rounded-xl bg-surface1/30 border border-border/30 text-3xs text-foreground-muted space-y-1.5">
+        <div className="p-3 rounded-xl bg-surface1/30 border border-border/60 text-3xs text-foreground-muted space-y-1.5">
           <div className="flex items-center gap-1 font-semibold text-foreground">
             <ShieldCheck className="size-3 text-status-success" />
             <span>Architecture: Per-Agent Window Isolation</span>

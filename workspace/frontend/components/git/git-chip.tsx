@@ -274,7 +274,7 @@ export function GitChip({
               <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/50"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/60"
               >
                 <RefreshCw className={cn("size-2.5 text-muted-foreground", syncing && "animate-spin")} />
                 Sync

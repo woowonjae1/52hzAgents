@@ -108,44 +108,44 @@ export function Wrapper() {
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
           {/* Full-screen views (no list/detail split) */}
           {viewMode === 'mission' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <MissionControl />
             </div>
           ) : !hasAgents && viewMode === 'threads' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <EmptyState />
             </div>
           ) : viewMode === 'connect' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <ConnectAgentView />
             </div>
           ) : viewMode === 'tasks' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <TasksView />
             </div>
           ) : viewMode === 'timers' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <TimersView />
             </div>
           ) : viewMode === 'inbox' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <InboxView />
             </div>
           ) : viewMode === 'skills' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <SkillsView />
             </div>
           ) : viewMode === 'knowledge' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <KnowledgeView />
             </div>
           ) : viewMode === 'settings' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <SettingsView />
             </div>
           ) : mobilePane === 'list' ? (
             /* List pane — full width */
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm flex flex-col">
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm flex flex-col">
               {viewMode === 'threads' && <ThreadList />}
               {viewMode === 'files' && <FileList />}
               {viewMode === 'browser' && <BrowserTabList />}
@@ -153,7 +153,7 @@ export function Wrapper() {
             </div>
           ) : (
             /* Detail pane — full width, edge-to-edge on mobile */
-            <div className="relative h-full bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm">
+            <div className="relative h-full bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               {(viewMode === 'threads' || viewMode === 'routines') && (
                 <main className="h-full" role="content">
                   <ChatView />
@@ -248,7 +248,7 @@ export function Wrapper() {
 
               {/* Column 3: Right Collapsible Preview Panel */}
               {!isDetailExpanded && activeRightTab !== null && viewMode !== 'mission' && viewMode !== 'connect' && viewMode !== 'files' && (
-                <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-border/80 dark:border-border/80 rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
+                <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
                   {/* Close button for right panel */}
                   <button 
                     onClick={() => setActiveRightTab(null)}
