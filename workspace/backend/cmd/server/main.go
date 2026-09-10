@@ -2,10 +2,13 @@ package main // 声明 main 主包。
 
 // 引入所需标准库，以及 Gin 框架和内部编写的配置、数据库、事件处理器、广播 Hub 以及后台调度器。
 import (
+	"bytes"         // 把内嵌文件包成 ReadSeeker 交给 http.ServeContent。
 	"fmt"           // 用于进行格式化拼接生成监听地址字符串。
+	"io/fs"         // 读取内嵌前端导出的 fs.FS。
 	"log"           // 用于输出后台服务的启动和错误日志。
 	"net/http"      // 包含标准 HTTP 状态码定义。
 	"os"            // 文件系统操作与路径探测
+	"path"          // URL 路径（斜杠语义），与 filepath 的平台语义不同
 	"path/filepath" // 文件路径处理
 	"strconv"       // 进程 ID 转换
 	"strings"       // 字符串前缀判断
@@ -22,6 +25,7 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"      // 消息广播 Hub 中继包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/middleware"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/scheduler" // 后台定时与周期任务调度包（新增）。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/webui"     // 内嵌前端导出，使二进制自包含。
 )
 
 func startParentWatchdog(ppid int) {
@@ -304,28 +308,86 @@ func main() { // 服务程序运行主入口函数。
 			}
 		}
 	}
-	if staticDir != "" {
-		log.Printf("Serving static frontend assets from %s", staticDir)
+	/*
+		A DISK EXPORT WINS OVER THE EMBEDDED ONE.
+
+		The embedded copy is frozen at compile time, so during frontend work it
+		is whatever was baked into the last `go build` -- and rebuilding Go to
+		see a CSS change is not a workflow. When a real `out/` sits on disk it
+		is the newer of the two by definition, so it goes first. A shipped
+		binary has no such directory beside it and falls through to the embed,
+		which is the whole point: one file that serves itself.
+	*/
+	embeddedUI, hasEmbeddedUI := webui.FS()
+
+	if staticDir != "" || hasEmbeddedUI {
+		// Each returns true once it has written the response.
+		fromDisk := func(c *gin.Context, name string) bool {
+			full := filepath.Join(staticDir, filepath.FromSlash(name))
+			if stat, err := os.Stat(full); err == nil && !stat.IsDir() {
+				c.File(full)
+				return true
+			}
+			return false
+		}
+		fromEmbed := func(c *gin.Context, name string) bool {
+			data, err := fs.ReadFile(embeddedUI, name)
+			if err != nil {
+				return false
+			}
+			// ServeContent, not c.Data: it sets Content-Type from the
+			// extension and answers Range requests, which matters for the
+			// fonts and the few media files in the export.
+			http.ServeContent(c.Writer, c.Request, name, time.Time{}, bytes.NewReader(data))
+			return true
+		}
+
+		try := fromEmbed
+		if staticDir != "" {
+			try = fromDisk
+			log.Printf("Serving frontend from %s (on disk)", staticDir)
+		} else {
+			log.Printf("Serving frontend from the embedded build")
+		}
+
 		router.NoRoute(func(c *gin.Context) {
 			reqPath := c.Request.URL.Path
 			if strings.HasPrefix(reqPath, "/v1/") || strings.HasPrefix(reqPath, "/api/") {
 				c.JSON(http.StatusNotFound, gin.H{"error": "API route not found"})
 				return
 			}
-			filePath := filepath.Join(staticDir, filepath.Clean(reqPath))
-			if stat, err := os.Stat(filePath); err == nil && !stat.IsDir() {
-				c.File(filePath)
-				return
+
+			/*
+				`trailingSlash: true` IN next.config.mjs MEANS DIRECTORY INDEXES.
+
+				The export writes `/quickbar/` as `quickbar/index.html`, never
+				`quickbar.html`. The previous version tried the path itself,
+				then `path + ".html"`, then fell back to the ROOT index -- so
+				every sub-route was served the home page and only recovered
+				because the client-side router re-resolved it after hydration.
+				That is a flash of the wrong screen on every deep link.
+
+				`dir/index.html` is therefore tried BEFORE `path.html`, and the
+				root index stays last as the genuine SPA fallback.
+			*/
+			clean := strings.TrimPrefix(path.Clean("/"+reqPath), "/")
+			for _, candidate := range []string{
+				clean,
+				path.Join(clean, "index.html"),
+				clean + ".html",
+				"index.html",
+			} {
+				if candidate == "" || candidate == "." {
+					continue
+				}
+				if try(c, candidate) {
+					return
+				}
 			}
-			// Check if HTML file matching route exists (Next.js export)
-			htmlPath := filePath + ".html"
-			if stat, err := os.Stat(htmlPath); err == nil && !stat.IsDir() {
-				c.File(htmlPath)
-				return
-			}
-			// Fallback to index.html for client-side routing
-			c.File(filepath.Join(staticDir, "index.html"))
+			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		})
+	} else {
+		log.Printf("No frontend found (none on disk, none embedded) - serving API only")
 	}
 
 	address := fmt.Sprintf("%s:%d", config.GlobalConfig.Host, config.GlobalConfig.Port) // 格式化拼接生成服务监听地址。

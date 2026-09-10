@@ -1,0 +1,5 @@
+
+# Generated: the frontend export copied in for //go:embed (see internal/webui).
+# .gitkeep is tracked so the embed pattern still matches on a clean checkout.
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep

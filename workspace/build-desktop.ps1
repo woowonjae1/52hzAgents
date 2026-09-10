@@ -28,24 +28,8 @@ New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
 New-Item -ItemType Directory -Force -Path $WwjDir | Out-Null
 
-# 2. Build Go Backend (Pure Go SQLite, CGO_ENABLED=0)
-Write-Host "`n[1/4] Compiling Go Backend (52hz-server.exe)..." -ForegroundColor Yellow
-$BackendDir = Join-Path $WorkspaceRoot "workspace\backend"
-Push-Location $BackendDir
-try {
-    $env:CGO_ENABLED = "0"
-    $ServerExe = Join-Path $BinDir "52hz-server.exe"
-    go build -ldflags="-s -w" -o $ServerExe ./cmd/server
-    if (-not (Test-Path $ServerExe)) {
-        throw "Failed to compile Go backend binary!"
-    }
-    Write-Host "  -> Successfully compiled 52hz-server.exe ($([math]::Round((Get-Item $ServerExe).Length / 1MB, 2)) MB)" -ForegroundColor Green
-} finally {
-    Pop-Location
-}
-
 # 3. Copy WWJ Agent Connector (Node.js Engine for 17+ Adapters)
-Write-Host "`n[2/4] Assembling WWJ Agent Connector..." -ForegroundColor Yellow
+Write-Host "`n[1/4] Assembling WWJ Agent Connector..." -ForegroundColor Yellow
 $WwjSource = Join-Path $WorkspaceRoot "packages\wwj"
 Copy-Item -Recurse -Force (Join-Path $WwjSource "src") $WwjDir
 Copy-Item -Recurse -Force (Join-Path $WwjSource "bin") $WwjDir
@@ -59,8 +43,9 @@ if (Test-Path (Join-Path $WwjSource "node_modules")) {
 Write-Host "  -> WWJ Connector assembled." -ForegroundColor Green
 
 # 4. Build Next.js Frontend
-Write-Host "`n[3/4] Building Next.js Frontend..." -ForegroundColor Yellow
+Write-Host "`n[2/4] Building Next.js Frontend..." -ForegroundColor Yellow
 $FrontendDir = Join-Path $WorkspaceRoot "workspace\frontend"
+$NextOut = Join-Path $FrontendDir "out"
 Push-Location $FrontendDir
 try {
     $NextOut = Join-Path $FrontendDir "out"
@@ -94,6 +79,46 @@ try {
     }
     Copy-Item -Recurse -Force "$NextOut\*" $PublicDir
     Write-Host "  -> Frontend assets ready in resources/public (built $(Get-Date -Format 'HH:mm:ss'))." -ForegroundColor Green
+} finally {
+    Pop-Location
+}
+
+# ---------------------------------------------------------------------------
+# THE GO BUILD MOVED BELOW THE FRONTEND BUILD ON PURPOSE.
+#
+# `internal/webui` embeds the export with //go:embed, and //go:embed is
+# resolved by the COMPILER. Compiling the server before the frontend exists
+# bakes in whatever was in that directory last time -- which on a clean
+# checkout is the .gitkeep placeholder, i.e. a binary that serves the API and
+# a 404 for every page, and reports success while doing it.
+#
+# The export is staged into internal/webui/dist (gitignored) rather than
+# embedded from ../frontend/out directly, because //go:embed cannot reference
+# anything outside its own package directory.
+# ---------------------------------------------------------------------------
+Write-Host "`n[3/4] Compiling Go Backend (52hz-server.exe, frontend embedded)..." -ForegroundColor Yellow
+$BackendDir = Join-Path $WorkspaceRoot "workspace\backend"
+$EmbedDir = Join-Path $BackendDir "internal\webui\dist"
+
+# Clear everything except the placeholder, so a removed page cannot survive
+# into the next binary as a stale embedded file.
+if (Test-Path $EmbedDir) {
+    Get-ChildItem -Path $EmbedDir -Force -Exclude ".gitkeep" | Remove-Item -Recurse -Force
+} else {
+    New-Item -ItemType Directory -Force -Path $EmbedDir | Out-Null
+}
+Copy-Item -Recurse -Force "$NextOut\*" $EmbedDir
+Write-Host "  -> Staged $((Get-ChildItem $EmbedDir -Recurse -File).Count) files for embedding." -ForegroundColor DarkGray
+
+Push-Location $BackendDir
+try {
+    $env:CGO_ENABLED = "0"
+    $ServerExe = Join-Path $BinDir "52hz-server.exe"
+    go build -ldflags="-s -w" -o $ServerExe ./cmd/server
+    if (-not (Test-Path $ServerExe)) {
+        throw "Failed to compile Go backend binary!"
+    }
+    Write-Host "  -> Successfully compiled 52hz-server.exe ($([math]::Round((Get-Item $ServerExe).Length / 1MB, 2)) MB, self-contained)" -ForegroundColor Green
 } finally {
     Pop-Location
 }
