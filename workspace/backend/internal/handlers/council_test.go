@@ -121,9 +121,9 @@ func TestCouncilLifecycleAndAntiSelfCertification(t *testing.T) {
 
 	// 2. Claude submits a PROPOSAL
 	propReq := PostSpeechActRequest{
-		ActType: models.ActProposal,
-		Summary: "Introduce JWT with RS256 signing and Redis token blacklist",
-		Payload: map[string]interface{}{"spec": "jwt-rs256"},
+		ActType:  models.ActProposal,
+		Summary:  "Introduce JWT with RS256 signing and Redis token blacklist",
+		Payload:  map[string]interface{}{"spec": "jwt-rs256"},
 		Metadata: map[string]interface{}{"session_id": "sess-claude-1"},
 	}
 	body, _ = json.Marshal(propReq)
@@ -145,9 +145,9 @@ func TestCouncilLifecycleAndAntiSelfCertification(t *testing.T) {
 
 	// 3. Claude attempts to self-certify victory by submitting RESOLUTION directly -> MUST FAIL
 	resReq := PostSpeechActRequest{
-		ActType: models.ActResolution,
-		Summary: "Self-certified victory without challenge",
-		Payload: map[string]interface{}{"result": "passed"},
+		ActType:  models.ActResolution,
+		Summary:  "Self-certified victory without challenge",
+		Payload:  map[string]interface{}{"result": "passed"},
 		Metadata: map[string]interface{}{"session_id": "sess-claude-1"},
 	}
 	body, _ = json.Marshal(resReq)
@@ -181,8 +181,8 @@ func TestCouncilLifecycleAndAntiSelfCertification(t *testing.T) {
 
 	// 5. Claude submits a DEFENSE
 	defReq := PostSpeechActRequest{
-		ActType: models.ActDefense,
-		Summary: "Added JWKS endpoint for dynamic key rotation; replaced Redis with local Bloom filter",
+		ActType:  models.ActDefense,
+		Summary:  "Added JWKS endpoint for dynamic key rotation; replaced Redis with local Bloom filter",
 		Metadata: map[string]interface{}{"session_id": "sess-claude-1"},
 	}
 	body, _ = json.Marshal(defReq)
@@ -214,9 +214,9 @@ func TestCouncilLifecycleAndAntiSelfCertification(t *testing.T) {
 
 	// 7. Claude now submits RESOLUTION -> MUST SUCCEED and CONVERGE session
 	finalResReq := PostSpeechActRequest{
-		ActType: models.ActResolution,
-		Summary: "Final Architecture Decision: JWT with JWKS rotation and Bloom filter blacklist",
-		Payload: map[string]interface{}{"decision": "approved_by_adversary"},
+		ActType:  models.ActResolution,
+		Summary:  "Final Architecture Decision: JWT with JWKS rotation and Bloom filter blacklist",
+		Payload:  map[string]interface{}{"decision": "approved_by_adversary"},
 		Metadata: map[string]interface{}{"session_id": "sess-claude-1"},
 	}
 	body, _ = json.Marshal(finalResReq)

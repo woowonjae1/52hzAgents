@@ -194,4 +194,3 @@ func TestEventHubWorkspaceWideBroadcast(t *testing.T) {
 	GlobalHub.Unregister(c3)
 	GlobalHub.Unregister(c4)
 }
-

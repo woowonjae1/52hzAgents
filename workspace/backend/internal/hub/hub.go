@@ -29,12 +29,12 @@ type BroadcastMsg struct {
 
 // EventHub 结构体负责管理所有活跃的 Client 连接，并异步地处理注册、注销和事件广播。
 type EventHub struct {
-	clients    map[string]*Client                            // 全局 Client 索引表，Key 为 Client.ID
-	wsClients  map[string]map[string]map[string]*Client       // 二级分桶索引: WorkspaceID -> ChannelName ("" 代表全局) -> ClientID -> Client
-	register   chan *Client                                  // 注册信道（带缓冲）
-	unregister chan *Client                                  // 注销信道（带缓冲）
-	broadcast  chan BroadcastMsg                             // 广播信道（带缓冲）
-	mu         sync.RWMutex                                  // 读写锁，保护 clients 和 wsClients
+	clients    map[string]*Client                       // 全局 Client 索引表，Key 为 Client.ID
+	wsClients  map[string]map[string]map[string]*Client // 二级分桶索引: WorkspaceID -> ChannelName ("" 代表全局) -> ClientID -> Client
+	register   chan *Client                             // 注册信道（带缓冲）
+	unregister chan *Client                             // 注销信道（带缓冲）
+	broadcast  chan BroadcastMsg                        // 广播信道（带缓冲）
+	mu         sync.RWMutex                             // 读写锁，保护 clients 和 wsClients
 }
 
 // GlobalHub 是全局唯一的事件总线单例。

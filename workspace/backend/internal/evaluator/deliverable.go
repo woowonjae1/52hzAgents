@@ -60,7 +60,7 @@ func ExtractDeliverable(actor string, step models.PipelineStep, messages []strin
 			fileMatches := filePathRegex.FindAllStringSubmatch(trimmed, -1)
 			for _, fm := range fileMatches {
 				if len(fm) > 1 {
-					cleanPath := strings.Trim(fm[1], `"'` + "`" + `()[]:, `)
+					cleanPath := strings.Trim(fm[1], `"'`+"`"+`()[]:, `)
 					ext := strings.ToLower(filepath.Ext(cleanPath))
 					// Exclude URLs, standard libraries, or generic extensions
 					if !strings.HasPrefix(cleanPath, "http") && !strings.Contains(cleanPath, "://") {

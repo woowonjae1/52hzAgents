@@ -98,12 +98,22 @@ func GetCompactedHistoryHandler(c *gin.Context) {
 		return
 	}
 	channelName := strings.TrimPrefix(strings.TrimSpace(c.Param("channel_name")), "channel/")
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "15"))
-	if limit < 1 || limit > 100 {
-		limit = 15
+	agentName := strings.TrimSpace(c.Query("agent"))
+
+	var summary string
+	var recentMessages []compaction.MessageItem
+	var err error
+
+	if agentName != "" {
+		summary, recentMessages, err = compaction.GetCompactedChannelHistoryForAgent(workspace.ID, channelName, agentName)
+	} else {
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+		if limit < 1 || limit > 300 {
+			limit = 50
+		}
+		summary, recentMessages, err = compaction.GetCompactedChannelHistory(workspace.ID, channelName, limit)
 	}
 
-	summary, recentMessages, err := compaction.GetCompactedChannelHistory(workspace.ID, channelName, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -111,6 +121,7 @@ func GetCompactedHistoryHandler(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"channel":         channelName,
+		"agent":           agentName,
 		"summary":         summary,
 		"has_summary":     strings.TrimSpace(summary) != "",
 		"recent_messages": recentMessages,

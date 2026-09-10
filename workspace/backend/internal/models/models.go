@@ -211,11 +211,11 @@ func (WorkspaceCollaborator) TableName() string {
 // ---------------------------------------------------------------------------
 
 type KnowledgeEntry struct {
-	ID          string    `gorm:"primaryKey;type:text"`
-	WorkspaceID string    `gorm:"type:uuid;not null;index:idx_knowledge_workspace_status;uniqueIndex:uq_knowledge_workspace_slug"`
-	Slug        string    `gorm:"type:text;not null;uniqueIndex:uq_knowledge_workspace_slug"`
-	Title       string    `gorm:"type:text;not null"`
-	Description *string   `gorm:"type:text"`
+	ID          string  `gorm:"primaryKey;type:text"`
+	WorkspaceID string  `gorm:"type:uuid;not null;index:idx_knowledge_workspace_status;uniqueIndex:uq_knowledge_workspace_slug"`
+	Slug        string  `gorm:"type:text;not null;uniqueIndex:uq_knowledge_workspace_slug"`
+	Title       string  `gorm:"type:text;not null"`
+	Description *string `gorm:"type:text"`
 	// Set explicitly by whoever wrote the entry. NULL means unclassified, which
 	// the client falls back to guessing from the title — a guess it must not
 	// make once someone has actually chosen.
@@ -329,24 +329,24 @@ func (DeviceToken) TableName() string {
 // ---------------------------------------------------------------------------
 
 type TodoRecord struct {
-	ID          string    `gorm:"primaryKey;type:text" json:"id"`
-	WorkspaceID string    `gorm:"type:uuid;not null;index:idx_todos_workspace_channel" json:"workspace_id"`
-	ChannelName string    `gorm:"type:text;not null;index:idx_todos_workspace_channel" json:"channel_name"`
-	ThreadID    *string   `gorm:"type:text" json:"thread_id"`
-	CreatedBy   string    `gorm:"type:text;not null;index:idx_todos_workspace_created_by" json:"created_by"`
-	Assignee    string    `gorm:"type:text;not null" json:"assignee"`
-	Content     string    `gorm:"type:text;not null" json:"content"`
-	Status      string    `gorm:"type:text;not null;default:pending" json:"status"`
-	Priority    string    `gorm:"type:text;default:none" json:"priority,omitempty"`
-	RoutineID   *string   `gorm:"type:text;index" json:"routine_id,omitempty"`
-	RunID       *string   `gorm:"type:text;index" json:"run_id,omitempty"`
+	ID          string  `gorm:"primaryKey;type:text" json:"id"`
+	WorkspaceID string  `gorm:"type:uuid;not null;index:idx_todos_workspace_channel" json:"workspace_id"`
+	ChannelName string  `gorm:"type:text;not null;index:idx_todos_workspace_channel" json:"channel_name"`
+	ThreadID    *string `gorm:"type:text" json:"thread_id"`
+	CreatedBy   string  `gorm:"type:text;not null;index:idx_todos_workspace_created_by" json:"created_by"`
+	Assignee    string  `gorm:"type:text;not null" json:"assignee"`
+	Content     string  `gorm:"type:text;not null" json:"content"`
+	Status      string  `gorm:"type:text;not null;default:pending" json:"status"`
+	Priority    string  `gorm:"type:text;default:none" json:"priority,omitempty"`
+	RoutineID   *string `gorm:"type:text;index" json:"routine_id,omitempty"`
+	RunID       *string `gorm:"type:text;index" json:"run_id,omitempty"`
 	// TimerID links a task to the one-off timer that will carry it out.
 	//
 	// A recurring routine already had this (RoutineID/RunID) and so its runs
 	// showed up on the board; a timer had no such link, so "remind me at 16:11"
 	// left nothing anywhere in Tasks & Issues.
-	TimerID *string `gorm:"type:text;index" json:"timer_id,omitempty"`
-	Position    int       `gorm:"type:integer;not null;default:0" json:"position"`
+	TimerID  *string `gorm:"type:text;index" json:"timer_id,omitempty"`
+	Position int     `gorm:"type:integer;not null;default:0" json:"position"`
 	// DueDate is the optional deadline a task is measured against. Todo lists
 	// without one cannot surface "overdue", which is the single most requested
 	// signal on a task board.
@@ -356,9 +356,9 @@ type TodoRecord struct {
 	// column those writes failed and every scheduled task stayed in_progress.
 	CompletedAt *time.Time `gorm:"" json:"completed_at,omitempty"`
 	// Error records the failure reason if the task failed or was cancelled due to an issue.
-	Error       *string    `gorm:"type:text" json:"error,omitempty"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	Error     *string   `gorm:"type:text" json:"error,omitempty"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (TodoRecord) TableName() string {
@@ -489,28 +489,28 @@ func (AgentLogRecord) TableName() string {
 
 // AgentUsageRecord stores subscription quota, rate limits and 5-hour/weekly usage.
 type AgentUsageRecord struct {
-	WorkspaceID        string    `gorm:"primaryKey;type:uuid" json:"workspace_id"`
-	AgentName          string    `gorm:"primaryKey;type:text" json:"agent_name"`
-	SessionUsedPercent int       `gorm:"type:integer;not null;default:0" json:"session_used_percent"`
-	SessionResetsAt    *string   `gorm:"type:text" json:"session_resets_at"`
-	WeekUsedPercent    int       `gorm:"type:integer;not null;default:0" json:"week_used_percent"`
-	WeekResetsAt       *string   `gorm:"type:text" json:"week_resets_at"`
-	Last24hSummary     *string   `gorm:"type:text" json:"last_24h_summary"`
-	Last7dSummary      *string   `gorm:"type:text" json:"last_7d_summary"`
-	CurrentModel       *string   `gorm:"type:text" json:"current_model"`
-	AvailableModels    *string   `gorm:"type:text" json:"available_models"`
+	WorkspaceID        string  `gorm:"primaryKey;type:uuid" json:"workspace_id"`
+	AgentName          string  `gorm:"primaryKey;type:text" json:"agent_name"`
+	SessionUsedPercent int     `gorm:"type:integer;not null;default:0" json:"session_used_percent"`
+	SessionResetsAt    *string `gorm:"type:text" json:"session_resets_at"`
+	WeekUsedPercent    int     `gorm:"type:integer;not null;default:0" json:"week_used_percent"`
+	WeekResetsAt       *string `gorm:"type:text" json:"week_resets_at"`
+	Last24hSummary     *string `gorm:"type:text" json:"last_24h_summary"`
+	Last7dSummary      *string `gorm:"type:text" json:"last_7d_summary"`
+	CurrentModel       *string `gorm:"type:text" json:"current_model"`
+	AvailableModels    *string `gorm:"type:text" json:"available_models"`
 	// Reasoning-effort level the agent's CLI is set to, and the levels that CLI
 	// actually accepts (JSON array). Both come from the CLI itself; a nil value
 	// means "this runtime has no effort concept", not "default".
-	CurrentEffort      *string   `gorm:"type:text" json:"current_effort"`
-	AvailableEfforts   *string   `gorm:"type:text" json:"available_efforts"`
-	RawText            *string   `gorm:"type:text" json:"raw_text"`
+	CurrentEffort    *string `gorm:"type:text" json:"current_effort"`
+	AvailableEfforts *string `gorm:"type:text" json:"available_efforts"`
+	RawText          *string `gorm:"type:text" json:"raw_text"`
 	// Cumulative token metrics across all turns & sessions
 	TotalPromptTokens     int64     `gorm:"type:bigint;not null;default:0" json:"total_prompt_tokens"`
 	TotalCompletionTokens int64     `gorm:"type:bigint;not null;default:0" json:"total_completion_tokens"`
 	TotalTokens           int64     `gorm:"type:bigint;not null;default:0" json:"total_tokens"`
 	ContextWindowSize     int       `gorm:"type:integer;not null;default:0" json:"context_window_size"`
-	UpdatedAt          time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	UpdatedAt             time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (AgentUsageRecord) TableName() string {

@@ -4,12 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -167,4 +167,3 @@ func TestAgentSourceWith52hzAgentsPrefix(t *testing.T) {
 		t.Fatalf("expected agentNameFromSource(%q) to be 'antigravity', got %q", src, name)
 	}
 }
-

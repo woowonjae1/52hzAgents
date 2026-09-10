@@ -383,7 +383,7 @@ func ListRoutines(c *gin.Context) {
 		query = query.Where("created_by = ?", getAgentNameFromSource(source))
 	}
 
-	var routines []models.RoutineRecord // 声明列表容器。
+	var routines []models.RoutineRecord            // 声明列表容器。
 	query.Order("created_at DESC").Find(&routines) // 执行检索。
 
 	// 返回列表。
@@ -1051,5 +1051,3 @@ func StopActiveRoutineRunsAndTasks(workspaceID, agentName, channelName string) {
 		})
 	}
 }
-
-

@@ -15,8 +15,8 @@ import (
 	"strings"         // 用于判断文件扩展名。
 	"time"            // 用于时间戳的获取（新增）。
 
-	"github.com/gin-gonic/gin"                           // Gin Web 框架路由控制。
-	"github.com/google/uuid"                            // 用于为新上传文件生成唯一的 UUID。
+	"github.com/gin-gonic/gin"                                           // Gin Web 框架路由控制。
+	"github.com/google/uuid"                                             // 用于为新上传文件生成唯一的 UUID。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config" // 全局配置模块。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 本地 GORM 数据库连接包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 内存消息分发总线。

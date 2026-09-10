@@ -195,7 +195,7 @@ func mapWorkspaceMembers(members []models.WorkspaceMember) []gin.H {
 			"agentType": member.AgentType, "serverHost": member.ServerHost,
 			"workingDir": member.WorkingDir, "description": member.Description,
 			"enabledSkills": decodeJSONMap(member.EnabledSkills), "status": member.Status,
-			"autostart": member.Autostart,
+			"autostart":       member.Autostart,
 			"lastHeartbeatAt": member.LastHeartbeat, "joinedAt": member.JoinedAt,
 		})
 	}
@@ -432,4 +432,3 @@ func ResolveToken(c *gin.Context) {
 		"name":         ws.Name,
 	})
 }
-

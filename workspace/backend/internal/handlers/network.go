@@ -336,4 +336,3 @@ func UpdatePresence(c *gin.Context) {
 	// 渲染返回成功。
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
-

@@ -379,11 +379,11 @@ func projectSessionAnnouncement(workspaceID string, channel *models.Channel, ses
 	eventID := uuid.New().String()
 	targetChan := "channel/" + channel.Name
 
-	content := fmt.Sprintf("🏛️ **Council Session Initiated**\n\n" +
-		"**Topic**: %s\n" +
-		"**Session ID**: `%s`\n" +
-		"**Mandatory Challenger**: @%s\n" +
-		"**Max Rounds**: %d\n\n" +
+	content := fmt.Sprintf("🏛️ **Council Session Initiated**\n\n"+
+		"**Topic**: %s\n"+
+		"**Session ID**: `%s`\n"+
+		"**Mandatory Challenger**: @%s\n"+
+		"**Max Rounds**: %d\n\n"+
 		"_Agents may submit a PROPOSAL using `workspace_council_post` or the Council REST API._",
 		session.Topic, session.ID, session.MandatoryChallenger, session.MaxRounds)
 
@@ -415,47 +415,47 @@ func projectSpeechActToEvents(workspaceID string, channel *models.Channel, sessi
 	switch act.ActType {
 	case models.ActProposal:
 		targetAgents = []string{session.MandatoryChallenger}
-		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Proposal submitted by @%s.\n\n" +
-			"**Topic**: %s\n" +
-			"**Session ID**: `%s`\n" +
-			"**Proposal ID**: `%s`\n" +
-			"**Summary**: %s\n\n" +
-			"👉 **MANDATORY ACTION REQUIRED**:\n" +
-			"You are designated as the **Mandatory Challenger**. You must critically inspect this proposal for architectural flaws, security risks, or missing edge cases.\n" +
+		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Proposal submitted by @%s.\n\n"+
+			"**Topic**: %s\n"+
+			"**Session ID**: `%s`\n"+
+			"**Proposal ID**: `%s`\n"+
+			"**Summary**: %s\n\n"+
+			"👉 **MANDATORY ACTION REQUIRED**:\n"+
+			"You are designated as the **Mandatory Challenger**. You must critically inspect this proposal for architectural flaws, security risks, or missing edge cases.\n"+
 			"Submit your structured CHALLENGE using `workspace_council_post` (or via Council API) within %d seconds.",
 			session.MandatoryChallenger, act.Round, act.Author, session.Topic, session.ID, act.ID, act.Summary, timeoutSec)
 
 	case models.ActChallenge:
 		targetAgents = []string{session.ProposerAgent}
-		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Your proposal was CHALLENGED by @%s.\n\n" +
-			"**Target Act ID**: `%s`\n" +
-			"**Challenge Summary**: %s\n\n" +
-			"👉 **DEFENSE REQUIRED**:\n" +
+		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Your proposal was CHALLENGED by @%s.\n\n"+
+			"**Target Act ID**: `%s`\n"+
+			"**Challenge Summary**: %s\n\n"+
+			"👉 **DEFENSE REQUIRED**:\n"+
 			"Please evaluate the criticisms above, revise your proposal, and submit your DEFENSE using `workspace_council_post`.",
 			session.ProposerAgent, act.Round, act.Author, safeStr(act.TargetActID), act.Summary)
 
 	case models.ActDefense:
 		targetAgents = []string{session.MandatoryChallenger}
-		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Proposer @%s submitted a DEFENSE.\n\n" +
-			"**Defense Summary**: %s\n\n" +
-			"👉 **REVIEW REQUIRED**:\n" +
+		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Proposer @%s submitted a DEFENSE.\n\n"+
+			"**Defense Summary**: %s\n\n"+
+			"👉 **REVIEW REQUIRED**:\n"+
 			"If all concerns are resolved, submit SUPPORT. Otherwise, submit an additional CHALLENGE.",
 			session.MandatoryChallenger, act.Round, act.Author, act.Summary)
 
 	case models.ActSupport:
 		targetAgents = []string{session.ProposerAgent}
-		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Challenger @%s submitted SUPPORT for the proposal.\n\n" +
-			"**Summary**: %s\n\n" +
-			"👉 **SEAL RESOLUTION**:\n" +
+		promptContent = fmt.Sprintf("@%s\n🏛️ [Council Debate - Round %d] Challenger @%s submitted SUPPORT for the proposal.\n\n"+
+			"**Summary**: %s\n\n"+
+			"👉 **SEAL RESOLUTION**:\n"+
 			"The proposal has satisfied adversarial review. Proposer @%s may now submit the final RESOLUTION to conclude the council.",
 			session.ProposerAgent, act.Round, act.Author, act.Summary, session.ProposerAgent)
 
 	case models.ActResolution:
-		promptContent = fmt.Sprintf("✅ **Council Resolution Sealed (Consensus Reached)**\n\n" +
-			"**Topic**: %s\n" +
-			"**Session ID**: `%s`\n" +
-			"**Sealed by**: @%s\n" +
-			"**Summary**: %s\n\n" +
+		promptContent = fmt.Sprintf("✅ **Council Resolution Sealed (Consensus Reached)**\n\n"+
+			"**Topic**: %s\n"+
+			"**Session ID**: `%s`\n"+
+			"**Sealed by**: @%s\n"+
+			"**Summary**: %s\n\n"+
 			"Awaiting Human Chairman Approval (Approve to execute, Veto to reject).",
 			session.Topic, session.ID, act.Author, act.Summary)
 	}
