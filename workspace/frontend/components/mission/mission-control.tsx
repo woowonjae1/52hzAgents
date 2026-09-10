@@ -77,7 +77,7 @@ export function MissionControl() {
     workingAgentNames,
     setCurrentSessionId,
   } = useWorkspace();
-  const { setViewMode, isSidebarOpen } = useLayout();
+  const { setViewMode, isSidebarOpen, setActiveRightTab } = useLayout();
   const reduceMotion = useReducedMotion();
 
   const [connectModalOpen, setConnectModalOpen] = useState(false);
@@ -105,65 +105,11 @@ export function MissionControl() {
   const [feedLoading, setFeedLoading] = useState(true);
 
   const fetchRecentData = useCallback(async () => {
-    if (!sessions.length) return;
-    const activeThreads = sessions.filter((s) => s.status !== 'archived').slice(0, 20);
     const updates: Record<string, { content: string; senderName: string; isStatus?: boolean; timestamp: number }> = {};
     const tokens: Record<string, number> = {};
     const approvals: PendingActionItem[] = [];
 
-    await Promise.all(
-      activeThreads.map(async (s) => {
-        try {
-          const res = await workspaceApi.loadMessageHistory(s.sessionId, { limit: 12 });
-          const msgs = (res.events || []).map(eventToMessage);
-          if (!msgs.length) return;
-
-          const respondedApprovalIds = new Set(
-            msgs.map((m) => m.metadata?.tool_approval_response?.approval_id).filter(Boolean)
-          );
-
-          for (const m of msgs) {
-            if (m.senderType === 'agent' && m.metadata?.tokens) {
-              const count = Number(m.metadata.tokens) || 0;
-              tokens[m.senderName] = (tokens[m.senderName] || 0) + count;
-            }
-
-            const appReq = m.metadata?.tool_approval_request;
-            if (appReq && !respondedApprovalIds.has(appReq.approval_id)) {
-              approvals.push({
-                id: `app-${m.messageId || appReq.approval_id}`,
-                type: 'approval',
-                agentName: m.senderName,
-                channelId: s.sessionId,
-                channelTitle: s.title,
-                toolName: appReq.tool,
-                command: appReq.args?.command,
-                path: appReq.args?.path,
-                approvalId: appReq.approval_id,
-                timestamp: m.createdAt ? new Date(m.createdAt) : new Date(),
-              });
-            }
-          }
-
-          const meaningful = [...msgs]
-            .reverse()
-            .find((m) => m.content && m.content.trim() && m.messageType !== 'status');
-          const fallback = msgs[msgs.length - 1];
-          const chosen = meaningful || fallback;
-          if (chosen) {
-            updates[s.sessionId] = {
-              content: chosen.content,
-              senderName: chosen.senderName,
-              isStatus: chosen.messageType === 'status',
-              timestamp: chosen.createdAt ? new Date(chosen.createdAt).getTime() : Date.now(),
-            };
-          }
-        } catch {
-          /* ignore */
-        }
-      })
-    );
-
+    // Always fetch authoritative token stats from backend
     try {
       const tokenStats = await workspaceApi.getWorkspaceTokenStats();
       if (tokenStats?.agents) {
@@ -175,6 +121,58 @@ export function MissionControl() {
       }
     } catch {
       // ignore
+    }
+
+    // If there are sessions, inspect recent message status & pending approvals
+    if (sessions.length > 0) {
+      const activeThreads = sessions.filter((s) => s.status !== 'archived').slice(0, 20);
+      await Promise.all(
+        activeThreads.map(async (s) => {
+          try {
+            const res = await workspaceApi.loadMessageHistory(s.sessionId, { limit: 12 });
+            const msgs = (res.events || []).map(eventToMessage);
+            if (!msgs.length) return;
+
+            const respondedApprovalIds = new Set(
+              msgs.map((m) => m.metadata?.tool_approval_response?.approval_id).filter(Boolean)
+            );
+
+            for (const m of msgs) {
+              const appReq = m.metadata?.tool_approval_request;
+              if (appReq && !respondedApprovalIds.has(appReq.approval_id)) {
+                approvals.push({
+                  id: `app-${m.messageId || appReq.approval_id}`,
+                  type: 'approval',
+                  agentName: m.senderName,
+                  channelId: s.sessionId,
+                  channelTitle: s.title,
+                  toolName: appReq.tool,
+                  command: appReq.args?.command,
+                  path: appReq.args?.path,
+                  approvalId: appReq.approval_id,
+                  timestamp: m.createdAt ? new Date(m.createdAt) : new Date(),
+                });
+              }
+            }
+
+            const meaningful = [...msgs]
+              .reverse()
+              .find((m) => m.content && m.content.trim() && m.messageType !== 'status');
+            const fallback = msgs[msgs.length - 1];
+            const chosen = meaningful || fallback;
+            if (chosen) {
+              updates[s.sessionId] = {
+                content: chosen.content,
+                senderName: chosen.senderName,
+                isStatus: chosen.messageType === 'status',
+                timestamp: chosen.createdAt ? new Date(chosen.createdAt).getTime() : Date.now(),
+              };
+            }
+          } catch {
+            /* ignore */
+          }
+        })
+      );
     }
 
     setLastMessageBySession(updates);
@@ -431,7 +429,19 @@ export function MissionControl() {
             <p className="truncate text-xs text-muted-foreground tabular-nums">
               {agents.length} {agents.length === 1 ? 'agent' : 'agents'}
               {sessions.length > 0 && ` · ${sessions.length} ${sessions.length === 1 ? 'channel' : 'channels'}`}
-              {totalTokens > 0 && ` · ${fmtTokens(totalTokens)} used`}
+              {totalTokens > 0 && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => setActiveRightTab('tokens')}
+                    className="hover:text-primary hover:underline transition-colors cursor-pointer font-medium"
+                    title="Open Token & Context Governance Dashboard"
+                  >
+                    {fmtTokens(totalTokens)} tokens
+                  </button>
+                </>
+              )}
             </p>
           </div>
 

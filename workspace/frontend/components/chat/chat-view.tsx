@@ -24,7 +24,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy } from 'lucide-react';
+import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy, Coins } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -909,13 +909,26 @@ export function ChatView() {
           {/* Git chip */}
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
-          {/* Quick Panels / Preview toggle */}
-          <Hint label={activeRightTab ? 'Close Side Panel' : 'Open Side Panel'}>
+          {/* Token Governance Dashboard Panel Toggle */}
+          <Hint label={activeRightTab === 'tokens' ? 'Close Token Dashboard' : 'Open Token & Context Dashboard'}>
             <button
-              onClick={() => setActiveRightTab(activeRightTab ? null : 'preview')}
+              onClick={() => setActiveRightTab(activeRightTab === 'tokens' ? null : 'tokens')}
               className={cn(
                 'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
-                activeRightTab ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+                activeRightTab === 'tokens' ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <Coins className="size-4" />
+            </button>
+          </Hint>
+
+          {/* Quick Panels / Preview toggle */}
+          <Hint label={activeRightTab === 'preview' || activeRightTab === 'browser' ? 'Close Side Panel' : 'Open Side Panel'}>
+            <button
+              onClick={() => setActiveRightTab(activeRightTab === 'preview' ? null : 'preview')}
+              className={cn(
+                'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+                activeRightTab === 'preview' || activeRightTab === 'browser' ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
               )}
             >
               <PanelRight className="size-4" />
@@ -933,7 +946,11 @@ export function ChatView() {
                 </button>
               </Hint>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'tokens' ? null : 'tokens')}>
+                <Coins className="size-4 mr-2 text-primary" />
+                <span>Token & Context Dashboard</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
                 <Download className="size-4 mr-2" />
                 <span>Export as Markdown</span>

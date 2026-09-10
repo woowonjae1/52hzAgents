@@ -1,10 +1,11 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
-import { Gauge, RefreshCw, Zap, Clock, Calendar, Sparkles, AlertCircle, FileText, Cpu, Coins } from 'lucide-react';
+import { Gauge, RefreshCw, Zap, Clock, Calendar, Sparkles, AlertCircle, FileText, Cpu, Coins, ChevronRight } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import type { AgentUsage, AgentTokenStat, WorkspaceTokenStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -22,14 +23,15 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
-function fmtContextLimit(window: number): string {
-  if (!window || window <= 0) return '64k';
+function fmtContextLimit(window?: number | null): string {
+  if (!window || window <= 0) return 'unknown';
   if (window >= 1_000_000) return `${(window / 1_000_000).toFixed(1)}M`;
   return `${Math.round(window / 1024)}k`;
 }
 
 export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsuleProps) {
   const { workspaceId, agents } = useWorkspace();
+  const { setActiveRightTab } = useLayout();
   const [tokenStats, setTokenStats] = React.useState<WorkspaceTokenStats | null>(null);
   const [usageByAgent, setUsageByAgent] = React.useState<Record<string, AgentUsage>>({});
   const [loadingAgent, setLoadingAgent] = React.useState<string | null>(null);
@@ -119,7 +121,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
   const totalTokens = agentStat?.total_tokens ?? usage?.total_tokens ?? 0;
   const promptTokens = agentStat?.total_prompt_tokens ?? usage?.total_prompt_tokens ?? 0;
   const completionTokens = agentStat?.total_completion_tokens ?? usage?.total_completion_tokens ?? 0;
-  const contextWindow = agentStat?.context_window_size ?? usage?.context_window_size ?? 64000;
+  const contextWindow = agentStat?.context_window_size ?? usage?.context_window_size ?? 0;
   const activeModel = agentStat?.current_model ?? usage?.current_model ?? selectedName;
 
   const getBarColor = (pct: number) => {
@@ -270,7 +272,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
             <div className="text-3xs text-foreground-muted mb-0.5">Total Tokens</div>
             <div className="font-semibold font-mono tabular-nums text-foreground">
-              {fmtTokens(totalTokens)}
+              {totalTokens > 0 ? fmtTokens(totalTokens) : '—'}
             </div>
           </div>
           <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
@@ -282,7 +284,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
             <div className="text-3xs text-foreground-muted mb-0.5">Prompt / Comp</div>
             <div className="font-mono text-3xs tabular-nums text-foreground-muted truncate">
-              {fmtTokens(promptTokens)} / {fmtTokens(completionTokens)}
+              {promptTokens > 0 || completionTokens > 0 ? `${fmtTokens(promptTokens)} / ${fmtTokens(completionTokens)}` : '—'}
             </div>
           </div>
         </div>
@@ -379,9 +381,20 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           </details>
         )}
 
-        {/* Footer Note */}
-        <div className="text-3xs text-foreground-extra-muted leading-relaxed pt-1">
-          Auto-synchronized with backend token governance and multi-agent compaction engine.
+        {/* Footer Note and Link */}
+        <div className="pt-2 border-t border-border/40 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              setActiveRightTab('tokens');
+            }}
+            className="text-3xs text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+          >
+            <Coins className="size-3" />
+            <span>Open Token Governance Dashboard</span>
+            <ChevronRight className="size-2.5" />
+          </button>
         </div>
       </PopoverContent>
     </Popover>

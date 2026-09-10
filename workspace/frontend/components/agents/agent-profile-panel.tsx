@@ -2,7 +2,7 @@
 
 import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight, Cpu, ChevronDown } from 'lucide-react';
+import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight, Cpu, ChevronDown, Coins, ChevronRight } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -24,8 +24,22 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { AgentApproval, AgentLogEntry, AgentRuntime, CloudAgentConfig, AgentUsage } from '@/lib/types';
 
+function fmtTokens(n?: number | null): string {
+  if (!n || n <= 0) return '0';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+function fmtWindow(n?: number | null): string {
+  if (!n || n <= 0) return 'unknown';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1024)}k`;
+  return String(n);
+}
+
 export function AgentProfilePanel() {
-  const { selectedAgentName, setSelectedAgentName, isMobile, setViewMode } = useLayout();
+  const { selectedAgentName, setSelectedAgentName, isMobile, setViewMode, setActiveRightTab } = useLayout();
   const { agents, refreshWorkspace, createSession } = useWorkspace();
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
@@ -41,6 +55,7 @@ export function AgentProfilePanel() {
   const [switchingModel, setSwitchingModel] = useState(false);
   const [customModelInput, setCustomModelInput] = useState('');
   const [isEnteringCustom, setIsEnteringCustom] = useState(false);
+  const [usage, setUsage] = useState<AgentUsage | null>(null);
 
   const refreshDiagnostics = useCallback(async () => {
     if (!agent) return;
@@ -55,6 +70,7 @@ export function AgentProfilePanel() {
       setRuntime(nextRuntime);
       setLogs(nextLogs);
       setApprovals(nextApprovals.filter((approval) => approval.agentName === agent.agentName));
+      setUsage(nextUsage);
       if (nextUsage) {
         setCurrentModel(nextUsage.current_model || null);
         setAvailableModels(parseReportedModels(nextUsage.available_models));
@@ -539,6 +555,60 @@ export function AgentProfilePanel() {
                 </DropdownMenu>
               </div>
 
+            </div>
+          </div>
+
+          {/* Token Usage & Context Capacity Card */}
+          <div className="rounded-lg border overflow-hidden">
+            <div className="px-3.5 py-2.5 flex items-center justify-between border-b border-border/40">
+              <div className="flex items-center gap-1.5">
+                <Coins className="size-3 text-primary" />
+                <span className="text-xs font-medium">Token Usage & Context</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedAgentName(null);
+                  setActiveRightTab('tokens');
+                }}
+                className="text-3xs text-primary hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+              >
+                <span>Full dashboard</span>
+                <ChevronRight className="size-2.5" />
+              </button>
+            </div>
+            <div className="p-3.5 space-y-2.5">
+              <div className="grid grid-cols-2 gap-2 text-2xs">
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                  <div className="text-3xs text-muted-foreground">Context Window</div>
+                  <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
+                    {fmtWindow(usage?.context_window_size)}
+                  </div>
+                </div>
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                  <div className="text-3xs text-muted-foreground">Last Prompt</div>
+                  <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
+                    {usage?.last_prompt_tokens ? fmtTokens(usage.last_prompt_tokens) : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-2xs">
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                  <div className="text-3xs text-muted-foreground">Total Tokens</div>
+                  <div className="font-semibold font-mono tabular-nums text-foreground mt-0.5">
+                    {usage?.total_tokens ? fmtTokens(usage.total_tokens) : '—'}
+                  </div>
+                </div>
+                <div className="p-2 rounded-lg bg-surface2/40 border border-border/40">
+                  <div className="text-3xs text-muted-foreground">Prompt / Comp</div>
+                  <div className="font-mono text-3xs tabular-nums text-muted-foreground mt-0.5 truncate">
+                    {usage?.total_prompt_tokens || usage?.total_completion_tokens
+                      ? `${fmtTokens(usage?.total_prompt_tokens)} / ${fmtTokens(usage?.total_completion_tokens)}`
+                      : '—'}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

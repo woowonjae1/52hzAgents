@@ -1,10 +1,11 @@
-﻿'use client';
+'use client';
 
 import * as React from 'react';
-import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle, Coins, ChevronRight } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import type { ChannelContextHealth, WorkspaceTokenStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,7 @@ function fmtTokens(n: number): string {
 
 export function ContextHealthIndicator({ channelName, className }: ContextHealthIndicatorProps) {
   const { workspaceId } = useWorkspace();
+  const { setActiveRightTab } = useLayout();
   const [stats, setStats] = React.useState<WorkspaceTokenStats | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [compacting, setCompacting] = React.useState(false);
@@ -255,6 +257,16 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
           </div>
         </div>
 
+        {/* Multi-agent disparity notice */}
+        {channelHealth?.has_disparity && channelHealth?.bottleneck_agent && (
+          <div className="p-2 rounded-lg bg-surface2/60 border border-border/40 text-3xs text-foreground-muted flex items-start gap-1.5">
+            <AlertTriangle className="size-3 text-status-warning shrink-0 mt-0.5" />
+            <span className="leading-snug">
+              Threshold constrained by <span className="font-semibold text-foreground">@{channelHealth.bottleneck_agent}</span> ({fmtTokens(minWindow)}) to prevent context overflow.
+            </span>
+          </div>
+        )}
+
         {/* Historical Savings */}
         <div className="grid grid-cols-2 gap-2 text-2xs">
           <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/40">
@@ -263,17 +275,10 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
               {channelHealth?.compaction_count || 0} runs
             </div>
           </div>
-          {/*
-            "Workspace Saved" was removed rather than re-sourced. Compaction
-            does not save tokens, it DISCARDS context, and the figure behind it
-            was the difference between two runs of a character heuristic --
-            shown in green, beside genuinely measured totals, in the same
-            typeface. It answered no question the reader actually had.
-          */}
         </div>
 
         {/* Compact Action */}
-        <div className="pt-1">
+        <div className="pt-1 space-y-2">
           <button
             type="button"
             onClick={triggerCompact}
@@ -288,10 +293,25 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
           </button>
 
           {lastCompactedResult && (
-            <p className="mt-1.5 text-center text-3xs text-foreground-muted font-mono truncate">
+            <p className="text-center text-3xs text-foreground-muted font-mono truncate">
               {lastCompactedResult}
             </p>
           )}
+
+          <div className="pt-1.5 border-t border-border/40 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setActiveRightTab('tokens');
+              }}
+              className="text-3xs text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <Coins className="size-3" />
+              <span>Open Token Governance Dashboard</span>
+              <ChevronRight className="size-2.5" />
+            </button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>

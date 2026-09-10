@@ -436,3 +436,11 @@ func GetCompactedChannelHistoryForAgent(workspaceID, channelName, agentName stri
 
 	return GetCompactedChannelHistory(workspaceID, channelName, recentLimit)
 }
+
+// ChannelContextDiagnostics returns diagnostic multi-agent window analysis for a channel.
+func ChannelContextDiagnostics(workspaceID, channelName string) ChannelDiagnostics {
+	rawName := strings.TrimPrefix(channelName, "channel/")
+	budgets := agentBudgetsForChannel(workspaceID, rawName)
+	return AnalyzeChannelBudgets(budgets)
+}
+

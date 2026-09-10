@@ -463,6 +463,7 @@ export interface AgentUsage {
   total_prompt_tokens?: number;
   total_completion_tokens?: number;
   total_tokens?: number;
+  last_prompt_tokens?: number;
   context_window_size?: number;
   updated_at: string;
 }
@@ -474,6 +475,7 @@ export interface AgentTokenStat {
   total_prompt_tokens: number;
   total_completion_tokens: number;
   total_tokens: number;
+  last_prompt_tokens?: number;
   session_used_percent: number;
   week_used_percent: number;
   session_resets_at?: string | null;
@@ -494,6 +496,8 @@ export interface ChannelContextHealth {
   measured: boolean;
   /** 0 when no participant has reported a window. NOT a default -- see below. */
   min_context_window: number;
+  bottleneck_agent?: string;
+  has_disparity?: boolean;
   token_budget_percent: number;
   /** 'unknown' is a real state: nobody has told us how big the window is. */
   health_status: 'optimal' | 'warning' | 'critical' | 'unknown';

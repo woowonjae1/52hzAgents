@@ -28,6 +28,7 @@ import { SettingsView } from '@/components/settings/settings-view';
 import { EmptyState } from '@/components/chat/empty-state';
 import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { TracePanel } from '@/components/trace/trace-panel';
+import { TokenDashboardPanel } from '@/components/tokens/token-dashboard-panel';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 import { CommandPalette } from './command-palette';
@@ -263,6 +264,7 @@ export function Wrapper() {
                   {activeRightTab === 'radar' && <RadarPanel />}
                   {activeRightTab === 'terminal' && <AgentTerminal />}
                   {activeRightTab === 'trace' && <TracePanel />}
+                  {activeRightTab === 'tokens' && <TokenDashboardPanel />}
                 </div>
               )}
             </>

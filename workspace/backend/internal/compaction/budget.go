@@ -262,3 +262,42 @@ func ChannelLoad(workspaceID, channelName string) (tokens int, measured bool) {
 	}
 	return tokens, measured
 }
+
+// ChannelDiagnostics provides multi-agent context insight for a channel.
+type ChannelDiagnostics struct {
+	MinWindow       int
+	MaxWindow       int
+	BottleneckAgent string
+	HasDisparity    bool
+	Budgets         []AgentBudget
+}
+
+// AnalyzeChannelBudgets evaluates participant capacities to detect bottlenecks and large disparities.
+func AnalyzeChannelBudgets(budgets []AgentBudget) ChannelDiagnostics {
+	min := 0
+	max := 0
+	bottleneck := ""
+	for _, b := range budgets {
+		if b.Window <= 0 {
+			continue
+		}
+		if min == 0 || b.Window < min {
+			min = b.Window
+			bottleneck = b.AgentName
+		}
+		if b.Window > max {
+			max = b.Window
+		}
+	}
+	hasDisparity := false
+	if min > 0 && max >= min*2 {
+		hasDisparity = true
+	}
+	return ChannelDiagnostics{
+		MinWindow:       min,
+		MaxWindow:       max,
+		BottleneckAgent: bottleneck,
+		HasDisparity:    hasDisparity,
+		Budgets:         budgets,
+	}
+}

@@ -84,6 +84,7 @@ func TestGetWorkspaceTokenStatsHandler(t *testing.T) {
 		TotalPromptTokens:     1200,
 		TotalCompletionTokens: 300,
 		TotalTokens:           1500,
+		LastPromptTokens:      850,
 		ContextWindowSize:     128000,
 	})
 
@@ -107,7 +108,7 @@ func TestGetWorkspaceTokenStatsHandler(t *testing.T) {
 	if len(resp.Agents) != 1 {
 		t.Fatalf("expected 1 agent, got %d", len(resp.Agents))
 	}
-	if resp.Agents[0].AgentName != "codex-agent" || resp.Agents[0].TotalTokens != 1500 {
+	if resp.Agents[0].AgentName != "codex-agent" || resp.Agents[0].TotalTokens != 1500 || resp.Agents[0].LastPromptTokens != 850 {
 		t.Errorf("unexpected agent token stat: %+v", resp.Agents[0])
 	}
 	if len(resp.Channels) != 1 {

@@ -25,7 +25,8 @@ export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' 
 // 'browser' watches the browser an agent is driving (remote session, expires,
 // reconnects). 'preview' points at a dev server on this machine. They look
 // alike and share nothing. 'trace' renders full multi-agent execution steps.
-export type RightPanelTab = 'browser' | 'preview' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | 'trace' | null;
+// 'tokens' renders the workspace token governance & channel context health dashboard.
+export type RightPanelTab = 'browser' | 'preview' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | 'trace' | 'tokens' | null;
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';

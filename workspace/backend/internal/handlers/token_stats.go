@@ -19,6 +19,7 @@ type AgentTokenStat struct {
 	TotalPromptTokens     int64   `json:"total_prompt_tokens"`
 	TotalCompletionTokens int64   `json:"total_completion_tokens"`
 	TotalTokens           int64   `json:"total_tokens"`
+	LastPromptTokens      int64   `json:"last_prompt_tokens"`
 	SessionUsedPercent    int     `json:"session_used_percent"`
 	WeekUsedPercent       int     `json:"week_used_percent"`
 	SessionResetsAt       *string `json:"session_resets_at,omitempty"`
@@ -36,6 +37,8 @@ type ChannelContextHealth struct {
 	ContextTokens      int     `json:"context_tokens"`
 	Measured           bool    `json:"measured"`
 	MinContextWindow   int     `json:"min_context_window"`
+	BottleneckAgent    string  `json:"bottleneck_agent,omitempty"`
+	HasDisparity       bool    `json:"has_disparity"`
 	TokenBudgetPercent float64 `json:"token_budget_percent"`
 	// "optimal", "warning", "critical", or "unknown" when no participant has
 	// reported a context window -- which is a real state, not 0%.
@@ -109,7 +112,7 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 		// reported to the dashboard as though it had been measured.
 		model := ""
 		window := compaction.UnknownWindow
-		var pTokens, cTokens, tTokens int64
+		var pTokens, cTokens, tTokens, lastPrompt int64
 		var sPct, wPct int
 		var sResets, wResets *string
 
@@ -128,6 +131,7 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 			if tTokens == 0 && (pTokens > 0 || cTokens > 0) {
 				tTokens = pTokens + cTokens
 			}
+			lastPrompt = u.LastPromptTokens
 			sPct = u.SessionUsedPercent
 			wPct = u.WeekUsedPercent
 			sResets = u.SessionResetsAt
@@ -145,6 +149,7 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 			TotalPromptTokens:     pTokens,
 			TotalCompletionTokens: cTokens,
 			TotalTokens:           tTokens,
+			LastPromptTokens:      lastPrompt,
 			SessionUsedPercent:    sPct,
 			WeekUsedPercent:       wPct,
 			SessionResetsAt:       sResets,
@@ -180,6 +185,7 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 				TotalPromptTokens:     u.TotalPromptTokens,
 				TotalCompletionTokens: u.TotalCompletionTokens,
 				TotalTokens:           tTokens,
+				LastPromptTokens:      u.LastPromptTokens,
 				SessionUsedPercent:    u.SessionUsedPercent,
 				WeekUsedPercent:       u.WeekUsedPercent,
 				SessionResetsAt:       u.SessionResetsAt,
@@ -267,7 +273,8 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 			inverts. And the actual window was available the whole time.
 		*/
 		cfg := compaction.ResolveChannelAdaptiveCompactorConfig(workspace.ID, target)
-		minWindow := compaction.ChannelWindow(workspace.ID, target)
+		diag := compaction.ChannelContextDiagnostics(workspace.ID, target)
+		minWindow := diag.MinWindow
 
 		budgetPct := 0.0
 		healthStatus := "unknown"
@@ -290,6 +297,8 @@ func GetWorkspaceTokenStatsHandler(c *gin.Context) {
 			ContextTokens:      contextTokens,
 			Measured:           measured,
 			MinContextWindow:   minWindow,
+			BottleneckAgent:    diag.BottleneckAgent,
+			HasDisparity:       diag.HasDisparity,
 			TokenBudgetPercent: budgetPct,
 			HealthStatus:       healthStatus,
 			LastCompactedAt:    lastCompactedAt,
