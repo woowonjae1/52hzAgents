@@ -1132,7 +1132,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('tasks')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <CheckCircle2 className="size-4" />
@@ -1156,7 +1156,7 @@ export function ChatView() {
                         onClick={() => {
                           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
                         }}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Search className="size-4" />
@@ -1178,7 +1178,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Activity className="size-4" />
@@ -1200,7 +1200,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => openSettings('general')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Settings className="size-4" />
@@ -1233,7 +1233,7 @@ export function ChatView() {
                         handleDraftChange(item.prompt);
                         setFocusKey((k) => k + 1);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group shadow-xs text-left"
+                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
                     >
                       <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0">
                         <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-primary transition-colors" />

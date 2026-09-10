@@ -156,7 +156,7 @@ export function RunsView() {
               return (
                 <div
                   key={run.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface1/60 hover:bg-surface1 hover:border-border transition-all shadow-xs"
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface1/60 hover:bg-surface1 hover:border-border transition-all"
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {/* Status Icon */}

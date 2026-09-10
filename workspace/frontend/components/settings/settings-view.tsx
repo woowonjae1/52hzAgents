@@ -661,7 +661,7 @@ export function SettingsView() {
                         return (
                           <div
                             key={agent.agentName}
-                            className="p-4 rounded-2xl bg-surface1 border border-border/60 shadow-xs flex flex-col justify-between space-y-3 hover:border-border transition-colors"
+                            className="p-4 rounded-2xl bg-surface1 border border-border/60 flex flex-col justify-between space-y-3 hover:border-border transition-colors"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex items-center gap-3 min-w-0">
@@ -785,7 +785,7 @@ export function SettingsView() {
               </div>
 
               {/* Split Browser Toggle */}
-              <div className="p-5 rounded-2xl bg-surface1 border border-border/60 shadow-xs flex items-center justify-between">
+              <div className="p-5 rounded-2xl bg-surface1 border border-border/60 flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Globe className="size-4 text-primary" />
@@ -884,7 +884,7 @@ export function SettingsView() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Export Markdown */}
-                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 shadow-xs space-y-4 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                       <FileText className="size-5" />
@@ -906,7 +906,7 @@ export function SettingsView() {
                 </div>
 
                 {/* Public Share Link */}
-                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 shadow-xs space-y-4 flex flex-col justify-between">
+                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
                     <div className="size-10 rounded-xl bg-status-success/10 text-status-success flex items-center justify-center">
                       <Share2 className="size-5" />

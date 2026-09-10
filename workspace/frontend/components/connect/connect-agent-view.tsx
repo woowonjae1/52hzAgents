@@ -714,7 +714,7 @@ function CloudAgentsTab({
                   <button
                     key={p.name}
                     onClick={() => onSelectProvider(p.name)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border dark:border-border hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10 text-left transition-all shadow-xs"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border dark:border-border hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10 text-left transition-all"
                   >
                     <div className="size-6 shrink-0 flex items-center justify-center">
                       <ProviderIcon name={p.name} size={22} />
@@ -746,7 +746,7 @@ function CloudAgentsTab({
             return (
               <div
                 key={name}
-                className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border border-border dark:border-border bg-card shadow-xs"
+                className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl border border-border dark:border-border bg-card"
               >
                 <div className="size-7 flex items-center justify-center shrink-0">
                   <ProviderIcon name={providerName} size={28} />

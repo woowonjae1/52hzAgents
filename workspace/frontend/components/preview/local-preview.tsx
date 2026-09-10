@@ -315,7 +315,7 @@ export function LocalPreview() {
           {/* Friendly Overlay when service is not reachable */}
           {loadError && (
             <div className="absolute inset-0 z-20 bg-surface0 flex flex-col items-center justify-center p-6 text-center select-none animate-[fadeIn_0.15s_ease-out]">
-              <div className="size-13 rounded-2xl bg-surface2 border border-border flex items-center justify-center mb-3 shadow-xs">
+              <div className="size-13 rounded-2xl bg-surface2 border border-border flex items-center justify-center mb-3">
                 <Globe className="size-6 text-foreground-extra-muted" />
               </div>
               <h3 className="text-sm font-semibold text-foreground mb-1">No local server running</h3>

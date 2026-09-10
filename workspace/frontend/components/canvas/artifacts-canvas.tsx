@@ -205,7 +205,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={handleCopy}
-              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer"
             >
               {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
             </button>
@@ -214,7 +214,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={handleDownload}
-              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer"
             >
               <Download className="size-3.5" />
             </button>
@@ -223,7 +223,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={() => setIsFullscreen((prev) => !prev)}
-              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer"
             >
               {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
@@ -234,7 +234,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
             <button
               type="button"
               onClick={closeCanvas}
-              className="size-7 rounded-lg border border-border/60 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer shadow-xs"
+              className="size-7 rounded-lg border border-border/60 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer"
             >
               <PanelRightClose className="size-3.5" />
             </button>
@@ -329,7 +329,7 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
                 {annotations.map((ann) => (
                   <div
                     key={ann.id}
-                    className="p-3.5 rounded-xl bg-surface2/80 border border-border shadow-xs space-y-2"
+                    className="p-3.5 rounded-xl bg-surface2/80 border border-border space-y-2"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">

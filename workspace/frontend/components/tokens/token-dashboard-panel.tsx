@@ -134,7 +134,7 @@ export function TokenDashboardPanel() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {/* Workspace Summary Cards */}
         <div className="grid grid-cols-2 gap-2">
-          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-xs">
+          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60">
             <div className="text-3xs font-medium uppercase tracking-wider text-foreground-muted">Total Usage</div>
             <div className="mt-1 text-base font-bold font-mono tabular-nums text-foreground">
               {totalTokens > 0 ? fmtTokens(totalTokens) : '—'}
@@ -144,7 +144,7 @@ export function TokenDashboardPanel() {
             </div>
           </div>
 
-          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60 shadow-xs">
+          <div className="p-3 rounded-xl bg-surface1/80 border border-border/60">
             <div className="text-3xs font-medium uppercase tracking-wider text-foreground-muted">Compaction Checkpoints</div>
             <div className="mt-1 text-base font-bold font-mono tabular-nums text-foreground">
               {compactionRuns}

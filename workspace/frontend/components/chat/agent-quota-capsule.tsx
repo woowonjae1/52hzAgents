@@ -237,7 +237,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
             type="button"
             className={cn(
               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
-              'bg-surface2/80 hover:bg-surface3/90 border-border hover:border-border text-foreground shadow-xs',
+              'bg-surface2/80 hover:bg-surface3/90 border-border hover:border-border text-foreground',
               isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
               className
             )}
@@ -338,7 +338,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                   className={cn(
                     'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium transition-all truncate border cursor-pointer',
                     active
-                      ? 'bg-surface1 text-foreground border-border/60 shadow-xs'
+                      ? 'bg-surface1 text-foreground border-border/60'
                       : 'text-foreground-muted hover:text-foreground border-transparent'
                   )}
                 >

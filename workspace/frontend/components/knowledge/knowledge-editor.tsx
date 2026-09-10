@@ -280,7 +280,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
           </div>
 
           {/* Main Editor / Preview Container */}
-          <div className="flex-1 min-h-[380px] flex flex-col rounded-xl border border-border bg-surface1/60 shadow-xs overflow-hidden">
+          <div className="flex-1 min-h-[380px] flex flex-col rounded-xl border border-border bg-surface1/60 overflow-hidden">
             {/* Markdown Toolbar */}
             <div className="flex items-center justify-between border-b border-border px-3 py-1.5 bg-surface2/60 shrink-0">
               <div className="flex items-center gap-0.5 overflow-x-auto">

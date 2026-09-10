@@ -255,7 +255,7 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
   if (!subagents || subagents.length === 0) return null;
 
   return (
-    <div className="my-2 rounded-xl border border-border bg-surface1/70 backdrop-blur-md p-3 shadow-xs">
+    <div className="my-2 rounded-xl border border-border bg-surface1/70 backdrop-blur-md p-3">
       {/* Root Header */}
       <button
         type="button"

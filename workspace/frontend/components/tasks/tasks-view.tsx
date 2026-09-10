@@ -662,7 +662,7 @@ export function TasksView() {
                       </div>
 
                       {/* Issue rows */}
-                      <div className="overflow-hidden rounded-xl border border-border bg-surface1/60 divide-y divide-border/60 shadow-xs">
+                      <div className="overflow-hidden rounded-xl border border-border bg-surface1/60 divide-y divide-border/60">
                         {group.items.map((todo) => {
                           const overdue = isOverdue(todo, now);
                           const failureReason = getTaskFailureReason(todo, routines);

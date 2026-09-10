@@ -73,7 +73,7 @@ export function ToolTimeline({
   return (
     <div
       className={cn(
-        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3 shadow-xs space-y-2.5 transition-all',
+        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3 space-y-2.5 transition-all',
         className
       )}
     >

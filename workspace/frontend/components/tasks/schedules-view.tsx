@@ -241,7 +241,7 @@ export function SchedulesView() {
                   {pendingTimers.length}
                 </span>
               </div>
-              <div className="overflow-hidden rounded-xl border border-border bg-surface1/60 divide-y divide-border/60 shadow-xs">
+              <div className="overflow-hidden rounded-xl border border-border bg-surface1/60 divide-y divide-border/60">
                 {[...pendingTimers]
                   .sort((a, b) => new Date(a.firesAt).getTime() - new Date(b.firesAt).getTime())
                   .map((timer) => (

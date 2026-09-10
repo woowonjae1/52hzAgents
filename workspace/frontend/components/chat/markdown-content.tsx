@@ -72,7 +72,7 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`knowledge-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-base bg-surface2 border border-border text-status-success font-mono text-2xs font-medium align-baseline shadow-xs"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-base bg-surface2 border border-border text-status-success font-mono text-2xs font-medium align-baseline"
             >
               <BookOpen className="size-3 shrink-0" />
               <span>{slug}</span>
@@ -86,7 +86,7 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`mention-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs align-baseline shadow-xs"
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs align-baseline"
               style={{ color }}
             >
               <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
@@ -182,7 +182,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
     // Tables
     table: ({ children }) => (
-      <div className="overflow-x-auto my-3.5 rounded-lg border border-border shadow-xs">
+      <div className="overflow-x-auto my-3.5 rounded-lg border border-border">
         <table className="w-full text-xs text-left border-collapse">{children}</table>
       </div>
     ),
@@ -198,7 +198,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       if (isInline) {
         return (
           <code
-            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal shadow-xs mx-0.5"
+            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal mx-0.5"
             {...props}
           >
             {children}
@@ -281,7 +281,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
       // Modern IDE-grade Code Block (Optimized for both Light & Dark themes)
       return (
-        <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono shadow-xs dark:shadow-md">
+        <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono dark:shadow-md">
           <div className="flex items-center justify-between px-3.5 py-2 bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none">
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 mr-1 opacity-80">

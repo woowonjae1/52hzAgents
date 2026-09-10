@@ -75,7 +75,7 @@ export function ToolCall({
   return (
     <div
       className={cn(
-        'my-1.5 rounded-xl border border-border bg-surface1/60 overflow-hidden shadow-xs transition-all',
+        'my-1.5 rounded-xl border border-border bg-surface1/60 overflow-hidden transition-all',
         className
       )}
     >

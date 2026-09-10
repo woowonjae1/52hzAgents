@@ -634,7 +634,7 @@ export function PromptComposer({
               {pendingFiles.map((pf, idx) => (
                 <div
                   key={idx}
-                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/80 border border-border/60 shadow-xs backdrop-blur-xs"
+                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/80 border border-border/60 backdrop-blur-xs"
                 >
                   {pf.preview ? (
                     <img
