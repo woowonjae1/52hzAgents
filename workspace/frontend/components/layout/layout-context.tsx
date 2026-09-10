@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { RowContextMenu } from '@/components/layout/row-context-menu';
 import {
   DEFAULT_SIDEBAR_WIDTH,
   clampSidebarWidth,
@@ -262,6 +263,9 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     <LayoutContext.Provider value={value}>
       <div data-slot="layout-wrapper" className="flex grow">
         <TooltipProvider delayDuration={0}>
+          {/* Right-click on any row opens that row's own actions menu. One
+              listener rather than a prop threaded through every list. */}
+          <RowContextMenu />
           {children}
         </TooltipProvider>
       </div>
