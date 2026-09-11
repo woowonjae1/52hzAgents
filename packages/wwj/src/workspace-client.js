@@ -490,21 +490,22 @@ class WorkspaceClient {
   // ── File methods ──
 
   /**
-   * Upload a file via POST /v1/files/base64.
+   * Upload a file via multipart POST /v1/files.
    */
   async uploadFile(workspaceId, token, filename, contentBase64, {
     contentType = 'application/octet-stream', source = 'human:user', channelName,
   } = {}) {
-    const body = {
-      filename,
-      content_base64: contentBase64,
-      content_type: contentType,
-      network: workspaceId,
-      source,
-    };
-    if (channelName) body.channel_name = channelName;
-
-    const data = await this._post('/v1/files/base64', body, this._wsHeaders(token), 60000);
+    const bytes = Buffer.from(contentBase64, 'base64');
+    const form = new FormData();
+    form.append('file', new Blob([bytes], { type: contentType }), filename);
+    form.append('network', workspaceId);
+    form.append('source', source);
+    if (channelName) form.append('channel_name', channelName);
+    const headers = this._wsHeaders(token);
+    delete headers['Content-Type'];
+    const response = await fetch(`${this.endpoint}/v1/files`, { method: 'POST', headers, body: form });
+    if (!response.ok) throw new Error(`Upload failed: ${await response.text()}`);
+    const data = await response.json();
     return data.data || data;
   }
 

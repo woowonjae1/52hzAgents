@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // normalizeChannel 标准化通道名称，统一去除 channel/ 前缀。
@@ -18,6 +20,7 @@ type Client struct {
 	WorkspaceID string      // 客户端所属的工作区 ID，用于进行工作区级别隔离。
 	ChannelName string      // 客户端订阅的特定会话通道名，若为空则订阅该工作区下的所有通道。
 	Send        chan string // 每个客户端独占的一个缓冲信道，用于异步接收即将推送给客户端的事件字符串。
+	ConnectedAt time.Time
 }
 
 // BroadcastMsg 结构体包装了要广播的消息数据以及路由过滤信息。
@@ -35,6 +38,8 @@ type EventHub struct {
 	unregister chan *Client                             // 注销信道（带缓冲）
 	broadcast  chan BroadcastMsg                        // 广播信道（带缓冲）
 	mu         sync.RWMutex                             // 读写锁，保护 clients 和 wsClients
+	dropped    atomic.Uint64
+	broadcasts atomic.Uint64
 }
 
 // GlobalHub 是全局唯一的事件总线单例。
@@ -54,7 +59,18 @@ func InitHub() {
 
 // Register 用于向总线注册一个新客户端。
 func (h *EventHub) Register(c *Client) {
+	if c.ConnectedAt.IsZero() {
+		c.ConnectedAt = time.Now()
+	}
 	h.register <- c
+}
+
+// Stats returns a point-in-time view for health and operational dashboards.
+func (h *EventHub) Stats() map[string]uint64 {
+	h.mu.RLock()
+	clients := uint64(len(h.clients))
+	h.mu.RUnlock()
+	return map[string]uint64{"active_connections": clients, "dropped_messages": h.dropped.Load(), "broadcasts": h.broadcasts.Load(), "broadcast_queue_depth": uint64(len(h.broadcast))}
 }
 
 // Unregister 用于从总线注销一个已断开连接的客户端。
@@ -117,6 +133,7 @@ func (h *EventHub) run() {
 			log.Printf("Client unregistered from Hub: %s", client.ID)
 
 		case msg := <-h.broadcast:
+			h.broadcasts.Add(1)
 			h.mu.RLock()
 			wsMap, wsOk := h.wsClients[msg.WorkspaceID]
 			if wsOk {
@@ -127,6 +144,7 @@ func (h *EventHub) run() {
 						select {
 						case client.Send <- msg.Payload:
 						default:
+							h.dropped.Add(1)
 							log.Printf("Warning: Client %s buffer is full, event dropped", client.ID)
 						}
 					}

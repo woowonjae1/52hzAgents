@@ -59,7 +59,7 @@ func main() { // 服务程序运行主入口函数。
 	)
 
 	// Initialize Database (SQLite/Postgres) and run migrations
-	db.InitDB() // 执行数据库建立连接并自动映射表结构。
+	db.InitDB()                      // 执行数据库建立连接并自动映射表结构。
 	handlers.ResetAllDanglingTurns() // 清理历史遗留的悬挂锁，防止排队死锁。
 
 	// Initialize Event Hub
@@ -103,6 +103,7 @@ func main() { // 服务程序运行主入口函数。
 				"db_dialect": db.DB.Dialector.Name(),         // 当前数据库驱动类型。
 			}) // 渲染返回。
 		}) // 结束健康状况路由。
+		v1.GET("/health/hub", handlers.HubStats)
 
 		// 注册实时事件接口路由组：
 		v1.POST("/events", handlers.SendEvent) // 客户端或 Agent 提交新事件的接口。
@@ -119,15 +120,15 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/token/resolve", handlers.ResolveToken)
 		v1.GET("/workspaces/:workspace_id", handlers.GetWorkspace) // 获取指定工作区详情。
 		v1.PATCH("/workspaces/:workspace_id", handlers.UpdateWorkspace)
-		v1.DELETE("/workspaces/:workspace_id", handlers.DeleteWorkspace)                    // 软删除工作区。
-		v1.PATCH("/workspaces/:workspace_id/channels/:channel_name", handlers.PatchChannel) // 修改会话通道属性。
-		v1.GET("/workspaces/:workspace_id/channels/:channel_name", handlers.GetChannel)     // 获取单通道详情。
-		v1.POST("/workspaces/:workspace_id/channels/:channel_name/compact", handlers.CompactChannelHandler)          // 触发频道上下文压缩
-		v1.GET("/workspaces/:workspace_id/channels/:channel_name/summary", handlers.GetChannelSummaryHandler)        // 查询频道最新历史摘要
+		v1.DELETE("/workspaces/:workspace_id", handlers.DeleteWorkspace)                                                  // 软删除工作区。
+		v1.PATCH("/workspaces/:workspace_id/channels/:channel_name", handlers.PatchChannel)                               // 修改会话通道属性。
+		v1.GET("/workspaces/:workspace_id/channels/:channel_name", handlers.GetChannel)                                   // 获取单通道详情。
+		v1.POST("/workspaces/:workspace_id/channels/:channel_name/compact", handlers.CompactChannelHandler)               // 触发频道上下文压缩
+		v1.GET("/workspaces/:workspace_id/channels/:channel_name/summary", handlers.GetChannelSummaryHandler)             // 查询频道最新历史摘要
 		v1.GET("/workspaces/:workspace_id/channels/:channel_name/history/compacted", handlers.GetCompactedHistoryHandler) // 获取压缩摘要+近期对话
 		v1.GET("/workspaces/:workspace_id/tokens/stats", handlers.GetWorkspaceTokenStatsHandler)                          // 获取工作区多智能体 Token 治理与上下文健康大盘
-		v1.GET("/workspaces/:workspace_id/policy/exec", handlers.GetWorkspaceExecPolicy)     // 获取命令执行安全策略
-		v1.PUT("/workspaces/:workspace_id/policy/exec", handlers.UpdateWorkspaceExecPolicy)  // 更新命令执行安全策略
+		v1.GET("/workspaces/:workspace_id/policy/exec", handlers.GetWorkspaceExecPolicy)                                  // 获取命令执行安全策略
+		v1.PUT("/workspaces/:workspace_id/policy/exec", handlers.UpdateWorkspaceExecPolicy)                               // 更新命令执行安全策略
 
 		// 注册 Agent 节点接入网络接口：
 		v1.POST("/join", handlers.JoinNetwork)                                 // Agent 登入工作区网络接口。
@@ -156,13 +157,13 @@ func main() { // 服务程序运行主入口函数。
 		v1.GET("/timers", handlers.ListTimers)               // 列出活跃状态的计时器。
 		v1.DELETE("/timers/:timer_id", handlers.DeleteTimer) // 取消定时提醒。
 
-		v1.POST("/routines", handlers.CreateRoutine)               // 创建周期性循环执行任务。
-		v1.GET("/routines", handlers.ListRoutines)                 // 列出活跃中的循环任务。
+		v1.POST("/routines", handlers.CreateRoutine)                     // 创建周期性循环执行任务。
+		v1.GET("/routines", handlers.ListRoutines)                       // 列出活跃中的循环任务。
 		v1.PATCH("/routines/:routine_id", handlers.UpdateRoutine)        // 就地编辑日程（保留短号与运行历史）。
 		v1.PATCH("/routines/:routine_id/toggle", handlers.ToggleRoutine) // 暂停或恢复周期任务。
 		v1.POST("/routines/:routine_id/run", handlers.TriggerRoutineNow) // 立即执行一次周期任务。
-		v1.DELETE("/routines/:routine_id", handlers.DeleteRoutine) // 撤销或取消周期任务。
-		v1.GET("/routine-runs", handlers.ListRoutineRuns)          // 查询任务执行记录。
+		v1.DELETE("/routines/:routine_id", handlers.DeleteRoutine)       // 撤销或取消周期任务。
+		v1.GET("/routine-runs", handlers.ListRoutineRuns)                // 查询任务执行记录。
 		v1.POST("/notifications", handlers.CreateNotification)
 		v1.GET("/notifications", handlers.ListNotifications)
 		v1.PATCH("/notifications/read-all", handlers.MarkAllNotificationsRead)
