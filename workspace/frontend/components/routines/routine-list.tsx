@@ -126,7 +126,7 @@ export function RoutineList() {
                     'group w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors border-b border-border/60',
                     isSelected
                       ? 'bg-surface2'
-                      : 'hover:bg-surface1 dark:hover:bg-primary/50'
+                      : 'hover:bg-surface1'
                   )}
                   onClick={() => handleSelect(routine.channelName)}
                 >

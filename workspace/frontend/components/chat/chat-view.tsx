@@ -1156,7 +1156,7 @@ export function ChatView() {
                           <CheckCircle2 className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
                             <span>Tasks & Kanban Board</span>
                             <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
                               Open →
@@ -1180,7 +1180,7 @@ export function ChatView() {
                           <Search className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
                             <span>Command Palette</span>
                             <kbd className="text-3xs font-mono text-foreground-extra-muted bg-surface3 px-1.5 py-0.2 rounded border border-border/60">
                               Ctrl+K
@@ -1202,7 +1202,7 @@ export function ChatView() {
                           <Activity className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
                             <span>Mission Control</span>
                             <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
                               Open →
@@ -1224,7 +1224,7 @@ export function ChatView() {
                           <Settings className="size-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
                             <span>System Settings</span>
                             <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
                               Open →
@@ -1254,10 +1254,10 @@ export function ChatView() {
                       className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
                     >
                       <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0">
-                        <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-primary transition-colors" />
+                        <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-foreground transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                        <div className="text-xs font-semibold text-foreground flex items-center justify-between">
                           <span>{item.title}</span>
                           <span className="text-3xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
                             ↵

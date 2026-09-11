@@ -296,7 +296,7 @@ export function AgentProfilePanel() {
           <Hint label="Close">
             <button
               onClick={() => setSelectedAgentName(null)}
-              className="size-7 flex items-center justify-center rounded-md hover:bg-surface3/60 dark:hover:bg-primary text-muted-foreground transition-colors"
+              className="size-7 flex items-center justify-center rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               <X className="size-4" />
             </button>
@@ -801,7 +801,7 @@ export function AgentProfilePanel() {
           <div className="flex gap-2">
             <button
               onClick={handleStartThread}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border bg-background hover:bg-surface1 dark:hover:bg-primary transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border bg-surface1 hover:bg-surface2 text-foreground transition-colors cursor-pointer"
             >
               <Plus className="size-3" />
               Start a Channel

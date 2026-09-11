@@ -153,7 +153,7 @@ export function BrowserTabList() {
                       'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
                       selectedBrowserTabId === tab.id
                         ? 'bg-surface2'
-                        : 'hover:bg-surface1 dark:hover:bg-primary/50'
+                        : 'hover:bg-surface2'
                     )}
                   >
                     <Lock className="size-4 text-status-success shrink-0" />
@@ -169,7 +169,7 @@ export function BrowserTabList() {
                     <Hint label="Close tab">
                       <button
                         onClick={(e) => handleClose(e, tab.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
                       >
                         <X className="size-3.5" />
                       </button>
@@ -197,7 +197,7 @@ export function BrowserTabList() {
                       <button
                         onClick={(e) => handleOpenWithContext(e, ctx.id)}
                         disabled={opening}
-                        className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-success transition-colors disabled:opacity-50"
+                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-success transition-colors disabled:opacity-50 cursor-pointer"
                       >
                         <Play className="size-3.5" />
                       </button>
@@ -205,7 +205,7 @@ export function BrowserTabList() {
                     <Hint label="Delete saved session">
                       <button
                         onClick={(e) => handleDeleteContext(e, ctx.id, ctx.name)}
-                        className="p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-colors"
+                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
                       >
                         <Trash2 className="size-3.5" />
                       </button>
@@ -233,7 +233,7 @@ export function BrowserTabList() {
                     'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
                     selectedBrowserTabId === tab.id
                       ? 'bg-surface2'
-                      : 'hover:bg-surface1 dark:hover:bg-primary/50'
+                      : 'hover:bg-surface2'
                   )}
                 >
                   <Globe className="size-4 text-foreground-muted shrink-0" />
@@ -251,7 +251,7 @@ export function BrowserTabList() {
                   <Hint label="Close tab">
                     <button
                       onClick={(e) => handleClose(e, tab.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-status-danger transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
                     >
                       <X className="size-3.5" />
                     </button>

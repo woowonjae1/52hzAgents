@@ -377,7 +377,7 @@ export function CreateRoutineDialog({
                           // --primary is near-white, so a hardcoded white label
                           // left the selected days as blank blocks.
                           ? 'bg-primary border-primary text-primary-foreground font-semibold'
-                          : 'border-border text-muted-foreground hover:bg-surface1 dark:hover:bg-primary'
+                          : 'border-border text-muted-foreground hover:bg-surface2 hover:text-foreground'
                       )}
                     >
                       {label}
@@ -407,7 +407,7 @@ export function CreateRoutineDialog({
                       'flex-1 text-xs font-medium py-1.5 rounded-md transition-colors border',
                       intervalMinutes === preset.value
                         ? 'bg-primary border-primary text-primary-foreground font-semibold'
-                        : 'border-border text-muted-foreground hover:bg-surface1 dark:hover:bg-primary'
+                        : 'border-border text-muted-foreground hover:bg-surface2 hover:text-foreground'
                     )}
                   >
                     {preset.label}

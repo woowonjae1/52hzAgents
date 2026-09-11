@@ -379,7 +379,7 @@ function LocalAgentsTab({
                 'flex items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all shadow-xs',
                 isSelected
                   ? 'border-primary bg-surface1/50'
-                  : 'border-border dark:border-border hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10',
+                  : 'border-border hover:border-border-accent hover:bg-surface2',
               )}
             >
               <div className="size-8 shrink-0 flex items-center justify-center">
@@ -608,7 +608,7 @@ function CloudAgentsTab({
                           'flex items-center gap-2.5 px-3 py-2 rounded-lg border text-xs text-left transition-colors shadow-xs',
                           cfgModel === modelId
                             ? 'border-primary bg-surface1/50 font-semibold'
-                            : 'border-transparent hover:bg-surface2/40 dark:hover:bg-primary/20 text-foreground-muted hover:text-foreground',
+                            : 'border-transparent hover:bg-surface2 text-foreground-muted hover:text-foreground',
                         )}
                       >
                         <CategoryIcon category={modelCat} className="size-3.5 shrink-0 opacity-70" />
@@ -732,7 +732,7 @@ function CloudAgentsTab({
                   <button
                     key={p.name}
                     onClick={() => onSelectProvider(p.name)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border dark:border-border hover:border-border-accent hover:bg-surface1/20 dark:hover:bg-primary/10 text-left transition-all"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border hover:border-border-accent hover:bg-surface2 text-left transition-all"
                   >
                     <div className="size-6 shrink-0 flex items-center justify-center">
                       <ProviderIcon name={p.name} size={22} />

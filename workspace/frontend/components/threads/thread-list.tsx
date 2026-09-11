@@ -83,7 +83,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="bg-yellow-200 dark:bg-yellow-800 text-foreground rounded-sm px-0.5">{text.slice(idx, idx + query.length)}</mark>
+      <mark className="bg-primary/20 text-foreground font-semibold rounded-xs px-0.5">{text.slice(idx, idx + query.length)}</mark>
       {text.slice(idx + query.length)}
     </>
   );
@@ -453,10 +453,10 @@ const ThreadRow = memo(function ThreadRow({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 dark:hover:bg-primary shrink-0"
+            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0 cursor-pointer"
             onClick={(e) => e.stopPropagation()}
           >
-            <MoreVertical className="size-3.5 text-muted-foreground" />
+            <MoreVertical className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
@@ -1173,10 +1173,10 @@ export function ThreadList() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 dark:hover:bg-primary shrink-0"
+                              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0 cursor-pointer"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <MoreVertical className="size-3.5 text-muted-foreground" />
+                              <MoreVertical className="size-3.5" />
                             </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44">

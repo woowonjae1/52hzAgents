@@ -176,7 +176,7 @@ export function TasksBoard({
                     onDragStart={(e) => handleDragStart(e, task.id)}
                     title={failureReason ? `Reason: ${failureReason}` : undefined}
                     className={cn(
-                      'group skip-offscreen-card relative rounded-lg border border-border bg-surface2/90 p-3 text-sm transition-all hover:border-border hover:shadow-xs cursor-grab active:cursor-grabbing',
+                      'group skip-offscreen-card relative rounded-lg border border-border bg-surface2/90 p-3 text-sm transition-all hover:border-border-accent hover:shadow-xs cursor-grab active:cursor-grabbing',
                       draggedTaskId === task.id && 'opacity-40 border-dashed border-primary/50'
                     )}
                   >
@@ -287,7 +287,7 @@ export function TasksBoard({
                           <button
                             type="button"
                             onClick={() => onEdit(task)}
-                            className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
+                            className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
                           >
                             <Pencil className="size-3" />
                           </button>
@@ -296,7 +296,7 @@ export function TasksBoard({
                           <button
                             type="button"
                             onClick={() => onDelete(task)}
-                            className="p-1 rounded text-foreground-extra-muted hover:text-destructive hover:bg-surface3 transition-colors"
+                            className="p-1 rounded text-foreground-extra-muted hover:text-destructive hover:bg-surface3 transition-colors cursor-pointer"
                           >
                             <Trash2 className="size-3" />
                           </button>

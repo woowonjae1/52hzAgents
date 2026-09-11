@@ -314,7 +314,7 @@ export function FileList() {
                     ? 'bg-primary/10 ring-1 ring-primary/30'
                     : isCurrentActive
                     ? 'bg-surface2'
-                    : 'hover:bg-surface1 dark:hover:bg-primary/50'
+                    : 'hover:bg-surface2'
                 )}
               >
                 {/* Selection checkbox — visible when selected or on row hover */}
@@ -345,7 +345,7 @@ export function FileList() {
                       e.stopPropagation();
                       setSingleDeleteTarget({ id: file.id, name: basename(file.filename) });
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 dark:hover:bg-primary text-muted-foreground hover:text-destructive transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
                   >
                     <Trash2 className="size-3.5" />
                   </button>
