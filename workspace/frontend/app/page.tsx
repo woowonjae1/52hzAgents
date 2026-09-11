@@ -607,7 +607,7 @@ function Dashboard({ autoCreateIfEmpty = false }: { autoCreateIfEmpty?: boolean 
         <div className="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <SignalMark size={22} />
-            <h1 className="font-semibold text-sm tracking-tight">52hzAgents Workspaces</h1>
+            <h1 className="font-semibold text-sm tracking-tight">52hzAgent Studio</h1>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-2xs font-medium font-mono text-muted-foreground hidden sm:inline">{user?.email}</span>

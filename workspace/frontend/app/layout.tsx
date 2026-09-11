@@ -49,7 +49,7 @@ const POSTHOG_HOST = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://d.openagen
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 
 export const metadata: Metadata = {
-  title: '52hzAgents Workspace',
+  title: '52hzAgent Studio',
   description: 'Interact with your AI agents in real time in a high-concurrency multi-agent collaboration space',
   icons: {
     icon: [

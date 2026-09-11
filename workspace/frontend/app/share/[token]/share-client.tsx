@@ -160,14 +160,14 @@ export function ShareClient({ params }: { params: Promise<{ token: string }> }) 
       {/* Footer */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 text-center border-t mt-8">
         <p className="text-sm text-muted-foreground mb-3">
-          This is a snapshot of a conversation on 52hzAgents Workspace.
+          This is a snapshot of a conversation on 52hzAgent Studio.
         </p>
         <a
           href="https://github.com/woowonjae1/52hzAgents"
           className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
         >
           <SignalMark size={18} />
-          Try 52hzAgents Workspace
+          Try 52hzAgent Studio
         </a>
       </div>
     </div>

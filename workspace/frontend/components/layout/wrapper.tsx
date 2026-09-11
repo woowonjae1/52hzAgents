@@ -50,7 +50,7 @@ function WorkspaceLoadingScreen() {
             actually wants. */}
         <SignalMark size={72} />
         <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgents Workspace</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgent Studio</h1>
           <p className="text-xs text-foreground-extra-muted mt-1.5">Loading your workspace…</p>
         </div>
       </div>

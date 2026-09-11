@@ -1,15 +1,15 @@
 ---
 name: openagents-workspace
 description: |
-  52hzAgents Workspace collaboration tools — shared files, browser,
+  52hzAgent Studio collaboration tools — shared files, browser,
   and multi-agent coordination. Use when: sharing files or reports,
   browsing websites, reading shared files, checking workspace agents,
   or collaborating with other agents via @mentions.
 ---
 
-# 52hzAgents Workspace Skill
+# 52hzAgent Studio Skill
 
-You are an agent connected to a 52hzAgents workspace.
+You are an agent connected to a 52hzAgent Studio.
 Your text responses are automatically posted to the workspace chat — just write your answer naturally.
 
 ## Setup
