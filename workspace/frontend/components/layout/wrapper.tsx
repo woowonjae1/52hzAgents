@@ -35,8 +35,11 @@ import { CommandPalette } from './command-palette';
 import { AppTitlebar } from './app-titlebar';
 import { useIsDesktop } from '@/lib/desktop';
 
+import { Hint } from '@/components/ui/hint';
+import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
+import { useArtifacts } from '@/lib/artifacts-context';
 import { SignalMark } from '@/components/brand/signal-mark';
-import { Network, X, PanelLeft } from 'lucide-react';
+import { Network, X, PanelLeft, FileText, Globe, CheckSquare, Terminal, Activity, Coins } from 'lucide-react';
 
 function WorkspaceLoadingScreen() {
   return (
@@ -70,10 +73,76 @@ const MIN_DOCKED_WIDTH = 680;
 export function Wrapper() {
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading, workspace } = useWorkspace();
+  const { activeArtifact, isCanvasOpen, closeCanvas } = useArtifacts();
   const hasAgents = agents.length > 0;
   const isDesktop = useIsDesktop();
   const desktopContainerRef = React.useRef<HTMLDivElement>(null);
   const narrowStateRef = React.useRef<boolean | null>(null);
+
+  // Studio width & drag-to-resize logic
+  const [studioWidth, setStudioWidth] = React.useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('studio_panel_width');
+        if (saved) return Math.max(380, Math.min(900, parseInt(saved, 10)));
+      } catch {}
+    }
+    return 480;
+  });
+  const [isStudioResizing, setIsStudioResizing] = React.useState(false);
+  const studioWidthRef = React.useRef(studioWidth);
+  studioWidthRef.current = studioWidth;
+
+  const startStudioResize = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsStudioResizing(true);
+  }, []);
+
+  React.useEffect(() => {
+    if (!isStudioResizing) return;
+    const onMove = (e: MouseEvent) => {
+      const maxAllowed = typeof window !== 'undefined' ? Math.max(400, window.innerWidth - 380) : 900;
+      const newWidth = Math.min(maxAllowed, Math.max(380, window.innerWidth - e.clientX));
+      setStudioWidth(newWidth);
+    };
+    const onUp = () => {
+      setIsStudioResizing(false);
+      try {
+        localStorage.setItem('studio_panel_width', studioWidthRef.current.toString());
+      } catch {}
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    const prevCursor = document.body.style.cursor;
+    const prevSelect = document.body.style.userSelect;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = prevCursor;
+      document.body.style.userSelect = prevSelect;
+    };
+  }, [isStudioResizing]);
+
+  const isStudioOpen =
+    !isDetailExpanded &&
+    (activeRightTab !== null || isCanvasOpen) &&
+    viewMode !== 'mission' &&
+    viewMode !== 'connect' &&
+    viewMode !== 'files';
+
+  const effectiveStudioTab =
+    activeRightTab !== null
+      ? activeRightTab
+      : isCanvasOpen && activeArtifact
+      ? 'canvas'
+      : null;
+
+  const handleCloseStudio = React.useCallback(() => {
+    setActiveRightTab(null);
+    closeCanvas();
+  }, [setActiveRightTab, closeCanvas]);
 
   // ShellFit container query: auto-collapse sidebar if the parent container box width drops below 680px
   React.useEffect(() => {
@@ -246,26 +315,140 @@ export function Wrapper() {
                 {isAgentPanelOpen && <AgentProfilePanel />}
               </div>
 
-              {/* Column 3: Right Collapsible Preview Panel */}
-              {!isDetailExpanded && activeRightTab !== null && viewMode !== 'mission' && viewMode !== 'connect' && viewMode !== 'files' && (
-                <div className="shrink-0 w-[420px] xl:w-[460px] bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm flex flex-col animate-[fadeIn_0.15s_ease-out] relative">
-                  {/* Close button for right panel */}
-                  <button 
-                    onClick={() => setActiveRightTab(null)}
-                    className="absolute top-3 right-3 z-10 size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground dark:text-foreground-extra-muted dark:hover:text-foreground-extra-muted transition-colors cursor-pointer"
-                    title="Close preview panel"
+              {/* Column 3: Unified Right Studio */}
+              {isStudioOpen && (
+                <aside
+                  aria-label="Studio Panel"
+                  style={{ width: `${studioWidth}px` }}
+                  className={cn(
+                    "shrink-0 h-full border-l border-border bg-surface1 flex flex-col z-20 relative select-text",
+                    isStudioResizing ? "select-none transition-none" : "transition-[width] duration-75"
+                  )}
+                >
+                  {/* Left Drag-to-Resize Handle */}
+                  <div
+                    onMouseDown={startStudioResize}
+                    className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none"
+                    title="Drag to resize Studio"
                   >
-                    <X className="size-4" />
-                  </button>
-                  {activeRightTab === 'browser' && <LocalPreview />}
-                  {activeRightTab === 'preview' && <LocalPreview />}
-                  {activeRightTab === 'file' && <FilePreview />}
-                  {activeRightTab === 'tasks' && <TasksView />}
-                  {activeRightTab === 'radar' && <RadarPanel />}
-                  {activeRightTab === 'terminal' && <AgentTerminal />}
-                  {activeRightTab === 'trace' && <TracePanel />}
-                  {activeRightTab === 'tokens' && <TokenDashboardPanel />}
-                </div>
+                    <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
+                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
+                      <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                      <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                      <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                    </div>
+                  </div>
+
+                  {/* Studio Header Bar */}
+                  <div className="app-header justify-between px-2.5 shrink-0 flex-nowrap border-b border-border bg-surface1 select-none">
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+                      {activeArtifact && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveRightTab('canvas')}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                            effectiveStudioTab === 'canvas'
+                              ? "bg-surface3 text-foreground font-semibold border border-border"
+                              : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                          )}
+                        >
+                          <FileText className="size-3.5" />
+                          <span>Canvas</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setActiveRightTab('preview')}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                          (effectiveStudioTab === 'preview' || effectiveStudioTab === 'browser')
+                            ? "bg-surface3 text-foreground font-semibold border border-border"
+                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                        )}
+                      >
+                        <Globe className="size-3.5" />
+                        <span>Preview</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveRightTab('tasks')}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                          effectiveStudioTab === 'tasks'
+                            ? "bg-surface3 text-foreground font-semibold border border-border"
+                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                        )}
+                      >
+                        <CheckSquare className="size-3.5" />
+                        <span>Tasks</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveRightTab('terminal')}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                          effectiveStudioTab === 'terminal'
+                            ? "bg-surface3 text-foreground font-semibold border border-border"
+                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                        )}
+                      >
+                        <Terminal className="size-3.5" />
+                        <span>Terminal</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveRightTab('trace')}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                          effectiveStudioTab === 'trace'
+                            ? "bg-surface3 text-foreground font-semibold border border-border"
+                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                        )}
+                      >
+                        <Activity className="size-3.5" />
+                        <span>Trace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveRightTab('tokens')}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                          effectiveStudioTab === 'tokens'
+                            ? "bg-surface3 text-foreground font-semibold border border-border"
+                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                        )}
+                      >
+                        <Coins className="size-3.5" />
+                        <span>Tokens</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 ml-1">
+                      <Hint label="Close Studio (Esc)">
+                        <button
+                          type="button"
+                          onClick={handleCloseStudio}
+                          className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </Hint>
+                    </div>
+                  </div>
+
+                  {/* Studio Content Pane */}
+                  <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+                    {effectiveStudioTab === 'canvas' && <ArtifactsCanvas embedded />}
+                    {(effectiveStudioTab === 'browser' || effectiveStudioTab === 'preview') && <LocalPreview />}
+                    {effectiveStudioTab === 'file' && <FilePreview />}
+                    {effectiveStudioTab === 'tasks' && <TasksView />}
+                    {effectiveStudioTab === 'radar' && <RadarPanel />}
+                    {effectiveStudioTab === 'terminal' && <AgentTerminal />}
+                    {effectiveStudioTab === 'trace' && <TracePanel />}
+                    {effectiveStudioTab === 'tokens' && <TokenDashboardPanel />}
+                  </div>
+                </aside>
               )}
             </>
           )}

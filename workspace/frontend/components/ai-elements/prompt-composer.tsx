@@ -588,39 +588,12 @@ export function PromptComposer({
            * 4px halo on a control that is focused most of the time is a
            * permanent glow, and blue was not a token.
            */
-          'relative rounded-2xl overflow-hidden',
-          'bg-surface1 border border-border transition-colors duration-150',
+          'relative rounded-xl overflow-hidden',
+          'bg-surface1/95 backdrop-blur-xl border border-border shadow-md transition-all duration-150',
           'hover:border-border-accent focus-within:border-border-accent',
           isDragging && 'border-border-accent bg-surface2'
         )}
       >
-        {/* Compact Mode Hint (Macro orchestration is controlled via Header) */}
-        {currentMode !== 'dynamic' && (
-          <div className="flex items-center justify-between gap-2 px-3.5 py-1.5 text-3xs select-none bg-surface2/20 text-foreground-muted">
-            <div className="flex items-center gap-1.5">
-              {currentMode === 'master' ? (
-                <>
-                  <Crown className="size-3 text-status-warning" />
-                  <span>Master Mode: @{masterAgentName}</span>
-                </>
-              ) : (
-                <>
-                  <Waypoints className="size-3 text-primary" />
-                  <span>Custom Workflow Plan active</span>
-                </>
-              )}
-            </div>
-            {currentMode === 'workflow' && (
-              <button
-                type="button"
-                onClick={() => setWorkflowPlanOpen(true)}
-                className="hover:text-foreground underline cursor-pointer"
-              >
-                Edit Plan
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Pending Files Previews */}
         <AnimatePresence>
@@ -726,11 +699,11 @@ export function PromptComposer({
           placeholder={
             disabled
               ? 'Connect an agent to start chatting…'
-              : 'Message 52hzAgents — type @ to mention an agent or / for knowledge base…'
+              : 'Message 52hzAgents… (@ for agents, / for knowledge)'
           }
           disabled={disabled}
           rows={1}
-          className="w-full resize-none bg-transparent px-4 pt-3.5 pb-2.5 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[48px]"
+          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[44px]"
         />
 
         {/* Bottom Control Row */}
@@ -741,6 +714,34 @@ export function PromptComposer({
               participants={session?.participants}
               sessionId={session?.sessionId}
             />
+
+            {currentMode !== 'dynamic' && (
+              <>
+                <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0" />
+                <div
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface2 border border-border text-foreground-muted select-none"
+                  title={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}
+                >
+                  {currentMode === 'master' ? (
+                    <>
+                      <Crown className="size-3 text-foreground-muted shrink-0" />
+                      <span className="truncate max-w-[120px]">Master: @{masterAgentName}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Waypoints className="size-3 text-foreground-muted shrink-0" />
+                      <button
+                        type="button"
+                        onClick={() => setWorkflowPlanOpen(true)}
+                        className="hover:text-foreground underline cursor-pointer"
+                      >
+                        Workflow Plan
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0" />
 

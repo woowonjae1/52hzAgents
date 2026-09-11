@@ -552,84 +552,90 @@ export const ChatMessage = memo(function ChatMessage({
     }
   }, [onRegenerate, message, currentUser.name]);
 
-  // ── User Messages (Modern AI Floating Bubble) ──
+  // ── User Messages (Modern Engineering Full-Width Stream) ──
   if (isHuman) {
     const isCurrentUser = isCurrentHumanMessage(message, currentUser);
+    const displayName = isCurrentUser ? (currentUser.name || message.senderName || 'You') : (message.senderName || 'User');
 
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="py-2.5 flex justify-end group/usermsg select-text">
-            <div className="flex items-start gap-3 flex-row-reverse max-w-[85%] lg:max-w-[70%] min-w-0">
-              {/*
-                Your mark mirrors the agent avatar across the transcript, so it has
-                to match it: 28px (AgentAvatar's size, and the size-7 spacer used
-                when a header is suppressed) and a gap-3 gutter. It was 30px at
-                gap-2.5, which read as subtly off on both axes.
-
-                Vertically it centres on the bubble's FIRST TEXT LINE rather than
-                the bubble's top edge — the agent avatar aligns to a bare text row,
-                while this one sits beside a padded bubble, so matching the raw top
-                offset would ride high by the bubble's padding. The box below is the
-                bubble's top padding (py-2.5) plus one line box, and it inherits the
-                bubble's own type so it survives the pending root/type rescale.
-              */}
-              <div
-                className="flex shrink-0 items-center text-sm leading-relaxed"
-                style={{ height: 'calc(1.25rem + 1lh)' }}
-              >
+          <div className="group/usermsg py-3.5 select-text">
+            <div className="flex items-start gap-3 w-full">
+              <div className="mt-0.5 shrink-0">
                 <SignalMark size={28} still={false} />
               </div>
-              {/* Refined AI User Bubble */}
-              {/*
-                The bubble sits directly on the transcript, not above it, so the drop
-                shadow and the 12px backdrop blur it carried were both drawing depth
-                that is not there. An opaque surface and one hairline is what actually
-                reads as a solid object.
-              */}
-              <div className="relative text-sm leading-relaxed text-foreground bg-surface2 border border-border px-4 py-2.5 rounded-2xl rounded-tr-sm break-words inline-block max-w-full">
-                <MarkdownContent content={message.content} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
-                <Attachments items={attachments} />
 
-                {isCurrentUser && message.deliveryStatus && (
-                  /*
-                    Delivery state, in words. "Sending" lost its `animate-ping` blue
-                    dot — an expanding ring is how a map pin announces itself, and
-                    blue was a hue no token defines. "Sent" keeps no colour either;
-                    it is the expected outcome. Only a failure is coloured, because
-                    only a failure asks the reader to do something.
-                  */
-                  <div className="flex items-baseline justify-end gap-1.5 mt-1.5 text-3xs font-mono">
-                    {message.deliveryStatus === 'sending' && (
-                      <span className="event-running text-foreground-extra-muted">Sending…</span>
-                    )}
-                    {message.deliveryStatus === 'confirmed' && (
-                      <span className="text-foreground-extra-muted inline-flex items-baseline gap-1">
-                        <Check className="size-2.5 translate-y-px" />
-                        <span>Sent</span>
-                      </span>
-                    )}
-                    {message.deliveryStatus === 'failed' && (
-                      <span className="text-destructive font-medium inline-flex items-baseline gap-1">
-                        <X className="size-2.5 translate-y-px" />
-                        <span>Failed</span>
-                      </span>
-                    )}
-                  </div>
-                )}
+              <div className="flex-1 min-w-0 space-y-2">
+                {/* Identity Header */}
+                <div className="flex items-baseline gap-2 select-none">
+                  <span className="text-sm font-semibold text-foreground tracking-tight">
+                    {displayName}
+                  </span>
+                  <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono border border-border">
+                    User
+                  </span>
+                  {isCurrentUser && message.deliveryStatus && (
+                    <span className="text-3xs font-mono ml-1">
+                      {message.deliveryStatus === 'sending' && (
+                        <span className="event-running text-foreground-extra-muted">Sending…</span>
+                      )}
+                      {message.deliveryStatus === 'confirmed' && (
+                        <span className="text-foreground-extra-muted inline-flex items-baseline gap-1">
+                          <Check className="size-2.5 translate-y-px" />
+                          <span>Sent</span>
+                        </span>
+                      )}
+                      {message.deliveryStatus === 'failed' && (
+                        <span className="text-destructive font-medium inline-flex items-baseline gap-1">
+                          <X className="size-2.5 translate-y-px" />
+                          <span>Failed</span>
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {timestamp && (
+                    <span className="text-3xs text-foreground-extra-muted font-mono ml-auto tabular-nums">
+                      {timestamp}
+                    </span>
+                  )}
+                </div>
+
+                {/* Main Full-Width Content */}
+                <div className="text-sm leading-7 text-foreground font-normal break-words">
+                  <MarkdownContent
+                    content={message.content}
+                    agentNames={agentNames}
+                    sessionId={message.sessionId}
+                    workingDir={workingDir}
+                  />
+                  <Attachments items={attachments} />
+                </div>
+
+                {/* Minimalist Hover Actions Row */}
+                <div className="flex items-center gap-1 opacity-0 group-hover/usermsg:opacity-100 focus-within:opacity-100 transition-opacity duration-150 pt-0.5">
+                  <Hint label="Copy Markdown">
+                    <button
+                      type="button"
+                      onClick={handleCopyMarkdown}
+                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                      aria-label="Copy markdown"
+                    >
+                      <Copy className="size-3" />
+                    </button>
+                  </Hint>
+                  <Hint label="Quote Reply">
+                    <button
+                      type="button"
+                      onClick={handleQuote}
+                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                      aria-label="Quote reply"
+                    >
+                      <Quote className="size-3" />
+                    </button>
+                  </Hint>
+                </div>
               </div>
-
-              {/* Minimalist Hover Copy Button */}
-              <Hint label="Copy message">
-                <button
-                  type="button"
-                  onClick={handleCopyMarkdown}
-                  className="opacity-0 group-hover/usermsg:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center shrink-0 cursor-pointer self-start mt-1.5"
-                  aria-label="Copy message"
-                >
-                  <Copy className="size-3.5" />
-                </button>
-              </Hint>
             </div>
           </div>
         </ContextMenuTrigger>

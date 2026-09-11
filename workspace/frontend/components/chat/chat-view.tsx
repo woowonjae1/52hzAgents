@@ -44,7 +44,6 @@ import { eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { toast } from 'sonner';
-import { ArtifactsCanvas } from '../canvas/artifacts-canvas';
 
 const PROMPT_SUGGESTIONS = [
   {
@@ -822,9 +821,7 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex h-full bg-surface0 overflow-hidden">
-      {/* Main Chat Stream Column */}
-      <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
+    <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
         {/* Thread header */}
       {/*
         `.app-header` (globals.css) owns the height, border, fill and padding —
@@ -918,35 +915,22 @@ export function ChatView() {
             />
           )}
 
-          {/* Agent Quota & Multi-Agent Token Dashboard */}
-          <AgentQuotaCapsule agentName={activeModelAgentName} />
-
-          {/* Channel Context Window Health & Compaction */}
-          <ContextHealthIndicator channelName={currentSessionId} />
+          {/* Unified Telemetry Capsule (Agent Quota + Context Health) */}
+          <div className="flex items-center gap-1 p-0.5 rounded-full bg-surface2/70 border border-border/80">
+            <AgentQuotaCapsule agentName={activeModelAgentName} />
+            <ContextHealthIndicator channelName={currentSessionId} />
+          </div>
 
           {/* Git chip */}
           <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
 
-          {/* Token Governance Dashboard Panel Toggle */}
-          <Hint label={activeRightTab === 'tokens' ? 'Close Token Dashboard' : 'Open Token & Context Dashboard'}>
+          {/* Unified Studio Panel Toggle */}
+          <Hint label={activeRightTab !== null ? 'Close Studio panel' : 'Open Studio panel'}>
             <button
-              onClick={() => setActiveRightTab(activeRightTab === 'tokens' ? null : 'tokens')}
+              onClick={() => setActiveRightTab(activeRightTab !== null ? null : 'preview')}
               className={cn(
                 'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
-                activeRightTab === 'tokens' ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
-              )}
-            >
-              <Coins className="size-4" />
-            </button>
-          </Hint>
-
-          {/* Quick Panels / Preview toggle */}
-          <Hint label={activeRightTab === 'preview' || activeRightTab === 'browser' ? 'Close Side Panel' : 'Open Side Panel'}>
-            <button
-              onClick={() => setActiveRightTab(activeRightTab === 'preview' ? null : 'preview')}
-              className={cn(
-                'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
-                activeRightTab === 'preview' || activeRightTab === 'browser' ? 'bg-primary/10 text-primary' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+                activeRightTab !== null ? 'bg-surface3 text-foreground font-medium border border-border' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
               )}
             >
               <PanelRight className="size-4" />
@@ -966,9 +950,14 @@ export function ChatView() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'tokens' ? null : 'tokens')}>
-                <Coins className="size-4 mr-2 text-primary" />
+                <Coins className="size-4 mr-2 text-foreground-muted" />
                 <span>Token & Context Dashboard</span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}>
+                <Activity className="size-4 mr-2 text-foreground-muted" />
+                <span>Execution Trace</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
                 <Download className="size-4 mr-2" />
                 <span>Export as Markdown</span>
@@ -978,10 +967,6 @@ export function ChatView() {
                 <span>Share conversation</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}>
-                <Activity className="size-4 mr-2" />
-                <span>Execution Trace</span>
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setViewMode(viewMode === 'tasks' ? 'threads' : 'tasks')}>
                 <ListChecks className="size-4 mr-2" />
                 <span>Tasks & Kanban</span>
@@ -1292,7 +1277,7 @@ export function ChatView() {
 
         {/* Input — hidden for read-only DM views */}
         {!isDM && (
-          <div className="px-4 lg:px-8 py-3 lg:py-4">
+          <div className="px-4 lg:px-8 pb-4 pt-1">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
               {/*
@@ -1420,10 +1405,6 @@ export function ChatView() {
           />
         )}
       </div>
-      </div>
-
-      {/* Artifacts Canvas Panel */}
-      <ArtifactsCanvas />
     </div>
   );
 }

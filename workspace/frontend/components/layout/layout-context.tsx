@@ -27,7 +27,8 @@ export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' 
 // reconnects). 'preview' points at a dev server on this machine. They look
 // alike and share nothing. 'trace' renders full multi-agent execution steps.
 // 'tokens' renders the workspace token governance & channel context health dashboard.
-export type RightPanelTab = 'browser' | 'preview' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | 'trace' | 'tokens' | null;
+// 'canvas' renders the active markdown / code / artifact deliverable.
+export type RightPanelTab = 'browser' | 'preview' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | 'trace' | 'tokens' | 'canvas' | null;
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';

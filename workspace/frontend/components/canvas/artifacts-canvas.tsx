@@ -28,7 +28,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 const MIN_CANVAS_WIDTH = 380;
 const DEFAULT_CANVAS_WIDTH = 580;
 
-export function ArtifactsCanvas({ className }: { className?: string }) {
+export function ArtifactsCanvas({ className, embedded }: { className?: string; embedded?: boolean }) {
   const { activeArtifact, isCanvasOpen, closeCanvas, addAnnotation, updateArtifactContent } = useArtifacts();
   const { currentSessionId, sessions } = useWorkspace();
   const currentSession = sessions.find((s) => (s as { sessionId?: string; id?: string }).sessionId === currentSessionId || (s as { sessionId?: string; id?: string }).id === currentSessionId);
@@ -149,20 +149,18 @@ export function ArtifactsCanvas({ className }: { className?: string }) {
 
   return (
     <div
-      style={{ width: isFullscreen ? '100vw' : `${canvasWidth}px` }}
+      style={isFullscreen ? { width: '100vw' } : embedded ? undefined : { width: `${canvasWidth}px` }}
       className={cn(
-        'relative flex flex-col bg-surface1 border-l border-border h-full select-text transition-all duration-75 z-20 shrink-0',
-        /* Stops at the titlebar rather than covering it: the window stays
-           draggable and the native caption buttons stay reachable while the
-           canvas is expanded, which is also why the header below no longer
-           reserves any inset of its own. */
+        'relative flex flex-col bg-surface1 h-full select-text transition-all duration-75 z-20',
+        !embedded && 'border-l border-border shrink-0',
+        embedded && 'w-full flex-1 min-w-0 min-h-0',
         isFullscreen && 'fixed top-[var(--titlebar-height)] inset-x-0 bottom-0 w-screen z-50 bg-surface1',
-        isResizing && 'select-none transition-none',
+        isResizing && !embedded && 'select-none transition-none',
         className
       )}
     >
-      {/* ── Left Drag-to-Resize Handle & Quick Collapse ── */}
-      {!isFullscreen && (
+      {/* ── Left Drag-to-Resize Handle & Quick Collapse (Only when not embedded) ── */}
+      {!isFullscreen && !embedded && (
         <div
           onMouseDown={startResize}
           className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none"

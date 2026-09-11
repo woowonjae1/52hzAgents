@@ -4,7 +4,7 @@ import { Hint } from '@/components/ui/hint';
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from 'sonner';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
@@ -539,10 +539,12 @@ export function ThreadList() {
   const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode, viewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleSelectSession = useCallback((sessionId: string) => {
@@ -762,22 +764,35 @@ export function ThreadList() {
   };
 
   // Keyboard shortcuts:
-  //   1-9  → open the Nth visible thread (mirrors monitor mode's 1-6)
-  //   i    → focus the chat input of the current thread
-  //   Esc  → handled inside chat-input (blurs the textarea)
+  //   1-9       → open the Nth visible thread
+  //   j / Down  → move selection down to next thread
+  //   k / Up    → move selection up to previous thread
+  //   /         → focus thread search filter
+  //   c         → new direct chat
+  //   i / Enter → focus chat input composer
+  //   Esc       → blur/close search filter
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Don't hijack typing in any input/textarea, and skip when modifier
-      // keys are held (so Cmd+1 / Ctrl+R / etc. still reach the browser).
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (target?.isContentEditable) return;
 
-      // 1-9 → open thread by index (uses the same list the user is looking at).
-      // Pass skipFocus so the chat input doesn't steal focus — the user is
-      // navigating with the keyboard and presses 'i' explicitly to type.
+      // When inside an input/textarea
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+        if (e.key === 'Escape') {
+          if (target === searchInputRef.current) {
+            e.preventDefault();
+            setSearchQuery('');
+            setShowSearch(false);
+            searchInputRef.current?.blur();
+          }
+        }
+        return;
+      }
+
+      // Skip when modifier keys are held (Cmd+1, Ctrl+R, etc.)
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      // 1-9 → open thread by index
       const num = parseInt(e.key, 10);
       if (num >= 1 && num <= 9) {
         const session = visualOrder[num - 1];
@@ -789,20 +804,64 @@ export function ThreadList() {
         return;
       }
 
-      // Any single printable character → focus the chat input and let the
-      // keystroke pass through so the character appears in the textarea.
-      // Only fires when a thread is open.
-      if (e.key.length === 1 && currentSessionId) {
-        const el = document.querySelector<HTMLTextAreaElement>('textarea[data-chat-input]');
-        if (el) {
-          el.focus();
-          // Don't preventDefault — let the character be typed into the textarea
+      // j / ArrowDown → move to next thread
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        if (visualOrder.length === 0) return;
+        e.preventDefault();
+        const currentIndex = visualOrder.findIndex((s) => s.sessionId === currentSessionId);
+        const nextIndex = currentIndex < 0 ? 0 : Math.min(visualOrder.length - 1, currentIndex + 1);
+        const nextSession = visualOrder[nextIndex];
+        if (nextSession) {
+          setCurrentSessionId(nextSession.sessionId, { skipFocus: true });
+          if (isMobile) openMobileDetail();
         }
+        return;
+      }
+
+      // k / ArrowUp → move to previous thread
+      if (e.key === 'k' || e.key === 'ArrowUp') {
+        if (visualOrder.length === 0) return;
+        e.preventDefault();
+        const currentIndex = visualOrder.findIndex((s) => s.sessionId === currentSessionId);
+        const prevIndex = currentIndex <= 0 ? 0 : currentIndex - 1;
+        const prevSession = visualOrder[prevIndex];
+        if (prevSession) {
+          setCurrentSessionId(prevSession.sessionId, { skipFocus: true });
+          if (isMobile) openMobileDetail();
+        }
+        return;
+      }
+
+      // '/' → search threads
+      if (e.key === '/') {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchInputRef.current?.focus(), 10);
+        return;
+      }
+
+      // 'c' → create new conversation
+      if (e.key === 'c') {
+        e.preventDefault();
+        setViewMode('threads');
+        startChannel(null);
+        return;
+      }
+
+      // 'i' or 'Enter' → focus the chat input composer
+      if (e.key === 'i' || e.key === 'Enter') {
+        if (currentSessionId) {
+          e.preventDefault();
+          const el = document.querySelector<HTMLTextAreaElement>('textarea[data-chat-input]');
+          el?.focus();
+        }
+        return;
       }
     };
+
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [visualOrder, currentSessionId, isMobile, setCurrentSessionId, openMobileDetail]);
+  }, [visualOrder, currentSessionId, isMobile, setCurrentSessionId, openMobileDetail, setViewMode]);
 
   return (
     <div className="flex flex-col h-full">
@@ -934,6 +993,25 @@ export function ThreadList() {
         </span>
 
         <div className="flex items-center gap-1">
+          {/* Quick Search Toggle */}
+          <Hint label="Search threads (/)">
+            <button
+              onClick={() => {
+                setShowSearch((prev) => {
+                  const next = !prev;
+                  if (next) setTimeout(() => searchInputRef.current?.focus(), 10);
+                  return next;
+                });
+              }}
+              className={cn(
+                "p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer",
+                (showSearch || searchQuery) && "bg-surface2 text-foreground"
+              )}
+            >
+              <Search className="size-3.5" />
+            </button>
+          </Hint>
+
           {/* New Project / Quick Start Dropdown Menu (Image 2) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -965,6 +1043,34 @@ export function ThreadList() {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Quick Search Input Filter Bar (Triggered via '/' or Search Icon) */}
+      {(showSearch || searchQuery) && (
+        <div className="px-3 pb-2 pt-0.5 shrink-0">
+          <div className="relative flex items-center">
+            <Search className="absolute left-2.5 size-3 text-foreground-extra-muted pointer-events-none" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter threads… (Esc to close)"
+              className="w-full bg-surface2/80 border border-border rounded-lg pl-7 pr-7 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden focus:border-border-accent"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setShowSearch(false);
+              }}
+              className="absolute right-2 size-4 flex items-center justify-center rounded text-foreground-extra-muted hover:text-foreground cursor-pointer"
+            >
+              <X className="size-3" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Thread rows grouped by Project (TanStack Virtualized) */}
       <div
