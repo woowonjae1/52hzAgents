@@ -301,6 +301,12 @@ func UpdatePresence(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Agent member not registered"})
 		return
 	}
+	// A heartbeat must belong to the currently active join session. Accepting a
+	// new session ID here lets a stale or competing bridge take over the member.
+	if member.SessionID == nil || *member.SessionID != req.SessionID {
+		c.JSON(http.StatusConflict, gin.H{"error": "session_revoked"})
+		return
+	}
 
 	oldStatus := member.Status
 
@@ -312,12 +318,11 @@ func UpdatePresence(c *gin.Context) {
 	} else {
 		member.Status = "online"
 	}
-	if req.SessionID != "" {
-		member.SessionID = &req.SessionID
-	}
-
 	// 保存心跳记录。
-	db.DB.Save(&member)
+	if err := db.DB.Save(&member).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update agent presence"})
+		return
+	}
 
 	// 同样向工作区最后活跃时间刷新。
 	db.DB.Model(workspace).Update("last_activity_at", now)
