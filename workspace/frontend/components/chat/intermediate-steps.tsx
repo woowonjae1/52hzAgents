@@ -61,6 +61,27 @@ interface ParsedStep {
   subagents?: SubagentInfo[];
 }
 
+/** Prefer structured adapter metadata when present; fall back to legacy text. */
+function parseMessageStep(message: WorkspaceMessage): ParsedStep {
+  const metadata = message.metadata || {};
+  const rawTool = metadata.tool_name || metadata.tool || metadata.tool_call;
+  if (typeof rawTool === 'string' && rawTool.trim()) {
+    const rawArgs = metadata.tool_args ?? metadata.arguments ?? metadata.args;
+    const args = typeof rawArgs === 'string' ? rawArgs : rawArgs ? JSON.stringify(rawArgs, null, 2) : undefined;
+    const status = String(metadata.tool_status || metadata.status || '').toLowerCase();
+    const step: ParsedStep = {
+      type: 'tool_call',
+      tool: rawTool,
+      toolDisplay: cleanToolName(rawTool),
+      args,
+      summary: typeof metadata.tool_summary === 'string' ? metadata.tool_summary : extractToolSummary(cleanToolName(rawTool), args || ''),
+    };
+    if (status === 'failed' || status === 'error') step.summary = `${step.summary || 'Tool call'} · failed`;
+    return step;
+  }
+  return parseStepContent(message.content);
+}
+
 function parseSubagentsPayload(raw: string): SubagentInfo[] | null {
   try {
     const data = JSON.parse(raw);
@@ -242,7 +263,7 @@ function isPlaceholderThinking(message: WorkspaceMessage): boolean {
   if (message.messageType === 'todos') return false;
   const parsed = message.messageType === 'thinking'
     ? { type: 'thinking' as const, text: message.content }
-    : parseStepContent(message.content);
+    : parseMessageStep(message);
   if (parsed.type !== 'thinking') return false;
   const t = (parsed.text || '').trim().toLowerCase();
   return t === '' || t === 'thinking...' || t === 'thinking';
@@ -493,6 +514,14 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         icon={<Icon />}
         label={parsed.toolDisplay || 'Tool'}
         detail={parsed.summary || undefined}
+        state={(() => {
+          const status = String(message.metadata?.tool_status || '').toLowerCase();
+          if (status === 'failed' || status === 'error') return 'failed' as const;
+          if (status === 'running' || status === 'pending' || status === 'in_progress') return 'running' as const;
+          if (status === 'blocked') return 'blocked' as const;
+          return 'ok' as const;
+        })()}
+        startTime={message.createdAt ? Date.parse(message.createdAt) : null}
         actions={
           hasDetail ? (
             <EventLineAction
@@ -622,7 +651,7 @@ function stepTime(msg: WorkspaceMessage): number | null {
 
 function isToolCallStep(msg: WorkspaceMessage): boolean {
   if (msg.messageType === 'thinking' || msg.messageType === 'todos') return false;
-  return parseStepContent(msg.content).type === 'tool_call';
+  return parseMessageStep(msg).type === 'tool_call';
 }
 
 /**
@@ -654,10 +683,10 @@ function joinThoughts(messages: WorkspaceMessage[]): string {
  * would hide the scale of what happened.
  */
 const ParallelTools = memo(function ParallelTools({ messages }: { messages: WorkspaceMessage[] }) {
-  const names = messages.map((m) => parseStepContent(m.content).toolDisplay || 'Tool');
+  const names = messages.map((m) => parseMessageStep(m).toolDisplay || 'Tool');
   // The batch's own icon is whichever tool it led with; a wrench for a batch of
   // four reads would be less informative than the read glyph.
-  const Icon = getStepIcon(parseStepContent(messages[0].content));
+  const Icon = getStepIcon(parseMessageStep(messages[0]));
 
   return (
     <EventLine
@@ -853,7 +882,7 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   const runs = coalesceThinking(renderable);
   const toolCount = renderable.filter((s) => {
     if (s.messageType === 'todos' || s.messageType === 'thinking') return false;
-    return parseStepContent(s.content).type === 'tool_call';
+    return parseMessageStep(s).type === 'tool_call';
   }).length;
   const thoughtCount = runs.filter((r) => r.kind === 'thinking').length;
 
