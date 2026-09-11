@@ -26,9 +26,12 @@ import { useLayout } from './layout-context';
  * to move them into.
  */
 export function AppTitlebar() {
-  const { workspace } = useWorkspace();
+  const { workspace, realtimeStatus } = useWorkspace();
   const { isSidebarOpen, sidebarToggle } = useLayout();
   const { resolvedTheme } = useTheme();
+  const isLive = realtimeStatus === 'live';
+  const isConnecting = realtimeStatus === 'connecting';
+  const connectionLabel = isLive ? 'Workspace connected' : isConnecting ? 'Reconnecting to workspace' : 'Workspace offline';
   const bandRef = React.useRef<HTMLElement>(null);
 
   /*
@@ -144,8 +147,9 @@ export function AppTitlebar() {
           {workspace?.name || '52hzAgents'}
         </span>
         <span
-          className="size-1.5 rounded-full bg-status-success shrink-0"
-          title="Workspace connected"
+          className={`size-1.5 rounded-full shrink-0 ${isLive ? 'bg-status-success' : isConnecting ? 'bg-status-warning animate-pulse' : 'bg-status-danger'}`}
+          title={connectionLabel}
+          aria-label={connectionLabel}
         />
       </div>
     </header>
