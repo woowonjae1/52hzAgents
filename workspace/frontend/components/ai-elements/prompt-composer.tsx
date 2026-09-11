@@ -589,8 +589,8 @@ export function PromptComposer({
            * permanent glow, and blue was not a token.
            */
           'relative rounded-xl overflow-hidden',
-          'bg-surface1/95 backdrop-blur-xl border border-border shadow-md transition-all duration-150',
-          'hover:border-border-accent focus-within:border-border-accent',
+          'bg-surface1/95 backdrop-blur-xl border border-border/70 shadow-sm transition-all duration-150',
+          'hover:border-border focus-within:border-border-accent',
           isDragging && 'border-border-accent bg-surface2'
         )}
       >
@@ -708,7 +708,7 @@ export function PromptComposer({
 
         {/* Bottom Control Row */}
         <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
-          <div className="flex items-center gap-1 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <AgentModelSwitcher
               agentName={masterAgentName}
               participants={session?.participants}
@@ -716,34 +716,29 @@ export function PromptComposer({
             />
 
             {currentMode !== 'dynamic' && (
-              <>
-                <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0" />
-                <div
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface2 border border-border text-foreground-muted select-none"
-                  title={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}
-                >
-                  {currentMode === 'master' ? (
-                    <>
-                      <Crown className="size-3 text-foreground-muted shrink-0" />
-                      <span className="truncate max-w-[120px]">Master: @{masterAgentName}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Waypoints className="size-3 text-foreground-muted shrink-0" />
-                      <button
-                        type="button"
-                        onClick={() => setWorkflowPlanOpen(true)}
-                        className="hover:text-foreground underline cursor-pointer"
-                      >
-                        Workflow Plan
-                      </button>
-                    </>
-                  )}
-                </div>
-              </>
+              <div
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface2 text-foreground-muted select-none"
+                title={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}
+              >
+                {currentMode === 'master' ? (
+                  <>
+                    <Crown className="size-3 text-foreground-muted shrink-0" />
+                    <span className="truncate max-w-[120px]">Master: @{masterAgentName}</span>
+                  </>
+                ) : (
+                  <>
+                    <Waypoints className="size-3 text-foreground-muted shrink-0" />
+                    <button
+                      type="button"
+                      onClick={() => setWorkflowPlanOpen(true)}
+                      className="hover:text-foreground underline cursor-pointer"
+                    >
+                      Workflow Plan
+                    </button>
+                  </>
+                )}
+              </div>
             )}
-
-            <div className="h-3.5 w-px bg-border/60 mx-1 shrink-0" />
 
             <Hint label="Mention an agent (@)">
               <button

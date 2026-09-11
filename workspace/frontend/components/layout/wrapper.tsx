@@ -26,9 +26,7 @@ import { RadarPanel } from '@/components/mission/radar-panel';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
 import { EmptyState } from '@/components/chat/empty-state';
-import { AgentTerminal } from '@/components/terminal/agent-terminal';
 import { TracePanel } from '@/components/trace/trace-panel';
-import { TokenDashboardPanel } from '@/components/tokens/token-dashboard-panel';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 import { CommandPalette } from './command-palette';
@@ -39,7 +37,7 @@ import { Hint } from '@/components/ui/hint';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { SignalMark } from '@/components/brand/signal-mark';
-import { Network, X, PanelLeft, FileText, Globe, CheckSquare, Terminal, Activity, Coins } from 'lucide-react';
+import { Network, X, PanelLeft, FileText, Globe, Activity } from 'lucide-react';
 
 function WorkspaceLoadingScreen() {
   return (
@@ -339,114 +337,69 @@ export function Wrapper() {
                     </div>
                   </div>
 
-                  {/* Studio Header Bar */}
-                  <div className="app-header justify-between px-2.5 shrink-0 flex-nowrap border-b border-border bg-surface1 select-none">
-                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-                      {activeArtifact && (
+                  {/* Studio Header Bar (Rendered when not in canvas mode; Canvas provides its own unified 38px header) */}
+                  {effectiveStudioTab !== 'canvas' && (
+                    <div className="app-header justify-between px-3 shrink-0 flex-nowrap border-b border-border bg-surface1 select-none">
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+                        {activeArtifact && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveRightTab('canvas')}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2"
+                          >
+                            <FileText className="size-3.5" />
+                            <span>Canvas</span>
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => setActiveRightTab('canvas')}
+                          onClick={() => setActiveRightTab('preview')}
                           className={cn(
                             "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
-                            effectiveStudioTab === 'canvas'
+                            (effectiveStudioTab === 'preview' || effectiveStudioTab === 'browser')
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
                           )}
                         >
-                          <FileText className="size-3.5" />
-                          <span>Canvas</span>
+                          <Globe className="size-3.5" />
+                          <span>Preview</span>
                         </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setActiveRightTab('preview')}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
-                          (effectiveStudioTab === 'preview' || effectiveStudioTab === 'browser')
-                            ? "bg-surface3 text-foreground font-semibold border border-border"
-                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                        )}
-                      >
-                        <Globe className="size-3.5" />
-                        <span>Preview</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveRightTab('tasks')}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
-                          effectiveStudioTab === 'tasks'
-                            ? "bg-surface3 text-foreground font-semibold border border-border"
-                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                        )}
-                      >
-                        <CheckSquare className="size-3.5" />
-                        <span>Tasks</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveRightTab('terminal')}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
-                          effectiveStudioTab === 'terminal'
-                            ? "bg-surface3 text-foreground font-semibold border border-border"
-                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                        )}
-                      >
-                        <Terminal className="size-3.5" />
-                        <span>Terminal</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveRightTab('trace')}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
-                          effectiveStudioTab === 'trace'
-                            ? "bg-surface3 text-foreground font-semibold border border-border"
-                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                        )}
-                      >
-                        <Activity className="size-3.5" />
-                        <span>Trace</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveRightTab('tokens')}
-                        className={cn(
-                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
-                          effectiveStudioTab === 'tokens'
-                            ? "bg-surface3 text-foreground font-semibold border border-border"
-                            : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                        )}
-                      >
-                        <Coins className="size-3.5" />
-                        <span>Tokens</span>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0 ml-1">
-                      <Hint label="Close Studio (Esc)">
                         <button
                           type="button"
-                          onClick={handleCloseStudio}
-                          className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                          onClick={() => setActiveRightTab('trace')}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                            effectiveStudioTab === 'trace'
+                              ? "bg-surface3 text-foreground font-semibold border border-border"
+                              : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                          )}
                         >
-                          <X className="size-3.5" />
+                          <Activity className="size-3.5" />
+                          <span>Trace</span>
                         </button>
-                      </Hint>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                        <Hint label="Close Studio (Esc)">
+                          <button
+                            type="button"
+                            onClick={handleCloseStudio}
+                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </Hint>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Studio Content Pane */}
                   <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
                     {effectiveStudioTab === 'canvas' && <ArtifactsCanvas embedded />}
                     {(effectiveStudioTab === 'browser' || effectiveStudioTab === 'preview') && <LocalPreview />}
                     {effectiveStudioTab === 'file' && <FilePreview />}
-                    {effectiveStudioTab === 'tasks' && <TasksView />}
                     {effectiveStudioTab === 'radar' && <RadarPanel />}
-                    {effectiveStudioTab === 'terminal' && <AgentTerminal />}
                     {effectiveStudioTab === 'trace' && <TracePanel />}
-                    {effectiveStudioTab === 'tokens' && <TokenDashboardPanel />}
                   </div>
                 </aside>
               )}

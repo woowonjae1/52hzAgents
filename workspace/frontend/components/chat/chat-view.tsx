@@ -885,7 +885,6 @@ export function ChatView() {
           */}
           {!isDM && channelAgentNames.length > 0 && (
             <div className="hidden sm:flex items-baseline gap-2 shrink min-w-0 max-w-[45%]">
-              <span className="h-3.5 w-px bg-border shrink-0 self-center" />
               {workingHere.length > 0 ? (
                 <span className="event-running inline-flex items-baseline gap-1.5 text-xs min-w-0 text-foreground-muted">
                   <span className="truncate text-foreground">{workingHere.join(', ')}</span>
@@ -916,7 +915,7 @@ export function ChatView() {
           )}
 
           {/* Unified Telemetry Capsule (Agent Quota + Context Health) */}
-          <div className="flex items-center gap-1 p-0.5 rounded-full bg-surface2/70 border border-border/80">
+          <div className="flex items-center gap-1 p-0.5 rounded-full bg-surface2/60">
             <AgentQuotaCapsule agentName={activeModelAgentName} />
             <ContextHealthIndicator channelName={currentSessionId} />
           </div>

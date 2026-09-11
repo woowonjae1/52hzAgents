@@ -572,7 +572,7 @@ export const ChatMessage = memo(function ChatMessage({
                   <span className="text-sm font-semibold text-foreground tracking-tight">
                     {displayName}
                   </span>
-                  <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono border border-border">
+                  <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono">
                     User
                   </span>
                   {isCurrentUser && message.deliveryStatus && (

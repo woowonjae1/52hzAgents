@@ -13,10 +13,9 @@ import {
   Maximize2,
   Minimize2,
   Sparkles,
-  ChevronRight,
   Send,
-  PanelRightClose,
-  Columns2,
+  Globe,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -24,12 +23,14 @@ import { MarkdownContent } from '../chat/markdown-content';
 import { AgentAvatar } from '../agents/agent-avatar';
 import { useArtifacts, type ArtifactItem, type ArtifactAnnotation } from '@/lib/artifacts-context';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useLayout } from '@/components/layout/layout-context';
 
 const MIN_CANVAS_WIDTH = 380;
 const DEFAULT_CANVAS_WIDTH = 580;
 
 export function ArtifactsCanvas({ className, embedded }: { className?: string; embedded?: boolean }) {
   const { activeArtifact, isCanvasOpen, closeCanvas, addAnnotation, updateArtifactContent } = useArtifacts();
+  const { setActiveRightTab } = useLayout();
   const { currentSessionId, sessions } = useWorkspace();
   const currentSession = sessions.find((s) => (s as { sessionId?: string; id?: string }).sessionId === currentSessionId || (s as { sessionId?: string; id?: string }).id === currentSessionId);
   const workingDir = currentSession?.workingDir ?? undefined;
@@ -177,42 +178,108 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
         </div>
       )}
 
-      {/* ── Canvas Top Header Bar ── */}
-      <div
-        className="app-header justify-between px-3.5 flex-nowrap min-w-0 overflow-hidden"
-
-      >
+      {/* ── Single Unified Header Bar (38px) ── */}
+      <div className="app-header justify-between px-3 flex-nowrap min-w-0 overflow-hidden shrink-0 border-b border-border bg-surface1 select-none">
+        {/* Left: Artifact Icon, Title & Segmented Mode Switch */}
         <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-          <div className="size-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            {activeArtifact.type === 'code' ? <Code2 className="size-4" /> : <FileText className="size-4" />}
+          <div className="size-6 rounded-md bg-surface2 text-foreground-muted flex items-center justify-center shrink-0">
+            {activeArtifact.type === 'code' ? <Code2 className="size-3.5" /> : <FileText className="size-3.5" />}
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="text-xs font-bold text-foreground truncate min-w-0 flex-1" title={activeArtifact.title}>
+          <div className="min-w-0 flex items-baseline gap-1.5 shrink truncate">
+            <span className="text-xs font-semibold text-foreground truncate max-w-[120px] sm:max-w-[160px]" title={activeArtifact.title}>
               {activeArtifact.title}
-            </h3>
-            <p className="text-3xs text-muted-foreground font-mono truncate">
-              {activeArtifact.filePath || (activeArtifact.language ? `${activeArtifact.language} · artifact` : 'Markdown Document')}
-              {activeArtifact.version && ` · v${activeArtifact.version}`}
-            </p>
+            </span>
+            {activeArtifact.version && (
+              <span className="text-3xs font-mono text-foreground-extra-muted shrink-0">
+                v{activeArtifact.version}
+              </span>
+            )}
+          </div>
+
+          {/* Quiet Segmented Mode Switcher */}
+          <div className="flex items-center p-0.5 rounded-lg bg-surface2 text-2xs shrink-0 ml-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('document')}
+              className={cn(
+                'px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer shrink-0',
+                activeTab === 'document'
+                  ? 'bg-surface0 text-foreground font-semibold shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              Doc
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('raw')}
+              className={cn(
+                'px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer shrink-0',
+                activeTab === 'raw'
+                  ? 'bg-surface0 text-foreground font-semibold shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              Code
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('annotations')}
+              className={cn(
+                'px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0',
+                activeTab === 'annotations'
+                  ? 'bg-surface0 text-foreground font-semibold shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <span>Reviews</span>
+              {annotations.length > 0 && (
+                <span className="size-3.5 rounded-full bg-surface3 text-foreground text-3xs flex items-center justify-center font-bold">
+                  {annotations.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Action icons & Aligned Close Button */}
-        <div className="flex items-center gap-1 shrink-0">
+        {/* Right: Quick Jumps + Actions + Close */}
+        <div className="flex items-center gap-1 shrink-0 ml-1">
+          {/* Quick jump to Live Preview */}
+          <Hint label="Switch to Live Preview">
+            <button
+              type="button"
+              onClick={() => setActiveRightTab('preview')}
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Globe className="size-3.5" />
+            </button>
+          </Hint>
+          {/* Quick jump to Trace */}
+          <Hint label="Switch to Execution Trace">
+            <button
+              type="button"
+              onClick={() => setActiveRightTab('trace')}
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <Activity className="size-3.5" />
+            </button>
+          </Hint>
+
+          {/* Action icons */}
           <Hint label="Copy content">
             <button
               type="button"
               onClick={handleCopy}
-              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             >
               {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
             </button>
           </Hint>
-          <Hint label="Download document">
+          <Hint label="Download artifact">
             <button
               type="button"
               onClick={handleDownload}
-              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             >
               <Download className="size-3.5" />
             </button>
@@ -221,76 +288,25 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <button
               type="button"
               onClick={() => setIsFullscreen((prev) => !prev)}
-              className="size-7 rounded-lg border border-border/60 hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             >
               {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
           </Hint>
 
-          {/* Symmetrical, Aligned Close Button */}
-          <Hint label="Close Canvas (Esc)">
+          {/* Symmetrical Close Button */}
+          <Hint label="Close Studio (Esc)">
             <button
               type="button"
-              onClick={closeCanvas}
-              className="size-7 rounded-lg border border-border/60 hover:bg-destructive/15 hover:border-destructive/30 hover:text-destructive text-muted-foreground flex items-center justify-center transition-all cursor-pointer"
+              onClick={() => {
+                closeCanvas();
+                setActiveRightTab(null);
+              }}
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             >
-              <PanelRightClose className="size-3.5" />
+              <X className="size-3.5" />
             </button>
           </Hint>
-        </div>
-      </div>
-
-      {/* ── Mode Navigation Tabs ── */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/60 bg-surface1 text-2xs shrink-0 gap-2 flex-nowrap overflow-hidden">
-        <div className="flex items-center gap-1 shrink-0 overflow-x-auto no-scrollbar">
-          <button
-            type="button"
-            onClick={() => setActiveTab('document')}
-            className={cn(
-              'px-2 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0',
-              activeTab === 'document'
-                ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
-                : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
-            )}
-          >
-            <FileText className="size-3 shrink-0" />
-            <span>Document</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('raw')}
-            className={cn(
-              'px-2 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0',
-              activeTab === 'raw'
-                ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
-                : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
-            )}
-          >
-            <Code2 className="size-3 shrink-0" />
-            <span>Raw</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('annotations')}
-            className={cn(
-              'px-2 py-1 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 shrink-0',
-              activeTab === 'annotations'
-                ? 'bg-primary/10 text-primary border border-primary/20 font-semibold'
-                : 'text-muted-foreground hover:text-foreground hover:bg-surface2'
-            )}
-          >
-            <MessageSquare className="size-3 shrink-0" />
-            <span>Reviews</span>
-            {annotations.length > 0 && (
-              <span className="size-4 rounded-full bg-primary/20 text-primary text-3xs flex items-center justify-center font-bold">
-                {annotations.length}
-              </span>
-            )}
-          </button>
-        </div>
-
-        <div className="text-3xs text-muted-foreground font-mono shrink-0 whitespace-nowrap pl-1">
-          {activeArtifact.content.length} chars
         </div>
       </div>
 
