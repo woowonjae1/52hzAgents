@@ -68,10 +68,16 @@ func JoinNetwork(c *gin.Context) {
 	// 为此次会话生成唯一的 Session ID，并记录当前的时间。
 	newSessionID := uuid.New().String()
 	now := time.Now()
+	tx := db.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start join transaction"})
+		return
+	}
+	rollback := func(err error) { tx.Rollback(); c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}) }
 
 	// 尝试在数据库中寻找已注册的同名成员记录。
 	var member models.WorkspaceMember
-	memberErr := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, req.AgentName).First(&member).Error
+	memberErr := tx.Where("workspace_id = ? AND agent_name = ?", workspace.ID, req.AgentName).First(&member).Error
 
 	if memberErr == nil {
 		// 如果记录已经存在，更新其状态为 online 并重置 Session ID 与心跳。
@@ -89,7 +95,10 @@ func JoinNetwork(c *gin.Context) {
 			member.WorkingDir = &req.WorkingDir
 		}
 		// 保存更新到数据库。
-		db.DB.Save(&member)
+		if err := tx.Save(&member).Error; err != nil {
+			rollback(err)
+			return
+		}
 	} else {
 		// 如果记录不存在，则新建一条在线成员记录。
 		role := "member" // 默认角色设定。
@@ -107,14 +116,23 @@ func JoinNetwork(c *gin.Context) {
 			JoinedAt:         now,
 		}
 		// 保存写入。
-		db.DB.Create(&member)
+		if err := tx.Create(&member).Error; err != nil {
+			rollback(err)
+			return
+		}
 	}
 
 	// 更新工作区最后的活跃时间。
-	db.DB.Model(&workspace).Update("last_activity_at", now)
+	if err := tx.Model(&workspace).Update("last_activity_at", now).Error; err != nil {
+		rollback(err)
+		return
+	}
 	var defaultChannel models.Channel
-	if db.DB.Where("workspace_id = ? AND name = ?", workspace.ID, "general").First(&defaultChannel).Error == nil {
-		db.DB.FirstOrCreate(&models.ChannelMember{ChannelID: defaultChannel.ID, AgentName: req.AgentName})
+	if tx.Where("workspace_id = ? AND name = ?", workspace.ID, "general").First(&defaultChannel).Error == nil {
+		if err := tx.FirstOrCreate(&models.ChannelMember{ChannelID: defaultChannel.ID, AgentName: req.AgentName}).Error; err != nil {
+			rollback(err)
+			return
+		}
 	}
 
 	// 构造 Agent 接入事件，并广播到消息通道中。
@@ -139,7 +157,14 @@ func JoinNetwork(c *gin.Context) {
 		Payload:   payloadBytes,
 		Timestamp: nowUnixMs,
 	}
-	db.DB.Create(&eventRec)
+	if err := tx.Create(&eventRec).Error; err != nil {
+		rollback(err)
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit join transaction"})
+		return
+	}
 
 	// 序列化 JSON 事件字符用于 Hub 广播。
 	fullEventBytes, _ := json.Marshal(gin.H{
