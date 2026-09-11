@@ -47,7 +47,7 @@ export function ActionRequiredBanner({
         source: 'human:user',
         target: `channel/${item.channelId}`,
         payload: {
-          content: 'Approved command execution via Mission Control.',
+          content: 'Approved command execution via Agent Dashboard.',
           sender_type: 'human',
           sender_name: 'user',
         },
@@ -78,7 +78,7 @@ export function ActionRequiredBanner({
         source: 'human:user',
         target: `channel/${item.channelId}`,
         payload: {
-          content: 'Rejected command execution via Mission Control.',
+          content: 'Rejected command execution via Agent Dashboard.',
           sender_type: 'human',
           sender_name: 'user',
         },

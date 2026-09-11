@@ -45,7 +45,7 @@ export interface ShortcutSpec {
 export const GOTO_SEQUENCE: Record<string, { view: string; label: string }> = {
   t: { view: 'threads', label: 'Threads' },
   a: { view: 'tasks', label: 'Tasks' },
-  m: { view: 'mission', label: 'Mission Control' },
+  m: { view: 'mission', label: 'Agent Dashboard' },
   f: { view: 'files', label: 'Files' },
   k: { view: 'knowledge', label: 'Knowledge' },
   e: { view: 'skills', label: 'Skills' },

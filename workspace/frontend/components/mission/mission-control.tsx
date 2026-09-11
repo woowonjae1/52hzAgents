@@ -424,7 +424,7 @@ export function MissionControl() {
         <div className="flex flex-1 items-center justify-between gap-4 min-w-0">
           <div className="flex items-baseline gap-2.5 min-w-0">
             <h1 className="text-sm font-semibold tracking-tight text-foreground shrink-0">
-              Mission control
+              Agent Dashboard
             </h1>
             <p className="truncate text-xs text-muted-foreground tabular-nums">
               {agents.length} {agents.length === 1 ? 'agent' : 'agents'}

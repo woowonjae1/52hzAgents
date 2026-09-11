@@ -446,11 +446,11 @@ function createTray() {
       return;
     }
     tray = new Tray(trayIcon);
-    tray.setToolTip('52hzAgents Workspace');
+    tray.setToolTip('52hzAgent Studio');
 
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: '显示 52hzAgents Workspace',
+        label: '显示 52hzAgent Studio',
         click: () => {
           if (mainWindow) {
             mainWindow.show();
@@ -521,7 +521,7 @@ function createMainWindow() {
     y: windowState.y,
     minWidth: 960,
     minHeight: 640,
-    title: '52hzAgents Workspace',
+    title: '52hzAgent Studio',
     icon: appIconPath,
     backgroundColor: WINDOW_BACKGROUND,
     darkTheme: true,
@@ -591,11 +591,11 @@ function createMainWindow() {
 
   const splashHtml = `data:text/html;charset=utf-8,
     <html>
-      <head><meta charset="utf-8"><title>52hzAgents Workspace</title></head>
+      <head><meta charset="utf-8"><title>52hzAgent Studio</title></head>
       <body style="background:#09090b;color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;user-select:none;-webkit-user-select:none;overflow:hidden;">
         <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
           <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.12);border-top-color:#3b82f6;border-radius:50%;animation:spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;"></div>
-          <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#f4f4f5;">52hzAgents Workspace</div>
+          <div style="font-size:15px;font-weight:600;letter-spacing:-0.01em;color:#f4f4f5;">52hzAgent Studio</div>
           <div style="font-size:12px;color:#71717a;">正在连接本地服务...</div>
         </div>
         <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>

@@ -114,7 +114,7 @@ export function SidebarContent() {
               <span>Agents</span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top">Agent Management & Mission Control</TooltipContent>
+          <TooltipContent side="top">Agent Management & Dashboard</TooltipContent>
         </Tooltip>
 
         {/* Right group: Token (if any), Theme Switcher, Settings */}

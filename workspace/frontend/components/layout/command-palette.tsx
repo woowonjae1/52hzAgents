@@ -140,7 +140,7 @@ export function CommandPalette() {
       {
         id: 'nav-mission',
         category: 'Navigation',
-        title: 'Mission Control',
+        title: 'Agent Dashboard',
         subtitle: 'Agent radar and orchestration topology',
         icon: <Compass className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'M'],

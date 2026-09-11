@@ -1190,7 +1190,7 @@ export function ChatView() {
                         </div>
                       </button>
 
-                      {/* Mission Control */}
+                      {/* Agent Dashboard */}
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
@@ -1201,7 +1201,7 @@ export function ChatView() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                            <span>Mission Control</span>
+                            <span>Agent Dashboard</span>
                             <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
                               Open →
                             </span>
