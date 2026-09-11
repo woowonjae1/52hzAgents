@@ -23,6 +23,8 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 数据结构体模型。
 )
 
+const maxUploadBytes int64 = 50 << 20
+
 // Base64UploadRequest 代表通过 Base64 数据提交文件的 JSON 请求载荷（供 Agent 客户端调用）。
 type Base64UploadRequest struct {
 	Filename      string  `json:"filename" binding:"required"`       // 文件名 (必选)
@@ -66,6 +68,12 @@ func saveFileLocal(workspaceID, fileID, filename string, data []byte) (string, e
 
 // UploadFileMultipart 处理 POST /v1/files 接口，支持标准的 multipart/form-data 格式上传。
 func UploadFileMultipart(c *gin.Context) {
+	if c.Request.ContentLength > maxUploadBytes+1<<20 {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Request exceeds maximum upload size of 50MB"})
+		return
+	}
+	// Bound the body before multipart parsing so oversized requests cannot exhaust memory.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxUploadBytes+1<<20)
 	// 接收表单中的 file 字段。
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
@@ -109,8 +117,7 @@ func UploadFileMultipart(c *gin.Context) {
 		return
 	}
 
-	// 限制文件上传的最大大小为 50MB (52428800 Bytes)。
-	if len(fileData) > 52428800 {
+	if int64(len(fileData)) > maxUploadBytes {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds maximum limit of 50MB"})
 		return
 	}
@@ -157,6 +164,7 @@ func UploadFileMultipart(c *gin.Context) {
 
 	// 存入数据库中。
 	if err := db.DB.Create(&record).Error; err != nil {
+		_ = os.Remove(filepath.Join(config.GlobalConfig.FileStoragePath, filepath.FromSlash(storageKey)))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file meta to database"})
 		return
 	}
@@ -208,6 +216,12 @@ func UploadFileMultipart(c *gin.Context) {
 
 // UploadFileBase64 处理 POST /v1/files/base64 接口，支持通过 JSON Base64 格式上传。
 func UploadFileBase64(c *gin.Context) {
+	// Base64 expands payloads by roughly 4/3; reject oversized JSON before decoding.
+	if c.Request.ContentLength > (maxUploadBytes*4/3)+1<<20 {
+		c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "Request exceeds maximum upload size of 50MB"})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, (maxUploadBytes*4/3)+1<<20)
 	var req Base64UploadRequest // 声明接收载荷。
 	// 校验 JSON。
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -237,7 +251,7 @@ func UploadFileBase64(c *gin.Context) {
 	}
 
 	// 限制大小。
-	if len(fileData) > 52428800 {
+	if int64(len(fileData)) > maxUploadBytes {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "File size exceeds limit of 50MB"})
 		return
 	}
@@ -276,6 +290,7 @@ func UploadFileBase64(c *gin.Context) {
 
 	// 写入元数据表中。
 	if err := db.DB.Create(&record).Error; err != nil {
+		_ = os.Remove(filepath.Join(config.GlobalConfig.FileStoragePath, filepath.FromSlash(storageKey)))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file meta to database"})
 		return
 	}
