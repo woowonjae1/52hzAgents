@@ -161,6 +161,26 @@ export function PromptComposer({
   const [workflowPlanOpen, setWorkflowPlanOpen] = React.useState(false);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  /*
+   * SENT-MESSAGE RECALL.
+   *
+   * Every chat client and every shell gives you the last thing you typed back
+   * with Up. This box did not, so a message sent one word short had to be
+   * retyped from scratch — and the cost of that lands hardest on the long
+   * multi-agent prompts this composer exists to write.
+   *
+   * Local to the composer on purpose: it is what THIS box sent, which is the
+   * thing Up is expected to return. The history resets with the channel, so
+   * Up in one channel never resurfaces a prompt written for another.
+   */
+  const historyRef = React.useRef<string[]>([]);
+  const [historyIndex, setHistoryIndex] = React.useState(-1);
+  const sessionKey = session?.sessionId ?? null;
+  React.useEffect(() => {
+    historyRef.current = [];
+    setHistoryIndex(-1);
+  }, [sessionKey]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const mentionListRef = React.useRef<HTMLDivElement>(null);
   const dragCountRef = React.useRef(0);
@@ -380,6 +400,8 @@ export function PromptComposer({
     const val = e.target.value;
     setMessage(val);
     onDraftChange?.(val);
+    // Editing a recalled message makes it a new draft, not a history entry.
+    if (historyIndex !== -1) setHistoryIndex(-1);
 
     const pos = e.target.selectionStart;
     const active = findActiveTrigger(val.slice(0, pos));
@@ -407,6 +429,10 @@ export function PromptComposer({
 
     onSend(trimmed, mentions, pendingFiles, segments.length >= 2 ? segments : undefined);
 
+    if (trimmed) {
+      historyRef.current = [trimmed, ...historyRef.current.filter((h) => h !== trimmed)].slice(0, 50);
+    }
+    setHistoryIndex(-1);
     setMessage('');
     setPendingFiles([]);
     onDraftChange?.('');
@@ -439,6 +465,35 @@ export function PromptComposer({
         setShowMentions(false);
         return;
       }
+    }
+
+    // Recall — only from an empty box, or while already walking the history.
+    // Anywhere else Up/Down are ordinary caret movement and must stay that way.
+    if (e.key === 'ArrowUp' && (historyIndex !== -1 || message.length === 0)) {
+      const next = historyIndex + 1;
+      const entry = historyRef.current[next];
+      if (entry !== undefined) {
+        e.preventDefault();
+        setHistoryIndex(next);
+        setMessage(entry);
+        onDraftChange?.(entry);
+        requestAnimationFrame(() => {
+          resizeTextarea();
+          const ta = textareaRef.current;
+          ta?.setSelectionRange(entry.length, entry.length);
+        });
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown' && historyIndex !== -1) {
+      e.preventDefault();
+      const next = historyIndex - 1;
+      const entry = next < 0 ? '' : historyRef.current[next] ?? '';
+      setHistoryIndex(next < 0 ? -1 : next);
+      setMessage(entry);
+      onDraftChange?.(entry);
+      requestAnimationFrame(resizeTextarea);
+      return;
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -808,6 +863,7 @@ export function PromptComposer({
                   className="hidden sm:inline select-none text-3xs font-mono text-muted-foreground/70"
                 >
                   Enter to send · Shift+Enter for new line
+                  {historyRef.current.length > 0 && ' · ↑ last message'}
                 </motion.span>
               )}
             </AnimatePresence>

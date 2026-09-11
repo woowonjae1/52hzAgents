@@ -30,6 +30,8 @@ import { TracePanel } from '@/components/trace/trace-panel';
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 import { CommandPalette } from './command-palette';
+import { GlobalShortcuts } from './global-shortcuts';
+import { RealtimeStatus } from './realtime-status';
 import { AppTitlebar } from './app-titlebar';
 import { useIsDesktop } from '@/lib/desktop';
 
@@ -222,7 +224,7 @@ export function Wrapper() {
             /* Detail pane — full width, edge-to-edge on mobile */
             <div className="relative h-full bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               {(viewMode === 'threads' || viewMode === 'routines') && (
-                <main className="h-full" role="content">
+                <main className="h-full">
                   <ChatView />
                 </main>
               )}
@@ -232,6 +234,8 @@ export function Wrapper() {
             </div>
           )}
         </div>
+        <GlobalShortcuts />
+        <RealtimeStatus />
         <NewThreadDialogHost />
       </div>
     );
@@ -295,7 +299,7 @@ export function Wrapper() {
                 )}
                 {/* Keep ChatView alive in DOM to prevent SSE disconnection, dropped messages, and re-fetch flicker */}
                 <div className={cn("h-full w-full", viewMode !== 'threads' && "hidden")}>
-                  <main className="h-full" role="content">
+                  <main className="h-full">
                     <ChatView />
                   </main>
                 </div>
@@ -407,6 +411,8 @@ export function Wrapper() {
           )}
         </div>
       </div>
+      <GlobalShortcuts />
+      <RealtimeStatus />
       <NewThreadDialogHost />
       <DropzoneOverlay />
       <CommandPalette />

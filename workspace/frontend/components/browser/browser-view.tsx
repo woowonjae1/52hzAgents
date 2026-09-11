@@ -9,6 +9,8 @@ import { workspaceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { stripAddressPrefix } from '@/lib/types';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
 
 export function BrowserView() {
   const {
@@ -24,6 +26,11 @@ export function BrowserView() {
   const [navigating, setNavigating] = useState(false);
   const [urlDraft, setUrlDraft] = useState('');
   const [editingUrl, setEditingUrl] = useState(false);
+  /* Was `window.prompt` / `window.confirm`. Both block the event loop, which
+     here means the screenshot poll and the SSE stream freeze behind an OS box
+     the user may have pushed behind the window. */
+  const [namingSession, setNamingSession] = useState(false);
+  const [confirmUnpersist, setConfirmUnpersist] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const prevBlobRef = useRef<string | null>(null);
   const failCountRef = useRef(0);
@@ -194,23 +201,19 @@ export function BrowserView() {
     }
   };
 
-  const handlePersist = async () => {
+  const handlePersist = async (name: string) => {
     if (!tab || tab.contextId) return;
-    const name = prompt('Give this session a name (e.g. "LinkedIn Account", "Google Search Console"):');
-    if (!name?.trim()) return;
     try {
-      await persistBrowserTab(tab.id, name.trim());
-      toast.success(`"${name.trim()}" is now persistent`);
+      await persistBrowserTab(tab.id, name);
+      toast.success(`"${name}" is now persistent`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to make persistent');
+      throw err;
     }
   };
 
   const handleUnpersist = async () => {
     if (!tab || !tab.contextId) return;
-    const ctx = browserContexts.find((c) => c.id === tab.contextId);
-    const label = ctx?.name || 'this tab';
-    if (!confirm(`Remove persistent state from "${label}"? The saved cookies and login state will be deleted.`)) return;
     try {
       await unpersistBrowserTab(tab.id);
       toast.success('Tab is now temporal');
@@ -234,6 +237,24 @@ export function BrowserView() {
 
   return (
     <div className="flex flex-col h-full">
+      <PromptDialog
+        open={namingSession}
+        onOpenChange={setNamingSession}
+        title="Name this session"
+        description="A persistent session keeps cookies and login state so an agent can come back to this site already signed in."
+        placeholder="LinkedIn Account"
+        confirmLabel="Make persistent"
+        onSubmit={handlePersist}
+      />
+      <ConfirmDialog
+        open={confirmUnpersist}
+        onOpenChange={setConfirmUnpersist}
+        title="Remove persistent state?"
+        targetName={browserContexts.find((c) => c.id === tab.contextId)?.name || 'This tab'}
+        description="will go back to being temporal — its saved cookies and login state are deleted."
+        confirmLabel="Remove"
+        onConfirm={handleUnpersist}
+      />
       {/* Header */}
       <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-2.5 border-b border-input shrink-0">
         {isMobile && (
@@ -293,7 +314,7 @@ export function BrowserView() {
         {tab.contextId ? (
           <Hint label="Remove persistent state — revert to temporal tab">
             <button
-              onClick={handleUnpersist}
+              onClick={() => setConfirmUnpersist(true)}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-status-success hover:bg-surface2 hover:text-status-warning transition-colors shrink-0"
             >
               <Lock className="size-3" />
@@ -303,7 +324,7 @@ export function BrowserView() {
         ) : (
           <Hint label="Make persistent — preserve login state for agents to reuse">
             <button
-              onClick={handlePersist}
+              onClick={() => setNamingSession(true)}
               className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs text-muted-foreground hover:bg-surface2 hover:text-status-success transition-colors shrink-0"
             >
               <Lock className="size-3" />

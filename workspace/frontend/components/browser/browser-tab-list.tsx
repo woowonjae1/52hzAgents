@@ -8,6 +8,8 @@ import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { stripAddressPrefix } from '@/lib/types';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -47,9 +49,7 @@ export function BrowserTabList() {
   const activeContextIds = new Set(persistentTabs.map((t) => t.contextId));
   const idleContexts = browserContexts.filter((c) => !activeContextIds.has(c.id));
 
-  const handleOpen = async () => {
-    const url = prompt('Enter URL (or leave blank for about:blank):', 'https://');
-    if (url === null) return;
+  const handleOpen = async (url: string) => {
     setOpening(true);
     try {
       const tab = await openBrowserTab(url || 'about:blank');
@@ -57,6 +57,7 @@ export function BrowserTabList() {
       toast.success('Browser tab opened');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to open tab');
+      throw err;
     } finally {
       setOpening(false);
     }
@@ -87,9 +88,14 @@ export function BrowserTabList() {
     }
   };
 
-  const handleDeleteContext = async (e: React.MouseEvent, contextId: string, name: string) => {
-    e.stopPropagation();
-    if (!confirm(`Delete saved session "${name}"? This will permanently remove the stored cookies and login state.`)) return;
+  /* Deleting a saved login is the most destructive thing on this screen, and
+     it was asking through `window.confirm` — a blocking OS dialog that stalls
+     the SSE stream behind it and looks like it belongs to a different program.
+     Same ConfirmDialog every other delete in the app uses. */
+  const [pendingContext, setPendingContext] = useState<{ id: string; name: string } | null>(null);
+  const [openingUrl, setOpeningUrl] = useState(false);
+
+  const handleDeleteContext = async (contextId: string) => {
     try {
       await deleteBrowserContext(contextId);
       toast.success('Saved session deleted');
@@ -107,6 +113,29 @@ export function BrowserTabList() {
 
   return (
     <div className="flex flex-col h-full">
+      <PromptDialog
+        open={openingUrl}
+        onOpenChange={setOpeningUrl}
+        title="Open a browser tab"
+        description="The agent drives this tab remotely. Leave the address as-is to start on a blank page."
+        placeholder="https://"
+        initialValue="https://"
+        confirmLabel="Open"
+        onSubmit={handleOpen}
+      />
+      <ConfirmDialog
+        open={pendingContext !== null}
+        onOpenChange={(v) => { if (!v) setPendingContext(null); }}
+        title="Delete saved session?"
+        targetName={pendingContext?.name}
+        description="will be removed along with its stored cookies and login state. Any agent using it will have to sign in again."
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (!pendingContext) return;
+          await handleDeleteContext(pendingContext.id);
+          setPendingContext(null);
+        }}
+      />
       {/* Header */}
       <div className="flex items-center gap-1 px-2 py-3 shrink-0">
         <div className="flex items-center w-full gap-1">
@@ -116,7 +145,7 @@ export function BrowserTabList() {
           </div>
           <Hint label="Open New Tab">
             <button
-              onClick={handleOpen}
+              onClick={() => setOpeningUrl(true)}
               disabled={opening}
               className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 disabled:opacity-50"
             >
@@ -204,7 +233,7 @@ export function BrowserTabList() {
                     </Hint>
                     <Hint label="Delete saved session">
                       <button
-                        onClick={(e) => handleDeleteContext(e, ctx.id, ctx.name)}
+                        onClick={(e) => { e.stopPropagation(); setPendingContext({ id: ctx.id, name: ctx.name }); }}
                         className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
                       >
                         <Trash2 className="size-3.5" />

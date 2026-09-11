@@ -1,6 +1,9 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { KeyCombo } from '@/components/ui/kbd';
+import { shortcutKeys } from '@/lib/shortcuts';
+import { SHORTCUTS_EVENT } from '@/components/layout/global-shortcuts';
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
@@ -803,16 +806,27 @@ export function ChatView() {
               <Plus className="size-4" />
               {agents.length > 0 ? 'New channel' : 'Connect an agent'}
             </Button>
-            {/* Desktop apps teach their shortcuts in the empty pane. */}
+            {/* Desktop apps teach their shortcuts in the empty pane. Every
+                cap here is read from the keymap (lib/shortcuts.ts), so it
+                cannot go back to advertising a key nothing listens for —
+                which is what `Ctrl+N` was doing here. */}
             <div className="mt-7 flex items-center gap-4 text-3xs text-foreground-extra-muted">
               <span className="inline-flex items-center gap-1.5">
-                <kbd className="rounded border border-border/60 bg-surface2 px-1.5 py-0.5 font-mono">Ctrl+N</kbd>
+                <KeyCombo keys={shortcutKeys('new-chat')} />
                 new chat
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <kbd className="rounded border border-border/60 bg-surface2 px-1.5 py-0.5 font-mono">Ctrl+K</kbd>
+                <KeyCombo keys={shortcutKeys('palette')} />
                 commands
               </span>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event(SHORTCUTS_EVENT))}
+                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer"
+              >
+                <KeyCombo keys={shortcutKeys('help')} />
+                all shortcuts
+              </button>
             </div>
           </>
         )}

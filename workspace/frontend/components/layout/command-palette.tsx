@@ -29,18 +29,16 @@ import {
   Sparkles,
   FileText,
   FileCode,
+  Keyboard,
+  PanelLeft,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
-
-function KeyBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <kbd className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded border border-border bg-surface2 font-mono text-3xs text-foreground-extra-muted">
-      {children}
-    </kbd>
-  );
-}
+import { Kbd } from '@/components/ui/kbd';
+import { shortcutKeys } from '@/lib/shortcuts';
+import { SHORTCUTS_EVENT } from './global-shortcuts';
 
 interface CommandItem {
   id: string;
@@ -59,8 +57,8 @@ export function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const { setViewMode, openSettings, openNewThread, setActiveRightTab, isMobile, openMobileDetail } = useLayout();
-  const { agents, currentSessionId, currentUser, sessions, files, todos, setCurrentSessionId, setSelectedFileId, workspaceId } = useWorkspace();
+  const { setViewMode, openSettings, openNewThread, setActiveRightTab, isMobile, openMobileDetail, sidebarToggle } = useLayout();
+  const { agents, currentSessionId, currentUser, sessions, files, todos, setCurrentSessionId, setSelectedFileId, workspaceId, createSession } = useWorkspace();
   const { theme, setTheme } = useTheme();
 
   // Open/close keyboard shortcut: ⌘K or Ctrl+K
@@ -87,6 +85,15 @@ export function CommandPalette() {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
+
+  // Keep the cursor visible. Without this the list scrolled only by mouse and
+  // arrowing down past the fold moved a selection nobody could see.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const row = list.querySelector<HTMLElement>('[data-palette-row][data-selected="true"]');
+    row?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex, query, open]);
 
   const execute = useCallback((item: CommandItem) => {
     setOpen(false);
@@ -141,6 +148,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-skills',
+        shortcut: ['G', 'E'],
         category: 'Navigation',
         title: 'Skills & Capabilities',
         subtitle: 'Manage agent tools and capabilities',
@@ -149,6 +157,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-files',
+        shortcut: ['G', 'F'],
         category: 'Navigation',
         title: 'Files & Workspace Artifacts',
         subtitle: 'Browse files and diffs',
@@ -157,6 +166,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-knowledge',
+        shortcut: ['G', 'K'],
         category: 'Navigation',
         title: 'Knowledge Base',
         subtitle: 'Manage workspace memories and documents',
@@ -165,6 +175,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-browser',
+        shortcut: ['G', 'B'],
         category: 'Navigation',
         title: 'Agent Browser',
         subtitle: 'Watch and control automated browser instances',
@@ -173,6 +184,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-routines',
+        shortcut: ['G', 'R'],
         category: 'Navigation',
         title: 'Routines & Automation',
         subtitle: 'Scheduled and recurring cron tasks',
@@ -189,6 +201,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-inbox',
+        shortcut: ['G', 'I'],
         category: 'Navigation',
         title: 'Inbox & Approvals',
         subtitle: 'Review agent notifications and approvals',
@@ -197,6 +210,7 @@ export function CommandPalette() {
       },
       {
         id: 'nav-connect',
+        shortcut: ['G', 'N'],
         category: 'Navigation',
         title: 'Connect Agents',
         subtitle: 'Add CLI agents (Claude Code, OpenClaw, Pi, etc.)',
@@ -215,13 +229,37 @@ export function CommandPalette() {
     ];
 
     const actions: CommandItem[] = [
+      /*
+       * TWO WAYS TO START, AND THEY ARE NOT THE SAME COMMAND.
+       *
+       * `C` (here, in the sidebar's New-chat row, and in the thread list's key
+       * handler) creates a channel immediately. The picker below asks who
+       * joins first. They used to share one palette row wearing a `C` cap, so
+       * the cap described a dialog the key never opened.
+       */
+      {
+        id: 'act-new-chat',
+        category: 'Actions',
+        title: 'New Chat',
+        subtitle: 'Create an empty channel right away',
+        icon: <Plus className="size-4 text-foreground-muted" />,
+        shortcut: ['C'],
+        action: async () => {
+          try {
+            await createSession({});
+            setViewMode('threads');
+            if (isMobile) openMobileDetail();
+          } catch (e: any) {
+            toast.error(e?.message || 'Could not create the channel');
+          }
+        },
+      },
       {
         id: 'act-new-thread',
         category: 'Actions',
-        title: 'New Thread',
-        subtitle: 'Start a new multi-agent conversation',
-        icon: <Plus className="size-4 text-foreground-muted" />,
-        shortcut: ['C'],
+        title: 'New Thread with Agents…',
+        subtitle: 'Pick participants, then start the conversation',
+        icon: <Users className="size-4 text-foreground-muted" />,
         action: () => openNewThread(),
       },
       {
@@ -268,7 +306,6 @@ export function CommandPalette() {
         title: 'Token Dashboard',
         subtitle: 'Inspect workspace token consumption, limits & channel health',
         icon: <Activity className="size-4 text-foreground-muted" />,
-        shortcut: ['G', 'L'],
         action: () => setActiveRightTab('tokens'),
       },
       {
@@ -286,6 +323,24 @@ export function CommandPalette() {
         subtitle: 'Open the agent interactive command console',
         icon: <Terminal className="size-4 text-foreground-muted" />,
         action: () => setActiveRightTab('terminal'),
+      },
+      {
+        id: 'act-sidebar',
+        category: 'Actions',
+        title: 'Toggle Sidebar',
+        subtitle: 'Collapse or restore the left column',
+        icon: <PanelLeft className="size-4 text-foreground-muted" />,
+        shortcut: shortcutKeys('sidebar'),
+        action: () => sidebarToggle(),
+      },
+      {
+        id: 'act-shortcuts',
+        category: 'Actions',
+        title: 'Keyboard Shortcuts',
+        subtitle: 'Every binding the app listens for',
+        icon: <Keyboard className="size-4 text-foreground-muted" />,
+        shortcut: shortcutKeys('help'),
+        action: () => window.dispatchEvent(new Event(SHORTCUTS_EVENT)),
       },
     ];
 
@@ -380,6 +435,8 @@ export function CommandPalette() {
     setSelectedFileId,
     isMobile,
     openMobileDetail,
+    createSession,
+    sidebarToggle,
   ]);
 
   // Filter commands by query
@@ -435,6 +492,10 @@ export function CommandPalette() {
             }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command or search..."
+            role="combobox"
+            aria-expanded
+            aria-controls="command-palette-list"
+            aria-autocomplete="list"
             className="flex-1 text-sm bg-transparent text-foreground placeholder:text-foreground-extra-muted focus:outline-none"
           />
           {query && (
@@ -447,12 +508,18 @@ export function CommandPalette() {
             </button>
           )}
           <div className="flex items-center gap-1.5 shrink-0 pl-3">
-            <KeyBadge>ESC</KeyBadge>
+            <Kbd>ESC</Kbd>
           </div>
         </div>
 
         {/* Command List */}
-        <div ref={listRef} className="max-h-96 overflow-y-auto p-2 space-y-1">
+        <div
+          ref={listRef}
+          id="command-palette-list"
+          role="listbox"
+          aria-label="Commands"
+          className="max-h-96 overflow-y-auto p-2 space-y-1"
+        >
           {filtered.length === 0 ? (
             <div className="py-12 text-center text-xs text-foreground-extra-muted">
               No matching commands found.
@@ -463,6 +530,10 @@ export function CommandPalette() {
               return (
                 <div
                   key={item.id}
+                  role="option"
+                  aria-selected={isSelected}
+                  data-palette-row
+                  data-selected={isSelected ? 'true' : 'false'}
                   onClick={() => execute(item)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={cn(
@@ -491,7 +562,7 @@ export function CommandPalette() {
                     {item.shortcut ? (
                       <div className="flex items-center gap-1">
                         {item.shortcut.map((k, i) => (
-                          <KeyBadge key={i}>{k}</KeyBadge>
+                          <Kbd key={i}>{k}</Kbd>
                         ))}
                       </div>
                     ) : (
@@ -511,12 +582,12 @@ export function CommandPalette() {
         <div className="flex items-center justify-between px-4 py-2 bg-surface2/60 border-t border-border/60 text-3xs text-foreground-extra-muted font-medium">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <KeyBadge>↑</KeyBadge>
-              <KeyBadge>↓</KeyBadge>
+              <Kbd>↑</Kbd>
+              <Kbd>↓</Kbd>
               Navigate
             </span>
             <span className="flex items-center gap-1">
-              <KeyBadge>↵</KeyBadge>
+              <Kbd>↵</Kbd>
               Select
             </span>
           </div>

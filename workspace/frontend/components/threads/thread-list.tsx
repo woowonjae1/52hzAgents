@@ -864,8 +864,11 @@ export function ThreadList() {
   }, [visualOrder, currentSessionId, isMobile, setCurrentSessionId, openMobileDetail, setViewMode]);
 
   return (
-    <div className="flex flex-col h-full">
-
+    /* `data-thread-list` is a contract, not decoration: the global key handler
+       (components/layout/global-shortcuts.tsx) looks for it to decide whether
+       the bare letters below are already spoken for. Renaming it silently
+       double-binds `c`. */
+    <div data-thread-list className="flex flex-col h-full">
 
       {/* Top Action & Navigation Block */}
       <div className="px-3.5 pt-2.5 pb-1 shrink-0 select-none">
@@ -894,7 +897,7 @@ export function ThreadList() {
             <span>New chat</span>
           </div>
           <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
-            Ctrl+N
+            C
           </kbd>
         </button>
 

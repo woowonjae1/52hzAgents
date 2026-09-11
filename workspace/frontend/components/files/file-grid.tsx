@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { FileEntry } from './file-utils';
 import { formatSize, getFileIconLarge, timeAgo, basename, getEntriesAtPath } from './file-utils';
@@ -54,6 +55,9 @@ export function FileGrid() {
   // Confirmation dialogs
   const [singleDeleteTarget, setSingleDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
+  // `window.prompt` blocked the whole tab while it was up. Same dialog the
+  // rest of the workspace asks in.
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const [deletingBatch, setDeletingBatch] = useState(false);
 
   // This panel opens from a thread's header, so it shows what THAT thread
@@ -144,10 +148,8 @@ export function FileGrid() {
     }
   };
 
-  const handleCreateFolder = async () => {
-    const name = prompt('Folder name:');
-    if (!name?.trim()) return;
-    const sanitized = name.trim().replace(/[/\\]/g, '-');
+  const handleCreateFolder = async (name: string) => {
+    const sanitized = name.replace(/[/\\]/g, '-');
     const folderPath = currentPath ? `${currentPath}/${sanitized}` : sanitized;
     try {
       // Upload a .keep placeholder so the folder persists even when empty
@@ -156,6 +158,7 @@ export function FileGrid() {
       toast.success(`Created folder "${sanitized}"`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create folder');
+      throw err;
     }
   };
 
@@ -329,7 +332,7 @@ export function FileGrid() {
         {/* Actions */}
         <Hint label="New Folder">
           <button
-            onClick={handleCreateFolder}
+            onClick={() => setCreatingFolder(true)}
             className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
           >
             <FolderPlus className="size-4" />
@@ -514,6 +517,15 @@ export function FileGrid() {
       )}
 
       {/* Single file delete confirmation dialog */}
+      <PromptDialog
+        open={creatingFolder}
+        onOpenChange={setCreatingFolder}
+        title="New folder"
+        description="Slashes are replaced with dashes — folders nest by navigating into them, not by typing a path."
+        placeholder="designs"
+        confirmLabel="Create"
+        onSubmit={handleCreateFolder}
+      />
       <ConfirmDialog
         open={Boolean(singleDeleteTarget)}
         onOpenChange={(open) => !open && setSingleDeleteTarget(null)}

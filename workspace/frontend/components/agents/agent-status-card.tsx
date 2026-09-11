@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
 import { toast } from 'sonner';
@@ -26,6 +27,15 @@ interface AgentStatusCardProps {
 export function AgentStatusCard({ agents }: AgentStatusCardProps) {
   const { refreshAgents } = useWorkspace();
   const [busy, setBusy] = useState(false);
+  /*
+   * `window.confirm` was doing this job. Three reasons it cannot stay: it
+   * blocks the JS thread (the SSE stream and every heartbeat stall behind the
+   * OS dialog), it renders in the browser chrome's font on a white plate with
+   * no relation to this app, and in the Electron shell it appears detached
+   * from the window it belongs to. ConfirmDialog is the workspace's own, and
+   * every other destructive path already uses it.
+   */
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   const handlePromote = async (agentName: string) => {
     setBusy(true);
@@ -41,7 +51,6 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
   };
 
   const handleRemove = async (agentName: string) => {
-    if (!confirm(`Remove ${agentName} from workspace?`)) return;
     setBusy(true);
     try {
       await workspaceApi.removeAgent(agentName);
@@ -56,6 +65,21 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
 
   return (
     <div className="space-y-2">
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(v) => { if (!v) setPendingRemoval(null); }}
+        title="Remove agent from workspace?"
+        targetName={pendingRemoval ?? undefined}
+        description="loses access to this workspace's channels, files and tasks. Reconnect it later with its token."
+        confirmLabel="Remove"
+        isLoading={busy}
+        onConfirm={async () => {
+          const name = pendingRemoval;
+          if (!name) return;
+          await handleRemove(name);
+          setPendingRemoval(null);
+        }}
+      />
       <SectionHeader label="Agents" />
       <div className="space-y-1.5">
         {agents.map((agent) => {
@@ -112,7 +136,7 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       variant="destructive"
-                      onClick={() => handleRemove(agent.agentName)}
+                      onClick={() => setPendingRemoval(agent.agentName)}
                     >
                       <UserMinus className="size-4" />
                       Remove

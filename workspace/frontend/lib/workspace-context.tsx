@@ -161,6 +161,9 @@ function isLiveStatus(messageType: string, timestamp: unknown): boolean {
   return ms > 0 && Date.now() - ms < STATUS_FRESHNESS_MS;
 }
 
+/** 'live' = events are flowing. 'offline' = the stream is down and retrying. */
+export type RealtimeStatus = 'connecting' | 'live' | 'offline';
+
 interface WorkspaceContextValue {
   workspace: Workspace | null;
   workspaceId: string;
@@ -176,6 +179,15 @@ interface WorkspaceContextValue {
   currentFilePath: string;
   currentSessionId: string | null;
   loading: boolean;
+  /**
+   * Live-event stream health. The workspace is a realtime surface: agent
+   * status, task changes, routines and notifications all arrive over one SSE
+   * connection. When it drops, nothing in the UI changes — it just quietly
+   * stops being true — so the state has to be observable.
+   */
+  realtimeStatus: RealtimeStatus;
+  /** Drop the backoff and redial now (a Retry button, or the tab waking up). */
+  reconnectRealtime: () => void;
   error: string | null;
   userSentMessageTimestamps: Record<string, number>;
   recordUserMessageSent: (sessionId: string) => void;
@@ -1563,6 +1575,15 @@ export function WorkspaceProvider({
   }, [refreshDiscovery]);
 
   // Workspace-level SSE event subscription for instantaneous agent status & state synchronization
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>('connecting');
+  /* Set by the effect below so `reconnectRealtime` — a Retry button, a tab
+     waking from sleep, the OS coming back online — can redial immediately
+     instead of waiting out a backoff that may be sitting at 30 seconds. */
+  const redialRef = useRef<(() => void) | null>(null);
+  const reconnectRealtime = useCallback(() => {
+    redialRef.current?.();
+  }, []);
+
   useEffect(() => {
     if (!workspaceId || typeof window === 'undefined') return;
 
@@ -1578,6 +1599,7 @@ export function WorkspaceProvider({
 
         eventSource.onopen = () => {
           backoffMs = 1000;
+          if (isMounted) setRealtimeStatus('live');
         };
 
         eventSource.onmessage = (ev) => {
@@ -1665,6 +1687,7 @@ export function WorkspaceProvider({
             eventSource = null;
           }
           if (isMounted) {
+            setRealtimeStatus('offline');
             reconnectTimeout = setTimeout(() => {
               backoffMs = Math.min(backoffMs * 2, 30_000);
               connect();
@@ -1673,15 +1696,50 @@ export function WorkspaceProvider({
         };
       } catch {
         if (isMounted) {
+          setRealtimeStatus('offline');
           reconnectTimeout = setTimeout(connect, 5000);
         }
       }
     };
 
+    /*
+     * Redial now, from the top of the backoff.
+     *
+     * Without this, the two moments a user is most likely to be looking at a
+     * dead workspace — the laptop waking up, the wifi coming back — were the
+     * two moments the retry timer was at its longest. Half a minute of a UI
+     * that looks live and is not.
+     */
+    const redial = () => {
+      if (!isMounted) return;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+      }
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+      backoffMs = 1000;
+      setRealtimeStatus('connecting');
+      connect();
+    };
+    redialRef.current = redial;
+
+    const onWake = () => {
+      if (document.visibilityState === 'visible' && eventSource === null) redial();
+    };
+    const onOnline = () => redial();
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('online', onOnline);
+
     connect();
 
     return () => {
       isMounted = false;
+      redialRef.current = null;
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('online', onOnline);
       if (eventSource) eventSource.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
@@ -2003,6 +2061,8 @@ export function WorkspaceProvider({
     dismissNotification,
     notificationSound,
     setNotificationSound,
+    realtimeStatus,
+    reconnectRealtime,
   }), [
     workspace, workspaceId, effectiveToken, agents, setAgents, currentUser, setUserName, onlineUsers, sessions, files,
     selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds, workingAgentNames,
@@ -2020,7 +2080,8 @@ export function WorkspaceProvider({
     createRoutine, updateRoutine, toggleRoutine, triggerRoutine, cancelRoutine, knowledge,
     refreshKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, notifications,
     unreadNotificationCount, refreshNotifications, markNotificationRead, markAllNotificationsRead,
-    dismissNotification, notificationSound, setNotificationSound
+    dismissNotification, notificationSound, setNotificationSound,
+    realtimeStatus, reconnectRealtime,
   ]);
 
   return (
