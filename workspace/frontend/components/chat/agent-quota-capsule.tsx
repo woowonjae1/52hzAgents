@@ -223,6 +223,32 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
     return 'bg-status-success';
   };
 
+  /*
+    THE CHIP APPEARS WHEN THERE IS A QUOTA TO WORRY ABOUT, AND NOT BEFORE.
+
+    It used to sit in the chat header permanently. With no subscription data
+    it fell through to a cumulative-token readout — `antigravity 2.4k tok` —
+    and that one form caused most of the confusion on this header, because:
+
+      * `2.4k tok` is total tokens SPENT, while the pill two inches to its
+        right reads `6.1k` for tokens currently HELD in the window. Two
+        monospace numbers, both labelled in tokens, measuring a flow and a
+        level. Nothing on screen distinguished them.
+      * the panel behind it then reported a third number, `1.4k / 1M`, against
+        the model's own window — a denominator that is fiction in this channel,
+        since @openclaw caps the whole thread at 64k.
+      * with a fresh subscription every row in it reads 0%: 5-hour 0%, weekly
+        0%. A permanent header control whose entire content is zeroes.
+
+    Cumulative spend is a reporting number, not a live one; it belongs in the
+    governance dashboard this panel already links to. What belongs in a header
+    is the limit you are approaching, so the chip now renders only when the
+    provider has reported actual usage — or when it reported something we could
+    not parse, which is itself worth surfacing.
+  */
+  const hasQuotaSignal = isUnparsed || sessionPercent > 0 || weekPercent > 0;
+  if (!hasQuotaSignal) return null;
+
   return (
     <Popover
       open={isOpen}
@@ -258,8 +284,9 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               />
             </span>
 
-            {/* Display: Claude 5h/week or Cumulative Tokens */}
-            {isClaudeQuota && (sessionPercent > 0 || weekPercent > 0) ? (
+            {/* Percentages of a real limit, or an honest "unknown". The
+                cumulative-token fallback is gone — see the note above. */}
+            {sessionPercent > 0 || weekPercent > 0 ? (
               <>
                 <span className="text-foreground-muted font-normal">5h</span>
                 <span
@@ -281,9 +308,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
             ) : (
               <>
                 <span className="text-foreground-muted font-normal">{selectedName}</span>
-                <span className="font-mono font-semibold tabular-nums text-foreground">
-                  {fmtTokens(totalTokens)} tok
-                </span>
+                <span className="font-medium">quota unreadable</span>
               </>
             )}
           </button>
