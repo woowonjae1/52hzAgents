@@ -1,6 +1,8 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { SkeletonRows } from '@/components/ui/skeleton';
+import { runUndoable } from '@/lib/undoable';
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from 'sonner';
@@ -25,6 +27,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { stripAddressPrefix } from '@/lib/types';
+import { isComposing } from '@/lib/ime';
+import { FIND_EVENT } from '@/components/layout/global-shortcuts';
 
 /*
   Who is in this channel, as marks rather than names. One agent renders as a
@@ -137,7 +141,7 @@ function DMSection({
                 key={dmId}
                 onClick={() => onSelect(dmId)}
                 className={cn(
-                  'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors cursor-pointer relative',
+                  'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative',
                   isSelected
                     ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
                     : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground'
@@ -361,7 +365,7 @@ const ThreadRow = memo(function ThreadRow({
         onSelect(session.sessionId);
       }}
       className={cn(
-        'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors relative group cursor-pointer select-none',
+        'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors relative group select-none',
         isSelected
           ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
           : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
@@ -398,6 +402,7 @@ const ThreadRow = memo(function ThreadRow({
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => setEditTitleValue(e.target.value)}
               onKeyDown={(e) => {
+                if (isComposing(e)) return;
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   const trimmed = editTitleValue.trim();
@@ -416,19 +421,20 @@ const ThreadRow = memo(function ThreadRow({
               className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary"
             />
           ) : (
-            <span
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onStartEdit(session.sessionId, smartTitle);
-              }}
-              className={cn(
-                'text-xs flex-1 min-w-0 truncate tracking-tight',
-                isSelected ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
-              )}
-              title="Double-click to rename"
-            >
-              {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
-            </span>
+            <Hint label="Double-click to rename">
+              <span
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onStartEdit(session.sessionId, smartTitle);
+                }}
+                className={cn(
+                  'text-xs flex-1 min-w-0 truncate tracking-tight',
+                  isSelected ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
+                )}
+              >
+                {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
+              </span>
+            </Hint>
           )}
           {/* `font-sans`, not `font-mono tabular-nums`: this is "5 hours ago",
               not a column of figures. Monospacing prose sets it in a second
@@ -453,7 +459,7 @@ const ThreadRow = memo(function ThreadRow({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
-            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0 cursor-pointer"
+            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0"
             onClick={(e) => e.stopPropagation()}
           >
             <MoreVertical className="size-3.5" />
@@ -536,7 +542,7 @@ interface VirtualSessionItem {
 type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem;
 
 export function ThreadList() {
-  const { sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
+  const { loading, sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode, viewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -571,19 +577,33 @@ export function ThreadList() {
     updateSession(sessionId, { starred });
   }, [updateSession]);
 
-  const [pendingDeleteSession, setPendingDeleteSession] = useState<{ id: string; title: string } | null>(null);
+  /*
+   * DELETE IS UNDOABLE, SO IT DOES NOT ASK FIRST.
+   *
+   * This used to raise a modal saying "this cannot be undone" — which was not
+   * true (the delete is a status flip, fully reversible) and charged a click
+   * for every deletion including the ones that were meant. A desktop list
+   * deletes on the key and gives you a few seconds to take it back.
+   */
+  const deleteSession = useCallback((sessionId: string, title: string) => {
+    const previous = sessions.find((s) => s.sessionId === sessionId)?.status || 'active';
+    runUndoable({
+      message: `Deleted "${title}"`,
+      onOptimistic: () => updateSession(sessionId, { status: 'deleted' }),
+      onRevert: () => updateSession(sessionId, { status: previous }),
+      // The status flip above IS the delete; there is nothing left to commit.
+      onCommit: async () => {},
+    });
+  }, [sessions, updateSession]);
 
   const handleUpdateStatus = useCallback((sessionId: string, status: 'active' | 'archived' | 'deleted') => {
     if (status === 'deleted') {
       const target = sessions.find((s) => s.sessionId === sessionId);
-      setPendingDeleteSession({
-        id: sessionId,
-        title: target?.title || 'Untitled conversation',
-      });
+      deleteSession(sessionId, target?.title || 'Untitled conversation');
       return;
     }
     updateSession(sessionId, { status });
-  }, [sessions, updateSession]);
+  }, [sessions, updateSession, deleteSession]);
 
   // Debounced content search
   useEffect(() => {
@@ -859,8 +879,23 @@ export function ThreadList() {
       }
     };
 
+    /*
+      Ctrl/Cmd+F reaches the thread list through an event rather than through
+      this key handler, because the filter bar is not in the DOM until it is
+      asked for — so the global shortcut has no input to focus and must ask the
+      list to produce one.
+    */
+    const onFind = () => {
+      setShowSearch(true);
+      setTimeout(() => searchInputRef.current?.focus(), 10);
+    };
+
+    window.addEventListener(FIND_EVENT, onFind);
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener(FIND_EVENT, onFind);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [visualOrder, currentSessionId, isMobile, setCurrentSessionId, openMobileDetail, setViewMode]);
 
   return (
@@ -917,7 +952,7 @@ export function ThreadList() {
             type="button"
             onClick={() => setViewMode('threads')}
             className={cn(
-              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
               viewMode === 'threads'
                 ? 'bg-surface2 text-foreground font-semibold'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
@@ -934,7 +969,7 @@ export function ThreadList() {
             type="button"
             onClick={() => setViewMode('tasks')}
             className={cn(
-              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
               viewMode === 'tasks'
                 ? 'bg-surface2 text-foreground font-semibold'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
@@ -960,7 +995,7 @@ export function ThreadList() {
             onClick={() => {
               window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
             }}
-            className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
+            className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
           >
             <div className="flex items-center gap-2">
               <Command className="size-3.5 text-foreground-extra-muted" />
@@ -1007,7 +1042,7 @@ export function ThreadList() {
                 });
               }}
               className={cn(
-                "p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer",
+                "p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors",
                 (showSearch || searchQuery) && "bg-surface2 text-foreground"
               )}
             >
@@ -1021,21 +1056,21 @@ export function ThreadList() {
               <Hint label="New Project / Quick Start">
                 <button
                   disabled={browsingFolder}
-                  className="p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+                  className="p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors disabled:opacity-50"
                 >
                   {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <FolderPlus className="size-3.5" />}
                 </button>
               </Hint>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1">
-              <DropdownMenuItem onClick={addProjectFolder} className="gap-2.5 py-2 px-2.5 text-xs cursor-pointer rounded-lg">
+            <DropdownMenuItem onClick={addProjectFolder} className="gap-2.5 py-2 px-2.5 text-xs rounded-lg">
                 <FolderPlus className="size-4 text-foreground-muted shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-semibold text-foreground">New Project</span>
                   <span className="text-3xs text-muted-foreground">Select a folder</span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => startChannel(null)} className="gap-2.5 py-2 px-2.5 text-xs cursor-pointer rounded-lg">
+              <DropdownMenuItem onClick={() => startChannel(null)} className="gap-2.5 py-2 px-2.5 text-xs rounded-lg">
                 <MessageSquarePlus className="size-4 text-foreground-muted shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-semibold text-foreground">Quick Start</span>
@@ -1058,6 +1093,7 @@ export function ThreadList() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filter threads… (Esc to close)"
+              data-view-search
               className="w-full bg-surface2/80 border border-border rounded-lg pl-7 pr-7 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden focus:border-border-accent"
               autoFocus
             />
@@ -1067,7 +1103,7 @@ export function ThreadList() {
                 setSearchQuery('');
                 setShowSearch(false);
               }}
-              className="absolute right-2 size-4 flex items-center justify-center rounded text-foreground-extra-muted hover:text-foreground cursor-pointer"
+              className="absolute right-2 size-4 flex items-center justify-center rounded text-foreground-extra-muted hover:text-foreground"
             >
               <X className="size-3" />
             </button>
@@ -1080,6 +1116,10 @@ export function ThreadList() {
         ref={listContainerRef}
         className="flex-1 overflow-y-auto px-2 py-1 overscroll-contain transform-gpu [contain:content]"
       >
+        {/* Placeholder rows while the first fetch is in flight. Without them
+            the sidebar renders as a blank column and then fills, which reads
+            as "no conversations" for as long as the request takes. */}
+        {loading && sessions.length === 0 && <SkeletonRows rows={7} />}
         {virtualListItems.length > 0 && (
           <div
             style={{
@@ -1109,19 +1149,20 @@ export function ThreadList() {
                   {item.type === 'header' ? (
                     <div className="flex items-center gap-1.5 px-2 pt-2.5 pb-1 select-none">
                       <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                      <span
-                        className="text-sm font-semibold text-foreground truncate"
-                        title={item.dir ?? 'Direct chats'}
-                      >
-                        {item.dir ? basename(item.dir) : 'Direct chats'}
-                      </span>
+                      <Hint label={item.dir ?? 'Direct chats'}>
+                        <span
+                          className="text-sm font-semibold text-foreground truncate"
+                        >
+                          {item.dir ? basename(item.dir) : 'Direct chats'}
+                        </span>
+                      </Hint>
                       <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
                         {item.count}
                       </span>
                       <Hint label={item.dir ? `New channel in ${item.dir}` : 'New direct chat'}>
                         <button
                           onClick={() => startChannel(item.dir)}
-                          className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+                          className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0"
                         >
                           <Plus className="size-3" />
                         </button>
@@ -1170,7 +1211,7 @@ export function ThreadList() {
                   <p className="text-xs mt-1">Start chatting, or pick a project folder first</p>
                   <button
                     onClick={() => startChannel(null)}
-                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors cursor-pointer"
+                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
                   >
                     <MessageCircle className="size-3.5" />
                     Direct chats
@@ -1254,7 +1295,7 @@ export function ThreadList() {
                           if (isMobile) openMobileDetail();
                         }}
                         className={cn(
-                          'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative group cursor-pointer',
+                          'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative group',
                           isSelected
                             ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
                             : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
@@ -1282,7 +1323,7 @@ export function ThreadList() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <button
-                              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0 cursor-pointer"
+                              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreVertical className="size-3.5" />
@@ -1303,10 +1344,7 @@ export function ThreadList() {
                               className="text-destructive focus:text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPendingDeleteSession({
-                                  id: session.sessionId,
-                                  title: session.title || 'Untitled conversation',
-                                });
+                                deleteSession(session.sessionId, session.title || 'Untitled conversation');
                               }}
                             >
                               <Trash2 className="size-4" />
@@ -1324,21 +1362,6 @@ export function ThreadList() {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={Boolean(pendingDeleteSession)}
-        onOpenChange={(open) => !open && setPendingDeleteSession(null)}
-        title="Delete conversation?"
-        targetName={pendingDeleteSession?.title}
-        description="will be permanently deleted along with all its messages and history. This action cannot be undone."
-        confirmLabel="Delete"
-        variant="destructive"
-        onConfirm={() => {
-          if (pendingDeleteSession) {
-            updateSession(pendingDeleteSession.id, { status: 'deleted' });
-            setPendingDeleteSession(null);
-          }
-        }}
-      />
     </div>
   );
 }

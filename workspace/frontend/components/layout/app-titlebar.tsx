@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Hint } from '@/components/ui/hint';
 import { useTheme } from 'next-themes';
 import { PanelLeft } from 'lucide-react';
 import { SignalMark } from '@/components/brand/signal-mark';
@@ -140,17 +141,17 @@ export function AppTitlebar() {
 
       <div className="flex items-center gap-2 min-w-0">
         <SignalMark size={16} className="shrink-0" title="52hzAgents" />
-        <span
-          className="text-2xs font-medium tracking-tight text-foreground-muted truncate"
-          title={workspace?.name || '52hzAgents'}
-        >
-          {workspace?.name || '52hzAgents'}
-        </span>
-        <span
-          className={`size-1.5 rounded-full shrink-0 ${isLive ? 'bg-status-success' : isConnecting ? 'bg-status-warning animate-pulse' : 'bg-status-danger'}`}
-          title={connectionLabel}
-          aria-label={connectionLabel}
-        />
+        <Hint label={workspace?.name || '52hzAgents'}>
+          <span className="text-2xs font-medium tracking-tight text-foreground-muted truncate">
+            {workspace?.name || '52hzAgents'}
+          </span>
+        </Hint>
+        <Hint label={connectionLabel}>
+          <span
+            className={`size-1.5 rounded-full shrink-0 ${isLive ? 'bg-status-success' : isConnecting ? 'bg-status-warning animate-pulse' : 'bg-status-danger'}`}
+            aria-label={connectionLabel}
+          />
+        </Hint>
       </div>
     </header>
   );

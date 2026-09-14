@@ -1,6 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import {
   Activity,
@@ -322,7 +323,7 @@ export function TracePanel() {
             <button
               onClick={() => setIsAutoScroll((v) => !v)}
               className={cn(
-                'size-6.5 flex items-center justify-center rounded-lg border transition-colors cursor-pointer',
+                'size-6.5 flex items-center justify-center rounded-lg border transition-colors',
                 isAutoScroll
                   ? 'text-status-success border-status-success/30 bg-surface2'
                   : 'text-foreground-muted border-border hover:text-foreground'
@@ -344,6 +345,7 @@ export function TracePanel() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search trace events..."
+            data-view-search
               className="bg-transparent border-0 outline-none text-2xs w-full text-foreground placeholder:text-foreground-extra-muted"
             />
           </div>
@@ -367,7 +369,7 @@ export function TracePanel() {
             <button
               onClick={() => setFilterType('all')}
               className={cn(
-                'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer',
+                'px-2 py-0.5 rounded font-medium transition-colors',
                 filterType === 'all'
                   ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
@@ -378,7 +380,7 @@ export function TracePanel() {
             <button
               onClick={() => setFilterType('tools')}
               className={cn(
-                'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1',
+                'px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1',
                 filterType === 'tools'
                   ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
@@ -390,7 +392,7 @@ export function TracePanel() {
             <button
               onClick={() => setFilterType('thinking')}
               className={cn(
-                'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1',
+                'px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1',
                 filterType === 'thinking'
                   ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
@@ -403,7 +405,7 @@ export function TracePanel() {
               <button
                 onClick={() => setFilterType('subagents')}
                 className={cn(
-                  'px-2 py-0.5 rounded font-medium transition-colors cursor-pointer flex items-center gap-1',
+                  'px-2 py-0.5 rounded font-medium transition-colors flex items-center gap-1',
                   filterType === 'subagents'
                     ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                     : 'text-foreground-muted hover:text-foreground'
@@ -417,18 +419,19 @@ export function TracePanel() {
 
           {/* Agent Filter Pill Selector */}
           {traceAgents.length > 1 && (
-            <select
-              value={agentFilter}
-              onChange={(e) => setAgentFilter(e.target.value)}
-              className="px-2 py-0.5 rounded-lg bg-surface2 border border-border text-3xs font-medium text-foreground outline-none cursor-pointer max-w-[110px] truncate"
-            >
-              <option value="all">@All Agents</option>
-              {traceAgents.map((agentName) => (
-                <option key={agentName} value={agentName}>
-                  @{agentName}
-                </option>
-              ))}
-            </select>
+            <Select value={agentFilter} onValueChange={setAgentFilter}>
+              <SelectTrigger size="sm" className="w-auto max-w-[130px] text-3xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">@All Agents</SelectItem>
+                {traceAgents.map((agentName) => (
+                  <SelectItem key={agentName} value={agentName}>
+                    @{agentName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           )}
         </div>
       </div>
@@ -557,12 +560,12 @@ function TraceStepCard({ step, agents }: { step: WorkspaceMessage; agents?: Work
           actions={
             parsed.args ? (
               <EventLineAction
+                title="Copy parameters"
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();
                   handleCopyArgs(parsed.args!);
                 }}
-                title="Copy parameters"
               >
                 {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
               </EventLineAction>

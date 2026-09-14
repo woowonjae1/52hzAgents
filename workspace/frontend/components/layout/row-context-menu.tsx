@@ -39,13 +39,100 @@ import * as React from 'react';
  *     stands. This is why the search is scoped to the ancestor chain rather
  *     than to the document.
  *
- * The trigger is clicked rather than positioned at the cursor, so the menu
- * anchors to the `⋯` button. That is a deliberate simplification: it reuses
- * the existing Radix positioning, collision handling and focus management
- * exactly as the button does, and the menu appears on the row you clicked.
+ * The row's own trigger is what gets opened — that reuses its Radix focus
+ * management and its item set — but the menu is then re-anchored to the
+ * pointer, because that is where a context menu belongs. See `pinToCursor`.
  */
 export function RowContextMenu() {
   React.useEffect(() => {
+    /*
+     * A CONTEXT MENU OPENS AT THE POINTER. Everywhere. That is the whole
+     * definition of the thing.
+     *
+     * The first version of this anchored the menu to the row's own `...`
+     * button instead, and said so in a comment as a "deliberate
+     * simplification" — reuse Radix's positioning exactly as the button uses
+     * it. It is the one corner that still read as a web page: right-click a
+     * row near the bottom of a long list and the menu appears somewhere off to
+     * the right, attached to a button you were not pointing at.
+     *
+     * Radix positions the menu against its trigger and there is no API to give
+     * it a different anchor after the fact, so the wrapper it renders is
+     * repositioned directly. `pinToCursor` below is the whole of it: clear the
+     * transform Radix wrote, set left/top from the click, and flip rather than
+     * overflow. A MutationObserver puts it back every time Radix recalculates
+     * (scroll, resize, its own arrow-key focus handling), which is what makes
+     * this hold rather than flicker back after a frame.
+     */
+    const MENU_MARGIN = 6;
+
+    const pinToCursor = (wrapper: HTMLElement, x: number, y: number) => {
+      const content = wrapper.firstElementChild as HTMLElement | null;
+      const rect = content?.getBoundingClientRect();
+      const w = rect?.width || 220;
+      const h = rect?.height || 200;
+
+      // Flip, then clamp. Flipping keeps the pointer on a corner of the menu —
+      // clamping alone would slide it under the cursor near an edge.
+      let left = x;
+      let top = y;
+      if (left + w > window.innerWidth - MENU_MARGIN) left = x - w;
+      if (top + h > window.innerHeight - MENU_MARGIN) top = y - h;
+      left = Math.max(MENU_MARGIN, Math.min(left, window.innerWidth - w - MENU_MARGIN));
+      top = Math.max(MENU_MARGIN, Math.min(top, window.innerHeight - h - MENU_MARGIN));
+
+      wrapper.style.setProperty('position', 'fixed', 'important');
+      wrapper.style.setProperty('transform', 'none', 'important');
+      wrapper.style.setProperty('left', `${Math.round(left)}px`, 'important');
+      wrapper.style.setProperty('top', `${Math.round(top)}px`, 'important');
+      wrapper.style.setProperty('margin', '0', 'important');
+    };
+
+    const anchorNextMenu = (x: number, y: number) => {
+      const seen = new Set(
+        Array.from(document.querySelectorAll('[data-radix-popper-content-wrapper]')),
+      );
+      let frames = 0;
+
+      const look = () => {
+        const wrapper = Array.from(
+          document.querySelectorAll<HTMLElement>('[data-radix-popper-content-wrapper]'),
+        ).find(
+          (el) => !seen.has(el) && el.querySelector('[data-slot="dropdown-menu-content"]'),
+        );
+
+        if (!wrapper) {
+          // Radix mounts the content, measures it, then positions it. A dozen
+          // frames is far more than that and still bounded, so a menu that
+          // never opens does not leave a loop running.
+          if (frames++ < 12) requestAnimationFrame(look);
+          return;
+        }
+
+        wrapper.setAttribute('data-cursor-anchored', '');
+        pinToCursor(wrapper, x, y);
+
+        const observer = new MutationObserver(() => {
+          // Guard against reacting to our own writes.
+          if (wrapper.style.transform === 'none') return;
+          pinToCursor(wrapper, x, y);
+        });
+        observer.observe(wrapper, { attributes: true, attributeFilter: ['style'] });
+
+        // The wrapper is removed from the DOM when the menu closes; stop
+        // watching it then rather than leaking one observer per right-click.
+        const gone = new MutationObserver(() => {
+          if (!wrapper.isConnected) {
+            observer.disconnect();
+            gone.disconnect();
+          }
+        });
+        gone.observe(document.body, { childList: true, subtree: true });
+      };
+
+      requestAnimationFrame(look);
+    };
+
     const onContextMenu = (event: MouseEvent) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
@@ -97,6 +184,7 @@ export function RowContextMenu() {
           what we are simulating.
         */
         event.preventDefault();
+        anchorNextMenu(event.clientX, event.clientY);
         trigger.dispatchEvent(
           new PointerEvent('pointerdown', {
             bubbles: true,
@@ -109,8 +197,6 @@ export function RowContextMenu() {
       }
     };
 
-    // Capture, so this runs before any row's own onContextMenu and before the
-    // event reaches Electron's handler on the webContents.
     document.addEventListener('contextmenu', onContextMenu, true);
     return () => document.removeEventListener('contextmenu', onContextMenu, true);
   }, []);

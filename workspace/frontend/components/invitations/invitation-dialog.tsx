@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/helpers';
 import type { WorkspaceInvitation } from '@/lib/types';
+import { isComposing } from '@/lib/ime';
 
 export function InvitationDialog() {
   const [open, setOpen] = useState(false);
@@ -107,7 +108,7 @@ export function InvitationDialog() {
                 onChange={(e) => setAgentName(e.target.value)}
                 placeholder="e.g. claude-abc123"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCreate();
+                  if (e.key === 'Enter' && !isComposing(e)) handleCreate();
                 }}
               />
               <Button onClick={handleCreate} disabled={creating || !agentName.trim()}>

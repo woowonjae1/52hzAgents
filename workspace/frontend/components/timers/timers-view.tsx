@@ -1,9 +1,12 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useEffect, useMemo, useState } from 'react';
-import { Clock3, Loader2, Plus, RefreshCw, Timer, X } from 'lucide-react';
+import { Clock3, Loader2, Plus, RefreshCw, Timer, X, Copy } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { RowActions } from '@/components/ui/row-actions';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -127,14 +130,25 @@ export function TimersView() {
                   <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-3xs text-muted-foreground">
                     <span>{timer.channelName}</span>
                     <span>for {stripAddressPrefix(timer.createdBy)}</span>
-                    <span title={formatDate(timer.firesAt)}>{timeUntil(timer.firesAt)}</span>
+                    <Hint label={formatDate(timer.firesAt)}>
+                      <span>{timeUntil(timer.firesAt)}</span>
+                    </Hint>
                   </div>
                 </div>
-                <Hint label="Cancel timer">
-                  <Button variant="ghost" mode="icon" size="sm" onClick={() => void cancelTimer(timer.id)}>
-                    <X className="size-4" />
-                  </Button>
-                </Hint>
+                <RowActions
+                  label={`Actions for timer ${timer.id}`}
+                  items={[
+                    {
+                      label: 'Copy message',
+                      icon: Copy,
+                      onSelect: () => {
+                        navigator.clipboard.writeText(timer.message);
+                        toast.success('Copied');
+                      },
+                    },
+                    { label: 'Cancel timer', icon: X, destructive: true, onSelect: () => { void cancelTimer(timer.id); } },
+                  ]}
+                />
               </div>
             ))}
           </div>
@@ -152,15 +166,25 @@ export function TimersView() {
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Agent</label>
-              <select value={source} onChange={(event) => setSource(event.target.value)} disabled={submitting} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-border-accent transition-colors">
-                {availableAgents.map((agent) => <option key={agent.agentName} value={agent.agentName}>{agent.agentName}</option>)}
-              </select>
+              <Select value={source} onValueChange={setSource} disabled={submitting}>
+                <SelectTrigger size="lg" className="w-full">
+                  <SelectValue placeholder="Pick an agent" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAgents.map((agent) => <SelectItem key={agent.agentName} value={agent.agentName}>{agent.agentName}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Conversation</label>
-              <select value={channel} onChange={(event) => setChannel(event.target.value)} disabled={submitting} className="w-full rounded-lg border border-input bg-background px-2.5 py-2 text-sm outline-none focus:border-border-accent transition-colors">
-                {channels.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-              </select>
+              <Select value={channel} onValueChange={setChannel} disabled={submitting}>
+                <SelectTrigger size="lg" className="w-full">
+                  <SelectValue placeholder="Pick a conversation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {channels.map((item) => <SelectItem key={item.id} value={item.id}>{item.title}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <label className="text-xs font-medium text-muted-foreground">Remind after</label>

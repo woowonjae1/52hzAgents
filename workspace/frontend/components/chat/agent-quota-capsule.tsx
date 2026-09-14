@@ -236,7 +236,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <button
             type="button"
             className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border ui-transition duration-200 select-none',
               'bg-surface2/80 hover:bg-surface3/90 border-border hover:border-border text-foreground',
               isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
               className
@@ -314,7 +314,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                 fetchUsageAndStats(selectedName);
               }}
               disabled={loading}
-              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-50 shrink-0"
             >
               <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
             </button>
@@ -336,7 +336,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                     fetchUsageAndStats(a.name);
                   }}
                   className={cn(
-                    'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium transition-all truncate border cursor-pointer',
+                    'flex-1 min-w-0 px-2 py-1 rounded-md text-2xs font-medium ui-transition truncate border',
                     active
                       ? 'bg-surface1 text-foreground border-border/60'
                       : 'text-foreground-muted hover:text-foreground border-transparent'
@@ -367,7 +367,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
                 setIsOpen(false);
                 setActiveRightTab('tokens');
               }}
-              className="inline-flex items-center gap-1 font-mono text-2xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer group"
+              className="inline-flex items-center gap-1 font-mono text-2xs text-foreground-muted hover:text-foreground transition-colors group"
             >
               {contextWindow > 0 ? (
                 <>
@@ -385,7 +385,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
             <div
               className={cn(
-                'h-full rounded-full transition-all duration-500',
+                'h-full rounded-full ui-transition duration-500',
                 contextPct >= 85 ? 'bg-status-danger' : contextPct >= 60 ? 'bg-status-warning' : 'bg-primary'
               )}
               style={{ width: `${Math.min(Math.max(contextPct, contextTokens > 0 ? 3 : 0), 100)}%` }}
@@ -432,7 +432,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               </div>
               <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
                 <div
-                  className={cn('h-full rounded-full transition-all duration-500', getBarColor(sessionPercent))}
+                  className={cn('h-full rounded-full ui-transition duration-500', getBarColor(sessionPercent))}
                   style={{ width: `${Math.min(Math.max(sessionPercent, sessionPercent > 0 ? 3 : 0), 100)}%` }}
                 />
               </div>
@@ -455,7 +455,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               </div>
               <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
                 <div
-                  className={cn('h-full rounded-full transition-all duration-500', getBarColor(weekPercent))}
+                  className={cn('h-full rounded-full ui-transition duration-500', getBarColor(weekPercent))}
                   style={{ width: `${Math.min(Math.max(weekPercent, weekPercent > 0 ? 3 : 0), 100)}%` }}
                 />
               </div>
@@ -496,7 +496,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               <div className="font-medium">Raw CLI output returned</div>
               {usage?.raw_text && (
                 <details className="pt-1 text-3xs text-foreground-muted">
-                  <summary className="cursor-pointer hover:text-foreground flex items-center gap-1 font-medium select-none">
+                <summary className="hover:text-foreground flex items-center gap-1 font-medium select-none">
                     <FileText className="size-3 text-muted-foreground" />
                     Show output
                   </summary>
@@ -519,7 +519,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               setIsOpen(false);
               setActiveRightTab('tokens');
             }}
-            className="w-full flex items-center justify-between text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer py-0.5 group"
+            className="w-full flex items-center justify-between text-xs font-medium text-foreground-muted hover:text-foreground transition-colors py-0.5 group"
           >
             <span>See detailed breakdown</span>
             <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5 text-foreground-muted group-hover:text-foreground" />

@@ -110,7 +110,7 @@ export function RadarPanel() {
         </p>
         <button
           onClick={() => setViewMode('connect')}
-          className="mt-4 inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
+          className="mt-4 inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground transition-colors duration-150 hover:bg-primary/90"
         >
           <Plus className="size-3.5" />
           Connect agent
@@ -143,7 +143,7 @@ export function RadarPanel() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.25, ease: 'easeOut', delay: Math.min(idx, 12) * 0.03 }}
               className={cn(
-                'flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left transition-all duration-200',
+                'flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-1.5 text-left ui-transition duration-200',
                 isSel
                   ? 'border-border bg-surface2'
                   : 'border-transparent hover:bg-surface2/60',

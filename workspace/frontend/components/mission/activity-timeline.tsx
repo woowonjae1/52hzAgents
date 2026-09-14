@@ -166,7 +166,7 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('all')}
             className={cn(
-              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors shrink-0',
               selectedType === 'all'
                 ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
@@ -178,7 +178,7 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('knowledge')}
             className={cn(
-              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors shrink-0',
               selectedType === 'knowledge'
                 ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
@@ -190,7 +190,7 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('tools')}
             className={cn(
-              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors shrink-0',
               selectedType === 'tools'
                 ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
@@ -202,7 +202,7 @@ export function ActivityTimeline({
             type="button"
             onClick={() => setSelectedType('issues')}
             className={cn(
-              'px-2 py-0.5 rounded-lg transition-colors cursor-pointer shrink-0',
+              'px-2 py-0.5 rounded-lg transition-colors shrink-0',
               selectedType === 'issues'
                 ? 'bg-surface3 text-foreground'
                 : 'bg-surface2 text-muted-foreground hover:text-foreground'
@@ -252,7 +252,7 @@ export function ActivityTimeline({
                   list, one hairline instead of four sides), and the fill
                   arrives on hover to say "this one is clickable".
                 */
-                className="group px-3.5 py-2.5 hover:bg-surface2/60 transition-colors cursor-pointer space-y-1.5"
+                className="group px-3.5 py-2.5 hover:bg-surface2/60 transition-colors space-y-1.5"
               >
                 {/* Group Sender Header */}
                 <div className="flex items-center justify-between gap-1 text-2xs">

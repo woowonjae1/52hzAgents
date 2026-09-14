@@ -125,7 +125,6 @@ export function PipelineStepper({
                           ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
                           : 'bg-surface2 text-foreground-extra-muted border-border/60'
                   )}
-                  title={step.instruction || `@${step.agent}`}
                 >
                   {isDone ? (
                     <CheckCircle2 className="size-3 text-status-success shrink-0" />
@@ -161,7 +160,7 @@ export function PipelineStepper({
             type="button"
             onClick={handleHalt}
             disabled={halting}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-medium bg-surface3 hover:bg-status-danger/10 text-foreground-muted hover:text-status-danger transition-colors cursor-pointer border border-border/60"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-3xs font-medium bg-surface3 hover:bg-status-danger/10 text-foreground-muted hover:text-status-danger transition-colors border border-border/60"
           >
             {halting ? <Loader2 className="size-2.5 animate-spin" /> : <Square className="size-2.5" />}
             Stop

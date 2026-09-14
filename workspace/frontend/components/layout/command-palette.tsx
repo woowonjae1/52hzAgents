@@ -30,6 +30,7 @@ import {
   FileText,
   FileCode,
   Keyboard,
+  AlertCircle,
   PanelLeft,
   Users,
 } from 'lucide-react';
@@ -39,6 +40,10 @@ import { workspaceApi } from '@/lib/api';
 import { Kbd } from '@/components/ui/kbd';
 import { shortcutKeys } from '@/lib/shortcuts';
 import { SHORTCUTS_EVENT } from './global-shortcuts';
+import { ERROR_LOG_EVENT } from './error-log-dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from 'radix-ui';
+import { isComposing } from '@/lib/ime';
 
 interface CommandItem {
   id: string;
@@ -49,6 +54,13 @@ interface CommandItem {
   shortcut?: string[];
   action: () => void;
 }
+
+/**
+ * Custom event any surface can fire to open the palette — the desktop menu
+ * bar's "Command Palette…" item does, because a menu item that only works by
+ * telling you the keystroke is not a menu item.
+ */
+export const COMMAND_PALETTE_EVENT = 'app:command-palette';
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -61,21 +73,28 @@ export function CommandPalette() {
   const { agents, currentSessionId, currentUser, sessions, files, todos, setCurrentSessionId, setSelectedFileId, workspaceId, createSession } = useWorkspace();
   const { theme, setTheme } = useTheme();
 
-  // Open/close keyboard shortcut: ⌘K or Ctrl+K
+  /*
+   * Only the open shortcut lives here now. Escape, the click-outside, the
+   * focus trap, the scroll lock and returning focus to whatever was focused
+   * before are all Radix Dialog's — see the render. This used to be a bare
+   * `fixed inset-0` div, which meant Tab walked straight out of the palette
+   * into the page behind it and the page kept scrolling under the backdrop.
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setOpen((prev) => !prev);
       }
-      if (e.key === 'Escape' && open) {
-        e.preventDefault();
-        setOpen(false);
-      }
     };
+    const openFromEvent = () => setOpen(true);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open]);
+    window.addEventListener(COMMAND_PALETTE_EVENT, openFromEvent);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener(COMMAND_PALETTE_EVENT, openFromEvent);
+    };
+  }, []);
 
   // Focus input when opened
   useEffect(() => {
@@ -334,6 +353,14 @@ export function CommandPalette() {
         action: () => sidebarToggle(),
       },
       {
+        id: 'act-error-log',
+        category: 'Actions',
+        title: 'Recent Errors',
+        subtitle: 'Read back failures the toast already dismissed',
+        icon: <AlertCircle className="size-4 text-foreground-muted" />,
+        action: () => window.dispatchEvent(new Event(ERROR_LOG_EVENT)),
+      },
+      {
         id: 'act-shortcuts',
         category: 'Actions',
         title: 'Keyboard Shortcuts',
@@ -453,6 +480,8 @@ export function CommandPalette() {
 
   // Handle arrow keys and enter
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // ↑/↓/Enter belong to the IME's candidate list while one is open.
+    if (isComposing(e)) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex((prev) => (prev + 1) % Math.max(1, filtered.length));
@@ -467,18 +496,22 @@ export function CommandPalette() {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20 sm:pt-28 px-4">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in-0 duration-150"
-        onClick={() => setOpen(false)}
-      />
-
-      {/* Palette Container */}
-      <div className="relative z-10 w-full max-w-xl rounded-2xl border border-border bg-surface1 text-foreground shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-150">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent
+        showCloseButton={false}
+        /* Top-anchored rather than centred: a palette is a launcher, and the
+           eye is already at the top of the window when it opens. */
+        className="p-0 gap-0 max-w-xl top-[14%] translate-y-0 bg-surface1 overflow-hidden"
+        onOpenAutoFocus={(e) => {
+          // Radix would focus the content box; the query field is the point.
+          e.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
+        <VisuallyHidden.Root asChild>
+          <DialogTitle>Command palette</DialogTitle>
+        </VisuallyHidden.Root>
         {/* Search Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface1/95">
           <Search className="size-4 text-foreground-extra-muted shrink-0" />
@@ -537,7 +570,7 @@ export function CommandPalette() {
                   onClick={() => execute(item)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={cn(
-                    'group flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors select-none',
+                    'group flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors select-none',
                     isSelected ? 'bg-surface2 text-foreground' : 'text-foreground-muted hover:bg-surface2/60'
                   )}
                 >
@@ -596,7 +629,7 @@ export function CommandPalette() {
             <span>52hzAgents Palette</span>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

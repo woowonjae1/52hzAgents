@@ -3,7 +3,8 @@
 import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { FolderClock } from 'lucide-react';
+import { FolderClock, FolderOpen } from 'lucide-react';
+import { getBridge, useIsDesktop } from '@/lib/desktop';
 
 /**
  * wwj (the local agent connector daemon) runs on the actual desktop and can
@@ -47,9 +48,7 @@ export function rememberWorkingDir(dir: string): void {
  */
 export async function browseForFolder(defaultPath?: string): Promise<string | null> {
   // 1. In Electron desktop, invoke the native C++ Win32 IFileDialog via Electron IPC (instant popup, 0ms delay)
-  const bridge = typeof window !== 'undefined'
-    ? (window as unknown as { electronBridge?: { browseFolder?: (defaultPath?: string) => Promise<string | null> } }).electronBridge
-    : undefined;
+  const bridge = getBridge();
 
   if (bridge?.browseFolder) {
     try {
@@ -87,6 +86,7 @@ interface ProjectFolderPickerProps {
  * shortcuts, shared by the new-thread dialog and the landing panel's project
  * step so the wwj-browse logic only lives in one place. */
 export function ProjectFolderPicker({ value, onChange, placeholder, helperText }: ProjectFolderPickerProps) {
+  const isDesktop = useIsDesktop();
   const [browsing, setBrowsing] = useState(false);
   const [browseError, setBrowseError] = useState<string | null>(null);
   // Read on mount, not during render: localStorage doesn't exist on the server.
@@ -125,6 +125,23 @@ export function ProjectFolderPicker({ value, onChange, placeholder, helperText }
         <Button variant="outline" size="sm" onClick={handleBrowse} disabled={browsing}>
           {browsing ? 'Waiting…' : 'Browse…'}
         </Button>
+        {/*
+          The shell has exposed `showItemInFolder` since it was written and
+          nothing in the app had ever called it. This box holds a real path on
+          a real disk; opening it is what anyone looking at it wants to do next.
+          Desktop only — a browser tab has no file manager to open.
+        */}
+        {isDesktop && value.trim() && (
+          <Hint label="Open in file manager">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { void getBridge()?.showItemInFolder(value.trim()); }}
+            >
+              <FolderOpen className="size-3.5" />
+            </Button>
+          </Hint>
+        )}
       </div>
       {suggestions.length > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1">

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -248,7 +249,7 @@ export function AgentStation({
         <button
           type="button"
           onClick={onOpenAgent}
-          className="flex flex-1 items-center gap-2.5 min-w-0 text-left cursor-pointer group/title"
+          className="flex flex-1 items-center gap-2.5 min-w-0 text-left group/title"
         >
           <AgentAvatar
             name={agent.agentName}
@@ -297,9 +298,11 @@ export function AgentStation({
               statusBadge.ring,
             )}
           />
-          <span className={cn('truncate', isWorking && 'event-running')} title={statusBadge.label}>
-            {statusBadge.label}
-          </span>
+          <Hint label={statusBadge.label}>
+            <span className={cn('truncate', isWorking && 'event-running')} >
+              {statusBadge.label}
+            </span>
+          </Hint>
         </span>
       </div>
 
@@ -322,7 +325,7 @@ export function AgentStation({
               type="button"
               onClick={handleDeny}
               disabled={busy}
-              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium text-status-danger hover:bg-status-danger/10 cursor-pointer"
+              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium text-status-danger hover:bg-status-danger/10"
             >
               <X className="size-2.5" />
               <span>Deny</span>
@@ -331,7 +334,7 @@ export function AgentStation({
               type="button"
               onClick={handleApprove}
               disabled={busy}
-              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium bg-primary text-primary-foreground hover:opacity-90 cursor-pointer shadow-xs"
+              className="flex-1 inline-flex items-center justify-center gap-1 h-6 rounded-lg text-2xs font-medium bg-primary text-primary-foreground hover:opacity-90 shadow-xs"
             >
               <Check className="size-2.5" />
               <span>Approve</span>
@@ -392,7 +395,7 @@ export function AgentStation({
               <button
                 type="button"
                 onClick={() => onOpenThread(activeThread.sessionId)}
-                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate cursor-pointer text-left text-3xs"
+                className="inline-flex items-center gap-1 hover:text-foreground transition-colors truncate text-left text-3xs"
               >
                 <span className="text-primary font-medium">#{activeThread.title || 'New channel'}</span>
                 {activeThread.lastEventAt && (
@@ -422,7 +425,7 @@ export function AgentStation({
           <button
             type="button"
             onClick={onOpenAgent}
-            className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors cursor-pointer shadow-xs"
+            className="flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg bg-surface2/80 hover:bg-surface3 text-xs font-medium text-foreground transition-colors shadow-xs"
           >
             <MessageSquare className="size-3 text-muted-foreground" />
             <span>Chat</span>
@@ -452,10 +455,10 @@ export function AgentStation({
             onPairAgent?.();
           }}
           className={cn(
-            'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium transition-all',
+            'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium ui-transition',
             isHeartbeatTimeout
-              ? 'bg-status-warning/15 text-status-warning hover:bg-status-warning/25 cursor-pointer font-semibold'
-              : 'bg-surface2/80 hover:bg-surface3 text-foreground cursor-pointer'
+              ? 'bg-status-warning/15 text-status-warning hover:bg-status-warning/25 font-semibold'
+                : 'bg-surface2/80 hover:bg-surface3 text-foreground'
           )}
         >
           {isHeartbeatTimeout ? (

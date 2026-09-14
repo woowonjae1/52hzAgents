@@ -41,7 +41,7 @@ export function SubagentList({
   return (
     <div
       className={cn(
-        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3.5 space-y-3 transition-all',
+        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3.5 space-y-3 ui-transition',
         className
       )}
     >
@@ -79,9 +79,9 @@ export function SubagentList({
               key={index}
               onClick={() => onAgentClick?.(agent, index)}
               className={cn(
-                'group flex flex-col justify-between rounded-xl border border-border bg-surface2/70 p-3 transition-all duration-200',
+                'group flex flex-col justify-between rounded-xl border border-border bg-surface2/70 p-3 ui-transition duration-200',
                 isRunning && 'border-primary/40 shadow-xs shadow-primary/5',
-                onAgentClick && 'cursor-pointer hover:border-border hover:bg-surface2'
+                onAgentClick && 'hover:border-border hover:bg-surface2'
               )}
             >
               <div className="space-y-1.5">
@@ -140,7 +140,7 @@ export function SubagentList({
                 <div className="h-1 w-full bg-surface3 rounded-full overflow-hidden">
                   <div
                     className={cn(
-                      'h-full rounded-full transition-all duration-300',
+                      'h-full rounded-full ui-transition duration-300',
                       isDone
                         ? 'bg-status-success'
                         : isRunning

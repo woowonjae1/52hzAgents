@@ -52,7 +52,7 @@ function FilterChip({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'inline-flex items-baseline gap-1.5 rounded-md px-2 py-1 text-xs transition-colors cursor-pointer',
+        'inline-flex items-baseline gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
         active
           ? 'bg-surface2 text-foreground'
           : 'text-muted-foreground hover:text-foreground hover:bg-surface2/60',
@@ -432,14 +432,15 @@ export function MissionControl() {
               {totalTokens > 0 && (
                 <>
                   {' · '}
-                  <button
-                    type="button"
-                    onClick={() => setActiveRightTab('tokens')}
-                    className="hover:text-primary hover:underline transition-colors cursor-pointer font-medium"
-                    title="Open Token & Context Governance Dashboard"
-                  >
-                    {fmtTokens(totalTokens)} tokens
-                  </button>
+                  <Hint label="Token &amp; context dashboard">
+                    <button
+                      type="button"
+                      onClick={() => setActiveRightTab('tokens')}
+                      className="hover:text-primary hover:underline transition-colors font-medium"
+                    >
+                      {fmtTokens(totalTokens)} tokens
+                    </button>
+                  </Hint>
                 </>
               )}
             </p>
@@ -506,7 +507,7 @@ export function MissionControl() {
                 onClick={() => setShowActivity((prev) => !prev)}
                 aria-pressed={showActivity}
                 className={cn(
-                  'inline-flex size-7 items-center justify-center rounded-md transition-colors cursor-pointer',
+                  'inline-flex size-7 items-center justify-center rounded-md transition-colors',
                   showActivity
                     ? 'bg-surface2 text-foreground'
                     : 'text-muted-foreground hover:text-foreground hover:bg-surface2/60',
@@ -560,7 +561,7 @@ export function MissionControl() {
                   onClick={() => {
                     agents.forEach((a) => handlePairAgent(a.agentName));
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity shadow-xs"
                 >
                   <RotateCw className="size-3" />
                   <span>Connect all</span>
@@ -591,7 +592,7 @@ export function MissionControl() {
                     <button
                       type="button"
                       onClick={() => setFilterTab('all')}
-                      className="ml-2 text-2xs text-primary hover:underline cursor-pointer"
+                      className="ml-2 text-2xs text-primary hover:underline"
                     >
                       (clear filter: {filterTab})
                     </button>
@@ -647,7 +648,7 @@ export function MissionControl() {
                 <button
                   type="button"
                   onClick={() => setShowIntegrations((prev) => !prev)}
-                  className="flex items-center gap-2 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors cursor-pointer select-none"
+                  className="flex items-center gap-2 text-xs font-medium text-foreground-muted hover:text-foreground transition-colors select-none"
                 >
                   <span>Available integrations ({integrationStations.length})</span>
                   {showIntegrations ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}

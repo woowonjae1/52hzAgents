@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -209,7 +210,19 @@ export function CreateRoutineDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent
+        className="max-w-sm"
+        /* Cmd/Ctrl+Enter submits. A form dialog whose only way out is the
+           mouse is the tell of a web page; every native sheet commits on the
+           keyboard. Plain Enter is left alone here because these dialogs hold
+           multi-line fields. */
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void handleSubmit();
+          }
+        }}
+      >
         <DialogTitle>{isEditing ? 'Edit Schedule' : 'Create Routine'}</DialogTitle>
         <DialogDescription className="text-sm text-muted-foreground">
           {isEditing
@@ -254,16 +267,16 @@ export function CreateRoutineDialog({
             onlineAgents.length > 1 && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">Agent</label>
-                <select
-                  value={source}
-                  onChange={(e) => setSource(e.target.value)}
-                  disabled={submitting}
-                  className="w-full text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:border-border-accent transition-colors"
-                >
-                  {onlineAgents.map((a) => (
-                    <option key={a.agentName} value={a.agentName}>{a.agentName}</option>
-                  ))}
-                </select>
+                <Select value={source} onValueChange={setSource} disabled={submitting}>
+                  <SelectTrigger size="lg" className="w-full">
+                    <SelectValue placeholder="Pick an agent" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {onlineAgents.map((a) => (
+                      <SelectItem key={a.agentName} value={a.agentName}>{a.agentName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )
           )}
@@ -296,29 +309,37 @@ export function CreateRoutineDialog({
               <div className="flex gap-2">
                 <div className="flex-1 space-y-1">
                   <label className="text-2xs text-muted-foreground">Hour</label>
-                  <select
-                    value={hour}
-                    onChange={(e) => setHour(Number(e.target.value))}
+                  <Select
+                    value={String(hour)}
+                    onValueChange={(v) => setHour(Number(v))}
                     disabled={submitting}
-                    className="w-full text-sm rounded-lg border border-border bg-card px-2 py-1.5 focus:outline-none focus:border-border-accent transition-colors"
                   >
-                    {Array.from({ length: 24 }, (_, i) => (
-                      <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{String(i).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex-1 space-y-1">
                   <label className="text-2xs text-muted-foreground">Minute</label>
-                  <select
-                    value={minute}
-                    onChange={(e) => setMinute(Number(e.target.value))}
+                  <Select
+                    value={String(minute)}
+                    onValueChange={(v) => setMinute(Number(v))}
                     disabled={submitting}
-                    className="w-full text-sm rounded-lg border border-border bg-card px-2 py-1.5 focus:outline-none focus:border-border-accent transition-colors"
                   >
-                    {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
-                      <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                        <SelectItem key={m} value={String(m)}>{String(m).padStart(2, '0')}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -327,18 +348,18 @@ export function CreateRoutineDialog({
                   "Hour (UTC)" while the server ignored the user's zone. */}
               <div className="space-y-1">
                 <label className="text-2xs text-muted-foreground">Timezone</label>
-                <select
-                  value={timezone}
-                  onChange={(e) => setTimezone(e.target.value)}
-                  disabled={submitting}
-                  className="w-full text-sm rounded-lg border border-border bg-card px-2 py-1.5 focus:outline-none focus:border-border-accent transition-colors"
-                >
-                  {Array.from(new Set([localTimezone(), timezone, 'UTC'])).map((tz) => (
-                    <option key={tz} value={tz}>
-                      {tz === localTimezone() ? `${tz} (local)` : tz} · {timezoneLabel(tz)}
-                    </option>
-                  ))}
-                </select>
+                <Select value={timezone} onValueChange={setTimezone} disabled={submitting}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from(new Set([localTimezone(), timezone, 'UTC'])).map((tz) => (
+                      <SelectItem key={tz} value={tz}>
+                        {tz === localTimezone() ? `${tz} (local)` : tz} · {timezoneLabel(tz)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">

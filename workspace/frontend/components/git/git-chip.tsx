@@ -43,14 +43,15 @@ function FileRow({
   return (
     <div className="group flex items-center gap-2 px-3 py-1 text-2xs hover:bg-surface3/60 transition-colors">
       <StatusLetter letter={file.status} />
-      <span
-        className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono cursor-pointer hover:text-foreground hover:underline"
-        dir="rtl"
-        title={file.path}
-        onClick={() => onViewDiff?.(file.path)}
-      >
-        {file.path}
-      </span>
+      <Hint label={file.path}>
+        <span
+          className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono hover:text-foreground hover:underline"
+          dir="rtl"
+          onClick={() => onViewDiff?.(file.path)}
+        >
+          {file.path}
+        </span>
+      </Hint>
       <span className="shrink-0 font-mono tabular-nums text-3xs">
         {file.additions > 0 && <span className="text-status-success">+{file.additions}</span>}
         {file.additions > 0 && file.deletions > 0 && ' '}
@@ -62,7 +63,7 @@ function FileRow({
             <button
               type="button"
               onClick={() => onViewDiff(file.path)}
-              className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               <FileDiff className="size-3" />
             </button>
@@ -73,7 +74,7 @@ function FileRow({
             <button
               type="button"
               onClick={() => onDiscard(file.path)}
-              className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors cursor-pointer"
+              className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors"
             >
               <Undo2 className="size-3" />
             </button>
@@ -230,21 +231,22 @@ export function GitChip({
 
   return (
     <div ref={rootRef} className="relative shrink-0">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors cursor-pointer"
-        title={`${status.dir}${status.commit ? ` @ ${status.commit}` : ''}`}
-      >
-        <GitBranch className="size-3 text-foreground-muted shrink-0" />
-        <span className="font-medium max-w-[120px] truncate">{status.branch || 'detached'}</span>
-        {status.additions > 0 && (
-          <span className="font-mono tabular-nums text-2xs text-status-success">+{status.additions}</span>
-        )}
-        {status.deletions > 0 && (
-          <span className="font-mono tabular-nums text-2xs text-status-danger">−{status.deletions}</span>
-        )}
-        <ChevronDown className={cn('size-2.5 text-foreground-muted transition-transform', open && 'rotate-180')} />
-      </button>
+      <Hint label={`${status.dir}${status.commit ? ` @ ${status.commit}` : ''}`}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors"
+        >
+          <GitBranch className="size-3 text-foreground-muted shrink-0" />
+          <span className="font-medium max-w-[120px] truncate">{status.branch || 'detached'}</span>
+          {status.additions > 0 && (
+            <span className="font-mono tabular-nums text-2xs text-status-success">+{status.additions}</span>
+          )}
+          {status.deletions > 0 && (
+            <span className="font-mono tabular-nums text-2xs text-status-danger">−{status.deletions}</span>
+          )}
+          <ChevronDown className={cn('size-2.5 text-foreground-muted transition-transform', open && 'rotate-180')} />
+        </button>
+      </Hint>
 
       {/* Multi-file Diff Inspector */}
       <MultiDiffInspector
@@ -274,7 +276,7 @@ export function GitChip({
               <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors cursor-pointer border border-border/60"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-medium rounded-md bg-surface3 hover:bg-surface4 text-foreground transition-colors border border-border/60"
               >
                 <RefreshCw className={cn("size-2.5 text-muted-foreground", syncing && "animate-spin")} />
                 Sync
@@ -294,7 +296,7 @@ export function GitChip({
                   <span className="text-2xs font-medium text-foreground-muted">Staged ({staged.length})</span>
                   <button
                     onClick={unstageAll}
-                    className="text-2xs text-primary hover:underline transition-colors cursor-pointer"
+                    className="text-2xs text-primary hover:underline transition-colors"
                   >
                     Unstage
                   </button>
@@ -315,7 +317,7 @@ export function GitChip({
                   <span className="text-2xs font-medium text-foreground-muted">Unstaged ({unstaged.length})</span>
                   <button
                     onClick={stageAll}
-                    className="text-2xs text-primary hover:underline transition-colors cursor-pointer"
+                    className="text-2xs text-primary hover:underline transition-colors"
                   >
                     Stage all
                   </button>
@@ -346,7 +348,7 @@ export function GitChip({
             <button
               onClick={commit}
               disabled={committing || status.files.length === 0 || !message.trim()}
-              className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+              className="w-full h-8 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:pointer-events-none transition-colors inline-flex items-center justify-center gap-1.5"
             >
               {committing && <Loader2 className="size-3 animate-spin" />}
               {staged.length === 0 && unstaged.length > 0 ? 'Commit (Auto-stage all)' : 'Commit'}
@@ -360,7 +362,7 @@ export function GitChip({
                 <button
                   onClick={handlePull}
                   disabled={pulling || !channelId}
-                  className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                  className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors inline-flex items-center justify-center gap-1.5"
                 >
                   {pulling ? <Loader2 className="size-3 animate-spin" /> : <ArrowDownToLine className="size-3 text-foreground-muted" />}
                   Pull{status.behind > 0 ? ` (${status.behind})` : ''}
@@ -370,7 +372,7 @@ export function GitChip({
                 <button
                   onClick={handlePush}
                   disabled={pushing || !channelId}
-                  className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer inline-flex items-center justify-center gap-1.5"
+                  className="flex-1 h-8 rounded-lg bg-surface3 border border-border text-foreground text-xs font-medium hover:bg-surface4 disabled:opacity-40 disabled:pointer-events-none transition-colors inline-flex items-center justify-center gap-1.5"
                 >
                   {pushing ? <Loader2 className="size-3 animate-spin" /> : <ArrowUpFromLine className="size-3 text-foreground-muted" />}
                   Push{status.ahead > 0 ? ` (${status.ahead})` : ''}

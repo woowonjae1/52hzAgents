@@ -2,6 +2,14 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 let cachedDesktopApiUrl = null;
 
+/** One-argument IPC subscription that hands back its own unsubscribe. */
+function subscribe(channel, handler) {
+  if (typeof handler !== 'function') return () => {};
+  const listener = (_event, payload) => handler(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
+
 contextBridge.exposeInMainWorld('electronBridge', {
   isDesktop: true,
   platform: process.platform,
@@ -41,6 +49,30 @@ contextBridge.exposeInMainWorld('electronBridge', {
   openPath: (pathStr) => ipcRenderer.invoke('shell-open-path', pathStr),
   showItemInFolder: (pathStr) => ipcRenderer.invoke('shell-show-item', pathStr),
   showNotification: (opts) => ipcRenderer.invoke('show-os-notification', opts),
+  /**
+   * Push the unread count out to the OS — dock badge, Windows taskbar overlay,
+   * tray tooltip. `overlayDataUrl` is drawn by the renderer because the main
+   * process has no canvas to render a number into.
+   */
+  setUnreadCount: (count, overlayDataUrl) =>
+    ipcRenderer.send('set-unread-count', { count, overlayDataUrl }),
+
+  /**
+   * Download lifecycle, so the renderer can say "saved" and offer to reveal the
+   * file instead of clicking an invisible anchor and hoping.
+   *
+   * Each returns its own unsubscribe. `removeListener` with the same wrapper is
+   * what makes that work — `removeAllListeners` here would tear down every
+   * other subscriber in the app.
+   */
+  onDownloadProgress: (handler) => subscribe('download-progress', handler),
+  onDownloadComplete: (handler) => subscribe('download-complete', handler),
+  onDownloadCancelled: (handler) => subscribe('download-cancelled', handler),
+  onDownloadFailed: (handler) => subscribe('download-failed', handler),
+
+  /** Menu-bar items that run an in-app command. See main.js `command()`. */
+  onMenuCommand: (handler) => subscribe('menu-command', handler),
+
   onNavigateToChannel: (handler) => {
     if (typeof handler !== 'function') return () => {};
     const listener = (event, channel) => handler(channel);

@@ -90,7 +90,7 @@ export function RoutinesView() {
               return (
                 <div
                   key={routine.id}
-                  className="rounded-lg border border-border bg-card overflow-hidden cursor-pointer hover:border-primary/40 transition-colors"
+                  className="rounded-lg border border-border bg-card overflow-hidden hover:border-primary/40 transition-colors"
                   onClick={() => handleOpenThread(routine.channelName)}
                 >
                   {/* Routine header */}

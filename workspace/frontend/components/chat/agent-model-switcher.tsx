@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Hint } from '@/components/ui/hint';
 import { Check, ChevronDown, Search, Sparkles, X } from 'lucide-react';
 import {
   Popover,
@@ -371,7 +372,7 @@ export function AgentModelSwitcher({
           setActiveCategory('all');
         }}
         className={cn(
-          'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer select-none',
+          'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left ui-transition select-none',
           isSelected
             ? 'bg-surface3 text-foreground font-medium ring-1 ring-border shadow-xs'
             : 'text-foreground-muted hover:text-foreground hover:bg-surface2/70',
@@ -393,9 +394,11 @@ export function AgentModelSwitcher({
               </span>
             )}
           </div>
-          <div className="text-3xs text-muted-foreground/80 truncate mt-0.5" title={currentModel || 'Default'}>
-            {displayModel}
-          </div>
+          <Hint label={currentModel || 'Default'}>
+            <div className="text-3xs text-muted-foreground/80 truncate mt-0.5" >
+              {displayModel}
+            </div>
+          </Hint>
         </div>
       </button>
     );
@@ -404,33 +407,31 @@ export function AgentModelSwitcher({
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={!anyOnline}
-          className={cn(
-            'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-xs',
-            anyOnline
-              ? 'bg-surface2 hover:bg-surface3 border-border text-foreground cursor-pointer'
-              : 'bg-surface2/40 border-border/60 text-muted-foreground/60 cursor-not-allowed',
-            className,
-          )}
-          title={
-            anyOnline
-              ? `@${leadName}: ${leadLabel}${othersConfigured > 0 ? ` · ${othersConfigured} more agent${othersConfigured > 1 ? 's' : ''} set separately` : ''}`
-              : offlineHint
-          }
-        >
-          <span className="truncate max-w-[140px]">{anyOnline ? leadLabel : 'Offline'}</span>
-          {anyOnline && othersConfigured > 0 && (
-            <span className="shrink-0 text-foreground-extra-muted">+{othersConfigured}</span>
-          )}
-          <ChevronDown
+        <Hint label={anyOnline ? `@${leadName}: ${leadLabel}${othersConfigured > 0 ? ` · ${othersConfigured} more agent${othersConfigured > 1 ? 's' : ''} set separately` : ''}` : offlineHint}>
+          <button
+            type="button"
+            disabled={!anyOnline}
             className={cn(
-              'size-3 shrink-0',
-              anyOnline ? 'text-foreground-extra-muted' : 'text-muted-foreground/40',
+              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-xs',
+              anyOnline
+                ? 'bg-surface2 hover:bg-surface3 border-border text-foreground'
+                : 'bg-surface2/40 border-border/60 text-muted-foreground/60 cursor-not-allowed',
+              className,
             )}
-          />
-        </button>
+
+          >
+            <span className="truncate max-w-[140px]">{anyOnline ? leadLabel : 'Offline'}</span>
+            {anyOnline && othersConfigured > 0 && (
+              <span className="shrink-0 text-foreground-extra-muted">+{othersConfigured}</span>
+            )}
+            <ChevronDown
+              className={cn(
+                'size-3 shrink-0',
+                anyOnline ? 'text-foreground-extra-muted' : 'text-muted-foreground/40',
+              )}
+            />
+          </button>
+        </Hint>
       </PopoverTrigger>
 
       <PopoverContent
@@ -452,7 +453,7 @@ export function AgentModelSwitcher({
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface3 transition-colors cursor-pointer"
+              className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface3 transition-colors"
             >
               <X className="size-3.5" />
             </button>
@@ -505,14 +506,15 @@ export function AgentModelSwitcher({
                   </div>
                   <div className="text-3xs text-muted-foreground shrink-0 flex items-center gap-1">
                     <span>Current:</span>
-                    <span
-                      className="font-medium text-foreground bg-surface2 px-1.5 py-0.5 rounded border border-border/60 truncate max-w-[150px]"
-                      title={activeCurrentModel || 'Default'}
-                    >
-                      {activeCurrentModel
-                        ? (activeCurrentModel.includes('/') ? activeCurrentModel.slice(activeCurrentModel.indexOf('/') + 1) : activeCurrentModel)
-                        : 'Default'}
-                    </span>
+                    <Hint label={activeCurrentModel || 'Default'}>
+                      <span
+                        className="font-medium text-foreground bg-surface2 px-1.5 py-0.5 rounded border border-border/60 truncate max-w-[150px]"
+                      >
+                        {activeCurrentModel
+                          ? (activeCurrentModel.includes('/') ? activeCurrentModel.slice(activeCurrentModel.indexOf('/') + 1) : activeCurrentModel)
+                          : 'Default'}
+                      </span>
+                    </Hint>
                   </div>
                 </div>
 
@@ -531,7 +533,7 @@ export function AgentModelSwitcher({
                       <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-2 text-muted-foreground/60 hover:text-foreground p-0.5 rounded cursor-pointer"
+                        className="absolute right-2 text-muted-foreground/60 hover:text-foreground p-0.5 rounded"
                       >
                         <X className="size-3" />
                       </button>
@@ -548,7 +550,7 @@ export function AgentModelSwitcher({
                             type="button"
                             onClick={() => setActiveCategory(cat.id)}
                             className={cn(
-                              'px-2 py-0.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer select-none font-medium',
+                              'px-2 py-0.5 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 select-none font-medium',
                               isActive
                                 ? 'bg-foreground text-background font-semibold shadow-xs'
                                 : cat.isFree
@@ -584,7 +586,7 @@ export function AgentModelSwitcher({
                           type="button"
                           onClick={() => handleSelectModel(activeAgent.agentName, m.id, m.name)}
                           className={cn(
-                            'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer text-left',
+                            'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors text-left',
                             isSelected
                               ? 'bg-surface3 text-foreground font-semibold ring-1 ring-border/80'
                               : 'text-foreground-muted hover:text-foreground hover:bg-surface2',

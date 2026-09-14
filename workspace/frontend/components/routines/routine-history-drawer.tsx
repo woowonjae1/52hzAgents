@@ -208,7 +208,7 @@ export function RoutineHistoryDrawer({
                             onOpenThread(run.channelName);
                             onOpenChange(false);
                           }}
-                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium cursor-pointer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium"
                         >
                           <span>Open thread</span>
                           <ArrowUpRight className="size-3" />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -116,7 +117,19 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent
+        className="max-w-sm"
+        /* Cmd/Ctrl+Enter submits. A form dialog whose only way out is the
+           mouse is the tell of a web page; every native sheet commits on the
+           keyboard. Plain Enter is left alone here because these dialogs hold
+           multi-line fields. */
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            handleCreate();
+          }
+        }}
+      >
         <DialogTitle>New Channel</DialogTitle>
         <DialogDescription className="text-sm text-muted-foreground">
           {multipleAgents
@@ -142,7 +155,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
         {onlineAgents.length > 0 && (
           <button
             type="button"
-            className="mt-3 flex w-full items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-left transition-colors hover:bg-surface1"
+            className="mt-3 flex w-full items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors hover:bg-surface1"
             onClick={toggleAll}
           >
             <div className={cn(
@@ -187,7 +200,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
               <div
                 key={agent.agentName}
                 className={cn(
-                  'flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-all border',
+                  'flex items-center gap-2.5 px-3 py-2.5 rounded-lg ui-transition border',
                   isSelected
                     ? 'bg-surface1/80 border-border'
                     : 'border-transparent opacity-50 hover:opacity-75 hover:bg-surface1'
@@ -223,18 +236,22 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
               <History className="size-3" />
               Resume from past session
             </label>
-            <select
-              value={resumeFrom}
-              onChange={(e) => setResumeFrom(e.target.value)}
-              className="w-full text-sm rounded-lg border border-border bg-card px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ring"
+            <Select
+              value={resumeFrom || '__new__'}
+              onValueChange={(v) => setResumeFrom(v === '__new__' ? '' : v)}
             >
-              <option value="">New conversation (no context)</option>
-              {resumableSessions.map((s) => (
-                <option key={s.sessionId} value={s.sessionId}>
-                  {s.title || s.sessionId}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger size="lg" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__new__">New conversation (no context)</SelectItem>
+                {resumableSessions.map((s) => (
+                  <SelectItem key={s.sessionId} value={s.sessionId}>
+                    {s.title || s.sessionId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         )}
 

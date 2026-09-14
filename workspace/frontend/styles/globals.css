@@ -1296,3 +1296,44 @@ nextjs-portal,
   content-visibility: auto;
   contain-intrinsic-size: auto 132px;
 }
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   `ui-transition` — THE ONLY TRANSITION A CONTROL NEEDS.
+
+   76 places in this app said `transition-all`. That is a wildcard: it puts
+   EVERY animatable property on the same clock, including the ones that are
+   being driven by something other than a hover — `width` while a panel is
+   being dragged, `transform` while a list is being scrolled, `height` while a
+   disclosure opens. The symptom is lag: the pane trails the cursor by the
+   duration, because the value the drag just wrote is being interpolated
+   towards instead of applied.
+
+   It is also how the app grew hover effects nobody asked for. `transition-all`
+   plus any `hover:` utility that touches geometry produces a control that
+   moves under the pointer, which is a web-page affordance — native controls
+   answer a hover with COLOUR, never with position or size.
+
+   So: colour, fill, edge, elevation and opacity. Everything a control legibly
+   changes when you point at it, press it, or disable it, and nothing that
+   changes where it is.
+
+   A PLAIN CLASS, NOT `@utility`. Two things were learned the hard way here,
+   both of them silent: `@utility transition-ui` is swallowed because
+   `transition-*` is one of Tailwind v4's own functional namespaces, and even
+   renamed out of it the `@utility` form did not reach the compiled sheet from
+   this position in the file. No error, no warning, no build failure — the
+   class simply never matches a rule, so 74 controls lose their transition and
+   nothing says so. A plain rule is emitted unconditionally. It cannot take
+   Tailwind variants (`hover:ui-transition`), which this never wants.
+
+   VERIFY BY FETCHING THE STYLESHEET and regexing for the rule. Reading
+   `getComputedStyle(el).transitionProperty` cannot tell you: an element with
+   no transition at all reports `all`, which is exactly the value this exists
+   to get rid of.
+   ────────────────────────────────────────────────────────────────────────── */
+.ui-transition {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, opacity;
+  transition-timing-function: var(--default-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1));
+  transition-duration: var(--default-transition-duration, 150ms);
+}

@@ -179,6 +179,7 @@ export function SchedulesView() {
           <input
             type="text"
             placeholder="Search scheduled routines by name, prompt, ID..."
+            data-view-search
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
@@ -256,12 +257,13 @@ export function SchedulesView() {
                           <AgentAvatar name={timer.createdBy} size={16} />
                           <span className="hidden sm:inline text-foreground-muted">{timer.createdBy}</span>
                         </span>
-                        <span
-                          className="font-medium text-status-warning"
-                          title={formatAbsolute(timer.firesAt)}
-                        >
-                          {timeUntil(timer.firesAt, now)}
-                        </span>
+                        <Hint label={formatAbsolute(timer.firesAt)}>
+                          <span
+                            className="font-medium text-status-warning"
+                          >
+                            {timeUntil(timer.firesAt, now)}
+                          </span>
+                        </Hint>
                         <Hint label="Cancel this reminder">
                           <Button
                             variant="ghost"
@@ -309,7 +311,7 @@ export function SchedulesView() {
                 <div
                   key={routine.id}
                   className={cn(
-                    'group relative rounded-xl border bg-surface1/60 p-4 transition-all shadow-xs hover:border-border hover:bg-surface1/80',
+                    'group relative rounded-xl border bg-surface1/60 p-4 ui-transition shadow-xs hover:border-border hover:bg-surface1/80',
                     isPaused ? 'border-border/60 opacity-75' : 'border-border'
                   )}
                 >
@@ -477,30 +479,33 @@ export function SchedulesView() {
                         {isPaused ? (
                           <span className="text-foreground-extra-muted">Paused</span>
                         ) : (
-                          <span
-                            className="font-medium text-foreground-muted"
-                            title={formatAbsolute(routine.nextFiresAt)}
-                          >
-                            Next run: {timeUntil(routine.nextFiresAt, now)}
-                          </span>
+                          <Hint label={formatAbsolute(routine.nextFiresAt)}>
+                            <span
+                              className="font-medium text-foreground-muted"
+                            >
+                              Next run: {timeUntil(routine.nextFiresAt, now)}
+                            </span>
+                          </Hint>
                         )}
                       </div>
 
                       {/* Run Count & Last Status */}
                       {routine.runCount !== undefined && routine.runCount > 0 && (
-                        <div className="flex items-center gap-1" title={formatAbsolute(routine.lastFiredAt)}>
-                          {routine.lastRunStatus === 'completed' ? (
-                            <CheckCircle2 className="size-3 text-status-success" />
-                          ) : hasFailed ? (
-                            <AlertCircle className="size-3 text-status-danger" />
-                          ) : (
-                            <Loader2 className="size-3 text-foreground-muted animate-spin" />
-                          )}
-                          <span>
-                            Run #{routine.runCount} ({routine.lastRunStatus || 'completed'})
-                            {routine.lastFiredAt ? ` · ${timeAgo(routine.lastFiredAt, now)}` : ''}
-                          </span>
-                        </div>
+                        <Hint label={formatAbsolute(routine.lastFiredAt)}>
+                          <div className="flex items-center gap-1" >
+                            {routine.lastRunStatus === 'completed' ? (
+                              <CheckCircle2 className="size-3 text-status-success" />
+                            ) : hasFailed ? (
+                              <AlertCircle className="size-3 text-status-danger" />
+                            ) : (
+                              <Loader2 className="size-3 text-foreground-muted animate-spin" />
+                            )}
+                            <span>
+                              Run #{routine.runCount} ({routine.lastRunStatus || 'completed'})
+                              {routine.lastFiredAt ? ` · ${timeAgo(routine.lastFiredAt, now)}` : ''}
+                            </span>
+                          </div>
+                        </Hint>
                       )}
                     </div>
                   </div>

@@ -251,6 +251,7 @@ export function MonitorGrid() {
                   }
                 }}
                 placeholder="Search threads..."
+            data-view-search
                 className="flex-1 text-sm bg-transparent placeholder:text-muted-foreground"
               />
               <button

@@ -120,7 +120,7 @@ function ContextMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        'relative flex cursor-pointer select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs outline-hidden transition-colors',
+        'relative flex select-none items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs outline-hidden transition-colors',
         'focus:bg-surface2 focus:text-foreground',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         variant === 'destructive' && 'text-destructive focus:bg-destructive/10 focus:text-destructive',

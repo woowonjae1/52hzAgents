@@ -165,7 +165,7 @@ export function LocalPreview() {
             <button
               onClick={() => webviewRef.current?.goBack()}
               disabled={!isDesktop}
-              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center"
             >
               <ArrowLeft className="size-3.5" />
             </button>
@@ -174,7 +174,7 @@ export function LocalPreview() {
             <button
               onClick={() => webviewRef.current?.goForward()}
               disabled={!isDesktop}
-              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground disabled:opacity-20 transition-colors flex items-center justify-center"
             >
               <ArrowRight className="size-3.5" />
             </button>
@@ -182,7 +182,7 @@ export function LocalPreview() {
           <Hint label="Reload">
             <button
               onClick={reload}
-              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
             >
               {isLoading ? (
                 <Loader2 className="size-3.5 animate-spin text-primary" />
@@ -196,7 +196,7 @@ export function LocalPreview() {
         {/* Spacious Address Bar */}
         <form
           onSubmit={(e) => { e.preventDefault(); commit(); }}
-          className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 h-7.5 rounded-lg bg-surface2/80 hover:bg-surface2 border border-border/60 focus-within:border-primary/60 focus-within:bg-surface1 transition-all"
+          className="flex-1 min-w-0 flex items-center gap-1.5 px-2.5 h-7.5 rounded-lg bg-surface2/80 hover:bg-surface2 border border-border/60 focus-within:border-primary/60 focus-within:bg-surface1 ui-transition"
         >
           <Globe className="size-3.5 text-muted-foreground shrink-0" />
           <input
@@ -225,7 +225,7 @@ export function LocalPreview() {
                     if (!isDesktop) setIframeNonce((n) => n + 1);
                   }}
                   className={cn(
-                    "px-1.5 py-0.5 rounded text-3xs font-mono transition-colors cursor-pointer",
+                    "px-1.5 py-0.5 rounded text-3xs font-mono transition-colors",
                     isCurrent
                       ? "bg-primary text-primary-foreground font-semibold"
                       : "bg-surface2 text-muted-foreground hover:text-foreground hover:bg-surface3"
@@ -245,7 +245,7 @@ export function LocalPreview() {
               <button
                 onClick={() => setViewport('desktop')}
                 className={cn(
-                  'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
+                  'size-6 rounded flex items-center justify-center transition-colors',
                   viewport === 'desktop' ? 'bg-surface0 text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -256,7 +256,7 @@ export function LocalPreview() {
               <button
                 onClick={() => setViewport('mobile')}
                 className={cn(
-                  'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
+                  'size-6 rounded flex items-center justify-center transition-colors',
                   viewport === 'mobile' ? 'bg-surface0 text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -269,7 +269,7 @@ export function LocalPreview() {
             <Hint label="Open DevTools">
               <button
                 onClick={() => webviewRef.current?.openDevTools()}
-                className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+                className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
               >
                 <Terminal className="size-3.5" />
               </button>
@@ -281,7 +281,7 @@ export function LocalPreview() {
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center"
             >
               <ExternalLink className="size-3.5" />
             </a>
@@ -292,7 +292,7 @@ export function LocalPreview() {
       {/* ── Viewport Canvas & Empty / Offline State ── */}
       <div className="flex-1 min-h-0 overflow-auto bg-surface2/30 flex items-center justify-center relative">
         <div
-          className="h-full bg-white transition-all duration-200 relative shadow-sm"
+          className="h-full bg-white ui-transition duration-200 relative shadow-sm"
           style={{ width: viewport === 'mobile' ? '375px' : '100%' }}
         >
           {isDesktop ? (
@@ -333,7 +333,7 @@ export function LocalPreview() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={reload}
-                  className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs"
                 >
                   <RefreshCw className="size-3" />
                   <span>Check again</span>

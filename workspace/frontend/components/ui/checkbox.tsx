@@ -16,7 +16,7 @@ export const Checkbox = React.forwardRef<
       'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
       'disabled:cursor-not-allowed disabled:opacity-50',
       'data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary',
-      'cursor-pointer flex items-center justify-center',
+      'flex items-center justify-center',
       className
     )}
     {...props}

@@ -822,7 +822,7 @@ export function ChatView() {
               <button
                 type="button"
                 onClick={() => window.dispatchEvent(new Event(SHORTCUTS_EVENT))}
-                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
               >
                 <KeyCombo keys={shortcutKeys('help')} />
                 all shortcuts
@@ -851,7 +851,7 @@ export function ChatView() {
             <Hint label="Expand Sidebar">
               <button
                 onClick={sidebarToggle}
-                className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1 cursor-pointer"
+                className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1"
               >
                 <PanelLeft className="size-4" />
               </button>
@@ -879,13 +879,14 @@ export function ChatView() {
               autoFocus
             />
           ) : (
-            <h2
-              className="text-sm font-bold tracking-tight truncate cursor-pointer hover:text-foreground-muted transition-colors text-foreground flex items-center gap-1.5"
-              onClick={startEditingTitle}
-              title="Click to rename"
-            >
-              <span>{currentSession?.title || 'Channel'}</span>
-            </h2>
+            <Hint label="Click to rename">
+              <h2
+                className="text-sm font-bold tracking-tight truncate hover:text-foreground-muted transition-colors text-foreground flex items-center gap-1.5"
+                onClick={startEditingTitle}
+              >
+                <span>{currentSession?.title || 'Channel'}</span>
+              </h2>
+            </Hint>
           )}
 
           {/*
@@ -942,7 +943,7 @@ export function ChatView() {
             <button
               onClick={() => setActiveRightTab(activeRightTab !== null ? null : 'preview')}
               className={cn(
-                'size-7.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+                'size-7.5 rounded-lg flex items-center justify-center transition-colors',
                 activeRightTab !== null ? 'bg-surface3 text-foreground font-medium border border-border' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
               )}
             >
@@ -955,7 +956,7 @@ export function ChatView() {
             <DropdownMenuTrigger asChild>
               <Hint label="More actions">
                 <button
-                  className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                  className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
                 >
                   <MoreHorizontal className="size-4" />
                 </button>
@@ -1010,7 +1011,7 @@ export function ChatView() {
                 <Hint key={a.agentName} label={`Add a description for ${a.agentName}`}>
                   <button
                     onClick={() => setSelectedAgentName(a.agentName)}
-                    className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors cursor-pointer text-foreground"
+                    className="inline-flex items-center gap-1 text-2xs font-medium px-2 py-0.5 rounded-md bg-surface3 hover:bg-surface4 transition-colors text-foreground"
                   >
                     <Sparkles className="size-2.5 text-status-warning" />
                     {a.agentName}
@@ -1021,7 +1022,7 @@ export function ChatView() {
             <Hint label="Dismiss warning">
               <button
                 onClick={() => setDismissedRoutingWarning(true)}
-                className="ml-auto p-1 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0 cursor-pointer"
+                className="ml-auto p-1 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0"
               >
                 <X className="size-3.5" />
               </button>
@@ -1116,7 +1117,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shadow-xs"
                       >
                         <Plug className="size-3.5" />
                         <span>Connect agent</span>
@@ -1129,7 +1130,7 @@ export function ChatView() {
                             navigator.clipboard.writeText(cmd);
                             toast.success('Connector CLI command copied to clipboard');
                           }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 border border-border text-foreground text-xs font-medium transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 border border-border text-foreground text-xs font-medium transition-colors"
                         >
                           <Copy className="size-3.5 text-foreground-muted" />
                           <span>Copy CLI command</span>
@@ -1148,7 +1149,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('tasks')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <CheckCircle2 className="size-4" />
@@ -1172,7 +1173,7 @@ export function ChatView() {
                         onClick={() => {
                           window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
                         }}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Search className="size-4" />
@@ -1194,7 +1195,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => setViewMode('mission')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Activity className="size-4" />
@@ -1216,7 +1217,7 @@ export function ChatView() {
                       <button
                         type="button"
                         onClick={() => openSettings('general')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
+                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
                       >
                         <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
                           <Settings className="size-4" />
@@ -1249,7 +1250,7 @@ export function ChatView() {
                         handleDraftChange(item.prompt);
                         setFocusKey((k) => k + 1);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors cursor-pointer group text-left"
+                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
                     >
                       <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0">
                         <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-foreground transition-colors" />
@@ -1335,7 +1336,7 @@ export function ChatView() {
                         key={a.agentName}
                         type="button"
                         onClick={() => currentSessionId && addParticipant(currentSessionId, a.agentName)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors"
                       >
                         <Plus className="size-3" />
                         <span>Add @{a.agentName}</span>
@@ -1344,7 +1345,7 @@ export function ChatView() {
                     <button
                       type="button"
                       onClick={() => setViewMode('mission')}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors"
                     >
                       <span>Connect</span>
                     </button>
@@ -1363,7 +1364,7 @@ export function ChatView() {
                         onClick={() => {
                           if (currentSessionId) addParticipant(currentSessionId, agent.agentName);
                         }}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/60 text-2xs font-medium transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface2 hover:bg-primary/15 hover:text-primary border border-border/60 text-2xs font-medium transition-colors"
                       >
                         <AgentAvatar name={agent.agentName} size={14} />
                         <span>@{agent.agentName}</span>

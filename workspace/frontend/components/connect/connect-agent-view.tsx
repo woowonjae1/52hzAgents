@@ -376,7 +376,7 @@ function LocalAgentsTab({
               key={entry.name}
               onClick={() => onSelectAgent(isSelected ? null : entry.name)}
               className={cn(
-                'flex items-center gap-2.5 px-3 py-3 rounded-lg border text-left transition-all shadow-xs',
+                'flex items-center gap-2.5 px-3 py-3 rounded-lg border text-left ui-transition shadow-xs',
                 isSelected
                   ? 'border-primary bg-surface1/50'
                   : 'border-border hover:border-border-accent hover:bg-surface2',
@@ -732,7 +732,7 @@ function CloudAgentsTab({
                   <button
                     key={p.name}
                     onClick={() => onSelectProvider(p.name)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border hover:border-border-accent hover:bg-surface2 text-left transition-all"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-border hover:border-border-accent hover:bg-surface2 text-left ui-transition"
                   >
                     <div className="size-6 shrink-0 flex items-center justify-center">
                       <ProviderIcon name={p.name} size={22} />

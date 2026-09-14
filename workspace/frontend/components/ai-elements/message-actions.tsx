@@ -3,6 +3,7 @@
 import { Copy, Check, RotateCw, Download, ThumbsUp, ThumbsDown, FileText, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { downloadBlob } from '@/lib/download';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
@@ -18,7 +19,7 @@ export interface MessageActionsProps {
 
 /** 统一的幽灵图标按钮样式 */
 const ghostButton = cn(
-  'inline-flex items-center justify-center size-7 rounded-md cursor-pointer',
+  'inline-flex items-center justify-center size-7 rounded-md',
   'text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
   'transition-colors duration-150',
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
@@ -56,13 +57,7 @@ export function MessageActions({
       onExportMarkdown();
       return;
     }
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `message-${Date.now()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(content, `message-${Date.now()}.md`, 'text/markdown;charset=utf-8;');
     toast.success('Exported as Markdown');
   };
 

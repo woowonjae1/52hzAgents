@@ -10,6 +10,7 @@
  * reusable from anywhere in the app.
  */
 
+import { downloadBlob } from '@/lib/download';
 import type { WorkspaceMessage } from './types';
 
 /**
@@ -124,14 +125,5 @@ export function downloadTextFile(
   text: string,
   mime = 'text/markdown;charset=utf-8',
 ): void {
-  const url = URL.createObjectURL(new Blob([text], { type: mime }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Revoking synchronously can cancel the download in some Chromium builds
-  // before it has finished reading the blob.
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadBlob(text, filename, mime);
 }

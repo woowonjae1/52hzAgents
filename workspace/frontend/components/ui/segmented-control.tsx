@@ -46,7 +46,7 @@ export function SegmentedControl<T extends string = string>({
             disabled={opt.disabled}
             onClick={() => onValueChange(opt.value)}
             className={cn(
-              'relative flex items-center justify-center gap-1.5 rounded-md text-xs font-medium transition-all cursor-pointer',
+              'relative flex items-center justify-center gap-1.5 rounded-md text-xs font-medium ui-transition',
               size === 'xs' && 'px-2 h-6 text-2xs',
               size === 'sm' && 'px-2.5 h-7 text-xs',
               size === 'md' && 'px-3.5 h-9 text-xs',

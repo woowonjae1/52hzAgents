@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { runUndoable } from '@/lib/undoable';
 import { workspaceApi } from './api';
 import { capture, group } from './analytics';
 import { useOpenAgentsAuth } from './openagents-auth-context';
@@ -222,6 +223,14 @@ interface WorkspaceContextValue {
   refreshFiles: () => Promise<void>;
   uploadFile: (file: File) => Promise<WorkspaceFile>;
   deleteFile: (fileId: string) => Promise<void>;
+  /**
+   * Delete with a way back. The row disappears at once, a toast offers Undo,
+   * and the irreversible call does not happen until that window closes — so
+   * Undo needs no restore endpoint and cannot itself fail. Prefer this over
+   * `deleteFile` + a confirmation dialog everywhere a person is deleting one
+   * thing they can see.
+   */
+  deleteFileUndoable: (fileId: string, displayName: string) => void;
   browserTabs: BrowserTab[];
   selectedBrowserTabId: string | null;
   setSelectedBrowserTabId: (id: string | null) => void;
@@ -1340,6 +1349,42 @@ export function WorkspaceProvider({
     if (selectedFileId === fileId) setSelectedFileId(null);
   }, [selectedFileId]);
 
+  /*
+   * The row is removed from `files` immediately and the real DELETE is held
+   * for the length of the undo window. Holding the ROW rather than a flag is
+   * what makes Undo trivial: putting it back is a setState, and every surface
+   * that reads `files` — the list, the grid, the preview pane, the command
+   * palette — hides and restores it together, with no per-view bookkeeping.
+   */
+  const deleteFileUndoable = useCallback((fileId: string, displayName: string) => {
+    let removed: WorkspaceFile | undefined;
+    let removedAt = -1;
+    runUndoable({
+      message: `Deleted ${displayName}`,
+      onOptimistic: () => {
+        setFiles((prev) => {
+          removedAt = prev.findIndex((f) => f.id === fileId);
+          removed = removedAt >= 0 ? prev[removedAt] : undefined;
+          return prev.filter((f) => f.id !== fileId);
+        });
+        setSelectedFileId((cur) => (cur === fileId ? null : cur));
+      },
+      onRevert: () => {
+        if (!removed) return;
+        setFiles((prev) => {
+          if (prev.some((f) => f.id === fileId)) return prev;
+          const next = [...prev];
+          // Back where it was, not at the end — a file that reappears
+          // somewhere else reads as a different file.
+          next.splice(removedAt < 0 ? next.length : removedAt, 0, removed!);
+          return next;
+        });
+      },
+      onCommit: () => workspaceApi.deleteFile(fileId),
+      errorMessage: `Could not delete ${displayName}`,
+    });
+  }, []);
+
   const refreshBrowserTabs = useCallback(async () => {
     try {
       const result = await workspaceApi.listBrowserTabs();
@@ -2015,6 +2060,7 @@ export function WorkspaceProvider({
     refreshFiles,
     uploadFile,
     deleteFile,
+    deleteFileUndoable,
     browserTabs,
     selectedBrowserTabId,
     setSelectedBrowserTabId,
@@ -2071,7 +2117,7 @@ export function WorkspaceProvider({
     consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession,
     renameSession, updateSession, addParticipant, removeParticipant, setSessionMaster,
     setSessionOrchestration, renameWorkspace, refreshWorkspace, refreshAgents, refreshFiles,
-    uploadFile, deleteFile, browserTabs, selectedBrowserTabId, setSelectedBrowserTabId,
+    uploadFile, deleteFile, deleteFileUndoable, browserTabs, selectedBrowserTabId, setSelectedBrowserTabId,
     refreshBrowserTabs, openBrowserTab, closeBrowserTab, navigateBrowserTab,
     reconnectBrowserTab, browserContexts, refreshBrowserContexts, persistBrowserTab,
     unpersistBrowserTab, deleteBrowserContext, openBrowserTabWithContext, dmConversations,

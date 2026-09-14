@@ -296,7 +296,7 @@ export function AgentProfilePanel() {
           <Hint label="Close">
             <button
               onClick={() => setSelectedAgentName(null)}
-              className="size-7 flex items-center justify-center rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="size-7 flex items-center justify-center rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="size-4" />
             </button>
@@ -417,7 +417,7 @@ export function AgentProfilePanel() {
                   type="button"
                   onClick={handleToggleAutostart}
                   disabled={togglingAutostart}
-                  className="text-primary hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
+                  className="text-primary hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0"
                 >
                   {agent.autostart ? (
                     <ToggleRight className="size-6 text-primary" />
@@ -456,7 +456,7 @@ export function AgentProfilePanel() {
                         className={cn(
                           'w-full flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors',
                           canConfigure
-                            ? 'bg-surface2/60 hover:bg-surface2 text-foreground cursor-pointer'
+                            ? 'bg-surface2/60 hover:bg-surface2 text-foreground'
                             : 'bg-surface2/30 text-muted-foreground/60 cursor-not-allowed',
                           'disabled:opacity-50'
                         )}
@@ -474,7 +474,7 @@ export function AgentProfilePanel() {
                         key={m.id}
                         onClick={() => handleSwitchModel(m.id)}
                         className={cn(
-                          'flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer',
+                          'flex items-center justify-between px-2 py-1.5 text-xs rounded',
                           currentModel === m.id && 'font-bold text-primary bg-surface3'
                         )}
                       >
@@ -546,7 +546,7 @@ export function AgentProfilePanel() {
                           setIsEnteringCustom(true);
                           setCustomModelInput(currentModel || '');
                         }}
-                        className="flex items-center justify-between px-2 py-1.5 text-xs rounded cursor-pointer text-muted-foreground hover:text-foreground border-t border-border/60 mt-1"
+                        className="flex items-center justify-between px-2 py-1.5 text-xs rounded text-muted-foreground hover:text-foreground border-t border-border/60 mt-1"
                       >
                         <span>Custom model…</span>
                       </DropdownMenuItem>
@@ -571,7 +571,7 @@ export function AgentProfilePanel() {
                   setSelectedAgentName(null);
                   setActiveRightTab('tokens');
                 }}
-                className="text-3xs text-primary hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                className="text-3xs text-primary hover:underline flex items-center gap-0.5 font-medium"
               >
                 <span>Full dashboard</span>
                 <ChevronRight className="size-2.5" />
@@ -801,7 +801,7 @@ export function AgentProfilePanel() {
           <div className="flex gap-2">
             <button
               onClick={handleStartThread}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border bg-surface1 hover:bg-surface2 text-foreground transition-colors cursor-pointer"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border bg-surface1 hover:bg-surface2 text-foreground transition-colors"
             >
               <Plus className="size-3" />
               Start a Channel

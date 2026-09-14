@@ -62,3 +62,51 @@ export function useIsDesktop(): boolean {
   }, []);
   return isDesktop;
 }
+
+/**
+ * THE SHELL BRIDGE, TYPED ONCE.
+ *
+ * Eight components reached for `window.electronBridge` through their own
+ * inline `as unknown as { electronBridge?: { … } }` cast, each declaring only
+ * the one method it needed. So the bridge had eight partial, drifting type
+ * declarations and no single place that said what the shell can actually do —
+ * which is how `showItemInFolder` and `showNotification` ended up exposed in
+ * preload.js and called from nowhere. Nobody knew they were there.
+ */
+export interface ElectronBridge {
+  isDesktop: true;
+  platform: string;
+  minimizeWindow(): void;
+  maximizeWindow(): void;
+  closeWindow(): void;
+  isMaximized(): Promise<boolean>;
+  setTitleBarSymbolColor(color: string): void;
+  onWindowStateChanged(handler: () => void): () => void;
+  hideQuickBar(): void;
+  openMainWindow(route?: string): void;
+  getAutostart(): Promise<boolean>;
+  setAutostart(enabled: boolean): Promise<boolean>;
+  getApiUrl(): string;
+  browseFolder(defaultPath?: string): Promise<string | null>;
+  /** Open a path with the OS default handler. */
+  openPath(pathStr: string): Promise<boolean>;
+  /** Reveal a path in Explorer / Finder / the Linux file manager. */
+  showItemInFolder(pathStr: string): Promise<boolean>;
+  showNotification(opts: { title: string; body: string; channel?: string; silent?: boolean }): Promise<boolean>;
+  setUnreadCount(count: number, overlayDataUrl?: string | null): void;
+  onDownloadProgress(handler: (p: { filename: string; received: number; total: number; percent: number }) => void): () => void;
+  onDownloadComplete(handler: (p: { filename: string; savePath: string }) => void): () => void;
+  onDownloadCancelled(handler: (p: { filename: string }) => void): () => void;
+  onDownloadFailed(handler: (p: { filename: string; state: string }) => void): () => void;
+  onMenuCommand(handler: (command: string) => void): () => void;
+  onNavigateToChannel(handler: (channel: string) => void): () => void;
+}
+
+/**
+ * The bridge, or null in a browser tab. Every caller must handle null — the
+ * same build runs at claude.ai-style web URLs with no shell at all.
+ */
+export function getBridge(): ElectronBridge | null {
+  if (typeof window === 'undefined') return null;
+  return (window as unknown as { electronBridge?: ElectronBridge }).electronBridge ?? null;
+}

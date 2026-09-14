@@ -137,7 +137,7 @@ export function MonitorTile({ session, tileData, isActive, isCompleted, agents, 
     <button
       onClick={onClick}
       className={cn(
-        'flex flex-col text-left border border-input rounded-xl bg-background shadow-xs cursor-pointer p-3 overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md',
+        'flex flex-col text-left border border-input rounded-xl bg-background shadow-xs p-3 overflow-hidden ui-transition hover:shadow-md',
         isActive && 'thread-wip',
         isCompleted && 'bg-surface2 ring-1 ring-border-accent animate-[glow_2s_ease-in-out_infinite]',
       )}

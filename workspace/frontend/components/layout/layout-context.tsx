@@ -49,6 +49,11 @@ interface LayoutState {
   setSidebarResizing: (v: boolean) => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  /** Alt+← / Alt+→. False when there is nothing in that direction. */
+  canGoBack: boolean;
+  canGoForward: boolean;
+  goBack: () => void;
+  goForward: () => void;
   settingsTab: SettingsTab;
   setSettingsTab: (tab: SettingsTab) => void;
   openSettings: (tab?: SettingsTab) => void;
@@ -88,11 +93,57 @@ interface LayoutState {
   openNewThread: () => void;
 }
 
+/*
+ * THE WINDOW COMES BACK THE WAY YOU LEFT IT.
+ *
+ * The Electron shell already restores its own size, position and maximised
+ * state, and three panel widths are in localStorage. What was NOT kept was
+ * everything that decides what the window is actually showing: which view you
+ * were in, whether the Studio panel was open and on which tab, whether the
+ * sidebar was collapsed, which Settings tab you were reading. So a restart
+ * always landed on Threads, sidebar open, Studio closed — the layout the app
+ * ships with rather than the one you built.
+ *
+ * Per workspace would be better still, but the layout provider does not know
+ * the workspace id; these are window-level preferences and are stored as such.
+ */
+const LAYOUT_STORAGE_KEY = 'workspace_layout_v1';
+
+interface PersistedLayout {
+  viewMode?: ViewMode;
+  settingsTab?: SettingsTab;
+  activeRightTab?: RightPanelTab;
+  sidebarOpen?: boolean;
+  detailExpanded?: boolean;
+}
+
+function readLayout(): PersistedLayout {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PersistedLayout) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLayout(patch: PersistedLayout) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(
+      LAYOUT_STORAGE_KEY,
+      JSON.stringify({ ...readLayout(), ...patch }),
+    );
+  } catch {
+    /* private mode, quota, a disabled store — a lost preference is not an error */
+  }
+}
+
 const LayoutContext = createContext<LayoutState | undefined>(undefined);
 
 export function LayoutProvider({ children }: { children: ReactNode }) {
   const isMobile = useIsMobile();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => readLayout().sidebarOpen ?? true);
   const [sidebarWidth, setSidebarWidthState] = useState(() => readStoredSidebarWidth());
   const setSidebarWidth = useCallback((width: number) => {
     const clamped = clampSidebarWidth(width);
@@ -100,36 +151,93 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     storeSidebarWidth(clamped);
   }, []);
   const [isSidebarResizing, setSidebarResizing] = useState(false);
-  const [viewMode, setViewModeState] = useState<ViewMode>('threads');
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>('general');
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => readLayout().viewMode ?? 'threads');
+  const [settingsTab, setSettingsTabState] = useState<SettingsTab>(
+    () => readLayout().settingsTab ?? 'general',
+  );
 
-  const setViewMode = useCallback((mode: ViewMode) => {
-    if (mode === 'skills') {
-      setSettingsTab('skills');
+  const setSettingsTab = useCallback((tab: SettingsTab) => {
+    setSettingsTabState(tab);
+    writeLayout({ settingsTab: tab });
+  }, []);
+
+  /*
+    BACK AND FORWARD.
+
+    The app has a dozen top-level views and no way to return to the one you
+    were just in. Every desktop application with panes this deep has Alt+← —
+    file managers, mail clients, IDEs — because navigating away to check one
+    thing and then hunting for the way back is the most common thing a user
+    does and the app made it a fresh navigation every time.
+
+    A stack rather than the browser's own history: this is a single-page shell
+    with no URL per view, so `history.back()` would leave the app entirely.
+
+    `historyIndex` is the cursor INTO `viewHistory`, not a count — moving back
+    and then navigating somewhere new truncates the forward tail, which is what
+    every back button in existence does.
+  */
+  /** Change the view WITHOUT touching history — used by back/forward itself. */
+  const applyViewMode = useCallback((mode: ViewMode) => {
+    if (mode === 'skills' || mode === 'knowledge' || mode === 'routines') {
+      setSettingsTabState(mode);
       setViewModeState('settings');
-      return;
-    }
-    if (mode === 'knowledge') {
-      setSettingsTab('knowledge');
-      setViewModeState('settings');
-      return;
-    }
-    if (mode === 'routines') {
-      setSettingsTab('routines');
-      setViewModeState('settings');
+      writeLayout({ viewMode: 'settings', settingsTab: mode });
       return;
     }
     setViewModeState(mode);
+    writeLayout({ viewMode: mode });
   }, []);
 
+  const [nav, setNav] = useState<{ stack: ViewMode[]; index: number }>(() => ({
+    stack: [readLayout().viewMode ?? 'threads'],
+    index: 0,
+  }));
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    applyViewMode(mode);
+    setNav((prev) => {
+      // Re-selecting the view you are already on is not a navigation, and
+      // recording it would make one Alt+← do nothing.
+      if (prev.stack[prev.index] === mode) return prev;
+      // Truncating the forward tail is what every back button does: going back
+      // and then somewhere new abandons the branch you left.
+      const stack = [...prev.stack.slice(0, prev.index + 1), mode].slice(-50);
+      return { stack, index: stack.length - 1 };
+    });
+  }, [applyViewMode]);
+
+  const canGoBack = nav.index > 0;
+  const canGoForward = nav.index < nav.stack.length - 1;
+
+  /*
+    Both of these apply the view OUTSIDE the state updater. An updater must be
+    a pure function of the previous state — React is free to call it twice, and
+    in development under StrictMode it does — so driving navigation from inside
+    one would fire the view change twice and, worse, make the order in which
+    the two pieces of state settle undefined.
+  */
+  const goBack = useCallback(() => {
+    if (nav.index <= 0) return;
+    applyViewMode(nav.stack[nav.index - 1]);
+    setNav((prev) => ({ ...prev, index: Math.max(0, prev.index - 1) }));
+  }, [nav, applyViewMode]);
+
+  const goForward = useCallback(() => {
+    if (nav.index >= nav.stack.length - 1) return;
+    applyViewMode(nav.stack[nav.index + 1]);
+    setNav((prev) => ({ ...prev, index: Math.min(prev.stack.length - 1, prev.index + 1) }));
+  }, [nav, applyViewMode]);
+
   const openSettings = useCallback((tab: SettingsTab = 'general') => {
-    setSettingsTab(tab);
+    setSettingsTabState(tab);
     setViewModeState('settings');
+    writeLayout({ viewMode: 'settings', settingsTab: tab });
   }, []);
 
   const [selectedAgentName, setSelectedAgentName] = useState<string | null>(null);
   const [mobilePane, setMobilePane] = useState<MobilePane>('list');
-  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
+  const [isDetailExpanded, setIsDetailExpanded] = useState(() => readLayout().detailExpanded ?? false);
   const [splitBrowser, setSplitBrowser] = useState(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('x-split-browser') === '1';
@@ -140,7 +248,15 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('x-split-browser', v ? '1' : '0');
   }, []);
 
-  const [activeRightTab, setActiveRightTab] = useState<RightPanelTab>(null);
+  const [activeRightTab, setActiveRightTabState] = useState<RightPanelTab>(
+    () => readLayout().activeRightTab ?? null,
+  );
+  const setActiveRightTab = useCallback((tab: RightPanelTab) => {
+    setActiveRightTabState(tab);
+    // 'canvas' is not restorable — it points at an artifact that belongs to a
+    // particular message, so a restart would reopen an empty panel.
+    writeLayout({ activeRightTab: tab === 'canvas' ? null : tab });
+  }, []);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const openPreview = useCallback((url: string) => {
@@ -177,7 +293,10 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const isAgentPanelOpen = selectedAgentName !== null;
   const openMobileDetail = useCallback(() => setMobilePane('detail'), []);
   const openMobileList = useCallback(() => setMobilePane('list'), []);
-  const toggleDetailExpanded = useCallback(() => setIsDetailExpanded((v) => !v), []);
+  const toggleDetailExpanded = useCallback(() => setIsDetailExpanded((v) => {
+    writeLayout({ detailExpanded: !v });
+    return !v;
+  }), []);
 
   const cssVariables = useMemo(() => ({
     // Tracks the real, resizable width instead of a hardcoded 240px that never
@@ -187,7 +306,10 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     '--header-height-mobile': '60px',
   } as React.CSSProperties), [sidebarWidth]);
 
-  const sidebarToggle = useCallback(() => setIsSidebarOpen((open) => !open), []);
+  const sidebarToggle = useCallback(() => setIsSidebarOpen((open) => {
+    writeLayout({ sidebarOpen: !open });
+    return !open;
+  }), []);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -224,6 +346,10 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setSidebarResizing,
       viewMode,
       setViewMode,
+      canGoBack,
+      canGoForward,
+      goBack,
+      goForward,
       settingsTab,
       setSettingsTab,
       openSettings,
@@ -248,7 +374,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       openNewThread,
   }), [
     isMobile, isSidebarOpen, sidebarToggle, sidebarWidth, setSidebarWidth,
-    isSidebarResizing, viewMode, setViewMode, settingsTab, openSettings,
+    isSidebarResizing, viewMode, setViewMode, canGoBack, canGoForward, goBack, goForward,
+    settingsTab, openSettings,
     selectedAgentName, isAgentPanelOpen, mobilePane, openMobileDetail,
     openMobileList, isDetailExpanded, toggleDetailExpanded, splitBrowser,
     handleSetSplitBrowser, showBrowserPreview, setShowBrowserPreview,

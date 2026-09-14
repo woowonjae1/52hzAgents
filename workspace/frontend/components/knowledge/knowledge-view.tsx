@@ -1,6 +1,9 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { SkeletonRows } from '@/components/ui/skeleton';
+import { useListKeyboardNav } from '@/hooks/use-list-keyboard-nav';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { formatDistanceToNow } from 'date-fns';
 import {
   ArrowLeft,
@@ -36,13 +39,15 @@ import { MarkdownContent } from '@/components/chat/markdown-content';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import type { KnowledgeEntry, WorkspaceAgent } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, mergeRefs } from '@/lib/utils';
+import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { downloadBlob } from '@/lib/download';
 import { KnowledgeEditor } from './knowledge-editor';
 import {
   KNOWLEDGE_IMPORT_ACCEPT,
@@ -143,7 +148,7 @@ function extractToc(markdown: string): TocItem[] {
 }
 
 export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }) {
-  const { knowledge, refreshKnowledge, deleteKnowledge, agents } = useWorkspace();
+  const { loading, knowledge, refreshKnowledge, deleteKnowledge, agents } = useWorkspace();
   const { isMobile, setViewMode } = useLayout();
   const agentNames = useMemo(() => agents.map((a) => a.agentName), [agents]);
   const onlineAgents = useMemo(() => agents.filter((a) => a.status === 'online'), [agents]);
@@ -320,15 +325,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   }, [selectedContent]);
 
   const exportAsMarkdown = useCallback((entry: KnowledgeEntry, content: string) => {
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${entry.slug || 'knowledge'}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadBlob(content, `${entry.slug || 'knowledge'}.md`, 'text/markdown;charset=utf-8');
     toast.success(`Exported ${entry.slug}.md`);
   }, []);
 
@@ -362,6 +359,18 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     });
   }, [knowledge, activeCategory, query, sortBy]);
 
+  /* Arrow keys, Home/End, Page keys, Enter to open. A knowledge base is the
+     surface people scan fastest, and it answered no key at all. */
+  const scrollRef = useScrollRestore<HTMLDivElement>('knowledge');
+  const { cursor, setCursor, listNavProps, rowProps } = useListKeyboardNav({
+    count: filtered.length,
+    onActivate: (index) => {
+      const entry = filtered[index];
+      if (entry) void handleSelect(entry);
+    },
+    pageSize: 10,
+  });
+
   // Category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<KnowledgeCategory, number> = {
@@ -389,7 +398,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   };
 
   const iconButton =
-    'inline-flex size-8 items-center justify-center rounded-xl text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+  'inline-flex size-8 items-center justify-center rounded-xl text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
 
   // --- List Pane (Left Column) ---
   const EntryList = (
@@ -402,7 +411,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={() => setViewMode('threads')}
-                className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors"
               >
                 <ArrowLeft className="size-3.5" />
                 <span>Back</span>
@@ -486,7 +495,8 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search knowledge…"
-            className="h-8.5 w-full rounded-xl border border-border bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            data-view-search
+            className="h-8.5 w-full rounded-xl border border-border bg-surface1 pl-9 pr-8 text-xs text-foreground placeholder:text-foreground-extra-muted ui-transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           />
           {query && (
             <button
@@ -510,7 +520,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 type="button"
                 onClick={() => setActiveCategory(cat.id)}
                 className={cn(
-                  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium transition-all duration-150 shrink-0 cursor-pointer',
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium ui-transition duration-150 shrink-0',
                   active
                     ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
                     : 'bg-surface2/60 text-foreground-muted hover:text-foreground hover:bg-surface2'
@@ -534,8 +544,14 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       </div>
 
       {/* Entry Cards List */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {filtered.length === 0 ? (
+      <div
+        {...listNavProps}
+        ref={mergeRefs(listNavProps.ref, scrollRef)}
+        className="flex-1 overflow-y-auto p-3 space-y-2 outline-none"
+      >
+        {loading && knowledge.length === 0 ? (
+          <SkeletonRows rows={7} showAvatar={false} />
+        ) : filtered.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-foreground-muted">
             <div className="flex size-12 items-center justify-center rounded-2xl bg-surface2 text-foreground-extra-muted">
               <Search className="size-5" />
@@ -555,12 +571,14 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             return (
               <motion.div
                 key={entry.id}
+                {...rowProps(index, active)}
                 initial={reduceMotion ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2, delay: Math.min(index, 8) * 0.02 }}
                 className={cn(
                   CARD,
-                  'group relative p-3 cursor-pointer select-none',
+                  'group relative p-3 select-none',
+                  cursor === index && 'ring-1 ring-border-accent',
                   /*
                    * Only PAST the staggered intro. `content-visibility` creates
                    * a containment context, so a row the browser decides to skip
@@ -574,7 +592,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                     ? 'border-primary/50 bg-surface2/90 shadow-xs ring-1 ring-primary/20'
                     : 'hover:border-border-accent hover:bg-surface2/50'
                 )}
-                onClick={() => handleSelect(entry)}
+                onClick={() => { setCursor(index); void handleSelect(entry); }}
               >
                 <div className="flex items-start gap-2.5">
                   <span
@@ -645,19 +663,20 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                       <Pencil className="size-3" />
                     </button>
                   </Hint>
-                  <Hint label="Delete">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(entry);
-                      }}
-                      className="p-1 rounded-md text-foreground-extra-muted hover:text-destructive hover:bg-destructive/10 transition-colors"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </Hint>
                 </div>
+
+                {/* Direct child of the card: RowContextMenu matches on that
+                    exact relationship to tell this entry's menu apart from
+                    every other card's trigger it can also see. */}
+                <RowActions
+                  label={`Actions for ${entry.title}`}
+                  className="absolute right-1 top-1"
+                  items={[
+                    { label: 'Edit', icon: Pencil, onSelect: () => handleEdit(entry) },
+                    { label: 'Copy @knowledge citation', icon: Copy, onSelect: () => copySlugDirective(entry.slug) },
+                    { label: 'Delete', icon: Trash2, destructive: true, onSelect: () => handleDelete(entry) },
+                  ]}
+                />
               </motion.div>
             );
           })
@@ -676,7 +695,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             <button
               type="button"
               onClick={() => setMobileDetail(false)}
-              className="p-1.5 rounded-lg text-foreground-muted hover:bg-surface2 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-foreground-muted hover:bg-surface2 transition-colors"
             >
               <ArrowLeft className="size-4" />
             </button>
@@ -694,7 +713,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                 <button
                   type="button"
                   onClick={() => copySlugDirective(selectedEntry.slug)}
-                  className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors"
                 >
                   <span>@knowledge:{selectedEntry.slug}</span>
                   {copiedSlug === selectedEntry.slug ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5 text-foreground-extra-muted" />}
@@ -728,7 +747,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={copyFullContent}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 ui-transition"
               >
                 {copiedContent ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5 text-foreground-muted" />}
                 <span className="hidden sm:inline">Copy</span>
@@ -742,7 +761,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={() => exportAsMarkdown(selectedEntry, selectedContent)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 ui-transition"
               >
                 <Download className="size-3.5 text-foreground-muted" />
                 <span className="hidden sm:inline">Export</span>
@@ -754,7 +773,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           <button
             type="button"
             onClick={() => handleEdit(selectedEntry)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 ui-transition shadow-xs"
           >
             <Pencil className="size-3.5" />
             <span>Edit</span>
@@ -802,7 +821,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
                   type="button"
                   onClick={() => scrollToSection(item.id)}
                   style={{ paddingLeft: `${(item.level - 1) * 12 + 6}px` }}
-                  className="w-full text-left py-1 text-2xs text-foreground-muted hover:text-primary transition-colors truncate block rounded hover:bg-surface2 cursor-pointer"
+                  className="w-full text-left py-1 text-2xs text-foreground-muted hover:text-primary transition-colors truncate block rounded hover:bg-surface2"
                 >
                   {item.text}
                 </button>
@@ -824,7 +843,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       <button
         type="button"
         onClick={openNewEntry}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all cursor-pointer"
+        className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 ui-transition"
       >
         <Plus className="size-3.5" />
         <span>Create the first entry</span>
@@ -895,7 +914,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               type="button"
               onClick={() => setPendingDelete(null)}
               disabled={deleting}
-              className="cursor-pointer rounded-base border border-border px-2.5 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface2 hover:text-foreground disabled:cursor-default disabled:opacity-50"
+              className="rounded-base border border-border px-2.5 py-1 text-xs text-foreground-muted transition-colors hover:bg-surface2 hover:text-foreground disabled:cursor-default disabled:opacity-50"
             >
               Cancel
             </button>
@@ -903,7 +922,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               type="button"
               onClick={() => void confirmDelete()}
               disabled={deleting}
-              className="cursor-pointer rounded-base bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+              className="rounded-base bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-50"
             >
               {deleting ? 'Deleting…' : 'Delete'}
             </button>

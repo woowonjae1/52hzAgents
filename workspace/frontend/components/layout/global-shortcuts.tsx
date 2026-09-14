@@ -4,12 +4,21 @@ import * as React from 'react';
 import { useTheme } from 'next-themes';
 import { useLayout, type ViewMode } from './layout-context';
 import { useArtifacts } from '@/lib/artifacts-context';
+import { useWorkspace } from '@/lib/workspace-context';
 import { ShortcutsDialog } from './shortcuts-dialog';
 import { GOTO_SEQUENCE } from '@/lib/shortcuts';
 import { Kbd } from '@/components/ui/kbd';
 
 /** Custom event any surface can fire to open the help sheet. */
 export const SHORTCUTS_EVENT = 'app:shortcuts';
+
+/**
+ * Ctrl/Cmd+F when the current view's search box is not on screen yet. A view
+ * whose filter is hidden until asked for (the thread list) listens for this
+ * and reveals it; everything with a permanently visible box is found by the
+ * `[data-view-search]` query instead and never fires this.
+ */
+export const FIND_EVENT = 'app:find';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
@@ -52,8 +61,17 @@ export function GlobalShortcuts() {
     toggleDetailExpanded,
     selectedAgentName,
     setSelectedAgentName,
+    viewMode,
+    goBack,
+    goForward,
   } = useLayout();
   const { isCanvasOpen, closeCanvas } = useArtifacts();
+  const {
+    browserTabs,
+    selectedBrowserTabId,
+    setSelectedBrowserTabId,
+    closeBrowserTab,
+  } = useWorkspace();
   const { theme, setTheme } = useTheme();
 
   const [helpOpen, setHelpOpen] = React.useState(false);
@@ -81,6 +99,13 @@ export function GlobalShortcuts() {
     theme,
     setTheme,
     helpOpen,
+    viewMode,
+    goBack,
+    goForward,
+    browserTabs,
+    selectedBrowserTabId,
+    setSelectedBrowserTabId,
+    closeBrowserTab,
   };
   const handlers = React.useRef(state);
   handlers.current = state;
@@ -142,7 +167,76 @@ export function GlobalShortcuts() {
           h.setTheme(h.theme === 'dark' ? 'light' : 'dark');
           return;
         }
+        /*
+          CTRL+F IS "FIND", EVERYWHERE, IN EVERY APPLICATION.
+
+          This app bound `/` instead — a vim and web convention that exists
+          because a browser had already taken Ctrl+F for its own find bar.
+          Inside a window with no find bar the key is free, and reaching for it
+          and getting nothing is the single most reflexive failure available.
+          `/` still works; this is the key people actually press.
+
+          It focuses whatever the CURRENT view calls its search box, marked
+          `data-view-search`, rather than opening a find-in-page the app cannot
+          implement over virtualised lists.
+        */
+        if (key === 'f' && !e.shiftKey) {
+          const box = document.querySelector<HTMLInputElement>('[data-view-search]');
+          if (box) {
+            e.preventDefault();
+            box.focus();
+            box.select();
+            return;
+          }
+          // No box on screen — ask the view to produce one.
+          if (document.querySelector('[data-thread-list]')) {
+            e.preventDefault();
+            window.dispatchEvent(new Event(FIND_EVENT));
+          }
+          return;
+        }
+        /*
+          CTRL+W closes the browser tab you are looking at — and ONLY when the
+          browser view owns the screen. Binding it globally would mean the one
+          key everyone uses to close a window silently closed something else.
+        */
+        if (key === 'w' && !e.shiftKey && h.viewMode === 'browser' && h.selectedBrowserTabId) {
+          e.preventDefault();
+          void h.closeBrowserTab(h.selectedBrowserTabId);
+          return;
+        }
+        // Ctrl+Tab / Ctrl+Shift+Tab cycle those tabs, as in any tabbed window.
+        if (e.key === 'Tab' && h.viewMode === 'browser' && h.browserTabs.length > 1) {
+          e.preventDefault();
+          const at = h.browserTabs.findIndex((t) => t.id === h.selectedBrowserTabId);
+          const step = e.shiftKey ? -1 : 1;
+          const next = (at + step + h.browserTabs.length) % h.browserTabs.length;
+          h.setSelectedBrowserTabId(h.browserTabs[next].id);
+          return;
+        }
         return; // every other chord belongs to the browser or to a field
+      }
+
+      /*
+        ALT+← / ALT+→ — back and forward through the views visited.
+
+        Checked before the `e.altKey` bail below, which exists to keep Alt
+        combinations out of the bare-letter handlers. These two are the reason
+        that bail needed an exception.
+      */
+      if (e.altKey && !mod && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        if (e.key === 'ArrowLeft') h.goBack();
+        else h.goForward();
+        return;
+      }
+
+      // F1 is the help key on every desktop platform. `?` is the web's, and
+      // it is unreachable from a keyboard layout where ? needs AltGr.
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setHelpOpen(true);
+        return;
       }
 
       // -- Escape: close the topmost thing, one layer per press -----------

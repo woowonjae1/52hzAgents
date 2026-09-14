@@ -4,9 +4,11 @@ import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, External
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
+import { downloadUrl } from '@/lib/download';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { FileGrid } from './file-grid';
+import { basename } from './file-utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn } from '@/lib/utils';
 import { stripAddressPrefix } from '@/lib/types';
@@ -170,8 +172,9 @@ export function FilePreview() {
   }
 
   const handleDownload = () => {
-    const url = workspaceApi.getFileUrl(file.id);
-    window.open(url, '_blank');
+    // Was `window.open(url, '_blank')`, which the desktop shell denied and
+    // replaced with nothing. See lib/download.ts.
+    downloadUrl(workspaceApi.getFileUrl(file.id), basename(file.filename));
   };
 
   const handleCopy = () => {
@@ -212,7 +215,7 @@ export function FilePreview() {
               if (isMobile) openMobileList();
               else setSelectedFileId(null);
             }}
-            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0 cursor-pointer"
+            className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground transition-colors shrink-0"
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -232,7 +235,7 @@ export function FilePreview() {
           <Hint label="Copy content">
             <button
               onClick={handleCopy}
-              className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors"
             >
               {copied ? <Check className="size-4 text-status-success" /> : <Copy className="size-4" />}
             </button>
@@ -242,7 +245,7 @@ export function FilePreview() {
         <Hint label={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen View'}>
           <button
             onClick={() => setIsFullscreen((prev) => !prev)}
-            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors"
           >
             {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
           </button>
@@ -251,7 +254,7 @@ export function FilePreview() {
         <Hint label="Open in new tab / Download">
           <button
             onClick={handleDownload}
-            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground transition-colors"
           >
             <ExternalLink className="size-4" />
           </button>
@@ -260,7 +263,7 @@ export function FilePreview() {
         <Hint label="Delete">
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors"
           >
             <Trash2 className="size-4" />
           </button>
@@ -329,7 +332,7 @@ export function FilePreview() {
             <p className="text-sm font-medium">Preview not available for this file type</p>
             <button
               onClick={handleDownload}
-              className="px-3.5 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors cursor-pointer"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
             >
               Download file
             </button>

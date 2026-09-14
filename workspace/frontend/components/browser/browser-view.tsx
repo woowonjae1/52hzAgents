@@ -282,13 +282,14 @@ export function BrowserView() {
               autoFocus
             />
           ) : (
-            <p
-              className="text-xs text-muted-foreground truncate cursor-pointer hover:text-foreground transition-colors"
-              onClick={startEditingUrl}
-              title="Click to edit URL"
-            >
-              {tab.url}
-            </p>
+            <Hint label="Click to edit URL">
+              <p
+                className="text-xs text-muted-foreground truncate hover:text-foreground transition-colors"
+                onClick={startEditingUrl}
+              >
+                {tab.url}
+              </p>
+            </Hint>
           )}
         </div>
 

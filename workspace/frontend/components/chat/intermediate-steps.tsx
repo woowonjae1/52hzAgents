@@ -281,7 +281,7 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-2 text-left cursor-pointer group"
+        className="flex w-full items-center justify-between gap-2 text-left group"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -350,7 +350,7 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
                           setCopiedId(agent.index ?? i);
                           setTimeout(() => setCopiedId(null), 2000);
                         }}
-                        className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+                        className="p-1 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors"
                       >
                         {copiedId === (agent.index ?? i) ? (
                           <Check className="size-3 text-status-success" />
@@ -525,6 +525,7 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         actions={
           hasDetail ? (
             <EventLineAction
+              title="Copy parameters"
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -534,7 +535,6 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
                   setTimeout(() => setCopied(false), 2000);
                 }
               }}
-              title="Copy parameters"
             >
               {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
             </EventLineAction>
@@ -901,12 +901,12 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
       defaultOpen={defaultOpen}
       actions={
         <EventLineAction
+          title="Open in Trace Panel"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             setActiveRightTab('trace');
           }}
-          title="Open in Trace Panel"
         >
           <Activity className="size-3" />
         </EventLineAction>
@@ -979,7 +979,7 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
                 <button
                   type="button"
                   onClick={() => setActiveRightTab('trace')}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-medium text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-medium text-primary hover:bg-primary/10 transition-colors"
                 >
                   <Activity className="size-2.5" />
                   <span>Trace</span>

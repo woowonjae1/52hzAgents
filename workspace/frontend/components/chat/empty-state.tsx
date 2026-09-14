@@ -97,7 +97,7 @@ export function EmptyState() {
             key={agent.agentName}
             onClick={() => toggleParticipant(agent.agentName)}
             className={cn(
-              'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold transition-all cursor-pointer shadow-xs',
+              'flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold ui-transition shadow-xs',
               isSelected
                 ? 'border-border-accent bg-surface2 text-foreground'
                 : 'border-border bg-surface2/60 text-muted-foreground hover:text-foreground hover:bg-surface2'
@@ -117,10 +117,10 @@ export function EmptyState() {
       disabled={starting || (hasAgents && participants.size === 0)}
       onClick={handleStartChat}
       className={cn(
-        'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-xs transition-opacity cursor-pointer',
+        'w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-medium text-xs transition-opacity',
         !hasAgents || participants.size === 0
           ? 'bg-surface3 text-muted-foreground opacity-50 cursor-not-allowed'
-          : 'bg-primary text-primary-foreground hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]'
+            : 'bg-primary text-primary-foreground hover:opacity-90'
       )}
     >
       {starting ? <Loader2 className="size-4 animate-spin" /> : <Rocket className="size-4" />}
@@ -169,14 +169,14 @@ export function EmptyState() {
           <div className="flex items-center justify-between text-2xs pt-1">
             <button
               onClick={() => setViewMode('mission')}
-              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors"
             >
               <Plug className="size-3.5 opacity-70" />
               Connect a new agent
             </button>
             <button
               onClick={() => setViewMode('mission')}
-              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors"
             >
               <Cloud className="size-3.5 opacity-70" />
               Try Cloud Agents
@@ -188,7 +188,7 @@ export function EmptyState() {
             <div className="text-2xs text-foreground-extra-muted font-mono mb-1 flex items-center justify-between">
               <span>Or connect from the command line:</span>
               <button
-                className="flex items-center gap-1 text-3xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
+                className="flex items-center gap-1 text-3xs text-foreground-muted hover:text-foreground transition-colors"
                 onClick={() => {
                   copyToClipboard(connectCommand);
                   toast.success('Pairing command copied');

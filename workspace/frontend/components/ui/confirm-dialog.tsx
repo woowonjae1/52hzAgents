@@ -54,7 +54,20 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!busy) onOpenChange(v); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        /* Enter confirms, Cmd/Ctrl+Enter too. A two-button dialog that can
+           only be answered with the mouse is the thing that makes a window
+           feel like a web page — every native alert commits on Return. Escape
+           is Radix's and already cancels. */
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' || busy) return;
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'TEXTAREA' && !(e.metaKey || e.ctrlKey)) return;
+          e.preventDefault();
+          void handleConfirm();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {(description || targetName) && (

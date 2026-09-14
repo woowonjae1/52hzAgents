@@ -14,10 +14,26 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps['theme']}
       className="toaster group"
-      position="top-center"
+      /*
+        BOTTOM-RIGHT, NOT TOP-CENTRE.
+
+        A banner that drops over the middle of the top edge is a web pattern —
+        it exists because a page has no other chrome to put a notice in. A
+        desktop window does: transient status collects in the corner furthest
+        from where you are working, and on every platform with a notification
+        centre that corner is the bottom-trailing one. Top-centre here also
+        landed directly under the titlebar and over the thread header.
+
+        `closeButton` because these toasts now carry actions — "Show in folder"
+        after a download, "Undo" after a delete — and an action the reader has
+        to catch inside three seconds is not an action. The button lets a toast
+        be read at the reader's pace and dismissed deliberately.
+      */
+      position="bottom-right"
       offset="18px"
       gap={10}
       duration={3000}
+      closeButton
       visibleToasts={3}
       icons={{
         /*
@@ -53,7 +69,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
            * to work in both.
            */
           toast:
-            'group toast group-[.toaster]:bg-surface-overlay/95 group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-xl group-[.toaster]:backdrop-blur-xl group-[.toaster]:rounded-full group-[.toaster]:px-5 group-[.toaster]:py-2.5 group-[.toaster]:min-h-0 group-[.toaster]:w-auto group-[.toaster]:max-w-lg group-[.toaster]:gap-3 group-[.toaster]:text-[14px] group-[.toaster]:font-medium transition-all duration-200',
+            'group toast group-[.toaster]:bg-surface-overlay/95 group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-xl group-[.toaster]:backdrop-blur-xl group-[.toaster]:rounded-2xl group-[.toaster]:px-5 group-[.toaster]:py-2.5 group-[.toaster]:min-h-0 group-[.toaster]:w-auto group-[.toaster]:max-w-lg group-[.toaster]:gap-3 group-[.toaster]:text-[14px] group-[.toaster]:font-medium ui-transition duration-200',
           title: 'group-[.toast]:font-medium group-[.toast]:text-[14px] group-[.toast]:leading-snug group-[.toast]:text-foreground group-[.toast]:tracking-normal',
           description: 'group-[.toast]:text-muted-foreground group-[.toast]:text-xs group-[.toast]:leading-normal group-[.toast]:mt-0.5',
           actionButton:

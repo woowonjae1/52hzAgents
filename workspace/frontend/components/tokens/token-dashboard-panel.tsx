@@ -123,7 +123,7 @@ export function TokenDashboardPanel() {
             type="button"
             onClick={fetchStats}
             disabled={loading}
-            className="size-7 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50"
+            className="size-7 rounded-md flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
           </button>
@@ -185,7 +185,7 @@ export function TokenDashboardPanel() {
                   <div
                     key={ch.channel_name}
                     className={cn(
-                      'p-3 rounded-xl border transition-all duration-150',
+                      'p-3 rounded-xl border ui-transition duration-150',
                       isCurrent
                         ? 'border-primary/40 bg-surface1 ring-1 ring-primary/20 shadow-xs'
                         : 'border-border/60 bg-surface1/60 hover:bg-surface1/90'
@@ -249,7 +249,7 @@ export function TokenDashboardPanel() {
                       <div className="mt-2 h-1.5 w-full bg-surface2 rounded-full overflow-hidden">
                         <div
                           className={cn(
-                            'h-full rounded-full transition-all duration-300',
+                            'h-full rounded-full ui-transition duration-300',
                             pct >= 75 ? 'bg-status-danger' : pct >= 50 ? 'bg-status-warning' : 'bg-status-success'
                           )}
                           style={{ width: `${Math.min(Math.max(pct, 2), 100)}%` }}
@@ -278,7 +278,7 @@ export function TokenDashboardPanel() {
                         onClick={() => handleCompact(ch.channel_name)}
                         disabled={isCompactingThis}
                         className={cn(
-                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium transition-all duration-150 cursor-pointer shadow-xs',
+                          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium ui-transition duration-150 shadow-xs',
                           'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed'
                         )}
                       >

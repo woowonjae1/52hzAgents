@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import * as React from 'react';
+import { Hint } from '@/components/ui/hint';
 import {
   Clock,
   ChevronDown,
@@ -73,7 +74,7 @@ export function ToolTimeline({
   return (
     <div
       className={cn(
-        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3 space-y-2.5 transition-all',
+        'my-2 rounded-2xl border border-border bg-surface1/75 backdrop-blur-md p-3 space-y-2.5 ui-transition',
         className
       )}
     >
@@ -81,7 +82,7 @@ export function ToolTimeline({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center justify-between gap-2 text-left cursor-pointer group select-none"
+        className="flex w-full items-center justify-between gap-2 text-left group select-none"
       >
         <div className="flex items-center gap-2 min-w-0">
           <span
@@ -151,9 +152,11 @@ export function ToolTimeline({
               <div className="space-y-1">
                 {stats.map((stat, sIdx) => (
                   <div key={sIdx} className="flex items-center justify-between text-2xs font-mono py-0.5">
-                    <span className="text-foreground-muted truncate mr-2" title={stat.file}>
-                      {stat.file}
-                    </span>
+                    <Hint label={stat.file}>
+                      <span className="text-foreground-muted truncate mr-2" >
+                        {stat.file}
+                      </span>
+                    </Hint>
                     <div className="flex items-center gap-1.5 shrink-0 font-medium tabular-nums">
                       {stat.added !== undefined && stat.added > 0 && (
                         <span className="text-status-success inline-flex items-center gap-0.5">

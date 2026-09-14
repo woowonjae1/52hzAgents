@@ -114,7 +114,7 @@ export function ApprovalCard({
                         'flex w-full items-baseline justify-between gap-2 rounded-base border px-2.5 py-1.5 text-left text-xs transition-colors',
                         isSelected
                           ? 'border-border-accent bg-surface2 text-foreground'
-                          : 'cursor-pointer border-border bg-transparent text-foreground-muted hover:bg-surface2 hover:text-foreground',
+                            : 'border-border bg-transparent text-foreground-muted hover:bg-surface2 hover:text-foreground',
                         status !== 'pending' && 'cursor-default opacity-70'
                       )}
                     >
@@ -167,7 +167,7 @@ export function ApprovalCard({
               className={cn(
                 'rounded-base px-2.5 py-1 text-xs font-medium transition-opacity',
                 isComplete
-                  ? 'cursor-pointer bg-primary text-primary-foreground hover:opacity-90'
+                  ? 'bg-primary text-primary-foreground hover:opacity-90'
                   : 'cursor-not-allowed bg-surface3 text-foreground-extra-muted'
               )}
             >

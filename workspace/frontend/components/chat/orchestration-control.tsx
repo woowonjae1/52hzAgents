@@ -94,7 +94,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
               e.preventDefault();
               selectMode(m.value);
             }}
-            className="flex items-start gap-2 py-2 cursor-pointer"
+            className="flex items-start gap-2 py-2"
           >
             <Icon className="size-3.5 mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -115,7 +115,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
               e.preventDefault();
               setPlanOpen(true);
             }}
-            className="text-xs cursor-pointer"
+            className="text-xs"
           >
             Edit workflow plan…
           </DropdownMenuItem>
@@ -314,7 +314,7 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
                   data-selected={i === mentionIndex ? 'true' : undefined}
                   onClick={() => insertMention(a.agentName)}
                   className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface2 cursor-pointer',
+                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface2',
                     i === mentionIndex && 'bg-surface2',
                   )}
                 >

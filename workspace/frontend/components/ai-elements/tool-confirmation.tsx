@@ -122,7 +122,7 @@ export function ToolConfirmation({
               onClick={handleDenyClick}
               disabled={Boolean(loadingAction)}
               className={cn(
-                'cursor-pointer rounded-base border border-border px-2.5 py-1 text-xs',
+                'rounded-base border border-border px-2.5 py-1 text-xs',
                 'text-destructive transition-colors hover:bg-destructive/10',
                 'disabled:cursor-default disabled:opacity-50'
               )}
@@ -134,7 +134,7 @@ export function ToolConfirmation({
               onClick={handleApproveClick}
               disabled={Boolean(loadingAction)}
               className={cn(
-                'cursor-pointer rounded-base bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground',
+                'rounded-base bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground',
                 'transition-opacity hover:opacity-90',
                 'disabled:cursor-default disabled:opacity-50'
               )}

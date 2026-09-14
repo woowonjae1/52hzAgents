@@ -4,15 +4,20 @@ import { Hint } from '@/components/ui/hint';
 import { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Search, Upload, FolderOpen, Folder, ChevronRight, FolderPlus, Trash2,
-  Download, X,
+  Download, X, Link as LinkIcon,
 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
-import { cn } from '@/lib/utils';
+import { cn, mergeRefs } from '@/lib/utils';
 import { toast } from 'sonner';
 import { workspaceApi } from '@/lib/api';
+import { fileDragProps } from '@/lib/file-drag';
+import { downloadUrl } from '@/lib/download';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PromptDialog } from '@/components/ui/prompt-dialog';
+import { RowActions } from '@/components/ui/row-actions';
+import { useFileSort, sortFiles, SORT_LABELS, type FileSortKey } from '@/lib/file-sort';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { FileEntry } from './file-utils';
 import { formatSize, getFileIconLarge, timeAgo, basename, getEntriesAtPath } from './file-utils';
@@ -40,20 +45,20 @@ function ImageThumbnail({ fileId, filename }: { fileId: string; filename: string
 
 export function FileGrid() {
   const {
-    files: allFiles, selectedFileId, setSelectedFileId, uploadFile, deleteFile,
+    files: allFiles, selectedFileId, setSelectedFileId, uploadFile, deleteFile, deleteFileUndoable,
     currentFilePath, setCurrentFilePath, currentSessionId,
   } = useWorkspace();
-  const { isMobile, openMobileDetail } = useLayout();
+  const { isMobile, openMobileDetail, setActiveRightTab } = useLayout();
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { sort, toggle: toggleSort } = useFileSort('files_grid_sort');
 
   // Multi-selection state
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
 
   // Confirmation dialogs
-  const [singleDeleteTarget, setSingleDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [batchDeleteConfirmOpen, setBatchDeleteConfirmOpen] = useState(false);
   // `window.prompt` blocked the whole tab while it was up. Same dialog the
   // rest of the workspace asks in.
@@ -69,6 +74,9 @@ export function FileGrid() {
   );
 
   const currentPath = currentFilePath;
+  // Keyed by folder: each directory keeps its own scroll position, which is
+  // what a file manager does when you go up and back down again.
+  const scrollRef = useScrollRestore<HTMLDivElement>(`files-grid:${currentPath}`);
   const setCurrentPath = setCurrentFilePath;
 
   const entries = useMemo(() => {
@@ -83,11 +91,19 @@ export function FileGrid() {
     return getEntriesAtPath(files, currentPath);
   }, [files, currentPath, search]);
 
-  // Extract all file entries for range selection and batch actions
-  const fileEntries = useMemo(
-    () => entries.filter((e): e is { type: 'file'; file: WorkspaceFile; displayName: string } => e.type === 'file'),
-    [entries]
-  );
+  /*
+    Files are sorted; folders are not. Folders staying pinned above the files
+    in their own order is what every icon view does — sorting the two together
+    by size or date scatters the directories through the listing.
+  */
+  const fileEntries = useMemo(() => {
+    const files_ = entries.filter(
+      (e): e is { type: 'file'; file: WorkspaceFile; displayName: string } => e.type === 'file',
+    );
+    const sorted = sortFiles(files_.map((e) => e.file), sort);
+    const byId = new Map(files_.map((e) => [e.file.id, e]));
+    return sorted.map((f) => byId.get(f.id)!).filter(Boolean);
+  }, [entries, sort]);
 
   // Clear multi-selection on Escape
   useEffect(() => {
@@ -164,9 +180,12 @@ export function FileGrid() {
 
   const handleCardClick = (e: React.MouseEvent, file: WorkspaceFile, fileIndex: number) => {
     if (e.shiftKey && lastClickedIndex !== null) {
+      // A range REPLACES the selection. Ctrl+Shift is the gesture that adds
+      // to it — see the same note in file-list.tsx.
       const start = Math.min(lastClickedIndex, fileIndex);
       const end = Math.max(lastClickedIndex, fileIndex);
-      const next = new Set(selectedFileIds);
+      const union = e.metaKey || e.ctrlKey;
+      const next = union ? new Set(selectedFileIds) : new Set<string>();
       for (let i = start; i <= end; i++) {
         if (fileEntries[i]) next.add(fileEntries[i].file.id);
       }
@@ -219,14 +238,7 @@ export function FileGrid() {
     const targets = fileEntries.filter((e) => selectedFileIds.has(e.file.id));
     if (targets.length === 0) return;
     targets.forEach((e) => {
-      const url = workspaceApi.getFileUrl(e.file.id);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = basename(e.file.filename);
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadUrl(workspaceApi.getFileUrl(e.file.id), basename(e.file.filename));
     });
     toast.success(`Downloading ${targets.length} file${targets.length > 1 ? 's' : ''}`);
   };
@@ -325,6 +337,7 @@ export function FileGrid() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
+            data-view-search
             className="text-xs bg-transparent flex-1 text-foreground placeholder:text-muted-foreground"
           />
         </div>
@@ -425,7 +438,25 @@ export function FileGrid() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto p-4">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+          {/* Right-click on the blank part of the icon view. */}
+          <RowActions
+            background
+            label="Folder actions"
+            items={[
+              { label: 'New folder…', icon: FolderPlus, onSelect: () => setCreatingFolder(true) },
+              { label: 'Upload file…', icon: Upload, onSelect: () => fileInputRef.current?.click() },
+              { label: 'Select all', icon: Search, onSelect: handleSelectAll, separatorBefore: true },
+              ...(['name', 'size', 'date'] as FileSortKey[]).map((key) => ({
+                label:
+                  sort.key === key
+                    ? `Sort by ${SORT_LABELS[key]} ${sort.direction === 'asc' ? '↑' : '↓'}`
+                    : `Sort by ${SORT_LABELS[key]}`,
+                separatorBefore: key === 'name',
+                onSelect: () => toggleSort(key),
+              })),
+            ]}
+          />
           <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
             {entries.map((entry) => {
               if (entry.type === 'folder') {
@@ -434,7 +465,8 @@ export function FileGrid() {
                     key={`folder:${entry.name}`}
                     type="button"
                     onClick={() => navigateToFolder(entry.name)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-surface2/60 cursor-pointer group"
+                    onDoubleClick={() => navigateToFolder(entry.name)}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-surface2/60 group"
                   >
                     <Folder className="size-12 text-status-warning" />
                     <span className="text-xs font-medium truncate w-full">{entry.name}</span>
@@ -455,7 +487,7 @@ export function FileGrid() {
                 <div
                   key={file.id}
                   className={cn(
-                    'relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors cursor-pointer group select-none',
+                    'skip-offscreen-card relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors group select-none',
                     isBatchSelected
                       ? 'bg-primary/10 ring-2 ring-primary/40'
                       : isSelected
@@ -463,6 +495,21 @@ export function FileGrid() {
                       : 'hover:bg-surface2/60'
                   )}
                   onClick={(e) => handleCardClick(e, file, fileIdx)}
+                  /* Icon views open on double-click; a single click only
+                     selects. This grid opened nothing at all on desktop — the
+                     preview appeared as a side effect of selection on mobile
+                     only — so a double-click landed as two selections. */
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedFileId(file.id);
+                    if (isMobile) openMobileDetail();
+                    else setActiveRightTab('file');
+                  }}
+                  {...fileDragProps({
+                    filename: file.filename,
+                    contentType: file.contentType,
+                    url: workspaceApi.getFileUrl(file.id),
+                  })}
                 >
                   {/* Selection checkbox */}
                   <div
@@ -486,9 +533,11 @@ export function FileGrid() {
                   </div>
 
                   {/* Filename */}
-                  <span className="text-xs font-medium truncate w-full leading-tight" title={displayName}>
-                    {displayName}
-                  </span>
+                  <Hint label={displayName}>
+                    <span className="text-xs font-medium truncate w-full leading-tight" >
+                      {displayName}
+                    </span>
+                  </Hint>
 
                   {/* Metadata */}
                   <span className="text-3xs text-muted-foreground leading-tight">
@@ -496,19 +545,42 @@ export function FileGrid() {
                     {file.createdAt && ` · ${timeAgo(file.createdAt)}`}
                   </span>
 
-                  {/* Delete button on hover */}
-                  <Hint label="Delete">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSingleDeleteTarget({ id: file.id, name: basename(file.filename) });
-                      }}
-                      className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 p-1 rounded-lg bg-card/80 hover:bg-surface3 text-muted-foreground hover:text-destructive transition-all shadow-sm"
-                    >
-                      <Trash2 className="size-3" />
-                    </button>
-                  </Hint>
+                  {/* Was a lone hover-only trash can, which left right-click
+                      on an icon-view tile with nothing to open. */}
+                  <RowActions
+                    label={`Actions for ${basename(file.filename)}`}
+                    className="absolute top-1.5 right-1.5 rounded-lg bg-card/80 shadow-sm"
+                    items={[
+                      {
+                        label: 'Open',
+                        icon: FolderOpen,
+                        onSelect: () => {
+                          setSelectedFileId(file.id);
+                          if (isMobile) openMobileDetail();
+                          else setActiveRightTab('file');
+                        },
+                      },
+                      {
+                        label: 'Download',
+                        icon: Download,
+                        onSelect: () => downloadUrl(workspaceApi.getFileUrl(file.id), basename(file.filename)),
+                      },
+                      {
+                        label: 'Copy link',
+                        icon: LinkIcon,
+                        onSelect: () => {
+                          navigator.clipboard.writeText(workspaceApi.getFileUrl(file.id));
+                          toast.success('Link copied');
+                        },
+                      },
+                      {
+                        label: 'Delete',
+                        icon: Trash2,
+                        destructive: true,
+                        onSelect: () => deleteFileUndoable(file.id, basename(file.filename)),
+                      },
+                    ]}
+                  />
                 </div>
               );
             })}
@@ -516,7 +588,6 @@ export function FileGrid() {
         </div>
       )}
 
-      {/* Single file delete confirmation dialog */}
       <PromptDialog
         open={creatingFolder}
         onOpenChange={setCreatingFolder}
@@ -525,32 +596,6 @@ export function FileGrid() {
         placeholder="designs"
         confirmLabel="Create"
         onSubmit={handleCreateFolder}
-      />
-      <ConfirmDialog
-        open={Boolean(singleDeleteTarget)}
-        onOpenChange={(open) => !open && setSingleDeleteTarget(null)}
-        title="Delete file?"
-        targetName={singleDeleteTarget?.name}
-        description="will be permanently deleted from this workspace. This action cannot be undone."
-        confirmLabel="Delete"
-        variant="destructive"
-        onConfirm={async () => {
-          if (!singleDeleteTarget) return;
-          try {
-            await deleteFile(singleDeleteTarget.id);
-            toast.success(`Deleted ${singleDeleteTarget.name}`);
-            if (selectedFileId === singleDeleteTarget.id) {
-              setSelectedFileId(null);
-            }
-            if (selectedFileIds.has(singleDeleteTarget.id)) {
-              const next = new Set(selectedFileIds);
-              next.delete(singleDeleteTarget.id);
-              setSelectedFileIds(next);
-            }
-          } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Delete failed');
-          }
-        }}
       />
 
       {/* Batch delete confirmation dialog */}

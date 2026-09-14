@@ -15,6 +15,7 @@
  */
 
 import { AlertCircle, BookOpen, Check, FileText, RefreshCw, UploadCloud } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -412,7 +413,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
   const errorCount = docs.filter((d) => d.error).length;
 
   const selectClass =
-    'cursor-pointer rounded-lg border border-border bg-surface1 px-2 py-1 text-xs text-foreground shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
+  'rounded-lg border border-border bg-surface1 px-2 py-1 text-xs text-foreground shadow-sm ui-transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30';
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v && !importing) onClose(); }}>
@@ -449,7 +450,7 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.25, delay: reduceMotion ? 0 : Math.min(index, 12) * 0.03 }}
                       className={cn(
-                        'flex items-start gap-3 rounded-xl border bg-surface1 p-4 shadow-sm transition-all duration-200 hover:shadow-md',
+                        'flex items-start gap-3 rounded-xl border bg-surface1 p-4 shadow-sm ui-transition duration-200 hover:shadow-md',
                         doc.error
                           ? 'border-status-danger/25'
                           : 'border-border',
@@ -506,26 +507,32 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
                       {!doc.error && (
                         <div className="shrink-0">
                           {doc.conflict ? (
-                            <select
+                            <Select
                               value={doc.action}
-                              onChange={(e) => setAction(doc.key, e.target.value as ImportAction)}
-                              className={selectClass}
-                              aria-label={`Action for ${doc.fileName}`}
+                              onValueChange={(v) => setAction(doc.key, v as ImportAction)}
                             >
-                              <option value="overwrite">Replace</option>
-                              <option value="create">Keep both</option>
-                              <option value="skip">Skip</option>
-                            </select>
+                              <SelectTrigger size="sm" className={selectClass} aria-label={`Action for ${doc.fileName}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="overwrite">Replace</SelectItem>
+                                <SelectItem value="create">Keep both</SelectItem>
+                                <SelectItem value="skip">Skip</SelectItem>
+                              </SelectContent>
+                            </Select>
                           ) : (
-                            <select
+                            <Select
                               value={doc.action}
-                              onChange={(e) => setAction(doc.key, e.target.value as ImportAction)}
-                              className={selectClass}
-                              aria-label={`Action for ${doc.fileName}`}
+                              onValueChange={(v) => setAction(doc.key, v as ImportAction)}
                             >
-                              <option value="create">Add</option>
-                              <option value="skip">Skip</option>
-                            </select>
+                              <SelectTrigger size="sm" className={selectClass} aria-label={`Action for ${doc.fileName}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="create">Add</SelectItem>
+                                <SelectItem value="skip">Skip</SelectItem>
+                              </SelectContent>
+                            </Select>
                           )}
                         </div>
                       )}

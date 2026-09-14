@@ -111,6 +111,39 @@ function persistWindowState(win) {
   } catch {}
 }
 
+/**
+ * ZOOM SURVIVES A RESTART.
+ *
+ * The View menu has Ctrl/Cmd +, - and 0, and they worked — for exactly as long
+ * as the window stayed open. Nothing read the level back, so every launch
+ * started at 100% and a user who had zoomed for a reason (a high-DPI display,
+ * eyesight, a projector) re-did it every single time. Window size and position
+ * were already persisted right next to this; zoom was the one piece of window
+ * state that was not.
+ *
+ * Stored in the same file as the bounds, so there is one place that answers
+ * "what did this window look like last time".
+ */
+const ZOOM_STATE_FILE = path.join(app.getPath('userData'), 'zoom-state.json');
+
+function readZoomLevel() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(ZOOM_STATE_FILE, 'utf8'));
+    const level = Number(raw.zoomLevel);
+    // Clamp to what the menu can reach. A corrupt file must not be able to
+    // open the app at a zoom level with no visible way back.
+    return Number.isFinite(level) ? Math.max(-5, Math.min(5, level)) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function persistZoomLevel(level) {
+  try {
+    fs.writeFileSync(ZOOM_STATE_FILE, JSON.stringify({ zoomLevel: level }));
+  } catch {}
+}
+
 /** Trailing-edge debounce: resize/move fire continuously while dragging. */
 function debounce(fn, ms) {
   let t = null;
@@ -430,6 +463,99 @@ function ensureDevStackRunning() {
   });
 }
 
+/**
+ * The tray menu is REBUILT, not built once.
+ *
+ * The "Start at login" checkbox read `app.getLoginItemSettings()` at the
+ * moment the menu was constructed — at startup, once, for the life of the
+ * process. Settings → General changes the same setting through
+ * `app-set-autostart`, so after using it the tray showed the opposite of the
+ * truth until the app was restarted. Two controls for one value, and one of
+ * them lying.
+ *
+ * Strings are English because every other surface in this application is.
+ */
+function buildTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: 'Show 52hzAgent Studio',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      },
+    },
+    {
+      label: 'Quick Bar',
+      accelerator: 'Alt+Space',
+      click: () => toggleQuickBar(),
+    },
+    { type: 'separator' },
+    {
+      label: 'Start at login',
+      type: 'checkbox',
+      checked: app.getLoginItemSettings().openAtLogin,
+      click: (item) => {
+        app.setLoginItemSettings({ openAtLogin: item.checked });
+        // Re-read rather than trusting the click: the OS can refuse.
+        buildTrayMenu();
+      },
+    },
+    ...(isPackaged ? [] : [
+      { type: 'separator' },
+      { label: 'Reload window', click: () => mainWindow?.reload() },
+      { label: 'Developer tools', click: () => mainWindow?.webContents.toggleDevTools() },
+    ]),
+    { type: 'separator' },
+    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
+  ]));
+}
+
+/**
+ * 24. THE UNREAD COUNT HAS TO LEAVE THE WINDOW.
+ *
+ * `unreadNotificationCount` was computed, rendered in the Inbox header, and
+ * went no further. Minimised to the tray — which is where this app spends most
+ * of its life, since closing the window hides it — there was no way to learn
+ * that an agent was waiting on an approval short of reopening the window and
+ * looking.
+ *
+ * Three surfaces, because no single one exists everywhere: `setBadgeCount` is
+ * the dock badge on macOS and Linux, `setOverlayIcon` is the taskbar corner on
+ * Windows, and the tray tooltip is the fallback that works on all three. The
+ * overlay image is drawn by the RENDERER and arrives here as a data URL —
+ * the main process has no canvas, and a pre-baked dot cannot show a number.
+ */
+function applyUnreadCount(count, overlayDataUrl) {
+  const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+
+  try {
+    app.setBadgeCount(n);
+  } catch (e) {
+    // Unsupported on some Linux desktops; not worth a log line per update.
+  }
+
+  if (tray && !tray.isDestroyed()) {
+    tray.setToolTip(n > 0 ? `52hzAgent Studio — ${n} unread` : '52hzAgent Studio');
+  }
+
+  if (process.platform !== 'win32' || !mainWindow || mainWindow.isDestroyed()) return;
+  try {
+    if (n === 0 || !overlayDataUrl) {
+      mainWindow.setOverlayIcon(null, '');
+      return;
+    }
+    const { nativeImage } = require('electron');
+    const image = nativeImage.createFromDataURL(overlayDataUrl);
+    if (image.isEmpty()) return;
+    mainWindow.setOverlayIcon(image, `${n} unread`);
+  } catch (e) {
+    console.warn('[52hzAgents] overlay icon failed:', e.message);
+  }
+}
+
 function createTray() {
   try {
     const { nativeImage } = require('electron');
@@ -448,54 +574,19 @@ function createTray() {
     tray = new Tray(trayIcon);
     tray.setToolTip('52hzAgent Studio');
 
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: '显示 52hzAgent Studio',
-        click: () => {
-          if (mainWindow) {
-            mainWindow.show();
-            mainWindow.focus();
-          }
-        },
-      },
-      {
-        label: '呼出 Quick Bar (Alt+Space)',
-        click: () => {
-          toggleQuickBar();
-        },
-      },
-      { type: 'separator' },
-      {
-        label: '开机自动启动',
-        type: 'checkbox',
-        checked: app.getLoginItemSettings().openAtLogin,
-        click: (item) => {
-          app.setLoginItemSettings({ openAtLogin: item.checked });
-        },
-      },
-      {
-        label: '刷新界面 (F5)',
-        click: () => {
-          if (mainWindow) mainWindow.reload();
-        },
-      },
-      {
-        label: '开发者工具 (F12)',
-        click: () => {
-          if (mainWindow) mainWindow.webContents.toggleDevTools();
-        },
-      },
-      { type: 'separator' },
-      {
-        label: '退出应用',
-        click: () => {
-          isQuitting = true;
-          app.quit();
-        },
-      },
-    ]);
+    buildTrayMenu();
 
-    tray.setContextMenu(contextMenu);
+    // Windows opens a tray app on a single click; the double-click binding
+    // below is the macOS/Linux idiom and was the only one here, so on Windows
+    // clicking the icon appeared to do nothing.
+    if (process.platform === 'win32') {
+      tray.on('click', () => {
+        if (!mainWindow) return;
+        mainWindow.show();
+        mainWindow.focus();
+      });
+    }
+
     tray.on('double-click', () => {
       if (mainWindow) {
         if (mainWindow.isVisible()) {
@@ -554,6 +645,30 @@ function createMainWindow() {
   });
 
   if (windowState.maximized) mainWindow.maximize();
+
+  /*
+    Applied on every completed load, not once after the first: `setZoomLevel`
+    is per-frame-origin and Chromium resets it on navigation, so a reload or a
+    route change inside the app would otherwise snap back to 100%.
+  */
+  mainWindow.webContents.on('did-finish-load', () => {
+    try {
+      mainWindow.webContents.setZoomLevel(readZoomLevel());
+    } catch (e) {}
+  });
+
+  const saveZoom = debounce(() => {
+    try {
+      persistZoomLevel(mainWindow.webContents.getZoomLevel());
+    } catch (e) {}
+  }, 400);
+  mainWindow.webContents.on('zoom-changed', saveZoom);
+  // The menu roles change the zoom without emitting `zoom-changed` (that event
+  // is for ctrl+wheel only), so the accelerators are sampled on their own.
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (!(input.control || input.meta) || input.type !== 'keyUp') return;
+    if (['=', '+', '-', '_', '0'].includes(input.key)) saveZoom();
+  });
 
   const saveState = debounce(() => persistWindowState(mainWindow), 400);
   mainWindow.on('resize', saveState);
@@ -640,23 +755,79 @@ function createMainWindow() {
     accelerators live without drawing a menu bar inside our titlebar.
   */
   const isMac = process.platform === 'darwin';
+
+  /*
+    MENU ITEMS THAT ARE THIS APPLICATION, not Chromium.
+
+    Every entry below was previously a Chromium `role` — zoom, fullscreen,
+    window. Nothing the app itself can do appeared anywhere in the menu, which
+    on macOS (where the bar is always drawn) read as an empty shell.
+
+    `registerAccelerator: false` is the load-bearing flag. These keys are
+    already bound in the renderer (components/layout/global-shortcuts.tsx),
+    which owns the context needed to decide what "close the topmost panel"
+    means. Registering them here too would take the key away from that handler
+    and route it through IPC instead — two implementations of one binding, and
+    the menu's would win silently. With the flag off the item still PRINTS the
+    accelerator, which is the whole point of putting it in a menu, and clicking
+    it still works. The key itself stays where it was.
+  */
+  const command = (label, id, accelerator) => ({
+    label,
+    ...(accelerator ? { accelerator, registerAccelerator: false } : {}),
+    click: () => mainWindow?.webContents.send('menu-command', id),
+  });
+
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     ...(isMac ? [{ role: 'appMenu' }] : []),
     {
       label: 'File',
-      // Deliberately no New Chat item. A CmdOrCtrl+N accelerator here would
-      // fire before the renderer's keydown handler and shadow the in-page
-      // Ctrl+N the sidebar advertises.
-      submenu: [isMac ? { role: 'close' } : { role: 'quit' }],
+      submenu: [
+        // No accelerator: Chrome and Safari reserve CmdOrCtrl+N for a new
+        // window and will not let the page cancel it, so the renderer binds
+        // plain `C` instead and this item is the discoverable half of that.
+        command('New Chat', 'new-chat'),
+        command('Command Palette…', 'palette', 'CmdOrCtrl+K'),
+        { type: 'separator' },
+        command('Settings…', 'settings', 'CmdOrCtrl+,'),
+        { type: 'separator' },
+        isMac ? { role: 'close' } : { role: 'quit' },
+      ],
     },
     { role: 'editMenu' },
     {
+      label: 'Go',
+      submenu: [
+        command('Threads', 'go:threads'),
+        command('Tasks', 'go:tasks'),
+        command('Agent Dashboard', 'go:mission'),
+        command('Files', 'go:files'),
+        command('Knowledge', 'go:knowledge'),
+        command('Skills', 'go:skills'),
+        command('Routines', 'go:routines'),
+        command('Inbox', 'go:inbox'),
+        command('Browser', 'go:browser'),
+      ],
+    },
+    {
       label: 'View',
       submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
+        /*
+          Reload, Force Reload and Inspect are DEVELOPMENT items.
+
+          A shipped desktop application has no "reload the page", because it
+          has no page — offering one tells the user this is a browser in a
+          costume, and gives them a way to throw away in-flight state that no
+          native app would. The right-click menu already gated Inspect Element
+          on `!isPackaged`; the View menu did not, so F5 and Ctrl+R stayed live
+          in the build users actually run.
+        */
+        ...(isPackaged ? [] : [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+        ]),
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         // Ctrl+- only reaches the app as Ctrl+Shift+- on some layouts, so the
@@ -664,10 +835,17 @@ function createMainWindow() {
         { role: 'zoomOut' },
         { role: 'zoomOut', accelerator: 'CmdOrCtrl+Shift+-', visible: false },
         { type: 'separator' },
+        command('Toggle Sidebar', 'toggle-sidebar', 'CmdOrCtrl+B'),
+        command('Toggle Studio Panel', 'toggle-studio', 'CmdOrCtrl+\\'),
+        { type: 'separator' },
         { role: 'togglefullscreen' },
       ],
     },
     { role: 'windowMenu' },
+    {
+      label: 'Help',
+      submenu: [command('Keyboard Shortcuts', 'shortcuts', '?')],
+    },
   ]));
   if (!isMac) {
     mainWindow.setAutoHideMenuBar(true);
@@ -737,6 +915,8 @@ function createMainWindow() {
 
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
+    // Same rule as the View menu above: a packaged build has no devtools key.
+    if (isPackaged) return;
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
       mainWindow.webContents.toggleDevTools();
     }
@@ -815,12 +995,91 @@ function createMainWindow() {
         url.includes('localhost:3005') ||
         url.includes('/api/files/');
       if (isInternal) {
+        /*
+          THIS BRANCH USED TO BE A SILENT DEAD END.
+
+          `deny` with nothing after it is what made the file preview's Download
+          button do literally nothing in the desktop build: the renderer called
+          `window.open('http://127.0.0.1:8000/v1/files/<id>?token=…')`, this
+          matched `isInternal`, the window was denied, and no download, error
+          or toast followed. In a browser tab the same code worked, which is
+          exactly why it survived.
+
+          Opening an app URL in a new window is still wrong — there is no
+          browser chrome to put it in, and the URL carries the session token.
+          So it is turned into what the caller actually meant: a download,
+          which `will-download` below hands to a native Save As dialog.
+        */
+        try {
+          mainWindow.webContents.downloadURL(url);
+        } catch (e) {
+          console.error('[52hzAgents] internal downloadURL failed:', e);
+        }
         return { action: 'deny' };
       }
       shell.openExternal(url);
       return { action: 'deny' };
     }
     return { action: 'deny' };
+  });
+
+  /*
+    DOWNLOADS ARE A NATIVE OPERATION.
+
+    Every "export", "download" and "save" in this app built an `<a download>`
+    and clicked it. In a browser that is correct. In a window with no download
+    shelf, no downloads page and no Ctrl+J, the file lands somewhere the user
+    cannot see, with no confirmation that anything happened at all — the click
+    produces silence, twice over, because the in-app toast says "Downloading"
+    and then nothing ever says "done".
+
+    Electron prompts for a save location on its own when `setSavePath` is not
+    called; what it does not do is tell the renderer how it went. So: give the
+    dialog a sensible default name, and report the outcome back with the final
+    path, which is what lets the toast offer "Show in folder" — the one gesture
+    that makes a saved file feel like it exists.
+  */
+  mainWindow.webContents.session.on('will-download', (_event, item) => {
+    const filename = item.getFilename();
+    try {
+      item.setSaveDialogOptions({
+        defaultPath: path.join(app.getPath('downloads'), filename),
+      });
+    } catch (e) {
+      // Older Electron, or a download the dialog cannot describe. The default
+      // routine still prompts; only the pre-filled name is lost.
+    }
+
+    const send = (channel, payload) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(channel, payload);
+      }
+    };
+
+    item.on('updated', (_e, state) => {
+      if (state !== 'progressing') return;
+      const total = item.getTotalBytes();
+      send('download-progress', {
+        filename,
+        received: item.getReceivedBytes(),
+        total,
+        // -1 rather than a fake 0: a server that sends no Content-Length gives
+        // a total of 0, and a progress bar stuck at 0% reads as a hang.
+        percent: total > 0 ? Math.round((item.getReceivedBytes() / total) * 100) : -1,
+      });
+    });
+
+    item.once('done', (_e, state) => {
+      if (state === 'completed') {
+        send('download-complete', { filename, savePath: item.getSavePath() });
+      } else if (state === 'cancelled') {
+        // A cancelled download is the user closing the Save dialog. That is an
+        // answer, not a failure, and must not raise an error toast.
+        send('download-cancelled', { filename });
+      } else {
+        send('download-failed', { filename, state });
+      }
+    });
   });
 
   mainWindow.on('close', (event) => {
@@ -1004,7 +1263,15 @@ ipcMain.on('main-window-open', (event, route) => {
 ipcMain.handle('app-get-autostart', () => app.getLoginItemSettings().openAtLogin);
 ipcMain.handle('app-set-autostart', (event, enabled) => {
   app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+  // The tray shows the same checkbox. Without this it keeps the value it read
+  // at startup and disagrees with Settings for the rest of the session.
+  buildTrayMenu();
   return app.getLoginItemSettings().openAtLogin;
+});
+
+ipcMain.on('set-unread-count', (_event, payload) => {
+  const { count, overlayDataUrl } = payload || {};
+  applyUnreadCount(count, overlayDataUrl);
 });
 
 // Instant Native Folder Picker (0ms delay using Win32 IFileDialog via Electron C++ API)

@@ -75,7 +75,7 @@ export function ToolCall({
   return (
     <div
       className={cn(
-        'my-1.5 rounded-xl border border-border bg-surface1/60 overflow-hidden transition-all',
+        'my-1.5 rounded-xl border border-border bg-surface1/60 overflow-hidden ui-transition',
         className
       )}
     >
@@ -85,7 +85,7 @@ export function ToolCall({
         disabled={!hasContent}
         className={cn(
           'flex w-full items-center justify-between gap-2 px-3 py-2 text-left select-none transition-colors',
-          hasContent ? 'cursor-pointer hover:bg-surface2/60' : 'cursor-default'
+          hasContent ? 'hover:bg-surface2/60': 'cursor-default'
         )}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -143,7 +143,7 @@ export function ToolCall({
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
                     }}
-                    className="hover:text-foreground transition-colors p-0.5 rounded cursor-pointer"
+                    className="hover:text-foreground transition-colors p-0.5 rounded"
                   >
                     {copied ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5" />}
                   </button>

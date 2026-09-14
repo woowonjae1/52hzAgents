@@ -299,7 +299,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                   toast.success('Code copied to clipboard');
                 }
               }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors cursor-pointer text-3xs font-sans font-medium"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors text-3xs font-sans font-medium"
             >
               <span>Copy</span>
             </button>
@@ -337,7 +337,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
                 a.download = '';
                 a.click();
               }}
-              className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
+              className="text-primary underline underline-offset-2 hover:text-primary/80 text-left"
             >
               {children}
             </button>
@@ -405,7 +405,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             <button
               type="button"
               onClick={() => void openLocal()}
-              className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer text-left"
+              className="text-primary underline underline-offset-2 hover:text-primary/80 text-left"
             >
               {children}
             </button>
@@ -426,7 +426,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
           }}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline underline-offset-2 hover:text-primary/80 cursor-pointer"
+          className="text-primary underline underline-offset-2 hover:text-primary/80"
         >
           {children}
         </a>

@@ -58,7 +58,7 @@ export function RealtimeStatus() {
           setRetrying(true);
           reconnectRealtime();
         }}
-        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-medium text-foreground hover:bg-surface2 disabled:opacity-50 transition-colors cursor-pointer"
+        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-2xs font-medium text-foreground hover:bg-surface2 disabled:opacity-50 transition-colors"
       >
         <RefreshCw className={cn('size-3', (connecting || retrying) && 'animate-spin')} />
         Retry

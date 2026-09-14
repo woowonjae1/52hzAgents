@@ -3,6 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, Trash2, Plus, ArrowLeft, History } from 'lucide-react';
+import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
@@ -70,7 +71,7 @@ export function RoutineList() {
             <button
               type="button"
               onClick={() => setViewMode('threads')}
-              className="p-1 -ml-1 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+              className="p-1 -ml-1 rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
               <ArrowLeft className="size-3.5" />
               <span className="text-xs font-medium">Back</span>
@@ -88,7 +89,7 @@ export function RoutineList() {
             <button
               type="button"
               onClick={() => setShowCreateDialog(true)}
-              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             >
               <Plus className="size-3.5" />
             </button>
@@ -97,7 +98,7 @@ export function RoutineList() {
             <button
               type="button"
               onClick={refreshRoutines}
-              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors cursor-pointer"
+              className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             >
               <RefreshCw className="size-3.5" />
             </button>
@@ -149,16 +150,14 @@ export function RoutineList() {
                         <History className="size-3.5" />
                       </button>
                     </Hint>
-                    <Hint label="Delete schedule">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setDeletingRoutine(routine); }}
-                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </Hint>
                   </div>
+                  <RowActions
+                    label={`Actions for ${routine.name}`}
+                    items={[
+                      { label: 'Run history', icon: History, onSelect: () => setHistoryRoutine(routine) },
+                      { label: 'Delete schedule', icon: Trash2, destructive: true, onSelect: () => setDeletingRoutine(routine) },
+                    ]}
+                  />
                 </button>
               );
             })}

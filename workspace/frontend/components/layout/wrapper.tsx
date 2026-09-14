@@ -31,7 +31,12 @@ import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 import { CommandPalette } from './command-palette';
 import { GlobalShortcuts } from './global-shortcuts';
+import { useSplitter } from '@/hooks/use-splitter';
+import { DesktopIntegration } from './desktop-integration';
 import { RealtimeStatus } from './realtime-status';
+import { WindowTitle } from './window-title';
+import { ErrorLogDialog } from './error-log-dialog';
+import { installErrorCapture } from '@/lib/error-log';
 import { AppTitlebar } from './app-titlebar';
 import { useIsDesktop } from '@/lib/desktop';
 
@@ -71,6 +76,11 @@ function WorkspaceLoadingScreen() {
 const MIN_DOCKED_WIDTH = 680;
 
 export function Wrapper() {
+  /* Route every error toast into the log the Recent Errors dialog reads.
+     Here rather than in a provider because this is the one component that
+     mounts for every workspace route and exactly once. */
+  React.useEffect(() => { installErrorCapture(); }, []);
+
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading, workspace } = useWorkspace();
   const { activeArtifact, isCanvasOpen, closeCanvas } = useArtifacts();
@@ -79,51 +89,23 @@ export function Wrapper() {
   const desktopContainerRef = React.useRef<HTMLDivElement>(null);
   const narrowStateRef = React.useRef<boolean | null>(null);
 
-  // Studio width & drag-to-resize logic
-  const [studioWidth, setStudioWidth] = React.useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('studio_panel_width');
-        if (saved) return Math.max(380, Math.min(900, parseInt(saved, 10)));
-      } catch {}
-    }
-    return 480;
+  /*
+    Studio width. This was 45 lines of mousedown/mousemove bookkeeping, and the
+    drag froze the moment the pointer entered the panel's own iframe — see
+    hooks/use-splitter.ts for why, and for the pointer-capture fix.
+  */
+  const {
+    width: studioWidth,
+    isResizing: isStudioResizing,
+    separatorProps: studioSeparatorProps,
+  } = useSplitter({
+    min: 380,
+    max: () => (typeof window !== 'undefined' ? Math.max(400, window.innerWidth - 380) : 900),
+    defaultWidth: 480,
+    storageKey: 'studio_panel_width',
+    edge: 'end',
+    label: 'Resize Studio panel',
   });
-  const [isStudioResizing, setIsStudioResizing] = React.useState(false);
-  const studioWidthRef = React.useRef(studioWidth);
-  studioWidthRef.current = studioWidth;
-
-  const startStudioResize = React.useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsStudioResizing(true);
-  }, []);
-
-  React.useEffect(() => {
-    if (!isStudioResizing) return;
-    const onMove = (e: MouseEvent) => {
-      const maxAllowed = typeof window !== 'undefined' ? Math.max(400, window.innerWidth - 380) : 900;
-      const newWidth = Math.min(maxAllowed, Math.max(380, window.innerWidth - e.clientX));
-      setStudioWidth(newWidth);
-    };
-    const onUp = () => {
-      setIsStudioResizing(false);
-      try {
-        localStorage.setItem('studio_panel_width', studioWidthRef.current.toString());
-      } catch {}
-    };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    const prevCursor = document.body.style.cursor;
-    const prevSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = prevCursor;
-      document.body.style.userSelect = prevSelect;
-    };
-  }, [isStudioResizing]);
 
   const isStudioOpen =
     !isDetailExpanded &&
@@ -235,7 +217,10 @@ export function Wrapper() {
           )}
         </div>
         <GlobalShortcuts />
+        <DesktopIntegration />
         <RealtimeStatus />
+        <WindowTitle />
+        <ErrorLogDialog />
         <NewThreadDialogHost />
       </div>
     );
@@ -263,7 +248,7 @@ export function Wrapper() {
           {shouldShowSidebar && (
             <div
               data-sidebar-sized
-              /* `transition-[width]`, not `transition-all`: the only property
+              /* `transition-[width]`, not `ui-transition`: the only property
                  that ever changes here is the width, and `all` puts every
                  animatable property of a flex sibling on a 300ms clock. */
               className={cn('shrink-0', !isSidebarResizing && 'transition-[width] duration-300')}
@@ -283,19 +268,20 @@ export function Wrapper() {
               {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
               <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", undefined)}>
                 {!isSidebarOpen && !isSettings && viewMode !== 'threads' && (
-                  <button
-                    onClick={sidebarToggle}
-                    /* `backdrop-blur` (bare) was the one site not on the blur
-                       ramp — it reads `--blur`, which is still Tailwind's 8px.
-                       `hover:scale-105` and `transition-all` went with it: a
-                       chrome button that grows under the cursor is a web
-                       affordance, and a desktop tool answers a hover with
-                       colour, not with size. */
-                    className="absolute top-4 left-3.5 z-30 size-8 rounded-lg bg-surface2/90 backdrop-blur-sm border border-border text-foreground-muted hover:text-foreground hover:bg-surface3/90 shadow-sm flex items-center justify-center transition-colors cursor-pointer"
-                    title="Expand sidebar"
-                  >
-                    <PanelLeft className="size-4" />
-                  </button>
+                  <Hint label="Expand sidebar" side="right">
+                    <button
+                      onClick={sidebarToggle}
+                      /* `backdrop-blur` (bare) was the one site not on the blur
+                         ramp — it reads `--blur`, which is still Tailwind's 8px.
+                         `hover:scale-105` and `transition-all` went with it: a
+                         chrome button that grows under the cursor is a web
+                         affordance, and a desktop tool answers a hover with
+                         colour, not with size. */
+                         className="absolute top-4 left-3.5 z-30 size-8 rounded-lg bg-surface2/90 backdrop-blur-sm border border-border text-foreground-muted hover:text-foreground hover:bg-surface3/90 shadow-sm flex items-center justify-center transition-colors"
+                    >
+                      <PanelLeft className="size-4" />
+                    </button>
+                  </Hint>
                 )}
                 {/* Keep ChatView alive in DOM to prevent SSE disconnection, dropped messages, and re-fetch flicker */}
                 <div className={cn("h-full w-full", viewMode !== 'threads' && "hidden")}>
@@ -328,18 +314,19 @@ export function Wrapper() {
                   )}
                 >
                   {/* Left Drag-to-Resize Handle */}
-                  <div
-                    onMouseDown={startStudioResize}
-                    className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none"
-                    title="Drag to resize Studio"
-                  >
-                    <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
-                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
-                      <div className="size-1 rounded-full bg-foreground-extra-muted" />
-                      <div className="size-1 rounded-full bg-foreground-extra-muted" />
-                      <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                  <Hint label="Drag to resize · double-click to reset" side="left">
+                    <div
+                      {...studioSeparatorProps}
+                      className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none focus-visible:outline-none focus-visible:bg-primary/40"
+                    >
+                      <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
+                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
+                        <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                        <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                        <div className="size-1 rounded-full bg-foreground-extra-muted" />
+                      </div>
                     </div>
-                  </div>
+                  </Hint>
 
                   {/* Studio Header Bar (Rendered when not in canvas mode; Canvas provides its own unified 38px header) */}
                   {effectiveStudioTab !== 'canvas' && (
@@ -349,7 +336,7 @@ export function Wrapper() {
                           <button
                             type="button"
                             onClick={() => setActiveRightTab('canvas')}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2"
                           >
                             <FileText className="size-3.5" />
                             <span>Canvas</span>
@@ -359,7 +346,7 @@ export function Wrapper() {
                           type="button"
                           onClick={() => setActiveRightTab('preview')}
                           className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0",
                             (effectiveStudioTab === 'preview' || effectiveStudioTab === 'browser')
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
@@ -372,7 +359,7 @@ export function Wrapper() {
                           type="button"
                           onClick={() => setActiveRightTab('trace')}
                           className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors cursor-pointer shrink-0",
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0",
                             effectiveStudioTab === 'trace'
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
@@ -388,7 +375,7 @@ export function Wrapper() {
                           <button
                             type="button"
                             onClick={handleCloseStudio}
-                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
                           >
                             <X className="size-3.5" />
                           </button>
@@ -412,7 +399,10 @@ export function Wrapper() {
         </div>
       </div>
       <GlobalShortcuts />
+      <DesktopIntegration />
       <RealtimeStatus />
+      <WindowTitle />
+      <ErrorLogDialog />
       <NewThreadDialogHost />
       <DropzoneOverlay />
       <CommandPalette />

@@ -25,6 +25,9 @@ export type ShortcutGroup =
   | 'General'
   | 'Navigation'
   | 'Threads'
+  | 'Browser'
+  | 'Terminal'
+  | 'Lists'
   | 'Panels';
 
 export interface ShortcutSpec {
@@ -60,6 +63,8 @@ export const SHORTCUTS: ShortcutSpec[] = [
   // ── General ──
   { id: 'palette', group: 'General', label: 'Command palette', keys: ['Mod', 'K'] },
   { id: 'help', group: 'General', label: 'Keyboard shortcuts', keys: ['?'] },
+  { id: 'help-f1', group: 'General', label: 'Keyboard shortcuts', keys: ['F1'] },
+  { id: 'find', group: 'General', label: 'Search the current view', keys: ['Mod', 'F'] },
   { id: 'new-chat', group: 'General', label: 'New chat', keys: ['C'] },
   { id: 'settings', group: 'General', label: 'Settings', keys: ['Mod', ','] },
   { id: 'theme', group: 'General', label: 'Toggle light / dark', keys: ['Mod', 'Shift', 'L'] },
@@ -72,6 +77,8 @@ export const SHORTCUTS: ShortcutSpec[] = [
     keys: ['G', 'then', 'key'],
   },
   { id: 'thread-n', group: 'Navigation', label: 'Open the Nth thread', keys: ['1'], scope: 'Thread list' },
+  { id: 'nav-back', group: 'Navigation', label: 'Back', keys: ['Alt', '←'] },
+  { id: 'nav-forward', group: 'Navigation', label: 'Forward', keys: ['Alt', '→'] },
 
   // ── Threads ──
   { id: 'thread-next', group: 'Threads', label: 'Next thread', keys: ['J'], scope: 'Thread list' },
@@ -81,6 +88,26 @@ export const SHORTCUTS: ShortcutSpec[] = [
   { id: 'send', group: 'Threads', label: 'Send message', keys: ['Enter'], scope: 'Message box' },
   { id: 'newline', group: 'Threads', label: 'New line', keys: ['Shift', 'Enter'], scope: 'Message box' },
   { id: 'edit-last', group: 'Threads', label: 'Edit your last message', keys: ['↑'], scope: 'Empty message box' },
+
+  // ── Lists ──
+  // Implemented once, in hooks/use-list-keyboard-nav.ts, for every list that
+  // adopts it. Listed here because a key nobody knows about is not a feature.
+  { id: 'list-move', group: 'Lists', label: 'Move the cursor', keys: ['↑'], scope: 'Any list' },
+  { id: 'list-jump', group: 'Lists', label: 'First / last row', keys: ['Home'], scope: 'Any list' },
+  { id: 'list-page', group: 'Lists', label: 'Page up / down', keys: ['PageUp'], scope: 'Any list' },
+  { id: 'list-extend', group: 'Lists', label: 'Extend the selection', keys: ['Shift', '↑'], scope: 'Any list' },
+  { id: 'list-open', group: 'Lists', label: 'Open the row', keys: ['Enter'], scope: 'Any list' },
+  { id: 'list-toggle', group: 'Lists', label: 'Add the row to the selection', keys: ['Space'], scope: 'Any list' },
+  { id: 'list-delete', group: 'Lists', label: 'Delete the row', keys: ['Delete'], scope: 'Any list' },
+
+  // ── Browser ──
+  { id: 'tab-close', group: 'Browser', label: 'Close the current tab', keys: ['Mod', 'W'], scope: 'Browser' },
+  { id: 'tab-next', group: 'Browser', label: 'Next / previous tab', keys: ['Ctrl', 'Tab'], scope: 'Browser' },
+
+  // ── Terminal ──
+  { id: 'term-cancel', group: 'Terminal', label: 'Abandon the current line', keys: ['Ctrl', 'C'], scope: 'Terminal' },
+  { id: 'term-clear', group: 'Terminal', label: 'Clear the screen', keys: ['Ctrl', 'L'], scope: 'Terminal' },
+  { id: 'term-kill', group: 'Terminal', label: 'Clear the line', keys: ['Ctrl', 'U'], scope: 'Terminal' },
 
   // ── Panels ──
   { id: 'sidebar', group: 'Panels', label: 'Toggle sidebar', keys: ['Mod', 'B'] },

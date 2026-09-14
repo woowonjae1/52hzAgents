@@ -43,7 +43,7 @@ export function TerminalBlock({
   return (
     <div
       className={cn(
-        'my-2 rounded-2xl overflow-hidden border shadow-xs transition-all font-mono',
+        'my-2 rounded-2xl overflow-hidden border shadow-xs ui-transition font-mono',
         isInk
           ? 'bg-neutral-950 text-neutral-200 border-neutral-800'
           : 'bg-surface1/90 text-foreground border-border backdrop-blur-md',
@@ -99,7 +99,7 @@ export function TerminalBlock({
               onCopy?.();
             }}
             className={cn(
-              'p-1 rounded transition-colors cursor-pointer',
+              'p-1 rounded transition-colors',
               isInk ? 'hover:bg-neutral-800 text-neutral-400' : 'hover:bg-surface3 text-foreground-muted'
             )}
           >

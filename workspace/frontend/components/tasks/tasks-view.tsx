@@ -1,6 +1,8 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { useListKeyboardNav } from '@/hooks/use-list-keyboard-nav';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDown,
@@ -15,6 +17,7 @@ import {
   ListTodo,
   MessageSquare,
   Pencil,
+  Copy,
   Plus,
   RefreshCw,
   Search,
@@ -30,10 +33,12 @@ import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
-import { cn } from '@/lib/utils';
+import { cn, mergeRefs } from '@/lib/utils';
 import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
 import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
 import { PrioritySelector } from './priority-selector';
+import { RowActions } from '@/components/ui/row-actions';
+import { toast } from 'sonner';
 import { StatusSelector, StatusGlyph } from './status-selector';
 import { TasksDisplayOptions, type TasksDisplaySettings } from './tasks-display-options';
 import { TasksBoard } from './tasks-board';
@@ -381,6 +386,26 @@ export function TasksView() {
     ];
   }, [filteredTodos, displaySettings.grouping]);
 
+  /*
+   * One cursor across every group. The list draws sections, but ↓ from the
+   * last row of "In progress" has to land on the first row of "Done" — a
+   * cursor that stops at a section boundary reads as a broken key, not as a
+   * boundary.
+   */
+  const flatTasks = useMemo(
+    () => listGroups.flatMap((g) => g.items),
+    [listGroups],
+  );
+  const scrollRef = useScrollRestore<HTMLDivElement>('tasks');
+
+  const { cursor, listNavProps, rowProps } = useListKeyboardNav({
+    count: flatTasks.length,
+    onActivate: (i) => { const t = flatTasks[i]; if (t) openEdit(t); },
+    onDelete: (i) => { const t = flatTasks[i]; if (t) void removeTask(t); },
+    pageSize: 12,
+  });
+
+
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden">
       {/* ── Top Header Toolbar ──
@@ -407,7 +432,7 @@ export function TasksView() {
               type="button"
               onClick={() => setActiveSubTab('tasks')}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
                 activeSubTab === 'tasks'
                   ? 'bg-background text-foreground shadow-xs font-semibold'
                   : 'text-foreground-muted hover:text-foreground'
@@ -423,7 +448,7 @@ export function TasksView() {
               type="button"
               onClick={() => setActiveSubTab('schedules')}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
                 activeSubTab === 'schedules'
                   ? 'bg-background text-foreground shadow-xs font-semibold'
                   : 'text-foreground-muted hover:text-foreground'
@@ -439,7 +464,7 @@ export function TasksView() {
               type="button"
               onClick={() => setActiveSubTab('runs')}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
                 activeSubTab === 'runs'
                   ? 'bg-background text-foreground shadow-xs font-semibold'
                   : 'text-foreground-muted hover:text-foreground'
@@ -460,6 +485,7 @@ export function TasksView() {
               <input
                 type="text"
                 placeholder="Search tasks..."
+            data-view-search
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
@@ -483,7 +509,7 @@ export function TasksView() {
                     type="button"
                     onClick={() => setScope('workspace')}
                     className={cn(
-                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ui-transition',
                       scope === 'workspace'
                         ? 'bg-background text-foreground shadow-xs font-semibold'
                         : 'text-foreground-muted hover:text-foreground'
@@ -498,7 +524,7 @@ export function TasksView() {
                     type="button"
                     onClick={() => setScope('channel')}
                     className={cn(
-                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                      'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium ui-transition',
                       scope === 'channel'
                         ? 'bg-background text-foreground shadow-xs font-semibold'
                         : 'text-foreground-muted hover:text-foreground'
@@ -518,7 +544,7 @@ export function TasksView() {
                   type="button"
                   onClick={() => setDisplaySettings((prev) => ({ ...prev, viewType: 'list' }))}
                   className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
                     displaySettings.viewType === 'list'
                       ? 'bg-background text-foreground shadow-xs font-semibold'
                       : 'text-foreground-muted hover:text-foreground'
@@ -533,7 +559,7 @@ export function TasksView() {
                   type="button"
                   onClick={() => setDisplaySettings((prev) => ({ ...prev, viewType: 'board' }))}
                   className={cn(
-                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer',
+                    'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
                     displaySettings.viewType === 'board'
                       ? 'bg-background text-foreground shadow-xs font-semibold'
                       : 'text-foreground-muted hover:text-foreground'
@@ -584,7 +610,11 @@ export function TasksView() {
       ) : activeSubTab === 'runs' ? (
         <RunsView />
       ) : (
-        <div className="flex-1 overflow-y-auto">
+        <div
+          {...listNavProps}
+          ref={mergeRefs(listNavProps.ref, scrollRef)}
+          className="flex-1 overflow-y-auto outline-none"
+        >
           {actionError && (
             <div className="mx-4 mt-4 flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive sm:mx-6">
               <span>{actionError}</span>
@@ -676,153 +706,191 @@ export function TasksView() {
                         {group.items.map((todo) => {
                           const overdue = isOverdue(todo, now);
                           const failureReason = getTaskFailureReason(todo, routines);
+                          const rowIndex = flatTasks.indexOf(todo);
                           return (
-                            <div
-                              key={todo.id}
-                              title={failureReason ? `Reason: ${failureReason}` : undefined}
-                              className="group skip-offscreen-row flex items-center gap-3 px-4 py-2.5 hover:bg-surface2/60 transition-colors"
-                            >
-                              <PrioritySelector
-                                priority={todo.priority}
-                                size="sm"
-                                onChange={(p) => void updatePriority(todo, p)}
-                              />
-
-                              <StatusSelector
-                                status={todo.status}
-                                size="sm"
-                                failureReason={failureReason}
-                                onChange={(s) => void updateStatus(todo, s)}
-                              />
-
-                              <span
-                                className="text-2xs font-mono font-medium text-foreground-extra-muted shrink-0 hidden sm:inline-block"
-                                title={todo.id}
+                            <Hint key={todo.id} label={failureReason ? `Reason: ${failureReason}` : undefined}>
+                              <div
+                                {...rowProps(rowIndex, cursor === rowIndex)}
+                                /* Double-click opens the editor. Rows in a task
+                                   list are edited far more often than any of the
+                                   per-field controls on them are used, and the
+                                   only way in was a menu behind a hover target. */
+                                onDoubleClick={() => openEdit(todo)}
+                                className={cn(
+                                  'group skip-offscreen-row flex items-center gap-3 px-4 py-2.5 hover:bg-surface2/60 transition-colors',
+                                  cursor === rowIndex && 'ring-1 ring-inset ring-border-accent',
+                                )}
                               >
-                                {taskRef(todo)}
-                              </span>
+                                <PrioritySelector
+                                  priority={todo.priority}
+                                  size="sm"
+                                  onChange={(p) => void updatePriority(todo, p)}
+                                />
 
-                              <div className="min-w-0 flex-1 flex items-center gap-2">
-                                <p
-                                  className={cn(
-                                    'text-sm font-medium leading-snug truncate text-foreground',
-                                    todo.status === 'in_progress' && 'event-running',
-                                    (todo.status === 'completed' || todo.status === 'cancelled') &&
-                                      'line-through text-foreground-extra-muted'
-                                  )}
-                                >
-                                  {todo.content}
-                                </p>
-                                {failureReason && (
+                                <StatusSelector
+                                  status={todo.status}
+                                  size="sm"
+                                  failureReason={failureReason}
+                                  onChange={(s) => void updateStatus(todo, s)}
+                                />
+
+                                <Hint label={todo.id}>
                                   <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/30 text-3xs font-medium shrink-0 cursor-help select-none"
-                                    title={`Reason: ${failureReason}`}
+                                    className="text-2xs font-mono font-medium text-foreground-extra-muted shrink-0 hidden sm:inline-block"
                                   >
-                                    <TriangleAlert className="size-2.5 shrink-0" />
-                                    <span className="max-w-[200px] truncate">{failureReason}</span>
+                                    {taskRef(todo)}
                                   </span>
-                                )}
-                              </div>
+                                </Hint>
 
-                              {/* Stacked badges, fanning out on hover */}
-                              <div className="flex items-center -space-x-3 hover:space-x-1.5 transition-all duration-200 shrink-0">
-                                {todo.dueDate && (
-                                  <span
+                                <div className="min-w-0 flex-1 flex items-center gap-2">
+                                  <p
                                     className={cn(
-                                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-3xs font-medium shrink-0',
-                                      overdue
-                                        ? 'bg-status-muted-warning text-status-warning border-status-warning/30'
-                                        : 'bg-surface2 text-foreground-muted border-border/60'
+                                      'text-sm font-medium leading-snug truncate text-foreground',
+                                      todo.status === 'in_progress' && 'event-running',
+                                      (todo.status === 'completed' || todo.status === 'cancelled') &&
+                                        'line-through text-foreground-extra-muted'
                                     )}
-                                    title={`Due ${formatAbsolute(todo.dueDate)}`}
                                   >
-                                    <CalendarClock className="size-2.5 shrink-0" />
-                                    {overdue ? 'Overdue' : 'Due'}
-                                  </span>
-                                )}
-                                {todo.channelName && (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs font-medium text-foreground-muted truncate max-w-[120px]"
-                                    title={`Channel: ${todo.channelName}`}
-                                  >
-                                    <Hash className="size-2.5 text-foreground-extra-muted shrink-0" />
-                                    {todo.channelName}
-                                  </span>
-                                )}
-                                {todo.assignee && (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs font-medium text-foreground-muted truncate max-w-[110px]"
-                                    title={`Assigned to: ${todo.assignee}`}
-                                  >
-                                    <User className="size-2.5 text-foreground-extra-muted shrink-0" />
-                                    {todo.assignee}
-                                  </span>
-                                )}
-                                <span
-                                  className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs text-foreground-extra-muted shrink-0"
-                                  title={formatAbsolute(todo.updatedAt || todo.createdAt)}
-                                >
-                                  {timeAgo(todo.updatedAt || todo.createdAt, now)}
-                                </span>
-                                {(todo.routineId || todo.timerId) && (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border text-3xs font-medium shrink-0"
-                                    title="Created by a scheduled routine"
-                                  >
-                                    <CalendarClock className="size-2.5 shrink-0" />
-                                    Scheduled
-                                  </span>
-                                )}
-                              </div>
+                                    {todo.content}
+                                  </p>
+                                  {failureReason && (
+                                    <Hint label={`Reason: ${failureReason}`}>
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/30 text-3xs font-medium shrink-0 cursor-help select-none"
+                                      >
+                                        <TriangleAlert className="size-2.5 shrink-0" />
+                                        <span className="max-w-[200px] truncate">{failureReason}</span>
+                                      </span>
+                                    </Hint>
+                                  )}
+                                </div>
 
-                              {/* Row actions.
-                                  These used to be hidden for anything the current
-                                  user did not author, which left agent- and
-                                  routine-created tasks with no way to be renamed
-                                  or removed. Single-row writes make that safe. */}
-                              <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Hint label="Edit task">
-                                  <button
-                                    type="button"
-                                    onClick={() => openEdit(todo)}
-                                    className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
-                                  >
-                                    <Pencil className="size-3.5" />
-                                  </button>
-                                </Hint>
-                                {displaySettings.ordering === 'position' && (
-                                  <>
-                                    <Hint label="Move up">
-                                      <button
-                                        type="button"
-                                        onClick={() => void reorderTask(todo, -1)}
-                                        className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                {/* Stacked badges, fanning out on hover */}
+                                <div className="flex items-center -space-x-3 hover:space-x-1.5 ui-transition duration-200 shrink-0">
+                                  {todo.dueDate && (
+                                    <Hint label={`Due ${formatAbsolute(todo.dueDate)}`}>
+                                      <span
+                                        className={cn(
+                                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-3xs font-medium shrink-0',
+                                          overdue
+                                            ? 'bg-status-muted-warning text-status-warning border-status-warning/30'
+                                            : 'bg-surface2 text-foreground-muted border-border/60'
+                                        )}
                                       >
-                                        <ArrowUp className="size-3.5" />
-                                      </button>
+                                        <CalendarClock className="size-2.5 shrink-0" />
+                                        {overdue ? 'Overdue' : 'Due'}
+                                      </span>
                                     </Hint>
-                                    <Hint label="Move down">
-                                      <button
-                                        type="button"
-                                        onClick={() => void reorderTask(todo, 1)}
-                                        className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                  )}
+                                  {todo.channelName && (
+                                    <Hint label={`Channel: ${todo.channelName}`}>
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs font-medium text-foreground-muted truncate max-w-[120px]"
                                       >
-                                        <ArrowDown className="size-3.5" />
-                                      </button>
+                                        <Hash className="size-2.5 text-foreground-extra-muted shrink-0" />
+                                        {todo.channelName}
+                                      </span>
                                     </Hint>
-                                  </>
-                                )}
-                                <Hint label="Delete task">
-                                  <button
-                                    type="button"
-                                    onClick={() => void removeTask(todo)}
-                                    className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-destructive transition-colors"
-                                  >
-                                    <Trash2 className="size-3.5" />
-                                  </button>
-                                </Hint>
+                                  )}
+                                  {todo.assignee && (
+                                    <Hint label={`Assigned to: ${todo.assignee}`}>
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs font-medium text-foreground-muted truncate max-w-[110px]"
+                                      >
+                                        <User className="size-2.5 text-foreground-extra-muted shrink-0" />
+                                        {todo.assignee}
+                                      </span>
+                                    </Hint>
+                                  )}
+                                  <Hint label={formatAbsolute(todo.updatedAt || todo.createdAt)}>
+                                    <span
+                                      className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs text-foreground-extra-muted shrink-0"
+                                    >
+                                      {timeAgo(todo.updatedAt || todo.createdAt, now)}
+                                    </span>
+                                  </Hint>
+                                  {(todo.routineId || todo.timerId) && (
+                                    <Hint label="Created by a scheduled routine">
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border text-3xs font-medium shrink-0"
+                                      >
+                                        <CalendarClock className="size-2.5 shrink-0" />
+                                        Scheduled
+                                      </span>
+                                    </Hint>
+                                  )}
+                                </div>
+
+                                {/* Row actions.
+                                    These used to be hidden for anything the current
+                                    user did not author, which left agent- and
+                                    routine-created tasks with no way to be renamed
+                                    or removed. Single-row writes make that safe. */}
+                                <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Hint label="Edit task">
+                                    <button
+                                      type="button"
+                                      onClick={() => openEdit(todo)}
+                                      className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                    >
+                                      <Pencil className="size-3.5" />
+                                    </button>
+                                  </Hint>
+                                  {displaySettings.ordering === 'position' && (
+                                    <>
+                                      <Hint label="Move up">
+                                        <button
+                                          type="button"
+                                          onClick={() => void reorderTask(todo, -1)}
+                                          className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                        >
+                                          <ArrowUp className="size-3.5" />
+                                        </button>
+                                      </Hint>
+                                      <Hint label="Move down">
+                                        <button
+                                          type="button"
+                                          onClick={() => void reorderTask(todo, 1)}
+                                          className="p-1 rounded text-foreground-extra-muted hover:bg-surface3 hover:text-foreground transition-colors"
+                                        >
+                                          <ArrowDown className="size-3.5" />
+                                        </button>
+                                      </Hint>
+                                    </>
+                                  )}
+                                </div>
+                                {/* The strip above is hover-only and, more to
+                                    the point, is not a dropdown — so right-click
+                                    on a task row had nothing to open and fell
+                                    through to the shell's "Select All". */}
+                                <RowActions
+                                  label={`Actions for ${todo.content}`}
+                                  items={[
+                                    { label: 'Edit task', icon: Pencil, onSelect: () => openEdit(todo) },
+                                    {
+                                      label: 'Copy task text',
+                                      icon: Copy,
+                                      onSelect: () => {
+                                        navigator.clipboard.writeText(todo.content);
+                                        toast.success('Copied');
+                                      },
+                                    },
+                                    ...(displaySettings.ordering === 'position'
+                                      ? [
+                                          { label: 'Move up', icon: ArrowUp, onSelect: () => { void reorderTask(todo, -1); } },
+                                          { label: 'Move down', icon: ArrowDown, onSelect: () => { void reorderTask(todo, 1); } },
+                                        ]
+                                      : []),
+                                    {
+                                      label: 'Delete task',
+                                      icon: Trash2,
+                                      destructive: true,
+                                      onSelect: () => { void removeTask(todo); },
+                                    },
+                                  ]}
+                                />
                               </div>
-                            </div>
+                            </Hint>
                           );
                         })}
                       </div>

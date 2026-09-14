@@ -1,6 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   FileText,
@@ -143,14 +144,26 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
   };
 
   const fieldClass =
-    'h-9 rounded-lg border-border bg-surface1 text-sm text-foreground shadow-xs transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
+    'h-9 rounded-lg border-border bg-surface1 text-sm text-foreground shadow-xs ui-transition duration-200 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/40';
 
   const toolBtnClass =
-    'p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer text-xs';
+  'p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface3 transition-colors text-xs';
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="sm:max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden border-border shadow-xl">
+      <DialogContent
+        className="sm:max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden border-border shadow-xl"
+        /* Cmd/Ctrl+Enter submits. A form dialog whose only way out is the
+           mouse is the tell of a web page; every native sheet commits on the
+           keyboard. Plain Enter is left alone here because these dialogs hold
+           multi-line fields. */
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void handleSave();
+          }
+        }}
+      >
         {/* Header */}
         <DialogHeader className="shrink-0 mb-0 border-b border-border pl-6 pr-14 py-3.5 bg-surface1/80 backdrop-blur-md">
           <div className="flex items-center justify-between gap-4">
@@ -183,7 +196,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
                   type="button"
                   onClick={() => setViewMode('edit')}
                   className={cn(
-                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium ui-transition',
                     viewMode === 'edit'
                       ? 'bg-surface1 text-foreground shadow-xs font-semibold'
                       : 'text-foreground-muted hover:text-foreground'
@@ -198,7 +211,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
                   type="button"
                   onClick={() => setViewMode('split')}
                   className={cn(
-                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium ui-transition',
                     viewMode === 'split'
                       ? 'bg-surface1 text-foreground shadow-xs font-semibold'
                       : 'text-foreground-muted hover:text-foreground'
@@ -213,7 +226,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
                   type="button"
                   onClick={() => setViewMode('preview')}
                   className={cn(
-                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                    'flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs font-medium ui-transition',
                     viewMode === 'preview'
                       ? 'bg-surface1 text-foreground shadow-xs font-semibold'
                       : 'text-foreground-muted hover:text-foreground'
@@ -264,18 +277,23 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
             */}
             <div className="space-y-1.5">
               <Label htmlFor="kb-category" className={MICRO}>Category</Label>
-              <select
-                id="kb-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className={cn(fieldClass, 'w-full cursor-pointer px-2')}
+              {/* Radix needs a non-empty value, so the "unset" option carries
+                  a sentinel and is mapped back to '' on the way out. */}
+              <Select
+                value={category || '__auto__'}
+                onValueChange={(v) => setCategory(v === '__auto__' ? '' : v)}
               >
-                <option value="">Detect from title</option>
-                <option value="rules">Standards</option>
-                <option value="architecture">Architecture</option>
-                <option value="api">API</option>
-                <option value="docs">Docs</option>
-              </select>
+                <SelectTrigger id="kb-category" className={cn(fieldClass, 'w-full px-2')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__auto__">Detect from title</SelectItem>
+                  <SelectItem value="rules">Standards</SelectItem>
+                  <SelectItem value="architecture">Architecture</SelectItem>
+                  <SelectItem value="api">API</SelectItem>
+                  <SelectItem value="docs">Docs</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

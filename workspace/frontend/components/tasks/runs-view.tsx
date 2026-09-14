@@ -94,6 +94,7 @@ export function RunsView() {
           <input
             type="text"
             placeholder="Search execution runs by ID, agent, trigger..."
+            data-view-search
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full h-8 pl-8 pr-7 text-xs rounded-lg border border-border bg-surface2/60 text-foreground placeholder:text-foreground-extra-muted focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
@@ -156,7 +157,7 @@ export function RunsView() {
               return (
                 <div
                   key={run.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface1/60 hover:bg-surface1 hover:border-border transition-all"
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface1/60 hover:bg-surface1 hover:border-border ui-transition"
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {/* Status Icon */}
@@ -207,9 +208,11 @@ export function RunsView() {
 
                       {/* A failed run without its reason is not actionable. */}
                       {isFailed && run.error && (
-                        <p className="text-3xs text-destructive truncate" title={run.error}>
-                          {run.error}
-                        </p>
+                        <Hint label={run.error}>
+                          <p className="text-3xs text-destructive truncate" >
+                            {run.error}
+                          </p>
+                        </Hint>
                       )}
                     </div>
                   </div>
@@ -217,13 +220,14 @@ export function RunsView() {
                   {/* Right Side: Timestamps & Action */}
                   <div className="flex items-center gap-4 shrink-0 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-border/60">
                     <div className="text-right text-3xs text-foreground-extra-muted space-y-0.5">
-                      <div
-                        className="flex items-center justify-end gap-1"
-                        title={formatAbsolute(run.startedAt)}
-                      >
-                        <Clock className="size-3" />
-                        <span>{timeAgo(run.startedAt, now)}</span>
-                      </div>
+                      <Hint label={formatAbsolute(run.startedAt)}>
+                        <div
+                          className="flex items-center justify-end gap-1"
+                        >
+                          <Clock className="size-3" />
+                          <span>{timeAgo(run.startedAt, now)}</span>
+                        </div>
+                      </Hint>
                       <div className="font-mono">
                         {isRunning ? 'Elapsed' : 'Duration'}:{' '}
                         {formatDuration(run.startedAt, run.completedAt, now)}

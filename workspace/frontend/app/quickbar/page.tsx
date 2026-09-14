@@ -1,6 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, ArrowRight, CornerDownLeft, Maximize2, Loader2, X } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
@@ -143,23 +144,30 @@ export default function QuickBarPage() {
           {/* Agent Picker Pill */}
           <div className="relative shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-white/80 font-medium">
             <Sparkles className="size-3.5 text-status-warning shrink-0" />
-            <select
-              value={selectedAgent}
-              onChange={(e) => setSelectedAgent(e.target.value)}
-              className="bg-transparent outline-none text-xs text-white cursor-pointer pr-1"
-            >
-              {agents.length === 0 && <option value="">Auto Route</option>}
-              {[...agents]
-                .sort((a, b) => {
-                  if (a.status !== b.status) return a.status === 'online' ? -1 : 1;
-                  return a.agentName.localeCompare(b.agentName);
-                })
-                .map((a) => (
-                  <option key={a.agentName} value={a.agentName} className="bg-[#18181b] text-white">
-                    @{a.agentName}{a.status === 'online' ? ' (Online)' : ''}
-                  </option>
-                ))}
-            </select>
+            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <SelectTrigger
+                size="sm"
+                /* The quickbar paints its own dark glass regardless of theme,
+                   so the trigger is transparent here rather than inheriting
+                   the app surface tokens. */
+                className="w-auto border-0 bg-transparent shadow-none text-xs text-white px-0 h-auto focus-visible:ring-0"
+              >
+                <SelectValue placeholder="Auto Route" />
+              </SelectTrigger>
+              <SelectContent>
+                {agents.length === 0 && <SelectItem value="__auto__">Auto Route</SelectItem>}
+                {[...agents]
+                  .sort((a, b) => {
+                    if (a.status !== b.status) return a.status === 'online' ? -1 : 1;
+                    return a.agentName.localeCompare(b.agentName);
+                  })
+                  .map((a) => (
+                    <SelectItem key={a.agentName} value={a.agentName}>
+                      @{a.agentName}{a.status === 'online' ? ' (Online)' : ''}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Quick Prompt Input */}
@@ -188,7 +196,7 @@ export default function QuickBarPage() {
                 <button
                   onClick={handleSend}
                   disabled={!prompt.trim()}
-                  className="size-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white disabled:opacity-30 transition-all cursor-pointer"
+                  className="size-7 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white disabled:opacity-30 ui-transition cursor-pointer"
                 >
                   <CornerDownLeft className="size-3.5" />
                 </button>

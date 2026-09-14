@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { isComposing } from '@/lib/ime';
 import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession } from '@/lib/types';
 import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -108,7 +109,7 @@ function isImageFile(file: File): boolean {
 
 /** 底部控制条上的紧凑胶囊按钮样式 */
 const pillButton = cn(
-  'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full cursor-pointer select-none text-2xs font-medium',
+  'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full select-none text-2xs font-medium',
   'text-foreground-muted hover:text-foreground hover:bg-surface2',
   'transition-colors duration-150',
   'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40'
@@ -268,6 +269,49 @@ export function PromptComposer({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+  };
+
+  /**
+   * CTRL+V OF A SCREENSHOT.
+   *
+   * The box accepted files by drag and by the paperclip button, and pasting a
+   * screenshot into it did nothing at all — the one gesture people actually
+   * use to get an image into a chat. Snipping Tool, Cmd+Shift+4, "copy image"
+   * from a browser: all of them put the bitmap on the clipboard and nothing
+   * on disk, so there is no file to drag.
+   *
+   * Only intercept when the clipboard actually carries files. A paste that is
+   * also carrying text (copying a cell out of a spreadsheet hands over both an
+   * image and its text) stays a text paste, because that is what the user
+   * meant; `preventDefault` is called only on the branch that consumes files,
+   * so ordinary text paste keeps the native undo stack.
+   */
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const data = e.clipboardData;
+    if (!data) return;
+
+    const text = data.getData('text/plain');
+    if (text) return;
+
+    const files: File[] = [];
+    for (const item of Array.from(data.items)) {
+      if (item.kind !== 'file') continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      // A pasted bitmap arrives as "image.png" on every platform, so several in
+      // a row are indistinguishable in the pending-file strip. Stamp it.
+      const named =
+        file.name && file.name !== 'image.png'
+          ? file
+          : new File([file], `pasted-${Date.now()}.${(file.type.split('/')[1] || 'png')}`, {
+              type: file.type,
+            });
+      files.push(named);
+    }
+
+    if (files.length === 0) return;
+    e.preventDefault();
+    addFiles(files);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -444,6 +488,14 @@ export function PromptComposer({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    /*
+      Nothing below this line is a command while an input method is composing.
+      Enter commits the candidate the user is looking at, and ↑/↓ move between
+      candidates — both were being read as "send" and "change mention", so
+      picking a Chinese character sent half a line of pinyin.
+    */
+    if (isComposing(e)) return;
+
     if (showMentions && filteredMentions.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -543,7 +595,7 @@ export function PromptComposer({
                         data-selected={isSelected ? 'true' : undefined}
                         onClick={() => insertMention(item)}
                         className={cn(
-                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group select-none',
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors text-xs group select-none',
                           isSelected
                             ? 'bg-surface3 text-foreground font-medium ring-1 ring-border/60'
                             : 'hover:bg-surface2/80 text-foreground'
@@ -602,7 +654,7 @@ export function PromptComposer({
                         data-selected={isSelected ? 'true' : undefined}
                         onClick={() => insertMention(item)}
                         className={cn(
-                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors cursor-pointer text-xs group select-none',
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors text-xs group select-none',
                           isSelected
                             ? 'bg-surface3 text-foreground font-medium ring-1 ring-border/60'
                             : 'hover:bg-surface2/80 text-foreground'
@@ -644,7 +696,7 @@ export function PromptComposer({
            * permanent glow, and blue was not a token.
            */
           'relative rounded-xl overflow-hidden',
-          'bg-surface1/95 backdrop-blur-xl border border-border/70 shadow-sm transition-all duration-150',
+          'bg-surface1/95 backdrop-blur-xl border border-border/70 shadow-sm ui-transition duration-150',
           'hover:border-border focus-within:border-border-accent',
           isDragging && 'border-border-accent bg-surface2'
         )}
@@ -681,7 +733,7 @@ export function PromptComposer({
                   <button
                     type="button"
                     onClick={() => removeFile(idx)}
-                    className="size-4 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 cursor-pointer shadow-xs"
+                    className="size-4 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 shadow-xs"
                   >
                     <X className="size-2.5" />
                   </button>
@@ -714,9 +766,9 @@ export function PromptComposer({
                           aria-hidden
                         />
                       )}
+                      <Hint label={seg.instruction ? `@${seg.agent}: ${seg.instruction}` : `@${seg.agent}`}>
                       <div
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground max-w-[220px]"
-                        title={seg.instruction ? `@${seg.agent}: ${seg.instruction}` : `@${seg.agent}`}
                       >
                         <span className="size-3.5 rounded-full bg-primary text-primary-foreground text-3xs font-bold flex items-center justify-center shrink-0">
                           {idx + 1}
@@ -729,6 +781,7 @@ export function PromptComposer({
                           </span>
                         )}
                       </div>
+                      </Hint>
                     </React.Fragment>
                   ))}
                 </div>
@@ -743,6 +796,7 @@ export function PromptComposer({
           value={message}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           onFocus={() => {
             setIsFocused(true);
             onFocusChange?.(true);
@@ -771,9 +825,9 @@ export function PromptComposer({
             />
 
             {currentMode !== 'dynamic' && (
+              <Hint label={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}>
               <div
                 className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface2 text-foreground-muted select-none"
-                title={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}
               >
                 {currentMode === 'master' ? (
                   <>
@@ -786,13 +840,14 @@ export function PromptComposer({
                     <button
                       type="button"
                       onClick={() => setWorkflowPlanOpen(true)}
-                      className="hover:text-foreground underline cursor-pointer"
+                      className="hover:text-foreground underline"
                     >
                       Workflow Plan
                     </button>
                   </>
                 )}
               </div>
+              </Hint>
             )}
 
             <Hint label="Mention an agent (@)">
@@ -875,11 +930,11 @@ export function PromptComposer({
                 disabled={isWorking ? stopping : !canSend}
                 className={cn(
                   'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                  'transition-all duration-150 cursor-pointer select-none',
+                  'ui-transition duration-150 select-none',
                   isWorking
                     ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-xs'
                     : canSend
-                    ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs active:scale-95'
+                      ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs'
                     : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/60'
                 )}
               >

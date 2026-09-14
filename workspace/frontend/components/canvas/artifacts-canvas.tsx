@@ -1,6 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   X,
@@ -18,7 +19,9 @@ import {
   Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSplitter } from '@/hooks/use-splitter';
 import { toast } from 'sonner';
+import { downloadBlob } from '@/lib/download';
 import { MarkdownContent } from '../chat/markdown-content';
 import { AgentAvatar } from '../agents/agent-avatar';
 import { useArtifacts, type ArtifactItem, type ArtifactAnnotation } from '@/lib/artifacts-context';
@@ -40,19 +43,21 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
   const [newComment, setNewComment] = useState('');
   const [selectedAgent, setSelectedAgent] = useState('claude');
 
-  // ── Drag to Resize State ──
-  const [canvasWidth, setCanvasWidth] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('artifacts_canvas_width');
-        if (saved) return Math.max(MIN_CANVAS_WIDTH, parseInt(saved, 10));
-      } catch {}
-    }
-    return DEFAULT_CANVAS_WIDTH;
+  // ── Drag to Resize ──
+  // One shared splitter, so this edge answers the keyboard and survives the
+  // pointer crossing into the artifact iframe mid-drag. See use-splitter.ts.
+  const {
+    width: canvasWidth,
+    isResizing,
+    separatorProps: canvasSeparatorProps,
+  } = useSplitter({
+    min: MIN_CANVAS_WIDTH,
+    max: () => (typeof window !== 'undefined' ? Math.max(400, window.innerWidth - 380) : 1000),
+    defaultWidth: DEFAULT_CANVAS_WIDTH,
+    storageKey: 'artifacts_canvas_width',
+    edge: 'end',
+    label: 'Resize Canvas panel',
   });
-  const [isResizing, setIsResizing] = useState(false);
-  const widthRef = useRef(canvasWidth);
-  widthRef.current = canvasWidth;
 
   const annotations = useMemo(() => activeArtifact?.annotations || [], [activeArtifact]);
 
@@ -71,44 +76,6 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isCanvasOpen, closeCanvas]);
 
-  // Drag border resize logic
-  const startResize = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isResizing) return;
-
-    const onMove = (e: MouseEvent) => {
-      const maxAllowed = typeof window !== 'undefined' ? Math.max(400, window.innerWidth - 380) : 1000;
-      const newWidth = Math.min(maxAllowed, Math.max(MIN_CANVAS_WIDTH, window.innerWidth - e.clientX));
-      setCanvasWidth(newWidth);
-    };
-
-    const onUp = () => {
-      setIsResizing(false);
-      try {
-        localStorage.setItem('artifacts_canvas_width', widthRef.current.toString());
-      } catch {}
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-
-    const prevCursor = document.body.style.cursor;
-    const prevSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = prevCursor;
-      document.body.style.userSelect = prevSelect;
-    };
-  }, [isResizing]);
-
   if (!isCanvasOpen || !activeArtifact) {
     return null;
   }
@@ -123,13 +90,13 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
 
   const handleDownload = () => {
     if (!activeArtifact.content) return;
-    const blob = new Blob([activeArtifact.content], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(activeArtifact.title || 'artifact').toLowerCase().replace(/\s+/g, '-')}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    // The object URL used to be revoked on the next line, which cancels the
+    // download on Chromium builds that had not finished reading the blob.
+    downloadBlob(
+      activeArtifact.content,
+      `${(activeArtifact.title || 'artifact').toLowerCase().replace(/\s+/g, '-')}.md`,
+      'text/markdown;charset=utf-8',
+    );
     toast.success('Artifact downloaded');
   };
 
@@ -152,7 +119,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
     <div
       style={isFullscreen ? { width: '100vw' } : embedded ? undefined : { width: `${canvasWidth}px` }}
       className={cn(
-        'relative flex flex-col bg-surface1 h-full select-text transition-all duration-75 z-20',
+        'relative flex flex-col bg-surface1 h-full select-text ui-transition duration-75 z-20',
         !embedded && 'border-l border-border shrink-0',
         embedded && 'w-full flex-1 min-w-0 min-h-0',
         isFullscreen && 'fixed top-[var(--titlebar-height)] inset-x-0 bottom-0 w-screen z-50 bg-surface1',
@@ -162,20 +129,21 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
     >
       {/* ── Left Drag-to-Resize Handle & Quick Collapse (Only when not embedded) ── */}
       {!isFullscreen && !embedded && (
-        <div
-          onMouseDown={startResize}
-          className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none"
-          title="Drag to resize Canvas border width"
-        >
-          {/* Subtle Hover Glow Line */}
-          <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
-          {/* Central Grip Indicator */}
-          <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
-            <div className="size-1 rounded-full bg-foreground-extra-muted" />
-            <div className="size-1 rounded-full bg-foreground-extra-muted" />
-            <div className="size-1 rounded-full bg-foreground-extra-muted" />
+        <Hint label="Drag to resize" side="left">
+          <div
+            {...canvasSeparatorProps}
+            className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none focus-visible:outline-none focus-visible:bg-primary/40"
+          >
+            {/* Subtle Hover Glow Line */}
+            <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
+            {/* Central Grip Indicator */}
+            <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
+              <div className="size-1 rounded-full bg-foreground-extra-muted" />
+              <div className="size-1 rounded-full bg-foreground-extra-muted" />
+              <div className="size-1 rounded-full bg-foreground-extra-muted" />
+            </div>
           </div>
-        </div>
+        </Hint>
       )}
 
       {/* ── Single Unified Header Bar (38px) ── */}
@@ -186,9 +154,11 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             {activeArtifact.type === 'code' ? <Code2 className="size-3.5" /> : <FileText className="size-3.5" />}
           </div>
           <div className="min-w-0 flex items-baseline gap-1.5 shrink truncate">
-            <span className="text-xs font-semibold text-foreground truncate max-w-[120px] sm:max-w-[160px]" title={activeArtifact.title}>
-              {activeArtifact.title}
-            </span>
+            <Hint label={activeArtifact.title}>
+              <span className="text-xs font-semibold text-foreground truncate max-w-[120px] sm:max-w-[160px]" >
+                {activeArtifact.title}
+              </span>
+            </Hint>
             {activeArtifact.version && (
               <span className="text-3xs font-mono text-foreground-extra-muted shrink-0">
                 v{activeArtifact.version}
@@ -202,7 +172,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
               type="button"
               onClick={() => setActiveTab('document')}
               className={cn(
-                'px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer shrink-0',
+                'px-2 py-0.5 rounded-md font-medium transition-colors shrink-0',
                 activeTab === 'document'
                   ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
@@ -214,7 +184,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
               type="button"
               onClick={() => setActiveTab('raw')}
               className={cn(
-                'px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer shrink-0',
+                'px-2 py-0.5 rounded-md font-medium transition-colors shrink-0',
                 activeTab === 'raw'
                   ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
@@ -226,7 +196,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
               type="button"
               onClick={() => setActiveTab('annotations')}
               className={cn(
-                'px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1 shrink-0',
+                'px-2 py-0.5 rounded-md font-medium transition-colors flex items-center gap-1 shrink-0',
                 activeTab === 'annotations'
                   ? 'bg-surface0 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground'
@@ -249,7 +219,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <button
               type="button"
               onClick={() => setActiveRightTab('preview')}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               <Globe className="size-3.5" />
             </button>
@@ -259,7 +229,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <button
               type="button"
               onClick={() => setActiveRightTab('trace')}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               <Activity className="size-3.5" />
             </button>
@@ -270,7 +240,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <button
               type="button"
               onClick={handleCopy}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               {copied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
             </button>
@@ -279,7 +249,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <button
               type="button"
               onClick={handleDownload}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               <Download className="size-3.5" />
             </button>
@@ -288,7 +258,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <button
               type="button"
               onClick={() => setIsFullscreen((prev) => !prev)}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
             </button>
@@ -302,7 +272,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
                 closeCanvas();
                 setActiveRightTab(null);
               }}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
             >
               <X className="size-3.5" />
             </button>
@@ -376,15 +346,16 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
             <form onSubmit={handleAddAnnotation} className="pt-2 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-2xs text-muted-foreground">Reviewer:</span>
-                <select
-                  value={selectedAgent}
-                  onChange={(e) => setSelectedAgent(e.target.value)}
-                  className="px-2 py-1 rounded bg-surface2 border border-border text-2xs text-foreground cursor-pointer"
-                >
-                  <option value="claude">@claude (Reviewer)</option>
-                  <option value="antigravity">@antigravity (Architect)</option>
-                  <option value="human">@human (You)</option>
-                </select>
+                <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                  <SelectTrigger size="sm" className="w-auto min-w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="claude">@claude (Reviewer)</SelectItem>
+                    <SelectItem value="antigravity">@antigravity (Architect)</SelectItem>
+                    <SelectItem value="human">@human (You)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex gap-2">
@@ -398,7 +369,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
                 <button
                   type="submit"
                   disabled={!newComment.trim()}
-                  className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity self-end cursor-pointer shrink-0 flex items-center gap-1"
+                  className="px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity self-end shrink-0 flex items-center gap-1"
                 >
                   <Send className="size-3.5" />
                   <span>Submit</span>

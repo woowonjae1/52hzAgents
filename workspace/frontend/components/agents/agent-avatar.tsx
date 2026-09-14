@@ -54,7 +54,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
   return (
     <div
       className={cn(
-        'relative shrink-0 transition-all duration-200 select-none',
+        'relative shrink-0 ui-transition duration-200 select-none',
         isOffline && 'opacity-80',
         className
       )}

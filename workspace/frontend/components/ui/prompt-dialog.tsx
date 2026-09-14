@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { isComposing } from '@/lib/ime';
 
 export interface PromptDialogProps {
   open: boolean;
@@ -91,7 +92,7 @@ export function PromptDialog({
           placeholder={placeholder}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !isComposing(e)) {
               e.preventDefault();
               void submit();
             }

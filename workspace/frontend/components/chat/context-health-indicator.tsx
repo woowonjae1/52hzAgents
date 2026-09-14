@@ -164,7 +164,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
           <button
             type="button"
             className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border transition-all duration-200 cursor-pointer select-none',
+              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border ui-transition duration-200 select-none',
               'bg-surface2/80 hover:bg-surface3/90 shadow-xs',
               statusBadge.pillClass,
               className
@@ -216,7 +216,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
                 fetchStats();
               }}
               disabled={loading}
-              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer disabled:opacity-50"
+              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-50"
             >
               <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
             </button>
@@ -244,7 +244,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
           <div className="h-2 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
             <div
               className={cn(
-                'h-full rounded-full transition-all duration-500',
+                'h-full rounded-full ui-transition duration-500',
                 budgetPct >= 50 ? 'bg-status-danger' : budgetPct >= 25 ? 'bg-status-warning' : 'bg-status-success'
               )}
               style={{ width: `${Math.min(Math.max(budgetPct, 2), 100)}%` }}
@@ -284,7 +284,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
             onClick={triggerCompact}
             disabled={compacting}
             className={cn(
-              'w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer shadow-xs',
+              'w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium ui-transition duration-200 shadow-xs',
               'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed'
             )}
           >
@@ -305,7 +305,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
                 setIsOpen(false);
                 setActiveRightTab('tokens');
               }}
-              className="text-3xs text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+              className="text-3xs text-primary hover:underline flex items-center gap-1 font-medium"
             >
               <Coins className="size-3" />
               <span>Open Token Governance Dashboard</span>

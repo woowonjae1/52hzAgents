@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { Hint } from '@/components/ui/hint';
 import { SidebarContent } from './sidebar-content';
 import { SidebarHeader } from './sidebar-header';
 import { useLayout } from './layout-context';
@@ -26,8 +27,22 @@ export function Sidebar() {
   const widthRef = useRef(sidebarWidth);
   widthRef.current = sidebarWidth;
 
-  const startResize = useCallback((event: React.MouseEvent) => {
+  /*
+    POINTER, NOT MOUSE, AND CAPTURED.
+
+    The drag used to track `mousemove` on `window`. The main pane can host an
+    iframe (the browser view in split mode) and a `<webview>` (the local
+    preview), and a cross-document element swallows mouse events — so dragging
+    the sidebar wider until the pointer crossed into one froze the edge with
+    the button still down. Capturing the pointer on the handle routes every
+    move back here regardless of what it passes over, and brings pen and touch
+    with it, which `mousedown` never supported.
+  */
+  const handleRef = useRef<HTMLDivElement | null>(null);
+  const startResize = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
     event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
     setIsResizing(true);
   }, []);
 
@@ -68,7 +83,7 @@ export function Sidebar() {
       frame = 0;
       for (const { el } of sized) el.style.width = `${pending}px`;
     };
-    const onMove = (event: MouseEvent) => {
+    const onMove = (event: PointerEvent) => {
       // The sidebar is pinned to the start edge, so clientX *is* the width.
       pending = clampSidebarWidth(event.clientX);
       if (!frame) frame = requestAnimationFrame(flush);
@@ -92,8 +107,16 @@ export function Sidebar() {
       setIsResizing(false);
     };
 
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    /*
+      Listen on the HANDLE, not on window: the pointer is captured to it, so it
+      is the element the events are delivered to. `pointercancel` matters as
+      much as `pointerup` — an OS gesture or a lost device never sends the
+      latter, and without it the edge stays glued to the cursor.
+    */
+    const handle = handleRef.current ?? window;
+    handle.addEventListener('pointermove', onMove as EventListener);
+    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointercancel', onUp);
     // Hold the resize cursor and kill text selection while the pointer travels
     // over arbitrary content in the main pane.
     const previousCursor = document.body.style.cursor;
@@ -101,8 +124,9 @@ export function Sidebar() {
     document.body.style.userSelect = 'none';
     return () => {
       if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      handle.removeEventListener('pointermove', onMove as EventListener);
+      handle.removeEventListener('pointerup', onUp);
+      handle.removeEventListener('pointercancel', onUp);
       document.body.style.cursor = previousCursor;
       document.body.style.userSelect = '';
     };
@@ -161,25 +185,28 @@ export function Sidebar() {
         where the sidebar is an overlay and has no column to resize.
       */}
       {isSidebarOpen && !isMobile && (
-        <div
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize sidebar"
-          aria-valuenow={sidebarWidth}
-          aria-valuemin={MIN_SIDEBAR_WIDTH}
-          aria-valuemax={MAX_SIDEBAR_WIDTH}
-          suppressHydrationWarning
-          tabIndex={0}
-          onMouseDown={startResize}
-          onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
-          onKeyDown={onHandleKeyDown}
-          title="Drag to resize · double-click to reset"
-          className={cn(
-            'absolute top-0 bottom-0 end-0 z-10 w-1 cursor-col-resize transition-colors',
-            'hover:bg-accent/40 focus-visible:bg-accent/60 focus-visible:outline-none',
-            isResizing && 'bg-accent/60',
-          )}
-        />
+        <Hint label="Drag to resize · double-click to reset" side="right">
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            aria-valuenow={sidebarWidth}
+            aria-valuemin={MIN_SIDEBAR_WIDTH}
+            aria-valuemax={MAX_SIDEBAR_WIDTH}
+            suppressHydrationWarning
+            tabIndex={0}
+            ref={handleRef}
+          onPointerDown={startResize}
+          style={{ touchAction: 'none' }}
+            onDoubleClick={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
+            onKeyDown={onHandleKeyDown}
+            className={cn(
+              'absolute top-0 bottom-0 end-0 z-10 w-1 cursor-col-resize transition-colors',
+              'hover:bg-accent/40 focus-visible:bg-accent/60 focus-visible:outline-none',
+              isResizing && 'bg-accent/60',
+            )}
+          />
+        </Hint>
       )}
     </aside>
   );

@@ -255,7 +255,7 @@ export function EventLine({
 
   return (
     <details className={cn('event-line my-1.5 min-w-0', className)} open={defaultOpen}>
-      <summary className="flex min-w-0 cursor-pointer list-none items-baseline">
+    <summary className="flex min-w-0 list-none items-baseline">
         {row}
         {trailing}
       </summary>
@@ -350,7 +350,7 @@ export function EventLineAction({
         type="button"
         onClick={onClick}
         className={cn(
-          'inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1 py-0.5',
+          'inline-flex shrink-0 items-center gap-1 rounded-base px-1 py-0.5',
           'text-3xs text-foreground-extra-muted transition-colors',
           'hover:bg-surface2 hover:text-foreground',
           'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2'

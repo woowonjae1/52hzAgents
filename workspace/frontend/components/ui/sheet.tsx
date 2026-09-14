@@ -90,7 +90,7 @@ function SheetContent({
         {close && (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="cursor-pointer absolute end-4 top-4 rounded-full p-1.5 opacity-60 ring-offset-background transition-all hover:opacity-100 hover:bg-surface3/80 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary"
+            className="absolute end-4 top-4 rounded-full p-1.5 opacity-60 ring-offset-background ui-transition hover:opacity-100 hover:bg-surface3/80 dark:hover:bg-white/10 text-muted-foreground hover:text-foreground focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-secondary"
           >
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>

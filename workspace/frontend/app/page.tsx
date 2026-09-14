@@ -479,7 +479,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceSummary }) {
 
   return (
     <Card
-      className="cursor-pointer border border-border dark:border-border bg-card hover:border-border-accent hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200"
+      className="cursor-pointer border border-border dark:border-border bg-card hover:border-border-accent hover:-translate-y-0.5 hover:shadow-sm ui-transition duration-200"
       onClick={() => enterWorkspace(workspace, router)}
     >
       <CardContent className="p-4 space-y-4">

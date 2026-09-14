@@ -1,13 +1,14 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { workspaceApi } from '@/lib/api';
 import { Terminal, Search, Cpu, TerminalSquare, RefreshCw, ArrowDownToLine, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { isComposing } from '@/lib/ime';
 
 // Strip markdown so log lines read as plain terminal output.
 function cleanLogContent(text: string): string {
@@ -59,6 +60,10 @@ const LINE_STYLE: Record<TerminalLine['type'], { glyph: string; sender: string; 
   info: { glyph: '›', sender: 'text-foreground-extra-muted', text: 'text-foreground-extra-muted', gutter: 'bg-transparent', bg: '' },
 };
 
+/** Command history is per-machine, not per-workspace: it is muscle memory. */
+const HISTORY_KEY = 'agent-terminal-history';
+const HISTORY_LIMIT = 200;
+
 export function AgentTerminal() {
   const { currentSessionId, sessions, currentUser } = useWorkspace();
   const { messages } = useMessagePolling({ sessionId: currentSessionId });
@@ -71,8 +76,38 @@ export function AgentTerminal() {
   // Lines before this index are hidden by a manual "clear".
   const [clearedBefore, setClearedBefore] = useState(0);
 
-  const [history, setHistory] = useState<string[]>([]);
+  /*
+    HISTORY SURVIVES THE PANEL BEING CLOSED.
+
+    It lived in `useState`, so switching to another view and back — which
+    unmounts this component — emptied it. A shell whose ↑ forgets everything
+    the moment you look away is not offering history, it is offering an
+    accident that sometimes works.
+  */
+  const [history, setHistory] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(HISTORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
+  });
   const [historyIndex, setHistoryIndex] = useState(-1);
+
+  const pushHistory = useCallback((cmd: string) => {
+    setHistory((prev) => {
+      // Consecutive duplicates are noise in a history walk, the same rule bash
+      // applies with HISTCONTROL=ignoredups.
+      const next = prev[prev.length - 1] === cmd ? prev : [...prev, cmd];
+      const capped = next.slice(-HISTORY_LIMIT);
+      try {
+        window.localStorage.setItem(HISTORY_KEY, JSON.stringify(capped));
+      } catch {}
+      return capped;
+    });
+  }, []);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -169,6 +204,43 @@ export function AgentTerminal() {
   };
 
   const handleInputKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isComposing(e)) return;
+
+    /*
+      THE THREE KEYS EVERY TERMINAL HAS.
+
+      This prompt answered Enter and the arrows and nothing else — so the
+      muscle memory everyone brings to a black rectangle with a `$` in it
+      (Ctrl+C to abandon the line, Ctrl+L to clear the scrollback, Ctrl+U to
+      kill it) did the browser's thing instead, and Ctrl+L in particular put
+      the caret in a URL bar that is not there.
+    */
+    if (e.ctrlKey && !e.altKey && !e.metaKey) {
+      const key = e.key.toLowerCase();
+      if (key === 'c') {
+        e.preventDefault();
+        // Echo the abandoned line the way a shell does, so the transcript
+        // shows what was discarded rather than swallowing it.
+        if (inputValue) {
+          const t = new Date().toLocaleTimeString('en-GB', { hour12: false });
+          setLocalLines((prev) => [...prev, { time: t, type: 'command', sender: 'you', content: `${inputValue}^C` }]);
+        }
+        setInputValue('');
+        setHistoryIndex(history.length);
+        return;
+      }
+      if (key === 'l') {
+        e.preventDefault();
+        setClearedBefore(localLines.length);
+        return;
+      }
+      if (key === 'u') {
+        e.preventDefault();
+        setInputValue('');
+        return;
+      }
+    }
+
     if (e.key === 'Enter') {
       if (!inputValue.trim()) return;
       if (!currentSessionId) {
@@ -176,9 +248,8 @@ export function AgentTerminal() {
         return;
       }
       const cmd = inputValue.trim();
-      const newHistory = [...history, cmd];
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length);
+      pushHistory(cmd);
+      setHistoryIndex(history.length + 1);
       setInputValue('');
       setSending(true);
 
@@ -254,7 +325,7 @@ export function AgentTerminal() {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="filter"
-              className="bg-transparent border-0 outline-none text-3xs w-16 focus:w-24 transition-all text-foreground-extra-muted placeholder:text-foreground-muted"
+              className="bg-transparent border-0 outline-none text-3xs w-16 focus:w-24 ui-transition text-foreground-extra-muted placeholder:text-foreground-muted"
               onClick={(e) => e.stopPropagation()}
             />
           </div>

@@ -23,6 +23,7 @@ import { MessageActions } from '@/components/ai-elements/message-actions';
 import { SourcesCard, type SourceItem } from '@/components/ai-elements/sources-card';
 import { TurnChangesCapsule } from './turn-changes-capsule';
 import { workspaceApi } from '@/lib/api';
+import { downloadUrl } from '@/lib/download';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useArtifacts, type ArtifactItem } from '@/lib/artifacts-context';
@@ -88,10 +89,7 @@ function Attachments({ items }: { items: Attachment[] }) {
   }, [setSelectedFileId, setViewMode]);
 
   const handleDownload = useCallback((url: string, filename: string) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
+    downloadUrl(url, filename);
   }, []);
 
   const fixedItems = useMemo(() =>
@@ -111,7 +109,7 @@ function Attachments({ items }: { items: Attachment[] }) {
               key={img.fileId}
               type="button"
               onClick={() => openPreview(img.fileId)}
-              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md transition-all max-w-sm cursor-pointer text-left"
+              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md ui-transition max-w-sm text-left"
             >
               <img
                 src={img.url}
@@ -136,7 +134,7 @@ function Attachments({ items }: { items: Attachment[] }) {
                   <button
                     type="button"
                     onClick={() => openPreview(file.fileId)}
-                    className="inline-flex items-center gap-2 cursor-pointer text-foreground hover:text-primary transition-colors"
+                    className="inline-flex items-center gap-2 text-foreground hover:text-primary transition-colors"
                   >
                     {previewable ? (
                       <Eye className="size-3.5 text-primary shrink-0" />
@@ -150,7 +148,7 @@ function Attachments({ items }: { items: Attachment[] }) {
                   <button
                     type="button"
                     onClick={() => handleDownload(file.url, file.filename)}
-                    className="size-5 rounded hover:bg-surface1 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer ml-1"
+                    className="size-5 rounded hover:bg-surface1 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors ml-1"
                   >
                     <Download className="size-3" />
                   </button>
@@ -618,7 +616,7 @@ export const ChatMessage = memo(function ChatMessage({
                     <button
                       type="button"
                       onClick={handleCopyMarkdown}
-                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
                       aria-label="Copy markdown"
                     >
                       <Copy className="size-3" />
@@ -628,7 +626,7 @@ export const ChatMessage = memo(function ChatMessage({
                     <button
                       type="button"
                       onClick={handleQuote}
-                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
                       aria-label="Quote reply"
                     >
                       <Quote className="size-3" />

@@ -1,9 +1,13 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { useListKeyboardNav } from '@/hooks/use-list-keyboard-nav';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { useEffect, useMemo } from 'react';
-import { cn } from '@/lib/utils';
-import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight } from 'lucide-react';
+import { cn, mergeRefs } from '@/lib/utils';
+import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight, Check, Copy } from 'lucide-react';
+import { toast } from 'sonner';
+import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { useLayout } from '@/components/layout/layout-context';
@@ -52,7 +56,7 @@ function NotificationCard({
   return (
     <div
       className={cn(
-        'px-3 py-2.5 flex items-start gap-2.5 cursor-pointer transition-colors',
+        'skip-offscreen-row group px-3 py-2.5 flex items-start gap-2.5 transition-colors',
         !notification.isRead
           ? 'bg-surface2 hover:bg-surface3'
           : 'hover:bg-surface2',
@@ -98,22 +102,36 @@ function NotificationCard({
           )}
         </div>
       </div>
-      <Hint label="Dismiss">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDismiss(notification.id);
-          }}
-          className="p-1 rounded-md hover:bg-surface3 text-muted-foreground hover:text-foreground transition-colors shrink-0 opacity-0 group-hover:opacity-100 cursor-pointer"
-        >
-          <X className="size-3" />
-        </button>
-      </Hint>
+      <RowActions
+        label={`Actions for ${notification.title}`}
+        items={[
+          ...(notification.channelName
+            ? [{ label: 'Go to thread', icon: ArrowRight, onSelect: () => onNavigate(notification) }]
+            : []),
+          ...(notification.isRead
+            ? []
+            : [{ label: 'Mark as read', icon: Check, onSelect: () => onRead(notification.id) }]),
+          {
+            label: 'Copy message',
+            icon: Copy,
+            onSelect: () => {
+              navigator.clipboard.writeText(`${notification.title}
+
+${notification.message}`);
+              toast.success('Copied');
+            },
+          },
+          { label: 'Dismiss', icon: X, destructive: true, onSelect: () => onDismiss(notification.id) },
+        ]}
+      />
     </div>
   );
 }
 
 function NotificationSection({
+  indexOffset,
+  cursor,
+  rowProps,
   title,
   items,
   onRead,
@@ -125,6 +143,10 @@ function NotificationSection({
   onRead: (id: string) => void;
   onDismiss: (id: string) => void;
   onNavigate: (notification: NotificationItem) => void;
+  /** Where this section starts in the flat, cross-section cursor. */
+  indexOffset: number;
+  cursor: number;
+  rowProps: (index: number, selected?: boolean) => Record<string, unknown>;
 }) {
   if (items.length === 0) return null;
 
@@ -134,8 +156,12 @@ function NotificationSection({
         {title} ({items.length})
       </h3>
       <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-        {items.map((n) => (
-          <div key={n.id} className="group">
+        {items.map((n, i) => (
+          <div
+            key={n.id}
+            {...rowProps(indexOffset + i, cursor === indexOffset + i)}
+            className={cn('group', cursor === indexOffset + i && 'ring-1 ring-inset ring-border-accent')}
+          >
             <NotificationCard
               notification={n}
               onRead={onRead}
@@ -189,6 +215,23 @@ export function InboxView() {
     return { unread: u, read: r };
   }, [notifications]);
 
+  /*
+   * The inbox draws two sections but the keyboard walks ONE list — Unread then
+   * Read, the order they appear in. Splitting the cursor per section would mean
+   * ↓ stopping dead at the bottom of Unread with more rows visible below it,
+   * which is the behaviour people read as "the arrow keys are broken".
+   */
+  const ordered = useMemo(() => [...unread, ...read], [unread, read]);
+  const scrollRef = useScrollRestore<HTMLDivElement>('inbox');
+
+  const { cursor, listNavProps, rowProps } = useListKeyboardNav({
+    count: ordered.length,
+    onActivate: (i) => { const n = ordered[i]; if (n) handleNavigate(n); },
+    onDelete: (i) => { const n = ordered[i]; if (n) dismissNotification(n.id); },
+    onToggle: (i) => { const n = ordered[i]; if (n && !n.isRead) markNotificationRead(n.id); },
+    pageSize: 8,
+  });
+
   const handleNavigate = (notification: NotificationItem) => {
     if (!notification.isRead) {
       markNotificationRead(notification.id);
@@ -238,7 +281,11 @@ export function InboxView() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        {...listNavProps}
+        ref={mergeRefs(listNavProps.ref, scrollRef)}
+        className="flex-1 overflow-y-auto outline-none"
+      >
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
             <Inbox className="size-8 opacity-30" />
@@ -250,6 +297,9 @@ export function InboxView() {
             <NotificationSection
               title="Unread"
               items={unread}
+              indexOffset={0}
+              cursor={cursor}
+              rowProps={rowProps}
               onRead={markNotificationRead}
               onDismiss={dismissNotification}
               onNavigate={handleNavigate}
@@ -257,6 +307,9 @@ export function InboxView() {
             <NotificationSection
               title="Read"
               items={read}
+              indexOffset={unread.length}
+              cursor={cursor}
+              rowProps={rowProps}
               onRead={markNotificationRead}
               onDismiss={dismissNotification}
               onNavigate={handleNavigate}

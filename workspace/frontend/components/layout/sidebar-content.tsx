@@ -65,7 +65,7 @@ export function SidebarContent() {
             </div>
             <span className="text-2xs text-muted-foreground truncate flex-1">{user.email}</span>
             <Hint label="Sign out">
-              <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+            <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors">
                 <LogOut className="size-3" />
               </button>
             </Hint>
@@ -77,7 +77,7 @@ export function SidebarContent() {
         <div className="shrink-0 px-3.5 py-1.5 bg-surface1/60 backdrop-blur-md">
           <button
             onClick={signIn}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <LogIn className="size-3" />
             <span>Sign in</span>
@@ -94,7 +94,7 @@ export function SidebarContent() {
               type="button"
               onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
               className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
                 viewMode === 'mission'
                   ? 'bg-surface2 text-foreground font-semibold shadow-xs'
                   : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
@@ -126,7 +126,7 @@ export function SidebarContent() {
                   type="button"
                   onClick={handleCopyToken}
                   aria-label="Copy management token"
-                  className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
+                  className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
                 >
                   {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <KeyRound className="size-3.5" />}
                 </button>
@@ -141,7 +141,7 @@ export function SidebarContent() {
                 type="button"
                 onClick={toggleTheme}
                 aria-label={isDark ? 'Light mode' : 'Dark mode'}
-                className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors cursor-pointer"
+                className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
               >
                 {isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
               </button>
@@ -156,7 +156,7 @@ export function SidebarContent() {
                 onClick={() => openSettings('general')}
                 aria-label="Settings"
                 className={cn(
-                  'size-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer',
+                  'size-7 rounded-lg flex items-center justify-center transition-colors',
                   viewMode === 'settings'
                     ? 'bg-surface2 text-foreground'
                     : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'

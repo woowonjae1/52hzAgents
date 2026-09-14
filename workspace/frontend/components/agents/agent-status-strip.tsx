@@ -66,7 +66,7 @@ export function AgentStatusStrip() {
       <button
         type="button"
         onClick={() => setViewMode('mission')}
-        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors"
       >
         <Plus className="size-3.5 shrink-0 text-foreground-extra-muted" />
         <span>Connect agent</span>
@@ -103,7 +103,7 @@ export function AgentStatusStrip() {
       <button
         type="button"
         onClick={() => setViewMode('mission')}
-        className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors cursor-pointer text-left"
+        className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors text-left"
       >
         {/* -space-x-1.5, not -1: at 4px the discs merely touched, which reads as
             a crowded row rather than a stack. */}

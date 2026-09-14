@@ -1,13 +1,15 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { VisuallyHidden } from 'radix-ui';
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { Sparkles, Search, ExternalLink, Star, ArrowRight, ArrowLeft, Check, Plus, Loader2, AlertCircle, Upload, Package, LayoutGrid, Brain, Palette, Server, Database, Rocket, FlaskConical, Lock, Link2, FileText } from 'lucide-react';
+import { Sparkles, Search, ExternalLink, Star, ArrowRight, ArrowLeft, Check, Plus, Loader2, AlertCircle, Upload, Package, LayoutGrid, Brain, Palette, Server, Database, Rocket, FlaskConical, Lock, Link2, FileText, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
 import { workspaceApi } from '@/lib/api';
+import { RowActions } from '@/components/ui/row-actions';
 import type { WorkspaceCustomSkill } from '@/lib/types';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import {
@@ -189,9 +191,23 @@ const CATEGORIES = [
 // ---------------------------------------------------------------------------
 
 function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => void }) {
+  const ghUrl = skill.sourceRepo
+    ? `https://github.com/${skill.sourceRepo}/tree/main/${skill.sourcePath}`
+    : '';
+
+  /*
+    A WRAPPER, BECAUSE A BUTTON CANNOT CONTAIN A BUTTON.
+
+    The whole card was one `<button>`, so there was nowhere to put a menu
+    trigger — nesting one is invalid HTML and React warns about it. Wrapping
+    instead keeps the card's click target exactly as it was, and makes the
+    wrapper the element RowContextMenu walks up to: the trigger's parent is
+    this div, which is the relationship it matches on.
+  */
   return (
+    <div className="relative group">
     <button
-      className="text-left rounded-xl border border-border bg-card p-4 transition-all duration-150 hover:shadow-lg hover:border-primary/30 hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      className="w-full text-left rounded-xl border border-border bg-card p-4 ui-transition duration-150 hover:shadow-lg hover:border-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       onClick={() => onSelect(skill)}
     >
       <div className="flex items-start gap-3">
@@ -241,6 +257,24 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
         </span>
       </div>
     </button>
+      <RowActions
+        label={`Actions for ${skill.name}`}
+        className="absolute right-2 top-2"
+        items={[
+          { label: 'View details', icon: ArrowRight, onSelect: () => onSelect(skill) },
+          ...(ghUrl
+            ? [{
+                label: 'Copy source link',
+                icon: Copy,
+                onSelect: () => {
+                  navigator.clipboard.writeText(ghUrl);
+                  toast.success('Link copied');
+                },
+              }]
+            : []),
+        ]}
+      />
+    </div>
   );
 }
 
@@ -314,10 +348,22 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
 
   const onlineAgents = agents.filter(a => a.status === 'online');
 
+  /*
+   * A hand-rolled `fixed inset-0` overlay with an onClick was standing in for
+   * a modal here. What that misses is everything a modal is FOR: Tab walked
+   * out of the panel into the page behind it, Escape did nothing, the page
+   * kept scrolling under the backdrop, and closing left focus on <body> so the
+   * next keystroke went nowhere. Same Dialog as the rest of the app.
+   */
   return (
-    <>
-      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
-      <div className="fixed inset-x-4 top-[5%] bottom-[5%] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[480px] bg-background rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden border border-border">
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="p-0 gap-0 max-w-none w-[calc(100%-2rem)] md:w-[480px] top-[5%] bottom-[5%] translate-y-0 h-auto flex flex-col overflow-hidden"
+      >
+        <VisuallyHidden.Root asChild>
+          <DialogTitle>{skill.name}</DialogTitle>
+        </VisuallyHidden.Root>
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <div className="flex items-start gap-3">
             <div className="size-12 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">
@@ -491,8 +537,8 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
             </a>
           )}
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -562,7 +608,7 @@ export function SkillsView() {
             <button
               type="button"
               onClick={() => setViewMode('threads')}
-              className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors"
             >
               <ArrowLeft className="size-3.5" />
               <span>Back</span>
@@ -574,7 +620,7 @@ export function SkillsView() {
           <span className="text-xs text-muted-foreground">{allSkills.length} skills</span>
           <button
             onClick={() => setUploadOpen(true)}
-            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-2xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+            className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-2xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
           >
             <Upload className="size-3.5" />
             Upload custom skill
@@ -589,6 +635,7 @@ export function SkillsView() {
           <input
             type="text"
             placeholder="Search skills..."
+            data-view-search
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-muted/50 border border-input placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
@@ -741,7 +788,7 @@ function UploadSkillDialog({
             <label className="text-2xs font-medium text-muted-foreground">
               Skill package (.md or .zip)
             </label>
-            <label className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-input px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors">
+            <label className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-input px-3 py-2.5 hover:bg-muted/50 transition-colors">
               <Upload className="size-4 text-muted-foreground shrink-0" />
               <span className="text-xs truncate flex-1">
                 {file ? file.name : 'Choose a .md or .zip file…'}

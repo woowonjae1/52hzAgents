@@ -11,7 +11,7 @@ import {
 import { KeyCombo } from '@/components/ui/kbd';
 import { SHORTCUTS, type ShortcutGroup } from '@/lib/shortcuts';
 
-const GROUP_ORDER: ShortcutGroup[] = ['General', 'Navigation', 'Threads', 'Panels'];
+const GROUP_ORDER: ShortcutGroup[] = ['General', 'Navigation', 'Threads', 'Lists', 'Browser', 'Terminal', 'Panels'];
 
 /**
  * The keyboard help sheet — `?`.

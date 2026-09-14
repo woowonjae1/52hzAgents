@@ -225,7 +225,7 @@ export function ActionRequiredBanner({
                 <button
                   type="button"
                   onClick={() => onOpenThread(item.channelId)}
-                  className="inline-flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 text-2xs text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <span>Open channel</span>
                   <ArrowRight className="size-3" />
@@ -238,7 +238,7 @@ export function ActionRequiredBanner({
                         type="button"
                         onClick={() => handleDeny(item)}
                         disabled={isBusy}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-status-danger hover:bg-status-danger/10 border border-status-danger/20 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium text-status-danger hover:bg-status-danger/10 border border-status-danger/20 transition-colors"
                       >
                         <X className="size-3" />
                         <span>Deny</span>
@@ -247,7 +247,7 @@ export function ActionRequiredBanner({
                         type="button"
                         onClick={() => handleApprove(item)}
                         disabled={isBusy}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-xs"
                       >
                         <Check className="size-3" />
                         <span>Approve</span>
@@ -258,7 +258,7 @@ export function ActionRequiredBanner({
                       type="button"
                       onClick={() => handleForceStop(item)}
                       disabled={isBusy}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-status-danger text-white hover:bg-status-danger transition-colors cursor-pointer shadow-xs"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-status-danger text-white hover:bg-status-danger transition-colors shadow-xs"
                     >
                       <Square className="size-3 fill-current" />
                       <span>Force stop</span>

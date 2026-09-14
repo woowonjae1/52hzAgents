@@ -46,17 +46,18 @@ function ChangeMark({ status }: { status: string }) {
   const added = status === 'A' || status === '?';
   const deleted = status === 'D';
   return (
-    <span
-      className={cn(
-        'w-3 shrink-0 text-center font-mono text-3xs font-medium',
-        added && 'text-diff-addition',
-        deleted && 'text-diff-deletion',
-        !added && !deleted && 'text-foreground-extra-muted'
-      )}
-      title={added ? 'added' : deleted ? 'deleted' : 'modified'}
-    >
-      {status === '?' ? 'U' : status}
-    </span>
+    <Hint label={added ? 'added' : deleted ? 'deleted' : 'modified'}>
+      <span
+        className={cn(
+          'w-3 shrink-0 text-center font-mono text-3xs font-medium',
+          added && 'text-diff-addition',
+          deleted && 'text-diff-deletion',
+          !added && !deleted && 'text-foreground-extra-muted'
+        )}
+      >
+        {status === '?' ? 'U' : status}
+      </span>
+    </Hint>
   );
 }
 
@@ -124,7 +125,7 @@ export function TurnChangesCapsule({
                     setInspectFilePath(files[0]?.path);
                     setInspectorOpen(true);
                   }}
-                  className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
                 >
                   <FileDiff className="size-2.5" />
                   <span>Inspect diff</span>
@@ -138,7 +139,7 @@ export function TurnChangesCapsule({
                     onClick={handleRollback}
                     disabled={rollingBack}
                     className={cn(
-                      'cursor-pointer rounded-base bg-destructive px-2 py-0.5 text-3xs font-medium',
+                      'rounded-base bg-destructive px-2 py-0.5 text-3xs font-medium',
                       'text-destructive-foreground transition-opacity hover:opacity-90',
                       'disabled:cursor-default disabled:opacity-50'
                     )}
@@ -149,7 +150,7 @@ export function TurnChangesCapsule({
                     type="button"
                     onClick={() => setShowConfirm(false)}
                     disabled={rollingBack}
-                    className="cursor-pointer rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                    className="rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
                   >
                     Cancel
                   </button>
@@ -159,7 +160,7 @@ export function TurnChangesCapsule({
                   <button
                     type="button"
                     onClick={() => setShowConfirm(true)}
-                    className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
                   >
                     <Undo2 className="size-2.5" />
                     <span>Roll back</span>
@@ -173,33 +174,35 @@ export function TurnChangesCapsule({
         {files.length > 0 && (
           <div className="max-h-48 overflow-y-auto py-0.5">
             {files.map((file) => (
-              <button
-                key={file.path}
-                type="button"
-                onClick={() => {
-                  setInspectFilePath(file.path);
-                  setInspectorOpen(true);
-                }}
-                className="-mx-1 w-[calc(100%+8px)] flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2 text-left cursor-pointer group"
-                title="Click to inspect diff"
-              >
-                <span className="flex min-w-0 items-baseline gap-2">
-                  <ChangeMark status={file.status} />
-                  <span className="truncate text-foreground-muted group-hover:text-foreground group-hover:underline decoration-foreground-extra-muted" title={file.path}>
-                    {file.path}
+              <Hint key={file.path} label="Click to inspect diff">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectFilePath(file.path);
+                    setInspectorOpen(true);
+                  }}
+                  className="-mx-1 w-[calc(100%+8px)] flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2 text-left group"
+                >
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <ChangeMark status={file.status} />
+                    <Hint label={file.path}>
+                      <span className="truncate text-foreground-muted group-hover:text-foreground group-hover:underline decoration-foreground-extra-muted" >
+                        {file.path}
+                      </span>
+                    </Hint>
+                    {file.pre_existing && (
+                      <span className="shrink-0 text-3xs text-foreground-extra-muted">
+                        pre-existing
+                      </span>
+                    )}
                   </span>
-                  {file.pre_existing && (
-                    <span className="shrink-0 text-3xs text-foreground-extra-muted">
-                      pre-existing
-                    </span>
-                  )}
-                </span>
-                <span className="shrink-0 tabular-nums text-3xs">
-                  {file.additions > 0 && <span className="text-diff-addition">+{file.additions}</span>}
-                  {file.additions > 0 && file.deletions > 0 && ' '}
-                  {file.deletions > 0 && <span className="text-diff-deletion">−{file.deletions}</span>}
-                </span>
-              </button>
+                  <span className="shrink-0 tabular-nums text-3xs">
+                    {file.additions > 0 && <span className="text-diff-addition">+{file.additions}</span>}
+                    {file.additions > 0 && file.deletions > 0 && ' '}
+                    {file.deletions > 0 && <span className="text-diff-deletion">−{file.deletions}</span>}
+                  </span>
+                </button>
+              </Hint>
             ))}
           </div>
         )}

@@ -180,7 +180,7 @@ export function SettingsDialog({ workspace }: SettingsDialogProps) {
                 size="sm"
                 onClick={handleTestBrowserFabric}
                 disabled={testingBf}
-                className="h-7 px-2.5 text-xs font-medium border-border text-foreground hover:bg-surface2 shrink-0 cursor-pointer"
+                className="h-7 px-2.5 text-xs font-medium border-border text-foreground hover:bg-surface2 shrink-0"
               >
                 {testingBf ? (
                   <>

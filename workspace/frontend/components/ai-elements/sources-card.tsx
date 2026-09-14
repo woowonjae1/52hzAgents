@@ -1,6 +1,7 @@
 'use client';
 
 import { BookOpen, ExternalLink, FileText, Link2 } from 'lucide-react';
+import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { EventLine } from './event-line';
 
@@ -62,33 +63,33 @@ export function SourcesCard({ sources, onSelectSource, className }: SourcesCardP
           const label = src.title || src.slug || 'Untitled document';
           const description = describeSource(src);
           return (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectSource?.(src)}
-              title={src.snippet || label}
-              className={cn(
-                // No chip, no border, no shadow: these are list rows in a body
-                // that already has a rail. A bordered pill inside a bordered
-                // rail is two frames doing one frame's job.
-                'group/source -mx-1 flex min-w-0 cursor-pointer items-baseline gap-2 rounded-base px-1 py-1 text-left',
-                'transition-colors hover:bg-surface2',
-                'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2'
-              )}
-            >
-              <span className="shrink-0 translate-y-px text-foreground-extra-muted group-hover/source:text-foreground-muted">
-                <SourceIcon type={src.type} />
-              </span>
-              <span className="shrink-0 font-mono text-3xs tabular-nums text-foreground-extra-muted">
-                {idx + 1}
-              </span>
-              <span className="truncate text-xs text-foreground">{label}</span>
-              {description && (
-                <span className="truncate font-mono text-3xs text-foreground-extra-muted">
-                  {description}
+            <Hint key={idx} label={src.snippet || label}>
+              <button
+                type="button"
+                onClick={() => onSelectSource?.(src)}
+                className={cn(
+                  // No chip, no border, no shadow: these are list rows in a body
+                  // that already has a rail. A bordered pill inside a bordered
+                  // rail is two frames doing one frame's job.
+                  'group/source -mx-1 flex min-w-0 items-baseline gap-2 rounded-base px-1 py-1 text-left',
+                  'transition-colors hover:bg-surface2',
+                  'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2'
+                )}
+              >
+                <span className="shrink-0 translate-y-px text-foreground-extra-muted group-hover/source:text-foreground-muted">
+                  <SourceIcon type={src.type} />
                 </span>
-              )}
-            </button>
+                <span className="shrink-0 font-mono text-3xs tabular-nums text-foreground-extra-muted">
+                  {idx + 1}
+                </span>
+                <span className="truncate text-xs text-foreground">{label}</span>
+                {description && (
+                  <span className="truncate font-mono text-3xs text-foreground-extra-muted">
+                    {description}
+                  </span>
+                )}
+              </button>
+            </Hint>
           );
         })}
       </div>

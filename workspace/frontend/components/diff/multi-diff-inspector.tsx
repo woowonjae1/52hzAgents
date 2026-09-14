@@ -224,14 +224,14 @@ export function MultiDiffInspector({
                       setShowRollbackConfirm(false);
                     }}
                     disabled={isRollingBack}
-                    className="px-2 py-0.5 rounded bg-destructive text-destructive-foreground text-3xs font-medium hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                    className="px-2 py-0.5 rounded bg-destructive text-destructive-foreground text-3xs font-medium hover:opacity-90 disabled:opacity-50"
                   >
                     {isRollingBack ? 'Reverting…' : 'Confirm'}
                   </button>
                   <button
                     onClick={() => setShowRollbackConfirm(false)}
                     disabled={isRollingBack}
-                    className="px-1.5 py-0.5 rounded text-3xs text-foreground-extra-muted hover:text-foreground cursor-pointer"
+                    className="px-1.5 py-0.5 rounded text-3xs text-foreground-extra-muted hover:text-foreground"
                   >
                     Cancel
                   </button>
@@ -240,7 +240,7 @@ export function MultiDiffInspector({
                 <Hint label="Undo all file edits made during this agent turn">
                   <button
                     onClick={() => setShowRollbackConfirm(true)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground bg-surface3 border border-border hover:bg-surface4 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground bg-surface3 border border-border hover:bg-surface4 transition-colors"
                   >
                     <Undo2 className="size-3" />
                     <span>Roll back turn</span>
@@ -258,7 +258,7 @@ export function MultiDiffInspector({
             <Hint label="Close (Esc)">
               <button
                 onClick={onClose}
-                className="size-8 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+                className="size-8 rounded-lg flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface3 transition-colors"
               >
                 <X className="size-4" />
               </button>
@@ -285,7 +285,7 @@ export function MultiDiffInspector({
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 text-foreground-extra-muted hover:text-foreground text-3xs cursor-pointer"
+                      className="absolute right-2 text-foreground-extra-muted hover:text-foreground text-3xs"
                     >
                       Clear
                     </button>
@@ -307,7 +307,7 @@ export function MultiDiffInspector({
                     key={file.path}
                     onClick={() => setSelectedFile(file.path)}
                     className={cn(
-                      'w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer font-mono',
+                      'w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left ui-transition font-mono',
                       isSelected
                         ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs font-medium'
                         : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
@@ -366,7 +366,7 @@ export function MultiDiffInspector({
                 <Hint label={copied ? 'Copied' : 'Copy file path'}>
                   <button
                     onClick={handleCopyPath}
-                    className="p-1 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer"
+                    className="p-1 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
                   >
                     {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
                   </button>

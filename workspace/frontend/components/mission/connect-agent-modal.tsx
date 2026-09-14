@@ -118,7 +118,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                         disabled={isStarting}
                         onClick={() => handleLaunchAgent(cat.name)}
                         className={cn(
-                          'h-8 px-3 text-2xs font-medium gap-1.5 shrink-0 cursor-pointer',
+                          'h-8 px-3 text-2xs font-medium gap-1.5 shrink-0',
                           isOnline && 'border-status-success/40 text-status-success hover:bg-status-success/10',
                         )}
                       >

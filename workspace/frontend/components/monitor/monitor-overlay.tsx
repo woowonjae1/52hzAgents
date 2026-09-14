@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Hint } from '@/components/ui/hint';
 import {
   Dialog,
   DialogContent,
@@ -220,13 +221,14 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
               autoFocus
             />
           ) : (
-            <h2
-              className="text-sm font-semibold truncate flex-1 cursor-pointer hover:text-primary transition-colors"
-              onClick={startEditingTitle}
-              title="Click to rename"
-            >
-              {session.title || 'Channel'}
-            </h2>
+            <Hint label="Click to rename">
+              <h2
+                className="text-sm font-semibold truncate flex-1 hover:text-primary transition-colors"
+                onClick={startEditingTitle}
+              >
+                {session.title || 'Channel'}
+              </h2>
+            </Hint>
           )}
           {/* Stop button — visible when a Claude agent is working */}
           {(() => {

@@ -262,7 +262,7 @@ export function SettingsView() {
           <Hint label="Back to chat">
             <button
               onClick={() => setViewMode('threads')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors shadow-xs"
             >
               <ArrowLeft className="size-3.5" />
               <span>Back to chat</span>
@@ -282,7 +282,7 @@ export function SettingsView() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-3.5 h-8 shadow-xs cursor-pointer"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-3.5 h-8 shadow-xs"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Save className="size-3.5 mr-1.5" />}
               Save changes
@@ -310,7 +310,7 @@ export function SettingsView() {
                   setSettingsTab(item.id);
                 }}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all cursor-pointer',
+                  'flex items-center gap-3 px-3 py-2 rounded-xl text-left ui-transition',
                   active
                     ? 'bg-surface2 text-foreground font-medium shadow-xs'
                     : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
@@ -368,7 +368,7 @@ export function SettingsView() {
                     <button
                       type="button"
                       onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium transition-colors cursor-pointer select-none py-1"
+                      className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium transition-colors select-none py-1"
                     >
                       <ChevronRight className={cn('size-3.5 transition-transform duration-200', showAdvanced && 'rotate-90 text-primary')} />
                       <span>Developer options (workspace ID and token)</span>
@@ -388,7 +388,7 @@ export function SettingsView() {
                               variant="outline"
                               size="sm"
                               onClick={() => copyUrl(workspace?.workspaceId || '52hz')}
-                              className="h-9 px-3 shrink-0 cursor-pointer"
+                              className="h-9 px-3 shrink-0"
                             >
                               {urlCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                             </Button>
@@ -414,7 +414,7 @@ export function SettingsView() {
                                   toast.success('Token copied');
                                 }
                               }}
-                              className="h-9 px-3 shrink-0 cursor-pointer"
+                              className="h-9 px-3 shrink-0"
                             >
                               {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                             </Button>
@@ -438,7 +438,7 @@ export function SettingsView() {
                     <button
                       type="button"
                       onClick={() => setMarkColor(DEFAULT_MARK_COLOR)}
-                      className="text-2xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer flex items-center gap-1"
+                      className="text-2xs text-foreground-muted hover:text-foreground transition-colors flex items-center gap-1"
                     >
                       <RefreshCw className="size-3" />
                       Reset
@@ -468,7 +468,7 @@ export function SettingsView() {
                               aria-label={preset.label}
                               aria-pressed={active}
                               className={cn(
-                                'relative size-9 rounded-full cursor-pointer transition-all duration-150',
+                                'relative size-9 rounded-full ui-transition duration-150',
                                 // The ring sits OUTSIDE the swatch so selecting one
                                 // does not change its apparent colour area — with
                                 // an inset ring the active chip reads as a
@@ -476,7 +476,7 @@ export function SettingsView() {
                                 'ring-offset-2 ring-offset-surface1',
                                 active
                                   ? 'ring-2 ring-foreground scale-105'
-                                  : 'ring-1 ring-border/60 hover:ring-foreground-muted hover:scale-105',
+                                    : 'ring-1 ring-border/60 hover:ring-foreground-muted',
                               )}
                               style={{ backgroundColor: preset.value }}
                             >
@@ -516,7 +516,7 @@ export function SettingsView() {
                     <button
                       onClick={handleToggleAutostart}
                       disabled={!isDesktop}
-                      className="text-primary hover:opacity-80 transition-opacity cursor-pointer disabled:opacity-30"
+                      className="text-primary hover:opacity-80 transition-opacity disabled:opacity-30"
                     >
                       {autostart ? <ToggleRight className="size-7 text-primary" /> : <ToggleLeft className="size-7 text-foreground-muted" />}
                     </button>
@@ -556,7 +556,7 @@ export function SettingsView() {
                       size="sm"
                       onClick={handleAddCollaborator}
                       disabled={!newCollabEmail.trim()}
-                      className="h-9 px-4 text-xs shrink-0 cursor-pointer"
+                      className="h-9 px-4 text-xs shrink-0"
                     >
                       Add member
                     </Button>
@@ -581,7 +581,7 @@ export function SettingsView() {
                           </div>
                           <button
                             onClick={() => handleRemoveCollaborator(c.email)}
-                            className="text-xs text-status-danger hover:text-status-danger transition-colors cursor-pointer"
+                            className="text-xs text-status-danger hover:text-status-danger transition-colors"
                           >
                             Remove
                           </button>
@@ -602,7 +602,7 @@ export function SettingsView() {
                   <div className="flex items-center justify-between">
                     <button
                       onClick={() => setShowConnectAgent(false)}
-                      className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground cursor-pointer font-medium"
+                      className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium"
                     >
                       <ArrowLeft className="size-3.5" />
                       <span>Back to agents</span>
@@ -627,7 +627,7 @@ export function SettingsView() {
 
                     <Button
                       onClick={() => setShowConnectAgent(true)}
-                      className="bg-primary text-primary-foreground text-xs h-8.5 px-3.5 flex items-center gap-1.5 shadow-xs cursor-pointer"
+                      className="bg-primary text-primary-foreground text-xs h-8.5 px-3.5 flex items-center gap-1.5 shadow-xs"
                     >
                       <Plug className="size-3.5" />
                       <span>Connect agent</span>
@@ -693,7 +693,7 @@ export function SettingsView() {
                                     type="button"
                                     onClick={() => handleToggleAgentAutostart(agent.agentName, !!agent.autostart)}
                                     className={cn(
-                                      'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer border',
+                                      'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors border',
                                       agent.autostart
                                         ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
                                         : 'bg-surface2/60 border-border/60 text-foreground-extra-muted hover:text-foreground-muted'
@@ -724,7 +724,7 @@ export function SettingsView() {
                                     <button
                                       onClick={() => setSessionMaster(currentSessionId, agent.agentName)}
                                       className={cn(
-                                        'px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer inline-flex items-center gap-1',
+                                        'px-2 py-1 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1',
                                         isMaster ? 'bg-status-warning/15 text-status-warning font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
                                       )}
                                     >
@@ -738,14 +738,14 @@ export function SettingsView() {
                                   inCurrentSession ? (
                                     <button
                                       onClick={() => removeParticipant(currentSessionId, agent.agentName)}
-                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-status-danger hover:bg-status-danger/10 transition-colors cursor-pointer"
+                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-status-danger hover:bg-status-danger/10 transition-colors"
                                     >
                                       Remove from thread
                                     </button>
                                   ) : (
                                     <button
                                       onClick={() => addParticipant(currentSessionId, agent.agentName)}
-                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-primary hover:bg-primary/10 transition-colors"
                                     >
                                       Add to thread
                                     </button>
@@ -755,7 +755,7 @@ export function SettingsView() {
 
                               <button
                                 onClick={() => setSelectedAgentName(agent.agentName)}
-                                className="text-xs text-foreground-muted hover:text-foreground inline-flex items-center gap-1 cursor-pointer"
+                                className="text-xs text-foreground-muted hover:text-foreground inline-flex items-center gap-1"
                               >
                                 <span>Role</span>
                                 <ChevronRight className="size-3" />
@@ -801,7 +801,7 @@ export function SettingsView() {
                     setSplitBrowser(next);
                     toast.success(next ? 'Split browser on' : 'Split browser off');
                   }}
-                  className="text-primary hover:opacity-80 transition-opacity cursor-pointer"
+                  className="text-primary hover:opacity-80 transition-opacity"
                 >
                   {splitBrowser ? <ToggleRight className="size-7 text-primary" /> : <ToggleLeft className="size-7 text-foreground-muted" />}
                 </button>
@@ -817,7 +817,7 @@ export function SettingsView() {
                     <div
                       key={panel.id}
                       className={cn(
-                        'p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-4 shadow-xs',
+                        'p-5 rounded-2xl border ui-transition flex flex-col justify-between space-y-4 shadow-xs',
                         isActive
                           ? 'bg-surface2/60 border-primary/40 ring-1 ring-primary/20'
                           : 'bg-surface1 border-border/60 hover:border-border'
@@ -857,7 +857,7 @@ export function SettingsView() {
                             setActiveRightTab(isActive ? null : panel.id);
                             toast.success(isActive ? `${panel.name} closed` : `${panel.name} opened`);
                           }}
-                          className="h-7.5 px-3 text-xs cursor-pointer"
+                          className="h-7.5 px-3 text-xs"
                         >
                           {isActive ? 'Close' : 'Open'}
                         </Button>
@@ -898,7 +898,7 @@ export function SettingsView() {
                   <Button
                     onClick={handleExportCurrentMarkdown}
                     disabled={exporting}
-                    className="w-full bg-primary text-primary-foreground text-xs h-9 flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    className="w-full bg-primary text-primary-foreground text-xs h-9 flex items-center justify-center gap-2 shadow-xs"
                   >
                     {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
                     <span>{exporting ? 'Exporting…' : 'Export Markdown (.md)'}</span>
@@ -931,7 +931,7 @@ export function SettingsView() {
                           copyShare(workspaceShareUrl);
                           toast.success('Share link copied');
                         }}
-                        className="h-9 px-3 shrink-0 cursor-pointer"
+                        className="h-9 px-3 shrink-0"
                       >
                         {shareCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
                       </Button>

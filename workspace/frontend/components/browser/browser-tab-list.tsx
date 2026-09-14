@@ -2,7 +2,9 @@
 
 import { Hint } from '@/components/ui/hint';
 import { useState } from 'react';
-import { Globe, Plus, X, Monitor, Lock, Play, Trash2 } from 'lucide-react';
+import { Globe, Plus, X, Monitor, Lock, Play, Trash2, Copy, ExternalLink } from 'lucide-react';
+import { RowActions } from '@/components/ui/row-actions';
+import { getBridge } from '@/lib/desktop';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
@@ -178,8 +180,17 @@ export function BrowserTabList() {
                   <div
                     key={tab.id}
                     onClick={() => selectTab(tab.id)}
+                    /* Middle-click closes a tab. Every browser, every editor,
+                       every terminal multiplexer — it is the one gesture a tab
+                       strip is expected to answer, and nothing in this app
+                       listened for button 1 anywhere. */
+                    onAuxClick={(e) => {
+                      if (e.button !== 1) return;
+                      e.preventDefault();
+                      void handleClose(e, tab.id);
+                    }}
                     className={cn(
-                      'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
+                      'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group',
                       selectedBrowserTabId === tab.id
                         ? 'bg-surface2'
                         : 'hover:bg-surface2'
@@ -195,14 +206,18 @@ export function BrowserTabList() {
                         {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                       </p>
                     </div>
-                    <Hint label="Close tab">
-                      <button
-                        onClick={(e) => handleClose(e, tab.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </Hint>
+                    <RowActions
+                      label={`Actions for ${ctx?.name || tab.title || tab.url}`}
+                      items={[
+                        { label: 'Open in browser', icon: ExternalLink, onSelect: () => { void getBridge()?.openPath(tab.url); } },
+                        {
+                          label: 'Copy URL',
+                          icon: Copy,
+                          onSelect: () => { navigator.clipboard.writeText(tab.url); toast.success('URL copied'); },
+                        },
+                        { label: 'Close tab', icon: X, destructive: true, onSelect: () => { void closeBrowserTab(tab.id); } },
+                      ]}
+                    />
                   </div>
                 );
               })}
@@ -221,25 +236,36 @@ export function BrowserTabList() {
                       {' · idle'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                  {/* The two hover buttons stay — they are this row's primary
+                      verbs — but the menu is what gives the row a right-click. */}
+                  <div className="flex items-center gap-0.5">
                     <Hint label="Open tab with this session">
                       <button
                         onClick={(e) => handleOpenWithContext(e, ctx.id)}
                         disabled={opening}
-                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-success transition-colors disabled:opacity-50 cursor-pointer"
+                        className="opacity-0 group-hover:opacity-100 ui-transition p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-success disabled:opacity-50"
                       >
                         <Play className="size-3.5" />
                       </button>
                     </Hint>
-                    <Hint label="Delete saved session">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setPendingContext({ id: ctx.id, name: ctx.name }); }}
-                        className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    </Hint>
                   </div>
+                  <RowActions
+                    label={`Actions for ${ctx.name}`}
+                    items={[
+                      {
+                        label: 'Open tab with this session',
+                        icon: Play,
+                        disabled: opening,
+                        onSelect: () => { void openBrowserTabWithContext(ctx.id); },
+                      },
+                      {
+                        label: 'Delete saved session',
+                        icon: Trash2,
+                        destructive: true,
+                        onSelect: () => setPendingContext({ id: ctx.id, name: ctx.name }),
+                      },
+                    ]}
+                  />
                 </div>
               ))}
             </>
@@ -258,8 +284,13 @@ export function BrowserTabList() {
                 <div
                   key={tab.id}
                   onClick={() => selectTab(tab.id)}
+                  onAuxClick={(e) => {
+                    if (e.button !== 1) return;
+                    e.preventDefault();
+                    void handleClose(e, tab.id);
+                  }}
                   className={cn(
-                    'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group cursor-pointer',
+                    'w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group',
                     selectedBrowserTabId === tab.id
                       ? 'bg-surface2'
                       : 'hover:bg-surface2'
@@ -277,14 +308,18 @@ export function BrowserTabList() {
                       {(tab.lastActivityAt || tab.lastActiveAt) && ` · ${timeAgo((tab.lastActivityAt || tab.lastActiveAt)!)}`}
                     </p>
                   </div>
-                  <Hint label="Close tab">
-                    <button
-                      onClick={(e) => handleClose(e, tab.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer"
-                    >
-                      <X className="size-3.5" />
-                    </button>
-                  </Hint>
+                  <RowActions
+                    label={`Actions for ${tab.title || tab.url}`}
+                    items={[
+                      { label: 'Open in browser', icon: ExternalLink, onSelect: () => { void getBridge()?.openPath(tab.url); } },
+                      {
+                        label: 'Copy URL',
+                        icon: Copy,
+                        onSelect: () => { navigator.clipboard.writeText(tab.url); toast.success('URL copied'); },
+                      },
+                      { label: 'Close tab', icon: X, destructive: true, onSelect: () => { void closeBrowserTab(tab.id); } },
+                    ]}
+                  />
                 </div>
               ))}
             </>
