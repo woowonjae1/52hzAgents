@@ -24,6 +24,8 @@ const WIN_DRIVE = /^[a-zA-Z]:[\\/]/;
 import { BookOpen } from 'lucide-react';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { workspaceApi } from '@/lib/api';
+import { downloadUrl } from '@/lib/download';
+import { getBridge } from '@/lib/desktop';
 
 // Stable plugin arrays — avoids re-creating on every render
 const remarkPlugins = [remarkGfm];
@@ -332,10 +334,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             <button
               type="button"
               onClick={() => {
-                const a = document.createElement('a');
-                a.href = href!;
-                a.download = '';
-                a.click();
+                downloadUrl(href!);
               }}
               className="text-primary underline underline-offset-2 hover:text-primary/80 text-left"
             >
@@ -375,10 +374,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
             return;
           }
 
-          const bridge =
-            typeof window !== 'undefined'
-              ? (window as unknown as { electronBridge?: { openPath?: (p: string) => Promise<boolean> } }).electronBridge
-              : undefined;
+          const bridge = getBridge();
 
           if (bridge?.openPath) {
             const opened = await bridge.openPath(targetPath);
@@ -401,13 +397,13 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         };
 
         return (
-          <Hint label={href}>
+          <Hint label={`Open locally: ${href}`}>
             <button
               type="button"
-              onClick={() => void openLocal()}
-              className="text-primary underline underline-offset-2 hover:text-primary/80 text-left"
+              onClick={openLocal}
+              className="text-primary underline underline-offset-2 hover:text-primary/80 font-mono text-xs cursor-pointer inline-flex items-center gap-1"
             >
-              {children}
+              <span>{children}</span>
             </button>
           </Hint>
         );
@@ -418,7 +414,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         <a
           href={href}
           onClick={(e) => {
-            const bridge = (window as unknown as { electronBridge?: { openPath?: (p: string) => void } }).electronBridge;
+            const bridge = getBridge();
             if (isHttp && bridge?.openPath) {
               e.preventDefault();
               bridge.openPath(href!);

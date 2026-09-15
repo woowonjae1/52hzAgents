@@ -13,6 +13,7 @@ import { SectionHeader } from './section-header';
 import type { WorkspaceSession } from '@/lib/types';
 import { useState } from 'react';
 import { timeAgo } from '@/lib/helpers';
+import { isComposing } from '@/lib/ime';
 
 interface SessionListProps {
   sessions: WorkspaceSession[];
@@ -52,6 +53,7 @@ function SessionItem({
           onChange={(e) => setRenameValue(e.target.value)}
           onBlur={handleRenameSubmit}
           onKeyDown={(e) => {
+            if (isComposing(e)) return;
             if (e.key === 'Enter') handleRenameSubmit();
             if (e.key === 'Escape') setIsRenaming(false);
           }}

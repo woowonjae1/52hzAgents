@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Sparkles, ArrowRight, CornerDownLeft, Maximize2, Loader2, X } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
+import { isComposing } from '@/lib/ime';
+import { getBridge } from '@/lib/desktop';
 import type { WorkspaceAgent, WorkspaceMessage } from '@/lib/types';
 
 export default function QuickBarPage() {
@@ -42,8 +44,7 @@ export default function QuickBarPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        const bridge = (window as unknown as { electronBridge?: { hideQuickBar: () => void } }).electronBridge;
-        bridge?.hideQuickBar();
+        getBridge()?.hideQuickBar();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -124,7 +125,7 @@ export default function QuickBarPage() {
   }, [prompt, loading, selectedAgent, activeSessionId]);
 
   const handleOpenFull = () => {
-    const bridge = (window as unknown as { electronBridge?: { openMainWindow: (route?: string) => void; hideQuickBar: () => void } }).electronBridge;
+    const bridge = getBridge();
     if (bridge) {
       bridge.openMainWindow(activeSessionId ? `/${activeSessionId}` : '/');
       bridge.hideQuickBar();
@@ -132,8 +133,7 @@ export default function QuickBarPage() {
   };
 
   const handleDismiss = () => {
-    const bridge = (window as unknown as { electronBridge?: { hideQuickBar: () => void } }).electronBridge;
-    bridge?.hideQuickBar();
+    getBridge()?.hideQuickBar();
   };
 
   return (
@@ -177,6 +177,7 @@ export default function QuickBarPage() {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => {
+              if (isComposing(e)) return;
               if (e.key === 'Enter') handleSend();
             }}
             placeholder="Command agents or ask anything... (Press Enter)"

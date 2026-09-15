@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLayout } from '@/components/layout/layout-context';
+import { useIsDesktop } from '@/lib/desktop';
 
 interface WebviewProps extends React.HTMLAttributes<HTMLElement> {
   src?: string;
@@ -57,9 +58,7 @@ function normalizeInput(raw: string): string | null {
 }
 
 export function LocalPreview() {
-  const isDesktop =
-    typeof window !== 'undefined' &&
-    !!(window as unknown as { electronBridge?: unknown }).electronBridge;
+  const isDesktop = useIsDesktop();
 
   const { previewUrl } = useLayout();
 

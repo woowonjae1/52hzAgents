@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { stripAddressPrefix } from '@/lib/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { PromptDialog } from '@/components/ui/prompt-dialog';
+import { isComposing } from '@/lib/ime';
 
 export function BrowserView() {
   const {
@@ -275,6 +276,7 @@ export function BrowserView() {
               onChange={(e) => setUrlDraft(e.target.value)}
               onBlur={() => setEditingUrl(false)}
               onKeyDown={(e) => {
+                if (isComposing(e)) return;
                 if (e.key === 'Enter') handleNavigate();
                 if (e.key === 'Escape') setEditingUrl(false);
               }}

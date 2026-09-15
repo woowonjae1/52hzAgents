@@ -3,11 +3,12 @@
 import * as React from 'react';
 import { Hint } from '@/components/ui/hint';
 import { useTheme } from 'next-themes';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from './layout-context';
+import { getBridge } from '@/lib/desktop';
 
 /**
  * The window's own titlebar, rendered only inside the Electron shell.
@@ -28,7 +29,7 @@ import { useLayout } from './layout-context';
  */
 export function AppTitlebar() {
   const { workspace, realtimeStatus } = useWorkspace();
-  const { isSidebarOpen, sidebarToggle } = useLayout();
+  const { isSidebarOpen, sidebarToggle, goBack, goForward, canGoBack, canGoForward } = useLayout();
   const { resolvedTheme } = useTheme();
   const isLive = realtimeStatus === 'live';
   const isConnecting = realtimeStatus === 'connecting';
@@ -54,9 +55,7 @@ export function AppTitlebar() {
     If the cache was fine, this is two style writes and a no-op.
   */
   React.useEffect(() => {
-    const bridge = (window as unknown as {
-      electronBridge?: { onWindowStateChanged?: (cb: () => void) => () => void };
-    }).electronBridge;
+    const bridge = getBridge();
     if (!bridge?.onWindowStateChanged) return;
 
     let frame = 0;
@@ -89,9 +88,7 @@ export function AppTitlebar() {
   */
   React.useEffect(() => {
     if (!resolvedTheme) return;
-    const bridge = (window as unknown as {
-      electronBridge?: { setTitleBarSymbolColor?: (color: string) => void };
-    }).electronBridge;
+    const bridge = getBridge();
     bridge?.setTitleBarSymbolColor?.(resolvedTheme === 'dark' ? '#8a8a8a' : '#52525b');
   }, [resolvedTheme]);
 
@@ -120,22 +117,58 @@ export function AppTitlebar() {
       className="app-titlebar fixed top-0 start-0 end-0 z-50 flex items-center gap-2 bg-surface-sidebar"
       aria-label="Window titlebar"
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            onClick={sidebarToggle}
-            aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-            aria-expanded={isSidebarOpen}
-            className="size-6 shrink-0 rounded-md flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors"
-          >
-            <PanelLeft className="size-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={6}>
-          {isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-        </TooltipContent>
-      </Tooltip>
+      <div className="flex items-center gap-0.5 shrink-0 [app-region:no-drag]">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={sidebarToggle}
+              aria-label={isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+              aria-expanded={isSidebarOpen}
+              className="size-6 shrink-0 rounded-md flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors"
+            >
+              <PanelLeft className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            {isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={goBack}
+              disabled={!canGoBack}
+              aria-label="Back"
+              className="size-6 shrink-0 rounded-md flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            Back (Alt+←)
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={goForward}
+              disabled={!canGoForward}
+              aria-label="Forward"
+              className="size-6 shrink-0 rounded-md flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={6}>
+            Forward (Alt+→)
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
       <span className="h-3.5 w-px bg-border shrink-0" />
 

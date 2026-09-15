@@ -20,6 +20,9 @@ import * as React from 'react';
  * to the middle of a list whose contents have all changed is worse than the
  * top.
  */
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
 export function useScrollRestore<T extends HTMLElement>(
   key: string,
   /** Wait for this to be true before restoring — pass `!loading`. */
@@ -31,7 +34,7 @@ export function useScrollRestore<T extends HTMLElement>(
 
   // Restore once the rows exist. Restoring into an empty container just sets
   // scrollTop to 0, so a list that is still loading must not be restored yet.
-  React.useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!ready || restored.current) return;
     const el = ref.current;
     if (!el || el.scrollHeight <= el.clientHeight) return;

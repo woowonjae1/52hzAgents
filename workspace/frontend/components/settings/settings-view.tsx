@@ -51,6 +51,7 @@ import { useLayout, type SettingsTab } from '@/components/layout/layout-context'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getBridge } from '@/lib/desktop';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { useMarkColor } from '@/hooks/use-mark-color';
@@ -98,7 +99,7 @@ export function SettingsView() {
 
   // Check desktop bridge for autostart status
   useEffect(() => {
-    const bridge = (window as unknown as { electronBridge?: { isDesktop: boolean; getAutostart: () => Promise<boolean>; setAutostart: (enabled: boolean) => Promise<boolean> } }).electronBridge;
+    const bridge = getBridge();
     if (bridge?.isDesktop) {
       setIsDesktop(true);
       bridge.getAutostart().then((enabled) => setAutostart(enabled)).catch(() => {});
@@ -121,7 +122,7 @@ export function SettingsView() {
   }, [workspace?.workspaceId]);
 
   const handleToggleAutostart = async () => {
-    const bridge = (window as unknown as { electronBridge?: { setAutostart: (enabled: boolean) => Promise<boolean> } }).electronBridge;
+    const bridge = getBridge();
     if (bridge) {
       const next = !autostart;
       const res = await bridge.setAutostart(next);

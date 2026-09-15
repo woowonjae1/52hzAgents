@@ -915,8 +915,13 @@ function createMainWindow() {
 
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    // Same rule as the View menu above: a packaged build has no devtools key.
-    if (isPackaged) return;
+    // Same rule as the View menu above: a packaged build has no devtools or reload key.
+    if (isPackaged) {
+      if (input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')) {
+        event.preventDefault();
+      }
+      return;
+    }
     if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
       mainWindow.webContents.toggleDevTools();
     }
@@ -1371,6 +1376,7 @@ ipcMain.handle('shell-show-item', async (event, pathStr) => {
       if (cleanPath.startsWith('/') && /^[a-zA-Z]:/.test(cleanPath.slice(1))) {
         cleanPath = cleanPath.slice(1);
       }
+      cleanPath = cleanPath.replace(/\//g, '\\');
     }
     shell.showItemInFolder(cleanPath);
     return true;

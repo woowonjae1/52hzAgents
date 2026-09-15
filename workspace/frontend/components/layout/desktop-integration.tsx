@@ -164,7 +164,16 @@ export function DesktopIntegration() {
     if (!bridge?.onDownloadComplete) return;
 
     const unsubscribers = [
+      bridge.onDownloadProgress?.(({ filename, percent }) => {
+        if (percent > 0 && percent < 100) {
+          toast.loading(`Downloading ${filename} (${percent}%)`, {
+            id: `download-${filename}`,
+            duration: 4000,
+          });
+        }
+      }),
       bridge.onDownloadComplete(({ filename, savePath }) => {
+        toast.dismiss(`download-${filename}`);
         toast.success(`Saved ${filename}`, {
           action: {
             label: 'Show in folder',
@@ -178,8 +187,11 @@ export function DesktopIntegration() {
         });
       }),
       // Closing the Save dialog is an answer, not a failure — say nothing.
-      bridge.onDownloadCancelled?.(() => {}),
+      bridge.onDownloadCancelled?.(({ filename }) => {
+        if (filename) toast.dismiss(`download-${filename}`);
+      }),
       bridge.onDownloadFailed?.(({ filename }) => {
+        if (filename) toast.dismiss(`download-${filename}`);
         toast.error(`Could not save ${filename}`);
       }),
     ].filter(Boolean) as Array<() => void>;

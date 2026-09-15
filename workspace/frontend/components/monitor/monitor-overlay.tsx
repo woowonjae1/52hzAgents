@@ -13,6 +13,7 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { workspaceApi } from '@/lib/api';
+import { isComposing } from '@/lib/ime';
 import { Square } from 'lucide-react';
 import type { WorkspaceMessage, WorkspaceSession } from '@/lib/types';
 
@@ -214,6 +215,7 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={commitTitle}
               onKeyDown={(e) => {
+                if (isComposing(e)) return;
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}

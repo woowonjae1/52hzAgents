@@ -12,6 +12,7 @@ import { EmptyState } from './empty-state';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { useComposingSignal } from '@/hooks/use-composing-signal';
+import { isComposing } from '@/lib/ime';
 import { workspaceApi } from '@/lib/api';
 import { capture } from '@/lib/analytics';
 import { Button } from '@/components/ui/button';
@@ -872,6 +873,7 @@ export function ChatView() {
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={commitTitle}
               onKeyDown={(e) => {
+                if (isComposing(e)) return;
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}

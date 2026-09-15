@@ -95,6 +95,7 @@ export function AgentTerminal() {
     }
   });
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const draftRef = useRef('');
 
   const pushHistory = useCallback((cmd: string) => {
     setHistory((prev) => {
@@ -249,7 +250,8 @@ export function AgentTerminal() {
       }
       const cmd = inputValue.trim();
       pushHistory(cmd);
-      setHistoryIndex(history.length + 1);
+      setHistoryIndex(-1);
+      draftRef.current = '';
       setInputValue('');
       setSending(true);
 
@@ -271,14 +273,23 @@ export function AgentTerminal() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (history.length === 0) return;
-      const idx = historyIndex > 0 ? historyIndex - 1 : 0;
+      if (historyIndex === -1) {
+        draftRef.current = inputValue;
+      }
+      const idx = historyIndex === -1 ? history.length - 1 : Math.max(0, historyIndex - 1);
       setHistoryIndex(idx);
       setInputValue(history[idx] || '');
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const idx = historyIndex < history.length - 1 ? historyIndex + 1 : history.length;
-      setHistoryIndex(idx);
-      setInputValue(idx === history.length ? '' : history[idx] || '');
+      if (historyIndex === -1) return;
+      const idx = historyIndex + 1;
+      if (idx >= history.length) {
+        setHistoryIndex(-1);
+        setInputValue(draftRef.current);
+      } else {
+        setHistoryIndex(idx);
+        setInputValue(history[idx] || '');
+      }
     }
   };
 
