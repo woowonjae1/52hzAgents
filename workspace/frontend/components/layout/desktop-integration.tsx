@@ -206,5 +206,36 @@ export function DesktopIntegration() {
     bridge.setUnreadCount(unreadNotificationCount, drawBadge(unreadNotificationCount));
   }, [unreadNotificationCount]);
 
+  // ── Protocol URL, Power Resume & Approval Navigation ─────────────────
+  React.useEffect(() => {
+    const bridge = getBridge();
+    if (!bridge) return;
+
+    const unsubs = [
+      bridge.onProtocolUrl?.((rawUrl) => {
+        try {
+          const u = new URL(rawUrl);
+          const target = u.pathname?.replace(/^\/+/, '') || u.hostname;
+          if (target) {
+            toast.info(`Opened via protocol: ${target}`);
+          }
+        } catch {
+          // Invalid protocol URL
+        }
+      }),
+      bridge.onPowerResume?.(() => {
+        toast.info('System resumed. Connections synchronised.');
+      }),
+      bridge.onNavigateApproval?.(({ agentName, action }) => {
+        toast.info(`Approval required for @${agentName}`, {
+          description: action,
+          duration: 8000,
+        });
+      }),
+    ].filter(Boolean) as Array<() => void>;
+
+    return () => unsubs.forEach((fn) => fn());
+  }, []);
+
   return null;
 }

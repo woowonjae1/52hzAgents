@@ -100,6 +100,13 @@ export interface ElectronBridge {
   onDownloadFailed(handler: (p: { filename: string; state: string }) => void): () => void;
   onMenuCommand(handler: (command: string) => void): () => void;
   onNavigateToChannel(handler: (channel: string) => void): () => void;
+  setProgressBar(progress: number): void;
+  flashFrame(flag: boolean): void;
+  resizeQuickBar(height: number): void;
+  writeClipboard(text: string): Promise<boolean>;
+  onProtocolUrl(handler: (url: string) => void): () => void;
+  onPowerResume(handler: () => void): () => void;
+  onNavigateApproval(handler: (info: { approvalId: string; agentName: string; action: string }) => void): () => void;
 }
 
 /**
@@ -109,4 +116,29 @@ export interface ElectronBridge {
 export function getBridge(): ElectronBridge | null {
   if (typeof window === 'undefined') return null;
   return (window as unknown as { electronBridge?: ElectronBridge }).electronBridge ?? null;
+}
+
+/**
+ * Robust clipboard copy that uses the desktop bridge when available and
+ * falls back cleanly to the browser navigator.clipboard.
+ */
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  const bridge = getBridge();
+  if (bridge?.writeClipboard) {
+    try {
+      await bridge.writeClipboard(text);
+      return true;
+    } catch {
+      // Fall through to navigator.clipboard
+    }
+  }
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fallback
+    }
+  }
+  return false;
 }

@@ -162,6 +162,11 @@ export function GlobalShortcuts() {
           h.openSettings('general');
           return;
         }
+        if ((key === '/' || e.code === 'Slash') && !e.shiftKey) {
+          e.preventDefault();
+          setHelpOpen(true);
+          return;
+        }
         if (key === 'l' && e.shiftKey) {
           e.preventDefault();
           h.setTheme(h.theme === 'dark' ? 'light' : 'dark');

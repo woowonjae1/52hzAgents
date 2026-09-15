@@ -73,6 +73,15 @@ contextBridge.exposeInMainWorld('electronBridge', {
   /** Menu-bar items that run an in-app command. See main.js `command()`. */
   onMenuCommand: (handler) => subscribe('menu-command', handler),
 
+  setProgressBar: (progress) => ipcRenderer.send('window-set-progress-bar', progress),
+  flashFrame: (flag) => ipcRenderer.send('window-flash-frame', flag),
+  resizeQuickBar: (height) => ipcRenderer.send('quickbar:resize-height', height),
+  writeClipboard: (text) => ipcRenderer.invoke('clipboard-write-text', text),
+
+  onProtocolUrl: (handler) => subscribe('open-protocol-url', handler),
+  onPowerResume: (handler) => subscribe('power-monitor-resume', handler),
+  onNavigateApproval: (handler) => subscribe('navigate-approval', handler),
+
   onNavigateToChannel: (handler) => {
     if (typeof handler !== 'function') return () => {};
     const listener = (event, channel) => handler(channel);

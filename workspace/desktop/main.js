@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog } = require('electron');
+const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog, clipboard, powerMonitor } = require('electron');
 const path = require('path');
 const http = require('http');
 const net = require('net');
@@ -9,17 +9,27 @@ const { spawn, execSync, fork } = require('child_process');
 try {
   app.commandLine.appendSwitch('enable-gpu-rasterization');
   app.commandLine.appendSwitch('enable-zero-copy');
-  // `disable-gpu-shader-disk-cache` and `disable-gpu-program-cache` used to sit
-  // here, directly under the two switches above, and undid part of what they
-  // buy: with both caches off every launch recompiles the shader programs for
-  // every draw path the UI hits, and nothing is retained between runs. Turning
-  // GPU rasterisation on and then refusing to keep its compiled programs is a
-  // contradiction. If they were added to work around a shader-cache write
-  // failure in the packaged app, the fix is the userData path below, not
-  // disabling the cache.
   const customUserData = path.join(app.getPath('appData'), '52hzAgents-Desktop');
   app.setPath('userData', customUserData);
 } catch (e) {}
+
+// Diagnostic File Logger
+const LOGS_DIR = path.join(app.getPath('userData'), 'logs');
+const LOG_FILE = path.join(LOGS_DIR, 'app.log');
+function logToFile(level, ...args) {
+  try {
+    if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
+    const line = `[${new Date().toISOString()}] [${level}] ${args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')}\n`;
+    fs.appendFileSync(LOG_FILE, line, 'utf8');
+  } catch (e) {}
+}
+
+// Register Custom URL Scheme (52hzagents://)
+try {
+  app.setAsDefaultProtocolClient('52hzagents');
+} catch (e) {
+  logToFile('WARN', 'Failed to register protocol client:', e.message);
+}
 
 function getAssetPath(filename) {
   const unpackedPath = path.join(__dirname.replace(/app\.asar$/, 'app.asar.unpacked'), filename);
@@ -719,6 +729,70 @@ function createMainWindow() {
   `;
   mainWindow.loadURL(splashHtml);
 
+  // Download lifecycle & OS Taskbar progress
+  mainWindow.webContents.session.on('will-download', (_event, item) => {
+    const filename = item.getFilename();
+    item.on('updated', (_evt, state) => {
+      if (state === 'progressing') {
+        const received = item.getReceivedBytes();
+        const total = item.getTotalBytes();
+        const percent = total > 0 ? Math.round((received / total) * 100) : 0;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setProgressBar(total > 0 ? received / total : 0.5);
+          mainWindow.webContents.send('download-progress', {
+            filename,
+            received,
+            total,
+            percent,
+          });
+        }
+      } else if (state === 'interrupted') {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.setProgressBar(-1);
+          mainWindow.webContents.send('download-failed', { filename, state: 'interrupted' });
+        }
+      }
+    });
+
+    item.once('done', (_evt, state) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.setProgressBar(-1);
+        if (state === 'completed') {
+          const savePath = item.getSavePath();
+          mainWindow.webContents.send('download-complete', { filename, savePath });
+        } else if (state === 'cancelled') {
+          mainWindow.webContents.send('download-cancelled', { filename });
+        } else {
+          mainWindow.webContents.send('download-failed', { filename, state });
+        }
+      }
+    });
+  });
+
+  // Crash recovery & responsiveness monitoring
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logToFile('ERROR', 'Render process gone:', JSON.stringify(details));
+    if (details.reason !== 'clean-exit' && details.reason !== 'killed') {
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: '52hzAgents: 页面异常',
+        message: '窗口渲染进程发生意外退出。',
+        detail: `退出原因: ${details.reason} (错误代码: ${details.exitCode})。是否尝试重新加载？`,
+        buttons: ['重新加载 (Reload)', '关闭窗口 (Close)'],
+        defaultId: 0,
+        cancelId: 1,
+      }).then(({ response }) => {
+        if (response === 0 && mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.reload();
+        }
+      }).catch(() => {});
+    }
+  });
+
+  mainWindow.on('unresponsive', () => {
+    logToFile('WARN', 'Main window became unresponsive');
+  });
+
   // Guard every <webview> attach. Two independent things are enforced here:
   //
   //  1. The child gets no preload and no node integration, whatever the
@@ -844,7 +918,23 @@ function createMainWindow() {
     { role: 'windowMenu' },
     {
       label: 'Help',
-      submenu: [command('Keyboard Shortcuts', 'shortcuts', '?')],
+      submenu: [
+        command('Keyboard Shortcuts', 'shortcuts', '?'),
+        { type: 'separator' },
+        {
+          label: 'Open Logs Folder',
+          click: () => {
+            if (!fs.existsSync(LOGS_DIR)) {
+              fs.mkdirSync(LOGS_DIR, { recursive: true });
+            }
+            shell.openPath(LOGS_DIR);
+          },
+        },
+        {
+          label: 'Documentation & GitHub',
+          click: () => shell.openExternal('https://github.com/openagents/openagents'),
+        },
+      ],
     },
   ]));
   if (!isMac) {
@@ -1152,13 +1242,14 @@ function toggleQuickBar() {
 function showApprovalNotification(agentName, action, approvalId) {
   if (!Notification.isSupported()) return;
 
+  const isWin = process.platform === 'win32';
   const notif = new Notification({
-    title: `52hzAgents: Approval Required`,
-    body: `Agent @${agentName} requested permission to execute: ${action}`,
-    actions: [
+    title: `52hzAgents: 审批请求`,
+    body: `Agent @${agentName} 请求执行: ${action}${isWin ? ' (点击前往处理)' : ''}`,
+    actions: process.platform === 'darwin' ? [
       { type: 'button', text: 'Approve' },
       { type: 'button', text: 'Reject' },
-    ],
+    ] : [],
   });
 
   notif.on('action', (event, index) => {
@@ -1171,7 +1262,20 @@ function showApprovalNotification(agentName, action, approvalId) {
     req.end();
   });
 
+  notif.on('click', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+      mainWindow.flashFrame(false);
+      mainWindow.webContents.send('navigate-approval', { approvalId, agentName, action });
+    }
+  });
+
   notif.show();
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+    mainWindow.flashFrame(true);
+  }
 }
 
 // OS Native Notification for Tasks, Timers, Routines & Notifications
@@ -1195,10 +1299,11 @@ function showDesktopNotification({ title, body, channel, silent = false }) {
   });
 
   notif.on('click', () => {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
       mainWindow.focus();
+      mainWindow.flashFrame(false);
       if (channel) {
         mainWindow.webContents.send('navigate-to-channel', channel);
       }
@@ -1206,6 +1311,9 @@ function showDesktopNotification({ title, body, channel, silent = false }) {
   });
 
   notif.show();
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused() && !silent) {
+    mainWindow.flashFrame(true);
+  }
 }
 
 // IPC Handlers
@@ -1253,7 +1361,41 @@ ipcMain.on('window-titlebar-symbol-color', (_event, color) => {
   }
 });
 
-ipcMain.on('quickbar-hide', () => quickBarWindow?.hide());
+ipcMain.on('window-set-progress-bar', (_event, progress) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setProgressBar(typeof progress === 'number' ? progress : -1);
+  }
+});
+
+ipcMain.on('window-flash-frame', (_event, flag) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.flashFrame(Boolean(flag));
+  }
+});
+
+ipcMain.on('quickbar:resize-height', (_event, height) => {
+  if (!quickBarWindow || quickBarWindow.isDestroyed()) return;
+  const clampedHeight = Math.max(100, Math.min(560, Math.round(height)));
+  const [w, h] = quickBarWindow.getSize();
+  if (h !== clampedHeight) {
+    quickBarWindow.setSize(w, clampedHeight);
+  }
+});
+
+ipcMain.handle('clipboard-write-text', (_event, text) => {
+  try {
+    clipboard.writeText(String(text || ''));
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.on('quickbar-hide', () => {
+  if (quickBarWindow && !quickBarWindow.isDestroyed()) {
+    quickBarWindow.hide();
+  }
+});
 ipcMain.on('main-window-open', (event, route) => {
   if (mainWindow) {
     if (route) {
@@ -1386,18 +1528,36 @@ ipcMain.handle('shell-show-item', async (event, pathStr) => {
   }
 });
 
-// Single Instance Lock
+// Single Instance Lock & Protocol Dispatcher
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
-    if (mainWindow) {
+  app.on('second-instance', (_event, commandLine) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       if (!mainWindow.isVisible()) mainWindow.show();
       mainWindow.setAlwaysOnTop(true);
       mainWindow.focus();
       mainWindow.setAlwaysOnTop(false);
+
+      // Extract custom URL scheme if launched via 52hzagents://
+      const urlArg = commandLine && commandLine.find((arg) => typeof arg === 'string' && arg.startsWith('52hzagents://'));
+      if (urlArg && mainWindow.webContents) {
+        mainWindow.webContents.send('open-protocol-url', urlArg);
+      }
+    }
+  });
+
+  app.on('open-url', (event, url) => {
+    event.preventDefault();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+      if (mainWindow.webContents) {
+        mainWindow.webContents.send('open-protocol-url', url);
+      }
     }
   });
 }
@@ -1406,6 +1566,40 @@ app.whenReady().then(async () => {
   if (!gotTheLock) return;
   if (process.platform === 'win32') {
     app.setAppUserModelId('com.52hzagents.app');
+
+    // Windows Taskbar JumpList
+    try {
+      app.setUserTasks([
+        {
+          program: process.execPath,
+          arguments: '--action=new-chat',
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: '新建会话 (New Chat)',
+          description: '创建新的 Agent 对话',
+        },
+        {
+          program: process.execPath,
+          arguments: '--action=quickbar',
+          iconPath: process.execPath,
+          iconIndex: 0,
+          title: '快速悬浮栏 (QuickBar)',
+          description: '呼出快速提问浮窗',
+        },
+      ]);
+    } catch (e) {
+      logToFile('WARN', 'Failed to register JumpList tasks:', e.message);
+    }
+  }
+
+  // Power Monitor (System Sleep / Wakeup Sync)
+  if (powerMonitor) {
+    powerMonitor.on('resume', () => {
+      logToFile('INFO', 'System resumed from sleep');
+      if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+        mainWindow.webContents.send('power-monitor-resume');
+      }
+    });
   }
 
   if (isPackaged) {

@@ -51,8 +51,20 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
 
   React.useEffect(() => {
     fetchStats();
-    const interval = setInterval(fetchStats, 30_000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchStats();
+    }, 30_000);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchStats();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [fetchStats]);
 
   const channelHealth = React.useMemo<ChannelContextHealth | null>(() => {

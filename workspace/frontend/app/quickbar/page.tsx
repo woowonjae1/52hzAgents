@@ -18,6 +18,28 @@ export default function QuickBarPage() {
   const [latestResponse, setLatestResponse] = useState<string>('');
   const [statusText, setStatusText] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize QuickBar window height with content
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const updateHeight = () => {
+      const rect = el.getBoundingClientRect();
+      const targetHeight = Math.ceil(rect.height) + 20;
+      getBridge()?.resizeQuickBar(Math.max(120, targetHeight));
+    };
+
+    updateHeight();
+
+    const ro = new ResizeObserver(() => {
+      updateHeight();
+    });
+    ro.observe(el);
+
+    return () => ro.disconnect();
+  }, [statusText, latestResponse, loading]);
 
   // Auto-focus input on mount / window focus
   useEffect(() => {
@@ -138,7 +160,7 @@ export default function QuickBarPage() {
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-transparent p-2 select-none overflow-hidden font-sans">
-      <div className="flex flex-col w-full bg-[#121215]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden [app-region:drag]">
+      <div ref={containerRef} className="flex flex-col w-full bg-[#121215]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden [app-region:drag]">
         {/* Main Input Row */}
         <div className="flex items-center gap-2.5 px-3.5 py-3.5 [app-region:no-drag]">
           {/* Agent Picker Pill */}
@@ -234,7 +256,7 @@ export default function QuickBarPage() {
               </div>
             )}
             {latestResponse && (
-              <div className="max-h-28 overflow-y-auto text-white/90 text-xs bg-black/30 rounded-lg p-2.5 leading-relaxed font-sans border border-white/5">
+              <div className="max-h-72 overflow-y-auto text-white/90 text-xs bg-black/30 rounded-lg p-2.5 leading-relaxed font-sans border border-white/5">
                 <p className="whitespace-pre-wrap">{latestResponse}</p>
                 <button
                   onClick={handleOpenFull}

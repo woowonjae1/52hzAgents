@@ -21,11 +21,11 @@ import { getApiBaseUrl } from '@/lib/config';
  * literal that gets mangled when this file is edited by a script.
  */
 const WIN_DRIVE = /^[a-zA-Z]:[\\/]/;
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Check, Copy, ChevronDown, ChevronUp, FileCode } from 'lucide-react';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { workspaceApi } from '@/lib/api';
 import { downloadUrl } from '@/lib/download';
-import { getBridge } from '@/lib/desktop';
+import { getBridge, copyTextToClipboard } from '@/lib/desktop';
 
 // Stable plugin arrays — avoids re-creating on every render
 const remarkPlugins = [remarkGfm];
@@ -144,6 +144,89 @@ class MarkdownErrorBoundary extends React.Component<
     }
     return this.props.children;
   }
+}
+
+interface IdeCodeBlockProps {
+  children: React.ReactNode;
+  language: string;
+  filename?: string;
+  rawCodeText: string;
+}
+
+function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBlockProps) {
+  const [copied, setCopied] = React.useState(false);
+  const lineCount = React.useMemo(() => rawCodeText.split('\n').length, [rawCodeText]);
+  const isLong = lineCount > 35;
+  const [expanded, setExpanded] = React.useState(!isLong);
+
+  const handleCopy = async () => {
+    const text = rawCodeText.trim();
+    if (!text) return;
+    const ok = await copyTextToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      toast.success('Code copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      toast.error('Failed to copy');
+    }
+  };
+
+  return (
+    <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono dark:shadow-md">
+      <div className="flex items-center justify-between px-3.5 py-2 bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none border-b border-border/50 dark:border-white/[0.05]">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 mr-1 opacity-80 shrink-0">
+            <span className="size-2.5 rounded-full bg-[#ff5f56] inline-block" />
+            <span className="size-2.5 rounded-full bg-[#ffbd2e] inline-block" />
+            <span className="size-2.5 rounded-full bg-[#27c93f] inline-block" />
+          </div>
+          {filename ? (
+            <div className="flex items-center gap-1 text-foreground dark:text-white font-medium truncate">
+              <FileCode className="size-3.5 text-primary shrink-0" />
+              <span className="truncate">{filename}</span>
+            </div>
+          ) : (
+            <span className="font-mono uppercase tracking-wider font-semibold">{language}</span>
+          )}
+          <span className="text-muted-foreground/60 text-3xs">({lineCount} lines)</span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isLong && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors text-3xs font-sans font-medium cursor-pointer"
+            >
+              {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+              <span>{expanded ? 'Collapse' : 'Show all'}</span>
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors text-3xs font-sans font-medium cursor-pointer"
+          >
+            {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+            <span>{copied ? 'Copied' : 'Copy'}</span>
+          </button>
+        </div>
+      </div>
+      <div className={cn('relative overflow-hidden', !expanded && 'max-h-72')}>
+        <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] font-mono bg-transparent selection:bg-primary/20">
+          {children}
+        </pre>
+        {!expanded && (
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#f6f8fa] dark:from-[#0e0f13] to-transparent pointer-events-none flex items-end justify-center pb-2">
+            <button
+              onClick={() => setExpanded(true)}
+              className="pointer-events-auto text-3xs font-sans font-medium px-3 py-1 rounded-full bg-surface2 dark:bg-[#1a1c23] border border-border text-foreground hover:bg-surface3 shadow-xs cursor-pointer"
+            >
+              Show {lineCount - 20} more lines...
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export const MarkdownContent = memo(function MarkdownContent({ content, agentNames = [], sessionId, workingDir }: MarkdownContentProps) {
@@ -281,35 +364,29 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         }
       }
 
-      // Modern IDE-grade Code Block (Optimized for both Light & Dark themes)
+      // Modern IDE-grade Code Block with line counter, collapse & robust copy
+      const rawMatch = /language-([a-zA-Z0-9_\-\.\/:]+)/.exec(className);
+      let parsedLang = 'CODE';
+      let parsedFilename: string | undefined = undefined;
+
+      if (rawMatch && rawMatch[1]) {
+        if (rawMatch[1].includes(':')) {
+          const parts = rawMatch[1].split(':');
+          parsedLang = parts[0].toUpperCase();
+          parsedFilename = parts.slice(1).join(':');
+        } else {
+          parsedLang = rawMatch[1].toUpperCase();
+        }
+      }
+
       return (
-        <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono dark:shadow-md">
-          <div className="flex items-center justify-between px-3.5 py-2 bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 mr-1 opacity-80">
-                <span className="size-2.5 rounded-full bg-[#ff5f56] inline-block" />
-                <span className="size-2.5 rounded-full bg-[#ffbd2e] inline-block" />
-                <span className="size-2.5 rounded-full bg-[#27c93f] inline-block" />
-              </div>
-              <span className="font-mono uppercase tracking-wider font-semibold">{language}</span>
-            </div>
-            <button
-              onClick={() => {
-                const text = rawCodeText.trim();
-                if (text) {
-                  navigator.clipboard.writeText(text);
-                  toast.success('Code copied to clipboard');
-                }
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors text-3xs font-sans font-medium"
-            >
-              <span>Copy</span>
-            </button>
-          </div>
-          <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] font-mono bg-transparent selection:bg-primary/20">
-            {children}
-          </pre>
-        </div>
+        <IdeCodeBlock
+          language={parsedLang}
+          filename={parsedFilename}
+          rawCodeText={rawCodeText}
+        >
+          {children}
+        </IdeCodeBlock>
       );
     },
 

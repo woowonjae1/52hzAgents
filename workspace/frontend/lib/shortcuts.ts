@@ -61,7 +61,9 @@ export const GOTO_SEQUENCE: Record<string, { view: string; label: string }> = {
 
 export const SHORTCUTS: ShortcutSpec[] = [
   // ── General ──
+  { id: 'quickbar', group: 'General', label: 'Toggle QuickBar (Desktop)', keys: ['Alt', 'Space'] },
   { id: 'palette', group: 'General', label: 'Command palette', keys: ['Mod', 'K'] },
+  { id: 'help-slash', group: 'General', label: 'Keyboard shortcuts', keys: ['Mod', '/'] },
   { id: 'help', group: 'General', label: 'Keyboard shortcuts', keys: ['?'] },
   { id: 'help-f1', group: 'General', label: 'Keyboard shortcuts', keys: ['F1'] },
   { id: 'find', group: 'General', label: 'Search the current view', keys: ['Mod', 'F'] },

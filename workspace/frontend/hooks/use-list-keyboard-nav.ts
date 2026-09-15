@@ -38,6 +38,11 @@ export interface ListKeyboardNavOptions {
   pageSize?: number;
   /** Turn the whole thing off (e.g. while a dialog owns the keyboard). */
   disabled?: boolean;
+  /**
+   * For 2D grid layouts: number of columns.
+   * When columns > 1, ArrowLeft/Right moves by 1, and ArrowUp/Down strides by columns.
+   */
+  columns?: number;
 }
 
 export function useListKeyboardNav({
@@ -49,6 +54,7 @@ export function useListKeyboardNav({
   onDelete,
   pageSize = 10,
   disabled = false,
+  columns = 1,
 }: ListKeyboardNavOptions) {
   const [cursor, setCursor] = React.useState(initialIndex);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -96,6 +102,8 @@ export function useListKeyboardNav({
     [count, onExtend],
   );
 
+  const cols = Math.max(1, columns || 1);
+
   const onKeyDown = React.useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (disabled || count === 0) return;
@@ -114,13 +122,25 @@ export function useListKeyboardNav({
       const from = cursor < 0 ? -1 : cursor;
 
       switch (e.key) {
+        case 'ArrowRight':
+          if (cols > 1) {
+            e.preventDefault();
+            move(from + 1, e.shiftKey);
+          }
+          return;
+        case 'ArrowLeft':
+          if (cols > 1) {
+            e.preventDefault();
+            move(from <= 0 ? 0 : from - 1, e.shiftKey);
+          }
+          return;
         case 'ArrowDown':
           e.preventDefault();
-          move(from + 1, e.shiftKey);
+          move(from + cols, e.shiftKey);
           return;
         case 'ArrowUp':
           e.preventDefault();
-          move(from <= 0 ? 0 : from - 1, e.shiftKey);
+          move(from - cols < 0 ? 0 : from - cols, e.shiftKey);
           return;
         case 'Home':
           e.preventDefault();

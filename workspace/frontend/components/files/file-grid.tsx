@@ -18,6 +18,7 @@ import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { RowActions } from '@/components/ui/row-actions';
 import { useFileSort, sortFiles, SORT_LABELS, type FileSortKey } from '@/lib/file-sort';
 import { useScrollRestore } from '@/hooks/use-scroll-restore';
+import { useListKeyboardNav } from '@/hooks/use-list-keyboard-nav';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { FileEntry } from './file-utils';
 import { formatSize, getFileIconLarge, timeAgo, basename, getEntriesAtPath } from './file-utils';
@@ -294,6 +295,33 @@ export function FileGrid() {
     }
   };
 
+  const activateEntry = useCallback(
+    (index: number) => {
+      const entry = entries[index];
+      if (!entry) return;
+      if (entry.type === 'folder') {
+        navigateToFolder(entry.name);
+      } else {
+        setSelectedFileId(entry.file.id);
+        if (isMobile) openMobileDetail();
+        else setActiveRightTab('file');
+      }
+    },
+    [entries, navigateToFolder, setSelectedFileId, isMobile, openMobileDetail, setActiveRightTab]
+  );
+
+  const { cursor, setCursor, listNavProps, rowProps } = useListKeyboardNav({
+    count: entries.length,
+    columns: 4,
+    onActivate: activateEntry,
+    onDelete: (index) => {
+      const entry = entries[index];
+      if (entry && entry.type === 'file') {
+        void deleteFileUndoable(entry.file.id, basename(entry.file.filename));
+      }
+    },
+  });
+
   return (
     <div
       className={cn('flex flex-col h-full', dragOver && 'ring-2 ring-inset ring-primary/40 bg-primary/5')}
@@ -457,16 +485,26 @@ export function FileGrid() {
               })),
             ]}
           />
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2">
-            {entries.map((entry) => {
+          <div
+            {...listNavProps}
+            className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-2 outline-none"
+          >
+            {entries.map((entry, index) => {
               if (entry.type === 'folder') {
                 return (
                   <button
                     key={`folder:${entry.name}`}
                     type="button"
-                    onClick={() => navigateToFolder(entry.name)}
+                    {...rowProps(index)}
+                    onClick={() => {
+                      setCursor(index);
+                      navigateToFolder(entry.name);
+                    }}
                     onDoubleClick={() => navigateToFolder(entry.name)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-surface2/60 group"
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors hover:bg-surface2/60 group outline-none',
+                      cursor === index && 'ring-2 ring-primary/60 bg-surface2/40'
+                    )}
                   >
                     <Folder className="size-12 text-status-warning" />
                     <span className="text-xs font-medium truncate w-full">{entry.name}</span>
@@ -486,8 +524,10 @@ export function FileGrid() {
               return (
                 <div
                   key={file.id}
+                  {...rowProps(index)}
                   className={cn(
-                    'skip-offscreen-card relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors group select-none',
+                    'skip-offscreen-card relative flex flex-col items-center gap-1.5 p-3 rounded-xl text-center transition-colors group select-none outline-none',
+                    cursor === index && 'ring-2 ring-primary/60',
                     isBatchSelected
                       ? 'bg-primary/10 ring-2 ring-primary/40'
                       : isSelected

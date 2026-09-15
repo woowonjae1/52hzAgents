@@ -1337,3 +1337,28 @@ nextjs-portal,
   transition-timing-function: var(--default-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1));
   transition-duration: var(--default-transition-duration, 150ms);
 }
+
+/* ==========================================================================
+   DESKTOP NATIVE TEXT SELECTION PROTECTION
+   Prevent accidental selection of UI chrome (splitters, titlebars, buttons, tabs)
+   while preserving selectable content in reading and editor surfaces.
+   ========================================================================== */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.prose,
+pre,
+code,
+input,
+textarea,
+[contenteditable="true"],
+.selectable,
+.chat-bubble,
+.terminal-container,
+[data-selectable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+

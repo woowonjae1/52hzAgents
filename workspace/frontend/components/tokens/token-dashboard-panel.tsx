@@ -61,8 +61,20 @@ export function TokenDashboardPanel() {
 
   React.useEffect(() => {
     fetchStats();
-    const interval = setInterval(fetchStats, 20_000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchStats();
+    }, 20_000);
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        fetchStats();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [fetchStats]);
 
   const handleCompact = async (channelName: string) => {

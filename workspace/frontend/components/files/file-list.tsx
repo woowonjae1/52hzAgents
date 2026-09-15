@@ -88,6 +88,38 @@ export function FileList() {
     }
   };
 
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFiles = e.dataTransfer?.files;
+    if (!droppedFiles || droppedFiles.length === 0) return;
+    setUploading(true);
+    let successCount = 0;
+    try {
+      for (let i = 0; i < droppedFiles.length; i++) {
+        const file = droppedFiles[i];
+        try {
+          if (currentFilePath) {
+            const renamedFile = new File([file], `${currentFilePath}/${file.name}`, { type: file.type });
+            await uploadFile(renamedFile);
+          } else {
+            await uploadFile(file);
+          }
+          successCount++;
+        } catch (err) {
+          console.error('Failed to upload file:', err);
+        }
+      }
+      if (successCount > 0) {
+        toast.success(`Uploaded ${successCount} file${successCount > 1 ? 's' : ''}`);
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
   /*
    * ↑/↓, Home/End, Page keys, Enter to open, Space to tick, Delete to delete,
    * Shift+↑/↓ to extend the selection. A file list that answers none of those
@@ -235,7 +267,23 @@ export function FileList() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div
+      className={cn('flex flex-col h-full relative', dragOver && 'ring-2 ring-inset ring-primary/40 bg-primary/5')}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+    >
+      {dragOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs border-2 border-dashed border-primary/50 rounded-xl pointer-events-none">
+          <div className="flex flex-col items-center gap-2 text-primary">
+            <Upload className="size-8 animate-bounce" />
+            <span className="text-xs font-medium">Drop files to upload</span>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center gap-1 px-2 py-3 shrink-0 pr-12">
         <div className="flex items-center w-full gap-1">
