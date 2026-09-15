@@ -3,7 +3,10 @@ const path = require('path');
 const http = require('http');
 const net = require('net');
 const fs = require('fs');
+const os = require('os');
 const { spawn, execSync, fork } = require('child_process');
+
+const isWindows11 = process.platform === 'win32' && parseInt((os.release() || '').split('.')[2], 10) >= 22000;
 
 // 1. Isolate userData folder & configure GPU acceleration
 try {
@@ -618,8 +621,10 @@ function createMainWindow() {
     icon: appIconPath,
     backgroundColor: WINDOW_BACKGROUND,
     darkTheme: true,
-    show: true,
+    show: false,
     titleBarStyle: 'hidden',
+    ...(isWindows11 ? { backgroundMaterial: 'mica' } : {}),
+    ...(process.platform === 'darwin' ? { vibrancy: 'under-window' } : {}),
     // On macOS the traffic lights are inset to line up with the 36px band;
     // `titleBarOverlay` is a Windows/Linux-only option and is ignored there.
     trafficLightPosition: { x: 12, y: (TITLEBAR_HEIGHT - 16) / 2 },
@@ -645,6 +650,20 @@ function createMainWindow() {
       webviewTag: true,
     },
   });
+
+  // Flicker-free launch: show window gracefully once initial frame is ready to paint
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  });
+
+  // Safety fallback to guarantee the window is revealed even if ready-to-show does not fire
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  }, 1000);
 
   if (windowState.maximized) mainWindow.maximize();
 
@@ -1217,14 +1236,31 @@ function createQuickBarWindow() {
   });
 }
 
+function positionQuickBar() {
+  if (!quickBarWindow || quickBarWindow.isDestroyed()) return;
+  try {
+    const { screen } = require('electron');
+    const cursor = screen.getCursorScreenPoint();
+    const currentDisplay = screen.getDisplayNearestPoint(cursor);
+    const { x, y, width, height } = currentDisplay.workArea;
+    const [qWidth] = quickBarWindow.getSize();
+    const targetX = Math.round(x + (width - qWidth) / 2);
+    const targetY = Math.round(y + height * 0.24); // Raycast-style top 24% eye-level
+    quickBarWindow.setPosition(targetX, targetY, false);
+  } catch (e) {
+    console.warn('[QuickBar] Failed to calculate screen position:', e);
+  }
+}
+
 function toggleQuickBar() {
-  if (!quickBarWindow) {
+  if (!quickBarWindow || quickBarWindow.isDestroyed()) {
     createQuickBarWindow();
   }
 
   if (quickBarWindow.isVisible()) {
     quickBarWindow.hide();
   } else {
+    positionQuickBar();
     quickBarWindow.show();
     quickBarWindow.focus();
   }

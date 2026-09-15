@@ -85,14 +85,21 @@ export function DropzoneOverlay() {
   if (!isDragging) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-primary/80 backdrop-blur-md border-4 border-dashed border-border-accent animate-[fadeIn_0.15s_ease-out] text-white p-6">
-      <div className="size-20 rounded-full bg-surface3 border border-border-accent flex items-center justify-center mb-4 animate-bounce">
-        <UploadCloud className="size-10 text-foreground-muted" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/80 dark:bg-background/85 backdrop-blur-xl animate-in fade-in-0 duration-200 pointer-events-none select-none">
+      <div className="w-full h-full max-w-2xl max-h-[460px] rounded-3xl border-2 border-dashed border-accent-bright/35 dark:border-accent/30 bg-surface-overlay/90 dark:bg-surface1/90 shadow-2xl flex flex-col items-center justify-center p-8 text-center transition-transform animate-in zoom-in-95 duration-200">
+        <div className="size-20 rounded-2xl bg-surface2 border border-border-accent shadow-sm flex items-center justify-center mb-4">
+          <UploadCloud className="size-10 text-foreground transition-transform animate-pulse" />
+        </div>
+        <h3 className="text-xl font-semibold tracking-tight text-foreground">
+          Drop files to upload
+        </h3>
+        <p className="text-sm text-foreground-muted mt-1.5 max-w-sm leading-relaxed">
+          Files will be added directly to Workspace Shared Storage & available to all agents
+        </p>
+        <div className="mt-5 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface2 border border-border text-2xs font-medium text-foreground-extra-muted">
+          <span>Release pointer to upload</span>
+        </div>
       </div>
-      <h3 className="text-xl font-semibold tracking-tight">Drop files to upload</h3>
-      <p className="text-sm text-foreground-extra-muted mt-1 max-w-sm text-center">
-        Files will be added directly to the Workspace Shared Storage
-      </p>
     </div>
   );
 }

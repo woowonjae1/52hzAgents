@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 export function Sidebar() {
   const {
     isSidebarOpen,
+    sidebarToggle,
     sidebarWidth,
     setSidebarWidth,
     isMobile,
@@ -85,13 +86,20 @@ export function Sidebar() {
     };
     const onMove = (event: PointerEvent) => {
       // The sidebar is pinned to the start edge, so clientX *is* the width.
-      pending = clampSidebarWidth(event.clientX);
+      // If dragged past collapse threshold (< 140px), snap to 0 to signal collapse
+      if (event.clientX < 140) {
+        pending = 0;
+      } else {
+        pending = clampSidebarWidth(event.clientX);
+      }
       if (!frame) frame = requestAnimationFrame(flush);
     };
     const onUp = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
-      if (pending) {
+      if (pending === 0) {
+        if (isSidebarOpen) sidebarToggle();
+      } else if (pending) {
         // Set the variable BEFORE handing the elements back, or they render one
         // frame at the pre-drag width while React's effect catches up.
         html.style.setProperty('--sidebar-width', `${pending}px`);

@@ -160,11 +160,11 @@ export default function QuickBarPage() {
 
   return (
     <div className="flex flex-col w-full min-h-screen bg-transparent p-2 select-none overflow-hidden font-sans">
-      <div ref={containerRef} className="flex flex-col w-full bg-[#121215]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden [app-region:drag]">
+      <div ref={containerRef} className="flex flex-col w-full bg-[#121215]/95 backdrop-blur-2xl border border-white/12 rounded-2xl shadow-2xl overflow-hidden [app-region:drag] animate-in fade-in-0 zoom-in-95 duration-150 ring-1 ring-white/10">
         {/* Main Input Row */}
         <div className="flex items-center gap-2.5 px-3.5 py-3.5 [app-region:no-drag]">
           {/* Agent Picker Pill */}
-          <div className="relative shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-white/80 font-medium">
+          <div className="relative shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-white/80 font-medium hover:bg-white/10 transition-colors">
             <Sparkles className="size-3.5 text-status-warning shrink-0" />
             <Select value={selectedAgent} onValueChange={setSelectedAgent}>
               <SelectTrigger
@@ -172,7 +172,7 @@ export default function QuickBarPage() {
                 /* The quickbar paints its own dark glass regardless of theme,
                    so the trigger is transparent here rather than inheriting
                    the app surface tokens. */
-                className="w-auto border-0 bg-transparent shadow-none text-xs text-white px-0 h-auto focus-visible:ring-0"
+                className="w-auto border-0 bg-transparent shadow-none text-xs text-white px-0 h-auto focus-visible:ring-0 cursor-pointer"
               >
                 <SelectValue placeholder="Auto Route" />
               </SelectTrigger>
@@ -200,9 +200,14 @@ export default function QuickBarPage() {
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => {
               if (isComposing(e)) return;
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleOpenFull();
+                return;
+              }
               if (e.key === 'Enter') handleSend();
             }}
-            placeholder="Command agents or ask anything... (Press Enter)"
+            placeholder="Command agents or ask anything... (Enter to send · Ctrl+Enter to open workspace)"
             className="flex-1 min-w-0 bg-transparent text-sm text-white placeholder:text-white/40 outline-none"
             disabled={loading}
           />
@@ -226,7 +231,7 @@ export default function QuickBarPage() {
               </Hint>
             )}
 
-            <Hint label="Open full workspace">
+            <Hint label="Open full workspace (Ctrl+Enter)">
               <button
                 onClick={handleOpenFull}
                 className="size-7 flex items-center justify-center rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors cursor-pointer"

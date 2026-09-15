@@ -47,7 +47,7 @@ export const HEADER_HEIGHT = 48;
  * does NOT read localStorage — `window.electronBridge` is injected by the
  * preload script, so it is already there when this runs.
  */
-export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');}catch(e){}})();`;
+export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');if(b.isWindows11)r.setAttribute('data-win11','');}catch(e){}})();`;
 
 /**
  * True inside the Electron shell. Reads the DOM attribute rather than
@@ -76,6 +76,7 @@ export function useIsDesktop(): boolean {
 export interface ElectronBridge {
   isDesktop: true;
   platform: string;
+  isWindows11?: boolean;
   minimizeWindow(): void;
   maximizeWindow(): void;
   closeWindow(): void;

@@ -116,6 +116,11 @@ export function AppTitlebar() {
       ref={bandRef}
       className="app-titlebar fixed top-0 start-0 end-0 z-50 flex items-center gap-2 bg-surface-sidebar"
       aria-label="Window titlebar"
+      onDoubleClick={(e) => {
+        if ((e.target as HTMLElement).closest('[app-region:no-drag], button, a, input, [role="button"]')) return;
+        const bridge = getBridge();
+        bridge?.maximizeWindow();
+      }}
     >
       <div className="flex items-center gap-0.5 shrink-0 [app-region:no-drag]">
         <Tooltip>

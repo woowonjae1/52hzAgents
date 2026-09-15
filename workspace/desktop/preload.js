@@ -1,4 +1,10 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const os = require('os');
+
+let isWindows11 = false;
+try {
+  isWindows11 = process.platform === 'win32' && parseInt((os.release() || '').split('.')[2], 10) >= 22000;
+} catch (e) {}
 
 let cachedDesktopApiUrl = null;
 
@@ -13,6 +19,7 @@ function subscribe(channel, handler) {
 contextBridge.exposeInMainWorld('electronBridge', {
   isDesktop: true,
   platform: process.platform,
+  isWindows11,
   minimizeWindow: () => ipcRenderer.send('window-minimize'),
   maximizeWindow: () => ipcRenderer.send('window-maximize'),
   closeWindow: () => ipcRenderer.send('window-close'),

@@ -789,6 +789,29 @@ html {
   --traffic-lights-inset: 78px;
 }
 
+/* Windows 11 Mica & macOS Vibrancy subtle translucency */
+:root[data-desktop][data-win11].dark,
+:root[data-desktop][data-platform='darwin'].dark {
+  --surface-sidebar: rgba(13, 13, 16, 0.78);
+  --surface-sidebar-hover: rgba(23, 23, 30, 0.85);
+}
+
+:root[data-desktop][data-win11]:not(.dark),
+:root[data-desktop][data-platform='darwin']:not(.dark) {
+  --surface-sidebar: rgba(244, 244, 246, 0.82);
+  --surface-sidebar-hover: rgba(234, 236, 239, 0.90);
+}
+
+:root[data-desktop] .app-titlebar {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+:root[data-desktop] aside {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
 /**
  * The titlebar band: full window width, above everything, and draggable along
  * its whole length. It is the main window's only drag region now (the QuickBar

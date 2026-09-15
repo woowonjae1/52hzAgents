@@ -17,7 +17,12 @@ export const SIDEBAR_WIDTH_CSS_VAR = '--sidebar-width';
 
 export function clampSidebarWidth(width: number): number {
   if (!Number.isFinite(width)) return DEFAULT_SIDEBAR_WIDTH;
-  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)));
+  const rounded = Math.round(width);
+  // Magnetic snap to DEFAULT_SIDEBAR_WIDTH (320px) within ±8px range
+  if (Math.abs(rounded - DEFAULT_SIDEBAR_WIDTH) <= 8) {
+    return DEFAULT_SIDEBAR_WIDTH;
+  }
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, rounded));
 }
 
 export function readStoredSidebarWidth(): number {
