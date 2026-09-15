@@ -154,7 +154,11 @@ export function Wrapper() {
   // ── Mobile layout: single-pane with list/detail switching ──
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
+      <div
+        className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5"
+        style={isDesktop ? { paddingTop: 'var(--titlebar-height, 36px)' } : undefined}
+      >
+        {isDesktop && <AppTitlebar />}
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
           {/* Full-screen views (no list/detail split) */}
@@ -236,6 +240,7 @@ export function Wrapper() {
       /* pt is `--titlebar-height`, which is 0px outside the Electron shell —
          one rule for both, rather than a conditional class and a magic 28. */
       className="flex h-screen w-full bg-surface0 pt-[var(--titlebar-height)] [&_.container-fluid]:px-5"
+      style={isDesktop ? { paddingTop: 'var(--titlebar-height, 36px)' } : undefined}
     >
       {isDesktop && <AppTitlebar />}
       {shouldShowSidebar && <Sidebar />}

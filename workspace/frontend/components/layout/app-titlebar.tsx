@@ -115,6 +115,11 @@ export function AppTitlebar() {
     <header
       ref={bandRef}
       className="app-titlebar fixed top-0 start-0 end-0 z-50 flex items-center gap-2 bg-surface-sidebar"
+      style={{
+        height: 'var(--titlebar-height, 36px)',
+        minHeight: '36px',
+        paddingRight: 'var(--window-controls-inset, 138px)',
+      }}
       aria-label="Window titlebar"
       onDoubleClick={(e) => {
         if ((e.target as HTMLElement).closest('[app-region:no-drag], button, a, input, [role="button"]')) return;

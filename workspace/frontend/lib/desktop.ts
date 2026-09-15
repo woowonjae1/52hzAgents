@@ -47,19 +47,53 @@ export const HEADER_HEIGHT = 48;
  * does NOT read localStorage — `window.electronBridge` is injected by the
  * preload script, so it is already there when this runs.
  */
-export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');if(b.isWindows11)r.setAttribute('data-win11','');}catch(e){}})();`;
+export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');if(b.isWindows11)r.setAttribute('data-win11','');r.style.setProperty('--titlebar-height','36px');r.style.setProperty('--window-controls-inset',b.platform==='darwin'?'0px':'138px');if(b.platform==='darwin')r.style.setProperty('--traffic-lights-inset','78px');}catch(e){}})();`;
+
+// Stamp DOM attributes and root CSS variables immediately when this module loads on the client
+if (typeof window !== 'undefined') {
+  try {
+    const bridge = getBridge();
+    if (bridge || document.documentElement.hasAttribute('data-desktop')) {
+      const root = document.documentElement;
+      if (!root.hasAttribute('data-desktop')) root.setAttribute('data-desktop', '');
+      const platform = bridge?.platform || root.getAttribute('data-platform') || '';
+      if (platform && !root.hasAttribute('data-platform')) root.setAttribute('data-platform', platform);
+      if (bridge?.isWindows11 && !root.hasAttribute('data-win11')) root.setAttribute('data-win11', '');
+      root.style.setProperty('--titlebar-height', `${TITLEBAR_HEIGHT}px`);
+      root.style.setProperty('--window-controls-inset', platform === 'darwin' ? '0px' : `${WINDOW_CONTROLS_INSET}px`);
+      if (platform === 'darwin') root.style.setProperty('--traffic-lights-inset', `${TRAFFIC_LIGHTS_INSET}px`);
+    }
+  } catch {}
+}
 
 /**
- * True inside the Electron shell. Reads the DOM attribute rather than
- * `window.electronBridge` directly so that server render and first client
- * render agree: the attribute is set pre-paint, but React still hydrates
- * against markup built with `false`, so the value is committed in an effect.
+ * True inside the Electron shell. Checks both getBridge() and the DOM
+ * attribute, initializing synchronously on the client and re-asserting
+ * attributes & CSS variables in useEffect so React 19 hydration cannot strip them.
  */
 export function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = React.useState(false);
+  const [isDesktop, setIsDesktop] = React.useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(getBridge()) || document.documentElement.hasAttribute('data-desktop');
+  });
+
   React.useEffect(() => {
-    setIsDesktop(document.documentElement.hasAttribute('data-desktop'));
+    const bridge = getBridge();
+    const desktop = Boolean(bridge) || document.documentElement.hasAttribute('data-desktop');
+    setIsDesktop(desktop);
+
+    if (desktop && typeof document !== 'undefined') {
+      const root = document.documentElement;
+      if (!root.hasAttribute('data-desktop')) root.setAttribute('data-desktop', '');
+      const platform = bridge?.platform || root.getAttribute('data-platform') || '';
+      if (platform && !root.hasAttribute('data-platform')) root.setAttribute('data-platform', platform);
+      if (bridge?.isWindows11 && !root.hasAttribute('data-win11')) root.setAttribute('data-win11', '');
+      root.style.setProperty('--titlebar-height', `${TITLEBAR_HEIGHT}px`);
+      root.style.setProperty('--window-controls-inset', platform === 'darwin' ? '0px' : `${WINDOW_CONTROLS_INSET}px`);
+      if (platform === 'darwin') root.style.setProperty('--traffic-lights-inset', `${TRAFFIC_LIGHTS_INSET}px`);
+    }
   }, []);
+
   return isDesktop;
 }
 

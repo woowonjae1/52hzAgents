@@ -5,6 +5,10 @@ export function useIsMobile() {
 
   useEffect(() => {
     const checkIsMobile = () => {
+      if (typeof window !== 'undefined' && ((window as unknown as { electronBridge?: unknown }).electronBridge || (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-desktop')))) {
+        setIsMobile(false);
+        return;
+      }
       setIsMobile(window.innerWidth < 1024);
     };
 
