@@ -107,11 +107,11 @@ function isImageFile(file: File): boolean {
   return file.type.startsWith('image/');
 }
 
-/** 底部控制条上的紧凑胶囊按钮样式 */
+/** 底部控制条上的紧凑胶囊按钮样式 (Micro-pill tactile style) */
 const pillButton = cn(
   'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full select-none text-2xs font-medium',
-  'text-foreground-muted hover:text-foreground hover:bg-surface2',
-  'transition-colors duration-150',
+  'text-muted-foreground hover:text-foreground bg-surface2/60 hover:bg-surface3/80 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]',
+  'border border-border/40 hover:border-border/80 transition-all duration-150 active:scale-95',
   'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40'
 );
 
@@ -684,21 +684,19 @@ export function PromptComposer({
         onDrop={handleDrop}
         className={cn(
           /*
-           * The shell sits over scrolling transcript, so it has to read as
-           * solid. It was trying to do that three ways at once: a 95% fill, a
-           * `backdrop-blur-2xl` behind that fill (which almost nothing shows
-           * through), an `shadow-xl`, AND a second hand-rolled 40px black shadow
-           * for dark mode. An opaque surface with one hairline is more solid
-           * than any of it, and costs no compositing.
-           *
-           * The focus ring drops from `ring-4` blue to a 1px accent border: a
-           * 4px halo on a control that is focused most of the time is a
-           * permanent glow, and blue was not a token.
+           * Floating Island Container (ChatGPT / Claude Desktop grade).
+           * High-radius (24px) pill-card with soft-glow multi-tier elevation,
+           * frosted glass blur, and razor hairline borders.
            */
-          'relative rounded-xl overflow-hidden',
-          'bg-surface1/95 backdrop-blur-xl border border-border/70 shadow-sm ui-transition duration-150',
-          'hover:border-border focus-within:border-border-accent',
-          isDragging && 'border-border-accent bg-surface2'
+          'relative rounded-[24px] overflow-hidden transition-all duration-200',
+          'bg-surface1/90 dark:bg-[#16161b]/92 backdrop-blur-2xl',
+          'border border-border/80 dark:border-white/[0.12]',
+          'shadow-[0_8px_30px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)]',
+          'dark:shadow-[0_12px_40px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.08)]',
+          'focus-within:border-foreground/20 dark:focus-within:border-white/25',
+          'focus-within:shadow-[0_12px_36px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.05)]',
+          'dark:focus-within:shadow-[0_16px_48px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.12)]',
+          isDragging && 'border-primary ring-2 ring-primary/20 bg-surface2/90'
         )}
       >
 
@@ -812,11 +810,11 @@ export function PromptComposer({
           }
           disabled={disabled}
           rows={1}
-          className="w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[44px]"
+          className="w-full resize-none bg-transparent px-4.5 pt-3.5 pb-2 text-[14px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[46px]"
         />
 
         {/* Bottom Control Row */}
-        <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
+        <div className="flex items-center justify-between gap-2 px-3.5 pb-3 pt-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <AgentModelSwitcher
               agentName={masterAgentName}
@@ -930,19 +928,37 @@ export function PromptComposer({
                 disabled={isWorking ? stopping : !canSend}
                 className={cn(
                   'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                  'ui-transition duration-150 select-none',
+                  'transition-all duration-150 select-none active:scale-95',
                   isWorking
-                    ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-xs'
+                    ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-md shadow-destructive/25 cursor-pointer'
                     : canSend
-                      ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-xs'
-                    : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/60'
+                      ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/25 cursor-pointer'
+                    : 'bg-surface2/70 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
                 )}
               >
                 <AnimatePresence mode="wait" initial={false}>
                   {isWorking ? (
-                    <Square className="size-3 fill-current" />
+                    <motion.div
+                      key="stop"
+                      initial={{ scale: 0.6, rotate: -30 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      exit={{ scale: 0.6, rotate: 30 }}
+                      transition={{ duration: 0.12 }}
+                      className="flex items-center justify-center"
+                    >
+                      <Square className="size-3 fill-current" />
+                    </motion.div>
                   ) : (
-                    <ArrowUp className="size-4" />
+                    <motion.div
+                      key="arrow"
+                      initial={{ scale: 0.6, y: 2 }}
+                      animate={{ scale: 1, y: 0 }}
+                      exit={{ scale: 0.6, y: -2 }}
+                      transition={{ duration: 0.12 }}
+                      className="flex items-center justify-center"
+                    >
+                      <ArrowUp className="size-4 stroke-[2.5]" />
+                    </motion.div>
                   )}
                 </AnimatePresence>
               </button>

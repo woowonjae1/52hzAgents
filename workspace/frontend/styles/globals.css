@@ -134,7 +134,8 @@
   */
   --radius: 8px;
 
-  --chat-column: min(1380px, 100%);
+  /* ChatGPT & Claude desktop standardized reading column width (~860px max) */
+  --chat-column: min(860px, 100%);
 
   /*
     ── Elevation ──

@@ -10,7 +10,6 @@ import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { SignalMark } from '@/components/brand/signal-mark';
 import { MarkdownContent } from './markdown-content';
 import { ToolCallsDisclosure } from './intermediate-steps';
 import { Reasoning } from '@/components/ai-elements/reasoning';
@@ -550,57 +549,26 @@ export const ChatMessage = memo(function ChatMessage({
     }
   }, [onRegenerate, message, currentUser.name]);
 
-  // ── User Messages (Modern Engineering Full-Width Stream) ──
+  // ── User Messages (Modern ChatGPT/Claude Refined Bubble Card) ──
   if (isHuman) {
     const isCurrentUser = isCurrentHumanMessage(message, currentUser);
-    const displayName = isCurrentUser ? (currentUser.name || message.senderName || 'You') : (message.senderName || 'User');
 
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="group/usermsg py-3.5 select-text">
-            <div className="flex items-start gap-3 w-full">
-              <div className="mt-0.5 shrink-0">
-                <SignalMark size={28} still={false} />
-              </div>
-
-              <div className="flex-1 min-w-0 space-y-2">
-                {/* Identity Header */}
-                <div className="flex items-baseline gap-2 select-none">
-                  <span className="text-sm font-semibold text-foreground tracking-tight">
-                    {displayName}
-                  </span>
-                  <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono">
-                    User
-                  </span>
-                  {isCurrentUser && message.deliveryStatus && (
-                    <span className="text-3xs font-mono ml-1">
-                      {message.deliveryStatus === 'sending' && (
-                        <span className="event-running text-foreground-extra-muted">Sending…</span>
-                      )}
-                      {message.deliveryStatus === 'confirmed' && (
-                        <span className="text-foreground-extra-muted inline-flex items-baseline gap-1">
-                          <Check className="size-2.5 translate-y-px" />
-                          <span>Sent</span>
-                        </span>
-                      )}
-                      {message.deliveryStatus === 'failed' && (
-                        <span className="text-destructive font-medium inline-flex items-baseline gap-1">
-                          <X className="size-2.5 translate-y-px" />
-                          <span>Failed</span>
-                        </span>
-                      )}
-                    </span>
-                  )}
-                  {timestamp && (
-                    <span className="text-3xs text-foreground-extra-muted font-mono ml-auto tabular-nums">
-                      {timestamp}
-                    </span>
-                  )}
-                </div>
-
-                {/* Main Full-Width Content */}
-                <div className="text-sm leading-7 text-foreground font-normal break-words">
+          <div className="group/usermsg py-2.5 select-text flex flex-col items-end w-full">
+            {/* Contained bubble card aligned to right */}
+            <div className="max-w-[88%] sm:max-w-[80%] flex flex-col items-end">
+              <div
+                className={cn(
+                  'relative rounded-[22px] rounded-br-[6px] px-4.5 py-3',
+                  'bg-surface2/90 dark:bg-[#222228] text-foreground',
+                  'border border-border/80 dark:border-white/[0.08]',
+                  'shadow-xs dark:shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
+                  'transition-all duration-150 break-words'
+                )}
+              >
+                <div className="text-sm leading-relaxed font-normal select-text">
                   <MarkdownContent
                     content={message.content}
                     agentNames={agentNames}
@@ -609,15 +577,42 @@ export const ChatMessage = memo(function ChatMessage({
                   />
                   <Attachments items={attachments} />
                 </div>
+              </div>
 
-                {/* Minimalist Hover Actions Row */}
-                <div className="flex items-center gap-1 opacity-0 group-hover/usermsg:opacity-100 focus-within:opacity-100 transition-opacity duration-150 pt-0.5">
-                  <Hint label="Copy Markdown">
+              {/* Minimalist Hover Actions & Status Row */}
+              <div className="flex items-center gap-2 mt-1 px-1.5 select-none">
+                {isCurrentUser && message.deliveryStatus && (
+                  <span className="text-3xs font-mono">
+                    {message.deliveryStatus === 'sending' && (
+                      <span className="event-running text-foreground-extra-muted">Sending…</span>
+                    )}
+                    {message.deliveryStatus === 'confirmed' && (
+                      <span className="text-foreground-extra-muted/70 inline-flex items-center gap-0.5">
+                        <Check className="size-2.5" />
+                      </span>
+                    )}
+                    {message.deliveryStatus === 'failed' && (
+                      <span className="text-destructive font-medium inline-flex items-center gap-0.5">
+                        <X className="size-2.5" />
+                        <span>Failed</span>
+                      </span>
+                    )}
+                  </span>
+                )}
+
+                {timestamp && (
+                  <span className="text-3xs text-foreground-extra-muted/70 font-mono tabular-nums">
+                    {timestamp}
+                  </span>
+                )}
+
+                <div className="flex items-center gap-1 opacity-0 group-hover/usermsg:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+                  <Hint label="Copy Plain Text">
                     <button
                       type="button"
-                      onClick={handleCopyMarkdown}
-                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
-                      aria-label="Copy markdown"
+                      onClick={handleCopyPlain}
+                      className="size-5 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
+                      aria-label="Copy plain text"
                     >
                       <Copy className="size-3" />
                     </button>
@@ -626,7 +621,7 @@ export const ChatMessage = memo(function ChatMessage({
                     <button
                       type="button"
                       onClick={handleQuote}
-                      className="size-6 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
+                      className="size-5 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
                       aria-label="Quote reply"
                     >
                       <Quote className="size-3" />
@@ -664,42 +659,31 @@ export const ChatMessage = memo(function ChatMessage({
         {hideHeader ? (
           <div className="size-7 shrink-0" aria-hidden />
         ) : (
-          <AgentAvatar
-            name={message.senderName}
-            agentType={agent?.agentType}
-            size={28}
-            className="mt-0.5 shrink-0"
-          />
+          <div className="relative mt-0.5 shrink-0">
+            <AgentAvatar
+              name={message.senderName}
+              agentType={agent?.agentType}
+              size={28}
+              className="ring-1 ring-border/70 dark:ring-white/[0.1] shadow-xs rounded-full"
+            />
+          </div>
         )}
 
-        <div className="flex-1 min-w-0 space-y-2">
+        <div className="flex-1 min-w-0 space-y-2.5">
           {/* Identity Header */}
           {!hideHeader && (
-          /*
-            `items-baseline`: the name, the type chip and the timestamp are three
-            different sizes on one line, and centring each of their boxes
-            independently is what made this row read as loosely stacked rather
-            than set. One baseline, three sizes.
-          */
           <div className="flex items-baseline gap-2 select-none">
-            <span className="text-sm font-semibold text-foreground tracking-tight">
+            <span className="text-[13.5px] font-semibold text-foreground tracking-tight">
               {message.senderName}
             </span>
             {agent?.agentType && (
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono border border-border">
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2/90 text-foreground-muted font-mono border border-border/60">
                 {agent.agentType}
               </span>
             )}
-            {/*
-              "Lead" is a role, not a state — it says who this agent is, not that
-              something needs attention. It was amber (a hue no token defines),
-              which put it in the same visual register as a warning while sitting
-              directly beside a neutral chip carrying the same kind of fact. Both
-              chips are the same chip now.
-            */}
             {agent?.role === 'master' && (
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted border border-border inline-flex items-center gap-1">
-                <Crown className="size-2.5" />
+              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2/90 text-foreground-muted border border-border/60 inline-flex items-center gap-1">
+                <Crown className="size-2.5 text-amber-500/80" />
                 <span>Lead</span>
               </span>
             )}
@@ -745,7 +729,7 @@ export const ChatMessage = memo(function ChatMessage({
               </div>
             </div>
           ) : cleanContent ? (
-            <div className="text-sm leading-7 text-foreground font-normal">
+            <div className="text-[14px] leading-[1.75] text-foreground font-normal tracking-[-0.005em]">
               <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
             </div>
           ) : null}

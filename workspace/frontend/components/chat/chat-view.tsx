@@ -1050,201 +1050,60 @@ export function ChatView() {
             <span className="event-running text-xs text-foreground-muted">Loading conversation</span>
           </div>
         ) : displayMessages.length === 0 ? (
-          /*
-            The decoration that used to open this branch is gone: a 600×320
-            `blur-[110px]` sky/indigo/primary gradient "ambient lighting mesh"
-            and a masked radial dot-grid, stacked behind everything. Both are on
-            the explicit no-list for this app (no gradients, no glows, no
-            neon sky/violet) and this is the FIRST screen of an empty
-            workspace — the one place the look gets set. What remains is the
-            content that was already here.
-          */
           <div className="relative flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
-            <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6">
-              {/*
-                Status line. Three things left: the `animate-ping` halo (on the
-                no-list, and it announced a state that was not changing), the
-                `backdrop-blur-md` (there is nothing behind this pill to blur —
-                it is a filter and a compositing layer for no effect), and
-                "System Standby · Awaiting Agent", which is the sci-fi register
-                this app does not use. It now reads as a count, because a count
-                is the fact.
-              */}
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-border bg-surface1 text-2xs font-medium text-foreground-muted">
+            <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6 my-auto py-6">
+              {/* Refined subtle status pill */}
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] text-2xs font-medium text-muted-foreground shadow-xs">
                 <span
                   className={cn(
                     'size-1.5 rounded-full shrink-0',
-                    hasOnlineAgents ? 'bg-status-success' : 'bg-status-warning',
+                    hasOnlineAgents
+                      ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                      : 'bg-muted-foreground/40'
                   )}
                 />
                 <span>
                   {hasOnlineAgents
-                    ? `${onlineAgents.length} of ${agents.length} agents online`
-                    : 'No agents online'}
+                    ? `${onlineAgents.length} ${onlineAgents.length === 1 ? 'agent' : 'agents'} online`
+                    : 'Autonomous Workspace Ready'}
                 </span>
+                {!hasOnlineAgents && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('mission')}
+                    className="text-foreground-extra-muted hover:text-foreground transition-colors ml-0.5 underline underline-offset-2"
+                  >
+                    Connect agent
+                  </button>
+                )}
               </div>
 
-              {/* The mark, with no halo behind it. It is a solid two-colour
-                  disc precisely so it does not need one. */}
-              <SignalMark size={84} />
+              {/* Brand SignalMark with subtle ambient scale */}
+              <div className="relative flex items-center justify-center">
+                <SignalMark size={72} />
+              </div>
 
-              {/* One line, not a tagline under a headline. "autonomous
-                  multi-agent workspace. Deep reasoning, instant recall, and
-                  tool-augmented execution." was product-page copy in a tool the
-                  user has already bought and opened. */}
-              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground max-w-lg">
-                What can I help you build?
-              </h1>
+              {/* Dynamic OpenAI/Claude Greeting Header */}
+              <div className="space-y-1.5 max-w-lg">
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+                  {(() => {
+                    const h = new Date().getHours();
+                    if (h < 5) return 'Good night';
+                    if (h < 12) return 'Good morning';
+                    if (h < 18) return 'Good afternoon';
+                    return 'Good evening';
+                  })()}, what can I help you build?
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Select a prompt below, or start typing to collaborate with your agents.
+                </p>
+              </div>
 
-              {!hasOnlineAgents ? (
-                <div className="w-full space-y-4">
-                  {/* Hero Connection Card */}
-                  {/* `amber-500/10` → `--status-warning`, which is the token
-                      that already means "attention" here; `animate-pulse` on
-                      the icon is on the no-list; `backdrop-blur-md` blurs a
-                      flat surface; `active:scale-[0.98]` is a web affordance;
-                      and `transition-all` on a card put its border, shadow and
-                      padding on one clock. */}
-                  <div className="w-full p-4 rounded-lg bg-surface1 border border-border shadow-sm flex flex-col items-center text-center space-y-3 transition-colors hover:border-border-accent">
-                    <div className="size-9 rounded-md bg-status-warning/10 border border-status-warning/20 flex items-center justify-center text-status-warning">
-                      <Radio className="size-4.5" />
-                    </div>
-                    <div className="space-y-1 max-w-md">
-                      <h2 className="text-sm font-semibold text-foreground">No agents online</h2>
-                      <p className="text-xs text-foreground-muted leading-relaxed">
-                        Start the local connector CLI, or open the connect station to hook up Claude, OpenClaw, or a custom agent.
-                      </p>
-                    </div>
-                    <div className="pt-0.5 flex flex-wrap items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setViewMode('mission')}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity shadow-xs"
-                      >
-                        <Plug className="size-3.5" />
-                        <span>Connect agent</span>
-                      </button>
-                      <Hint label="Copy command to run agent connector locally">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const cmd = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=${getApiBaseUrl()}`;
-                            navigator.clipboard.writeText(cmd);
-                            toast.success('Connector CLI command copied to clipboard');
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 border border-border text-foreground text-xs font-medium transition-colors"
-                        >
-                          <Copy className="size-3.5 text-foreground-muted" />
-                          <span>Copy CLI command</span>
-                        </button>
-                      </Hint>
-                    </div>
-                  </div>
-
-                  {/* Linear-style Quick Launch Exploration Grid (4 Cards) */}
-                  <div className="w-full pt-1">
-                    <div className="text-2xs font-semibold text-foreground-extra-muted uppercase tracking-wider mb-2.5 text-left px-1">
-                      Quick Workspace Actions
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left">
-                      {/* Tasks & Kanban */}
-                      <button
-                        type="button"
-                        onClick={() => setViewMode('tasks')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
-                      >
-                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
-                          <CheckCircle2 className="size-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                            <span>Tasks & Kanban Board</span>
-                            <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
-                              Open →
-                            </span>
-                          </div>
-                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
-                            Manage sprint backlog, priorities & board swimlanes
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Command Palette */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-                        }}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
-                      >
-                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
-                          <Search className="size-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                            <span>Command Palette</span>
-                            <kbd className="text-3xs font-mono text-foreground-extra-muted bg-surface3 px-1.5 py-0.2 rounded border border-border/60">
-                              Ctrl+K
-                            </kbd>
-                          </div>
-                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
-                            Instant navigation, search, and system actions
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Agent Dashboard */}
-                      <button
-                        type="button"
-                        onClick={() => setViewMode('mission')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
-                      >
-                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
-                          <Activity className="size-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                            <span>Agent Dashboard</span>
-                            <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
-                              Open →
-                            </span>
-                          </div>
-                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
-                            Agent topology, event feeds & execution status
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* System Settings */}
-                      <button
-                        type="button"
-                        onClick={() => openSettings('general')}
-                        className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
-                      >
-                        <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0 text-foreground-muted group-hover:text-foreground transition-colors">
-                          <Settings className="size-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-foreground flex items-center justify-between">
-                            <span>System Settings</span>
-                            <span className="text-3xs text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity">
-                              Open →
-                            </span>
-                          </div>
-                          <div className="text-2xs text-foreground-muted line-clamp-1 mt-0.5 leading-snug">
-                            Model parameters, shortcuts & account configs
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* 4 Interactive Prompt Starter Cards */
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full text-left pt-2">
-                  {PROMPT_SUGGESTIONS.map((item, idx) => {
-                    const SuggestionIcon = item.icon;
-                    return (
+              {/* 4 Enterprise Interactive Prompt Inspiration Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full text-left pt-2">
+                {PROMPT_SUGGESTIONS.map((item, idx) => {
+                  const SuggestionIcon = item.icon;
+                  return (
                     <button
                       key={idx}
                       type="button"
@@ -1252,27 +1111,63 @@ export function ChatView() {
                         handleDraftChange(item.prompt);
                         setFocusKey((k) => k + 1);
                       }}
-                      className="flex items-start gap-3 p-2.5 rounded-md bg-surface1 hover:bg-surface2 border border-border hover:border-border-accent transition-colors group text-left"
+                      className={cn(
+                        'flex items-start gap-3.5 p-3.5 rounded-2xl text-left cursor-pointer select-none group',
+                        'bg-surface1/70 dark:bg-[#18181e]/80 hover:bg-surface2 dark:hover:bg-[#202028]',
+                        'border border-border/70 dark:border-white/[0.07] hover:border-border-accent dark:hover:border-white/[0.14]',
+                        'shadow-xs hover:shadow-md transition-all duration-200 active:scale-[0.99]'
+                      )}
                     >
-                      <div className="size-8 rounded-md bg-surface2 border border-border flex items-center justify-center shrink-0">
-                        <SuggestionIcon className="size-4 text-foreground-muted group-hover:text-foreground transition-colors" />
+                      <div className="size-8 rounded-xl bg-surface2 dark:bg-white/[0.05] border border-border/50 dark:border-white/[0.08] flex items-center justify-center shrink-0 group-hover:border-primary/30 transition-colors">
+                        <SuggestionIcon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-foreground flex items-center justify-between">
+                        <div className="text-[13px] font-semibold text-foreground flex items-center justify-between">
                           <span>{item.title}</span>
-                          <span className="text-3xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-normal">
+                          <span className="text-3xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-mono">
                             ↵
                           </span>
                         </div>
-                        <div className="text-2xs text-muted-foreground line-clamp-1 mt-0.5 leading-snug">
+                        <div className="text-2xs text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
                           {item.desc}
                         </div>
                       </div>
                     </button>
-                    );
-                  })}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+
+              {/* Sleek Workspace Navigation Quick Bar */}
+              <div className="pt-2 flex flex-wrap items-center justify-center gap-4 text-2xs text-foreground-extra-muted select-none">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('tasks')}
+                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                >
+                  <CheckCircle2 className="size-3.5" />
+                  <span>Tasks & Kanban</span>
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+                  }}
+                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                >
+                  <Search className="size-3.5" />
+                  <span>Command Palette (Ctrl+K)</span>
+                </button>
+                <span>·</span>
+                <button
+                  type="button"
+                  onClick={() => openSettings('general')}
+                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                >
+                  <Settings className="size-3.5" />
+                  <span>Settings</span>
+                </button>
+              </div>
             </div>
           </div>
         ) : (

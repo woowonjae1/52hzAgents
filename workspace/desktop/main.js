@@ -370,17 +370,9 @@ function subscribeWorkspaceEvents(baseUrl) {
                 });
               }
 
-              // 3. Routine triggered
+              // 3. Routine triggered (internal execution; quiet in background, no toast needed)
               if (event.type === 'workspace.routine.triggered') {
-                const routine = payload.routine || {};
-                const name = routine.name || '周期性计划任务';
-                const message = routine.message || '任务已开始自动执行';
-                const channel = routine.channel_name || targetChannel;
-                showDesktopNotification({
-                  title: `🔁 周期任务触发: ${name}`,
-                  body: message,
-                  channel,
-                });
+                // Intentionally quiet: starting a routine is not an alert-worthy event
               }
 
               // 4. Routine completed
@@ -1278,9 +1270,29 @@ function showApprovalNotification(agentName, action, approvalId) {
   }
 }
 
+const recentDesktopNotifs = new Map();
+
 // OS Native Notification for Tasks, Timers, Routines & Notifications
 function showDesktopNotification({ title, body, channel, silent = false }) {
   if (!Notification.isSupported()) return;
+
+  // If the app is currently open and focused by the user, do not interrupt with OS toasts
+  if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused()) {
+    return;
+  }
+
+  // Rate-limit / deduplicate identical notifications within 15 seconds
+  const notifKey = `${title || ''}::${body || ''}`;
+  const now = Date.now();
+  if (recentDesktopNotifs.has(notifKey) && now - recentDesktopNotifs.get(notifKey) < 15000) {
+    return;
+  }
+  recentDesktopNotifs.set(notifKey, now);
+  if (recentDesktopNotifs.size > 80) {
+    for (const [k, t] of recentDesktopNotifs.entries()) {
+      if (now - t > 60000) recentDesktopNotifs.delete(k);
+    }
+  }
 
   const icoPath = getAssetPath('icon.ico');
   const pngPath = getAssetPath('tray-icon.png');
