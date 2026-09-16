@@ -457,7 +457,9 @@ class PiAdapter extends BaseAdapter {
     try {
       const file = path.join(this._piConfigDir(), name);
       if (!fs.existsSync(file)) return null;
-      return JSON.parse(fs.readFileSync(file, 'utf-8'));
+      let raw = fs.readFileSync(file, 'utf-8');
+      if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
+      return JSON.parse(raw);
     } catch {
       // A malformed config is Pi's problem to report, not ours to guess around.
       return null;
