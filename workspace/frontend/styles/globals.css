@@ -914,9 +914,46 @@ html {
 }
 
 .selectable,
-.selectable * {
+.selectable *,
+.select-text,
+.select-text *,
+.markdown-content,
+.markdown-content *,
+.group\/agentmsg,
+.group\/agentmsg * {
   user-select: text;
   -webkit-user-select: text;
+}
+
+.markdown-content p,
+.markdown-content li,
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6,
+.markdown-content span:not(button *),
+.markdown-content blockquote,
+.group\/agentmsg p,
+.group\/agentmsg li {
+  cursor: text;
+}
+
+.group\/agentmsg button,
+.group\/agentmsg button *,
+.group\/agentmsg [role="button"],
+.group\/agentmsg [role="button"] *,
+.group\/agentmsg svg,
+.group\/agentmsg summary,
+.markdown-content button,
+.markdown-content button *,
+.markdown-content [role="button"],
+.markdown-content [role="button"] *,
+.markdown-content svg,
+.markdown-content summary {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /**
@@ -1405,6 +1442,13 @@ input,
 textarea,
 [contenteditable="true"],
 .selectable,
+.selectable *,
+.select-text,
+.select-text *,
+.markdown-content,
+.markdown-content *,
+.group\/agentmsg,
+.group\/agentmsg *,
 .chat-bubble,
 .terminal-container,
 [data-selectable="true"] {

@@ -24,7 +24,7 @@ const { execSync, spawn } = require('child_process');
 
 const BaseAdapter = require('./base');
 const { buildOpenclawSystemPrompt } = require('./workspace-prompt');
-const { whereBinary, getRuntimePrefix } = require('../paths');
+const { whereBinary, whichBinary, getRuntimePrefix, getEnhancedEnv } = require('../paths');
 
 const IS_WINDOWS = process.platform === 'win32';
 const MAX_HISTORY_ENTRIES = 12;
@@ -71,13 +71,55 @@ class PiAdapter extends BaseAdapter {
   // Binary discovery (multi-tier, matching claude/codex/hermes pattern)
   // ------------------------------------------------------------------
 
+  /**
+   * Resolve a Node.js executable to run JS-entry CLIs with.
+   * Prefers the portable Node in ~/.wwj/nodejs/, then system PATH node.
+   * Deliberately avoids returning Electron's process.execPath because Electron's
+   * bundled Node runtime lacks modern APIs (e.g. markAsUncloneable) and causes
+   * undici/fetch crashes in child processes.
+   */
+  _resolveNodeBinary() {
+    const nodeName = IS_WINDOWS ? 'node.exe' : 'node';
+    const portableDir = path.join(os.homedir(), '.wwj', 'nodejs');
+    for (const candidate of [
+      path.join(portableDir, nodeName),
+      path.join(portableDir, 'bin', nodeName),
+    ]) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+
+    const found = whichBinary('node') || whereBinary('node');
+    if (found && !found.toLowerCase().includes('electron') && !found.toLowerCase().includes('52hzagents')) {
+      return found;
+    }
+
+    const isElectron = Boolean(process.versions.electron || (process.execPath && process.execPath.toLowerCase().includes('52hzagents')));
+    if (!isElectron && process.execPath) {
+      return process.execPath;
+    }
+
+    try {
+      const systemFound = execSync(IS_WINDOWS ? 'where node.exe' : 'which node', {
+        encoding: 'utf-8',
+        timeout: 5000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: getEnhancedEnv(),
+      }).split(/\r?\n/)[0].trim();
+      if (systemFound && fs.existsSync(systemFound)) return systemFound;
+    } catch {}
+
+    return 'node';
+  }
+
   _findPiBinary() {
+    const nodeBin = this._resolveNodeBinary();
+
     // Tier 0: Check if workingDir points to pi source repository
     if (this.workingDir) {
       const sourceCli = path.join(this.workingDir, 'packages', 'coding-agent', 'dist', 'cli.js');
       if (fs.existsSync(sourceCli)) {
         this._piJsPath = sourceCli;
-        return process.execPath;
+        return nodeBin;
       }
     }
 
@@ -85,7 +127,7 @@ class PiAdapter extends BaseAdapter {
     const runtimeJs = path.join(getRuntimePrefix('pi'), 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
     if (fs.existsSync(runtimeJs)) {
       this._piJsPath = runtimeJs;
-      return process.execPath;
+      return nodeBin;
     }
 
     // Tier 2: npm-global node_modules entrypoint
@@ -94,7 +136,7 @@ class PiAdapter extends BaseAdapter {
       const globalJs = path.join(globalAppdata, 'npm', 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
       if (fs.existsSync(globalJs)) {
         this._piJsPath = globalJs;
-        return process.execPath;
+        return nodeBin;
       }
     }
 
@@ -105,7 +147,7 @@ class PiAdapter extends BaseAdapter {
         const cmdJs = path.join(path.dirname(viaWhere), 'node_modules', '@earendil-works', 'pi-coding-agent', 'dist', 'cli.js');
         if (fs.existsSync(cmdJs)) {
           this._piJsPath = cmdJs;
-          return process.execPath;
+          return nodeBin;
         }
       }
       return viaWhere;
@@ -256,7 +298,9 @@ class PiAdapter extends BaseAdapter {
     const args = this._buildPiCmd(prompt, channelName);
     this._log(`Running pi (channel=${channelName}, session=${sessionPath})`);
 
-    const env = { ...(this.agentEnv || process.env) };
+    const env = { ...getEnhancedEnv(), ...(this.agentEnv || process.env) };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.ELECTRON_NO_ASAR;
     const cwd = await this._resolveWorkingDir(channelName);
 
     let spawnBin = this._piBin;
@@ -293,7 +337,7 @@ class PiAdapter extends BaseAdapter {
 
       let event;
       try { event = JSON.parse(line); } catch {
-        // Not JSON â€?treat as plain text output (fallback)
+        // Not JSON --?treat as plain text output (fallback)
         if (line.trim()) responseChunks.push(line.trim());
         return;
       }
@@ -304,7 +348,7 @@ class PiAdapter extends BaseAdapter {
        * `thinking` and `assistant`/`text_delta` used to share one branch, so
        * they were indistinguishable downstream. They are not the same thing:
        * `thinking` is the model reasoning, the other two are its reply arriving
-       * a piece at a time. Only the latter is flagged as a reply preview â€?with
+       * a piece at a time. Only the latter is flagged as a reply preview --?with
        * them merged, tagging the branch would have mislabelled real reasoning as
        * the answer, and not tagging it would have left the answer duplicated.
        */
@@ -399,7 +443,7 @@ class PiAdapter extends BaseAdapter {
   }
 
   /**
-   * Read one of Pi's own config files. Strictly read-only â€?this adapter never
+   * Read one of Pi's own config files. Strictly read-only --?this adapter never
    * writes them. Returns null when the file is absent or unparsable, which must
    * read as "unknown", never as an empty configuration.
    */
@@ -436,7 +480,7 @@ class PiAdapter extends BaseAdapter {
 
   /**
    * Every model this install can actually reach, from `~/.pi/agent/models.json`
-   * â€?the providers the user configured in Pi itself. There is no hardcoded
+   * --?the providers the user configured in Pi itself. There is no hardcoded
    * catalog: an install with no configured provider reports nothing, and the UI
    * must show that as "not configured" rather than offering a guess.
    */
@@ -492,8 +536,8 @@ class PiAdapter extends BaseAdapter {
   /**
    * Read-only runtime snapshot for the workspace UI. `source` says where the
    * current model came from so the UI can never present an inferred value as
-   * configuration truth, and `available_models` is omitted entirely â€?not
-   * padded with the current model â€?when Pi has no configured providers.
+   * configuration truth, and `available_models` is omitted entirely --?not
+   * padded with the current model --?when Pi has no configured providers.
    */
   async fetchAndReportUsage() {
     try {

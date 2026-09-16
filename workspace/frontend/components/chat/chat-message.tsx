@@ -694,7 +694,7 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={cn('group/agentmsg', hideHeader ? 'pb-3.5' : 'py-3.5')}>
+        <div className={cn('group/agentmsg select-text selectable', hideHeader ? 'pb-3.5' : 'py-3.5')}>
       <div className="flex items-start gap-3">
         {hideHeader ? (
           <div className="size-7 shrink-0" aria-hidden />
@@ -759,17 +759,17 @@ export const ChatMessage = memo(function ChatMessage({
 
           {/* Main Answer Content OR Formatted Error Callout */}
           {isErrorMessage ? (
-            <div className="my-2 p-3.5 rounded-xl border border-destructive/25 bg-destructive/5 dark:bg-destructive/10 text-foreground flex items-start gap-3">
+            <div className="my-2 p-3.5 rounded-xl border border-destructive/25 bg-destructive/5 dark:bg-destructive/10 text-foreground flex items-start gap-3 select-text selectable">
               <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0 space-y-1">
                 <p className="text-xs font-semibold text-destructive">Interrupted, or an auth problem</p>
-                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                <div className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed select-text selectable">
                   {cleanContent}
                 </div>
               </div>
             </div>
           ) : cleanContent ? (
-            <div className="text-[14px] leading-[1.75] text-foreground font-normal tracking-[-0.005em]">
+            <div className="text-[14px] leading-[1.75] text-foreground font-normal tracking-[-0.005em] select-text selectable">
               <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
             </div>
           ) : null}

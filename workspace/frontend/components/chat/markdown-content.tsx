@@ -514,7 +514,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 
   return (
     <MarkdownErrorBoundary fallbackContent={content}>
-      <div className="markdown-content">
+      <div className="markdown-content select-text selectable">
         <ReactMarkdown
           remarkPlugins={remarkPlugins}
           rehypePlugins={rehypePlugins}
