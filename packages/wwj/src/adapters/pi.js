@@ -323,6 +323,8 @@ class PiAdapter extends BaseAdapter {
 
     // Real-time JSON Lines event streaming (not buffered stdout)
     const responseChunks = [];
+    let finalAnswer = '';
+    let streamedText = '';
     let stderrBuf = '';
     let lineBuffer = '';
     let everPostedAnything = false;
@@ -337,48 +339,84 @@ class PiAdapter extends BaseAdapter {
 
       let event;
       try { event = JSON.parse(line); } catch {
-        // Not JSON --?treat as plain text output (fallback)
+        // Not JSON -- treat as plain text output (fallback)
         if (line.trim()) responseChunks.push(line.trim());
         return;
       }
 
       const eventType = event.type || '';
 
-      /*
-       * `thinking` and `assistant`/`text_delta` used to share one branch, so
-       * they were indistinguishable downstream. They are not the same thing:
-       * `thinking` is the model reasoning, the other two are its reply arriving
-       * a piece at a time. Only the latter is flagged as a reply preview --?with
-       * them merged, tagging the branch would have mislabelled real reasoning as
-       * the answer, and not tagging it would have left the answer duplicated.
-       */
+      // 1. Thinking / Reasoning
+      // Official Pi CLI emits message_update with assistantMessageEvent.type = 'thinking_delta' | 'thinking_end'
+      let thinkingText = '';
       if (eventType === 'thinking') {
-        const text = event.text || event.content || event.delta || '';
-        if (text.trim()) {
-          everPostedAnything = true;
-          try { await this.sendThinking(channelName, text.trim()); } catch {}
-        }
-      } else if (eventType === 'assistant' || eventType === 'text_delta') {
-        const text = event.text || event.content || event.delta || '';
-        if (text.trim()) {
-          everPostedAnything = true;
-          try { await this.sendThinking(channelName, text.trim(), { isReplyPreview: true }); } catch {}
+        thinkingText = event.text || event.content || event.delta || '';
+      } else if (eventType === 'message_update' && event.assistantMessageEvent) {
+        const ame = event.assistantMessageEvent;
+        if (ame.type === 'thinking_delta' && ame.delta) {
+          thinkingText = ame.delta;
+        } else if (ame.type === 'thinking_end' && ame.content) {
+          thinkingText = ame.content;
         }
       }
+      if (thinkingText && thinkingText.trim()) {
+        everPostedAnything = true;
+        try { await this.sendThinking(channelName, thinkingText.trim()); } catch {}
+      }
 
-      // Tool use / tool call activity
-      if (eventType === 'tool_use' || eventType === 'tool_call' || eventType === 'tool') {
-        const toolName = event.name || event.tool || event.tool_name || 'tool';
-        const detail = event.input?.command || event.input?.path || event.input?.query || '';
+      // 2. Assistant reply streaming preview
+      // Official Pi CLI emits message_update with assistantMessageEvent.type = 'text_delta' | 'text_end'
+      let replyPreviewText = '';
+      if (eventType === 'assistant' || eventType === 'text_delta') {
+        replyPreviewText = event.text || event.content || event.delta || '';
+      } else if (eventType === 'message_update' && event.assistantMessageEvent) {
+        const ame = event.assistantMessageEvent;
+        if (ame.type === 'text_delta' && ame.delta) {
+          replyPreviewText = ame.delta;
+          streamedText += ame.delta;
+        } else if (ame.type === 'text_end' && ame.content) {
+          replyPreviewText = ame.content;
+          streamedText = ame.content;
+        }
+      }
+      if (replyPreviewText && replyPreviewText.trim()) {
+        everPostedAnything = true;
+        try { await this.sendThinking(channelName, replyPreviewText.trim(), { isReplyPreview: true }); } catch {}
+      }
+
+      // 3. Tool use / tool execution activity
+      if (
+        eventType === 'tool_use' ||
+        eventType === 'tool_call' ||
+        eventType === 'tool' ||
+        eventType === 'tool_execution_start' ||
+        eventType === 'tool_execution_update'
+      ) {
+        const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
+        const input = event.args || event.input || {};
+        const detail = input.command || input.path || input.query || (typeof input === 'string' ? input : '');
         const label = detail ? `${toolName} > ${detail}` : toolName;
         everPostedAnything = true;
         try { await this.sendStatus(channelName, label); } catch {}
       }
 
-      // Result / completion
-      if (eventType === 'result' || eventType === 'response' || eventType === 'message') {
+      // 4. Final response extraction from message_end / turn_end
+      if (eventType === 'message_end' || eventType === 'turn_end') {
+        const msg = event.message;
+        if (msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
+          const textParts = msg.content
+            .filter((p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.trim())
+            .map((p) => p.text.trim());
+          if (textParts.length > 0) {
+            finalAnswer = textParts.join('\n\n');
+          }
+        }
+      }
+
+      // Result / completion / legacy message
+      if (eventType === 'result' || eventType === 'response' || (eventType === 'message' && typeof event.text === 'string')) {
         const text = event.text || event.content || event.result || '';
-        if (text.trim()) {
+        if (typeof text === 'string' && text.trim()) {
           responseChunks.push(text.trim());
         }
       }
@@ -412,12 +450,14 @@ class PiAdapter extends BaseAdapter {
 
     delete this._channelProcesses[channelName];
 
+    const resolvedAnswer = (finalAnswer || streamedText || responseChunks.join('\n')).trim();
+
     if (exitCode !== 0) {
-      const detail = (stderrBuf || responseChunks.join('\n')).trim().slice(0, 600);
+      const detail = (stderrBuf || resolvedAnswer).trim().slice(0, 600);
       throw new Error(`pi exited with code ${exitCode}: ${detail}`);
     }
 
-    return responseChunks.join('\n').trim();
+    return resolvedAnswer;
   }
 
   async _stopProcess(proc) {
