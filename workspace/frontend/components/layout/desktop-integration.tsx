@@ -199,6 +199,74 @@ export function DesktopIntegration() {
     return () => unsubscribers.forEach((off) => off());
   }, []);
 
+  /*
+    ── The caption-button reserve, MEASURED instead of guessed ─────────────
+
+    `--window-controls-inset` was the literal 138 — "three 46px buttons" — set
+    once from a constant in lib/desktop.ts. That number is right for exactly
+    one configuration: Windows 11, 100% display scaling, the default overlay
+    height. It is wrong for a 125% or 150% display (the commonest laptop
+    setting in this app's user base), wrong on Windows 10, and wrong again the
+    moment the window is maximised on some builds — and when it is too small,
+    the app's own header controls are drawn underneath the real minimise /
+    maximise / close buttons, which is exactly the overlap being reported.
+
+    The platform will simply tell us. `windowControlsOverlay.getTitlebarAreaRect()`
+    returns the area NOT occupied by the caption buttons, so the reserve is
+    whatever is left over on the trailing edge. `geometrychange` fires when the
+    overlay resizes — maximise, restore, a DPI change, the user moving the
+    window to a differently-scaled monitor — so this stays correct instead of
+    being correct once at startup.
+
+    The 138 stays as the pre-paint fallback: the attribute has to be on <html>
+    before the first frame, and this effect cannot run that early.
+  */
+  React.useEffect(() => {
+    const wco = (navigator as unknown as {
+      windowControlsOverlay?: {
+        visible: boolean;
+        getTitlebarAreaRect(): DOMRect;
+        addEventListener(t: string, h: () => void): void;
+        removeEventListener(t: string, h: () => void): void;
+      };
+    }).windowControlsOverlay;
+    if (!wco) return;
+
+    const apply = () => {
+      try {
+        // Not visible means the shell is drawing a normal frame (or the window
+        // is fullscreen) — there are no buttons to dodge, so reserve nothing.
+        if (!wco.visible) {
+          document.documentElement.style.setProperty('--window-controls-inset', '0px');
+          return;
+        }
+        const rect = wco.getTitlebarAreaRect();
+        // The buttons sit at whichever end the available area stops short of.
+        // On an RTL layout that is the start edge, which is why this measures
+        // the gap rather than assuming it is on the right.
+        const trailing = Math.max(0, Math.round(window.innerWidth - (rect.x + rect.width)));
+        const leading = Math.max(0, Math.round(rect.x));
+        const inset = Math.max(trailing, leading);
+        // A measurement of zero while the overlay claims to be visible means
+        // the rect is not ready yet; keep the fallback rather than removing the
+        // reserve and letting the header slide under the buttons for a frame.
+        if (inset > 0) {
+          document.documentElement.style.setProperty('--window-controls-inset', `${inset}px`);
+        }
+      } catch {
+        // Leave the pre-paint fallback in place.
+      }
+    };
+
+    apply();
+    wco.addEventListener('geometrychange', apply);
+    window.addEventListener('resize', apply);
+    return () => {
+      wco.removeEventListener('geometrychange', apply);
+      window.removeEventListener('resize', apply);
+    };
+  }, []);
+
   // ── Unread count → the OS ────────────────────────────────────────────
   React.useEffect(() => {
     const bridge = getBridge();

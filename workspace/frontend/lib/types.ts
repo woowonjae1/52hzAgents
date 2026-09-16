@@ -671,7 +671,7 @@ export interface NetworkProfile {
  * Use `stripAddressPrefix` rather than inlining a regex — that is how the two
  * halves drifted apart the first time.
  */
-export const ADDRESS_PREFIX_RE = /^(52hz:|openagents:|agent:|human:|system:)/;
+export const ADDRESS_PREFIX_RE = /^(52hzagents:|52hz:|openagents:|agent:|human:|system:)/i;
 
 export function stripAddressPrefix(address: string | null | undefined): string {
   return (address || '').replace(ADDRESS_PREFIX_RE, '');
@@ -679,8 +679,8 @@ export function stripAddressPrefix(address: string | null | undefined): string {
 
 /** True for an address that belongs to an agent rather than a human or the system. */
 export function isAgentAddress(address: string | null | undefined): boolean {
-  const a = address || '';
-  return a.startsWith('52hz:') || a.startsWith('openagents:') || a.startsWith('agent:');
+  const a = (address || '').toLowerCase();
+  return a.startsWith('52hzagents:') || a.startsWith('52hz:') || a.startsWith('openagents:') || a.startsWith('agent:');
 }
 
 export function networkAgentToWorkspaceAgent(agent: Record<string, unknown> | WorkspaceAgent | NetworkProfile): WorkspaceAgent {

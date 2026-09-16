@@ -5,23 +5,17 @@ import { PanelLeft } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { useWorkspace } from '@/lib/workspace-context';
-import { useIsDesktop } from '@/lib/desktop';
-
 export function SidebarHeader() {
   const { sidebarToggle } = useLayout();
   const { workspace } = useWorkspace();
-  const isDesktop = useIsDesktop();
-
-  /*
-    In the Electron shell the brand mark, the workspace name and the sidebar
-    toggle all live in AppTitlebar — see the note there. Rendering them here too
-    gave the desktop window three stacked bands before any content. In the
-    browser there is no titlebar, so this is where they belong.
-  */
-  if (isDesktop) return null;
 
   return (
-    <div className="app-header justify-between px-4">
+    <div
+      className="app-header justify-between px-4"
+      style={{
+        paddingInlineStart: 'max(1rem, var(--traffic-lights-inset, 0px))',
+      }}
+    >
       {/* Left: Brand logo with status dot */}
       <div className="flex items-center gap-3 min-w-0">
         <SignalMark size={22} className="shrink-0" title="52hzAgents" />

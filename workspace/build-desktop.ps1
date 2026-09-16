@@ -24,6 +24,11 @@ $BinDir = Join-Path $ResourcesDir "bin"
 $PublicDir = Join-Path $ResourcesDir "public"
 $WwjDir = Join-Path $ResourcesDir "wwj"
 
+try {
+    Get-Process -Name 52hzAgents, electron, "52hz-server" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+} catch {}
+
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
 New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
 New-Item -ItemType Directory -Force -Path $WwjDir | Out-Null

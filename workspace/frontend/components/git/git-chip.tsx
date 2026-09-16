@@ -237,7 +237,7 @@ export function GitChip({
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors"
         >
           <GitBranch className="size-3 text-foreground-muted shrink-0" />
-          <span className="font-medium max-w-[120px] truncate">{status.branch || 'detached'}</span>
+          <span className="font-medium max-w-[85px] sm:max-w-[120px] truncate">{status.branch || 'detached'}</span>
           {status.additions > 0 && (
             <span className="font-mono tabular-nums text-2xs text-status-success">+{status.additions}</span>
           )}

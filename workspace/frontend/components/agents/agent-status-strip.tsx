@@ -107,6 +107,26 @@ export function AgentStatusStrip() {
       >
         {/* -space-x-1.5, not -1: at 4px the discs merely touched, which reads as
             a crowded row rather than a stack. */}
+        {/*
+          WITH NOTHING ONLINE, THIS ROW HAD NO ANCHOR.
+
+          `empty:hidden` collapses the avatar stack when no agent is live —
+          which is the common state — and what was left was the bare sentence
+          "0 of 8 online" floating in the sidebar with no icon, no container
+          and nothing to align to. It read as a stray label rather than a
+          control, and it was the one thing in the header that looked
+          unfinished.
+
+          A muted presence dot stands in for the stack, so the row keeps its
+          shape whether eight agents are online or none: glyph, then text,
+          exactly like the navigation rows above it.
+        */}
+        {live.length === 0 && (
+          <span className="size-5 shrink-0 flex items-center justify-center">
+            <span className="size-1.5 rounded-full bg-foreground-extra-muted/70" />
+          </span>
+        )}
+
         <div className="flex items-center -space-x-1.5 shrink-0 empty:hidden">
           {shown.map(({ agent, state }) => (
             <Tooltip key={agent.agentName}>

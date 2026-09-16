@@ -37,8 +37,6 @@ import { RealtimeStatus } from './realtime-status';
 import { WindowTitle } from './window-title';
 import { ErrorLogDialog } from './error-log-dialog';
 import { installErrorCapture } from '@/lib/error-log';
-import { AppTitlebar } from './app-titlebar';
-import { useIsDesktop } from '@/lib/desktop';
 
 import { Hint } from '@/components/ui/hint';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
@@ -85,7 +83,6 @@ export function Wrapper() {
   const { monitorMode, agents, loading, workspace } = useWorkspace();
   const { activeArtifact, isCanvasOpen, closeCanvas } = useArtifacts();
   const hasAgents = agents.length > 0;
-  const isDesktop = useIsDesktop();
   const desktopContainerRef = React.useRef<HTMLDivElement>(null);
   const narrowStateRef = React.useRef<boolean | null>(null);
 
@@ -154,11 +151,7 @@ export function Wrapper() {
   // ── Mobile layout: single-pane with list/detail switching ──
   if (isMobile) {
     return (
-      <div
-        className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5"
-        style={isDesktop ? { paddingTop: 'var(--titlebar-height, 36px)' } : undefined}
-      >
-        {isDesktop && <AppTitlebar />}
+      <div className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
           {/* Full-screen views (no list/detail split) */}
@@ -237,15 +230,14 @@ export function Wrapper() {
   return (
     <div
       ref={desktopContainerRef}
-      /* pt is `--titlebar-height`, which is 0px outside the Electron shell —
-         one rule for both, rather than a conditional class and a magic 28. */
-      className="flex h-screen w-full bg-surface0 pt-[var(--titlebar-height)] [&_.container-fluid]:px-5"
-      style={isDesktop ? { paddingTop: 'var(--titlebar-height, 36px)' } : undefined}
+      className="flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5"
     >
-      {isDesktop && <AppTitlebar />}
       {shouldShowSidebar && <Sidebar />}
 
-      <div className="flex flex-col flex-grow min-w-0 w-full">
+      <div
+        className="flex flex-col flex-grow min-w-0 w-full"
+        data-studio-open={isStudioOpen ? 'true' : 'false'}
+      >
         <div className="flex grow min-h-0 overflow-hidden">
           {/* Invisible spacer standing in for the fixed sidebar. Reads the same
               resizable width the sidebar itself does, so dragging the handle moves

@@ -35,6 +35,11 @@ import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { getApiBaseUrl } from '@/lib/config';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import {
+  deriveTitleFromMessages,
+  rememberDerivedTitle,
+  getDerivedTitle,
+} from '@/lib/thread-title';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { GitChip } from '@/components/git/git-chip';
@@ -767,6 +772,37 @@ export function ChatView() {
     toast.success(`Quoted @${msg.senderName}'s message into composer`);
   }, [currentDraft, handleDraftChange]);
 
+  /*
+    Replace the draft rather than append to it: this is "say that again, but
+    right", not "add this below what I was writing". Anything already typed
+    would be a different thought and joining the two produces neither.
+  */
+  const handleReusePrompt = useCallback((msg: WorkspaceMessage) => {
+    handleDraftChange(msg.content);
+    setFocusKey((k) => k + 1);
+  }, [handleDraftChange]);
+
+  /*
+    RECORD WHAT THIS THREAD IS ABOUT, ONCE.
+
+    The sidebar cannot compute this: the sessions list carries no transcript,
+    only the newest message, which is how threads ended up named after whatever
+    an agent last said — including its crashes. Here the whole conversation is
+    loaded, so the first thing the user actually asked for is available, and it
+    is written down the first time it is seen and never again.
+
+    Deliberately not gated on the session being untitled: the cache is a
+    fallback the sidebar consults only when there is no explicit title, so
+    recording it for a named thread costs one localStorage entry and makes the
+    name correct the moment someone clears the title.
+  */
+  useEffect(() => {
+    if (!currentSessionId || displayMessages.length === 0) return;
+    if (getDerivedTitle(currentSessionId)) return;
+    const derived = deriveTitleFromMessages(displayMessages);
+    if (derived) rememberDerivedTitle(currentSessionId, derived);
+  }, [currentSessionId, displayMessages]);
+
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');
 
   if (!currentSessionId) {
@@ -845,7 +881,7 @@ export function ChatView() {
         longer reserves space for the native window buttons either: those live
         in AppTitlebar above, which is also the app's single drag region.
       */}
-      <div className="app-header sticky top-0 z-10 lg:px-8">
+      <div className="app-header sticky top-0 z-10 lg:ps-8">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
@@ -908,10 +944,42 @@ export function ChatView() {
                   <span className="shrink-0">working</span>
                 </span>
               ) : (
-                <span className="flex items-baseline gap-1.5 min-w-0 text-xs text-foreground-muted">
-                  <span className="truncate">{channelAgentNames.join(', ')}</span>
-                  <span className="shrink-0 text-3xs font-mono text-foreground-extra-muted">idle</span>
-                </span>
+                /*
+                  FACES, THEN A COUNT — not eight comma-separated names.
+
+                  `amp, antigravity, claude, cline, kilo, openclaw, opencode,
+                  pi` is 60-odd characters of header that the eye reads as one
+                  grey smear: it takes the space of a title, gives no sense of
+                  who is actually here, and the `max-w-[45%]` clipped it
+                  mid-name anyway. Four avatars carry the same information at a
+                  glance — these agents already have stable identity colours
+                  everywhere else in the app — and the overflow count is
+                  honest about what it is hiding.
+
+                  Full roster on hover, because occasionally you do want the
+                  names, and that is what a tooltip is for.
+                */
+                <Hint label={`${channelAgentNames.length} participants — ${channelAgentNames.join(', ')}`}>
+                  <span className="flex items-center gap-1.5 min-w-0 text-xs text-foreground-muted">
+                    <span className="flex items-center -space-x-1.5">
+                      {channelAgentNames.slice(0, 4).map((name) => (
+                        <AgentAvatar
+                          key={name}
+                          name={name}
+                          agentType={agents.find((a) => a.agentName === name)?.agentType}
+                          size={18}
+                          className="ring-1 ring-surface0 rounded-full shrink-0"
+                        />
+                      ))}
+                    </span>
+                    {channelAgentNames.length > 4 && (
+                      <span className="shrink-0 text-3xs font-mono tabular-nums text-foreground-extra-muted">
+                        +{channelAgentNames.length - 4}
+                      </span>
+                    )}
+                    <span className="shrink-0 text-3xs font-mono text-foreground-extra-muted">idle</span>
+                  </span>
+                </Hint>
               )}
             </div>
           )}
@@ -1182,6 +1250,7 @@ export function ChatView() {
             workingDir={currentSessionWorkingDir}
             onRegenerate={handleRegenerateMessage}
             onQuoteReply={handleQuoteReply}
+            onReusePrompt={handleReusePrompt}
             className="flex-1 overflow-y-auto px-4 lg:px-8 py-4"
           />
         )}

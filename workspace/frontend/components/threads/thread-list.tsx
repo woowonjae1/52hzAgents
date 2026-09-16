@@ -11,7 +11,7 @@ import { browseForFolder, basename } from '@/components/chat/project-folder-pick
 import { cn } from '@/lib/utils';
 import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
-import { timeAgo } from '@/lib/helpers';
+import { timeAgo, formatRowTime } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { AgentStatusStrip } from '@/components/agents/agent-status-strip';
@@ -28,6 +28,14 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { stripAddressPrefix } from '@/lib/types';
 import { isComposing } from '@/lib/ime';
+import { useThreadSeen } from '@/lib/thread-seen';
+import {
+  getDerivedTitle,
+  subscribeToTitles,
+  cleanTitleText,
+  truncateTitle,
+  isUnusableTitleSource,
+} from '@/lib/thread-title';
 import { FIND_EVENT } from '@/components/layout/global-shortcuts';
 
 /*
@@ -168,7 +176,23 @@ function DMSection({
   );
 }
 
-function getSmartSessionTitle(session: WorkspaceSession, lastMsg?: LastMessageInfo | null): string {
+/**
+ * The name of a thread, in priority order. See lib/thread-title.ts for why the
+ * old rule — "strip the last message and cut at 24" — produced a sidebar of
+ * crash text that renamed itself every turn.
+ *
+ *   1. what the user explicitly called it
+ *   2. what they asked for first, recorded the last time the thread was open
+ *   3. the newest message, but only if it is not a failure, a tool trace or an
+ *      agent narrating its own next step
+ *   4. the project folder — disambiguated, because otherwise every unnamed
+ *      thread in one folder shares a name
+ */
+function getSmartSessionTitle(
+  session: WorkspaceSession,
+  lastMsg?: LastMessageInfo | null,
+  folderOrdinal?: number,
+): string {
   const rawTitle = (session.title || '').trim();
   const isGeneric =
     !rawTitle ||
@@ -178,43 +202,43 @@ function getSmartSessionTitle(session: WorkspaceSession, lastMsg?: LastMessageIn
     rawTitle === 'Untitled' ||
     rawTitle === 'New Chat';
 
-  if (!isGeneric) {
-    return rawTitle;
-  }
+  if (!isGeneric) return rawTitle;
 
-  if (lastMsg && lastMsg.content) {
-    const trimmed = lastMsg.content.trim();
-    const isStatusOrThinking =
-      lastMsg.isStatus ||
-      /^thinking(\.{0,3})?$/i.test(trimmed) ||
-      /^<think/i.test(trimmed) ||
-      /^Using tool/i.test(trimmed) ||
-      /^sse-probe/i.test(trimmed);
+  // Recorded from the transcript's first user message. Stable by construction:
+  // written once, never overwritten.
+  const derived = getDerivedTitle(session.sessionId);
+  if (derived) return derived;
 
-    if (!isStatusOrThinking) {
-      let clean = trimmed
-        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-        .replace(/[`*_#~>]/g, '')
-        .replace(/[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/gu, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (clean && !/^thinking(\.{0,3})?$/i.test(clean)) {
-        if (clean.length > 24) {
-          clean = clean.slice(0, 24).trim() + '...';
-        }
-        return clean;
-      }
+  // Never opened, so the newest message is all there is. Filtered hard.
+  if (lastMsg && lastMsg.content && !lastMsg.isStatus) {
+    const clean = cleanTitleText(lastMsg.content);
+    if (clean && !isUnusableTitleSource(clean)) {
+      return truncateTitle(clean);
     }
   }
 
   if (session.workingDir) {
     const parts = session.workingDir.replace(/\\/g, '/').split('/').filter(Boolean);
     if (parts.length > 0) {
-      return parts[parts.length - 1];
+      const folder = parts[parts.length - 1];
+      /*
+        `java-to-go`, eight times, is not a list. The ordinal is assigned by the
+        caller from the thread's position among the other unnamed threads in
+        the same folder, so the numbers are stable for as long as the ordering
+        is and do not renumber themselves as unrelated threads arrive.
+      */
+      return folderOrdinal && folderOrdinal > 1 ? `${folder} ${folderOrdinal}` : folder;
     }
   }
 
-  return 'New Chat';
+  // Dated rather than bare: "New Chat" repeated is the same collision again.
+  if (session.createdAt) {
+    const d = new Date(session.createdAt);
+    if (!Number.isNaN(d.getTime())) {
+      return `New chat · ${d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}`;
+    }
+  }
+  return 'New chat';
 }
 
 interface ThreadRowProps {
@@ -227,6 +251,14 @@ interface ThreadRowProps {
   isSearching: boolean;
   searchQuery: string;
   isEditing: boolean;
+  /** Activity newer than the last time this thread was on screen. */
+  isUnread: boolean;
+  /**
+   * This thread's position among the OTHER unnamed threads sharing its project
+   * folder, 1-based. Only used when the title falls all the way back to the
+   * folder name, to stop eight rows all reading `java-to-go`.
+   */
+  folderOrdinal?: number;
   editTitleValue: string;
   agents: WorkspaceAgent[];
   onSelect: (sessionId: string) => void;
@@ -248,6 +280,8 @@ const ThreadRow = memo(function ThreadRow({
   isSearching,
   searchQuery,
   isEditing,
+  isUnread,
+  folderOrdinal,
   editTitleValue,
   agents,
   onSelect,
@@ -259,15 +293,27 @@ const ThreadRow = memo(function ThreadRow({
   setEditTitleValue,
 }: ThreadRowProps) {
   const activityMs = session.lastEventAt;
-  const displayTime = activityMs
-    ? timeAgo(new Date(activityMs).toISOString())
-    : session.createdAt ? timeAgo(session.createdAt) : '';
+  const displayTime = formatRowTime(
+    activityMs || (session.createdAt ? new Date(session.createdAt).getTime() : 0),
+  );
 
+  const rawSender = lastMsg?.senderName ? stripAddressPrefix(lastMsg.senderName).trim() : '';
   const lastSpeaker: WorkspaceAgent | 'you' | null = !lastMsg
     ? null
-    : lastMsg.senderName === 'user'
+    : rawSender === 'user' || rawSender === 'human'
       ? 'you'
-      : agents.find((a) => a.agentName === lastMsg.senderName) ?? null;
+      : agents.find((a) => a.agentName.toLowerCase() === rawSender.toLowerCase()) ?? null;
+
+  // Fallback to thread's assigned master agent or first participant if lastSpeaker is not found
+  const fallbackAgentName = !lastSpeaker
+    ? (session.master || (session.participants && session.participants.length > 0 ? session.participants[0] : null))
+    : null;
+  const cleanFallback = fallbackAgentName ? stripAddressPrefix(fallbackAgentName).trim() : '';
+  const fallbackAgent = cleanFallback
+    ? agents.find((a) => a.agentName.toLowerCase() === cleanFallback.toLowerCase()) ?? null
+    : null;
+
+  const displayAgent = (lastSpeaker && lastSpeaker !== 'you') ? lastSpeaker : fallbackAgent;
 
   let preview: React.ReactNode;
   let previewIsStatus = false;
@@ -314,7 +360,7 @@ const ThreadRow = memo(function ThreadRow({
     preview = 'No messages yet';
   }
 
-  const smartTitle = getSmartSessionTitle(session, lastMsg);
+  const smartTitle = getSmartSessionTitle(session, lastMsg, folderOrdinal);
 
   /*
     THE SECOND LINE IS DROPPED WHEN IT RESTATES THE FIRST.
@@ -356,18 +402,86 @@ const ThreadRow = memo(function ThreadRow({
     (normalizedPreview === normalizedTitle ||
       normalizedPreview.startsWith(normalizedTitle) ||
       normalizedTitle.startsWith(normalizedPreview));
-  const showPreview = !previewRestatesTitle;
+  /*
+    EVERY ROW IS THE SAME HEIGHT.
+
+    Two rules had accumulated for hiding the second line — "the preview repeats
+    the title" and "the preview is content-free chatter" — and between them
+    they collapsed most but not all rows. The result was a column alternating
+    62px and 42px in no pattern the eye could predict, which is worse than
+    either height consistently: scanning a list is a rhythm, and a list with no
+    rhythm has to be read instead of scanned.
+
+    Fixed single line, not fixed double. The second line's content here is an
+    agent's status output, not a person's message — the thing that makes
+    Slack's and Linear's two-line rows worth their height. Half the previews
+    were already being suppressed as noise by those two rules, which is the
+    measurement that settles it: a line that is empty half the time should not
+    be reserving space the other half.
+
+    Nothing is lost. The preview is now the row's hover text, where it costs
+    nothing until asked for.
+  */
+  const previewText = typeof preview === 'string' ? preview.trim() : '';
+  const hoverPreview =
+    previewText && !previewRestatesTitle && previewText !== 'No messages yet'
+      ? previewText
+      : null;
 
   return (
     <div
+      /*
+        THE MOST-USED LIST IN THE APP WAS THE ONE YOU COULD NOT TAB INTO.
+
+        Files, Inbox, Knowledge and Tasks all went through
+        `useListKeyboardNav`, which gives their rows `role="option"`, a roving
+        tabindex and `aria-selected`. This list kept its own hand-rolled j/k
+        handler — which works, and stays — but its rows were bare `<div
+        onClick>`: no role, no tab stop, no focus ring, invisible to a screen
+        reader as anything but text.
+
+        The roving tabindex is the part that matters: exactly one row is in the
+        tab order, the SELECTED one, so Tab reaches the list in a single press
+        and lands where the user already is rather than walking twenty threads.
+        Enter and Space then open it, which is what `role="option"` promises.
+
+        Deliberately NOT swapping in the shared hook. It owns a cursor of its
+        own, and this list already has one expressed through `currentSessionId`
+        plus the 1-9 number shortcuts; running both would give the list two
+        disagreeing notions of "the current row".
+      */
+      role="option"
+      aria-selected={isSelected}
+      tabIndex={isSelected ? 0 : -1}
+      onKeyDown={(e) => {
+        if (isEditing) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(session.sessionId);
+        }
+      }}
       onClick={() => {
         if (isEditing) return;
         onSelect(session.sessionId);
       }}
       className={cn(
-        'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-colors relative group select-none',
+        'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors relative group select-none',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-accent',
+        /*
+          4. A SOFTER SELECTED STATE.
+
+          This was a 4px `bg-primary` bar pinned to the row's left edge. In the
+          dark theme `--primary` is near-white, so the marker for "you are here"
+          was the highest-contrast object on the entire screen — brighter than
+          any text, for a state the user already knows they are in. Selection
+          needs to be unmistakable when scanned, not loud when stared at.
+
+          The fill does the work; the bar is now half the width, inset from the
+          rounded corner rather than butting against it, and tinted rather than
+          full-strength.
+        */
         isSelected
-          ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+          ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0.5 before:top-2.5 before:bottom-2.5 before:w-0.5 before:rounded-full before:bg-primary/60'
           : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
         'has-data-[state=open]:bg-surface2/60',
         isActive && 'thread-wip',
@@ -377,20 +491,36 @@ const ThreadRow = memo(function ThreadRow({
       <div className="shrink-0 self-start pt-0.5 size-[18px]">
         {lastSpeaker === 'you' ? (
           <SignalMark size={18} still />
-        ) : lastSpeaker ? (
+        ) : displayAgent ? (
           <AgentAvatar
-            name={lastSpeaker.agentName}
-            agentType={lastSpeaker.agentType}
+            name={displayAgent.agentName}
+            agentType={displayAgent.agentType}
             size={18}
           />
-        ) : null}
+        ) : (
+          <div className="size-[18px] flex items-center justify-center rounded-md bg-surface2/80 text-foreground-extra-muted border border-border/40">
+            <MessageSquare className="size-2.5 opacity-60" />
+          </div>
+        )}
       </div>
 
-      {/* No `space-y-1` here any more: the gap belongs to the preview line,
-          which is now conditional, and a `space-y` that only ever applies to
-          one optional child is a rule looking for a sibling. */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1.5">
+          {/*
+            The unread mark goes BEFORE the title, not after the timestamp.
+
+            It has to be findable by sweeping one vertical line down the list —
+            that is the entire job — and the right edge already holds the
+            relative time, which changes length per row and would make the dots
+            zigzag. A filled disc rather than a count: how many messages
+            arrived is not a decision input, whether any did is.
+          */}
+          {isUnread && (
+            <span
+              aria-label="Unread"
+              className="size-1.5 shrink-0 rounded-full bg-primary"
+            />
+          )}
           {session.starred && (
             <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
           )}
@@ -421,7 +551,13 @@ const ThreadRow = memo(function ThreadRow({
               className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary"
             />
           ) : (
-            <Hint label="Double-click to rename">
+            <Hint
+              label={
+                hoverPreview
+                  ? `${smartTitle} — ${hoverPreview}`
+                  : `${smartTitle} · double-click to rename`
+              }
+            >
               <span
                 onDoubleClick={(e) => {
                   e.stopPropagation();
@@ -436,23 +572,20 @@ const ThreadRow = memo(function ThreadRow({
               </span>
             </Hint>
           )}
-          {/* `font-sans`, not `font-mono tabular-nums`: this is "5 hours ago",
-              not a column of figures. Monospacing prose sets it in a second
-              typeface for no alignment benefit, and at 10px the mono face is
-              the widest thing in a row that is fighting for width. */}
+          {/*
+            3. FOUR CHARACTERS, NOT ELEVEN.
+
+            "2 weeks ago" on every row said what the date band directly above
+            the row had already said, and took 30-40% of the width to say it —
+            which is why the titles beside it were being cut to a dozen
+            characters. `formatRowTime` narrows as the band widens: the clock
+            today, the weekday this week, a date beyond that. The width goes
+            back to the title, which is the part that identifies the thread.
+          */}
           <span className="text-2xs text-foreground-extra-muted shrink-0 tabular-nums">
             {displayTime}
           </span>
         </div>
-        {showPreview && (
-          <p className={cn(
-            'text-2xs truncate leading-relaxed font-sans mt-1',
-            isSelected ? 'text-foreground/75 font-normal' : 'text-foreground-muted/90',
-            previewIsStatus && 'text-foreground-muted'
-          )}>
-            {preview}
-          </p>
-        )}
       </div>
 
       {/* Hover actions */}
@@ -521,6 +654,8 @@ const ThreadRow = memo(function ThreadRow({
     prev.isSearching === next.isSearching &&
     prev.searchQuery === next.searchQuery &&
     prev.isEditing === next.isEditing &&
+    prev.isUnread === next.isUnread &&
+    prev.folderOrdinal === next.folderOrdinal &&
     prev.editTitleValue === next.editTitleValue &&
     prev.agents === next.agents
   );
@@ -531,6 +666,8 @@ interface VirtualGroupHeaderItem {
   key: string;
   dir: string | null;
   count: number;
+  /** The starred band at the top of the list, rather than a project folder. */
+  pinned?: boolean;
 }
 
 interface VirtualSessionItem {
@@ -539,7 +676,39 @@ interface VirtualSessionItem {
   session: WorkspaceSession;
 }
 
-type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem;
+/**
+ * A date band inside a project group — "Today", "Previous 7 Days".
+ *
+ * WHY THE LIST NEEDED ONE. Every row already printed its own relative time, so
+ * a folder holding twenty threads printed "5 days ago" nine times in a column
+ * down the right edge: twenty timestamps to answer one question, and no shape
+ * to the list at all. A band answers it once for the whole run beneath it, and
+ * it is what turns a flat stack of titles into "here is today, here is the
+ * week, here is everything older" — the thing that makes a long chat list
+ * scannable in every application that has one.
+ */
+interface VirtualDateHeaderItem {
+  type: 'datehead';
+  key: string;
+  label: string;
+}
+
+type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem | VirtualDateHeaderItem;
+
+/** Which band a timestamp falls into. Boundaries are calendar days, not
+ *  rolling 24h windows: something from 11pm last night is "Yesterday", not
+ *  "Today", which is how a person reading the list thinks about it. */
+function dateBandFor(ms: number, now: number): string {
+  if (!ms) return 'Older';
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const dayStart = startOfToday.getTime();
+  if (ms >= dayStart) return 'Today';
+  if (ms >= dayStart - 86_400_000) return 'Yesterday';
+  if (ms >= dayStart - 7 * 86_400_000) return 'Previous 7 Days';
+  if (ms >= dayStart - 30 * 86_400_000) return 'Previous 30 Days';
+  return 'Older';
+}
 
 export function ThreadList() {
   const { loading, sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
@@ -656,8 +825,6 @@ export function ThreadList() {
 
   const activeSessions = sortedSessions.filter((s) => s.status === 'active');
   const archivedSessions = sortedSessions.filter((s) => s.status === 'archived');
-  const pinnedSessions = activeSessions.filter((s) => s.starred);
-  const unpinnedSessions = activeSessions.filter((s) => !s.starred);
   const onlineAgentCount = agents.filter((a) => a.status === 'online').length;
 
   const filteredSessions = isSearching
@@ -666,6 +833,26 @@ export function ThreadList() {
         hitsByChannel.has(s.sessionId)
       )
     : activeSessions;
+
+  /*
+    STARRING DID NOTHING.
+
+    These two lines existed already — computed, and then referenced nowhere in
+    the file. The context menu offered Star / Unstar, the row drew a star, and
+    the grouping below went on slicing `filteredSessions` by project directory
+    as if the flag did not exist. So the feature looked implemented from every
+    angle a user can see: you could turn it on, it remembered, and it changed
+    nothing about where the thread lived.
+
+    A star means "keep this one where I can reach it". It now gets a band at
+    the very top of the list, above the project groups, holding starred threads
+    from every project — which is the point, since the thread you want pinned
+    is usually not in the folder you are looking at.
+  */
+  const pinnedSessions = useMemo(
+    () => filteredSessions.filter((s) => s.starred),
+    [filteredSessions],
+  );
 
   // Channels grouped by Project Directory, sorted by most recent activity at both group & session level
   const groupedSessions = useMemo(() => {
@@ -699,9 +886,40 @@ export function ThreadList() {
     [visualOrder],
   );
 
+  /*
+    One clock for the whole list, refreshed on the minute.
+
+    `Date.now()` read inside the bucketing loop would let a slow pass straddle
+    midnight and file two adjacent threads under different bands. Ticking it
+    keeps "Today" honest without a render per second — the bands only ever
+    change at a day boundary, but the relative times on the rows want the
+    minute anyway.
+  */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Flatten grouped sessions into list items for TanStack Virtual
   const virtualListItems = useMemo<VirtualListItem[]>(() => {
     const items: VirtualListItem[] = [];
+
+    // Pinned first, and only when there are any — an empty "Pinned" heading is
+    // a promise about a section that is not there.
+    if (pinnedSessions.length > 0) {
+      items.push({
+        type: 'header',
+        key: 'header-__pinned__',
+        dir: null,
+        count: pinnedSessions.length,
+        pinned: true,
+      });
+      for (const s of pinnedSessions) {
+        items.push({ type: 'session', key: `pinned-${s.sessionId}`, session: s });
+      }
+    }
+
     for (const group of groupedSessions) {
       const groupKey = group.dir ?? '__no_folder__';
       items.push({
@@ -710,7 +928,28 @@ export function ThreadList() {
         dir: group.dir,
         count: group.sessions.length,
       });
+      /*
+        Sessions arrive already sorted newest-first, so the band only has to
+        change when the run does — no second pass, no re-sort, and the bands
+        come out in order for free.
+
+        A band is NOT emitted while searching: results are ranked by relevance
+        and chopping them into date buckets would imply an ordering the list
+        does not have.
+      */
+      let band: string | null = null;
       for (const s of group.sessions) {
+        if (!isSearching) {
+          const next = dateBandFor(getSessionTime(s), now);
+          if (next !== band) {
+            band = next;
+            items.push({
+              type: 'datehead',
+              key: `band-${groupKey}-${next}`,
+              label: next,
+            });
+          }
+        }
         items.push({
           type: 'session',
           key: s.sessionId,
@@ -719,7 +958,61 @@ export function ThreadList() {
       }
     }
     return items;
-  }, [groupedSessions]);
+    // `now` is captured once per rebuild rather than read inside the loop, so
+    // every row in one pass is bucketed against the same instant — otherwise a
+    // list rebuilt across midnight can put two adjacent threads in bands that
+    // disagree.
+  }, [groupedSessions, pinnedSessions, isSearching, getSessionTime, now]);
+
+  /*
+    Titles are recorded by ChatView the first time a thread's transcript is
+    read, which is usually while this list is already on screen. Without a
+    subscription the row keeps its fallback name until something else happens
+    to re-render it.
+  */
+  const [titleVersion, setTitleVersion] = useState(0);
+  useEffect(() => subscribeToTitles(() => setTitleVersion((v) => v + 1)), []);
+
+  const { isUnread, primeUnknown } = useThreadSeen(currentSessionId);
+
+  /*
+    Every thread this listing has ever shown gets a mark the first time it is
+    seen. Without it `isUnread` has no baseline for a thread it has not met,
+    and the choice is between lighting up the entire sidebar on first run or
+    never lighting up at all. Priming picks a third answer: start measuring now.
+  */
+  useEffect(() => {
+    if (sessions.length === 0) return;
+    primeUnknown(sessions.map((s) => s.sessionId));
+  }, [sessions, primeUnknown]);
+
+  /*
+    `java-to-go` EIGHT TIMES IS NOT A LIST.
+
+    The last-resort title is the project folder's name, so every unnamed thread
+    in one folder comes out identical and mutually unidentifiable. Numbering
+    them is the cheap fix, but only the threads that actually FALL BACK get a
+    number — a folder holding one unnamed thread and six named ones should not
+    have that one thread called `java-to-go 1`.
+
+    Computed over `visualOrder`, the flattened render order, so the numbers run
+    down the list the way the eye does rather than following some internal sort.
+  */
+  const folderOrdinals = useMemo(() => {
+    const counts = new Map<string, number>();
+    const result = new Map<string, number>();
+    for (const sess of visualOrder) {
+      const raw = (sess.title || '').trim();
+      const named = raw && !['新频道', 'New Channel', 'Untitled Channel', 'Untitled', 'New Chat'].includes(raw);
+      if (named || !sess.workingDir) continue;
+      if (getDerivedTitle(sess.sessionId)) continue;
+      const key = sess.workingDir;
+      const n = (counts.get(key) ?? 0) + 1;
+      counts.set(key, n);
+      result.set(sess.sessionId, n);
+    }
+    return result;
+  }, [visualOrder, titleVersion]);
 
   const listContainerRef = useRef<HTMLDivElement>(null);
 
@@ -728,11 +1021,15 @@ export function ThreadList() {
     getScrollElement: () => listContainerRef.current,
     estimateSize: (index) => {
       const item = virtualListItems[index];
-      // 52 assumed every row carried a preview line. Most no longer do (see
-      // `previewRestatesTitle` in ThreadRow), so the estimate sat ~18px over
-      // the common case and the scrollbar was wrong until `measureElement`
-      // caught up. 44 is between a one-line and a two-line row.
-      return item?.type === 'header' ? 34 : 44;
+      /*
+        Every row is one line now, so this is no longer a hedge between two
+        possible heights — it is the actual height, and `measureElement` has
+        nothing left to correct. 44 was the midpoint of a range that no longer
+        exists; 36 is a single line at `py-2`.
+      */
+      if (item?.type === 'header') return 34;
+      if (item?.type === 'datehead') return 26;
+      return 36;
     },
     overscan: 8,
     getItemKey: (index) => virtualListItems[index]?.key || index,
@@ -988,33 +1285,41 @@ export function ThreadList() {
 
         </div>
 
-        {/* Command Palette (Ctrl+K) Trigger Button */}
-        <div className="mt-1.5 flex flex-col gap-0.5">
-          <button
-            type="button"
-            onClick={() => {
-              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-            }}
-            className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <Command className="size-3.5 text-foreground-extra-muted" />
-              <span>Command Palette</span>
-            </div>
-            <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
-              Ctrl+K
-            </kbd>
-          </button>
-        </div>
+        {/*
+          THE COMMAND PALETTE ROW IS GONE, AND SEARCH TOOK ITS PLACE.
+
+          It sat in a column of destinations while being a command — it opened
+          an overlay, it did not go anywhere — and it was the third way into a
+          palette that already answers Ctrl+K everywhere in the app and now has
+          a File-menu item in the desktop shell too. A row whose entire content
+          is the name of a keystroke earns its place only while nothing else
+          teaches that keystroke.
+
+          What the column was actually missing is the thing every chat sidebar
+          has second from the top: a search box that is simply there. This list
+          reaches twenty-plus threads, and its filter was behind `/` or a
+          magnifier icon inside the Projects header — an entrance you had to
+          already know about. It is now permanent (see below), which is both
+          the ChatGPT-desktop arrangement and the reason the palette row is no
+          longer carrying a job it was bad at.
+        */}
       </div>
 
-      {/* Agent presence — one strip, not a roster. See AgentStatusStrip. */}
-      <div className="px-3 pt-2.5 pb-1 shrink-0">
+      {/*
+        5. THE HEADER IS SIX CONTROLS DEEP BEFORE THE FIRST CONVERSATION.
+
+        Every band up here had its own generous padding, and stacked they
+        pushed the list — the thing this sidebar is for — a third of the way
+        down the window. The rows are unchanged; only the air between them is,
+        which is the cheapest third of the problem and the one that does not
+        require deciding what the header should contain.
+      */}
+      <div className="px-3 pt-1.5 pb-0.5 shrink-0">
         <AgentStatusStrip />
       </div>
 
       {/* Projects Section Header & Create Dropdown (Antigravity 2.0 style) */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-1 shrink-0 select-none">
+      <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0 select-none">
         {/*
           THE SAME LABEL TREATMENT AS THE GROUPS ABOVE IT.
 
@@ -1082,9 +1387,12 @@ export function ThreadList() {
         </div>
       </div>
 
-      {/* Quick Search Input Filter Bar (Triggered via '/' or Search Icon) */}
-      {(showSearch || searchQuery) && (
-        <div className="px-3 pb-2 pt-0.5 shrink-0">
+      {/*
+        ALWAYS RENDERED, not revealed. `/` and Ctrl+F still focus it; they no
+        longer have to conjure it first, and a user who knows neither key can
+        still see that this list can be searched.
+      */}
+      <div className="px-3 pb-2 pt-0.5 shrink-0">
           <div className="relative flex items-center">
             <Search className="absolute left-2.5 size-3 text-foreground-extra-muted pointer-events-none" />
             <input
@@ -1092,28 +1400,41 @@ export function ThreadList() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Filter threads… (Esc to close)"
+              placeholder="Search chats…"
               data-view-search
               className="w-full bg-surface2/80 border border-border rounded-lg pl-7 pr-7 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden focus:border-border-accent"
-              autoFocus
+              /* `autoFocus` came off with the conditional rendering. It was
+                 correct while the bar only existed once you asked for it; on a
+                 box that is always present it means the sidebar takes the caret
+                 away from the message composer on every single mount. */
             />
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setShowSearch(false);
-              }}
-              className="absolute right-2 size-4 flex items-center justify-center rounded text-foreground-extra-muted hover:text-foreground"
-            >
-              <X className="size-3" />
-            </button>
+            {/* Only while there is something to clear — an X sitting in an
+                empty box is a control for a state that does not exist. */}
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowSearch(false);
+                  searchInputRef.current?.blur();
+                }}
+                className="absolute right-2 size-4 flex items-center justify-center rounded text-foreground-extra-muted hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </div>
         </div>
-      )}
 
       {/* Thread rows grouped by Project (TanStack Virtualized) */}
       <div
         ref={listContainerRef}
+        /* The rows below are `role="option"`, which is only meaningful inside
+           a listbox. Without this the roles are an assertion no assistive tech
+           can act on. */
+        role="listbox"
+        aria-label="Conversations"
         className="flex-1 overflow-y-auto px-2 py-1 overscroll-contain transform-gpu [contain:content]"
       >
         {/* Placeholder rows while the first fetch is in flight. Without them
@@ -1146,14 +1467,24 @@ export function ThreadList() {
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  {item.type === 'header' ? (
+                  {item.type === 'datehead' ? (
+                    <div className="px-2 pt-2 pb-0.5 select-none">
+                      <span className="text-3xs font-medium uppercase tracking-wide text-foreground-extra-muted">
+                        {item.label}
+                      </span>
+                    </div>
+                  ) : item.type === 'header' ? (
                     <div className="flex items-center gap-1.5 px-2 pt-2.5 pb-1 select-none">
-                      <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                      <Hint label={item.dir ?? 'Direct chats'}>
+                      {item.pinned ? (
+                        <Star className="size-3.5 shrink-0 fill-status-warning text-status-warning" />
+                      ) : (
+                        <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                      )}
+                      <Hint label={item.pinned ? 'Starred threads, from every project' : (item.dir ?? 'Direct chats')}>
                         <span
                           className="text-sm font-semibold text-foreground truncate"
                         >
-                          {item.dir ? basename(item.dir) : 'Direct chats'}
+                          {item.pinned ? 'Pinned' : item.dir ? basename(item.dir) : 'Direct chats'}
                         </span>
                       </Hint>
                       <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
@@ -1179,6 +1510,13 @@ export function ThreadList() {
                       isSearching={isSearching}
                       searchQuery={searchQuery}
                       isEditing={editingSessionId === item.session.sessionId}
+                      folderOrdinal={folderOrdinals.get(item.session.sessionId)}
+                      isUnread={isUnread(
+                        item.session.sessionId,
+                        getSessionTime(item.session),
+                        // The last thing said was yours — nothing to catch up on.
+                        (lastMessageBySession[item.session.sessionId]?.senderName ?? '') === 'user',
+                      )}
                       editTitleValue={editTitleValue}
                       agents={agents}
                       onSelect={handleSelectSession}

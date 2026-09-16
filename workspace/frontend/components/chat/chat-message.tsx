@@ -3,7 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown, Quote, FileCode, RotateCw } from 'lucide-react';
+import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
@@ -181,10 +181,17 @@ interface ChatMessageProps {
    * on reload and re-arms a card that has already been answered.
    */
   isDecisionAnswered?: boolean;
+  /**
+   * The newest message in the channel. Its action toolbar stays visible;
+   * every other message reveals one on hover. See the note at the toolbar.
+   */
+  isLast?: boolean;
   /** Current session working directory for resolving local path links */
   workingDir?: string;
   onRegenerate?: (message: WorkspaceMessage) => void;
   onQuoteReply?: (message: WorkspaceMessage) => void;
+  /** Load this message's text back into the composer for correction. */
+  onReusePrompt?: (message: WorkspaceMessage) => void;
 }
 
 function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: string; name: string }): boolean {
@@ -205,9 +212,11 @@ export const ChatMessage = memo(function ChatMessage({
   steps,
   hideHeader = false,
   isDecisionAnswered = false,
+  isLast = false,
   workingDir,
   onRegenerate,
   onQuoteReply,
+  onReusePrompt,
 }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
@@ -607,6 +616,37 @@ export const ChatMessage = memo(function ChatMessage({
                 )}
 
                 <div className="flex items-center gap-1 opacity-0 group-hover/usermsg:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+                  {/*
+                    "EDIT AS NEW MESSAGE", AND IT SAYS SO.
+
+                    ChatGPT's edit rewrites history: it truncates the thread at
+                    that turn and re-runs from there. This backend has no
+                    endpoint for that — no message delete, no update, no
+                    truncate — so the honest version of this button puts the
+                    text back in the composer and sends a NEW message.
+
+                    Naming matters more than usual here. Calling it "Edit"
+                    would promise the rewrite and quietly append instead, which
+                    in a channel with eight agents means the old prompt is
+                    still there and every one of them still reads it. The label
+                    says what happens, and the real edit stays on the list of
+                    things that need the server.
+
+                    The practical win is still the whole point: a long prompt
+                    with one wrong word does not have to be retyped.
+                  */}
+                  {onReusePrompt && (
+                    <Hint label="Edit as new message">
+                      <button
+                        type="button"
+                        onClick={() => onReusePrompt(message)}
+                        className="size-5 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
+                        aria-label="Edit as new message"
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    </Hint>
+                  )}
                   <Hint label="Copy Plain Text">
                     <button
                       type="button"
@@ -827,8 +867,30 @@ export const ChatMessage = memo(function ChatMessage({
             />
           )}
 
-          {/* OpenAI ChatGPT Signature Bottom Action Toolbar */}
-          <div className="pt-0.5">
+          {/*
+            HOVER, EXCEPT ON THE LAST MESSAGE.
+
+            The comment this replaces called the row a "ChatGPT signature
+            toolbar", and it was — except that ChatGPT reveals it on hover and
+            keeps it pinned only under the newest reply. Here it was pinned
+            under every reply, so a scrolled-back transcript carried five icons
+            (copy, retry, up, down, download) under every single turn: more
+            persistent controls on screen than messages, none of them wanted
+            until the moment they are.
+
+            The user-message toolbar a few hundred lines up already did this
+            correctly with `group-hover/usermsg`; this is the same treatment on
+            the group this block already sits inside.
+
+            `focus-within` is not decoration — without it the row cannot be
+            reached by keyboard at all, because it never becomes visible.
+          */}
+          <div
+            className={cn(
+              'pt-0.5 transition-opacity duration-150',
+              !isLast && 'opacity-0 group-hover/agentmsg:opacity-100 focus-within:opacity-100',
+            )}
+          >
             <MessageActions
               content={cleanContent || message.content}
               senderType="agent"

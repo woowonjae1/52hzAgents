@@ -336,7 +336,25 @@ func LatestEventsPerChannel(c *gin.Context) {
 		return
 	}
 	var records []models.EventRecord
-	db.DB.Where("network_id = ? AND target LIKE ?", workspace.ID, "channel/%").Order("timestamp desc, id desc").Limit(1000).Find(&records)
+	// Group by target channel and prioritize workspace.message% events so every channel
+	// with messages gets its latest chat event, avoiding global LIMIT 1000 truncation.
+	rawSQL := `
+		SELECT id, network_id, client_message_id, type, source, target, payload, metadata, timestamp, visibility, created_at
+		FROM (
+			SELECT *, ROW_NUMBER() OVER (
+				PARTITION BY target
+				ORDER BY (CASE WHEN type LIKE 'workspace.message%' THEN 1 ELSE 0 END) DESC,
+				         timestamp DESC, id DESC
+			) as rn
+			FROM events
+			WHERE network_id = ? AND target LIKE 'channel/%'
+		) ranked
+		WHERE rn = 1
+	`
+	if err := db.DB.Raw(rawSQL, workspace.ID).Scan(&records).Error; err != nil {
+		// Fallback in case of dialect incompatibility
+		db.DB.Where("network_id = ? AND target LIKE ?", workspace.ID, "channel/%").Order("timestamp desc, id desc").Limit(2000).Find(&records)
+	}
 	channels := map[string]gin.H{}
 	for _, record := range records {
 		name := strings.TrimPrefix(record.Target, "channel/")

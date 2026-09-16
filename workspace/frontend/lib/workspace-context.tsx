@@ -947,7 +947,8 @@ export function WorkspaceProvider({
               // If agent is actively working, show the status; otherwise show last chat
               const pick = isAgentWorking ? latest : (lastChat || latest);
               const payload = pick.payload as Record<string, string>;
-              const sender = payload?.sender_name || stripAddressPrefix(pick.source);
+              const rawSender = payload?.sender_name || pick.source;
+              const sender = stripAddressPrefix(rawSender);
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
               const isStatus = isLiveStatus(msgType, pick.timestamp);
@@ -1564,7 +1565,8 @@ export function WorkspaceProvider({
             const batch: Record<string, LastMessageInfo> = {};
             for (const [channelName, event] of Object.entries(bulk.channels)) {
               const payload = event.payload as Record<string, string>;
-              const sender = payload?.sender_name || stripAddressPrefix(event.source);
+              const rawSender = payload?.sender_name || event.source;
+              const sender = stripAddressPrefix(rawSender);
               const content = payload?.content || '';
               const msgType = payload?.message_type || 'chat';
               const isStatus = isLiveStatus(msgType, event.timestamp);

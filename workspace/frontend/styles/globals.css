@@ -778,7 +778,7 @@ html {
 }
 
 :root[data-desktop] {
-  --titlebar-height: 36px;
+  --titlebar-height: 0px;
   --window-controls-inset: 138px;
 }
 
@@ -853,7 +853,8 @@ html {
   height: var(--header-height);
   flex-shrink: 0;
   gap: 0.5rem;
-  padding-inline: 1.25rem;
+  padding-inline-start: 1.25rem;
+  padding-inline-end: max(1.25rem, var(--window-controls-inset, 0px));
   border-bottom: 1px solid var(--border);
   /*
     CHROME COLOUR, NOT CONTENT COLOUR.
@@ -873,6 +874,31 @@ html {
   background: var(--surface-sidebar);
   user-select: none;
   -webkit-user-select: none;
+}
+
+:root[data-desktop] .app-header {
+  app-region: drag;
+  -webkit-app-region: drag;
+}
+
+:root[data-desktop] .app-header :where(button, a, input, select, textarea, [role='button'], [data-no-drag]) {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
+
+/* When Studio is closed on desktop: main view header reserves window controls inset */
+:root[data-desktop] [data-studio-open='false'] .app-header {
+  padding-inline-end: max(1.25rem, var(--window-controls-inset, 0px)) !important;
+}
+
+/* When Studio is open on desktop: main view header has normal padding, Studio header reserves window controls inset */
+:root[data-desktop] [data-studio-open='true'] .flex-grow > div > .app-header,
+:root[data-desktop] [data-studio-open='true'] .flex-grow main .app-header {
+  padding-inline-end: 1.25rem !important;
+}
+
+:root[data-desktop] aside[aria-label="Studio Panel"] .app-header {
+  padding-inline-end: max(0.75rem, var(--window-controls-inset, 0px)) !important;
 }
 }
 

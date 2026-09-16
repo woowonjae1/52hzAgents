@@ -23,10 +23,10 @@ import * as React from 'react';
  * caption buttons are drawn at that height whatever CSS thinks, so a mismatch
  * puts them half over the band and half over the content below it.
  */
-export const TITLEBAR_HEIGHT = 36;
+export const TITLEBAR_HEIGHT = 0;
 
 /**
- * Width to keep clear at the inline-end of the titlebar for the Windows/Linux
+ * Width to keep clear at the inline-end of the top header for the Windows/Linux
  * caption buttons. Electron's overlay draws three 46px buttons.
  */
 export const WINDOW_CONTROLS_INSET = 138;
@@ -47,7 +47,7 @@ export const HEADER_HEIGHT = 48;
  * does NOT read localStorage — `window.electronBridge` is injected by the
  * preload script, so it is already there when this runs.
  */
-export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');if(b.isWindows11)r.setAttribute('data-win11','');r.style.setProperty('--titlebar-height','36px');r.style.setProperty('--window-controls-inset',b.platform==='darwin'?'0px':'138px');if(b.platform==='darwin')r.style.setProperty('--traffic-lights-inset','78px');}catch(e){}})();`;
+export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');if(b.isWindows11)r.setAttribute('data-win11','');r.style.setProperty('--titlebar-height','0px');r.style.setProperty('--window-controls-inset',b.platform==='darwin'?'0px':'138px');if(b.platform==='darwin')r.style.setProperty('--traffic-lights-inset','78px');}catch(e){}})();`;
 
 // Stamp DOM attributes and root CSS variables immediately when this module loads on the client
 if (typeof window !== 'undefined') {
@@ -59,7 +59,7 @@ if (typeof window !== 'undefined') {
       const platform = bridge?.platform || root.getAttribute('data-platform') || '';
       if (platform && !root.hasAttribute('data-platform')) root.setAttribute('data-platform', platform);
       if (bridge?.isWindows11 && !root.hasAttribute('data-win11')) root.setAttribute('data-win11', '');
-      root.style.setProperty('--titlebar-height', `${TITLEBAR_HEIGHT}px`);
+      root.style.setProperty('--titlebar-height', '0px');
       root.style.setProperty('--window-controls-inset', platform === 'darwin' ? '0px' : `${WINDOW_CONTROLS_INSET}px`);
       if (platform === 'darwin') root.style.setProperty('--traffic-lights-inset', `${TRAFFIC_LIGHTS_INSET}px`);
     }

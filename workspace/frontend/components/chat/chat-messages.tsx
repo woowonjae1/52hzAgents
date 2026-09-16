@@ -26,7 +26,23 @@ type MessageGroup =
   // `settled` means the agent has since posted its reply, so the trace below is
   // history rather than live output.
   | { type: 'thinking'; sender: string; messages: WorkspaceMessage[]; settled?: boolean }
-  | { type: 'steps'; messages: WorkspaceMessage[]; settled?: boolean };
+  | { type: 'steps'; messages: WorkspaceMessage[]; settled?: boolean }
+  /*
+    A DAY BOUNDARY IN THE TRANSCRIPT.
+
+    Messages carry a clock time and nothing else — `15:23`. In a channel that
+    has been running for a week, scrolling up gives you a column of times with
+    no way to tell which day any of them belongs to, and the answer matters
+    here more than in a single-sitting assistant chat: routines fire
+    overnight, agents reply hours apart, and "did this happen before or after
+    the thing I changed yesterday" is a question people actually ask of this
+    log.
+
+    Rendered as a rule with the date on it, the way every messaging client
+    does it, rather than adding a date to every message — one line per day
+    instead of a date on each of two hundred rows.
+  */
+  | { type: 'daybreak'; key: string; label: string };
 
 function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): MessageGroup[] {
   const groups: MessageGroup[] = [];
@@ -98,16 +114,118 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
             : { type: 'steps', messages: own, settled: true }
         );
       }
-      groups.push({ type: 'chat', message: msg, continuesFrom: Boolean(own) });
+      /*
+        CONSECUTIVE MESSAGES FROM ONE SENDER SHARE AN IDENTITY LINE.
+
+        `continuesFrom` already existed, but only for the narrow case of a
+        message preceded by its OWN thinking/tool steps. Two plain replies in a
+        row from the same agent each printed a full avatar + name + badge +
+        timestamp row, so a three-turn answer restated who was speaking three
+        times. In a channel with eight participants that chrome is the thing
+        the eye has to wade through to reach the text.
+
+        Identity is NOT dropped — this is a multi-agent room and knowing who
+        said what is the whole point. It is printed once per burst, and the
+        continuation rows keep the avatar's indent so the column still reads as
+        that speaker's.
+
+        The five-minute window is what keeps "same agent, an hour later" from
+        being absorbed into the morning's burst: a gap that long is a new
+        thought, and the timestamp on its header is the only thing that says so.
+      */
+      const prev = groups[groups.length - 1];
+      const sameSpeakerBurst =
+        !own &&
+        prev?.type === 'chat' &&
+        prev.message.senderName === msg.senderName &&
+        prev.message.senderType === msg.senderType &&
+        // An approval card, a decision or an artifact is a thing in its own
+        // right; it gets its own header even from the same sender.
+        !prev.message.metadata?.speech_act &&
+        withinBurst(prev.message.createdAt, msg.createdAt);
+
+      groups.push({ type: 'chat', message: msg, continuesFrom: Boolean(own) || sameSpeakerBurst });
     }
   });
 
   flushOrphanSteps();
-  return groups;
+
+  /*
+    Inserted as a second pass rather than inline in the loop above, because a
+    message's day has to be compared against the last message that was
+    actually RENDERED — and the loop emits thinking/steps groups out of order
+    with the chat messages that own them. Walking the finished list is the only
+    place where "what came before this on screen" is a straight answer.
+  */
+  const withDays: MessageGroup[] = [];
+  let lastDay: string | null = null;
+  for (const g of groups) {
+    const iso =
+      g.type === 'chat' || g.type === 'speech_act'
+        ? g.message.createdAt
+        : g.type === 'thinking' || g.type === 'steps'
+          ? g.messages[0]?.createdAt
+          : null;
+    const day = dayKeyOf(iso);
+    if (day && day !== lastDay) {
+      // No divider above the very first group: a rule at the top of a
+      // transcript separates the conversation from nothing.
+      if (lastDay !== null) {
+        withDays.push({ type: 'daybreak', key: day, label: dayLabel(iso!) });
+      }
+      lastDay = day;
+    }
+    withDays.push(g);
+  }
+  return withDays;
+}
+
+/** Two messages belong to one burst if they are less than this far apart. */
+const BURST_WINDOW_MS = 5 * 60_000;
+
+function withinBurst(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
+  return Math.abs(tb - ta) < BURST_WINDOW_MS;
 }
 
 // Stable key for a group
+/**
+ * "Today" / "Yesterday" / a written date. Calendar days, not rolling 24h
+ * windows — 11pm last night reads as Yesterday, which is how the person
+ * scrolling thinks about it.
+ */
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const dayStart = start.getTime();
+  const t = d.getTime();
+  if (t >= dayStart) return 'Today';
+  if (t >= dayStart - 86_400_000) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    // The year only once it is not this one — printing 2026 on every divider
+    // in 2026 is noise.
+    year: d.getFullYear() === start.getFullYear() ? undefined : 'numeric',
+  });
+}
+
+function dayKeyOf(iso?: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 function groupKey(group: MessageGroup, index: number): string {
+  if (group.type === 'daybreak') {
+    return `day-${group.key}`;
+  }
   if (group.type === 'chat') {
     return group.message.messageId ? `chat-${group.message.messageId}` : `chat-idx-${index}`;
   }
@@ -241,9 +359,10 @@ interface ChatMessagesProps {
   workingDir?: string;
   onRegenerate?: (message: WorkspaceMessage) => void;
   onQuoteReply?: (message: WorkspaceMessage) => void;
+  onReusePrompt?: (message: WorkspaceMessage) => void;
 }
 
-export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, workingDir, onRegenerate, onQuoteReply }: ChatMessagesProps) {
+export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, workingDir, onRegenerate, onQuoteReply, onReusePrompt }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
@@ -745,12 +864,22 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         steps={group.steps}
                         hideHeader={group.continuesFrom}
                         isDecisionAnswered={isDecisionAnswered}
+                        isLast={index === groups.length - 1}
                         workingDir={workingDir}
                         onRegenerate={onRegenerate}
                         onQuoteReply={onQuoteReply}
+                        onReusePrompt={onReusePrompt}
                       />
                     );
                   })()
+                ) : group.type === 'daybreak' ? (
+                  <div className="flex items-center gap-3 py-3 select-none" role="separator">
+                    <span className="h-px flex-1 bg-border/70" />
+                    <span className="text-3xs font-medium uppercase tracking-wide text-foreground-extra-muted shrink-0">
+                      {group.label}
+                    </span>
+                    <span className="h-px flex-1 bg-border/70" />
+                  </div>
                 ) : group.type === 'speech_act' ? (
                   <SpeechActEvent
                     message={group.message}

@@ -49,7 +49,7 @@ function getAssetPath(filename) {
  * 38px against a 28px reservation in the renderer, which left the bottom of
  * the minimise/close buttons sitting on top of the app's content.
  */
-const TITLEBAR_HEIGHT = 36;
+const TITLEBAR_HEIGHT = 48;
 
 /**
  * The window's ground colour, painted before the renderer's first frame.
@@ -66,6 +66,28 @@ let isQuitting = false;
 
 // Production / Development Configuration
 const isPackaged = app.isPackaged;
+
+/*
+  AN ESCAPE HATCH, BECAUSE "NO DEVTOOLS IN THE SHIPPED BUILD" IS NOT THE SAME
+  AS "NO WAY IN".
+
+  Reload and DevTools were removed from the packaged build on purpose: a
+  desktop application has no "reload the page", and F12 opening an inspector is
+  the loudest way a window can admit it is a browser wearing a titlebar. But
+  removing them outright also removed the only way to diagnose the packaged
+  build — which is the one users actually run — and the very first thing that
+  needed diagnosing proved it.
+
+  Off by default, on when explicitly asked. Awkward enough not to be hit by
+  accident, simple enough to give someone over a chat message:
+
+      set OPENAGENTS_DEVTOOLS=1 && "52hzAgent Studio.exe"
+      "52hzAgent Studio.exe" --devtools
+*/
+const devToolsEnabled =
+  !app.isPackaged ||
+  process.env.OPENAGENTS_DEVTOOLS === '1' ||
+  process.argv.includes('--devtools');
 const DEFAULT_PORT = 8000;
 let serverPort = DEFAULT_PORT;
 let TARGET_URL = process.env.FRONTEND_URL || (isPackaged ? `http://127.0.0.1:${DEFAULT_PORT}/` : 'http://127.0.0.1:3005/');
@@ -508,11 +530,19 @@ function buildTrayMenu() {
         buildTrayMenu();
       },
     },
-    ...(isPackaged ? [] : [
-      { type: 'separator' },
+    /*
+      ALWAYS AVAILABLE, packaged or not. It answers "what does this window
+      think its own geometry is" — the one question you cannot ask without
+      devtools, which is exactly what a shipped build does not have. Onto the
+      clipboard, so it can be pasted into a bug report without anyone reading
+      numbers out loud.
+    */
+    { type: 'separator' },
+    { label: 'Copy window diagnostics', click: () => copyDiagnostics() },
+    ...(devToolsEnabled ? [
       { label: 'Reload window', click: () => mainWindow?.reload() },
       { label: 'Developer tools', click: () => mainWindow?.webContents.toggleDevTools() },
-    ]),
+    ] : []),
     { type: 'separator' },
     { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
   ]));
@@ -558,6 +588,70 @@ function applyUnreadCount(count, overlayDataUrl) {
     mainWindow.setOverlayIcon(image, `${n} unread`);
   } catch (e) {
     console.warn('[52hzAgents] overlay icon failed:', e.message);
+  }
+}
+
+/**
+ * Window geometry, as the renderer actually sees it, onto the clipboard.
+ *
+ * `getTitlebarAreaRect()` is a Web API, so it lives in the renderer and the
+ * main process asks for it rather than computing it. Everything gathered is a
+ * measurement or a version string — nothing about the workspace, the threads
+ * or the user — so this is safe to paste anywhere.
+ *
+ * `underCloseButton` is the decisive field: it names whatever element is
+ * sitting at the point where the close button is drawn. If that is anything
+ * other than the titlebar's own drag region, something is being painted
+ * underneath the caption buttons and this says exactly what.
+ */
+async function copyDiagnostics() {
+  const { clipboard, screen } = require('electron');
+  try {
+    const fromRenderer = await mainWindow.webContents.executeJavaScript(`(() => {
+      const wco = navigator.windowControlsOverlay;
+      const r = wco && wco.visible ? wco.getTitlebarAreaRect() : null;
+      const cs = getComputedStyle(document.documentElement);
+      const el = document.elementFromPoint(window.innerWidth - 30, 18);
+      const describe = (n) => n ? (n.tagName.toLowerCase()
+        + (n.id ? '#' + n.id : '')
+        + (typeof n.className === 'string' && n.className.trim()
+            ? '.' + n.className.trim().split(' ').filter(Boolean).slice(0, 5).join('.')
+            : '')) : null;
+      return {
+        wcoVisible: !!(wco && wco.visible),
+        rect: r ? { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) } : null,
+        innerWidth: window.innerWidth,
+        measuredInset: r ? Math.round(window.innerWidth - (r.x + r.width)) : null,
+        cssInset: cs.getPropertyValue('--window-controls-inset').trim(),
+        cssTitlebarHeight: cs.getPropertyValue('--titlebar-height').trim(),
+        devicePixelRatio: window.devicePixelRatio,
+        underCloseButton: describe(el),
+        underCloseButtonParent: describe(el && el.parentElement),
+      };
+    })()`);
+    const display = screen.getPrimaryDisplay();
+    clipboard.writeText(JSON.stringify({
+      ...fromRenderer,
+      packaged: isPackaged,
+      platform: process.platform,
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      displayScaleFactor: display.scaleFactor,
+      displaySize: `${display.size.width}x${display.size.height}`,
+      windowBounds: mainWindow.getBounds(),
+      maximized: mainWindow.isMaximized(),
+      titlebarHeightConstant: TITLEBAR_HEIGHT,
+      windowControlsInsetConstant: 138,
+    }, null, 2));
+    if (Notification.isSupported()) {
+      new Notification({
+        title: '52hzAgent Studio',
+        body: 'Window diagnostics copied to clipboard',
+      }).show();
+    }
+  } catch (e) {
+    clipboard.writeText(`diagnostics failed: ${e && e.message}`);
+    console.error('[52hzAgents] diagnostics failed:', e);
   }
 }
 
@@ -907,12 +1001,12 @@ function createMainWindow() {
           on `!isPackaged`; the View menu did not, so F5 and Ctrl+R stayed live
           in the build users actually run.
         */
-        ...(isPackaged ? [] : [
+        ...(devToolsEnabled ? [
           { role: 'reload' },
           { role: 'forceReload' },
           { role: 'toggleDevTools' },
           { type: 'separator' },
-        ]),
+        ] : []),
         { role: 'resetZoom' },
         { role: 'zoomIn' },
         // Ctrl+- only reaches the app as Ctrl+Shift+- on some layouts, so the
@@ -1016,8 +1110,9 @@ function createMainWindow() {
 
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
-    // Same rule as the View menu above: a packaged build has no devtools or reload key.
-    if (isPackaged) {
+    // Same rule as the View menu above: no devtools or reload key unless the
+    // build was started with the flag.
+    if (!devToolsEnabled) {
       if (input.key === 'F5' || ((input.control || input.meta) && input.key.toLowerCase() === 'r')) {
         event.preventDefault();
       }

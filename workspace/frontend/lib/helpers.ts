@@ -76,3 +76,45 @@ export function isRecentAgent(agent: { status: string; agentType?: string | null
 // file derived one from the agent's INDEX in the roster — so every agent's
 // colour shifted whenever somebody joined or left. Import `deriveIdentityColor`
 // instead of reintroducing a parallel set of Tailwind classes here.
+/**
+ * A THREAD ROW'S TIMESTAMP, IN FOUR CHARACTERS WHERE POSSIBLE.
+ *
+ * The sidebar used `timeAgo`, which produces "2 weeks ago", "3 weeks ago" —
+ * eleven characters of right-aligned text on every row. Two things were wrong
+ * with that once the list grew date bands of its own:
+ *
+ *   - it says the same thing the band above the row already said, and
+ *   - it took 30-40% of the row's width to do it, which is why titles were
+ *     being cut to a dozen characters and an ellipsis.
+ *
+ * The band answers "roughly when"; the row only has to answer "which one", so
+ * the format narrows as the band widens. Today needs the clock, this week
+ * needs the day, older needs a date — and none of them needs a sentence.
+ *
+ * Mail clients have converged on exactly this, for exactly this reason.
+ */
+export function formatRowTime(ms: number, now: number = Date.now()): string {
+  if (!ms) return '';
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return '';
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const dayStart = startOfToday.getTime();
+
+  // Today — the clock, because that is what tells two of today's threads apart.
+  if (ms >= dayStart) {
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  // The last week — the weekday name, which people navigate by far better than
+  // "5 days ago" and which is shorter.
+  if (ms >= dayStart - 6 * 86_400_000) {
+    return d.toLocaleDateString(undefined, { weekday: 'short' });
+  }
+  // Older — a date. The year only when it is not this one.
+  return d.toLocaleDateString(undefined, {
+    month: 'numeric',
+    day: 'numeric',
+    year: d.getFullYear() === startOfToday.getFullYear() ? undefined : '2-digit',
+  });
+}
