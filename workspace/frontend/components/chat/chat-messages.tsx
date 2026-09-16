@@ -9,11 +9,13 @@ import { WorkingIndicator } from './working-indicator';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
+
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 // ── Message Grouping ──
 
@@ -267,9 +269,9 @@ function groupKey(group: MessageGroup, index: number): string {
   }
   const firstId = group.messages[0]?.messageId;
   if (group.type === 'thinking') {
-    return firstId ? `thinking-${firstId}-${index}` : `thinking-idx-${index}`;
+    return firstId ? `thinking-${firstId}` : `thinking-idx-${index}`;
   }
-  return firstId ? `steps-${firstId}-${index}` : `steps-idx-${index}`;
+  return firstId ? `steps-${firstId}` : `steps-idx-${index}`;
 }
 
 /**
@@ -435,6 +437,11 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   // True when the user has intentionally scrolled away from the bottom.
   // Prevents auto-scroll from yanking them back while reading history.
   const userScrolledUpRef = useRef(false);
+
+  // Smooth scroll compensation refs when prepending older messages
+  const prevScrollHeightRef = useRef<number | null>(null);
+  const prevScrollTopRef = useRef<number | null>(null);
+  const lastScrollTopRef = useRef(0);
 
   // Separate loading indicators (optimistic) from real messages
   const loadingMessages = useMemo(() => messages.filter((m) => m.messageType === 'loading'), [messages]);
@@ -628,7 +635,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
 
   // Auto-scroll on new messages — but NOT when the user has scrolled up to read
   // history, and NOT when older history is prepended at the top.
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
@@ -640,6 +647,9 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
       prevLengthRef.current = messages.length;
       prevFirstIdRef.current = firstId;
       prevLastIdRef.current = lastId;
+      prevScrollHeightRef.current = null;
+      prevScrollTopRef.current = null;
+      lastScrollTopRef.current = 0;
       userScrolledUpRef.current = false;
       scrollDebug('session-switch', el, { messageCount: messages.length, totalCount });
       requestAnimationFrame(() => scrollToBottom());
@@ -647,13 +657,28 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     }
 
     // ② Prepend detection: count grew, the first message changed, but the last
-    //    message is unchanged → older history loaded at the top. Never scroll.
+    //    message is unchanged → older history loaded at the top. Never scroll to bottom.
     const grew = messages.length > prevLengthRef.current;
     const isPrepend = grew && firstId !== prevFirstIdRef.current && lastId === prevLastIdRef.current;
     prevLengthRef.current = messages.length;
     prevFirstIdRef.current = firstId;
     prevLastIdRef.current = lastId;
     if (isPrepend) {
+      if (prevScrollHeightRef.current !== null) {
+        const delta = el.scrollHeight - prevScrollHeightRef.current;
+        if (delta > 0) {
+          el.scrollTop = (prevScrollTopRef.current ?? el.scrollTop) + delta;
+          lastScrollTopRef.current = el.scrollTop;
+          scrollDebug('history-prepend-compensate', el, {
+            prevScrollHeight: prevScrollHeightRef.current,
+            newScrollHeight: el.scrollHeight,
+            delta,
+            newScrollTop: el.scrollTop,
+          });
+        }
+        prevScrollHeightRef.current = null;
+        prevScrollTopRef.current = null;
+      }
       scrollDebug('history-prepend', el, { messageCount: messages.length, totalCount });
       return;
     }
@@ -688,30 +713,37 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     if (!el) return;
 
     const onScroll = async () => {
-      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+      const currentScrollTop = el.scrollTop;
+      const isScrollingUp = currentScrollTop < lastScrollTopRef.current;
+      const isNearBottom = el.scrollHeight - currentScrollTop - el.clientHeight < 100;
       setShowScrollBtn(!isNearBottom);
       userScrolledUpRef.current = !isNearBottom;
 
-      // Infinite scroll: load older messages when near the top
+      // Infinite scroll: ONLY trigger when user is actively scrolling UP and is near the top
       if (
-        el.scrollTop < 100 &&
+        isScrollingUp &&
+        currentScrollTop < 30 &&
         hasOlder &&
         !loadingOlder &&
         !loadingOlderInternalRef.current &&
         loadOlder
       ) {
         loadingOlderInternalRef.current = true;
-        const prevScrollHeight = el.scrollHeight;
-        scrollDebug('load-older-start', el, { prevScrollHeight });
-        await loadOlder();
-        // Maintain scroll position after prepending older messages
-        requestAnimationFrame(() => {
-          const newScrollHeight = el.scrollHeight;
-          el.scrollTop = newScrollHeight - prevScrollHeight;
+        prevScrollHeightRef.current = el.scrollHeight;
+        prevScrollTopRef.current = currentScrollTop;
+        scrollDebug('load-older-start', el, { prevScrollHeight: el.scrollHeight, currentScrollTop });
+        try {
+          await loadOlder();
+        } finally {
           loadingOlderInternalRef.current = false;
-          scrollDebug('load-older-compensate', el, { prevScrollHeight, newScrollHeight, delta: newScrollHeight - prevScrollHeight });
-        });
+          setTimeout(() => {
+            prevScrollHeightRef.current = null;
+            prevScrollTopRef.current = null;
+          }, 500);
+        }
       }
+
+      lastScrollTopRef.current = currentScrollTop;
     };
 
     // A real user scroll gesture cancels any in-flight settle-to-bottom so we
@@ -719,7 +751,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     // (which are what the settle loop exists to absorb) don't fire these.
     const cancelSettle = () => { settlingRef.current = false; };
 
-    el.addEventListener('scroll', onScroll);
+    el.addEventListener('scroll', onScroll, { passive: true });
     el.addEventListener('wheel', cancelSettle, { passive: true });
     el.addEventListener('touchmove', cancelSettle, { passive: true });
     el.addEventListener('mousedown', cancelSettle);
@@ -747,23 +779,28 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
           </div>
         )}
         {hasOlder && !loadingOlder && loadOlder && (
-          <button
-            onClick={async () => {
-              const el = containerRef.current;
-              if (!el) return;
-              const prevScrollHeight = el.scrollHeight;
-              scrollDebug('load-older-start(button)', el, { prevScrollHeight });
-              await loadOlder();
-              requestAnimationFrame(() => {
-                const newScrollHeight = el.scrollHeight;
-                el.scrollTop = newScrollHeight - prevScrollHeight;
-                scrollDebug('load-older-compensate(button)', el, { prevScrollHeight, newScrollHeight, delta: newScrollHeight - prevScrollHeight });
-              });
-            }}
-            className="flex items-center justify-center py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Load older messages
-          </button>
+          <div className="flex items-center justify-center py-2">
+            <button
+              onClick={async () => {
+                const el = containerRef.current;
+                if (!el || loadingOlder || !loadOlder) return;
+                prevScrollHeightRef.current = el.scrollHeight;
+                prevScrollTopRef.current = el.scrollTop;
+                scrollDebug('load-older-start(button)', el, { prevScrollHeight: el.scrollHeight, scrollTop: el.scrollTop });
+                try {
+                  await loadOlder();
+                } finally {
+                  setTimeout(() => {
+                    prevScrollHeightRef.current = null;
+                    prevScrollTopRef.current = null;
+                  }, 500);
+                }
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              Load older messages
+            </button>
+          </div>
         )}
         <div
           className="mx-auto w-full max-w-(--chat-column)"
