@@ -17,6 +17,17 @@ import { useWorkspace } from '@/lib/workspace-context';
 
 // ── Message Grouping ──
 
+/** Two messages belong to one burst if they are less than this far apart. */
+const BURST_WINDOW_MS = 5 * 60_000;
+
+function withinBurst(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  const ta = new Date(a).getTime();
+  const tb = new Date(b).getTime();
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
+  return Math.abs(tb - ta) < BURST_WINDOW_MS;
+}
+
 type MessageGroup =
   // `continuesFrom` is set when this message is preceded by its own thinking or
   // steps group. That group already printed the avatar and sender name, so this
@@ -68,13 +79,13 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
   // thinking/working) still have to be shown in real-time.
   // When the channel is inactive, orphan steps are marked as settled so historical
   // threads don't show spinning "thinking..." states.
-  const flushOrphanSteps = () => {
+  const flushOrphanSteps = (forceSettled?: boolean) => {
     for (const [sender, own] of pendingSteps) {
       if (own.length === 0) continue;
       const thinkingOnly = own.every((m) => m.messageType === 'thinking');
       const lastStep = own[own.length - 1];
       const isRecent = lastStep?.createdAt ? Date.now() - new Date(lastStep.createdAt).getTime() < 60_000 : false;
-      const isSettled = !isChannelActive || !isRecent;
+      const isSettled = forceSettled || !isChannelActive || !isRecent;
       if (thinkingOnly) {
         groups.push({ type: 'thinking', sender, messages: [...own], settled: isSettled });
       } else {
@@ -93,6 +104,20 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
   );
 
   visibleMessages.forEach((msg) => {
+    const isHuman =
+      msg.senderType === 'human' ||
+      msg.senderType === 'user' ||
+      msg.senderName === 'user' ||
+      msg.senderName === 'Guest';
+
+    if (isHuman) {
+      // A new user prompt marks the start of a new conversational turn.
+      // Any prior in-progress or orphan steps from any agent belong to the previous
+      // turn and must be flushed as settled history before this user prompt is added,
+      // preventing previous steps and their timestamps from bleeding into the new turn.
+      flushOrphanSteps(true);
+    }
+
     if (msg.metadata?.speech_act && msg.metadata?.act_type) {
       groups.push({
         type: 'speech_act',
@@ -102,8 +127,27 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
       });
     } else if (msg.messageType === 'thinking' || msg.messageType === 'status' || msg.messageType === 'todos') {
       const own = pendingSteps.get(msg.senderName);
-      if (own) own.push(msg);
-      else pendingSteps.set(msg.senderName, [msg]);
+      if (own && own.length > 0) {
+        const lastStep = own[own.length - 1];
+        const gap = msg.createdAt && lastStep.createdAt
+          ? new Date(msg.createdAt).getTime() - new Date(lastStep.createdAt).getTime()
+          : 0;
+        // If there's a gap exceeding the burst window (5 minutes) between consecutive steps,
+        // the older steps belonged to an abandoned/prior execution. Flush them as settled.
+        if (gap > BURST_WINDOW_MS) {
+          const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+          groups.push(
+            thinkingOnly
+              ? { type: 'thinking', sender: msg.senderName, messages: [...own], settled: true }
+              : { type: 'steps', messages: [...own], settled: true }
+          );
+          pendingSteps.set(msg.senderName, [msg]);
+        } else {
+          own.push(msg);
+        }
+      } else {
+        pendingSteps.set(msg.senderName, [msg]);
+      }
     } else {
       const own = takeSteps(msg.senderName);
       if (own) {
@@ -178,17 +222,6 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
     withDays.push(g);
   }
   return withDays;
-}
-
-/** Two messages belong to one burst if they are less than this far apart. */
-const BURST_WINDOW_MS = 5 * 60_000;
-
-function withinBurst(a?: string | null, b?: string | null): boolean {
-  if (!a || !b) return false;
-  const ta = new Date(a).getTime();
-  const tb = new Date(b).getTime();
-  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return false;
-  return Math.abs(tb - ta) < BURST_WINDOW_MS;
 }
 
 // Stable key for a group
