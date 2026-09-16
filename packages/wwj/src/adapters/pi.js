@@ -325,10 +325,18 @@ class PiAdapter extends BaseAdapter {
     const responseChunks = [];
     let finalAnswer = '';
     let streamedText = '';
+    let currentThinking = '';
     let stderrBuf = '';
     let lineBuffer = '';
-    let everPostedAnything = false;
     let _pendingLines = Promise.resolve();
+
+    const flushThinking = async () => {
+      const text = currentThinking.trim();
+      currentThinking = '';
+      if (text) {
+        try { await this.sendThinking(channelName, text); } catch {}
+      }
+    };
 
     proc.stderr.on('data', (d) => { stderrBuf += d.toString('utf-8'); });
 
@@ -348,60 +356,56 @@ class PiAdapter extends BaseAdapter {
 
       // 1. Thinking / Reasoning
       // Official Pi CLI emits message_update with assistantMessageEvent.type = 'thinking_delta' | 'thinking_end'
-      let thinkingText = '';
       if (eventType === 'thinking') {
-        thinkingText = event.text || event.content || event.delta || '';
+        const text = event.text || event.content || event.delta || '';
+        if (text) currentThinking += text;
       } else if (eventType === 'message_update' && event.assistantMessageEvent) {
         const ame = event.assistantMessageEvent;
         if (ame.type === 'thinking_delta' && ame.delta) {
-          thinkingText = ame.delta;
-        } else if (ame.type === 'thinking_end' && ame.content) {
-          thinkingText = ame.content;
+          currentThinking += ame.delta;
+        } else if (ame.type === 'thinking_end') {
+          if (ame.content) currentThinking = ame.content;
+          await flushThinking();
+        } else if (ame.type === 'text_start' || ame.type === 'toolcall_start') {
+          // If thinking completed and transitions to text or tool, flush buffered thought
+          await flushThinking();
         }
       }
-      if (thinkingText && thinkingText.trim()) {
-        everPostedAnything = true;
-        try { await this.sendThinking(channelName, thinkingText.trim()); } catch {}
-      }
 
-      // 2. Assistant reply streaming preview
+      // 2. Assistant reply accumulation (in memory only, never send per-token thinking messages)
       // Official Pi CLI emits message_update with assistantMessageEvent.type = 'text_delta' | 'text_end'
-      let replyPreviewText = '';
       if (eventType === 'assistant' || eventType === 'text_delta') {
-        replyPreviewText = event.text || event.content || event.delta || '';
+        const text = event.text || event.content || event.delta || '';
+        if (text) streamedText += text;
       } else if (eventType === 'message_update' && event.assistantMessageEvent) {
         const ame = event.assistantMessageEvent;
         if (ame.type === 'text_delta' && ame.delta) {
-          replyPreviewText = ame.delta;
+          await flushThinking();
           streamedText += ame.delta;
-        } else if (ame.type === 'text_end' && ame.content) {
-          replyPreviewText = ame.content;
-          streamedText = ame.content;
+        } else if (ame.type === 'text_end') {
+          if (ame.content) streamedText = ame.content;
         }
-      }
-      if (replyPreviewText && replyPreviewText.trim()) {
-        everPostedAnything = true;
-        try { await this.sendThinking(channelName, replyPreviewText.trim(), { isReplyPreview: true }); } catch {}
       }
 
       // 3. Tool use / tool execution activity
+      // Only notify on start/use, not on streaming output updates (tool_execution_update)
       if (
         eventType === 'tool_use' ||
         eventType === 'tool_call' ||
         eventType === 'tool' ||
-        eventType === 'tool_execution_start' ||
-        eventType === 'tool_execution_update'
+        eventType === 'tool_execution_start'
       ) {
+        await flushThinking();
         const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
         const input = event.args || event.input || {};
         const detail = input.command || input.path || input.query || (typeof input === 'string' ? input : '');
         const label = detail ? `${toolName} > ${detail}` : toolName;
-        everPostedAnything = true;
         try { await this.sendStatus(channelName, label); } catch {}
       }
 
       // 4. Final response extraction from message_end / turn_end
       if (eventType === 'message_end' || eventType === 'turn_end') {
+        await flushThinking();
         const msg = event.message;
         if (msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
           const textParts = msg.content
@@ -447,6 +451,7 @@ class PiAdapter extends BaseAdapter {
     if (lineBuffer.trim()) {
       try { await processLine(lineBuffer); } catch {}
     }
+    await flushThinking();
 
     delete this._channelProcesses[channelName];
 
