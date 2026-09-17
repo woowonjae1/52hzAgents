@@ -404,7 +404,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const EntryList = (
     <div className="h-full flex flex-col bg-background select-none">
       {/* Top Header */}
-      <div className="app-header px-4">
+      <div className="app-header ps-4">
         <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
           <div className="flex items-center gap-2.5 min-w-0">
             <Hint label="Back to conversation">
@@ -689,7 +689,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const EntryDetail = selectedEntry ? (
     <div className="h-full flex flex-col bg-background">
       {/* Detail Header Bar */}
-      <div className="app-header justify-between px-6 gap-4">
+      <div className="app-header justify-between ps-6 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           {isMobile && (
             <button

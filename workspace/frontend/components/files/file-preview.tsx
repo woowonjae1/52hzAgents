@@ -208,7 +208,7 @@ export function FilePreview() {
   return (
     <div className={cn("flex flex-col h-full bg-card", isFullscreen && "fixed inset-0 z-50 bg-background animate-in fade-in duration-150")}>
       {/* Header */}
-      <div className="flex items-center gap-2 pl-2 lg:pl-4 pr-12 py-2 lg:py-3 border-b shrink-0 bg-background/50">
+      <div className="app-header gap-2 ps-2 lg:ps-4 shrink-0 bg-background/50">
         <Hint label="Back to files">
           <button
             onClick={() => {

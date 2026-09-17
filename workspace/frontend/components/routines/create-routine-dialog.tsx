@@ -10,10 +10,12 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CalendarClock } from 'lucide-react';
+import { timeUntil } from '@/lib/schedule-format';
 import type { RoutineItem, WorkspaceAgent } from '@/lib/types';
 import { localTimezone } from '@/lib/api/planning';
 import { timezoneLabel } from '@/lib/schedule-format';
+import { isComposing } from '@/lib/ime';
 
 export interface RoutineDraft {
   name: string;
@@ -94,6 +96,62 @@ export function CreateRoutineDialog({
   const [timezone, setTimezone] = useState(localTimezone());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /*
+    WHEN WILL THIS ACTUALLY RUN?
+
+    The dialog asked for an hour, a minute, a set of weekdays and a timezone,
+    and then never answered the only question the user has: so when does it
+    fire? Every field here is an INPUT to a computation the user was being
+    asked to perform in their head — pick Tue/Thu, pick 09:00, pick a
+    timezone that is not theirs, and work out whether that means tomorrow or
+    next week.
+
+    Computing it here rather than waiting for the server's `nextFiresAt` is
+    the point: the answer has to change as the controls move, before anything
+    is saved, so the user can see they picked the wrong day while they can
+    still fix it cheaply.
+
+    Deliberately not a full cron implementation — this dialog only produces
+    two shapes (a daily time on a set of weekdays, or a fixed interval), so
+    this handles exactly those two and nothing else.
+  */
+  const nextFireAt = useMemo(() => {
+    if (scheduleType === 'interval') {
+      return new Date(Date.now() + Math.max(1, intervalMinutes) * 60_000);
+    }
+    if (days.size === 0) return null;
+
+    const now = new Date();
+    // Walk forward a day at a time. At most eight steps — today plus a full
+    // week — so a selection that can never match terminates rather than
+    // spinning.
+    for (let offset = 0; offset <= 7; offset += 1) {
+      const candidate = new Date(now);
+      candidate.setDate(now.getDate() + offset);
+      candidate.setHours(hour, minute, 0, 0);
+      // `days` is Monday-indexed (0 = Mon) to match DAY_NAMES; getDay() is
+      // Sunday-indexed. Getting this backwards silently shifts every routine
+      // by a day, which is the kind of bug nobody notices for a week.
+      const mondayIndex = (candidate.getDay() + 6) % 7;
+      if (!days.has(mondayIndex)) continue;
+      if (candidate.getTime() <= now.getTime()) continue;
+      return candidate;
+    }
+    return null;
+  }, [scheduleType, intervalMinutes, days, hour, minute]);
+
+  const nextFireLabel = useMemo(() => {
+    if (!nextFireAt) return null;
+    const rel = timeUntil(nextFireAt.toISOString());
+    const abs = nextFireAt.toLocaleString(undefined, {
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    return `${abs} · ${rel}`;
+  }, [nextFireAt]);
 
   useEffect(() => {
     if (!open) return;
@@ -217,6 +275,7 @@ export function CreateRoutineDialog({
            keyboard. Plain Enter is left alone here because these dialogs hold
            multi-line fields. */
         onKeyDown={(e) => {
+          if (isComposing(e)) return;
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void handleSubmit();
@@ -448,11 +507,27 @@ export function CreateRoutineDialog({
                 />
                 <span className="text-xs text-muted-foreground">minutes</span>
               </div>
-              <p className="text-3xs text-muted-foreground">
-                First run starts one interval from now.
-              </p>
             </div>
           )}
+
+          {/*
+            The answer, in the same place whichever schedule shape is selected.
+            An empty day-set is the one case with no answer, and saying so is
+            more useful than showing nothing — that state is reachable by
+            deselecting every weekday and is otherwise silent.
+          */}
+          <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-surface2/50 px-3 py-2">
+            <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
+            {nextFireLabel ? (
+              <span className="text-2xs text-foreground-muted">
+                Next run <span className="font-medium text-foreground">{nextFireLabel}</span>
+              </span>
+            ) : (
+              <span className="text-2xs text-status-warning">
+                Pick at least one day — this will never run.
+              </span>
+            )}
+          </div>
 
           {/* Error display */}
           {error && (

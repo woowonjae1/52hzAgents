@@ -910,6 +910,7 @@ export function ChatView() {
               onBlur={commitTitle}
               onKeyDown={(e) => {
                 if (isComposing(e)) return;
+                if (isComposing(e)) return;
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}

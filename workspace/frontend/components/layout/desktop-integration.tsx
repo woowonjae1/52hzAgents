@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
-import { getBridge } from '@/lib/desktop';
+import { getBridge, syncDesktopAttributes, WINDOW_CONTROLS_INSET } from '@/lib/desktop';
 import { useLayout, type ViewMode } from './layout-context';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -200,6 +200,30 @@ export function DesktopIntegration() {
   }, []);
 
   /*
+    ── Hydration-immune desktop attribute persistence ─────────────────────
+    React 19 hydration reconciles <html lang="en"> against JSX and strips
+    attributes injected before hydration (such as data-desktop, data-platform).
+    We re-assert them immediately and attach a MutationObserver to ensure
+    they remain active for the entire application lifetime.
+  */
+  React.useEffect(() => {
+    syncDesktopAttributes();
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const bridge = getBridge();
+      if (bridge || (window as unknown as { electronBridge?: unknown }).electronBridge) {
+        const observer = new MutationObserver(() => {
+          const root = document.documentElement;
+          if (!root.hasAttribute('data-desktop')) {
+            syncDesktopAttributes();
+          }
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-desktop'] });
+        return () => observer.disconnect();
+      }
+    }
+  }, []);
+
+  /*
     ── The caption-button reserve, MEASURED instead of guessed ─────────────
 
     `--window-controls-inset` was the literal 138 — "three 46px buttons" — set
@@ -222,6 +246,10 @@ export function DesktopIntegration() {
     before the first frame, and this effect cannot run that early.
   */
   React.useEffect(() => {
+    const bridge = getBridge();
+    const isDarwin = bridge?.platform === 'darwin' || (typeof document !== 'undefined' && document.documentElement.getAttribute('data-platform') === 'darwin');
+    if (isDarwin) return;
+
     const wco = (navigator as unknown as {
       windowControlsOverlay?: {
         visible: boolean;
@@ -230,28 +258,25 @@ export function DesktopIntegration() {
         removeEventListener(t: string, h: () => void): void;
       };
     }).windowControlsOverlay;
-    if (!wco) return;
 
     const apply = () => {
       try {
-        // Not visible means the shell is drawing a normal frame (or the window
-        // is fullscreen) — there are no buttons to dodge, so reserve nothing.
-        if (!wco.visible) {
+        const isFullscreen = Boolean(document.fullscreenElement || (window.innerHeight === screen.height && window.innerWidth === screen.width));
+        if (isFullscreen) {
           document.documentElement.style.setProperty('--window-controls-inset', '0px');
           return;
         }
-        const rect = wco.getTitlebarAreaRect();
-        // The buttons sit at whichever end the available area stops short of.
-        // On an RTL layout that is the start edge, which is why this measures
-        // the gap rather than assuming it is on the right.
-        const trailing = Math.max(0, Math.round(window.innerWidth - (rect.x + rect.width)));
-        const leading = Math.max(0, Math.round(rect.x));
-        const inset = Math.max(trailing, leading);
-        // A measurement of zero while the overlay claims to be visible means
-        // the rect is not ready yet; keep the fallback rather than removing the
-        // reserve and letting the header slide under the buttons for a frame.
-        if (inset > 0) {
-          document.documentElement.style.setProperty('--window-controls-inset', `${inset}px`);
+
+        if (wco && wco.visible) {
+          const rect = wco.getTitlebarAreaRect();
+          const trailing = Math.max(0, Math.round(window.innerWidth - (rect.x + rect.width)));
+          const leading = Math.max(0, Math.round(rect.x));
+          const inset = Math.max(trailing, leading);
+          const finalInset = Math.max(inset, WINDOW_CONTROLS_INSET);
+          document.documentElement.style.setProperty('--window-controls-inset', `${finalInset}px`);
+        } else {
+          // Keep safe 138px reserve if WCO rect is temporarily not ready or not visible outside fullscreen
+          document.documentElement.style.setProperty('--window-controls-inset', `${WINDOW_CONTROLS_INSET}px`);
         }
       } catch {
         // Leave the pre-paint fallback in place.
@@ -259,10 +284,14 @@ export function DesktopIntegration() {
     };
 
     apply();
-    wco.addEventListener('geometrychange', apply);
+    if (wco) {
+      wco.addEventListener('geometrychange', apply);
+    }
     window.addEventListener('resize', apply);
     return () => {
-      wco.removeEventListener('geometrychange', apply);
+      if (wco) {
+        wco.removeEventListener('geometrychange', apply);
+      }
       window.removeEventListener('resize', apply);
     };
   }, []);

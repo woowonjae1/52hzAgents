@@ -886,19 +886,49 @@ html {
   -webkit-app-region: no-drag;
 }
 
-/* When Studio is closed on desktop: main view header reserves window controls inset */
-:root[data-desktop] [data-studio-open='false'] .app-header {
-  padding-inline-end: max(1.25rem, var(--window-controls-inset, 0px)) !important;
+/*
+  DESKTOP CAPTION BUTTON SAFE ZONE PROTECTION
+  Ensure top-level view headers never get occluded by the native Windows/Linux caption buttons
+  (minimize / maximize / close: ~138px on the right).
+*/
+:root[data-desktop] .app-header,
+:root[style*="--window-controls-inset"] .app-header {
+  padding-inline-end: max(1.5rem, var(--window-controls-inset, 138px)) !important;
+  padding-right: max(1.5rem, var(--window-controls-inset, 138px)) !important;
 }
 
-/* When Studio is open on desktop: main view header has normal padding, Studio header reserves window controls inset */
+/* Sidebar and nested navigation headers sit on the left; do not add 138px right padding */
+:root[data-desktop] aside:not([aria-label="Studio Panel"]) .app-header,
+:root[data-desktop] nav .app-header,
+:root[style*="--window-controls-inset"] aside:not([aria-label="Studio Panel"]) .app-header,
+:root[style*="--window-controls-inset"] nav .app-header {
+  padding-inline-end: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+/* When Studio is open on desktop:
+   The Studio panel occupies the rightmost column and gets the caption button reserve,
+   while the main view header in the middle reverts to normal padding. */
 :root[data-desktop] [data-studio-open='true'] .flex-grow > div > .app-header,
-:root[data-desktop] [data-studio-open='true'] .flex-grow main .app-header {
+:root[data-desktop] [data-studio-open='true'] .flex-grow main .app-header,
+:root[data-desktop] [data-studio-open='true'] .flex-grow > div > div > .app-header,
+:root[style*="--window-controls-inset"] [data-studio-open='true'] .flex-grow > div > .app-header,
+:root[style*="--window-controls-inset"] [data-studio-open='true'] .flex-grow main .app-header,
+:root[style*="--window-controls-inset"] [data-studio-open='true'] .flex-grow > div > div > .app-header {
   padding-inline-end: 1.25rem !important;
+  padding-right: 1.25rem !important;
 }
 
-:root[data-desktop] aside[aria-label="Studio Panel"] .app-header {
-  padding-inline-end: max(0.75rem, var(--window-controls-inset, 0px)) !important;
+:root[data-desktop] aside[aria-label="Studio Panel"] .app-header,
+:root[style*="--window-controls-inset"] aside[aria-label="Studio Panel"] .app-header {
+  padding-inline-end: max(0.75rem, var(--window-controls-inset, 138px)) !important;
+  padding-right: max(0.75rem, var(--window-controls-inset, 138px)) !important;
+}
+
+/* macOS puts traffic lights at the inline-start, clear the right side back to normal */
+:root[data-desktop][data-platform='darwin'] .app-header {
+  padding-inline-end: 1.25rem !important;
+  padding-right: 1.25rem !important;
 }
 }
 

@@ -54,6 +54,7 @@ function SessionItem({
           onBlur={handleRenameSubmit}
           onKeyDown={(e) => {
             if (isComposing(e)) return;
+            if (isComposing(e)) return;
             if (e.key === 'Enter') handleRenameSubmit();
             if (e.key === 'Escape') setIsRenaming(false);
           }}

@@ -49,21 +49,37 @@ export const HEADER_HEIGHT = 48;
  */
 export const DESKTOP_PREPAINT_SCRIPT = `(function(){try{var b=window.electronBridge;if(!b)return;var r=document.documentElement;r.setAttribute('data-desktop','');r.setAttribute('data-platform',b.platform||'');if(b.isWindows11)r.setAttribute('data-win11','');r.style.setProperty('--titlebar-height','0px');r.style.setProperty('--window-controls-inset',b.platform==='darwin'?'0px':'138px');if(b.platform==='darwin')r.style.setProperty('--traffic-lights-inset','78px');}catch(e){}})();`;
 
-// Stamp DOM attributes and root CSS variables immediately when this module loads on the client
-if (typeof window !== 'undefined') {
+/**
+ * Synchronously ensure that the root <html> element has the required desktop
+ * attributes (`data-desktop`, `data-platform`, `data-win11`) and base CSS variables.
+ * Call this on mount, on route transitions, or inside desktop integration components
+ * to prevent React 19 hydration or DOM reconciliation from stripping them.
+ */
+export function syncDesktopAttributes(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
   try {
     const bridge = getBridge();
-    if (bridge || document.documentElement.hasAttribute('data-desktop')) {
-      const root = document.documentElement;
-      if (!root.hasAttribute('data-desktop')) root.setAttribute('data-desktop', '');
-      const platform = bridge?.platform || root.getAttribute('data-platform') || '';
-      if (platform && !root.hasAttribute('data-platform')) root.setAttribute('data-platform', platform);
-      if (bridge?.isWindows11 && !root.hasAttribute('data-win11')) root.setAttribute('data-win11', '');
-      root.style.setProperty('--titlebar-height', '0px');
+    const isDesktop = Boolean(bridge) || document.documentElement.hasAttribute('data-desktop');
+    if (!isDesktop) return false;
+    const root = document.documentElement;
+    if (!root.hasAttribute('data-desktop')) root.setAttribute('data-desktop', '');
+    const platform = bridge?.platform || root.getAttribute('data-platform') || '';
+    if (platform && !root.hasAttribute('data-platform')) root.setAttribute('data-platform', platform);
+    if (bridge?.isWindows11 && !root.hasAttribute('data-win11')) root.setAttribute('data-win11', '');
+    root.style.setProperty('--titlebar-height', `${TITLEBAR_HEIGHT}px`);
+    if (!root.style.getPropertyValue('--window-controls-inset')) {
       root.style.setProperty('--window-controls-inset', platform === 'darwin' ? '0px' : `${WINDOW_CONTROLS_INSET}px`);
-      if (platform === 'darwin') root.style.setProperty('--traffic-lights-inset', `${TRAFFIC_LIGHTS_INSET}px`);
     }
-  } catch {}
+    if (platform === 'darwin') root.style.setProperty('--traffic-lights-inset', `${TRAFFIC_LIGHTS_INSET}px`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Stamp DOM attributes and root CSS variables immediately when this module loads on the client
+if (typeof window !== 'undefined') {
+  syncDesktopAttributes();
 }
 
 /**
@@ -78,20 +94,8 @@ export function useIsDesktop(): boolean {
   });
 
   React.useEffect(() => {
-    const bridge = getBridge();
-    const desktop = Boolean(bridge) || document.documentElement.hasAttribute('data-desktop');
-    setIsDesktop(desktop);
-
-    if (desktop && typeof document !== 'undefined') {
-      const root = document.documentElement;
-      if (!root.hasAttribute('data-desktop')) root.setAttribute('data-desktop', '');
-      const platform = bridge?.platform || root.getAttribute('data-platform') || '';
-      if (platform && !root.hasAttribute('data-platform')) root.setAttribute('data-platform', platform);
-      if (bridge?.isWindows11 && !root.hasAttribute('data-win11')) root.setAttribute('data-win11', '');
-      root.style.setProperty('--titlebar-height', `${TITLEBAR_HEIGHT}px`);
-      root.style.setProperty('--window-controls-inset', platform === 'darwin' ? '0px' : `${WINDOW_CONTROLS_INSET}px`);
-      if (platform === 'darwin') root.style.setProperty('--traffic-lights-inset', `${TRAFFIC_LIGHTS_INSET}px`);
-    }
+    const active = syncDesktopAttributes();
+    setIsDesktop(active);
   }, []);
 
   return isDesktop;

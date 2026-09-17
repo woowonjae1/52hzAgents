@@ -37,6 +37,7 @@ import { RealtimeStatus } from './realtime-status';
 import { WindowTitle } from './window-title';
 import { ErrorLogDialog } from './error-log-dialog';
 import { installErrorCapture } from '@/lib/error-log';
+import { syncDesktopAttributes } from '@/lib/desktop';
 
 import { Hint } from '@/components/ui/hint';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
@@ -77,7 +78,10 @@ export function Wrapper() {
   /* Route every error toast into the log the Recent Errors dialog reads.
      Here rather than in a provider because this is the one component that
      mounts for every workspace route and exactly once. */
-  React.useEffect(() => { installErrorCapture(); }, []);
+  React.useEffect(() => {
+    installErrorCapture();
+    syncDesktopAttributes();
+  }, []);
 
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading, workspace } = useWorkspace();

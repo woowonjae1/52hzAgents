@@ -15,6 +15,9 @@ import { Button } from '@/components/ui/button';
 import { workspaceApi } from '@/lib/api';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useListKeyboardNav } from '@/hooks/use-list-keyboard-nav';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
+import { mergeRefs } from '@/lib/utils';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import type { RoutineRunItem } from '@/lib/types';
@@ -38,6 +41,7 @@ export function RunsView() {
   const [now, setNow] = useState(() => Date.now());
   const { setCurrentSessionId } = useWorkspace();
   const { setViewMode } = useLayout();
+  const scrollRef = useScrollRestore<HTMLDivElement>('routine-runs');
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -84,6 +88,15 @@ export function RunsView() {
     setCurrentSessionId(channelName);
     setViewMode('threads');
   };
+
+  // Enter opens the run's thread, which is the only thing a run row does.
+  const { cursor, listNavProps, rowProps } = useListKeyboardNav({
+    count: filteredRuns.length,
+    onActivate: (i) => {
+      const run = filteredRuns[i];
+      if (run?.channelName) handleOpenThread(run.channelName);
+    },
+  });
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -134,7 +147,18 @@ export function RunsView() {
       )}
 
       {/* Main Runs List */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      {/*
+        A table of execution records, and until now the only list in the app
+        with no keyboard, no row menu, no right-click and no scroll memory —
+        which is backwards, because a log of what ran and what failed is
+        precisely the surface you arrive at from somewhere else, scroll down,
+        leave to check something, and come back to.
+      */}
+      <div
+        {...listNavProps}
+        ref={mergeRefs(listNavProps.ref, scrollRef)}
+        className="flex-1 overflow-y-auto p-4 sm:p-6 outline-none"
+      >
         <div className="max-w-5xl mx-auto space-y-3">
           {filteredRuns.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center rounded-xl border border-dashed border-border p-8 space-y-2">
@@ -157,7 +181,12 @@ export function RunsView() {
               return (
                 <div
                   key={run.id}
-                  className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-border bg-surface1/60 hover:bg-surface1 hover:border-border ui-transition"
+                  {...rowProps(filteredRuns.indexOf(run), false)}
+                  className={cn(
+                    'group flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border bg-surface1/60 hover:bg-surface1 ui-transition',
+                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-accent',
+                    cursor === filteredRuns.indexOf(run) ? 'border-border-accent' : 'border-border',
+                  )}
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                     {/* Status Icon */}

@@ -2,11 +2,12 @@
 
 import { Hint } from '@/components/ui/hint';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock3, Loader2, Plus, RefreshCw, Timer, X, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { RowActions } from '@/components/ui/row-actions';
+import { runUndoable } from '@/lib/undoable';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -37,6 +38,47 @@ function formatDate(dateStr: string): string {
 
 export function TimersView() {
   const { timers, refreshTimers, createTimer, cancelTimer, agents, sessions, currentSessionId } = useWorkspace();
+
+  /*
+    CANCELLING A TIMER WAS THE ONE DESTRUCTIVE ACTION IN THE APP WITH NO WAY
+    BACK — no confirmation dialog, no undo window, one click and the reminder
+    is gone. Knowledge entries and routines at least ask first; this did not.
+
+    An undo window rather than a dialog, matching what files and threads
+    already do here. A confirmation stops you every time to protect against the
+    rare mistake; an undo window costs nothing when you meant it and still
+    catches the one time you did not — which is the right trade for something
+    you cancel deliberately and often.
+
+    `hidden` is local because the row list comes from the workspace context and
+    cannot be mutated optimistically from here; hiding the row is the optimistic
+    half, and putting it back is the exact inverse.
+  */
+  const [hiddenTimerIds, setHiddenTimerIds] = useState<Set<string>>(new Set());
+
+  const cancelTimerUndoable = useCallback((timer: { id: string; message: string }) => {
+    const label = timer.message.length > 32 ? timer.message.slice(0, 32).trim() + '…' : timer.message;
+    runUndoable({
+      message: `Cancelled "${label}"`,
+      onOptimistic: () => setHiddenTimerIds((prev) => new Set(prev).add(timer.id)),
+      onRevert: () => setHiddenTimerIds((prev) => {
+        const next = new Set(prev);
+        next.delete(timer.id);
+        return next;
+      }),
+      onCommit: async () => {
+        await cancelTimer(timer.id);
+        // The server no longer lists it, so the local hide has served its
+        // purpose; leaving the id in the set would leak one entry per cancel.
+        setHiddenTimerIds((prev) => {
+          const next = new Set(prev);
+          next.delete(timer.id);
+          return next;
+        });
+      },
+      errorMessage: 'Could not cancel the timer',
+    });
+  }, [cancelTimer]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [delaySeconds, setDelaySeconds] = useState(15 * 60);
@@ -55,7 +97,7 @@ export function TimersView() {
       .map((session) => ({ id: session.sessionId, title: session.title || session.sessionId }));
     return values.length ? values : [{ id: 'general', title: 'General' }];
   }, [sessions]);
-  const activeTimers = useMemo(() => timers.filter((timer) => timer.status === 'active').sort((a, b) => {
+  const activeTimers = useMemo(() => timers.filter((timer) => timer.status === 'active' && !hiddenTimerIds.has(timer.id)).sort((a, b) => {
     const aT = a.firesAt ? new Date(a.firesAt).getTime() : 0;
     const bT = b.firesAt ? new Date(b.firesAt).getTime() : 0;
     return aT - bT;
@@ -99,7 +141,7 @@ export function TimersView() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
+      <header className="app-header justify-between ps-4 shrink-0">
         <div>
           <ScreenTitle>Timers</ScreenTitle>
           <p className="text-xs text-muted-foreground">Schedule one-time reminders for an agent</p>
@@ -146,7 +188,7 @@ export function TimersView() {
                         toast.success('Copied');
                       },
                     },
-                    { label: 'Cancel timer', icon: X, destructive: true, onSelect: () => { void cancelTimer(timer.id); } },
+                    { label: 'Cancel timer', icon: X, destructive: true, onSelect: () => cancelTimerUndoable(timer) },
                   ]}
                 />
               </div>

@@ -12,6 +12,7 @@ import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/helpers';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
+import { isComposing } from '@/lib/ime';
 
 const POLL_INTERVAL = 5_000;
 
@@ -242,6 +243,7 @@ export function MonitorGrid() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
+                  if (isComposing(e)) return;
                   if (e.key === 'Escape') {
                     setSearchOpen(false);
                     setSearchQuery('');

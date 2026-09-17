@@ -412,7 +412,7 @@ export function TasksView() {
           `.app-header` is a single fixed-height row that does not wrap, so
           everything in it has to fit: the back button is icon-only, and search
           is the one element allowed to give up width. */}
-      <div className="app-header justify-between px-6">
+      <div className="app-header justify-between ps-6">
         <div className="flex items-center gap-3 shrink-0">
           <Hint label="Back to Chats">
             <button

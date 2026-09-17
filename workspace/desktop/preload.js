@@ -1,10 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
-const os = require('os');
 
 let isWindows11 = false;
 try {
+  const os = require('os');
   isWindows11 = process.platform === 'win32' && parseInt((os.release() || '').split('.')[2], 10) >= 22000;
-} catch (e) {}
+} catch (e) {
+  try {
+    if (typeof process.getSystemVersion === 'function') {
+      isWindows11 = process.platform === 'win32' && parseInt((process.getSystemVersion() || '').split('.')[2], 10) >= 22000;
+    }
+  } catch {}
+}
 
 let cachedDesktopApiUrl = null;
 

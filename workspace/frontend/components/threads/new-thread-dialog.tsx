@@ -14,6 +14,7 @@ import { History, Check, Minus, Folder } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { ProjectFolderPicker, rememberWorkingDir } from '@/components/chat/project-folder-picker';
+import { isComposing } from '@/lib/ime';
 
 interface NewThreadDialogProps {
   open: boolean;
@@ -124,6 +125,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
            keyboard. Plain Enter is left alone here because these dialogs hold
            multi-line fields. */
         onKeyDown={(e) => {
+          if (isComposing(e)) return;
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             handleCreate();

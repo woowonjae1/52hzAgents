@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import type { KnowledgeEntry } from '@/lib/types';
 import { toast } from 'sonner';
+import { isComposing } from '@/lib/ime';
 
 interface KnowledgeEditorProps {
   open: boolean;
@@ -158,6 +159,7 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
            keyboard. Plain Enter is left alone here because these dialogs hold
            multi-line fields. */
         onKeyDown={(e) => {
+          if (isComposing(e)) return;
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void handleSave();

@@ -731,6 +731,7 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       webSecurity: true,
       // Enables <webview> for the Local Preview panel. A <webview> is its own
       // WebContents, which is the only way to show a dev server running on this
@@ -1315,6 +1316,7 @@ function createQuickBarWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
     },
   });
 

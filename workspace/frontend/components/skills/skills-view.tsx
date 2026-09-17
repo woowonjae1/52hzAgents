@@ -206,7 +206,14 @@ function SkillCard({ skill, onSelect }: { skill: Skill; onSelect: (s: Skill) => 
   */
   return (
     <div className="relative group">
+    {/*
+      Still a real `<button>`, so Enter and Space open the skill and the card
+      keeps its tab stop. Wrapping it (rather than turning it into a div with
+      `role="button"`, which would have meant reimplementing both) is what let
+      the actions menu exist beside it without nesting one button in another.
+    */}
     <button
+      type="button"
       className="w-full text-left rounded-xl border border-border bg-card p-4 ui-transition duration-150 hover:shadow-lg hover:border-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       onClick={() => onSelect(skill)}
     >
@@ -602,7 +609,7 @@ export function SkillsView() {
       {/* Title bar — the 48px `.app-header` row every view shares, so this
           line and the sidebar's are one continuous divider. Filters live in
           their own band below rather than stretching the header to 3 rows. */}
-      <div className="app-header px-5">
+      <div className="app-header ps-5">
         <div className="flex flex-1 items-center gap-2 min-w-0">
           <Hint label="Back to chats">
             <button

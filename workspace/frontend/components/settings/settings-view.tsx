@@ -40,6 +40,7 @@ import {
   Power,
   Palette,
   Activity,
+  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +93,47 @@ export function SettingsView() {
     { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
     { id: 'routines', label: 'Scheduled Tasks', icon: CalendarClock },
   ];
+
+  /*
+    NINE HUNDRED LINES OF SETTINGS AND NO WAY TO SEARCH THEM.
+
+    Seven sections, each several screens deep, and the only way to find the
+    autostart toggle or the export format was to remember which section it was
+    filed under and then scroll. Every settings surface of this size has a
+    search box — it is the difference between "where is that" and "type three
+    letters".
+
+    Matching is over KEYWORDS, not the rendered DOM. Searching real controls
+    would mean either rendering every section at once (expensive, and the
+    sections mount live panels) or maintaining a parallel index that drifts.
+    Keywords per section are a small, honest index: they say what a section
+    can answer, and a miss sends the user to the section rather than to
+    nothing.
+  */
+  const [navQuery, setNavQuery] = useState('');
+
+  const SECTION_KEYWORDS: Record<string, string> = {
+    general: 'workspace name token autostart start at login theme dark light appearance language desktop',
+    agents: 'agent connect invite remove model provider api key online offline participant',
+    panels: 'panel sidebar studio layout display split browser preview width',
+    export: 'export markdown share download backup transcript',
+    skills: 'skill install uninstall marketplace package plugin',
+    knowledge: 'knowledge document note entry import citation',
+    routines: 'routine schedule cron timer recurring automation trigger',
+  };
+
+  const visibleNavItems = (() => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return SETTINGS_NAV_ITEMS;
+    const hit = SETTINGS_NAV_ITEMS.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        (SECTION_KEYWORDS[item.id] || '').includes(q),
+    );
+    // Never strand the user on an empty nav: a query that matches nothing
+    // leaves every section reachable rather than hiding the whole app.
+    return hit.length > 0 ? hit : SETTINGS_NAV_ITEMS;
+  })();
 
   useEffect(() => {
     if (workspace?.name) setName(workspace.name);
@@ -258,7 +300,7 @@ export function SettingsView() {
   return (
     <div className="flex flex-col h-full bg-surface0 text-foreground overflow-hidden">
       {/* Header Bar */}
-      <div className="app-header justify-between px-6">
+      <div className="app-header justify-between ps-6">
         <div className="flex items-center gap-3">
           <Hint label="Back to chat">
             <button
@@ -300,7 +342,19 @@ export function SettingsView() {
             Settings
           </div>
 
-          {SETTINGS_NAV_ITEMS.map((item) => {
+          <div className="relative flex items-center mb-1">
+            <Search className="absolute left-2.5 size-3 text-foreground-extra-muted pointer-events-none" />
+            <input
+              type="text"
+              value={navQuery}
+              onChange={(e) => setNavQuery(e.target.value)}
+              placeholder="Search settings…"
+              data-view-search
+              className="w-full bg-surface2/80 border border-border rounded-lg pl-7 pr-2 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden focus:border-border-accent"
+            />
+          </div>
+
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const active = settingsTab === item.id;
             return (

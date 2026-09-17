@@ -244,7 +244,7 @@ export function ConnectAgentView() {
   return (
     <div className="flex flex-col h-full bg-card text-foreground">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-border/60 shrink-0">
+      <div className="app-header justify-between ps-5 shrink-0">
         <h2 className="text-2xs font-medium text-foreground-muted">Connect Agents</h2>
         <Hint label="Close">
           <button

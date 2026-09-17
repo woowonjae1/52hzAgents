@@ -420,7 +420,7 @@ export function MissionControl() {
         Every card was also a filter toggle. Those toggles are preserved below
         as chips; nothing that did something lost its home.
       */}
-      <div className={cn('app-header px-6', !isSidebarOpen && 'ps-14')}>
+      <div className={cn('app-header ps-6', !isSidebarOpen && 'ps-14')}>
         <div className="flex flex-1 items-center justify-between gap-4 min-w-0">
           <div className="flex items-baseline gap-2.5 min-w-0">
             <h1 className="text-sm font-semibold tracking-tight text-foreground shrink-0">

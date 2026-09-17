@@ -23,6 +23,7 @@ import { workspaceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { AgentApproval, AgentLogEntry, AgentRuntime, CloudAgentConfig, AgentUsage } from '@/lib/types';
+import { isComposing } from '@/lib/ime';
 
 function fmtTokens(n?: number | null): string {
   if (!n || n <= 0) return '0';
@@ -502,6 +503,7 @@ export function AgentProfilePanel() {
                           onChange={(e) => setCustomModelInput(e.target.value)}
                           onKeyDown={(e) => {
                             e.stopPropagation();
+                            if (isComposing(e)) return;
                             if (e.key === 'Enter' && customModelInput.trim()) {
                               handleSwitchModel(customModelInput.trim());
                               setIsEnteringCustom(false);

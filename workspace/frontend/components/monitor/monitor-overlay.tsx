@@ -216,6 +216,7 @@ export function MonitorOverlay({ sessionId, session, initialMessages, open, onOp
               onBlur={commitTitle}
               onKeyDown={(e) => {
                 if (isComposing(e)) return;
+                if (isComposing(e)) return;
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}

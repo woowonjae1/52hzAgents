@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { WorkspaceSession, WorkspaceAgent } from '@/lib/types';
+import { isComposing } from '@/lib/ime';
 
 type Mode = 'dynamic' | 'master' | 'workflow';
 
@@ -252,6 +253,9 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // ↑/↓/Enter/Tab belong to the IME's candidate list while one is open — the
+    // same guard the main composer carries, for the same mention popup.
+    if (isComposing(e)) return;
     if (showMentions && filteredAgents.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
