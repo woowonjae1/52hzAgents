@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('electronBridge', {
   // The overlay is drawn by the OS, so CSS cannot reach it — without this the
   // buttons keep one fixed grey and go low-contrast in light mode.
   setTitleBarSymbolColor: (color) => ipcRenderer.send('window-titlebar-symbol-color', color),
+  setTheme: (theme) => ipcRenderer.send('window-theme-changed', theme),
   /**
    * Fires after the window is maximised, unmaximised, restored or re-shown.
    *

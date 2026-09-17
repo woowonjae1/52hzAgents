@@ -6,6 +6,7 @@ import { getBridge, syncDesktopAttributes, WINDOW_CONTROLS_INSET } from '@/lib/d
 import { useLayout, type ViewMode } from './layout-context';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useTheme } from 'next-themes';
 import { SHORTCUTS_EVENT } from './global-shortcuts';
 import { COMMAND_PALETTE_EVENT } from './command-palette';
 
@@ -112,6 +113,16 @@ export function DesktopIntegration() {
     isCanvasOpen,
     closeCanvas,
   };
+
+  const { resolvedTheme } = useTheme();
+
+  // ── Sync light/dark theme to Electron nativeTheme & Mica material ─────
+  React.useEffect(() => {
+    if (!resolvedTheme) return;
+    const bridge = getBridge();
+    bridge?.setTheme?.(resolvedTheme);
+    bridge?.setTitleBarSymbolColor?.(resolvedTheme === 'dark' ? '#8a8a8a' : '#52525b');
+  }, [resolvedTheme]);
 
   // ── Menu bar → in-app command ────────────────────────────────────────
   React.useEffect(() => {

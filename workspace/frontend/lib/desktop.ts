@@ -120,6 +120,7 @@ export interface ElectronBridge {
   closeWindow(): void;
   isMaximized(): Promise<boolean>;
   setTitleBarSymbolColor(color: string): void;
+  setTheme?(theme: string): void;
   onWindowStateChanged(handler: () => void): () => void;
   hideQuickBar(): void;
   openMainWindow(route?: string): void;

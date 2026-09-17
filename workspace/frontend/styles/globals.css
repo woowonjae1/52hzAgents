@@ -53,9 +53,9 @@
   /* Controls */
   --scrollbar-handle: #d4d4d8;
 
-  /* Borders - Hairline translucent */
-  --border: rgba(0, 0, 0, 0.08);
-  --border-accent: rgba(0, 0, 0, 0.14);
+  /* Borders - Hairline calibrated for crisp desktop boundaries */
+  --border: rgba(0, 0, 0, 0.095);
+  --border-accent: rgba(0, 0, 0, 0.16);
 
   /* Brand — Modern Indigo/Monochrome */
   --accent: #09090b;
@@ -189,8 +189,8 @@
   --scrollbar-handle: #3f3f46;
 
   /* Borders - Fine translucent micro-borders with light spill */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-accent: rgba(255, 255, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.09);
+  --border-accent: rgba(255, 255, 255, 0.16);
 
   /* Brand — Luminous Monochrome + Subtle Violet Accent */
   --accent: #f4f4f6;
@@ -789,27 +789,40 @@ html {
   --traffic-lights-inset: 78px;
 }
 
-/* Windows 11 Mica & macOS Vibrancy subtle translucency */
+/* Transparent body and root container on Mica/Vibrancy desktop builds so system backdrop shines through */
+:root[data-desktop][data-win11] body,
+:root[data-desktop][data-platform='darwin'] body,
+:root[data-desktop][data-win11] .app-root-container,
+:root[data-desktop][data-platform='darwin'] .app-root-container {
+  background-color: transparent !important;
+}
+
+/* Windows 11 Mica & macOS Vibrancy elevated translucency */
 :root[data-desktop][data-win11].dark,
 :root[data-desktop][data-platform='darwin'].dark {
-  --surface-sidebar: rgba(13, 13, 16, 0.78);
-  --surface-sidebar-hover: rgba(23, 23, 30, 0.85);
+  --surface-sidebar: rgba(13, 13, 16, 0.72);
+  --surface-sidebar-hover: rgba(25, 25, 32, 0.80);
 }
 
 :root[data-desktop][data-win11]:not(.dark),
 :root[data-desktop][data-platform='darwin']:not(.dark) {
-  --surface-sidebar: rgba(244, 244, 246, 0.82);
-  --surface-sidebar-hover: rgba(234, 236, 239, 0.90);
+  --surface-sidebar: rgba(244, 244, 246, 0.76);
+  --surface-sidebar-hover: rgba(230, 232, 236, 0.85);
 }
 
 :root[data-desktop] .app-titlebar {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+:root[data-desktop] .app-header {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 :root[data-desktop] aside {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 /**

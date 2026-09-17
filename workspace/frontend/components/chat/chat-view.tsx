@@ -1182,12 +1182,13 @@ export function ChatView() {
                       }}
                       className={cn(
                         'flex items-start gap-3.5 p-3.5 rounded-2xl text-left cursor-pointer select-none group',
-                        'bg-surface1/70 dark:bg-[#18181e]/80 hover:bg-surface2 dark:hover:bg-[#202028]',
-                        'border border-border/70 dark:border-white/[0.07] hover:border-border-accent dark:hover:border-white/[0.14]',
-                        'shadow-xs hover:shadow-md transition-all duration-200 active:scale-[0.99]'
+                        'bg-white/80 dark:bg-surface2/60 backdrop-blur-md hover:bg-white dark:hover:bg-[#202028]',
+                        'border border-black/[0.08] dark:border-white/[0.08] hover:border-black/[0.16] dark:hover:border-white/[0.18]',
+                        'shadow-xs hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:-translate-y-0.5',
+                        'transition-all duration-200 active:scale-[0.99]'
                       )}
                     >
-                      <div className="size-8 rounded-xl bg-surface2 dark:bg-white/[0.05] border border-border/50 dark:border-white/[0.08] flex items-center justify-center shrink-0 group-hover:border-primary/30 transition-colors">
+                      <div className="size-8 rounded-xl bg-surface1/80 dark:bg-white/[0.06] border border-black/[0.05] dark:border-white/[0.08] flex items-center justify-center shrink-0 group-hover:border-primary/30 group-hover:bg-primary/5 transition-colors">
                         <SuggestionIcon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
                       <div className="flex-1 min-w-0">

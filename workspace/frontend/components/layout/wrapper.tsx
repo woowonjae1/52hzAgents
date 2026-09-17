@@ -234,7 +234,7 @@ export function Wrapper() {
   return (
     <div
       ref={desktopContainerRef}
-      className="flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5"
+      className="app-root-container flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5"
     >
       {shouldShowSidebar && <Sidebar />}
 

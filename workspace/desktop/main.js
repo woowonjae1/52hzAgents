@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog, clipboard, powerMonitor } = require('electron');
+const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog, clipboard, powerMonitor, nativeTheme } = require('electron');
 const path = require('path');
 const http = require('http');
 const net = require('net');
@@ -713,7 +713,7 @@ function createMainWindow() {
     minHeight: 640,
     title: '52hzAgent Studio',
     icon: appIconPath,
-    backgroundColor: WINDOW_BACKGROUND,
+    backgroundColor: (isWindows11 || process.platform === 'darwin') ? '#00000000' : WINDOW_BACKGROUND,
     darkTheme: true,
     show: false,
     titleBarStyle: 'hidden',
@@ -1503,6 +1503,16 @@ ipcMain.on('window-titlebar-symbol-color', (_event, color) => {
     });
   } catch (e) {
     console.warn('[52hzAgents] setTitleBarOverlay failed:', e.message);
+  }
+});
+
+ipcMain.on('window-theme-changed', (_event, theme) => {
+  if (theme === 'light' || theme === 'dark' || theme === 'system') {
+    try {
+      nativeTheme.themeSource = theme;
+    } catch (e) {
+      console.warn('[52hzAgents] theme sync failed:', e.message);
+    }
   }
 });
 

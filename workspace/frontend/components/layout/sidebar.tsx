@@ -168,7 +168,7 @@ export function Sidebar() {
       className={cn(
         // `top` clears the titlebar band, which is 0px in the browser. The
         // sidebar is `fixed`, so the wrapper's padding does not reach it.
-        'fixed overflow-hidden bg-surface-sidebar border-r border-border top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
+        'fixed overflow-hidden bg-surface-sidebar border-r border-border shadow-[1px_0_0_0_rgba(0,0,0,0.02)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.02)] top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
         // No width transition mid-drag, or the edge visibly lags the cursor.
         // `width` only — `transition-all` also animated the border, padding and
         // colours on every open/close, and at 300ms the panel visibly trailed
