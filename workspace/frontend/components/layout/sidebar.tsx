@@ -189,6 +189,7 @@ export function Sidebar() {
         // colours on every open/close, and at 300ms the panel visibly trailed
         // the click. Desktop panels settle in ~150ms.
         !isResizing && 'transition-[width,border-width] duration-[var(--shell-duration)] ease-[var(--shell-ease)]',
+        !isSidebarOpen && 'pointer-events-none shadow-none border-r-0',
       )}
       data-sidebar-sized
       style={{

@@ -349,7 +349,49 @@ export function DesktopIntegration() {
     };
   }, []);
 
-  // ── Unread count → the OS ────────────────────────────────────────────
+  // ── Re-assert drag regions on window state changes and resize ───────────
+  // Chromium caches -webkit-app-region rectangles from layout. When the window
+  // is unmaximized, restored, or resized, the cache becomes stale and stops
+  // moving the window. Flipping -webkit-app-region to no-drag and back on the
+  // next animation frame forces Chromium to recollect the drag bounds.
+  React.useEffect(() => {
+    const bridge = getBridge();
+    let frame = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const reassert = () => {
+      if (typeof document === 'undefined') return;
+      const dragElements = document.querySelectorAll<HTMLElement>(
+        '.app-header, .app-titlebar, [data-drag-region]'
+      );
+      if (dragElements.length === 0) return;
+
+      dragElements.forEach((el) => el.style.setProperty('-webkit-app-region', 'no-drag'));
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        dragElements.forEach((el) => el.style.removeProperty('-webkit-app-region'));
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          dragElements.forEach((el) => {
+            el.style.setProperty('-webkit-app-region', 'no-drag');
+            requestAnimationFrame(() => el.style.removeProperty('-webkit-app-region'));
+          });
+        }, 60);
+      });
+    };
+
+    const unsubscribe = bridge?.onWindowStateChanged?.(reassert);
+    window.addEventListener('resize', reassert);
+
+    reassert();
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (timer) clearTimeout(timer);
+      unsubscribe?.();
+      window.removeEventListener('resize', reassert);
+    };
+  }, []);
   React.useEffect(() => {
     const bridge = getBridge();
     if (!bridge?.setUnreadCount) return;

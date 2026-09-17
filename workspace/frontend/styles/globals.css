@@ -900,7 +900,7 @@ html {
   --window-controls-inset: 0px;
   --traffic-lights-inset: 0px;
   /* One height for every top-level view header. See HEADER_HEIGHT. */
-  --header-height: 48px;
+  --header-height: 40px;
   /* Desktop-native motion. 300ms reads as sluggish next to a real window;
      the shell settles in ~150ms and individual controls faster still. */
   --shell-duration: 150ms;

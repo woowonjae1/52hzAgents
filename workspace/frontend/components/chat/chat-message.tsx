@@ -595,7 +595,6 @@ export const ChatMessage = memo(function ChatMessage({
           <div
             className={cn(
               'group/usermsg -mx-3 px-3 py-2.5 rounded-xl transition-colors duration-100',
-              'hover:bg-surface2/70 dark:hover:bg-surface1/70',
               'select-text flex flex-col items-end',
               !hideHeader && 'mt-3',
             )}
@@ -780,7 +779,6 @@ export const ChatMessage = memo(function ChatMessage({
         <div
           className={cn(
             'group/agentmsg relative -mx-3 px-3 rounded-xl transition-colors duration-100',
-            'hover:bg-surface2/70 dark:hover:bg-surface1/70',
             'select-text selectable',
             hideHeader ? 'pb-3.5' : 'py-3.5',
             /*

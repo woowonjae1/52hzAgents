@@ -49,7 +49,7 @@ function getAssetPath(filename) {
  * 38px against a 28px reservation in the renderer, which left the bottom of
  * the minimise/close buttons sitting on top of the app's content.
  */
-const TITLEBAR_HEIGHT = 48;
+const TITLEBAR_HEIGHT = 40;
 
 /**
  * The window's ground colour, painted before the renderer's first frame.

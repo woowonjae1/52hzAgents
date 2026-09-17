@@ -279,7 +279,7 @@ export function Wrapper() {
               /* `transition-[width]`, not `ui-transition`: the only property
                  that ever changes here is the width, and `all` puts every
                  animatable property of a flex sibling on a 300ms clock. */
-              className={cn('shrink-0', !isSidebarResizing && 'transition-[width] duration-300')}
+              className={cn('shrink-0', !isSidebarResizing && 'transition-[width] duration-[var(--shell-duration)] ease-[var(--shell-ease)]')}
               style={{ width: isSidebarOpen ? 'var(--sidebar-width)' : '0px' }}
             />
           )}
@@ -301,8 +301,8 @@ export function Wrapper() {
                       onClick={sidebarToggle}
                       /*
                         `data-no-drag` — this button is positioned against the
-                        main pane, but `top-4` lands it inside `.app-header`'s
-                        48px band, which is the window's drag region on
+                        main pane, but `top-1.5` lands it inside `.app-header`'s
+                        40px band, which is the window's drag region on
                         desktop. It is not a DESCENDANT of the header, so the
                         header's own no-drag rule never reached it, and an
                         app-region drag rect swallows whatever merely paints on
@@ -318,7 +318,7 @@ export function Wrapper() {
                          chrome button that grows under the cursor is a web
                          affordance, and a desktop tool answers a hover with
                          colour, not with size. */
-                         className="absolute top-4 left-3.5 z-30 size-8 rounded-lg bg-surface2/90 backdrop-blur-sm border border-border text-foreground-muted hover:text-foreground hover:bg-surface3/90 shadow-sm flex items-center justify-center transition-colors"
+                      className="absolute top-1.5 left-3.5 z-30 size-7 rounded-lg bg-surface2/90 backdrop-blur-sm border border-border text-foreground-muted hover:text-foreground hover:bg-surface3/90 shadow-sm flex items-center justify-center transition-colors"
                     >
                       <PanelLeft className="size-4" />
                     </button>

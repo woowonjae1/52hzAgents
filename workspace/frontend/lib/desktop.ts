@@ -39,7 +39,7 @@ export const TRAFFIC_LIGHTS_INSET = 78;
  * and the main pane's bottom border land on the same baseline and the row does
  * not change height when the view changes. Was five different paddings.
  */
-export const HEADER_HEIGHT = 48;
+export const HEADER_HEIGHT = 40;
 
 /**
  * Stamped on <html> in a blocking inline script (see app/layout.tsx) so the

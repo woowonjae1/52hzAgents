@@ -809,7 +809,27 @@ export function ChatView() {
   if (!currentSessionId) {
     const isRoutinesView = viewMode === 'routines';
     return (
-      <div className="flex flex-col h-full items-center justify-center text-center text-muted-foreground px-8">
+      <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
+        {/* Empty state header providing window drag region and sidebar toggle */}
+        <div className="app-header sticky top-0 z-10 px-3.5">
+          <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
+            {!isMobile && !isSidebarOpen && (
+              <Hint label="Expand Sidebar">
+                <button
+                  onClick={sidebarToggle}
+                  className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1"
+                >
+                  <PanelLeft className="size-4" />
+                </button>
+              </Hint>
+            )}
+            <span className="text-xs font-medium text-foreground-extra-muted">
+              {isRoutinesView ? 'Routines' : 'Messages'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col flex-1 items-center justify-center text-center text-muted-foreground px-8">
         {isRoutinesView ? (
           <>
             <div className="opacity-20 mb-3">
@@ -868,6 +888,7 @@ export function ChatView() {
             </div>
           </>
         )}
+        </div>
       </div>
     );
   }
@@ -882,7 +903,7 @@ export function ChatView() {
         longer reserves space for the native window buttons either: those live
         in AppTitlebar above, which is also the app's single drag region.
       */}
-      <div className="app-header sticky top-0 z-10 lg:ps-8">
+      <div className="app-header sticky top-0 z-10 px-3.5">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
