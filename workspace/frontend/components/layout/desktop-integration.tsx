@@ -349,47 +349,85 @@ export function DesktopIntegration() {
     };
   }, []);
 
-  // ── Re-assert drag regions on window state changes and resize ───────────
-  // Chromium caches -webkit-app-region rectangles from layout. When the window
-  // is unmaximized, restored, or resized, the cache becomes stale and stops
-  // moving the window. Flipping -webkit-app-region to no-drag and back on the
-  // next animation frame forces Chromium to recollect the drag bounds.
+  /*
+    ── Re-assert the drag regions ────────────────────────────────────────
+
+    Chromium collects `-webkit-app-region` as RECTANGLES during layout and
+    caches them. When the OS rebuilds the window's non-client area — maximise,
+    unmaximise, restore, resize — that cache can keep describing the old frame,
+    and the header then paints normally while dragging nothing. Flipping the
+    property off and on is what forces a recollect, because it is a real change
+    to the element's app-region and cannot be coalesced away.
+
+    THE FLIP MUST NOT BE ABLE TO STOP HALFWAY.
+
+    The previous version set `no-drag` synchronously and restored it inside a
+    `requestAnimationFrame`, with a second `setTimeout(60)` pass that did the
+    same again. rAF does not run in a window that is minimised, hidden or
+    occluded — which is exactly the state a window is in around the events this
+    listens to. Any callback that failed to fire left the header pinned to
+    `no-drag`, and from then on the window could not be dragged AT ALL until
+    some later event happened to complete a whole flip. "It just stops moving
+    and never comes back" is that bug, not a stale cache.
+
+    So the flip is synchronous and self-contained: set, force a layout read,
+    clear. `offsetHeight` is not a superstition here — reading it flushes
+    pending layout, which is the pass that collects the rectangles, so the
+    element genuinely holds `no-drag` across one layout and `drag` across the
+    next. Nothing is left pending, so nothing can be left stuck.
+
+    The `setTimeout` that remains only ever CLEARS. It is a safety net for a
+    flip interrupted by something outside this function, and it cannot itself
+    create the state it is there to undo.
+
+    `resize` is throttled through rAF-free debouncing for the same reason: a
+    drag-resize fires hundreds of events, and each one forcing a synchronous
+    layout on every header is a real cost.
+  */
   React.useEffect(() => {
     const bridge = getBridge();
-    let frame = 0;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (!bridge) return;
+    let debounce: ReturnType<typeof setTimeout> | null = null;
+    let safety: ReturnType<typeof setTimeout> | null = null;
 
-    const reassert = () => {
-      if (typeof document === 'undefined') return;
-      const dragElements = document.querySelectorAll<HTMLElement>(
-        '.app-header, .app-titlebar, [data-drag-region]'
-      );
-      if (dragElements.length === 0) return;
-
-      dragElements.forEach((el) => el.style.setProperty('-webkit-app-region', 'no-drag'));
-      if (frame) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        dragElements.forEach((el) => el.style.removeProperty('-webkit-app-region'));
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => {
-          dragElements.forEach((el) => {
-            el.style.setProperty('-webkit-app-region', 'no-drag');
-            requestAnimationFrame(() => el.style.removeProperty('-webkit-app-region'));
-          });
-        }, 60);
-      });
+    const clearOverride = () => {
+      document
+        .querySelectorAll<HTMLElement>('.app-header, .app-titlebar, [data-drag-region]')
+        .forEach((el) => el.style.removeProperty('-webkit-app-region'));
     };
 
-    const unsubscribe = bridge?.onWindowStateChanged?.(reassert);
-    window.addEventListener('resize', reassert);
+    const reassert = () => {
+      const els = document.querySelectorAll<HTMLElement>(
+        '.app-header, .app-titlebar, [data-drag-region]',
+      );
+      if (els.length === 0) return;
+      els.forEach((el) => {
+        el.style.setProperty('-webkit-app-region', 'no-drag');
+        // Flush layout so the rectangles are collected with the region off...
+        void el.offsetHeight;
+        // ...and hand the element straight back to the stylesheet's `drag`.
+        el.style.removeProperty('-webkit-app-region');
+      });
+      if (safety) clearTimeout(safety);
+      safety = setTimeout(clearOverride, 200);
+    };
 
+    const onResize = () => {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(reassert, 120);
+    };
+
+    const unsubscribe = bridge.onWindowStateChanged?.(reassert);
+    window.addEventListener('resize', onResize);
     reassert();
 
     return () => {
-      if (frame) cancelAnimationFrame(frame);
-      if (timer) clearTimeout(timer);
+      if (debounce) clearTimeout(debounce);
+      if (safety) clearTimeout(safety);
       unsubscribe?.();
-      window.removeEventListener('resize', reassert);
+      window.removeEventListener('resize', onResize);
+      // Never unmount holding the override.
+      clearOverride();
     };
   }, []);
   React.useEffect(() => {

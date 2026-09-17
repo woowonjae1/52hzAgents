@@ -612,7 +612,11 @@ export const ChatMessage = memo(function ChatMessage({
             <div className="max-w-[88%] sm:max-w-[80%] flex flex-col items-end">
               <div
                 className={cn(
-                  'relative rounded-[22px] rounded-br-[6px] px-4.5 py-3',
+                  // On the ramp — see the note in prompt-composer.tsx. The
+                  // notched corner keeps its relationship to the others
+                  // (`--radius-base`, the ramp's own small step) rather than
+                  // being a second arbitrary number.
+                  'relative rounded-2xl rounded-br-base px-4.5 py-3',
                   /*
                     OPAQUE, AND ON THE ELEVATION RAMP.
 
@@ -635,9 +639,17 @@ export const ChatMessage = memo(function ChatMessage({
                     `#15151a` now and `--surface2` (#18181e) sits too close to
                     it to read as a different layer.
                   */
+                  /*
+                    No shadow. A chat bubble is the flattest thing in a
+                    transcript — it is inline content, not an object resting on
+                    top of one — and `--elevation-2` under every one of them
+                    turned a scrolling column of text into a stack of cards.
+                    The fill plus the hairline is the whole separation, which
+                    is what Claude's own transcript does. See the composer for
+                    the rule this follows.
+                  */
                   'bg-surface2 dark:bg-surface3 text-foreground',
                   'border border-border/80 dark:border-white/[0.08]',
-                  'shadow-sm',
                   'transition-all duration-150 break-words'
                 )}
               >

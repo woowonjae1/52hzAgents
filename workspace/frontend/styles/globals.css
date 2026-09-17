@@ -43,6 +43,8 @@
   */
   --surface-sidebar: #e9ebf0;
   --surface-sidebar-hover: #dfe2e9;
+  /* Pressed / selected-without-brand, one step beyond hover. */
+  --surface-sidebar-active: #d4d9e3;
   --surface-workspace: #fafafa;
   /*
    * THE ONE GROUND FOR ANYTHING THAT FLOATS — dialog, sheet, dropdown, popover,
@@ -278,6 +280,7 @@
   */
   --surface-sidebar: #15151a;
   --surface-sidebar-hover: #1e1e26;
+  --surface-sidebar-active: #282833;
   --surface-workspace: #09090b;
   /* The value the five hardcoded overlay hexes were all groping for. */
   --surface-overlay: #16161c;
@@ -424,6 +427,7 @@
   --color-surface-diff-empty: var(--surface-diff-empty);
   --color-surface-sidebar: var(--surface-sidebar);
   --color-surface-sidebar-hover: var(--surface-sidebar-hover);
+  --color-surface-sidebar-active: var(--surface-sidebar-active);
   --color-surface-workspace: var(--surface-workspace);
   --color-surface-overlay: var(--surface-overlay);
 
@@ -595,9 +599,28 @@
     again by the steps above it. `* 1.25` / `* 1.75` keeps a visible ramp
     (8 → 10 → 14) without any step reading as a card corner.
   */
-  --radius-md: calc(var(--radius) * 0.75);
+  /*
+    THREE STEPS AND A PILL, NOT SIX.
+
+    The ramp was 2 / 4 / 6 / 8 / 10 / 14 plus `full`, and an audit of the shell
+    found md(6), lg(8) and xl(10) carrying 133 call sites between them — three
+    values within 2px of each other. Two pixels of corner is not a hierarchy
+    anyone perceives; it is six ways of saying "rounded" scattered across files
+    that were written at different times, and it is why the window reads as
+    assembled no matter how carefully each individual surface is tuned.
+
+    So md and xl now RESOLVE TO lg. Nothing at the call sites changes — the
+    utilities keep their names and the 133 sites keep their classes — but the
+    scale the eye actually sees becomes 4 (inset controls), 8 (everything),
+    14 (large surfaces: composer, bubbles, banners) and `full` (pills). Four
+    steps is about the most a single screen can express.
+
+    They stay as separate custom properties rather than being deleted so that
+    re-opening the question later is one line, not a 133-site edit.
+  */
+  --radius-md: var(--radius);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-xl: var(--radius);
   --radius-2xl: calc(var(--radius) * 1.75);
 
   /*
@@ -919,10 +942,14 @@ html {
   --traffic-lights-inset: 78px;
 }
 
-/* Transparent body and root container on Mica/Vibrancy desktop builds so system backdrop shines through */
-:root[data-desktop][data-win11] body,
+/*
+  Transparent body so the macOS vibrancy backdrop shows through. WINDOWS IS NOT
+  IN THIS LIST ANY MORE — `backgroundMaterial: 'mica'` is off (see the note in
+  desktop/main.js: it permanently breaks window dragging, electron#41824), so
+  there is no system backdrop behind the window to reveal, and a transparent
+  body would just show black.
+*/
 :root[data-desktop][data-platform='darwin'] body,
-:root[data-desktop][data-win11] .app-root-container,
 :root[data-desktop][data-platform='darwin'] .app-root-container {
   background-color: transparent !important;
 }
@@ -936,32 +963,54 @@ html {
    from the content ground than the opaque pair to leave the composite in the
    same place the opaque chrome sits.
 */
-:root[data-desktop][data-win11].dark,
 :root[data-desktop][data-platform='darwin'].dark {
   --surface-sidebar: rgba(21, 21, 26, 0.76);
   --surface-sidebar-hover: rgba(30, 30, 38, 0.84);
 }
 
-:root[data-desktop][data-win11]:not(.dark),
 :root[data-desktop][data-platform='darwin']:not(.dark) {
   --surface-sidebar: rgba(231, 234, 240, 0.80);
   --surface-sidebar-hover: rgba(219, 223, 231, 0.88);
 }
 
-:root[data-desktop] .app-titlebar {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
+/*
+  NO `backdrop-filter` ON A DRAG REGION.
 
-:root[data-desktop] .app-header {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
+  `.app-titlebar` and `.app-header` are the only two `-webkit-app-region: drag`
+  surfaces in this window — they are the whole reason the window can be moved,
+  since `titleBarStyle: 'hidden'` leaves no native caption bar to grab. A
+  `backdrop-filter` promotes its element into its own composited layer, and
+  Chromium collects app-region as rectangles from the LAYOUT tree; a promoted
+  layer is a long-standing way for those rectangles to stop being collected, at
+  which point the band paints perfectly and drags nothing, permanently.
 
-:root[data-desktop] aside {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-}
+  That is a better explanation of "the window cannot be dragged, ever" than a
+  stale rect cache — a cache goes stale after a window event and recovers after
+  the next one, which is not what was being seen. The cache flip in
+  desktop-integration.tsx stays (it fixes a real, separate, intermittent case)
+  but it was never going to fix this one.
+
+  The MATERIAL is unaffected. These surfaces are translucent under Mica
+  (`--surface-sidebar` is an rgba there), and a translucent fill still
+  composites against the system backdrop without this property — Mica is doing
+  the blurring, the app was blurring what Mica had already blurred. The sidebar
+  BODY keeps its own blur below: it is not a drag region, so it has nothing to
+  lose.
+*/
+
+/*
+  ...and the sidebar goes with them, for the same reason at one remove.
+
+  `SidebarHeader` renders `.app-header`, so a drag region lives INSIDE this
+  <aside>. Promoting the ancestor into its own composited layer takes the
+  descendant's app-region rectangles with it, which would have left the left
+  half of the title band undraggable even after the rule above. The band has to
+  work end to end or the fix is not a fix.
+
+  Same argument about the material as above: under Mica `--surface-sidebar` is
+  already an rgba compositing against the system backdrop, so what is lost here
+  is a blur applied on top of the OS's own blur.
+*/
 
 /**
  * The titlebar band: full window width, above everything, and draggable along
@@ -1184,6 +1233,38 @@ html {
 */
 .desktop-only { display: none; }
 :root[data-desktop] .desktop-only { display: block; }
+
+/**
+ * ── The sidebar's own layer ladder ──
+ *
+ * EVERY INTERACTIVE SURFACE INSIDE THE SIDEBAR WAS PAINTED WITH CONTENT
+ * TOKENS. `hover:bg-surface2/60` on the rows, `bg-surface2` on the section
+ * buttons, `hover:bg-surface3` on the row menus, `bg-surface2/80` on the
+ * search field — roughly twenty sites, all reaching for the ladder that was
+ * calibrated against `--surface0`, while sitting on `--surface-sidebar`.
+ *
+ * On the light chrome that merely looked arbitrary. On the dark chrome it
+ * broke: `--surface-sidebar` is `#15151a` and `--surface2` is `#18181e`, three
+ * values apart, so hovering a thread and selecting one produced very nearly no
+ * change at all. `--surface-sidebar-hover` has existed the whole time for
+ * exactly this and was used by nothing.
+ *
+ * Rather than rewriting twenty class names — which would only move the problem
+ * to the next component added to the sidebar — the LADDER ITSELF is redefined
+ * for this subtree. That is what custom properties are for: `bg-surface2`
+ * keeps meaning "one layer up from the ground you are on", and the ground is
+ * simply different in here.
+ *
+ * Scoped to `[data-app-sidebar]`, NOT to `aside`. The Studio panel and the
+ * agent profile panel are also `<aside>` elements, and they are content
+ * surfaces sitting on `--surface0` — remapping their ladder would break them
+ * in precisely the way this fixes the sidebar.
+ */
+[data-app-sidebar] {
+  --surface2: var(--surface-sidebar-hover);
+  --surface3: var(--surface-sidebar-active);
+  --surface1: var(--surface-sidebar);
+}
 
 /**
  * Chrome — anything that is shell rather than content — is not selectable.

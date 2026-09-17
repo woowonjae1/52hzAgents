@@ -87,7 +87,11 @@ export function SidebarContent() {
       )}
 
       {/* Bottom Horizontal Actions Bar (Settings on left like Figure 2, Tasks/Agents/Theme on right) */}
-      <div className="shrink-0 px-2.5 py-1.5 bg-transparent flex items-center justify-between gap-1 select-none border-t border-border/40">
+      <div // `--border` at full strength. This was `/40`, the only hairline
+        // in the shell drawn at a fraction of the token — so the one rule the
+        // eye meets at the bottom-left of the window was fainter than every
+        // other internal rule for no reason anyone recorded.
+        className="shrink-0 px-2.5 py-1.5 bg-transparent flex items-center justify-between gap-1 select-none border-t border-border">
         {/* Left: Settings button (Figure 2 reference) */}
         <button
           type="button"

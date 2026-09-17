@@ -350,7 +350,10 @@ export function Wrapper() {
                   aria-label="Studio Panel"
                   style={{ width: `${studioWidth}px` }}
                   className={cn(
-                    "shrink-0 h-full border-l border-border bg-surface1 flex flex-col z-20 relative select-text",
+                    // `--border-chrome`: this edge is content against panel, which is
+                    // the same seam the sidebar draws on the other side, not an
+                    // internal rule.
+                    "shrink-0 h-full border-l border-border-chrome bg-surface1 flex flex-col z-20 relative select-text",
                     isStudioResizing ? "select-none transition-none" : "transition-[width] duration-75"
                   )}
                 >
@@ -371,7 +374,16 @@ export function Wrapper() {
 
                   {/* Studio Header Bar (Rendered when not in canvas mode; Canvas provides its own unified 38px header) */}
                   {effectiveStudioTab !== 'canvas' && (
-                    <div className="app-header justify-between px-3 shrink-0 flex-nowrap border-b border-border bg-surface1 select-none">
+                    /*
+                      `.app-header` already owns the fill and the underline for
+                      every top-level header in the app — that is the whole
+                      point of the contract in globals.css. This one overrode
+                      both with `bg-surface1` and a plain `--border`, so the
+                      Studio panel's header was the only band in the window
+                      that was neither the chrome colour nor separated by the
+                      chrome seam. Dropping the two overrides is the fix.
+                    */
+                    <div className="app-header justify-between px-3 shrink-0 flex-nowrap select-none">
                       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
                         {activeArtifact && (
                           <button

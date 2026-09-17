@@ -713,11 +713,39 @@ function createMainWindow() {
     minHeight: 640,
     title: '52hzAgent Studio',
     icon: appIconPath,
-    backgroundColor: (isWindows11 || process.platform === 'darwin') ? '#00000000' : WINDOW_BACKGROUND,
+    backgroundColor: process.platform === 'darwin' ? '#00000000' : WINDOW_BACKGROUND,
     darkTheme: true,
     show: false,
     titleBarStyle: 'hidden',
-    ...(isWindows11 ? { backgroundMaterial: 'mica' } : {}),
+    /*
+      MICA IS OFF, AND THIS IS THE REASON THE WINDOW COULD NOT BE DRAGGED.
+
+      electron/electron#41824 — "Maximizing a frameless window with background
+      material (Mica) permanently breaks the window" — and #52063, where
+      `-webkit-app-region: drag` becomes ineffective. PERMANENTLY is the word
+      that matters: a stale app-region cache goes bad after a window event and
+      recovers after the next one, which is not what was happening here. The
+      window stopped moving and stayed that way, which is this bug, and it
+      arrived with the commit that turned Mica on.
+
+      Two earlier attempts aimed at the wrong layer — a rAF cache-flip in the
+      renderer, then dropping `backdrop-filter` off the drag regions. Neither
+      could have worked, because the region was never the problem: the window's
+      non-client area was.
+
+      It also fixes something the design pass kept fighting. `backgroundMaterial`
+      requires a transparent window and a transparent body, so every chrome
+      surface was an rgba composited against whatever the system backdrop
+      happened to be — the wallpaper, through a blur, at an unknown lightness.
+      The sidebar and the view header carry the same token and still did not
+      land on the same colour, and no value chosen in globals.css could be
+      relied on to survive. Opaque chrome is a precondition for the palette
+      meaning anything.
+
+      Reversible in one line if Electron fixes it upstream. Keep the transparent
+      `backgroundColor` for darwin below: macOS vibrancy is a different API and
+      does not carry this bug.
+    */
     ...(process.platform === 'darwin' ? { vibrancy: 'under-window' } : {}),
     // On macOS the traffic lights are inset to line up with the 36px band;
     // `titleBarOverlay` is a Windows/Linux-only option and is ignored there.

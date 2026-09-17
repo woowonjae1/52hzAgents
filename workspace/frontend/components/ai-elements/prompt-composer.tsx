@@ -705,7 +705,24 @@ export function PromptComposer({
            * grey. It is the same colour the keyboard ring uses, which is the
            * point — focus should look like one idea across the app.
            */
-          'relative rounded-[24px] overflow-hidden transition-all duration-200',
+          /*
+            `rounded-2xl` (14px), NOT an arbitrary 24.
+
+            globals.css defines the radius ramp — 2 / 4 / 6 / 8 / 10 / 14 — and
+            explains that 8px is the base because 12 "read soft rather than
+            dense, which is most of the gap against a desktop-native tool".
+            This element then ignored all of it and wrote 24: nearly double the
+            top of the scale, on the single largest control in the window. The
+            user bubble did the same with 22. Two arbitrary values, both larger
+            than anything the ramp can express, on the two surfaces the eye
+            spends the most time on — so the scale was correct everywhere
+            except where it mattered.
+
+            14px on an 88px-tall composer still reads as a rounded island; it
+            just reads as one belonging to the same family as the banner above
+            it and the sidebar rows beside it.
+          */
+          'relative rounded-2xl overflow-hidden transition-all duration-200',
           'bg-surface2',
           /*
             One token, no `dark:` variant. This read `border-border/80
@@ -716,7 +733,27 @@ export function PromptComposer({
             gain. `--border` covers both themes on its own.
           */
           'border border-border',
-          'shadow-lg focus-within:shadow-xl',
+          /*
+            ── Flat in the page; elevation is reserved for what floats ──
+
+            This is the rule the window was missing, and it is the one Claude's
+            own client follows: a surface that is PART OF THE PAGE is separated
+            by a hairline and a fill, and elevation belongs to things that are
+            genuinely above it — popovers, dialogs, toasts, the mention picker
+            two hundred lines up. The composer does not float. It sits at the
+            bottom of the view, anchored, never overlapping anything.
+
+            `shadow-lg` (`--elevation-4`) claimed otherwise, and that claim was
+            the source of the "half flat, half layered" feel: with a drop
+            shadow AND a border AND a 14px radius, three mechanisms were each
+            announcing the same edge. `shadow-xs` is `--elevation-1`, which in
+            the light ramp is a 1px ring and a 1px drop — enough to lift the
+            control off the ground it shares a family with, not enough to
+            pretend it is over it.
+
+            The mention popover keeps `shadow-xl`. It really does float.
+          */
+          'shadow-xs focus-within:shadow-sm',
           'focus-within:border-brand-border',
           isDragging && 'border-brand ring-2 ring-brand/20'
         )}

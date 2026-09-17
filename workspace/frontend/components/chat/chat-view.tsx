@@ -1367,7 +1367,16 @@ export function ChatView() {
                   lost above — spending the warning colour freely is how it
                   stops meaning anything.
                 */
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-surface1 border border-status-warning/35 text-foreground text-xs">
+                <div /*
+                    Same radius and the same border token as the composer it
+                    sits 10px above. It had `rounded-xl` against the composer's
+                    24, and `border-status-warning/35` against the composer's
+                    `--border` — two surfaces that read as one stacked object
+                    and disagreed about both of its edges. The warning now
+                    lives only in the icon, which is where the earlier pass
+                    already decided it belongs.
+                  */
+                  className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-2xl bg-surface1 border border-border text-foreground text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
                     <span className="truncate">

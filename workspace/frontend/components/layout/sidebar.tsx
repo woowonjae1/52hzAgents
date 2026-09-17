@@ -218,6 +218,7 @@ export function Sidebar() {
         !isSidebarOpen && 'pointer-events-none shadow-none border-r-0',
       )}
       data-sidebar-sized
+      data-app-sidebar
       style={{
         width: isSidebarOpen ? 'var(--sidebar-width)' : '0px',
       }}
