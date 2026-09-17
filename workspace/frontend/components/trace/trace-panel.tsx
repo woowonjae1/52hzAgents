@@ -467,7 +467,13 @@ export function TracePanel() {
           </div>
         ) : (
           filteredSteps.map((step, idx) => (
-            <TraceStepCard key={step.messageId || `step-${idx}`} step={step} agents={agents} />
+            <TraceStepCard
+              key={step.messageId || `step-${idx}`}
+              step={step}
+              agents={agents}
+              isWorking={isWorking}
+              isLatest={idx === filteredSteps.length - 1}
+            />
           ))
         )}
         <div ref={bottomRef} />
@@ -477,7 +483,17 @@ export function TracePanel() {
 }
 
 // ── Single Trace Step Card Component ──
-function TraceStepCard({ step, agents }: { step: WorkspaceMessage; agents?: WorkspaceAgent[] }) {
+function TraceStepCard({
+  step,
+  agents,
+  isWorking = false,
+  isLatest = false,
+}: {
+  step: WorkspaceMessage;
+  agents?: WorkspaceAgent[];
+  isWorking?: boolean;
+  isLatest?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const timeStr = step.createdAt
     ? new Date(step.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -496,6 +512,8 @@ function TraceStepCard({ step, agents }: { step: WorkspaceMessage; agents?: Work
 
   if (parsed.type === 'thinking') {
     const isThinkingWithContent = !!parsed.text && parsed.text !== 'thinking...' && parsed.text.toLowerCase() !== 'thinking';
+    const isActiveThinking = isWorking && isLatest;
+
     return (
       <div className="rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5">
         <div className="flex items-center justify-between text-3xs select-none">
@@ -508,8 +526,10 @@ function TraceStepCard({ step, agents }: { step: WorkspaceMessage; agents?: Work
         </div>
         {isThinkingWithContent ? (
           <Reasoning content={parsed.text!} defaultExpanded={false} />
-        ) : (
+        ) : isActiveThinking ? (
           <span className="event-running text-2xs text-foreground-extra-muted">reasoning in progress…</span>
+        ) : (
+          <span className="text-2xs text-foreground-extra-muted italic">Reasoning halted</span>
         )}
       </div>
     );

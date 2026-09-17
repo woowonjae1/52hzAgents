@@ -404,6 +404,10 @@ func resolveTurnDir(workspaceID string, channel *models.Channel, agentName strin
 // of the agent's own writes. Returns true if the turn is opened for execution immediately,
 // or false if the turn was queued due to directory contention.
 func openAgentTurn(workspaceID string, channel *models.Channel, agentName, taskID, triggerEventID string) bool {
+	return openAgentTurnWithBypass(workspaceID, channel, agentName, taskID, triggerEventID, false)
+}
+
+func openAgentTurnWithBypass(workspaceID string, channel *models.Channel, agentName, taskID, triggerEventID string, bypassQueue bool) bool {
 	agentName = strings.TrimSpace(agentName)
 	if workspaceID == "" || channel == nil || agentName == "" || agentName == noResponseAgent {
 		return false
@@ -443,25 +447,27 @@ func openAgentTurn(workspaceID string, channel *models.Channel, agentName, taskI
 	}
 
 	// Working directory concurrency control: if another agent is currently editing
-	// this working directory, enqueue this turn to prevent stomping.
-	if others := openTurnAgentsForDir(workspaceID, dir, agentName); len(others) > 0 {
-		record.Status = "queued"
-		record.Contended = true
-		record.ContendedBy, _ = json.Marshal(others)
-		if err := db.DB.Model(&models.AgentTurnChange{}).
-			Where("workspace_id = ? AND working_dir = ? AND status = ?", workspaceID, dir, "open").
-			Update("contended", true).Error; err != nil {
-			log.Printf("turn-changes: failed to flag contention on %s: %v", dir, err)
+	// this working directory, enqueue this turn to prevent stomping, unless bypassQueue is requested.
+	if !bypassQueue {
+		if others := openTurnAgentsForDir(workspaceID, dir, agentName); len(others) > 0 {
+			record.Status = "queued"
+			record.Contended = true
+			record.ContendedBy, _ = json.Marshal(others)
+			if err := db.DB.Model(&models.AgentTurnChange{}).
+				Where("workspace_id = ? AND working_dir = ? AND status = ?", workspaceID, dir, "open").
+				Update("contended", true).Error; err != nil {
+				log.Printf("turn-changes: failed to flag contention on %s: %v", dir, err)
+			}
+			if err := db.DB.Create(&record).Error; err != nil {
+				log.Printf("turn-changes: failed to enqueue turn for @%s in %s: %v", agentName, channel.Name, err)
+			} else {
+				busyAgents := strings.Join(others, ", @")
+				queueMsg := fmt.Sprintf("⏳ @%s 排队中：@%s 正在目录 `%s` 工作，将在前序任务完成后自动开始。",
+					agentName, busyAgents, dir)
+				RelayPipelineAlert(workspaceID, "channel/"+channel.Name, queueMsg)
+			}
+			return false
 		}
-		if err := db.DB.Create(&record).Error; err != nil {
-			log.Printf("turn-changes: failed to enqueue turn for @%s in %s: %v", agentName, channel.Name, err)
-		} else {
-			busyAgents := strings.Join(others, ", @")
-			queueMsg := fmt.Sprintf("⏳ @%s 排队中：@%s 正在目录 `%s` 工作，将在前序任务完成后自动开始。",
-				agentName, busyAgents, dir)
-			RelayPipelineAlert(workspaceID, "channel/"+channel.Name, queueMsg)
-		}
-		return false
 	}
 
 	snap, err := captureTurnSnapshot(dir)
@@ -768,6 +774,48 @@ func ResetAllDanglingTurns() {
 	}
 }
 
+// CancelChannelTurns cancels all currently open or queued turns in a channel/workspace,
+// freeing directory contention locks immediately when a user stops an agent or session.
+func CancelChannelTurns(workspaceID, channelID string) {
+	if db.DB == nil || workspaceID == "" {
+		return
+	}
+	nowMs := time.Now().UnixMilli()
+	query := db.DB.Model(&models.AgentTurnChange{}).
+		Where("workspace_id = ? AND status IN ?", workspaceID, []string{"open", "queued"})
+	if channelID != "" {
+		query = query.Where("channel_id = ?", channelID)
+	}
+
+	var turns []models.AgentTurnChange
+	_ = query.Find(&turns).Error
+	if len(turns) == 0 {
+		return
+	}
+
+	var turnIDs []string
+	for _, t := range turns {
+		turnIDs = append(turnIDs, t.ID)
+	}
+
+	_ = db.DB.Model(&models.AgentTurnChange{}).
+		Where("id IN ?", turnIDs).
+		Updates(map[string]interface{}{
+			"status":      "cancelled",
+			"reason":      "execution stopped by user",
+			"finished_at": nowMs,
+		}).Error
+
+	seenDirs := map[string]bool{}
+	for _, t := range turns {
+		if t.WorkingDir != "" && !seenDirs[t.WorkingDir] {
+			seenDirs[t.WorkingDir] = true
+			drainDirQueue(workspaceID, t.WorkingDir)
+		}
+	}
+	log.Printf("turn-changes: cancelled %d active/queued turn(s) for channel %s", len(turns), channelID)
+}
+
 // recordTurnChanges is the single hook from the event path. One agent chat
 // message can both end that agent's turn and begin the next agent's, and the
 // order matters: settle first, then open, so the next baseline includes
@@ -818,9 +866,10 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 	taskID := metadataString(req.Metadata, "task_id")
 	var activeTargets []string
 	var queuedTargets []string
+	isDecisionResponse := req.Metadata != nil && (req.Metadata["is_decision_response"] == true || req.Metadata["decision_response"] != nil)
 
 	for _, target := range metadataStrings(req.Metadata, "target_agents") {
-		if openAgentTurn(workspaceID, &channel, target, taskID, eventID) {
+		if openAgentTurnWithBypass(workspaceID, &channel, target, taskID, eventID, isDecisionResponse) {
 			activeTargets = append(activeTargets, target)
 		} else {
 			queuedTargets = append(queuedTargets, target)

@@ -167,3 +167,110 @@ func TestAgentSourceWith52hzAgentsPrefix(t *testing.T) {
 		t.Fatalf("expected agentNameFromSource(%q) to be 'antigravity', got %q", src, name)
 	}
 }
+
+func TestDecisionResponseRoutesDirectlyToQuestionAgent(t *testing.T) {
+	workspace, channel := setupHandoffDB(t, []string{"antigravity"})
+
+	// Setup a question event from @pi
+	questionEventID := "evt_question_123"
+	nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
+	questionEvent := models.EventRecord{
+		ID:        questionEventID,
+		NetworkID: workspace.ID,
+		Type:      "workspace.message.posted",
+		Source:    "52hz:pi",
+		Target:    "channel/" + channel.Name,
+		Timestamp: nowUnixMs,
+	}
+	if err := db.DB.Create(&questionEvent).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	// Human submits a decision answering that question
+	decisionReq := &SendEventRequest{
+		Type:   "workspace.message.posted",
+		Source: "human:user",
+		Target: "channel/" + channel.Name,
+		Payload: map[string]interface{}{
+			"content":      "[Decision]\nOption A",
+			"message_type": "chat",
+		},
+		Metadata: map[string]interface{}{
+			"decision_response": map[string]interface{}{
+				"source_message_id": questionEventID,
+			},
+		},
+	}
+
+	targets, routed, err := routeMessage(db.DB, workspace.ID, &channel, decisionReq)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !routed || len(targets) != 1 || targets[0] != "pi" {
+		t.Fatalf("expected decision to route to 'pi', got routed=%v targets=%v", routed, targets)
+	}
+
+	// Verify pi is now auto-joined to channel members
+	var cm models.ChannelMember
+	if err := db.DB.Where("channel_id = ? AND agent_name = ?", channel.ID, "pi").First(&cm).Error; err != nil {
+		t.Fatalf("expected 'pi' to be auto-joined to channel members, got error: %v", err)
+	}
+}
+
+func TestAgentHandoffResolvesOutsideChannelMembers(t *testing.T) {
+	workspace, channel := setupHandoffDB(t, []string{"antigravity"})
+
+	// Antigravity posts a message explicitly handing off to @claude (who is only in workspace, not in channel)
+	agentReq := &SendEventRequest{
+		Type:   "workspace.message.posted",
+		Source: "52hz:antigravity",
+		Target: "channel/" + channel.Name,
+		Payload: map[string]interface{}{
+			"content":      "分析完毕。给 @claude 的接棒说明：请进行后续步骤",
+			"message_type": "chat",
+		},
+		Metadata: map[string]interface{}{},
+	}
+
+	targets, routed, err := routeMessage(db.DB, workspace.ID, &channel, agentReq)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !routed || len(targets) != 1 || targets[0] != "claude" {
+		t.Fatalf("expected handoff to route to 'claude', got routed=%v targets=%v", routed, targets)
+	}
+
+	// Verify claude is auto-joined
+	var cm models.ChannelMember
+	if err := db.DB.Where("channel_id = ? AND agent_name = ?", channel.ID, "claude").First(&cm).Error; err != nil {
+		t.Fatalf("expected 'claude' to be auto-joined, got error: %v", err)
+	}
+}
+
+func TestCancelChannelTurnsCleansUpOpenTurns(t *testing.T) {
+	workspace, channel := setupHandoffDB(t, []string{"antigravity"})
+	_ = db.DB.AutoMigrate(&models.AgentTurnChange{})
+
+	turn := models.AgentTurnChange{
+		ID:          uuid.NewString(),
+		WorkspaceID: workspace.ID,
+		ChannelID:   channel.ID,
+		AgentName:   "antigravity",
+		WorkingDir:  "D:/test/dir",
+		Status:      "open",
+		StartedAt:   time.Now().UnixMilli(),
+	}
+	if err := db.DB.Create(&turn).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	CancelChannelTurns(workspace.ID, channel.ID)
+
+	var updated models.AgentTurnChange
+	if err := db.DB.Where("id = ?", turn.ID).First(&updated).Error; err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != "cancelled" {
+		t.Fatalf("expected turn status 'cancelled', got '%s'", updated.Status)
+	}
+}

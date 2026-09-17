@@ -285,10 +285,16 @@ func SendEvent(c *gin.Context) {
 		if action, ok := req.Payload["action"].(string); ok && action == "stop" {
 			agentName := agentNameFromSource(req.Target)
 			channelName := ""
+			channelID := ""
 			if ch, ok := req.Payload["channel"].(string); ok {
 				channelName = strings.TrimPrefix(ch, "channel/")
+				var chModel models.Channel
+				if err := db.DB.Where("workspace_id = ? AND name = ?", workspace.ID, channelName).First(&chModel).Error; err == nil {
+					channelID = chModel.ID
+				}
 			}
 			StopActiveRoutineRunsAndTasks(workspace.ID, agentName, channelName)
+			CancelChannelTurns(workspace.ID, channelID)
 		}
 	}
 
@@ -612,10 +618,16 @@ func StreamEventsWS(c *gin.Context) {
 			if action, ok := parsedReq.Payload["action"].(string); ok && action == "stop" {
 				agentName := agentNameFromSource(parsedReq.Target)
 				channelName := ""
+				channelID := ""
 				if ch, ok := parsedReq.Payload["channel"].(string); ok {
 					channelName = strings.TrimPrefix(ch, "channel/")
+					var chModel models.Channel
+					if err := db.DB.Where("workspace_id = ? AND name = ?", workspace.ID, channelName).First(&chModel).Error; err == nil {
+						channelID = chModel.ID
+					}
 				}
 				StopActiveRoutineRunsAndTasks(workspace.ID, agentName, channelName)
+				CancelChannelTurns(workspace.ID, channelID)
 			}
 		}
 

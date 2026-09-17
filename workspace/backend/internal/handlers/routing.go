@@ -778,6 +778,31 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 
 	// If human message contains multi-agent pipeline (@agent1 ... @agent2 ... @agent3 ...)
 	if isHumanSource(req.Source) {
+		// 0. Direct Decision Response routing: When a human submits an answer to an ApprovalCard/decision question,
+		// directly route the answer back to the agent who asked the question (from source_message_id).
+		if req.Metadata != nil {
+			if decResp, ok := req.Metadata["decision_response"].(map[string]interface{}); ok {
+				if sourceMsgID, ok := decResp["source_message_id"].(string); ok && sourceMsgID != "" {
+					var sourceEvent models.EventRecord
+					if err := database.Where("network_id = ? AND id = ?", workspaceID, sourceMsgID).First(&sourceEvent).Error; err == nil {
+						targetAgent := agentNameFromSource(sourceEvent.Source)
+						if targetAgent != "" && targetAgent != noResponseAgent {
+							// Ensure target agent is joined to the channel
+							var cm models.ChannelMember
+							if err := database.Where("channel_id = ? AND agent_name = ?", channel.ID, targetAgent).First(&cm).Error; err != nil {
+								_ = database.Create(&models.ChannelMember{
+									ChannelID: channel.ID,
+									AgentName: targetAgent,
+								}).Error
+							}
+							req.Metadata["is_decision_response"] = true
+							return []string{targetAgent}, true, nil
+						}
+					}
+				}
+			}
+		}
+
 		var segments []models.PipelineStep
 		// 1. Direct structured mention_segments check (deterministic, 0ms, no NLP guessing)
 		if req.Metadata != nil {
@@ -824,6 +849,15 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 				}
 			}
 			if len(nextTargets) > 0 {
+				for _, target := range nextTargets {
+					var cm models.ChannelMember
+					if err := database.Where("channel_id = ? AND agent_name = ?", channel.ID, target).First(&cm).Error; err != nil {
+						_ = database.Create(&models.ChannelMember{
+							ChannelID: channel.ID,
+							AgentName: target,
+						}).Error
+					}
+				}
 				return nextTargets, true, nil
 			}
 		}
@@ -891,16 +925,17 @@ func validateMessageSession(workspaceID, source string, metadata map[string]inte
 }
 
 func mentionedAgents(content string, payload map[string]interface{}, participants []string) []string {
-	allowed := make(map[string]bool, len(participants))
+	allowed := make(map[string]string, len(participants))
 	for _, name := range participants {
-		allowed[name] = true
+		allowed[strings.ToLower(name)] = name
 	}
 	seen := map[string]bool{}
 	mentions := make([]string, 0)
 	add := func(name string) {
-		if allowed[name] && !seen[name] {
-			mentions = append(mentions, name)
-			seen[name] = true
+		canonical, ok := allowed[strings.ToLower(name)]
+		if ok && !seen[canonical] {
+			mentions = append(mentions, canonical)
+			seen[canonical] = true
 		}
 	}
 	if raw, ok := payload["mentions"].([]interface{}); ok {
