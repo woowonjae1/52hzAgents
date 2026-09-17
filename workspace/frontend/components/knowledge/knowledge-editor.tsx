@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { MarkdownContent } from '@/components/chat/markdown-content';
@@ -59,6 +60,10 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
   // rather than defaulting to a category nobody picked.
   const [category, setCategory] = useState('');
   const [content, setContent] = useState('');
+  // The app removed its native confirm()/prompt() calls deliberately — a system
+  // modal is the loudest way a window admits it is a web page. This uses the
+  // same ConfirmDialog every other destructive path here uses.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [saving, setSaving] = useState(false);
   const [viewMode, setViewMode] = useState<EditorViewMode>('split');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -151,7 +156,33 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
   'p-1.5 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface3 transition-colors text-xs';
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (v) return;
+        /*
+          CLOSING THIS DIALOG THREW AWAY UNSAVED WRITING, SILENTLY.
+
+          Escape, a click on the backdrop, or the X — all three called
+          `onClose()` straight through, and the entry is a hand-written
+          document that may represent twenty minutes of typing. `isDirty` was
+          already computed a hundred lines up (it drives the footer's state),
+          so the dialog knew perfectly well that there was something to lose
+          and closed anyway.
+
+          A confirm rather than a block: the user who meant it gets through in
+          one keystroke, and the one who hit Escape by reflex gets their text
+          back. This is the only place in the app where a click can destroy
+          something the user authored and nothing is written down anywhere.
+        */
+        if (isDirty) {
+          setConfirmDiscard(true);
+          return;
+        }
+        onClose();
+      }}
+    >
       <DialogContent
         className="sm:max-w-5xl max-h-[92vh] flex flex-col gap-0 p-0 overflow-hidden border-border shadow-xl"
         /* Cmd/Ctrl+Enter submits. A form dialog whose only way out is the
@@ -483,5 +514,18 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={confirmDiscard}
+      onOpenChange={setConfirmDiscard}
+      title="Discard unsaved changes?"
+      description="This entry has edits that have not been saved. Closing now loses them."
+      confirmLabel="Discard"
+      onConfirm={() => {
+        setConfirmDiscard(false);
+        onClose();
+      }}
+    />
+    </>
   );
 }

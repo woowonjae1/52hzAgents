@@ -32,6 +32,7 @@ import { RoutineHistoryDrawer } from '@/components/routines/routine-history-draw
 import { toast } from 'sonner';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
@@ -74,6 +75,7 @@ export function SchedulesView() {
     setCurrentSessionId,
   } = useWorkspace();
   const { setViewMode } = useLayout();
+  const scrollRef = useScrollRestore<HTMLDivElement>('schedules');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -229,7 +231,13 @@ export function SchedulesView() {
       )}
 
       {/* Main Routine List */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+      {/*
+        This pane holds both the timers and the routines, so the scroll
+        position is the only record of where in a long schedule list the user
+        was. Restoring it costs one hook; not restoring it means every trip to
+        a thread and back starts at the top again.
+      */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="max-w-5xl mx-auto space-y-4">
           {/* One-off timers, soonest first. Rendered above the recurring list
               because they are the things about to happen. */}

@@ -21,6 +21,7 @@ import {
   RotateCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { workspaceApi } from '@/lib/api';
 import { eventToMessage, type ONMEvent, stripAddressPrefix } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
@@ -77,6 +78,8 @@ export function MissionControl() {
     workingAgentNames,
     setCurrentSessionId,
   } = useWorkspace();
+  // A dashboard you leave and come back to; it should not rewind.
+  const scrollRef = useScrollRestore<HTMLDivElement>('mission');
   const { setViewMode, isSidebarOpen, setActiveRightTab } = useLayout();
   const reduceMotion = useReducedMotion();
 
@@ -530,7 +533,7 @@ export function MissionControl() {
 
       {/* Main Body */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="min-w-0 flex-1 space-y-5 overflow-y-auto p-5">
+        <div ref={scrollRef} className="min-w-0 flex-1 space-y-5 overflow-y-auto p-5">
           {/* Top Priority Action Required Banner */}
           <ActionRequiredBanner
             items={allActionRequired}

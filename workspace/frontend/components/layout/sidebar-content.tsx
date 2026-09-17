@@ -11,6 +11,7 @@ import {
   Check,
   LogOut,
   LogIn,
+  CheckCircle2,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -29,7 +30,7 @@ export function SidebarContent() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
-  const { token, agents } = useWorkspace();
+  const { token, agents, todos } = useWorkspace();
   const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -85,40 +86,68 @@ export function SidebarContent() {
         </div>
       )}
 
-      {/* Bottom Horizontal Actions Bar (Agents, Settings, Theme Toggle) - Seamless, no border divider */}
-      <div className="shrink-0 px-3 py-2 bg-transparent flex items-center justify-between gap-1.5 select-none">
-        {/* Left: Agents button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-                viewMode === 'mission'
-                  ? 'bg-surface2 text-foreground font-semibold shadow-xs'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
-              )}
-            >
-              {/*
-                No count here any more. `AgentStatusStrip`, eight rows up the
-                same sidebar, already reads "3 of 8 online" — this badge showed
-                the other half of that same sentence, in a second place, on a
-                button that only navigates. One reading of one fact.
+      {/* Bottom Horizontal Actions Bar (Settings on left like Figure 2, Tasks/Agents/Theme on right) */}
+      <div className="shrink-0 px-2.5 py-1.5 bg-transparent flex items-center justify-between gap-1 select-none border-t border-border/40">
+        {/* Left: Settings button (Figure 2 reference) */}
+        <button
+          type="button"
+          onClick={() => openSettings('general')}
+          className={cn(
+            'flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors',
+            viewMode === 'settings'
+              ? 'bg-surface2 text-foreground font-semibold'
+              : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
+          )}
+        >
+          <Settings className="size-3.5 text-foreground-muted" />
+          <span>Settings</span>
+        </button>
 
-                `text-primary` also went: in the light theme `--primary` is
-                #09090b, the same near-black as the label beside it, so the
-                "accent" was only ever an accent in the dark.
-              */}
-              <Users className="size-3.5 text-foreground-extra-muted" />
-              <span>Agents</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top">Agent Management & Dashboard</TooltipContent>
-        </Tooltip>
+        {/* Right group: Tasks, Agents, Token, Theme */}
+        <div className="flex items-center gap-0.5">
+          {/* Tasks & Issues */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode(viewMode === 'tasks' ? 'threads' : 'tasks')}
+                aria-label="Tasks & Issues"
+                className={cn(
+                  'size-7 rounded-lg flex items-center justify-center transition-colors relative',
+                  viewMode === 'tasks'
+                    ? 'bg-surface2 text-foreground'
+                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
+                )}
+              >
+                <CheckCircle2 className="size-3.5" />
+                {todos && todos.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length > 0 && (
+                  <span className="absolute 1 top-1 right-1 size-1.5 rounded-full bg-status-success" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Tasks & Issues</TooltipContent>
+          </Tooltip>
 
-        {/* Right group: Token (if any), Theme Switcher, Settings */}
-        <div className="flex items-center gap-1">
+          {/* Agents Dashboard */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
+                aria-label="Agents Dashboard"
+                className={cn(
+                  'size-7 rounded-lg flex items-center justify-center transition-colors',
+                  viewMode === 'mission'
+                    ? 'bg-surface2 text-foreground'
+                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
+                )}
+              >
+                <Users className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Agents Dashboard</TooltipContent>
+          </Tooltip>
+
           {token && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -147,25 +176,6 @@ export function SidebarContent() {
               </button>
             </TooltipTrigger>
             <TooltipContent side="top">{isDark ? 'Light mode' : 'Dark mode'}</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => openSettings('general')}
-                aria-label="Settings"
-                className={cn(
-                  'size-7 rounded-lg flex items-center justify-center transition-colors',
-                  viewMode === 'settings'
-                    ? 'bg-surface2 text-foreground'
-                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
-                )}
-              >
-                <Settings className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Settings</TooltipContent>
           </Tooltip>
         </div>
       </div>

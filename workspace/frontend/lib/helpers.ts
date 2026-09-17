@@ -118,3 +118,23 @@ export function formatRowTime(ms: number, now: number = Date.now()): string {
     year: d.getFullYear() === startOfToday.getFullYear() ? undefined : '2-digit',
   });
 }
+
+/**
+ * Compact relative time string matching Figure 2 reference, e.g. 'now', '5m', '23h', '2d', '1mo', '1y'.
+ */
+export function formatCompactRelativeTime(ms: number, now: number = Date.now()): string {
+  if (!ms) return '';
+  const diffSec = Math.max(0, Math.floor((now - ms) / 1000));
+  if (diffSec < 60) return 'now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 30) return `${diffDays}d`;
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths}mo`;
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears}y`;
+}
+

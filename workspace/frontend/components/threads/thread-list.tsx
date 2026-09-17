@@ -6,15 +6,13 @@ import { runUndoable } from '@/lib/undoable';
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from 'sonner';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, Folder, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X, ListFilter } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
-import { timeAgo, formatRowTime } from '@/lib/helpers';
+import { timeAgo, formatRowTime, formatCompactRelativeTime } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { SignalMark } from '@/components/brand/signal-mark';
-import { AgentStatusStrip } from '@/components/agents/agent-status-strip';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { workspaceApi } from '@/lib/api';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
@@ -293,7 +291,7 @@ const ThreadRow = memo(function ThreadRow({
   setEditTitleValue,
 }: ThreadRowProps) {
   const activityMs = session.lastEventAt;
-  const displayTime = formatRowTime(
+  const displayTime = formatCompactRelativeTime(
     activityMs || (session.createdAt ? new Date(session.createdAt).getTime() : 0),
   );
 
@@ -362,23 +360,6 @@ const ThreadRow = memo(function ThreadRow({
 
   const smartTitle = getSmartSessionTitle(session, lastMsg, folderOrdinal);
 
-  /*
-    THE SECOND LINE IS DROPPED WHEN IT RESTATES THE FIRST.
-
-    `getSmartSessionTitle` falls back to the last message's content for any
-    session without a real title — cleaned, then cut at 24 characters with an
-    ellipsis. `preview` is that same message. So on every unnamed thread the row
-    spent two lines of height and a 10px type step to say one thing twice:
-      看了下现有覆盖（9 篇 /...
-      看了下现有覆盖（9 篇 / 40+ 节，基础→并...
-    Four of six rows looked like that. Comparing on normalised text — same
-    markdown/emoji stripping the title got, trailing ellipsis removed — catches
-    the truncation case, which a plain equality check cannot.
-
-    `No messages yet` deliberately survives: it does not repeat the title, and
-    "this thread is empty" is the one thing the second line can say that the
-    first cannot.
-  */
   const normalizeForCompare = (s: string) =>
     s
       .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
@@ -388,12 +369,7 @@ const ThreadRow = memo(function ThreadRow({
       .replace(/(\.{3}|…)$/, '')
       .trim()
       .toLowerCase();
-  /*
-    `preview` is a ReactNode, not a string — a search hit, a running tool chip
-    and the `thinking` sweep are all JSX. Those can never be a restatement of
-    the title, and the empty string below makes the test fall through to
-    "show it", which is the right answer for all three.
-  */
+
   const normalizedPreview = typeof preview === 'string' ? normalizeForCompare(preview) : '';
   const normalizedTitle = normalizeForCompare(smartTitle);
   const previewRestatesTitle =
@@ -402,26 +378,7 @@ const ThreadRow = memo(function ThreadRow({
     (normalizedPreview === normalizedTitle ||
       normalizedPreview.startsWith(normalizedTitle) ||
       normalizedTitle.startsWith(normalizedPreview));
-  /*
-    EVERY ROW IS THE SAME HEIGHT.
 
-    Two rules had accumulated for hiding the second line — "the preview repeats
-    the title" and "the preview is content-free chatter" — and between them
-    they collapsed most but not all rows. The result was a column alternating
-    62px and 42px in no pattern the eye could predict, which is worse than
-    either height consistently: scanning a list is a rhythm, and a list with no
-    rhythm has to be read instead of scanned.
-
-    Fixed single line, not fixed double. The second line's content here is an
-    agent's status output, not a person's message — the thing that makes
-    Slack's and Linear's two-line rows worth their height. Half the previews
-    were already being suppressed as noise by those two rules, which is the
-    measurement that settles it: a line that is empty half the time should not
-    be reserving space the other half.
-
-    Nothing is lost. The preview is now the row's hover text, where it costs
-    nothing until asked for.
-  */
   const previewText = typeof preview === 'string' ? preview.trim() : '';
   const hoverPreview =
     previewText && !previewRestatesTitle && previewText !== 'No messages yet'
@@ -430,26 +387,6 @@ const ThreadRow = memo(function ThreadRow({
 
   return (
     <div
-      /*
-        THE MOST-USED LIST IN THE APP WAS THE ONE YOU COULD NOT TAB INTO.
-
-        Files, Inbox, Knowledge and Tasks all went through
-        `useListKeyboardNav`, which gives their rows `role="option"`, a roving
-        tabindex and `aria-selected`. This list kept its own hand-rolled j/k
-        handler — which works, and stays — but its rows were bare `<div
-        onClick>`: no role, no tab stop, no focus ring, invisible to a screen
-        reader as anything but text.
-
-        The roving tabindex is the part that matters: exactly one row is in the
-        tab order, the SELECTED one, so Tab reaches the list in a single press
-        and lands where the user already is rather than walking twenty threads.
-        Enter and Space then open it, which is what `role="option"` promises.
-
-        Deliberately NOT swapping in the shared hook. It owns a cursor of its
-        own, and this list already has one expressed through `currentSessionId`
-        plus the 1-9 number shortcuts; running both would give the list two
-        disagreeing notions of "the current row".
-      */
       role="option"
       aria-selected={isSelected}
       tabIndex={isSelected ? 0 : -1}
@@ -465,182 +402,131 @@ const ThreadRow = memo(function ThreadRow({
         onSelect(session.sessionId);
       }}
       className={cn(
-        'w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors relative group select-none',
-        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border-accent',
-        /*
-          4. A SOFTER SELECTED STATE.
-
-          This was a 4px `bg-primary` bar pinned to the row's left edge. In the
-          dark theme `--primary` is near-white, so the marker for "you are here"
-          was the highest-contrast object on the entire screen — brighter than
-          any text, for a state the user already knows they are in. Selection
-          needs to be unmistakable when scanned, not loud when stared at.
-
-          The fill does the work; the bar is now half the width, inset from the
-          rounded corner rather than butting against it, and tinted rather than
-          full-strength.
-        */
+        'w-full flex items-center justify-between gap-2 ps-6 pe-2 py-1.5 rounded-lg text-left transition-colors relative group select-none cursor-pointer',
+        'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-border-accent',
         isSelected
-          ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0.5 before:top-2.5 before:bottom-2.5 before:w-0.5 before:rounded-full before:bg-primary/60'
-          : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground',
+          ? 'bg-surface3/80 dark:bg-surface2 text-foreground font-medium'
+          : 'hover:bg-surface2/60 text-foreground/85 hover:text-foreground',
         'has-data-[state=open]:bg-surface2/60',
         isActive && 'thread-wip',
-        isCompleted && !isSelected && 'bg-surface2/50 border border-border/60'
+        isCompleted && !isSelected && 'bg-surface2/40'
       )}
     >
-      <div className="shrink-0 self-start pt-0.5 size-[18px]">
-        {lastSpeaker === 'you' ? (
-          <SignalMark size={18} still />
-        ) : displayAgent ? (
-          <AgentAvatar
-            name={displayAgent.agentName}
-            agentType={displayAgent.agentType}
-            size={18}
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {isUnread && (
+          <span
+            aria-label="Unread"
+            className="size-1.5 shrink-0 rounded-full bg-primary"
           />
-        ) : (
-          <div className="size-[18px] flex items-center justify-center rounded-md bg-surface2/80 text-foreground-extra-muted border border-border/40">
-            <MessageSquare className="size-2.5 opacity-60" />
-          </div>
         )}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-1.5">
-          {/*
-            The unread mark goes BEFORE the title, not after the timestamp.
-
-            It has to be findable by sweeping one vertical line down the list —
-            that is the entire job — and the right edge already holds the
-            relative time, which changes length per row and would make the dots
-            zigzag. A filled disc rather than a count: how many messages
-            arrived is not a decision input, whether any did is.
-          */}
-          {isUnread && (
-            <span
-              aria-label="Unread"
-              className="size-1.5 shrink-0 rounded-full bg-primary"
-            />
-          )}
-          {session.starred && (
-            <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
-          )}
-          {isEditing ? (
-            <input
-              type="text"
-              autoFocus
-              value={editTitleValue}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => setEditTitleValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (isComposing(e)) return;
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  const trimmed = editTitleValue.trim();
-                  if (trimmed) onSaveEdit(session.sessionId, trimmed);
-                  onCancelEdit();
-                } else if (e.key === 'Escape') {
-                  e.preventDefault();
-                  onCancelEdit();
-                }
-              }}
-              onBlur={() => {
+        {session.starred && (
+          <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
+        )}
+        {isEditing ? (
+          <input
+            type="text"
+            autoFocus
+            value={editTitleValue}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => setEditTitleValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (isComposing(e)) return;
+              if (e.key === 'Enter') {
+                e.preventDefault();
                 const trimmed = editTitleValue.trim();
                 if (trimmed) onSaveEdit(session.sessionId, trimmed);
                 onCancelEdit();
-              }}
-              className="text-xs font-semibold flex-1 min-w-0 px-1 py-0.5 rounded bg-surface1 text-foreground border border-primary"
-            />
-          ) : (
-            <Hint
-              label={
-                hoverPreview
-                  ? `${smartTitle} — ${hoverPreview}`
-                  : `${smartTitle} · double-click to rename`
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                onCancelEdit();
               }
-            >
-              <span
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  onStartEdit(session.sessionId, smartTitle);
-                }}
-                className={cn(
-                  'text-xs flex-1 min-w-0 truncate tracking-tight',
-                  isSelected ? 'font-semibold text-foreground' : 'font-medium text-foreground/90'
-                )}
-              >
-                {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
-              </span>
-            </Hint>
-          )}
-          {/*
-            3. FOUR CHARACTERS, NOT ELEVEN.
-
-            "2 weeks ago" on every row said what the date band directly above
-            the row had already said, and took 30-40% of the width to say it —
-            which is why the titles beside it were being cut to a dozen
-            characters. `formatRowTime` narrows as the band widens: the clock
-            today, the weekday this week, a date beyond that. The width goes
-            back to the title, which is the part that identifies the thread.
-          */}
-          <span className="text-2xs text-foreground-extra-muted shrink-0 tabular-nums">
-            {displayTime}
-          </span>
-        </div>
-      </div>
-
-      {/* Hover actions */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-1 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <MoreVertical className="size-3.5" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem
-            onClick={(e) => {
+            }}
+            onBlur={() => {
+              const trimmed = editTitleValue.trim();
+              if (trimmed) onSaveEdit(session.sessionId, trimmed);
+              onCancelEdit();
+            }}
+            className="text-xs font-semibold flex-1 min-w-0 px-1.5 py-0.5 rounded bg-surface1 text-foreground border border-primary outline-hidden"
+          />
+        ) : (
+          <span
+            title={hoverPreview ? `${smartTitle} — ${hoverPreview}` : smartTitle}
+            onDoubleClick={(e) => {
               e.stopPropagation();
               onStartEdit(session.sessionId, smartTitle);
             }}
+            className={cn(
+              'text-xs flex-1 min-w-0 truncate tracking-tight transition-colors',
+              isSelected ? 'font-medium text-foreground' : 'font-normal text-foreground/85 group-hover:text-foreground'
+            )}
           >
-            <Pencil className="size-4" />
-            <span>Rename</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStarred(session.sessionId, !session.starred);
-            }}
-          >
-            <Star className={cn('size-4', session.starred && 'fill-status-warning text-status-warning')} />
-            <span>{session.starred ? 'Unstar' : 'Star'}</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStatus(session.sessionId, session.status === 'archived' ? 'active' : 'archived');
-            }}
-          >
-            {session.status === 'archived'
-              ? <><ArchiveRestore className="size-4" /><span>Unarchive</span></>
-              : <><Archive className="size-4" /><span>Archive</span></>
-            }
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:text-destructive"
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateStatus(session.sessionId, 'deleted');
-            }}
-          >
-            <Trash2 className="size-4" />
-            <span>Delete</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            {isSearching ? highlightMatch(smartTitle, searchQuery) : smartTitle}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 shrink-0">
+        <span className={cn(
+          'text-3xs tabular-nums transition-colors',
+          isSelected ? 'text-foreground/70' : 'text-foreground-extra-muted'
+        )}>
+          {displayTime}
+        </span>
+
+        {/* Hover actions */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 transition-opacity p-0.5 rounded hover:bg-surface3 text-foreground-extra-muted hover:text-foreground shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MoreVertical className="size-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartEdit(session.sessionId, smartTitle);
+              }}
+            >
+              <Pencil className="size-4" />
+              <span>Rename</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStarred(session.sessionId, !session.starred);
+              }}
+            >
+              <Star className={cn('size-4', session.starred && 'fill-status-warning text-status-warning')} />
+              <span>{session.starred ? 'Unstar' : 'Star'}</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStatus(session.sessionId, session.status === 'archived' ? 'active' : 'archived');
+              }}
+            >
+              {session.status === 'archived'
+                ? <><ArchiveRestore className="size-4" /><span>Unarchive</span></>
+                : <><Archive className="size-4" /><span>Archive</span></>
+              }
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStatus(session.sessionId, 'deleted');
+              }}
+            >
+              <Trash2 className="size-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }, (prev, next) => {
@@ -668,6 +554,7 @@ interface VirtualGroupHeaderItem {
   count: number;
   /** The starred band at the top of the list, rather than a project folder. */
   pinned?: boolean;
+  isCollapsed?: boolean;
 }
 
 interface VirtualSessionItem {
@@ -676,39 +563,15 @@ interface VirtualSessionItem {
   session: WorkspaceSession;
 }
 
-/**
- * A date band inside a project group — "Today", "Previous 7 Days".
- *
- * WHY THE LIST NEEDED ONE. Every row already printed its own relative time, so
- * a folder holding twenty threads printed "5 days ago" nine times in a column
- * down the right edge: twenty timestamps to answer one question, and no shape
- * to the list at all. A band answers it once for the whole run beneath it, and
- * it is what turns a flat stack of titles into "here is today, here is the
- * week, here is everything older" — the thing that makes a long chat list
- * scannable in every application that has one.
- */
-interface VirtualDateHeaderItem {
-  type: 'datehead';
+interface VirtualExpanderItem {
+  type: 'expander';
   key: string;
-  label: string;
+  groupKey: string;
+  totalCount: number;
+  isExpanded: boolean;
 }
 
-type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem | VirtualDateHeaderItem;
-
-/** Which band a timestamp falls into. Boundaries are calendar days, not
- *  rolling 24h windows: something from 11pm last night is "Yesterday", not
- *  "Today", which is how a person reading the list thinks about it. */
-function dateBandFor(ms: number, now: number): string {
-  if (!ms) return 'Older';
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const dayStart = startOfToday.getTime();
-  if (ms >= dayStart) return 'Today';
-  if (ms >= dayStart - 86_400_000) return 'Yesterday';
-  if (ms >= dayStart - 7 * 86_400_000) return 'Previous 7 Days';
-  if (ms >= dayStart - 30 * 86_400_000) return 'Previous 30 Days';
-  return 'Older';
-}
+type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem | VirtualExpanderItem;
 
 export function ThreadList() {
   const { loading, sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
@@ -719,8 +582,28 @@ export function ThreadList() {
   const [searching, setSearching] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitleValue, setEditTitleValue] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const toggleCollapseGroup = useCallback((groupKey: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
+
+  const toggleExpandGroup = useCallback((groupKey: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
 
   const handleSelectSession = useCallback((sessionId: string) => {
     setCurrentSessionId(sessionId);
@@ -895,11 +778,31 @@ export function ThreadList() {
     change at a day boundary, but the relative times on the rows want the
     minute anyway.
   */
-  const [now, setNow] = useState(() => Date.now());
+  // Auto-expand group if current session is past the preview limit
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+    if (!currentSessionId) return;
+    for (const group of groupedSessions) {
+      const groupKey = group.dir ?? '__no_folder__';
+      const index = group.sessions.findIndex((s) => s.sessionId === currentSessionId);
+      if (index >= 6) {
+        setExpandedGroups((prev) => {
+          if (prev.has(groupKey)) return prev;
+          const next = new Set(prev);
+          next.add(groupKey);
+          return next;
+        });
+        setCollapsedGroups((prev) => {
+          if (!prev.has(groupKey)) return prev;
+          const next = new Set(prev);
+          next.delete(groupKey);
+          return next;
+        });
+        break;
+      }
+    }
+  }, [currentSessionId, groupedSessions]);
+
+  const PREVIEW_LIMIT = 6;
 
   // Flatten grouped sessions into list items for TanStack Virtual
   const virtualListItems = useMemo<VirtualListItem[]>(() => {
@@ -922,47 +825,54 @@ export function ThreadList() {
 
     for (const group of groupedSessions) {
       const groupKey = group.dir ?? '__no_folder__';
+      const isCollapsed = collapsedGroups.has(groupKey);
+      const isExpanded = expandedGroups.has(groupKey);
+
       items.push({
         type: 'header',
         key: `header-${groupKey}`,
         dir: group.dir,
         count: group.sessions.length,
+        isCollapsed,
       });
-      /*
-        Sessions arrive already sorted newest-first, so the band only has to
-        change when the run does — no second pass, no re-sort, and the bands
-        come out in order for free.
 
-        A band is NOT emitted while searching: results are ranked by relevance
-        and chopping them into date buckets would imply an ordering the list
-        does not have.
-      */
-      let band: string | null = null;
-      for (const s of group.sessions) {
-        if (!isSearching) {
-          const next = dateBandFor(getSessionTime(s), now);
-          if (next !== band) {
-            band = next;
-            items.push({
-              type: 'datehead',
-              key: `band-${groupKey}-${next}`,
-              label: next,
-            });
-          }
+      if (isCollapsed) continue;
+
+      if (isSearching) {
+        for (const s of group.sessions) {
+          items.push({
+            type: 'session',
+            key: s.sessionId,
+            session: s,
+          });
         }
-        items.push({
-          type: 'session',
-          key: s.sessionId,
-          session: s,
-        });
+      } else {
+        const hasMore = group.sessions.length > PREVIEW_LIMIT;
+        const sessionsToShow = (hasMore && !isExpanded)
+          ? group.sessions.slice(0, PREVIEW_LIMIT)
+          : group.sessions;
+
+        for (const s of sessionsToShow) {
+          items.push({
+            type: 'session',
+            key: s.sessionId,
+            session: s,
+          });
+        }
+
+        if (hasMore) {
+          items.push({
+            type: 'expander',
+            key: `expander-${groupKey}`,
+            groupKey,
+            totalCount: group.sessions.length,
+            isExpanded,
+          });
+        }
       }
     }
     return items;
-    // `now` is captured once per rebuild rather than read inside the loop, so
-    // every row in one pass is bucketed against the same instant — otherwise a
-    // list rebuilt across midnight can put two adjacent threads in bands that
-    // disagree.
-  }, [groupedSessions, pinnedSessions, isSearching, getSessionTime, now]);
+  }, [groupedSessions, pinnedSessions, isSearching, collapsedGroups, expandedGroups]);
 
   /*
     Titles are recorded by ChatView the first time a thread's transcript is
@@ -1021,15 +931,9 @@ export function ThreadList() {
     getScrollElement: () => listContainerRef.current,
     estimateSize: (index) => {
       const item = virtualListItems[index];
-      /*
-        Every row is one line now, so this is no longer a hedge between two
-        possible heights — it is the actual height, and `measureElement` has
-        nothing left to correct. 44 was the midpoint of a range that no longer
-        exists; 36 is a single line at `py-2`.
-      */
-      if (item?.type === 'header') return 34;
-      if (item?.type === 'datehead') return 26;
-      return 36;
+      if (item?.type === 'header') return 30;
+      if (item?.type === 'expander') return 26;
+      return 32;
     },
     overscan: 8,
     getItemKey: (index) => virtualListItems[index]?.key || index,
@@ -1202,183 +1106,55 @@ export function ThreadList() {
        double-binds `c`. */
     <div data-thread-list className="flex flex-col h-full">
 
-      {/* Top Action & Navigation Block */}
-      <div className="px-3.5 pt-2.5 pb-1 shrink-0 select-none">
-        {/* + New Conversation Primary Button */}
-        <button
-          onClick={() => {
-            setViewMode('threads');
-            startChannel(null);
-          }}
-          /*
-            A row, not a filled pill.
-
-            This was `bg-primary` — in dark mode a near-white block spanning the
-            full sidebar width, which made the single loudest element on screen
-            a button you press once per conversation. It also sat one idiom
-            apart from the three navigation rows directly beneath it while
-            being the same shape and size, so the group read as "one CTA plus
-            some links" rather than a nav list. It is now the same row as its
-            neighbours, distinguished by weight and a filled icon rather than by
-            inverting the palette.
-          */
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold text-foreground hover:bg-surface2 transition-colors group"
-        >
-          <div className="flex items-center gap-2">
-            <Plus className="size-3.5 text-primary" />
-            <span>New chat</span>
-          </div>
-          <kbd className="inline-flex items-center px-1.5 py-0.2 text-3xs font-mono rounded bg-surface3 text-foreground-extra-muted opacity-0 group-hover:opacity-100 transition-opacity motion-reduce:transition-none">
-            C
-          </kbd>
-        </button>
-
-        {/*
-          COMMANDS AND DESTINATIONS ARE NOT THE SAME KIND OF ROW.
-
-          `New chat` above and `Command Palette` below DO something; the two in
-          between GO somewhere. One undifferentiated column of four is why only
-          half the rows carried a shortcut badge and the right edge came out
-          ragged — the badge was quietly marking which rows were commands. The
-          grouping is spacing, not a rule: this sidebar already has enough
-          horizontal lines in it.
-        */}
-        <div className="mt-1.5 flex flex-col gap-0.5">
-          {/* Chats & Threads */}
-          <button
-            type="button"
-            onClick={() => setViewMode('threads')}
-            className={cn(
-              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              viewMode === 'threads'
-                ? 'bg-surface2 text-foreground font-semibold'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <MessageSquare className="size-3.5 text-foreground-extra-muted" />
-              <span>Chats & Threads</span>
-            </div>
-          </button>
-
-          {/* Tasks & Issues (Linear Style!) */}
-          <button
-            type="button"
-            onClick={() => setViewMode('tasks')}
-            className={cn(
-              'flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              viewMode === 'tasks'
-                ? 'bg-surface2 text-foreground font-semibold'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="size-3.5 text-foreground-extra-muted" />
-              <span>Tasks & Issues</span>
-            </div>
-            {todos && todos.length > 0 && (
-              <span className="text-3xs px-1.5 py-0.2 rounded-full bg-status-success/10 text-status-success font-medium">
-                {todos.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length || todos.length}
-              </span>
-            )}
-          </button>
-
-        </div>
-
-        {/*
-          THE COMMAND PALETTE ROW IS GONE, AND SEARCH TOOK ITS PLACE.
-
-          It sat in a column of destinations while being a command — it opened
-          an overlay, it did not go anywhere — and it was the third way into a
-          palette that already answers Ctrl+K everywhere in the app and now has
-          a File-menu item in the desktop shell too. A row whose entire content
-          is the name of a keystroke earns its place only while nothing else
-          teaches that keystroke.
-
-          What the column was actually missing is the thing every chat sidebar
-          has second from the top: a search box that is simply there. This list
-          reaches twenty-plus threads, and its filter was behind `/` or a
-          magnifier icon inside the Projects header — an entrance you had to
-          already know about. It is now permanent (see below), which is both
-          the ChatGPT-desktop arrangement and the reason the palette row is no
-          longer carrying a job it was bad at.
-        */}
-      </div>
-
-      {/*
-        5. THE HEADER IS SIX CONTROLS DEEP BEFORE THE FIRST CONVERSATION.
-
-        Every band up here had its own generous padding, and stacked they
-        pushed the list — the thing this sidebar is for — a third of the way
-        down the window. The rows are unchanged; only the air between them is,
-        which is the cheapest third of the problem and the one that does not
-        require deciding what the header should contain.
-      */}
-      <div className="px-3 pt-1.5 pb-0.5 shrink-0">
-        <AgentStatusStrip />
-      </div>
-
-      {/* Projects Section Header & Create Dropdown (Antigravity 2.0 style) */}
-      <div className="flex items-center justify-between px-3 pt-2 pb-1 shrink-0 select-none">
-        {/*
-          THE SAME LABEL TREATMENT AS THE GROUPS ABOVE IT.
-
-          This was the only `uppercase tracking-wider` label in the sidebar,
-          sitting at the same level as "Chats & Threads", which is sentence
-          case at normal tracking. Two heading systems in one column is what
-          made this sidebar look cut into zones -- not rules, of which there
-          are none between these groups, but type. Uppercase plus letter
-          spacing is the machine-console idiom; it was removed from the Mission
-          Control section headings for the same reason.
-        */}
-        <span className="text-xs font-semibold text-foreground">
+      {/* Projects Section Header & Actions (Figure 2 Style) */}
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-1.5 shrink-0 select-none">
+        <span className="text-xs font-semibold text-foreground/80 tracking-tight">
           Projects
         </span>
 
-        <div className="flex items-center gap-1">
-          {/* Quick Search Toggle */}
-          <Hint label="Search threads (/)">
-            <button
-              onClick={() => {
-                setShowSearch((prev) => {
-                  const next = !prev;
-                  if (next) setTimeout(() => searchInputRef.current?.focus(), 10);
-                  return next;
-                });
-              }}
-              className={cn(
-                "p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors",
-                (showSearch || searchQuery) && "bg-surface2 text-foreground"
-              )}
-            >
-              <Search className="size-3.5" />
-            </button>
-          </Hint>
+        <div className="flex items-center gap-0.5">
+          {/* Filter / Search Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowSearch((prev) => {
+                const next = !prev;
+                if (next) setTimeout(() => searchInputRef.current?.focus(), 10);
+                return next;
+              });
+            }}
+            title="Filter & search chats (/)"
+            className={cn(
+              "size-6 flex items-center justify-center rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors",
+              (showSearch || searchQuery) && "bg-surface2 text-foreground"
+            )}
+          >
+            <ListFilter className="size-3.5" />
+          </button>
 
-          {/* New Project / Quick Start Dropdown Menu (Image 2) */}
+          {/* New Project / New Chat Dropdown (Figure 2 Style) */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Hint label="New Project / Quick Start">
-                <button
-                  disabled={browsingFolder}
-                  className="p-1 rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors disabled:opacity-50"
-                >
-                  {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <FolderPlus className="size-3.5" />}
-                </button>
-              </Hint>
+              <button
+                disabled={browsingFolder}
+                title="New Project or Chat"
+                className="size-6 flex items-center justify-center rounded-md hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <FolderPlus className="size-3.5" />}
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1">
-            <DropdownMenuItem onClick={addProjectFolder} className="gap-2.5 py-2 px-2.5 text-xs rounded-lg">
+              <DropdownMenuItem onClick={addProjectFolder} className="gap-2.5 py-2 px-2.5 text-xs rounded-lg cursor-pointer">
                 <FolderPlus className="size-4 text-foreground-muted shrink-0" />
                 <div className="flex flex-col">
                   <span className="font-semibold text-foreground">New Project</span>
-                  <span className="text-3xs text-muted-foreground">Select a folder</span>
+                  <span className="text-3xs text-muted-foreground">Select local folder</span>
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => startChannel(null)} className="gap-2.5 py-2 px-2.5 text-xs rounded-lg">
+              <DropdownMenuItem onClick={() => startChannel(null)} className="gap-2.5 py-2 px-2.5 text-xs rounded-lg cursor-pointer">
                 <MessageSquarePlus className="size-4 text-foreground-muted shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-semibold text-foreground">Quick Start</span>
+                  <span className="font-semibold text-foreground">New Chat</span>
                   <span className="text-3xs text-muted-foreground">Direct conversation</span>
                 </div>
               </DropdownMenuItem>
@@ -1387,12 +1163,9 @@ export function ThreadList() {
         </div>
       </div>
 
-      {/*
-        ALWAYS RENDERED, not revealed. `/` and Ctrl+F still focus it; they no
-        longer have to conjure it first, and a user who knows neither key can
-        still see that this list can be searched.
-      */}
-      <div className="px-3 pb-2 pt-0.5 shrink-0">
+      {/* Collapsible Search Input (Only shown when toggled or search active) */}
+      {(showSearch || searchQuery) && (
+        <div className="px-3 pb-2 pt-0.5 shrink-0 animate-in fade-in duration-150">
           <div className="relative flex items-center">
             <Search className="absolute left-2.5 size-3 text-foreground-extra-muted pointer-events-none" />
             <input
@@ -1403,13 +1176,7 @@ export function ThreadList() {
               placeholder="Search chats…"
               data-view-search
               className="w-full bg-surface2/80 border border-border rounded-lg pl-7 pr-7 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden focus:border-border-accent"
-              /* `autoFocus` came off with the conditional rendering. It was
-                 correct while the bar only existed once you asked for it; on a
-                 box that is always present it means the sidebar takes the caret
-                 away from the message composer on every single mount. */
             />
-            {/* Only while there is something to clear — an X sitting in an
-                empty box is a control for a state that does not exist. */}
             {searchQuery && (
               <button
                 type="button"
@@ -1426,6 +1193,7 @@ export function ThreadList() {
             )}
           </div>
         </div>
+      )}
 
       {/* Thread rows grouped by Project (TanStack Virtualized) */}
       <div
@@ -1467,37 +1235,44 @@ export function ThreadList() {
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  {item.type === 'datehead' ? (
-                    <div className="px-2 pt-2 pb-0.5 select-none">
-                      <span className="text-3xs font-medium uppercase tracking-wide text-foreground-extra-muted">
-                        {item.label}
-                      </span>
+                  {item.type === 'expander' ? (
+                    <div className="ps-6 pe-2.5 py-0.5 select-none">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandGroup(item.groupKey)}
+                        className="text-xs text-foreground-muted hover:text-foreground transition-colors cursor-pointer py-1"
+                      >
+                        {item.isExpanded ? 'Show less' : `See all (${item.totalCount})`}
+                      </button>
                     </div>
                   ) : item.type === 'header' ? (
-                    <div className="flex items-center gap-1.5 px-2 pt-2.5 pb-1 select-none">
-                      {item.pinned ? (
-                        <Star className="size-3.5 shrink-0 fill-status-warning text-status-warning" />
-                      ) : (
-                        <FolderOpen className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                      )}
-                      <Hint label={item.pinned ? 'Starred threads, from every project' : (item.dir ?? 'Direct chats')}>
+                    <div
+                      onClick={() => toggleCollapseGroup(item.key.replace(/^header-/, ''))}
+                      className="flex items-center justify-between gap-1.5 px-2.5 pt-2 pb-1 select-none group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {item.pinned ? (
+                          <Star className="size-3.5 shrink-0 fill-status-warning text-status-warning" />
+                        ) : (
+                          <Folder className="size-3.5 shrink-0 text-foreground-muted stroke-[1.5]" />
+                        )}
                         <span
-                          className="text-sm font-semibold text-foreground truncate"
+                          title={item.pinned ? 'Starred threads, from every project' : (item.dir ?? 'Direct chats')}
+                          className="text-xs font-semibold text-foreground/80 truncate"
                         >
                           {item.pinned ? 'Pinned' : item.dir ? basename(item.dir) : 'Direct chats'}
                         </span>
-                      </Hint>
-                      <span className="text-2xs font-mono tabular-nums text-foreground-extra-muted shrink-0">
-                        {item.count}
-                      </span>
-                      <Hint label={item.dir ? `New channel in ${item.dir}` : 'New direct chat'}>
-                        <button
-                          onClick={() => startChannel(item.dir)}
-                          className="ml-auto size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0"
-                        >
-                          <Plus className="size-3" />
-                        </button>
-                      </Hint>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startChannel(item.dir);
+                        }}
+                        title={item.dir ? `New channel in ${basename(item.dir)}` : 'New direct chat'}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0"
+                      >
+                        <Plus className="size-3" />
+                      </button>
                     </div>
                   ) : (
                     <ThreadRow
