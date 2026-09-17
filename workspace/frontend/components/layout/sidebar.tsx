@@ -183,18 +183,43 @@ export function Sidebar() {
           the lighter of the two and the cast is the only thing separating them
           below the lit edge.
         */
-        'fixed overflow-hidden bg-surface-sidebar border-r border-border-chrome shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_10px_-2px_rgba(0,0,0,0.55)] top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
+        /*
+          THE VERTICAL RULE STARTS BELOW THE HEADER, NOT AT THE TOP OF THE
+          WINDOW.
+
+          `border-r` runs the full height of the <aside>, and the <aside>
+          starts at y=0. But `SidebarHeader` renders `.app-header` too, so the
+          top 40px of this column and the top 40px of the main pane are the
+          SAME continuous chrome band — and the border was drawing the app's
+          heaviest line straight down the middle of it. One material, cut in
+          half, by the one rule that is supposed to mean "material changes
+          here". Upgrading this border to `--border-chrome` last round did not
+          create the seam, it just made it impossible to miss.
+
+          So the rule moves to an `::after` that starts at `--header-height`.
+          Below that line the sidebar really is chrome against content and the
+          rule is correct; above it, the two halves are simply one band, and
+          the header's own bottom border closes it.
+
+          The SHADOW stays on the <aside>. It cannot move with the border: this
+          element is `overflow-hidden`, which clips a pseudo-element's shadow
+          but never an element's own. The cast is 5% over 4px, so the 40px of
+          it that rides alongside the header is not a visible seam the way a
+          hairline is.
+        */
+        'fixed overflow-hidden bg-surface-sidebar shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_10px_-2px_rgba(0,0,0,0.55)] top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
+        "after:absolute after:end-0 after:bottom-0 after:w-px after:bg-border-chrome after:content-[''] after:top-[var(--header-height)]",
+        !isSidebarOpen && 'after:hidden',
         // No width transition mid-drag, or the edge visibly lags the cursor.
         // `width` only — `transition-all` also animated the border, padding and
         // colours on every open/close, and at 300ms the panel visibly trailed
         // the click. Desktop panels settle in ~150ms.
-        !isResizing && 'transition-[width,border-width] duration-[var(--shell-duration)] ease-[var(--shell-ease)]',
+        !isResizing && 'transition-[width] duration-[var(--shell-duration)] ease-[var(--shell-ease)]',
         !isSidebarOpen && 'pointer-events-none shadow-none border-r-0',
       )}
       data-sidebar-sized
       style={{
         width: isSidebarOpen ? 'var(--sidebar-width)' : '0px',
-        borderRightWidth: isSidebarOpen ? '1px' : '0px',
       }}
     >
       <div data-sidebar-sized className="flex flex-col h-full shrink-0 min-w-0" style={{ width: 'var(--sidebar-width)' }}>

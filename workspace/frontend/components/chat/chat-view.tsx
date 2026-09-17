@@ -1094,6 +1094,28 @@ export function ChatView() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/*
+            THE APP'S BUTTONS END HERE; THE OPERATING SYSTEM'S BEGIN.
+
+            `.app-header` reserves `--window-controls-inset` (138px) at its end
+            so nothing is drawn under the native minimise / maximise / close
+            glyphs — but reserving space is not the same as marking a boundary.
+            On screen the app's own 30px icon buttons ran straight into three
+            OS buttons of a different size, a different weight and a different
+            hit target, with nothing between them but empty chrome, so the six
+            read as one ragged row.
+
+            The rule above separates pills from squares — things that report
+            from things that act. This one separates ours from the system's,
+            which is the bigger jump of the two and was the only one unmarked.
+            It is drawn only on desktop, because in a browser tab the reserve
+            is 0 and there is nothing on the other side of it.
+          */}
+          <span
+            className="desktop-only h-4 w-px bg-border shrink-0 ms-1"
+            aria-hidden
+          />
         </div>
       </div>
 

@@ -767,7 +767,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     <div className="relative flex-1 min-h-0">
       <div
         ref={containerRef}
-        className={cn('h-full overflow-y-auto', className)}
+        className={cn('h-full overflow-y-auto scroll-fade-top', className)}
       >
         {/* The last ring spinner in the transcript. globals.css says there is
             one "still going" signal in this app and it is `.event-running`;

@@ -1174,6 +1174,17 @@ html {
   box-shadow: 1px 0 0 0 rgba(0, 0, 0, 0.5);
 }
 
+/*
+  Present only inside the Electron shell. A real class rather than a Tailwind
+  arbitrary variant: the selector needs nested brackets
+  (`[:root[data-desktop]_&]`), which is exactly the shape Tailwind's candidate
+  parser is not guaranteed to survive — and a variant that silently fails to
+  compile leaves the element visible in the browser with nothing to see in the
+  diff.
+*/
+.desktop-only { display: none; }
+:root[data-desktop] .desktop-only { display: block; }
+
 /**
  * Chrome — anything that is shell rather than content — is not selectable.
  * Drag-selecting a sidebar row's label is a web behaviour; in a desktop app
@@ -1444,14 +1455,61 @@ html {
   background: transparent;
 }
 
+/*
+  THE HANDLE IS INVISIBLE UNTIL THE POINTER IS OVER WHAT IT SCROLLS.
+
+  A permanently-drawn handle is a web behaviour. Every desktop client this app
+  is measured against — and both OSes themselves since Windows 11 — show the
+  bar on approach and take it away again, because a scrollbar is an answer to
+  "where am I", not a persistent part of the layout. It mattered more here than
+  usual: the transcript's scroller spans the whole main pane while the reading
+  column is centred inside it, so the handle sits ~130px clear of the text and
+  reads as a fixture of the window rather than of the conversation.
+
+  `:hover::-webkit-scrollbar-thumb` — the hover is on the SCROLLING ELEMENT,
+  which is what "approach" means here; `::-webkit-scrollbar-thumb:hover` (the
+  old rule, kept below) is the handle itself and only ever fires once you are
+  already on it.
+
+  The track stays transparent and the gutter stays reserved: fading the handle
+  is the point, reflowing text as it appears is not.
+*/
 ::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--scrollbar-handle) 55%, transparent);
+  background: transparent;
   border-radius: 9999px;
-  transition: background 0.2s ease;
+  transition: background 0.18s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
+:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--scrollbar-handle) 55%, transparent);
+}
+
+::-webkit-scrollbar-thumb:hover,
+:hover::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-handle);
+}
+
+/**
+ * ── `.scroll-fade-top` ──
+ *
+ * Content scrolling under a sticky header was being SLICED: the header is
+ * translucent with a 16px backdrop blur on desktop, so a line of text crossing
+ * the boundary smeared through it and then ended on a hard horizontal cut.
+ * Nothing about that says "there is more above" — it reads as clipping, which
+ * is what it is.
+ *
+ * A 20px alpha ramp at the top of the scroll VIEWPORT dissolves the line
+ * instead. It is on the scroller rather than an overlay gradient because an
+ * overlay has to be painted in the content's own colour to work, and this
+ * transcript sits on two different grounds across the two themes plus a Mica
+ * backdrop on Win11 — a mask has no colour to get wrong.
+ *
+ * Always on rather than only when scrolled: at scroll-top the first 20px is
+ * the list's own padding, so there is nothing there to fade.
+ */
+.scroll-fade-top {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 20px);
 }
 
 /*

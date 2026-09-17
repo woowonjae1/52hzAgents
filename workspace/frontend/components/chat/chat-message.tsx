@@ -594,9 +594,18 @@ export const ChatMessage = memo(function ChatMessage({
           */}
           <div
             className={cn(
-              'group/usermsg -mx-3 px-3 py-2.5 rounded-xl transition-colors duration-100',
+              'group/usermsg py-2.5',
               'select-text flex flex-col items-end',
-              !hideHeader && 'mt-3',
+              /*
+                Opens a turn, so it gets air above it — but 6px, not 12px. The
+                12px was sized against a hover plate that made the whole turn
+                one visible object and could carry the extra room; with the
+                plate gone it was just a loose transcript, and it was spending
+                back most of the 33px per turn that removing the reserved
+                toolbar bought. Within a turn the gap is 24px, between turns
+                30px: enough to group, not enough to drift.
+              */
+              !hideHeader && 'mt-1.5',
             )}
           >
             {/* Contained bubble card aligned to right */}
@@ -778,7 +787,7 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Same hover plate as the user turn above — see the comment there. */}
         <div
           className={cn(
-            'group/agentmsg relative -mx-3 px-3 rounded-xl transition-colors duration-100',
+            'group/agentmsg relative',
             'select-text selectable',
             hideHeader ? 'pb-3.5' : 'py-3.5',
             /*
@@ -1020,14 +1029,12 @@ export const ChatMessage = memo(function ChatMessage({
               'transition-opacity duration-150',
               isLast
                 ? 'pt-0.5'
-                // Offsets are measured from the PADDING BOX of the positioned
-                // ancestor, which now carries the hover plate's `px-3`. So the
-                // text column starts at 12px (that padding) + 28px (avatar) +
-                // 12px (the row's gap) = 52px, and the end side gives the same
-                // 12px back. These three numbers move together — changing the
-                // plate's padding without changing these silently slides the
-                // toolbar out from under the text it belongs to.
-                : 'absolute start-13 end-3 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                // `start-10` puts the floating copy on the text column rather
+                // than the avatar gutter: 28px avatar + the row's 12px gap.
+                // It tracks the wrapper's horizontal padding, so it went to 13
+                // while the hover plate added `px-3` and back to 10 now that
+                // the plate is gone.
+                : 'absolute start-10 end-0 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
             )}
           >
             <MessageActions
