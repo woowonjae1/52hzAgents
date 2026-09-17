@@ -33,6 +33,7 @@ import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
+import { headerIconButtonClass } from '@/components/headers/header-chip';
 import { getApiBaseUrl } from '@/lib/config';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import {
@@ -1000,22 +1001,38 @@ export function ChatView() {
             />
           )}
 
-          {/* Unified Telemetry Capsule (Agent Quota + Context Health) */}
-          <div className="flex items-center gap-1 p-0.5 rounded-full bg-surface2/60">
+          {/*
+            THE ROW HAS TWO KINDS OF THING IN IT, AND NOW SAYS SO.
+
+            Five controls sat in one undifferentiated 8px-gapped line: mode,
+            quota, context, branch, panel, overflow. Three of them REPORT
+            something you can open for detail; two PERFORM something. Nothing on
+            screen distinguished those, so the header read as a row of assorted
+            widgets — which is most of why it felt busy at a glance while
+            actually carrying very little.
+
+            Shape carries the distinction (pills report, squares act — see
+            headers/header-chip.ts) and a hairline carries the grouping. The
+            reporting chips also drop the `bg-surface2/60` tray they used to
+            share: a translucent ground behind two chips that already have their
+            own ground was a third fill for one idea, and with the chips now on
+            one recipe the grouping no longer needs a container to be legible.
+          */}
+          <div className="flex items-center gap-1.5">
             <AgentQuotaCapsule agentName={activeModelAgentName} />
             <ContextHealthIndicator channelName={currentSessionId} />
+            <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
           </div>
 
-          {/* Git chip */}
-          <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
+          <span className="h-4 w-px bg-border shrink-0 mx-0.5" aria-hidden />
 
           {/* Unified Studio Panel Toggle */}
           <Hint label={activeRightTab !== null ? 'Close Studio panel' : 'Open Studio panel'}>
             <button
               onClick={() => setActiveRightTab(activeRightTab !== null ? null : 'preview')}
               className={cn(
-                'size-7.5 rounded-lg flex items-center justify-center transition-colors',
-                activeRightTab !== null ? 'bg-surface3 text-foreground font-medium border border-border' : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
+                headerIconButtonClass,
+                activeRightTab !== null && 'bg-surface3 text-foreground border border-border',
               )}
             >
               <PanelRight className="size-4" />
@@ -1026,9 +1043,7 @@ export function ChatView() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Hint label="More actions">
-                <button
-                  className="size-7.5 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
-                >
+                <button className={headerIconButtonClass}>
                   <MoreHorizontal className="size-4" />
                 </button>
               </Hint>
@@ -1291,7 +1306,25 @@ export function ChatView() {
                 composer that fixes it.
               */}
               {isMissingParticipant ? (
-                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-status-muted-warning text-foreground text-xs">
+                /*
+                  THE BANNER KEEPS ITS AMBER, THE BANNER IS NOT MADE OF AMBER.
+
+                  It was a full-width `--status-muted-warning` fill (#fef3c7)
+                  directly above the composer — and since the rest of the
+                  palette is achromatic, that made a routine "an agent went
+                  offline" notice the single most saturated object in a healthy
+                  window. The eye went there first, every time, past the
+                  transcript and past the composer.
+
+                  The signal now lives where signals belong: the icon. The
+                  container is ordinary chrome with a warning-tinted border, so
+                  the banner still reads as "something is off" at a glance
+                  without outranking the conversation it is interrupting. This
+                  is the same argument the deleted "no agents online" banner
+                  lost above — spending the warning colour freely is how it
+                  stops meaning anything.
+                */
+                <div className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-surface1 border border-status-warning/35 text-foreground text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
                     <span className="truncate">
@@ -1304,7 +1337,7 @@ export function ChatView() {
                         key={a.agentName}
                         type="button"
                         onClick={() => currentSessionId && addParticipant(currentSessionId, a.agentName)}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface2 hover:bg-surface3 border border-border/60 text-foreground text-2xs font-medium transition-colors"
                       >
                         <Plus className="size-3" />
                         <span>Add @{a.agentName}</span>
@@ -1313,7 +1346,7 @@ export function ChatView() {
                     <button
                       type="button"
                       onClick={() => setViewMode('mission')}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-status-warning/20 hover:bg-status-warning/30 text-status-warning text-2xs font-medium transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface2 hover:bg-surface3 border border-border/60 text-foreground text-2xs font-medium transition-colors"
                     >
                       <span>Connect</span>
                     </button>

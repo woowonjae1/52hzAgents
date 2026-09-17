@@ -13,6 +13,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { composerPillClass } from '@/components/ai-elements/composer-pill';
 import {
   currentModelFor,
   hydrateAgentModels,
@@ -411,11 +412,22 @@ export function AgentModelSwitcher({
           <button
             type="button"
             disabled={!anyOnline}
+            /*
+              This is the first pill in the composer's bottom control row, and
+              it used to be the odd one out: same geometry as its three
+              neighbours, but its own fill (`--surface2`), its own border alpha
+              and a `shadow-xs` none of the others carried. Four pills, three
+              treatments, on one 28px row — which is the kind of thing that
+              reads as "unfinished" without anyone being able to say why.
+
+              It shares their recipe now. The only thing it adds is the
+              disabled/offline state, which the others have no equivalent of.
+            */
             className={cn(
-              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium border transition-colors select-none shadow-xs',
+              composerPillClass,
               anyOnline
-                ? 'bg-surface2 hover:bg-surface3 border-border text-foreground'
-                : 'bg-surface2/40 border-border/60 text-muted-foreground/60 cursor-not-allowed',
+                ? 'text-foreground'
+                : 'opacity-60 cursor-not-allowed hover:bg-surface1 dark:hover:bg-white/[0.05]',
               className,
             )}
 

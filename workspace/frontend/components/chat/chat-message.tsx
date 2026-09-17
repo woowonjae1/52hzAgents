@@ -565,19 +565,75 @@ export const ChatMessage = memo(function ChatMessage({
     return (
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="group/usermsg py-2.5 select-text flex flex-col items-end w-full">
+          {/*
+            A TURN IS A THING YOU CAN POINT AT.
+
+            Every message was its own flat row: nothing answered the pointer
+            except the little icon strip fading in, so scrolling a long thread
+            gave no sense of which exchange you were reading. ChatGPT and Claude
+            both treat a prompt and its answer as one hoverable object, and that
+            is most of why their transcripts feel like an application rather
+            than a log.
+
+            Two parts. The hover plate is full-bleed — `-mx-3 px-3` widens the
+            row past the list's own 1rem gutter so the highlight runs to the
+            edges of the reading column instead of stopping at the text. It has
+            to be margin-and-padding rather than an absolutely-positioned
+            `::before`, because a pseudo-element behind this content would need
+            a negative z-index and would then paint behind the main pane's own
+            background, not on top of it.
+
+            `w-full` went with it: a block child already fills its container, so
+            the class was doing nothing except pinning the width to the parent's
+            and cancelling the negative margins it now has to outgrow.
+
+            And `mt-3` when this message OPENS a turn (a same-speaker burst sets
+            `hideHeader`, and those stay tight). Space, not a rule: the daybreak
+            separator is the only horizontal line this transcript draws, and it
+            means something. Rhythm does the same job without spending it.
+          */}
+          <div
+            className={cn(
+              'group/usermsg -mx-3 px-3 py-2.5 rounded-xl transition-colors duration-100',
+              'hover:bg-surface2/70 dark:hover:bg-surface1/70',
+              'select-text flex flex-col items-end',
+              !hideHeader && 'mt-3',
+            )}
+          >
             {/* Contained bubble card aligned to right */}
             <div className="max-w-[88%] sm:max-w-[80%] flex flex-col items-end">
               <div
                 className={cn(
                   'relative rounded-[22px] rounded-br-[6px] px-4.5 py-3',
-                  'bg-surface2/90 dark:bg-[#222228] text-foreground',
+                  /*
+                    OPAQUE, AND ON THE ELEVATION RAMP.
+
+                    `bg-surface2/90` composited to roughly #fefefe over the
+                    #fafafa content ground — a bubble a single value lighter
+                    than the page it floats on, held together by its border
+                    alone. Solid `--surface2` is the full four-value step, and
+                    it is the honest one: nothing behind a chat bubble wants to
+                    show through it.
+
+                    Shadows come from the ramp now rather than a hand-written
+                    dark-only drop. `shadow-sm` is `--elevation-2`, which on
+                    light carries the hairline ring the whole light ramp uses
+                    and on dark leads with the 1px inset highlight that is the
+                    only thing that makes a near-black surface read as raised.
+                    The literal it replaces had no highlight and no light-mode
+                    counterpart at all.
+
+                    Dark moves to `--surface3` because `--surface-sidebar` is
+                    `#15151a` now and `--surface2` (#18181e) sits too close to
+                    it to read as a different layer.
+                  */
+                  'bg-surface2 dark:bg-surface3 text-foreground',
                   'border border-border/80 dark:border-white/[0.08]',
-                  'shadow-xs dark:shadow-[0_2px_12px_rgba(0,0,0,0.25)]',
+                  'shadow-sm',
                   'transition-all duration-150 break-words'
                 )}
               >
-                <div className="text-sm leading-relaxed font-normal select-text">
+                <div className="reading-prose font-normal select-text">
                   <MarkdownContent
                     content={message.content}
                     agentNames={agentNames}
@@ -588,8 +644,16 @@ export const ChatMessage = memo(function ChatMessage({
                 </div>
               </div>
 
-              {/* Minimalist Hover Actions & Status Row */}
-              <div className="flex items-center gap-2 mt-1 px-1.5 select-none">
+              {/*
+                Minimalist Hover Actions & Status Row.
+
+                `pe-1.5` rather than `px-1.5`: the row is the last child of an
+                `items-end` column, so its END edge is what lines up with the
+                bubble above it, and a symmetric inset was quietly pulling the
+                timestamp 6px off that line for no reason — the start side has
+                nothing to clear.
+              */}
+              <div className="flex items-center gap-2 mt-1 pe-1.5 select-none">
                 {isCurrentUser && message.deliveryStatus && (
                   <span className="text-3xs font-mono">
                     {message.deliveryStatus === 'sending' && (
@@ -615,7 +679,25 @@ export const ChatMessage = memo(function ChatMessage({
                   </span>
                 )}
 
-                <div className="flex items-center gap-1 opacity-0 group-hover/usermsg:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
+                {/*
+                  `order-first` — THE TIMESTAMP HAS TO BE THE LAST THING IN
+                  THIS ROW.
+
+                  These three buttons are hidden with `opacity-0`, which hides
+                  them without giving back their ~66px of width. Written last
+                  in the markup they therefore held the row's end position at
+                  all times, and the timestamp — the only thing here that is
+                  always visible — floated 66px short of the bubble's edge with
+                  apparently nothing to its right. That reads as a bug in the
+                  alignment every time, because it is one.
+
+                  Ordering rather than moving the JSX: the buttons belong next
+                  to the handlers they call, and an edit that drags a
+                  forty-line block across a status row to fix a visual
+                  alignment is a worse diff than one word. Actions to the start
+                  of the row is also where ChatGPT and Claude put them.
+                */}
+                <div className="order-first flex items-center gap-1 opacity-0 group-hover/usermsg:opacity-100 focus-within:opacity-100 transition-opacity duration-150">
                   {/*
                     "EDIT AS NEW MESSAGE", AND IT SAYS SO.
 
@@ -694,7 +776,31 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className={cn('group/agentmsg select-text selectable', hideHeader ? 'pb-3.5' : 'py-3.5')}>
+        {/* Same hover plate as the user turn above — see the comment there. */}
+        <div
+          className={cn(
+            'group/agentmsg relative -mx-3 px-3 rounded-xl transition-colors duration-100',
+            'hover:bg-surface2/70 dark:hover:bg-surface1/70',
+            'select-text selectable',
+            hideHeader ? 'pb-3.5' : 'py-3.5',
+            /*
+              A reply should arrive, not blink into existence. 160ms and a 2px
+              rise — under the shell's own 150ms budget for anything the user
+              did not ask for, and small enough that it reads as the text
+              settling rather than as a card animating in.
+
+              ONLY THE NEWEST MESSAGE. This list is virtualised: rows mount and
+              unmount as they cross the viewport, so animating every mount
+              would make the whole transcript twinkle while you scroll through
+              it — which is the opposite of the calm this is for. `isLast` is
+              the one row that mounts because something actually happened.
+
+              `motion-safe:` because a rise is motion, and the file already
+              respects `prefers-reduced-motion` for the working indicator.
+            */
+            isLast && 'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-150',
+          )}
+        >
       <div className="flex items-start gap-3">
         {hideHeader ? (
           <div className="size-7 shrink-0" aria-hidden />
@@ -713,7 +819,7 @@ export const ChatMessage = memo(function ChatMessage({
           {/* Identity Header */}
           {!hideHeader && (
           <div className="flex items-baseline gap-2 select-none">
-            <span className="text-[13.5px] font-semibold text-foreground tracking-tight">
+            <span className="text-sm font-semibold text-foreground tracking-tight">
               {message.senderName}
             </span>
             {agent?.agentType && (
@@ -769,7 +875,7 @@ export const ChatMessage = memo(function ChatMessage({
               </div>
             </div>
           ) : cleanContent ? (
-            <div className="text-[14px] leading-[1.75] text-foreground font-normal tracking-[-0.005em] select-text selectable">
+            <div className="reading-prose text-foreground font-normal select-text selectable">
               <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
             </div>
           ) : null}
@@ -884,11 +990,46 @@ export const ChatMessage = memo(function ChatMessage({
 
             `focus-within` is not decoration — without it the row cannot be
             reached by keyboard at all, because it never becomes visible.
+
+            IT ALSO MUST NOT RESERVE ITS HEIGHT.
+
+            Hiding it with `opacity-0` alone left the row in flow: a full 28px
+            of toolbar plus the parent's 10px `space-y-2.5`, invisible, under
+            every reply in the transcript. With the agent turn's own `py-3.5`
+            and the user bubble's `py-2.5` on either side, two consecutive
+            turns sat ~100px apart with nothing drawn in between, and the
+            channel read like a blog post rather than a tool. That gap was
+            never a spacing decision — no value in this file says 100 — it was
+            four paddings and a hidden control adding up.
+
+            So the hidden state comes OUT of flow entirely and floats in the
+            padding below the message, which is dead space anyway and exactly
+            where the toolbar belongs when it does appear. The pinned copy
+            under the newest reply stays in flow, because there the row is real
+            content and the transcript should end above it, not on top of it.
+
+            Absolute rather than a collapsed height on purpose: this list is
+            virtualised and `measureElement` observes each row, so a hover that
+            changed a row's height would remeasure it and shove everything
+            below it down while the pointer was still moving.
+
+            `pointer-events-none` while hidden matters for the same reason the
+            opacity does — an invisible toolbar that still swallows clicks over
+            the gap between turns is worse than a visible one.
           */}
           <div
             className={cn(
-              'pt-0.5 transition-opacity duration-150',
-              !isLast && 'opacity-0 group-hover/agentmsg:opacity-100 focus-within:opacity-100',
+              'transition-opacity duration-150',
+              isLast
+                ? 'pt-0.5'
+                // Offsets are measured from the PADDING BOX of the positioned
+                // ancestor, which now carries the hover plate's `px-3`. So the
+                // text column starts at 12px (that padding) + 28px (avatar) +
+                // 12px (the row's gap) = 52px, and the end side gives the same
+                // 12px back. These three numbers move together — changing the
+                // plate's padding without changing these silently slides the
+                // toolbar out from under the text it belongs to.
+                : 'absolute start-13 end-3 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
             )}
           >
             <MessageActions

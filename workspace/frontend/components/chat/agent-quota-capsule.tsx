@@ -9,6 +9,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import type { AgentUsage, AgentTokenStat, WorkspaceTokenStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { headerChipClass } from '@/components/headers/header-chip';
 
 interface AgentQuotaCapsuleProps {
   /** 建议展示的 agent 名（通常为当前选中模型所属），面板内可切换到其他 agent */
@@ -262,8 +263,10 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           <button
             type="button"
             className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border ui-transition duration-200 select-none',
-              'bg-surface2/80 hover:bg-surface3/90 border-border hover:border-border text-foreground',
+              headerChipClass,
+              // Semantic state stays local — the shape does not say "this
+              // agent's quota could not be parsed", and the chip recipe should
+              // not have to know that it might.
               isUnparsed && 'border-status-warning/40 bg-status-muted-warning text-status-warning',
               className
             )}

@@ -168,7 +168,22 @@ export function Sidebar() {
       className={cn(
         // `top` clears the titlebar band, which is 0px in the browser. The
         // sidebar is `fixed`, so the wrapper's padding does not reach it.
-        'fixed overflow-hidden bg-surface-sidebar border-r border-border shadow-[1px_0_0_0_rgba(0,0,0,0.02)] dark:shadow-[1px_0_0_0_rgba(255,255,255,0.02)] top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
+        /*
+          The sidebar's outer edge is the vertical half of the one seam that
+          matters — chrome against content — so it draws `--border-chrome`
+          rather than the same hairline used between rows INSIDE it. Two
+          different jobs were being done by one alpha.
+
+          And it casts. The shadow here used to be `1px 0 0 0 rgba(0,0,0,0.02)`
+          — a second hairline at 2% alpha, i.e. a shadow with no blur, which is
+          a border by another name and invisible next to a real one. A 3px cast
+          onto the content ground is what makes the rail read as standing in
+          front of the transcript instead of being cut out of the same sheet;
+          in dark it needs a wider, heavier one because the raised material is
+          the lighter of the two and the cast is the only thing separating them
+          below the lit edge.
+        */
+        'fixed overflow-hidden bg-surface-sidebar border-r border-border-chrome shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_10px_-2px_rgba(0,0,0,0.55)] top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
         // No width transition mid-drag, or the edge visibly lags the cursor.
         // `width` only — `transition-all` also animated the border, padding and
         // colours on every open/close, and at 300ms the panel visibly trailed

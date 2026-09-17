@@ -25,8 +25,24 @@
   --surface3: #e8e8ed;
   --surface4: #dcdee4;
   --surface-diff-empty: #f1f2f5;
-  --surface-sidebar: #f4f4f6;
-  --surface-sidebar-hover: #eaecef;
+  /*
+    CHROME IS A DIFFERENT MATERIAL FROM CONTENT, NOT A NEIGHBOURING STEP.
+
+    This was `#f4f4f6` against a `--surface0` content ground of `#fafafa` — six
+    values of 255 apart, which `.app-header`'s own comment already admitted.
+    At that distance the titlebar, the sidebar, every view header and the
+    transcript all read as one undifferentiated sheet, and the window lost the
+    single strongest cue that it is an application rather than a page.
+
+    Two things move it apart now, and both matter. Lightness: ~17/255, about 5
+    L* units — more than Notion's sidebar step, less than Slack's, which is the
+    band where a desktop app reads refined rather than either flat or loud.
+    And TEMPERATURE: the chrome carries a slight blue cast while the content
+    ground stays neutral. The tonal difference is what sells it as another
+    substance; lightness alone just reads as a dimmer copy of the same one.
+  */
+  --surface-sidebar: #e9ebf0;
+  --surface-sidebar-hover: #dfe2e9;
   --surface-workspace: #fafafa;
   /*
    * THE ONE GROUND FOR ANYTHING THAT FLOATS — dialog, sheet, dropdown, popover,
@@ -56,11 +72,50 @@
   /* Borders - Hairline calibrated for crisp desktop boundaries */
   --border: rgba(0, 0, 0, 0.095);
   --border-accent: rgba(0, 0, 0, 0.16);
+  /*
+    THE ONE SEAM: chrome against content.
+
+    `--border` is the hairline between things on the SAME surface — rows in a
+    list, sections of a card — and at 0.095 alpha it is correctly almost
+    invisible. The sidebar's outer edge and the view header's underside are not
+    that: they are where one material ends and another begins, and they were
+    drawing the same hairline as a table rule. This is the only boundary in the
+    shell that is allowed to be seen without being looked for.
+  */
+  --border-chrome: rgba(0, 0, 0, 0.14);
 
   /* Brand — Modern Indigo/Monochrome */
   --accent: #09090b;
   --accent-bright: #000000;
   --accent-foreground: #ffffff;
+
+  /*
+    ── Brand accent ──
+
+    The palette was achromatic on purpose, and mostly still is: `--accent` and
+    `--primary` stay near-black across 400+ sites, and nothing that is merely
+    *present* gets a hue. But achromatic-everywhere had a cost the earlier pass
+    did not price in — with no positive colour anywhere, the loudest pixels in
+    a healthy window were whatever status happened to be amber, so a routine
+    "an agent is offline" notice became the first thing the eye landed on. A
+    warning colour can only mean something if it is not the only colour.
+
+    So: three positions, and a hard ceiling of three. The focus ring, the send
+    button, and the selected thread in the sidebar — a state, an action and a
+    location. Nothing decorative, no tinted headers, no coloured icons.
+
+    The hue is not a new decision. `#1C6EA4` is the default body colour of the
+    SignalMark (components/brand/signal-mark.tsx), so the accent is the mark's
+    own blue rather than a fourth opinion about what this product looks like.
+    It is deliberately desaturated: a 60%-saturation blue at these sizes reads
+    as a web framework's default button.
+  */
+  --brand: #1c6ea4;
+  --brand-hover: #18608f;
+  --brand-foreground: #ffffff;
+  /* Fill behind a selected row — tinted, not saturated. */
+  --brand-subtle: rgba(28, 110, 164, 0.10);
+  --brand-border: rgba(28, 110, 164, 0.28);
 
   /* Semantic */
   --destructive: #ef4444;
@@ -121,7 +176,12 @@
   --muted: #f4f4f6;
   --muted-foreground: #64748b;
   --input: #f4f4f6;
-  --ring: #09090b;
+  /*
+    The focus ring is the first of the accent's three positions. It was
+    near-black, which on this ground is indistinguishable from a border and
+    left keyboard navigation with no visible thread to follow.
+  */
+  --ring: var(--brand);
   /*
     P4 scale recalibration. 12px was a card radius on a surface that is not made
     of cards — at `rounded-lg`'s 216 call sites it read soft rather than dense,
@@ -136,6 +196,33 @@
 
   /* ChatGPT & Claude desktop standardized reading column width (~860px max) */
   --chat-column: min(860px, 100%);
+
+  /*
+    ── The reading scale ──
+
+    THE TRANSCRIPT IS NOT UI, AND WAS BEING SET AS IF IT WERE.
+
+    Everything else in this window is a control, a label or a list row, and the
+    P4 ladder (15/13/12/11/10) is tuned for exactly that: dense, glanceable,
+    read in fragments. The transcript is the one surface people actually READ —
+    paragraphs, minutes at a time — and it was set at 14px, which is not a step
+    on that ladder at all. It was "one size up from UI text", which is what a
+    reading surface looks like when nobody decided it was one.
+
+    16px with a 1.7 measure is where ChatGPT and Claude's desktop clients sit,
+    and at an 860px column that lands near the 70-character line that typographic
+    convention has converged on for continuous prose. The agent's name goes to
+    the UI ladder's own `sm` (13px) rather than the 13.5 it invented, because a
+    speaker label IS a UI label — the contrast between the two is what tells the
+    eye where the reading starts.
+
+    These are variables, not literals at the call sites, because the same pair
+    has to hold for the message body, the user's own bubble and everything
+    `.markdown-content` renders inside them. Three places had three answers.
+  */
+  --reading-size: 16px;
+  --reading-leading: 1.7;
+  --reading-tracking: -0.006em;
 
   /*
     ── Elevation ──
@@ -174,8 +261,23 @@
   --surface3: #22222c;
   --surface4: #2e2e3a;
   --surface-diff-empty: #131317;
-  --surface-sidebar: #0d0d10;
-  --surface-sidebar-hover: #17171e;
+  /*
+    Same decision as `:root`, taken in the direction this ground allows.
+
+    On light, chrome goes DOWN from the content ground; here there is no room
+    below `#09090b`, so chrome goes UP and reads as a rail lifted off a deep
+    content well — which is what VS Code, Cursor and Linear all do in dark.
+    `#0d0d10` was four values off the content ground: the same non-boundary as
+    the light theme's six, just harder to notice because everything down here
+    is dark. `#15151a` is twelve, which at this end of the range is plainly
+    two materials, and it keeps the same faint blue cast as the light chrome.
+
+    It also lands just under `--surface2` (`#18181e`), so a selected sidebar
+    row can no longer be told apart by `bg-surface2` alone — see the brand
+    tint, which is what marks selection now.
+  */
+  --surface-sidebar: #15151a;
+  --surface-sidebar-hover: #1e1e26;
   --surface-workspace: #09090b;
   /* The value the five hardcoded overlay hexes were all groping for. */
   --surface-overlay: #16161c;
@@ -191,11 +293,31 @@
   /* Borders - Fine translucent micro-borders with light spill */
   --border: rgba(255, 255, 255, 0.09);
   --border-accent: rgba(255, 255, 255, 0.16);
+  /*
+    The chrome seam, dark. A LIT line, not a dark one: chrome is the raised
+    material here, so the boundary is the lit edge of the thing standing up,
+    which is the same reason the dark elevation ramp leads with an inset
+    highlight. A black rule between two near-blacks is invisible.
+  */
+  --border-chrome: rgba(255, 255, 255, 0.10);
 
   /* Brand — Luminous Monochrome + Subtle Violet Accent */
   --accent: #f4f4f6;
   --accent-bright: #ffffff;
   --accent-foreground: #09090b;
+
+  /*
+    Brand accent, dark. `#1C6EA4` holds on white and goes muddy on obsidian —
+    at 13% luminance against a 3% ground there is not enough separation for a
+    12px label or a 1px ring. Same hue, lifted to where it reads, and the
+    subtle fill needs roughly half again the alpha for equivalent presence
+    against a dark ground.
+  */
+  --brand: #4a9cd4;
+  --brand-hover: #63aede;
+  --brand-foreground: #09090b;
+  --brand-subtle: rgba(74, 156, 212, 0.16);
+  --brand-border: rgba(74, 156, 212, 0.34);
 
   /* Semantic */
   --destructive: #f87171;
@@ -256,7 +378,7 @@
   --muted: #18181e;
   --muted-foreground: #a1a1aa;
   --input: #18181e;
-  --ring: #f4f4f6;
+  --ring: var(--brand);
 
   /*
     Dark elevation. See the light ramp in `:root` for why this is a different
@@ -311,7 +433,15 @@
 
   /** Paseo — borders, brand, controls **/
   --color-border-accent: var(--border-accent);
+  --color-border-chrome: var(--border-chrome);
   --color-accent-bright: var(--accent-bright);
+
+  /** The brand accent's three positions: focus ring, send, selected thread. **/
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-subtle: var(--brand-subtle);
+  --color-brand-border: var(--brand-border);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-scrollbar-handle: var(--scrollbar-handle);
@@ -798,16 +928,24 @@ html {
 }
 
 /* Windows 11 Mica & macOS Vibrancy elevated translucency */
+/*
+   The translucent Mica/Vibrancy chrome tracks the opaque values above. It is
+   NOT simply those values with an alpha: a 0.72-alpha fill composites against
+   whatever the OS backdrop is showing, so it lands lighter than its own hex on
+   a light desktop and darker on a dark one. Both are pulled a step further
+   from the content ground than the opaque pair to leave the composite in the
+   same place the opaque chrome sits.
+*/
 :root[data-desktop][data-win11].dark,
 :root[data-desktop][data-platform='darwin'].dark {
-  --surface-sidebar: rgba(13, 13, 16, 0.72);
-  --surface-sidebar-hover: rgba(25, 25, 32, 0.80);
+  --surface-sidebar: rgba(21, 21, 26, 0.76);
+  --surface-sidebar-hover: rgba(30, 30, 38, 0.84);
 }
 
 :root[data-desktop][data-win11]:not(.dark),
 :root[data-desktop][data-platform='darwin']:not(.dark) {
-  --surface-sidebar: rgba(244, 244, 246, 0.76);
-  --surface-sidebar-hover: rgba(230, 232, 236, 0.85);
+  --surface-sidebar: rgba(231, 234, 240, 0.80);
+  --surface-sidebar-hover: rgba(219, 223, 231, 0.88);
 }
 
 :root[data-desktop] .app-titlebar {
@@ -849,6 +987,32 @@ html {
   app-region: no-drag;
   -webkit-app-region: no-drag;
 }
+
+/*
+  THE OPT-OUT HAS TO REACH CONTROLS THAT ONLY *OVERLAP* A DRAG BAND.
+
+  The two rules above (and the `.app-header` pair below) only reach DESCENDANTS
+  of a drag region. That is not the same set as "controls the drag region
+  covers": `-webkit-app-region` is computed from rectangles, and Chromium
+  subtracts a `no-drag` rect from a `drag` rect wherever it lands — but an
+  element that merely paints on top, without being inside, subtracts nothing.
+  It stays clickable-looking and is not clickable.
+
+  That is exactly what the expand-sidebar button in wrapper.tsx does. It is
+  positioned against the main pane, not the header, and `top-4` puts it inside
+  the header's 48px band — so it appears only while the sidebar is collapsed,
+  and lands in the one place where a plain click drags the window, a
+  double-click maximises it, and a RIGHT-click opens Windows' own window menu.
+
+  A rect-based property needs a rect-based escape hatch, so this one is not
+  scoped to an ancestor. Opting out is explicit either way — `[data-no-drag]`
+  has to be written on the element — so widening the selector costs nothing and
+  removes the trap for the next floating control that crosses the band.
+*/
+:root[data-desktop] [data-no-drag] {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+}
 }
 
 /**
@@ -868,7 +1032,13 @@ html {
   gap: 0.5rem;
   padding-inline-start: 1.25rem;
   padding-inline-end: max(1.25rem, var(--window-controls-inset, 0px));
-  border-bottom: 1px solid var(--border);
+  /*
+    `--border-chrome`, not `--border`. This is the boundary the whole shell is
+    organised around — the comment below explains that the titlebar drops its
+    own rule precisely so that this one can be the only line up here. A line
+    carrying that much load cannot be drawn at table-rule alpha.
+  */
+  border-bottom: 1px solid var(--border-chrome);
   /*
     CHROME COLOUR, NOT CONTENT COLOUR.
 
@@ -943,6 +1113,65 @@ html {
   padding-inline-end: 1.25rem !important;
   padding-right: 1.25rem !important;
 }
+}
+
+/**
+ * ── The inactive window ──
+ *
+ * `data-window-inactive` is stamped on <html> by DesktopIntegration whenever
+ * the OS moves focus to another window. See the comment there for why it is
+ * desktop-only and why it needs no IPC.
+ *
+ * What changes is deliberately small and deliberately NOT uniform. A blanket
+ * `opacity` or `filter: grayscale()` on the shell is the obvious version and
+ * the wrong one: it fades the CONTENT too, so a transcript you backgrounded in
+ * order to read something next to it becomes harder to read — the opposite of
+ * what the state is for. Text stays exactly as legible; what recedes is the
+ * chrome's colour and the accent.
+ *
+ * Three things move:
+ *   · the chrome desaturates and closes slightly toward the content ground, so
+ *     the window reads as one flat object rather than a live tool;
+ *   · the brand accent — the only hue in the app — drops most of the way out,
+ *     because a saturated marker on an inactive window competes with whatever
+ *     the user actually switched to;
+ *   · the sidebar's cast shadow softens, since the rail is no longer "in front
+ *     of" anything the user is working in.
+ *
+ * `transition` on the variables themselves so the change reads as the window
+ * settling rather than a repaint. 120ms: faster than the shell's own 150ms,
+ * because this follows an OS event the user already saw happen.
+ */
+:root[data-desktop][data-window-inactive]:not(.dark) {
+  --surface-sidebar: #eef0f3;
+  --surface-sidebar-hover: #e6e9ee;
+  --border-chrome: rgba(0, 0, 0, 0.09);
+  --brand: #7d93a3;
+  --brand-subtle: rgba(125, 147, 163, 0.10);
+  --brand-border: rgba(125, 147, 163, 0.26);
+}
+
+:root[data-desktop][data-window-inactive].dark {
+  --surface-sidebar: #131317;
+  --surface-sidebar-hover: #1a1a20;
+  --border-chrome: rgba(255, 255, 255, 0.07);
+  --brand: #6b7f8e;
+  --brand-subtle: rgba(107, 127, 142, 0.14);
+  --brand-border: rgba(107, 127, 142, 0.28);
+}
+
+:root[data-desktop] aside,
+:root[data-desktop] .app-header,
+:root[data-desktop] .app-titlebar {
+  transition: background-color 120ms linear, border-color 120ms linear, box-shadow 120ms linear;
+}
+
+/* The rail stops casting onto content it is no longer in front of. */
+:root[data-desktop][data-window-inactive] aside:not([aria-label='Studio Panel']) {
+  box-shadow: 1px 0 0 0 rgba(0, 0, 0, 0.04);
+}
+:root[data-desktop][data-window-inactive].dark aside:not([aria-label='Studio Panel']) {
+  box-shadow: 1px 0 0 0 rgba(0, 0, 0, 0.5);
 }
 
 /**
@@ -1048,6 +1277,55 @@ html {
 [data-slot=card-title] {
   @apply font-medium;
 }
+
+/**
+ * ── `.reading-prose` — the transcript's type ──
+ *
+ * One declaration of the reading scale, applied to the agent's answer and to
+ * the user's own bubble, and inherited by everything `.markdown-content`
+ * renders inside them.
+ *
+ * THE POINT IS THAT THE BLOCK ELEMENTS STOP RESTATING IT. `p`, `ul` and `ol`
+ * each carried `text-[13.5px] sm:text-sm`, the blockquote `text-[13px]`, the
+ * tables `text-xs`, and the four headings 18/16/14.5/13.5 — eight absolute
+ * sizes with no arithmetic between them, so the body could not be changed
+ * without re-deciding all eight. They are `em` here: the ONLY absolute size in
+ * the transcript is `--reading-size`, and everything else is a ratio of it.
+ *
+ * The other half is colour. The body was `text-foreground/95`, lists `/90`,
+ * blockquotes `/85`, table cells `/90` — four opacities of the same token,
+ * none of them a decision anyone would defend out loud, all of them making the
+ * one surface meant for sustained reading slightly harder to read than the
+ * labels around it. Body text is `--foreground`. The muted tiers still exist
+ * and still mean something; they are just not for paragraphs.
+ */
+.reading-prose {
+  font-size: var(--reading-size);
+  line-height: var(--reading-leading);
+  letter-spacing: var(--reading-tracking);
+}
+
+/*
+  Headings step 1.3 / 1.12 / 1 off the body and separate by weight below that.
+  A 16px body puts h1 at ~21px, which is a heading inside a message rather than
+  a page title — the transcript is already inside a view that has one.
+*/
+.reading-prose :where(h1) { font-size: 1.3em; }
+.reading-prose :where(h2) { font-size: 1.12em; }
+.reading-prose :where(h3, h4) { font-size: 1em; }
+.reading-prose :where(h1, h2, h3, h4) { line-height: 1.35; }
+
+/*
+  Mono runs small next to a proportional face of the same nominal size — the
+  x-height is taller and the glyphs are wider, so matching sizes makes code
+  look louder than the prose explaining it. 0.875em is the usual correction,
+  and it is relative so it tracks `--reading-size`.
+*/
+.reading-prose :where(code, kbd, samp) { font-size: 0.875em; }
+.reading-prose :where(pre) { font-size: 0.8em; line-height: 1.6; }
+
+/* Tables are scanned, not read, so they keep a denser measure than the prose. */
+.reading-prose :where(table) { font-size: 0.85em; line-height: 1.5; letter-spacing: 0; }
 
 /* ── Syntax Highlighting (highlight.js) ── */
 @import 'highlight.js/styles/github-dark.css';

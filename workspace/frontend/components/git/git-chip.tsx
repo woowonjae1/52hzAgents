@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { headerChipClass } from '@/components/headers/header-chip';
 import { workspaceApi } from '@/lib/api';
 import { type GitStatus } from '@/lib/use-git-status';
 import { toast } from 'sonner';
@@ -234,7 +235,7 @@ export function GitChip({
       <Hint label={`${status.dir}${status.commit ? ` @ ${status.commit}` : ''}`}>
         <button
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface2 border border-border-accent text-foreground hover:bg-surface3 transition-colors"
+          className={headerChipClass}
         >
           <GitBranch className="size-3 text-foreground-muted shrink-0" />
           <span className="font-medium max-w-[85px] sm:max-w-[120px] truncate">{status.branch || 'detached'}</span>

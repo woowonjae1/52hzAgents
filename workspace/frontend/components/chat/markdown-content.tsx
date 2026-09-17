@@ -235,31 +235,31 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
   const components: Components = useMemo(() => ({
     // Block elements
     h1: ({ children }) => (
-      <h1 className="text-[18px] font-semibold mt-6 mb-3 pb-1.5 border-b border-border/60 first:mt-0 tracking-tight text-foreground">{children}</h1>
+      <h1 className="font-semibold mt-6 mb-3 pb-1.5 border-b border-border/60 first:mt-0 tracking-tight text-foreground">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="text-[16px] font-semibold mt-5 mb-2.5 first:mt-0 tracking-tight text-foreground">{children}</h2>
+      <h2 className="font-semibold mt-5 mb-2.5 first:mt-0 tracking-tight text-foreground">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="text-[14.5px] font-medium mt-4 mb-2 first:mt-0 text-foreground">{children}</h3>
+      <h3 className="font-semibold mt-4 mb-2 first:mt-0 text-foreground">{children}</h3>
     ),
     h4: ({ children }) => (
-      <h4 className="text-[13.5px] font-medium mt-3 mb-1.5 first:mt-0 text-foreground">{children}</h4>
+      <h4 className="font-semibold mt-3 mb-1.5 first:mt-0 text-foreground">{children}</h4>
     ),
     p: ({ children }) => (
-      <p className="leading-[1.8] text-foreground/95 mb-3 last:mb-0 text-[13.5px] sm:text-sm font-normal">
+      <p className="text-foreground mb-4 last:mb-0 font-normal">
         {renderMentions(children, agentNames)}
       </p>
     ),
     ul: ({ children }) => (
-      <ul className="list-disc pl-5 my-2.5 space-y-1.5 text-[13.5px] sm:text-sm leading-[1.75] text-foreground/90 font-normal">{children}</ul>
+      <ul className="list-disc pl-5 my-3 space-y-1.5 text-foreground font-normal marker:text-foreground-extra-muted">{children}</ul>
     ),
     ol: ({ children }) => (
-      <ol className="list-decimal pl-5 my-2.5 space-y-1.5 text-[13.5px] sm:text-sm leading-[1.75] text-foreground/90 font-normal">{children}</ol>
+      <ol className="list-decimal pl-5 my-3 space-y-1.5 text-foreground font-normal marker:text-foreground-muted">{children}</ol>
     ),
     li: ({ children }) => <li className="pl-0.5">{renderMentions(children, agentNames)}</li>,
     blockquote: ({ children }) => (
-      <blockquote className="border-l-[3px] border-primary/50 bg-surface1/60 dark:bg-surface2/50 rounded-r-lg pl-3.5 pr-3 py-2 my-3 text-foreground/85 not-italic text-[13px] leading-[1.75] shadow-xs">
+      <blockquote className="border-l-[3px] border-brand/60 bg-surface1/70 dark:bg-surface2/60 rounded-r-lg pl-3.5 pr-3 py-2 my-4 text-foreground not-italic">
         {children}
       </blockquote>
     ),
@@ -268,14 +268,14 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     // Tables
     table: ({ children }) => (
       <div className="overflow-x-auto my-3.5 rounded-lg border border-border">
-        <table className="w-full text-xs text-left border-collapse">{children}</table>
+        <table className="w-full text-left border-collapse">{children}</table>
       </div>
     ),
     thead: ({ children }) => <thead className="bg-surface2/90 text-foreground font-semibold border-b border-border">{children}</thead>,
     tbody: ({ children }) => <tbody className="divide-y divide-border/60 bg-surface1/40">{children}</tbody>,
     tr: ({ children }) => <tr className="hover:bg-surface2/50 transition-colors">{children}</tr>,
-    th: ({ children }) => <th className="px-3.5 py-2.5 text-xs font-semibold text-foreground tracking-tight">{children}</th>,
-    td: ({ children }) => <td className="px-3.5 py-2 text-xs text-foreground/90 leading-relaxed">{children}</td>,
+    th: ({ children }) => <th className="px-3.5 py-2.5 font-semibold text-foreground tracking-tight">{children}</th>,
+    td: ({ children }) => <td className="px-3.5 py-2 text-foreground">{children}</td>,
 
     // Code
     code: ({ className, children, ...props }) => {
@@ -283,7 +283,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       if (isInline) {
         return (
           <code
-            className="bg-surface2 text-foreground font-mono text-[0.88em] px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal mx-0.5"
+            className="bg-surface1 text-foreground font-mono px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal"
             {...props}
           >
             {children}

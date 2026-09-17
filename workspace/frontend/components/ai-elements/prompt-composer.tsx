@@ -25,6 +25,7 @@ import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession } from '@/lib/typ
 import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
+import { composerPillClass } from './composer-pill';
 import { WorkflowPlanDialog } from '@/components/chat/orchestration-control';
 
 export type OrchestrationMode = 'dynamic' | 'master' | 'workflow';
@@ -107,13 +108,8 @@ function isImageFile(file: File): boolean {
   return file.type.startsWith('image/');
 }
 
-/** 底部控制条上的紧凑胶囊按钮样式 (Micro-pill tactile style) */
-const pillButton = cn(
-  'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full select-none text-2xs font-medium',
-  'text-muted-foreground hover:text-foreground bg-surface2/60 hover:bg-surface3/80 dark:bg-white/[0.04] dark:hover:bg-white/[0.08]',
-  'border border-border/40 hover:border-border/80 transition-all duration-150 active:scale-95',
-  'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary/40'
-);
+/** See composer-pill.ts — shared with AgentModelSwitcher on the same row. */
+const pillButton = composerPillClass;
 
 export function PromptComposer({
   onSend,
@@ -684,19 +680,45 @@ export function PromptComposer({
         onDrop={handleDrop}
         className={cn(
           /*
-           * Floating Island Container (ChatGPT / Claude Desktop grade).
-           * High-radius (24px) pill-card with soft-glow multi-tier elevation,
-           * frosted glass blur, and razor hairline borders.
+           * The composer is the control the user looks at longest, so it is
+           * the one element in the window that is allowed to be the visual
+           * centre of gravity. Two things were stopping it.
+           *
+           * IT WAS DARKER THAN THE PAGE. `bg-surface1/90` is #f4f4f6 over a
+           * #fafafa ground: a recessed well, not a floating island, and the
+           * comment this replaces claimed the opposite. Raised means brighter
+           * on a light ground, so it is `--surface2` — and opaque, because a
+           * translucent input that shows the transcript scrolling underneath
+           * it is a novelty the hundredth time you use it.
+           *
+           * THE SHADOWS WERE HAND-WRITTEN. Six literals across resting and
+           * focus, none of them on the ramp in globals.css, and the light pair
+           * had no ring while the dark pair had an inset highlight the light
+           * one could not express. `shadow-lg`/`shadow-xl` are `--elevation-4`
+           * and `-5`, the app's top two steps, which is the correct claim: the
+           * composer floats over the whole transcript.
+           *
+           * `backdrop-blur-2xl` goes with the translucency. It was compositing
+           * a full-width layer every frame to blur something now painted over.
+           *
+           * Focus borrows the brand accent's ring rather than inventing a
+           * grey. It is the same colour the keyboard ring uses, which is the
+           * point — focus should look like one idea across the app.
            */
           'relative rounded-[24px] overflow-hidden transition-all duration-200',
-          'bg-surface1/90 dark:bg-[#16161b]/92 backdrop-blur-2xl',
-          'border border-border/80 dark:border-white/[0.12]',
-          'shadow-[0_8px_30px_rgba(0,0,0,0.06),0_1px_3px_rgba(0,0,0,0.04)]',
-          'dark:shadow-[0_12px_40px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.06),inset_0_1px_0_rgba(255,255,255,0.08)]',
-          'focus-within:border-foreground/20 dark:focus-within:border-white/25',
-          'focus-within:shadow-[0_12px_36px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.05)]',
-          'dark:focus-within:shadow-[0_16px_48px_rgba(0,0,0,0.65),0_0_0_1px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.12)]',
-          isDragging && 'border-primary ring-2 ring-primary/20 bg-surface2/90'
+          'bg-surface2',
+          /*
+            One token, no `dark:` variant. This read `border-border/80
+            dark:border-white/[0.10]`, and that hardcoded white was simply
+            `--border`'s own dark value written out again (0.10 against 0.09) —
+            a variant that restated what the token already says, and one more
+            same-specificity rule competing with the focus colour below for no
+            gain. `--border` covers both themes on its own.
+          */
+          'border border-border',
+          'shadow-lg focus-within:shadow-xl',
+          'focus-within:border-brand-border',
+          isDragging && 'border-brand ring-2 ring-brand/20'
         )}
       >
 
@@ -712,7 +734,9 @@ export function PromptComposer({
               {pendingFiles.map((pf, idx) => (
                 <div
                   key={idx}
-                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface2/80 border border-border/60 backdrop-blur-xs"
+                  // Inset into the composer like the pills are, and no blur —
+                  // there is nothing translucent left in here to blur through.
+                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface1 border border-border/60"
                 >
                   {pf.preview ? (
                     <img
@@ -721,7 +745,7 @@ export function PromptComposer({
                       className="size-7 rounded-lg object-cover border border-border/60 shrink-0"
                     />
                   ) : (
-                    <span className="size-7 rounded-lg bg-surface1 border border-border/60 flex items-center justify-center shrink-0 text-muted-foreground">
+                    <span className="size-7 rounded-lg bg-surface3 border border-border/60 flex items-center justify-center shrink-0 text-muted-foreground">
                       <FileIcon className="size-3.5" />
                     </span>
                   )}
@@ -825,7 +849,9 @@ export function PromptComposer({
             {currentMode !== 'dynamic' && (
               <Hint label={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}>
               <div
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface2 text-foreground-muted select-none"
+                // `--surface1`, not `--surface2`: same reason as the pills —
+                // this chip sits ON the composer, which is `--surface2`.
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface1 text-foreground-muted select-none"
               >
                 {currentMode === 'master' ? (
                   <>
@@ -932,8 +958,22 @@ export function PromptComposer({
                   isWorking
                     ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-md shadow-destructive/25 cursor-pointer'
                     : canSend
-                      ? 'bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/25 cursor-pointer'
-                    : 'bg-surface2/70 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
+                      /*
+                        Accent position two of three: the primary ACTION.
+
+                        It was `--primary`, which is near-black — the same
+                        value as the body text, the sidebar labels and every
+                        border-accent in the window. The one button that
+                        commits what you typed looked exactly like everything
+                        that merely sits there.
+
+                        `hover:bg-brand-hover` rather than `hover:opacity-90`:
+                        fading a filled button toward its background is a web
+                        default that makes the control look like it is turning
+                        off as you reach for it.
+                      */
+                      ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-md shadow-brand/25 cursor-pointer'
+                    : 'bg-surface1 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
                 )}
               >
                 <AnimatePresence mode="wait" initial={false}>

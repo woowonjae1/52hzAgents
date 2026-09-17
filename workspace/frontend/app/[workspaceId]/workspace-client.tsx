@@ -10,30 +10,17 @@ import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { Network } from 'lucide-react';
 
-export function WorkspaceLoadingSplash() {
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        {/* No plate: see the note in chat-view.tsx. */}
-        <SignalMark size={72} />
-        <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgent Studio</h1>
-          <p className="text-xs text-foreground-extra-muted mt-1.5">Loading your workspace…</p>
-        </div>
-      </div>
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-        <div className="h-full w-1/3 bg-primary rounded-full animate-[loading-bar_1.5s_ease-in-out_infinite]" />
-      </div>
-      <style>{`
-        @keyframes loading-bar {
-          0% { transform: translateX(-100%); }
-          50% { transform: translateX(150%); }
-          100% { transform: translateX(400%); }
-        }
-      `}</style>
-    </div>
-  );
-}
+/*
+  ONE LOADING SHELL, NOT TWO.
+
+  This was a byte-for-byte copy of the splash in wrapper.tsx, down to the
+  `@keyframes loading-bar` block — so the two screens the user sees back to back
+  while a workspace opens were maintained separately and could drift. It is
+  re-exported from the shell instead, which is also what turned it into the
+  app's real frame rather than a centred wordmark; see the note there.
+*/
+import { WorkspaceLoadingScreen as WorkspaceLoadingSplash } from '@/components/layout/wrapper';
+export { WorkspaceLoadingSplash };
 
 function setWorkspaceCookie(slug: string, token: string) {
   const maxAge = 30 * 24 * 60 * 60;

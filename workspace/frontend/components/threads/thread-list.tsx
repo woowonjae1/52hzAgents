@@ -148,8 +148,11 @@ function DMSection({
                 onClick={() => onSelect(dmId)}
                 className={cn(
                   'w-full flex items-center gap-2.5 p-2 rounded-lg text-left transition-colors relative',
+                  // Matches the session rows above: brand tint + brand rail.
+                  // The rail was `--primary`, i.e. near-black, which on the
+                  // sidebar ground read as a crop mark rather than a marker.
                   isSelected
-                    ? 'bg-surface2 text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-primary'
+                    ? 'bg-brand-subtle text-foreground font-medium before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-r-full before:bg-brand'
                     : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground'
                 )}
               >
@@ -403,9 +406,25 @@ const ThreadRow = memo(function ThreadRow({
       }}
       className={cn(
         'w-full flex items-center justify-between gap-2 ps-6 pe-2 py-1.5 rounded-lg text-left transition-colors relative group select-none cursor-pointer',
-        'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-border-accent',
+        'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+        /*
+          Accent position three of three: WHERE YOU ARE.
+
+          Selection was carried by fill alone — `--surface3` at 80% on light,
+          `--surface2` on dark — which asks a sidebar row to be told apart from
+          its hover state by a few values of grey. It was already marginal;
+          `--surface-sidebar` moving to `#15151a` in dark broke it outright,
+          because `--surface2` (`#18181e`) is now three values off the rail it
+          sits on and the selected thread simply stopped being visible.
+
+          The tinted fill plus the rail is what the DM rows below already do
+          (`before:bg-primary`), so this is the sidebar agreeing with itself
+          rather than a new idea — and the rail is the part that survives being
+          glanced at, since an edge marker does not have to compete with the
+          row's own text for contrast the way a wash does.
+        */
         isSelected
-          ? 'bg-surface3/80 dark:bg-surface2 text-foreground font-medium'
+          ? 'bg-brand-subtle text-foreground font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-brand'
           : 'hover:bg-surface2/60 text-foreground/85 hover:text-foreground',
         'has-data-[state=open]:bg-surface2/60',
         isActive && 'thread-wip',

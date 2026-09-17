@@ -9,6 +9,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import type { ChannelContextHealth, WorkspaceTokenStats } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { headerChipClass } from '@/components/headers/header-chip';
 
 interface ContextHealthIndicatorProps {
   channelName?: string;
@@ -222,7 +223,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
           <button
             type="button"
             className={cn(
-              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-2xs font-medium border ui-transition duration-200 select-none',
+              headerChipClass,
               'bg-surface2/80 hover:bg-surface3/90 shadow-xs',
               statusBadge.pillClass,
               className

@@ -116,6 +116,48 @@ export function DesktopIntegration() {
 
   const { resolvedTheme } = useTheme();
 
+  /*
+    ── Is this window the one you are looking at? ────────────────────────
+
+    Nothing in this app answered that. A backgrounded window rendered pixel
+    for pixel like the focused one — which is the single most reliable tell
+    that something is a web page wearing a window, because every native app
+    on both platforms answers it. macOS pulls the whole chrome toward grey;
+    Windows 11 is subtler but still drops the title and the caption glyphs.
+
+    NO IPC. `window`'s own focus/blur fire on OS window activation inside
+    Electron, so the main process does not need to forward anything and there
+    is no channel to keep in sync with preload.js. `document.hasFocus()` seeds
+    the initial value, because the app can be launched into the background
+    (tray, auto-start) and would otherwise spend its first paint claiming to
+    be focused.
+
+    Gated on `[data-desktop]`. A browser tab that loses focus is not the same
+    event — you switch tabs constantly and dimming the UI each time would be
+    noise, not information.
+
+    The attribute lands on <html>, so globals.css can dim chrome without a
+    single component knowing this exists.
+  */
+  React.useEffect(() => {
+    const root = document.documentElement;
+    if (!root.hasAttribute('data-desktop')) return;
+    const apply = (active: boolean) => {
+      if (active) root.removeAttribute('data-window-inactive');
+      else root.setAttribute('data-window-inactive', '');
+    };
+    apply(document.hasFocus());
+    const onFocus = () => apply(true);
+    const onBlur = () => apply(false);
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      root.removeAttribute('data-window-inactive');
+    };
+  }, []);
+
   // ── Sync light/dark theme to Electron nativeTheme & Mica material ─────
   React.useEffect(() => {
     if (!resolvedTheme) return;

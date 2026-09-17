@@ -45,29 +45,56 @@ import { useArtifacts } from '@/lib/artifacts-context';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { Network, X, PanelLeft, FileText, Globe, Activity } from 'lucide-react';
 
-function WorkspaceLoadingScreen() {
+/**
+ * THE FIRST FRAME IS THE WINDOW, NOT A SPLASH.
+ *
+ * This used to be a centred 72px mark over an empty ground, a pulsing wordmark,
+ * "Loading your workspace…", and an indeterminate bar sweeping the bottom edge
+ * — four separate ways of saying the same thing, on a screen that exists for
+ * a few hundred milliseconds. A web page does that because it genuinely has
+ * nothing yet. A desktop application paints its frame immediately and fills the
+ * frame in: VS Code, Slack and Linear all show you the rail, the header and the
+ * empty content well before they know a single thing about your data, which is
+ * why they feel like they open rather than load.
+ *
+ * So this draws the real chrome at the real dimensions — `--sidebar-width`,
+ * `--header-height`, `--surface-sidebar` against `--surface0`, the same
+ * `--border-chrome` seam — and the layout below simply replaces it. Nothing
+ * moves when the data lands, because nothing here is in a different place from
+ * where the app puts it.
+ *
+ * DELIBERATELY NO SPINNER AND NO PROGRESS BAR. An indeterminate bar communicates
+ * nothing except that time is passing, and it draws the eye to the one part of
+ * the window that is about to be replaced. The mark is present but still
+ * (`still`, so it does not start its idle turn during a load) at the size it
+ * actually renders at in the titlebar, so the brand does not jump either.
+ *
+ * `aria-busy` rather than a visible label: the state is worth announcing to a
+ * screen reader and not worth a sentence on screen.
+ */
+export function WorkspaceLoadingScreen() {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-5 animate-[pulse_2s_ease-in-out_infinite]">
-        {/* No plate: see the note in chat-view.tsx. `overflow-hidden` here was
-            also clipping the spout, which is the one animation a loading splash
-            actually wants. */}
-        <SignalMark size={72} />
-        <div className="text-center">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">52hzAgent Studio</h1>
-          <p className="text-xs text-foreground-extra-muted mt-1.5">Loading your workspace…</p>
+    <div
+      className="flex h-screen w-full overflow-hidden bg-surface0"
+      role="status"
+      aria-busy="true"
+      aria-label="Opening workspace"
+    >
+      <div
+        className="hidden md:flex shrink-0 flex-col bg-surface-sidebar border-e border-border-chrome"
+        style={{ width: 'var(--sidebar-width)' }}
+      >
+        <div className="flex items-center gap-2 px-5 shrink-0" style={{ height: 'var(--header-height)' }}>
+          <SignalMark size={16} still className="shrink-0" />
+          <span className="text-2xs font-medium tracking-tight text-foreground-extra-muted">52hzAgents</span>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-        <div className="h-full w-1/3 bg-primary rounded-full animate-[loading-bar_1.5s_ease-in-out_infinite]" />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <div
+          className="shrink-0 bg-surface-sidebar border-b border-border-chrome"
+          style={{ height: 'var(--header-height)' }}
+        />
       </div>
-      <style>{`
-        @keyframes loading-bar {
-          0% { transform: translateX(-100%); }
-          50% { transform: translateX(150%); }
-          100% { transform: translateX(400%); }
-        }
-      `}</style>
     </div>
   );
 }
@@ -272,6 +299,19 @@ export function Wrapper() {
                   <Hint label="Expand sidebar" side="right">
                     <button
                       onClick={sidebarToggle}
+                      /*
+                        `data-no-drag` — this button is positioned against the
+                        main pane, but `top-4` lands it inside `.app-header`'s
+                        48px band, which is the window's drag region on
+                        desktop. It is not a DESCENDANT of the header, so the
+                        header's own no-drag rule never reached it, and an
+                        app-region drag rect swallows whatever merely paints on
+                        top of it: the click moved the window, a double-click
+                        maximised it, and a right-click opened Windows' native
+                        window menu. Since the button only exists while the
+                        sidebar is collapsed, that was the whole symptom.
+                      */
+                      data-no-drag
                       /* `backdrop-blur` (bare) was the one site not on the blur
                          ramp — it reads `--blur`, which is still Tailwind's 8px.
                          `hover:scale-105` and `transition-all` went with it: a
