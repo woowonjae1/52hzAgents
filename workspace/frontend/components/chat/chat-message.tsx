@@ -3,7 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Crown, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
+import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
 import { toast } from 'sonner';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
@@ -834,24 +834,13 @@ export const ChatMessage = memo(function ChatMessage({
           </div>
         )}
 
-        <div className="flex-1 min-w-0 space-y-2.5">
+        <div className="flex-1 min-w-0 space-y-1.5">
           {/* Identity Header */}
           {!hideHeader && (
-          <div className="flex items-baseline gap-2 select-none">
-            <span className="text-sm font-semibold text-foreground tracking-tight">
+          <div className="flex items-baseline gap-2 select-none mb-0.5">
+            <span className="text-sm font-medium text-foreground tracking-tight">
               {message.senderName}
             </span>
-            {agent?.agentType && (
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2/90 text-foreground-muted font-mono border border-border/60">
-                {agent.agentType}
-              </span>
-            )}
-            {agent?.role === 'master' && (
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2/90 text-foreground-muted border border-border/60 inline-flex items-center gap-1">
-                <Crown className="size-2.5 text-amber-500/80" />
-                <span>Lead</span>
-              </span>
-            )}
             {timestamp && (
               <span className="text-3xs text-foreground-extra-muted font-mono ml-auto tabular-nums">
                 {timestamp}

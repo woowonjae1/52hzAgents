@@ -53,7 +53,15 @@ export function Reasoning({
       className={className}
       icon={<Brain className={cn(isStreaming && 'text-primary animate-pulse')} />}
       label={isStreaming ? 'Thinking' : 'Thought'}
-      meta={!isStreaming && durationText ? durationText : undefined}
+      meta={
+        !isStreaming
+          ? durationText
+            ? `${durationText} · ~${wordCount} words`
+            : wordCount > 0
+            ? `~${wordCount} words`
+            : undefined
+          : undefined
+      }
       startTime={startTime}
       state={isStreaming ? 'running' : 'idle'}
       defaultOpen={defaultExpanded || isStreaming}
@@ -66,18 +74,11 @@ export function Reasoning({
       }
     >
       {content ? (
-        <div className="relative my-1 rounded-lg border border-border/60 bg-surface1/50 dark:bg-surface1/70 px-3.5 py-2.5 space-y-1.5">
-          <div className="flex items-center justify-between text-3xs font-mono text-foreground-extra-muted pb-2 select-none">
-            <span className="flex items-center gap-1 font-medium">
-              <Sparkles className="size-2.5 text-primary/70" />
-              <span>Chain of Thought</span>
-            </span>
-            {wordCount > 0 && <span>~{wordCount} words</span>}
-          </div>
-          <div className="py-0.5 text-xs leading-[1.75] text-foreground-muted [&_*]:text-xs [&_p]:my-1.5 [&_pre]:text-2xs selection:bg-primary/20">
+        <div className="relative my-1.5 border-l-2 border-border/80 pl-3.5 py-1">
+          <div className="max-h-[420px] overflow-y-auto pr-2 text-[13px] leading-[1.65] text-foreground/80 selection:bg-primary/20 space-y-2 [&_h1]:text-xs [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mt-2.5 [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mt-2 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-medium [&_h3]:text-foreground/90 [&_h3]:mt-1.5 [&_h3]:mb-0.5 [&_strong]:font-semibold [&_strong]:text-foreground [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5 [&_li]:my-0.5 [&_code]:text-3xs [&_code]:font-mono [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-surface2 [&_code]:border [&_code]:border-border/60 [&_code]:text-foreground [&_pre]:text-xs [&_pre]:my-2 [&_pre]:p-2.5 [&_pre]:rounded-lg [&_pre]:bg-surface2/90 [&_pre]:border [&_pre]:border-border/60 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic">
             <MarkdownContent content={content} />
             {isStreaming && (
-              <span className="inline-block w-1.5 h-3 bg-primary/70 animate-pulse ml-1 translate-y-0.5" />
+              <span className="inline-block w-1.5 h-3.5 bg-primary/70 animate-pulse ml-1 translate-y-0.5" />
             )}
           </div>
         </div>

@@ -222,9 +222,9 @@
     has to hold for the message body, the user's own bubble and everything
     `.markdown-content` renders inside them. Three places had three answers.
   */
-  --reading-size: 16px;
-  --reading-leading: 1.7;
-  --reading-tracking: -0.006em;
+  --reading-size: 14.5px;
+  --reading-leading: 1.62;
+  --reading-tracking: -0.005em;
 
   /*
     ── Elevation ──
@@ -1414,7 +1414,7 @@ html {
   and it is relative so it tracks `--reading-size`.
 */
 .reading-prose :where(code, kbd, samp) { font-size: 0.875em; }
-.reading-prose :where(pre) { font-size: 0.8em; line-height: 1.6; }
+.reading-prose :where(pre) { font-size: 0.875em; line-height: 1.6; }
 
 /* Tables are scanned, not read, so they keep a denser measure than the prose. */
 .reading-prose :where(table) { font-size: 0.85em; line-height: 1.5; letter-spacing: 0; }

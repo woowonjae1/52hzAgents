@@ -173,57 +173,33 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
   };
 
   return (
-    <div className="not-prose my-3.5 overflow-hidden rounded-xl border border-border dark:border-white/[0.08] bg-[#f6f8fa] dark:bg-[#0e0f13] text-foreground font-mono dark:shadow-md">
-      <div className="flex items-center justify-between px-3.5 py-2 bg-surface2/80 dark:bg-[#13141a] text-3xs font-medium text-foreground-muted dark:text-neutral-400 select-none border-b border-border/50 dark:border-white/[0.05]">
+    <div className="not-prose my-3 overflow-hidden rounded-lg border border-border/70 bg-[#f8f9fa] dark:bg-[#0c0d11] text-foreground font-mono">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-surface2/60 dark:bg-[#121318] text-3xs font-medium text-foreground-muted select-none border-b border-border/50">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-1.5 mr-1 opacity-80 shrink-0">
-            <span className="size-2.5 rounded-full bg-[#ff5f56] inline-block" />
-            <span className="size-2.5 rounded-full bg-[#ffbd2e] inline-block" />
-            <span className="size-2.5 rounded-full bg-[#27c93f] inline-block" />
-          </div>
           {filename ? (
-            <div className="flex items-center gap-1 text-foreground dark:text-white font-medium truncate">
-              <FileCode className="size-3.5 text-primary shrink-0" />
+            <div className="flex items-center gap-1.5 text-foreground font-medium truncate">
+              <FileCode className="size-3.5 text-foreground-muted shrink-0" />
               <span className="truncate">{filename}</span>
             </div>
           ) : (
-            <span className="font-mono uppercase tracking-wider font-semibold">{language}</span>
+            <span className="font-mono uppercase tracking-wider font-semibold text-foreground/80">{language}</span>
           )}
           <span className="text-muted-foreground/60 text-3xs">({lineCount} lines)</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {isLong && (
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors text-3xs font-sans font-medium cursor-pointer"
-            >
-              {expanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-              <span>{expanded ? 'Collapse' : 'Show all'}</span>
-            </button>
-          )}
           <button
             onClick={handleCopy}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground dark:hover:text-white text-foreground-muted dark:text-neutral-400 transition-colors text-3xs font-sans font-medium cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground transition-colors text-3xs font-sans font-medium cursor-pointer"
           >
             {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
         </div>
       </div>
-      <div className={cn('relative overflow-hidden', !expanded && 'max-h-72')}>
-        <pre className="p-4 overflow-x-auto text-[12.5px] leading-[1.65] font-mono bg-transparent selection:bg-primary/20">
+      <div className="relative overflow-x-auto max-h-[560px] overflow-y-auto">
+        <pre className="p-3.5 text-[12.5px] leading-[1.6] font-mono bg-transparent selection:bg-primary/20">
           {children}
         </pre>
-        {!expanded && (
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#f6f8fa] dark:from-[#0e0f13] to-transparent pointer-events-none flex items-end justify-center pb-2">
-            <button
-              onClick={() => setExpanded(true)}
-              className="pointer-events-auto text-3xs font-sans font-medium px-3 py-1 rounded-full bg-surface2 dark:bg-[#1a1c23] border border-border text-foreground hover:bg-surface3 shadow-xs cursor-pointer"
-            >
-              Show {lineCount - 20} more lines...
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -235,31 +211,31 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
   const components: Components = useMemo(() => ({
     // Block elements
     h1: ({ children }) => (
-      <h1 className="font-semibold mt-6 mb-3 pb-1.5 border-b border-border/60 first:mt-0 tracking-tight text-foreground">{children}</h1>
+      <h1 className="font-semibold mt-4 mb-2 first:mt-0 tracking-tight text-foreground text-[16px]">{children}</h1>
     ),
     h2: ({ children }) => (
-      <h2 className="font-semibold mt-5 mb-2.5 first:mt-0 tracking-tight text-foreground">{children}</h2>
+      <h2 className="font-semibold mt-3.5 mb-1.5 first:mt-0 tracking-tight text-foreground text-[15px]">{children}</h2>
     ),
     h3: ({ children }) => (
-      <h3 className="font-semibold mt-4 mb-2 first:mt-0 text-foreground">{children}</h3>
+      <h3 className="font-semibold mt-3 mb-1 first:mt-0 text-foreground text-[14px]">{children}</h3>
     ),
     h4: ({ children }) => (
-      <h4 className="font-semibold mt-3 mb-1.5 first:mt-0 text-foreground">{children}</h4>
+      <h4 className="font-semibold mt-2.5 mb-1 first:mt-0 text-foreground text-[13.5px]">{children}</h4>
     ),
     p: ({ children }) => (
-      <p className="text-foreground mb-4 last:mb-0 font-normal">
+      <p className="text-foreground mb-2.5 last:mb-0 font-normal">
         {renderMentions(children, agentNames)}
       </p>
     ),
     ul: ({ children }) => (
-      <ul className="list-disc pl-5 my-3 space-y-1.5 text-foreground font-normal marker:text-foreground-extra-muted">{children}</ul>
+      <ul className="list-disc pl-5 my-2 space-y-1 text-foreground font-normal marker:text-foreground-extra-muted">{children}</ul>
     ),
     ol: ({ children }) => (
-      <ol className="list-decimal pl-5 my-3 space-y-1.5 text-foreground font-normal marker:text-foreground-muted">{children}</ol>
+      <ol className="list-decimal pl-5 my-2 space-y-1 text-foreground font-normal marker:text-foreground-muted">{children}</ol>
     ),
     li: ({ children }) => <li className="pl-0.5">{renderMentions(children, agentNames)}</li>,
     blockquote: ({ children }) => (
-      <blockquote className="border-l-[3px] border-brand/60 bg-surface1/70 dark:bg-surface2/60 rounded-r-lg pl-3.5 pr-3 py-2 my-4 text-foreground not-italic">
+      <blockquote className="border-l-2 border-border/80 pl-3.5 my-2.5 text-foreground/85 italic bg-transparent py-0.5">
         {children}
       </blockquote>
     ),
@@ -283,7 +259,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       if (isInline) {
         return (
           <code
-            className="bg-surface1 text-foreground font-mono px-1.5 py-0.5 rounded-md border border-border inline align-baseline font-normal"
+            className="bg-surface2/70 text-foreground font-mono px-1.5 py-0.5 rounded text-[0.875em] border border-border/50 inline align-baseline font-normal"
             {...props}
           >
             {children}

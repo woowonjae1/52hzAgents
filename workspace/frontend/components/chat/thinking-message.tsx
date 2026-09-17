@@ -51,15 +51,10 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
           className="mt-0.5 shrink-0"
         />
         <div className="flex-1 min-w-0 space-y-1.5">
-          <div className="flex items-baseline gap-2 select-none">
-            <span className="text-sm font-semibold text-foreground tracking-tight">
+          <div className="flex items-baseline gap-2 select-none mb-0.5">
+            <span className="text-sm font-medium text-foreground tracking-tight">
               {sender}
             </span>
-            {agent?.agentType && (
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface2 text-foreground-muted font-mono border border-border">
-                {agent.agentType}
-              </span>
-            )}
           </div>
           {/*
             A run that is entirely `reply_preview` is the answer arriving early,
