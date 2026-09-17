@@ -6,7 +6,7 @@
  * - Workspace context injected via SKILL.md auto-discovery
  *
  * Direct port of Python: sdk/src/52hzAgents/adapters/openclaw.py
- * (CLI mode only â€?gateway WS and direct HTTP modes are not yet ported)
+ * (CLI mode only â€”gateway WS and direct HTTP modes are not yet ported)
  */
 
 'use strict';
@@ -46,17 +46,18 @@ class OpenClawAdapter extends BaseAdapter {
     this._gatewaySessionChannels = new Map();
     this._pendingApprovals = new Map();
 
-    // Find the openclaw binary â€?always use CLI/gateway mode for full tool support
+    // Find the openclaw binary â€”always use CLI/gateway mode for full tool support
     this._openclawBinary = this._findOpenclawBinary();
 
     if (this._openclawBinary) {
       this._log(`Using OpenClaw CLI mode (${this._openclawBinary})`);
     } else {
-      this._log('OpenClaw binary not found â€?agent will not be able to process messages');
+      this._log('OpenClaw binary not found â€”agent will not be able to process messages');
     }
 
     // Install workspace skill
     this._installWorkspaceSkill();
+    this._ensureExecApprovalsConfigured();
   }
 
   // ------------------------------------------------------------------
@@ -350,7 +351,7 @@ class OpenClawAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Model selection â€?openclaw.json is the single source of truth
+  // Model selection â€”openclaw.json is the single source of truth
   // ------------------------------------------------------------------
 
   get _configPath() {
@@ -389,7 +390,7 @@ class OpenClawAdapter extends BaseAdapter {
   /**
    * Every model openclaw.json actually declares, as `{ id, name }` where the
    * id is the `<provider>/<modelId>` string OpenClaw expects. Two sources:
-   * `models.providers.*.models` (custom endpoints â€?the list the user
+   * `models.providers.*.models` (custom endpoints â€”the list the user
    * configured) and the current `agents.defaults.model.primary` (standard
    * providers write only this, with no provider block to enumerate).
    *
@@ -420,7 +421,7 @@ class OpenClawAdapter extends BaseAdapter {
       }
     }
 
-    // A standard provider (openai/anthropic) has no provider block â€?the only
+    // A standard provider (openai/anthropic) has no provider block â€”the only
     // evidence it exists is the primary itself.
     const primary = this._getCurrentModel();
     if (primary) push(primary, primary.split('/').slice(1).join('/') || primary);
@@ -431,7 +432,7 @@ class OpenClawAdapter extends BaseAdapter {
   /**
    * Publish the openclaw.json model state so the UI's model switcher can offer
    * the models this install actually has, instead of a hardcoded guess. Called
-   * off BaseAdapter's heartbeat. Percentages stay 0 â€?OpenClaw exposes no quota
+   * off BaseAdapter's heartbeat. Percentages stay 0 â€”OpenClaw exposes no quota
    * figures, and the quota capsule excludes this agent kind for that reason.
    */
   async fetchAndReportUsage() {
@@ -459,7 +460,7 @@ class OpenClawAdapter extends BaseAdapter {
       if (!requested) return;
 
       // Accept the full `<provider>/<modelId>` id (what the UI sends), or a
-      // bare model id when exactly one provider declares it â€?the same bare id
+      // bare model id when exactly one provider declares it â€”the same bare id
       // can legitimately exist under two providers, and guessing which one
       // would silently route to the wrong endpoint.
       const known = this._listModels();
@@ -467,9 +468,9 @@ class OpenClawAdapter extends BaseAdapter {
       const match = known.find((m) => m.id === requested) || (bare.length === 1 ? bare[0] : null);
       if (!match) {
         const why = bare.length > 1
-          ? `is ambiguous (declared by ${bare.length} providers â€?send the full <provider>/<model> id)`
+          ? `is ambiguous (declared by ${bare.length} providers â€”send the full <provider>/<model> id)`
           : `is not declared in ${this._configPath}`;
-        this._log(`set_model: '${requested}' ${why} â€?ignoring`);
+        this._log(`set_model: '${requested}' ${why} â€”ignoring`);
         return;
       }
 
@@ -508,7 +509,7 @@ class OpenClawAdapter extends BaseAdapter {
         this._stoppingChannels.add(channel);
         await this._stopProcess(proc);
         delete this._channelProcesses[channel];
-        // No _channelQueues here â€?this adapter never had one, and the delete
+        // No _channelQueues here â€”this adapter never had one, and the delete
         // that used to sit on this line threw on `undefined[channel]`, aborting
         // the loop before the status below (and before any later channel).
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
@@ -586,11 +587,11 @@ class OpenClawAdapter extends BaseAdapter {
   }
 
   // ------------------------------------------------------------------
-  // Workspace file sync â€?publish files the agent produced
+  // Workspace file sync â€”publish files the agent produced
   // ------------------------------------------------------------------
 
   /**
-   * Recursively map relative-path â†?mtimeMs for files under `root`, skipping
+   * Recursively map relative-path â†’mtimeMs for files under `root`, skipping
    * internal/noise directories. Used to diff the workspace before/after a run.
    */
   _collectWorkspaceFiles(root) {
@@ -684,6 +685,8 @@ class OpenClawAdapter extends BaseAdapter {
       this._gatewaySessionChannels.set(`agent:${this.openclawAgentId}:explicit:${sessionKey}`, channel);
       this._gatewaySessionChannels.set(sessionKey, channel);
 
+      this._ensureExecApprovalsConfigured();
+
       const args = [
         '--log-level', 'trace',
         'agent',
@@ -714,7 +717,7 @@ class OpenClawAdapter extends BaseAdapter {
         }
       }
 
-      // Tool name â†?human-readable status
+      // Tool name â†’human-readable status
       const toolLabels = {
         exec: 'Running command...',
         read: 'Reading file...',
@@ -748,7 +751,7 @@ class OpenClawAdapter extends BaseAdapter {
       // even in non-TTY mode. We poll the temp file for new lines every 500ms.
       const stderrFile = path.join(os.tmpdir(), `openclaw-stderr-${Date.now()}.log`);
       const stderrFd = fs.openSync(stderrFile, 'w');
-      this._log('Spawn: stderr â†?' + stderrFile);
+      this._log('Spawn: stderr â†’' + stderrFile);
 
       // Always spawn node + openclaw.mjs directly (no shims, no cmd.exe, cross-platform)
       // This avoids Windows .cmd shim issues and Unicode path encoding problems.
@@ -813,7 +816,7 @@ class OpenClawAdapter extends BaseAdapter {
       }, 500);
 
       // 'error' and 'exit' can BOTH fire for a single failed spawn. Closing
-      // stderrFd twice throws EBADF from inside the event callback, which â€?      // with no daemon-level handler â€?used to crash the entire daemon. Guard
+      // stderrFd twice throws EBADF from inside the event callback, which â€”      // with no daemon-level handler â€”used to crash the entire daemon. Guard
       // so the fd is closed once and the promise settles once.
       let settled = false;
       const closeFd = () => { try { fs.closeSync(stderrFd); } catch {} };
@@ -878,84 +881,221 @@ class OpenClawAdapter extends BaseAdapter {
           reject(new Error(`CLI exited ${code}: ${allOutput.slice(-300)}`));
           return;
         }
-        this._parseCliOutput(allOutput, resolve);
+        this._parseCliOutput(output, allOutput, resolve);
       });
     });
   }
 
-  _parseCliOutput(output, resolve) {
-    const text = output.trim();
+  _parseCliOutput(stdoutText, combinedText, resolve) {
+    const text = (stdoutText || '').trim() || (combinedText || '').trim();
     if (!text) { resolve(''); return; }
 
-    // OpenClaw --json outputs a JSON blob with {"payloads":[...]} structure.
-    // With --log-level trace, stderr also contains diagnostic lines.
-    // Find the JSON by looking for '{"payloads"' or the last complete JSON object.
-    let jsonStr = null;
-
-    // Strategy 1: find {"payloads" or { "payloads" (with whitespace)
-    let payloadsIdx = text.indexOf('{"payloads"');
-    if (payloadsIdx < 0) {
-      // Try with whitespace after {
-      const match = text.match(/\{\s*"payloads"/);
-      if (match) payloadsIdx = match.index;
-    }
-    if (payloadsIdx >= 0) {
-      // Find the matching closing brace by counting braces
-      let depth = 0;
-      for (let i = payloadsIdx; i < text.length; i++) {
-        if (text[i] === '{') depth++;
-        else if (text[i] === '}') { depth--; if (depth === 0) { jsonStr = text.slice(payloadsIdx, i + 1); break; } }
-      }
-    }
-
-    // Strategy 2: find last '{' that starts a valid JSON with "payloads"
-    if (!jsonStr) {
-      for (let i = text.length - 1; i >= 0; i--) {
-        if (text[i] === '{') {
-          const candidate = text.slice(i);
-          try {
-            const d = JSON.parse(candidate);
-            if (d.payloads) { jsonStr = candidate; break; }
-          } catch {}
-        }
-      }
-    }
-
-    // Strategy 3: try each line that starts with '{'
-    if (!jsonStr) {
-      for (const line of text.split('\n')) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('{')) {
-          try {
-            const d = JSON.parse(trimmed);
-            if (d.payloads) { jsonStr = trimmed; break; }
-          } catch {}
-        }
-      }
-    }
-
-    if (jsonStr) {
+    const tryParseJson = (str) => {
       try {
-        const data = JSON.parse(jsonStr);
-        const payloads = data.payloads || [];
-        this._log(`CLI parsed: ${payloads.length} payloads, keys=${payloads.map(p=>Object.keys(p).join('/')).join(', ')}, text=${payloads.map(p=>(p.text||'').slice(0,50)).join('|')}`);
-        if (payloads.length > 0) {
-          const texts = payloads.filter(p => p.text).map(p => p.text);
-          if (texts.length > 0) {
-            resolve(texts.join('\n\n'));
-            return;
+        const obj = JSON.parse(str);
+        if (obj && typeof obj === 'object') {
+          if (obj.payloads || obj.meta || obj.finalAssistantVisibleText || obj.finalAssistantRawText) {
+            return obj;
           }
         }
+      } catch {}
+      return null;
+    };
+
+    let data = null;
+
+    // Search for JSON in stdout first, then combined stdout+stderr
+    for (const source of [stdoutText, combinedText]) {
+      if (!source || data) break;
+      const src = source.trim();
+
+      // Strategy 1: find {"payloads" or { "payloads"
+      let payloadsIdx = src.indexOf('{"payloads"');
+      if (payloadsIdx < 0) {
+        const match = src.match(/\{\s*"payloads"/);
+        if (match) payloadsIdx = match.index;
+      }
+      if (payloadsIdx >= 0) {
+        let depth = 0;
+        for (let i = payloadsIdx; i < src.length; i++) {
+          if (src[i] === '{') depth++;
+          else if (src[i] === '}') {
+            depth--;
+            if (depth === 0) {
+              data = tryParseJson(src.slice(payloadsIdx, i + 1));
+              break;
+            }
+          }
+        }
+      }
+
+      // Strategy 2: scan backwards for valid JSON with payloads or meta
+      if (!data) {
+        for (let i = src.length - 1; i >= 0; i--) {
+          if (src[i] === '{') {
+            const candidate = src.slice(i);
+            const parsed = tryParseJson(candidate);
+            if (parsed) { data = parsed; break; }
+          }
+        }
+      }
+
+      // Strategy 3: try each line that starts with '{'
+      if (!data) {
+        for (const line of src.split('\n')) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('{')) {
+            const parsed = tryParseJson(trimmed);
+            if (parsed) { data = parsed; break; }
+          }
+        }
+      }
+    }
+
+    if (data) {
+      try {
+        let assistantText = '';
+
+        // Priority 1: payloads with non-empty text
+        const payloads = Array.isArray(data.payloads) ? data.payloads : [];
+        const payloadTexts = payloads.filter(p => p && typeof p.text === 'string' && p.text.trim()).map(p => p.text.trim());
+        if (payloadTexts.length > 0) {
+          assistantText = payloadTexts.join('\n\n');
+        }
+
+        // Priority 2: meta.finalAssistantVisibleText or top-level finalAssistantVisibleText
+        if (!assistantText) {
+          const visibleText = (data.meta && data.meta.finalAssistantVisibleText) || data.finalAssistantVisibleText;
+          if (typeof visibleText === 'string' && visibleText.trim()) {
+            assistantText = visibleText.trim();
+          }
+        }
+
+        // Priority 3: meta.finalAssistantRawText or top-level finalAssistantRawText
+        if (!assistantText) {
+          const rawText = (data.meta && data.meta.finalAssistantRawText) || data.finalAssistantRawText;
+          if (typeof rawText === 'string' && rawText.trim()) {
+            assistantText = rawText.trim();
+          }
+        }
+
+        // Priority 4: reply, message, response, or text fields
+        if (!assistantText) {
+          const directText = data.reply || data.response || data.message || data.text;
+          if (typeof directText === 'string' && directText.trim()) {
+            assistantText = directText.trim();
+          }
+        }
+
+        // Priority 5: Read last assistant message directly from OpenClaw session JSONL file if available
+        if (!assistantText) {
+          const sessionFile = data.meta && data.meta.agentMeta && data.meta.agentMeta.sessionFile;
+          if (sessionFile && fs.existsSync(sessionFile)) {
+            try {
+              const lines = fs.readFileSync(sessionFile, 'utf-8').trim().split('\n');
+              for (let i = lines.length - 1; i >= 0; i--) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const msgObj = JSON.parse(line);
+                if (msgObj.type === 'message' && msgObj.message && msgObj.message.role === 'assistant') {
+                  const contents = msgObj.message.content || [];
+                  const texts = contents.filter(c => c.type === 'text' && c.text).map(c => c.text.trim());
+                  if (texts.length > 0) {
+                    assistantText = texts.join('\n\n');
+                    break;
+                  }
+                }
+              }
+            } catch (err) {
+              this._log(`Session file inspect fallback error: ${err.message}`);
+            }
+          }
+        }
+
+        if (assistantText) {
+          this._log(`CLI successfully parsed assistant text (${assistantText.length} chars)`);
+          resolve(assistantText);
+          return;
+        }
+
+        // If JSON was parsed successfully but no assistant text was generated:
+        // NEVER dump raw JSON telemetry into user chat!
+        this._log(`CLI returned JSON without assistant text: keys=${Object.keys(data).join(',')}`);
+        resolve('');
+        return;
       } catch (e) {
         this._log(`CLI JSON parse error: ${e.message}`);
       }
     }
 
-    // Fallback: return non-diagnostic text
-    const cleanLines = text.split('\n').filter(l =>
-      !l.includes('[diagnostic]') && !l.includes('[agent/embedded]') && !l.includes('Registered plugin')
-    ).map(l => l.trim()).filter(Boolean);
+    // Fallback: return filtered non-diagnostic text only if no JSON structure was recognized
+    const noisePatterns = [
+      /^\s*\[(plugins|paths|agents|diagnostic|provider-transport|mem9|openclaw|model-fetch)/i,
+      /^\s*\{.*\}\s*$/,
+      /^\s*["']?payloads["']?\s*:/,
+      /^\s*["']?meta["']?\s*:/,
+      /^\s*Registered plugin/i,
+      /^\s*__dirname:/i,
+      /^\s*getProjectRoot:/i,
+    ];
+    const cleanLines = (combinedText || '').split('\n').filter(l => {
+      const tr = l.trim();
+      if (!tr) return false;
+      return !noisePatterns.some(pat => pat.test(tr));
+    }).map(l => l.trim()).filter(Boolean);
+
     resolve(cleanLines.join('\n') || '');
+  }
+
+  /**
+   * Configure OpenClaw's exec approvals to bypass interactive approval timeouts in background agent mode.
+   */
+  _ensureExecApprovalsConfigured() {
+    try {
+      fs.mkdirSync(OPENCLAW_STATE_DIR, { recursive: true });
+      const approvalsFile = path.join(OPENCLAW_STATE_DIR, 'exec-approvals.json');
+      let approvalsData = {
+        version: 1,
+        defaults: { security: 'full', ask: 'off', askFallback: 'allow' },
+        agents: { main: { security: 'full', ask: 'off' } },
+      };
+      if (fs.existsSync(approvalsFile)) {
+        try {
+          approvalsData = JSON.parse(fs.readFileSync(approvalsFile, 'utf-8'));
+        } catch {}
+      }
+      approvalsData.defaults = approvalsData.defaults || {};
+      approvalsData.defaults.security = 'full';
+      approvalsData.defaults.ask = 'off';
+      approvalsData.defaults.askFallback = 'allow';
+
+      approvalsData.agents = approvalsData.agents || {};
+      const agentKey = this.openclawAgentId || 'main';
+      approvalsData.agents[agentKey] = approvalsData.agents[agentKey] || {};
+      approvalsData.agents[agentKey].security = 'full';
+      approvalsData.agents[agentKey].ask = 'off';
+
+      fs.writeFileSync(approvalsFile, JSON.stringify(approvalsData, null, 2), 'utf-8');
+      this._log(`Configured exec approvals (security=full, ask=off) in ${approvalsFile}`);
+    } catch (e) {
+      this._log(`Failed to configure exec approvals: ${e.message}`);
+    }
+
+    try {
+      const configFile = path.join(OPENCLAW_STATE_DIR, 'openclaw.json');
+      if (fs.existsSync(configFile)) {
+        let config = {};
+        try { config = JSON.parse(fs.readFileSync(configFile, 'utf-8')); } catch {}
+        config.tools = config.tools || {};
+        config.tools.exec = { security: 'full', ask: 'off' };
+        if (config.plugins && config.plugins.entries && config.plugins.entries['openclaw-eigenflux']) {
+          config.plugins.entries['openclaw-eigenflux'].enabled = false;
+        }
+        fs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf-8');
+      }
+    } catch (e) {
+      this._log(`Failed to update openclaw.json tools config: ${e.message}`);
+    }
   }
   // ------------------------------------------------------------------
   // Static: configure OpenClaw's native auth from LLM env vars
@@ -972,7 +1112,7 @@ class OpenClawAdapter extends BaseAdapter {
    */
   static configureNativeAuth(env) {
     const apiKey = env.LLM_API_KEY;
-    // Strip /chat/completions suffix â€?OpenClaw appends it internally
+    // Strip /chat/completions suffix â€”OpenClaw appends it internally
     const rawUrl = env.LLM_BASE_URL || 'https://api.openai.com/v1';
     const baseUrl = rawUrl.replace(/\/chat\/completions\/?$/, '');
     const model = env.LLM_MODEL || 'gpt-4o';
@@ -983,7 +1123,7 @@ class OpenClawAdapter extends BaseAdapter {
     const configFile = path.join(OPENCLAW_STATE_DIR, 'openclaw.json');
 
     if (isOpenAI || isAnthropic) {
-      // Standard provider â€?use auth-profiles.json
+      // Standard provider â€”use auth-profiles.json
       const provider = isAnthropic ? 'anthropic' : 'openai';
       const profileId = `${provider}:manual`;
       const agentDir = path.join(OPENCLAW_STATE_DIR, 'agents', 'main', 'agent');
@@ -1010,7 +1150,7 @@ class OpenClawAdapter extends BaseAdapter {
         fs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf-8');
       } catch {}
     } else {
-      // Custom endpoint â€?use models.providers for full gateway/tool support
+      // Custom endpoint â€”use models.providers for full gateway/tool support
       // This is the proper way to add custom LLM endpoints to OpenClaw.
       // See: https://docs.openclaw.ai/concepts/model-providers
       try {

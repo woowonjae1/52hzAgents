@@ -747,3 +747,63 @@ func TestPruneCheckpointRefsReleasesAgedSnapshots(t *testing.T) {
 		t.Errorf("BaseCommit = %q, want cleared", after.BaseCommit)
 	}
 }
+
+func TestDrainDirQueueEnrichesPromptWithTriggerContext(t *testing.T) {
+	workspace, channel, _ := setupTurnDB(t)
+
+	// Open first agent turn
+	openAgentTurn(workspace.ID, &channel, "coder-1", "task-1", "event-1")
+
+	// Trigger event for second agent that gets queued due to contention
+	triggerPayload, _ := json.Marshal(map[string]interface{}{
+		"content":      "Please write unit tests for the auth module.",
+		"deliverable":  map[string]interface{}{"summary": "Auth module ready"},
+		"message_type": "chat",
+	})
+	triggerEventID := uuid.NewString()
+	db.DB.Create(&models.EventRecord{
+		ID:        triggerEventID,
+		NetworkID: workspace.ID,
+		Type:      "workspace.message.posted",
+		Source:    "human:user",
+		Target:    "channel/" + channel.Name,
+		Payload:   triggerPayload,
+		Timestamp: time.Now().UnixMilli(),
+	})
+
+	// Open second agent turn - should be queued
+	openAgentTurn(workspace.ID, &channel, "coder-2", "task-2", triggerEventID)
+	qTurn := latestTurn(t, workspace.ID, "coder-2")
+	if qTurn.Status != "queued" {
+		t.Fatalf("expected coder-2 to be queued, got %s", qTurn.Status)
+	}
+
+	// Close coder-1 turn to drain queue
+	closeAgentTurn(workspace.ID, &channel, "coder-1")
+
+	// Check if coder-2 was opened
+	var activated models.AgentTurnChange
+	if err := db.DB.Where("id = ?", qTurn.ID).First(&activated).Error; err != nil {
+		t.Fatal(err)
+	}
+	if activated.Status != "open" {
+		t.Fatalf("expected coder-2 turn to be open, got %s", activated.Status)
+	}
+
+	// Verify wake event in database has enriched content and deliverable
+	var wakeEvents []models.EventRecord
+	db.DB.Where("network_id = ? AND source = ?", workspace.ID, "system:orchestrator").Order("timestamp desc").Limit(1).Find(&wakeEvents)
+	if len(wakeEvents) == 0 {
+		t.Fatal("expected wake event to be broadcast")
+	}
+	var wakePayload map[string]interface{}
+	json.Unmarshal(wakeEvents[0].Payload, &wakePayload)
+	content, _ := wakePayload["content"].(string)
+	if !strings.Contains(content, "Please write unit tests for the auth module.") {
+		t.Fatalf("expected wake content to contain original task prompt, got: %s", content)
+	}
+	if wakePayload["deliverable"] == nil {
+		t.Fatal("expected wake payload to carry deliverable from trigger event")
+	}
+}
+

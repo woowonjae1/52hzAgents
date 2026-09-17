@@ -430,3 +430,32 @@ func TestPipelineStructuredMentionSegmentsDirect(t *testing.T) {
 		t.Fatalf("unexpected step 1: %+v", steps[1])
 	}
 }
+
+func TestPipelineSuppressesAgentProseMentionsDuringActivePipeline(t *testing.T) {
+	workspace, channel := setupPipelineDB(t)
+
+	// Step 0: Start a pipeline: @codex-agent -> @claude-agent
+	startTestPipeline(t, workspace, channel)
+
+	// Agent finishes turn and posts a message that mentions @claude-agent and @hermes-agent in its conversational text
+	agentReq := &SendEventRequest{
+		Type:   "workspace.message.posted",
+		Source: "openagents:codex-agent",
+		Target: "channel/general",
+		Payload: map[string]interface{}{
+			"content":      "这是我的分析结果。后续可以交由 @claude-agent 进行修复，并由 @hermes-agent 审查。",
+			"message_type": "chat",
+		},
+	}
+
+	targets, routed, err := routeMessage(nil, workspace.ID, &channel, agentReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Active pipeline MUST suppress agent prose text mentions to prevent premature / parallel routing!
+	if routed || len(targets) > 0 {
+		t.Fatalf("Expected agent prose mentions to be suppressed during active pipeline, but got routed=%v targets=%v", routed, targets)
+	}
+}
+

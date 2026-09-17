@@ -840,6 +840,14 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 	// another agent — otherwise every agent reply triggers the next agent's
 	// turn, creating an infinite echo storm.
 	if isAgentSource(req.Source) {
+		// If a sequential pipeline is actively running in this channel, pipeline steps are strictly
+		// governed and sequenced by CheckAndTriggerNextPipelineStep. Do NOT allow conversational mentions
+		// inside an agent's narrative report to bypass the pipeline sequence and spawn parallel turns.
+		var activePipeline models.ChannelPipeline
+		if err := database.Where("channel_id = ? AND status IN ?", channel.ID, []string{"running", "retrying"}).First(&activePipeline).Error; err == nil {
+			return nil, false, nil
+		}
+
 		if len(mentions) > 0 {
 			sender := agentNameFromSource(req.Source)
 			var nextTargets []string

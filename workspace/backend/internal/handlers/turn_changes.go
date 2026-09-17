@@ -645,6 +645,22 @@ func drainDirQueue(workspaceID, dir string) {
 		return
 	}
 
+	// Guard against waking turns out-of-order in channels with actively running pipelines
+	var channel models.Channel
+	if err := db.DB.Where("id = ?", queued.ChannelID).First(&channel).Error; err == nil {
+		var activePipeline models.ChannelPipeline
+		if err := db.DB.Where("channel_id = ? AND status IN ?", channel.ID, []string{"running", "retrying"}).First(&activePipeline).Error; err == nil {
+			var steps []models.PipelineStep
+			if err := json.Unmarshal(activePipeline.Steps, &steps); err == nil && activePipeline.CurrentIndex < len(steps) {
+				expectedAgent := steps[activePipeline.CurrentIndex].Agent
+				if !strings.EqualFold(queued.AgentName, expectedAgent) {
+					// This queued turn belongs to a future or different pipeline step; do not wake it prematurely
+					return
+				}
+			}
+		}
+	}
+
 	// Activate this queued turn
 	nowMs := time.Now().UnixMilli()
 	snap, err := captureTurnSnapshot(dir)
@@ -666,14 +682,14 @@ func drainDirQueue(workspaceID, dir string) {
 	}
 
 	if err := db.DB.Model(&queued).Updates(updates).Error; err == nil {
-		var channel models.Channel
-		if err := db.DB.Where("id = ?", queued.ChannelID).First(&channel).Error; err == nil {
+		if channel.ID != "" || db.DB.Where("id = ?", queued.ChannelID).First(&channel).Error == nil {
 			targetChan := "channel/" + channel.Name
 			wakeEventID := uuid.New().String()
 			nowUnixMs := time.Now().UnixNano() / int64(time.Millisecond)
 
+			wakeContent := fmt.Sprintf("@%s 前序任务已完成，排队结束。开始在目录 `%s` 执行任务。", queued.AgentName, dir)
 			payload := map[string]interface{}{
-				"content":      fmt.Sprintf("@%s 前序任务已完成，排队结束。开始在目录 `%s` 执行任务。", queued.AgentName, dir),
+				"content":      wakeContent,
 				"sender_name":  "Pipeline Supervisor",
 				"sender_type":  "system",
 				"message_type": "chat",
@@ -682,6 +698,27 @@ func drainDirQueue(workspaceID, dir string) {
 				"target_agents": []string{queued.AgentName},
 				"task_id":       queued.TaskID,
 				"queued_wake":   true,
+			}
+
+			// If we have the triggering event that caused this turn to be queued, forward its full task content & deliverables
+			if queued.TriggerEventID != "" {
+				var triggerEvent models.EventRecord
+				if err := db.DB.Where("id = ?", queued.TriggerEventID).First(&triggerEvent).Error; err == nil {
+					var origPayload map[string]interface{}
+					if err := json.Unmarshal(triggerEvent.Payload, &origPayload); err == nil {
+						if origContent, ok := origPayload["content"].(string); ok && strings.TrimSpace(origContent) != "" {
+							trimmed := strings.TrimSpace(origContent)
+							payload["content"] = fmt.Sprintf("@%s 前序任务已完成，排队结束。请在目录 `%s` 继续执行任务：\n\n%s", queued.AgentName, dir, trimmed)
+						}
+						if deliverable, hasDel := origPayload["deliverable"]; hasDel && deliverable != nil {
+							payload["deliverable"] = deliverable
+							metadata["deliverable"] = deliverable
+						}
+						if att, hasAtt := origPayload["attachments"]; hasAtt && att != nil {
+							payload["attachments"] = att
+						}
+					}
+				}
 			}
 			payloadBytes, _ := json.Marshal(payload)
 			metaBytes, _ := json.Marshal(metadata)
