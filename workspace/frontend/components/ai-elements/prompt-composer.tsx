@@ -987,8 +987,6 @@ export function PromptComposer({
             It was a line of text competing with the pill row for the same
             strip, and it lost that fight as soon as the column narrowed to
             beUI's 48rem — it rendered straight over the attach button.
-            Giving it room would mean widening the reading column back out,
-            which is the one measurement the replication is built on.
 
             It is also not in the reference: beUI's composer carries only the
             model select, the add button and send. And the hint said three

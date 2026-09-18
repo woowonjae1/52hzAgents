@@ -196,11 +196,15 @@
   */
   --radius: 8px;
 
-  /* ChatGPT & Claude desktop standardized reading column width (~860px max) */
-  /* beUI's chat shell is `max-w-3xl` (48rem). 860px was ~7ch wider per
-     line than that, which is what made the transcript read looser than
-     the reference. The composer shares this var, so both move together. */
-  --chat-column: min(48rem, 100%);
+  /* The transcript + composer reading column. */
+  /* Was `48rem` (720px at the 15px root), borrowed from beUI's `max-w-3xl`.
+     That column was sized for a browser tab with chrome on both sides; this
+     window already spends ~260px on the thread rail, so 48rem left a dead
+     gutter as wide as the sidebar on every desktop width. 64rem (960px) fills
+     that gutter without pushing a line past a comfortable measure — long code
+     blocks and diffs stop wrapping early, which is where the old width hurt
+     most. The composer shares this var, so both move together. */
+  --chat-column: min(64rem, 100%);
 
   /*
     ── The reading scale ──
@@ -1825,7 +1829,7 @@ nextjs-portal,
 /* ──────────────────────────────────────────────────────────────────────────
    OFF-SCREEN ROWS THE BROWSER IS ALLOWED TO SKIP.
 
-   Four views render every row they have: the task list and Kanban board, the
+   Four views render every row they have: the task list and the board, the
    knowledge list and the skills grid. Only the transcript and the thread list
    are virtualised (`@tanstack/react-virtual`), and the honest reason the other
    four are not is that virtualisation is the wrong tool for them:

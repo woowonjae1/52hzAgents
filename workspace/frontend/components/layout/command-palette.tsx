@@ -151,7 +151,7 @@ export function CommandPalette() {
         id: 'nav-tasks',
         category: 'Navigation',
         title: 'Tasks & Issues',
-        subtitle: 'Linear-style task tracking and Kanban board',
+        subtitle: 'Linear-style task tracking, as a list or a board',
         icon: <CheckSquare className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'A'],
         action: () => setViewMode('tasks'),

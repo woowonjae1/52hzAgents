@@ -1169,7 +1169,7 @@ export function ChatView() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setViewMode(viewMode === 'tasks' ? 'threads' : 'tasks')}>
                 <ListChecks className="size-4 mr-2" />
-                <span>Tasks & Kanban</span>
+                <span>Tasks &amp; Issues</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1352,7 +1352,7 @@ export function ChatView() {
                   className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
                 >
                   <CheckCircle2 className="size-3.5" />
-                  <span>Tasks & Kanban</span>
+                  <span>Tasks &amp; Issues</span>
                 </button>
                 <span>·</span>
                 <button

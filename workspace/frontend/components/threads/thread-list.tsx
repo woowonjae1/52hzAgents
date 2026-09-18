@@ -104,32 +104,60 @@ function extractSessionAgents(
     addAgent(session.master);
   }
 
-  // 5. Explicit participants that are currently ONLINE (skip offline historical noise)
-  if (Array.isArray(session.participants) && session.participants.length > 0) {
-    for (const p of session.participants) {
-      const lower = stripAddressPrefix(p).trim().toLowerCase();
-      const matched = allWorkspaceAgents.find((a) => a.agentName.toLowerCase() === lower);
-      if (matched && matched.status === 'online') {
-        addAgent(p);
-      }
+  /*
+    5. Participants — but ONLY when that list is a real choice.
+
+    THE ROSTER IS NOT A PARTICIPANT LIST, AND WAS BEING READ AS ONE.
+
+    The backend puts every agent in the workspace into `participants` on a
+    plain new channel: 14 of 15 threads here came back with the identical
+    eight names. Sorted, so `amp` — offline since a week before these threads
+    existed, never launched in any of them — was first, and therefore the face
+    on nearly every row in the sidebar. The rows were not wrong about which
+    agent; they were answering a question the data cannot answer.
+
+    A list that is the whole roster carries no information, so it is skipped.
+    A list that is a subset was picked by the user in the New chat dialog, and
+    that IS worth showing: it says "this thread is for these two".
+
+    The online filter that used to sit here is gone with the fallbacks below.
+    It was there to suppress the roster's offline noise, but it also meant the
+    avatars changed every time an agent's process went up or down — a thread
+    pi worked on last week stopped showing pi the moment pi exited.
+  */
+  const rosterSize = allWorkspaceAgents.length;
+  if (rosterSize > 0 && Array.isArray(session.participants) && session.participants.length > 0) {
+    /*
+      `rosterSize > 0` is load-bearing, not a null guard.
+
+      Whether a participant list means anything can only be judged against the
+      roster, and the roster arrives one fetch later than the threads do. On
+      that first paint `allWorkspaceAgents` is `[]`, every subset test passes
+      vacuously, and the raw list goes straight to the avatars — which is the
+      frame the roster bug was visible in. No roster means no opinion.
+    */
+    const isWholeRoster =
+      rosterSize > 1 &&
+      session.participants.length >= rosterSize &&
+      allWorkspaceAgents.every((a) =>
+        session.participants.some(
+          (p) => stripAddressPrefix(p).trim().toLowerCase() === a.agentName.toLowerCase()
+        )
+      );
+    if (!isWholeRoster) {
+      for (const p of session.participants) addAgent(p);
     }
   }
 
-  // 6. If no agent identified yet, add other participants
-  if (agentMap.size === 0 && Array.isArray(session.participants) && session.participants.length > 0) {
-    for (const p of session.participants) {
-      addAgent(p);
-    }
-  }
+  /*
+    Nothing else. There is no "fall back to every participant" and no "fall
+    back to whichever agent happens to be online" — those were the two steps
+    that invented an answer when there wasn't one, and between them they put a
+    never-used agent's logo on a thread it had never seen.
 
-  // 7. If still empty (e.g. a brand new direct chat), default to the primary online agent
-  if (agentMap.size === 0) {
-    const online = allWorkspaceAgents.find((a) => a.status === 'online');
-    if (online) {
-      addAgent(online.agentName);
-    }
-  }
-
+    An empty result is correct for a thread nobody has spoken in. The caller
+    renders a neutral message icon for it, which is what an empty thread is.
+  */
   return Array.from(agentMap.values());
 }
 
