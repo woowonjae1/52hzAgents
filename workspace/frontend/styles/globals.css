@@ -119,6 +119,34 @@
   --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
   --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
 
+  /*
+    -- The user's own bubble --
+
+    It used to be `bg-foreground` / `text-background`: a straight inversion,
+    which meant a white plate on the dark theme and a black one on the light.
+    That is the loudest thing either theme can produce, and it arrived on the
+    one element that repeats down the whole transcript.
+
+    The fill is the brand mark's colour instead -- the one picked in
+    Settings, Brand mark -- so "what I said" is marked by the same colour
+    that identifies the app, and it does NOT flip with the theme. A bubble
+    that changes colour when the theme changes is not an identity. Defined
+    once here and deliberately NOT overridden in `.dark`, which is what makes
+    that true.
+
+    88% toward black, not the mark colour neat. The mark is 26px and the
+    bubble is a filled plate several hundred px wide, so the same value reads
+    much heavier here; the step down also buys the white text its contrast on
+    the lighter presets (Amber is the binding one -- see the preset list in
+    lib/mark-color-store.ts).
+
+    The foreground is a literal white rather than `--background`, because
+    `--background` is the thing that flips. Everything inside the bubble keys
+    off `--bubble-user-foreground`, so there is one value to change.
+  */
+  --bubble-user: color-mix(in oklab, var(--signal-mark-body, #1c6ea4) 88%, black);
+  --bubble-user-foreground: #ffffff;
+
   /* Semantic */
   --destructive: #e11d48;
   --destructive-foreground: #ffffff;
@@ -466,6 +494,8 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-brand-subtle: var(--brand-subtle);
   --color-brand-border: var(--brand-border);
+  --color-bubble-user: var(--bubble-user);
+  --color-bubble-user-foreground: var(--bubble-user-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-scrollbar-handle: var(--scrollbar-handle);

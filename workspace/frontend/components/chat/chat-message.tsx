@@ -678,27 +678,39 @@ export const ChatMessage = memo(function ChatMessage({
                     the rule this follows.
                   */
                   /*
-                    beUI's `solid` variant: `bg-foreground` with
-                    `text-background`. That is the inversion the reference
-                    uses to separate what you said from what came back —
-                    stronger than the one-step surface lift this had, and it
-                    drops the border, because a fully inverted plate does not
-                    need one to be found.
+                    THE BUBBLE IS BRAND-COLOURED, NOT INVERTED.
+
+                    This was beUI's `solid` variant — `bg-foreground` with
+                    `text-background` — which separates what you said from
+                    what came back by flipping the theme's own two poles. It
+                    works, but it means a white plate on the dark theme and a
+                    black one on the light, and that is the highest-contrast
+                    object either theme can make, arriving on the element that
+                    repeats most. It also gives the same message two opposite
+                    colours depending on when you look at it.
+
+                    `--bubble-user` is the brand mark's colour, stepped toward
+                    black, and it does not flip. See the note on the token in
+                    globals.css for why the step is there.
+
+                    The border stays off: a saturated plate is found on its
+                    own.
                   */
-                  'bg-foreground text-background',
+                  'bg-bubble-user text-bubble-user-foreground',
                   /*
-                    AN INVERTED BUBBLE HAS TO INVERT WHAT IS INSIDE IT TOO.
+                    A COLOURED BUBBLE HAS TO RECOLOUR WHAT IS INSIDE IT TOO.
 
-                    `text-background` on the bubble only reaches children that
-                    inherit. The markdown renderer was built for a normal
-                    ground, so its inline chips, links and code spans carry
-                    `text-foreground` and `bg-surface2` of their own — on a
-                    `bg-foreground` plate those land as the bubble's own
-                    colour and the message reads as an empty pill, in BOTH
-                    themes, because the inversion flips with the theme.
+                    `text-bubble-user-foreground` on the bubble only reaches
+                    children that inherit. The markdown renderer was built for
+                    a normal ground, so its inline chips, links and code spans
+                    carry `text-foreground` and `bg-surface2` of their own —
+                    on a brand plate those are near-invisible in one theme and
+                    merely wrong in the other.
 
-                    These scope the known offenders back onto the bubble's
-                    own pair instead of the page's.
+                    These used to key off `background`, which was correct only
+                    while the bubble WAS the background inverted. It is a
+                    fixed colour now, so they key off the bubble's own
+                    foreground and stop moving with the theme.
                   */
                   /*
                     Element by element, because the markdown renderer puts
@@ -710,20 +722,20 @@ export const ChatMessage = memo(function ChatMessage({
                     before. `[&_p]` is a descendant selector, so it outranks
                     the element's own single class.
                   */
-                  '[&_p]:text-background [&_li]:text-background',
-                  '[&_ul]:text-background [&_ol]:text-background',
-                  '[&_h1]:text-background [&_h2]:text-background [&_h3]:text-background [&_h4]:text-background',
-                  '[&_ul]:marker:text-background/55 [&_ol]:marker:text-background/55',
-                  '[&_blockquote]:text-background/85 [&_blockquote]:border-background/30',
-                  '[&_del]:text-background/60',
-                  '[&_a]:text-background [&_strong]:text-background [&_em]:text-background',
-                  '[&_code]:bg-background/15 [&_code]:text-background [&_code]:border-background/20',
-                  '[&_pre]:bg-background/15 [&_pre]:text-background',
-                  '[&_[class*=bg-surface]]:bg-background/15 [&_[class*=bg-surface]]:text-background [&_[class*=bg-surface]]:border-background/25',
+                  '[&_p]:text-bubble-user-foreground [&_li]:text-bubble-user-foreground',
+                  '[&_ul]:text-bubble-user-foreground [&_ol]:text-bubble-user-foreground',
+                  '[&_h1]:text-bubble-user-foreground [&_h2]:text-bubble-user-foreground [&_h3]:text-bubble-user-foreground [&_h4]:text-bubble-user-foreground',
+                  '[&_ul]:marker:text-bubble-user-foreground/55 [&_ol]:marker:text-bubble-user-foreground/55',
+                  '[&_blockquote]:text-bubble-user-foreground/85 [&_blockquote]:border-bubble-user-foreground/30',
+                  '[&_del]:text-bubble-user-foreground/60',
+                  '[&_a]:text-bubble-user-foreground [&_strong]:text-bubble-user-foreground [&_em]:text-bubble-user-foreground',
+                  '[&_code]:bg-bubble-user-foreground/15 [&_code]:text-bubble-user-foreground [&_code]:border-bubble-user-foreground/20',
+                  '[&_pre]:bg-bubble-user-foreground/15 [&_pre]:text-bubble-user-foreground',
+                  '[&_[class*=bg-surface]]:bg-bubble-user-foreground/15 [&_[class*=bg-surface]]:text-bubble-user-foreground [&_[class*=bg-surface]]:border-bubble-user-foreground/25',
                   'transition-all duration-150 break-words'
                 )}
               >
-                <div className="reading-prose font-normal select-text text-background">
+                <div className="reading-prose font-normal select-text text-bubble-user-foreground">
                   <MarkdownContent
                     content={message.content}
                     agentNames={agentNames}
