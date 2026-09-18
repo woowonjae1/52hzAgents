@@ -499,14 +499,33 @@ func getChannelHistory(workspaceID, channelName string, recentLimit int, crossCh
 // Gemini / Claude 3.7 (1M~2M) gets 150+ full recent messages without truncation;
 // Claude 3.5 / GPT-4o (128k~200k) gets 80 recent messages; smaller models get safe 25 messages.
 func GetCompactedChannelHistoryForAgent(workspaceID, channelName, agentName string) (string, []MessageItem, error) {
+	// `window` keeps its guessed default for sizing recentLimit, but `measured`
+	// records whether anything was actually established -- and only a measured
+	// window may unlock the checkpoint below. The guess is good enough to pick
+	// a row count; it is not evidence that this reader can hold more than the
+	// channel was compacted for.
 	window := 128000
+	measured := false
 	if db.DB != nil && agentName != "" {
 		var usage models.AgentUsageRecord
 		if db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, agentName).First(&usage).Error == nil {
-			if usage.ContextWindowSize > 0 {
-				window = usage.ContextWindowSize
-			} else if usage.CurrentModel != nil && *usage.CurrentModel != "" {
-				window = ModelContextWindow(*usage.CurrentModel)
+			model := ""
+			if usage.CurrentModel != nil {
+				model = *usage.CurrentModel
+			}
+			// The same gate the shared budget uses. It belongs here too: this
+			// window now decides whether the reader may look behind a
+			// checkpoint sized for someone else, so a placeholder report buys
+			// an overflow rather than just a wrong dashboard number.
+			if TrustReportedCapability(agentName, model, usage.TotalTokens) {
+				w := usage.ContextWindowSize
+				if w <= 0 {
+					w = ModelContextWindow(model)
+				}
+				if w > 0 {
+					window = w
+					measured = true
+				}
 			}
 		}
 		// No `else` guessing from agentName: an agent with no usage record
@@ -535,7 +554,7 @@ func GetCompactedChannelHistoryForAgent(workspaceID, channelName, agentName stri
 		read more -- so it stays clamped, which is the old behaviour.
 	*/
 	channelBudget := ChannelWindow(workspaceID, channelName)
-	crossCheckpoint := window > 0 && channelBudget > 0 && window > channelBudget
+	crossCheckpoint := measured && channelBudget > 0 && window > channelBudget
 
 	return getChannelHistory(workspaceID, channelName, recentLimit, crossCheckpoint)
 }
