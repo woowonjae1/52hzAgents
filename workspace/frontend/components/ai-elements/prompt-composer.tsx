@@ -981,21 +981,22 @@ export function PromptComposer({
             />
           </div>
 
-          <div className="flex min-w-0 items-center gap-2.5">
-            <AnimatePresence initial={false}>
-              {showHint && (
-                <motion.span
-                  initial={{ opacity: 0, x: 4 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 4 }}
-                  className="hidden min-w-0 truncate select-none text-3xs font-mono text-muted-foreground/70 lg:inline"
-                >
-                  Enter to send · Shift+Enter for new line
-                  {historyRef.current.length > 0 && ' · ↑ last message'}
-                </motion.span>
-              )}
-            </AnimatePresence>
+          {/*
+            THE KEYBOARD HINT IS GONE, NOT WIDENED.
 
+            It was a line of text competing with the pill row for the same
+            strip, and it lost that fight as soon as the column narrowed to
+            beUI's 48rem — it rendered straight over the attach button.
+            Giving it room would mean widening the reading column back out,
+            which is the one measurement the replication is built on.
+
+            It is also not in the reference: beUI's composer carries only the
+            model select, the add button and send. And the hint said three
+            things every chat client does the same way, to a reader who has
+            already typed into the box — the shortcut list (`?`) still has
+            all three for anyone who wants them.
+          */}
+          <div className="flex min-w-0 items-center gap-2.5">
             {/*
               `Magnetic` WRAPS the hint, and the hint still wraps the button.
 

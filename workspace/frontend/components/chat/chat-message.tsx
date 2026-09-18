@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { SignalMark } from '@/components/brand/signal-mark';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
@@ -608,7 +609,29 @@ export const ChatMessage = memo(function ChatMessage({
               !hideHeader && 'mt-1.5',
             )}
           >
-            {/* Contained bubble card aligned to right */}
+            {/*
+              THE SENDER'S OWN MARK.
+
+              beUI puts an avatar on both sides of the transcript; this side
+              had none, so a turn read as "someone spoke, then a bubble
+              appeared". The row is `flex-row-reverse` so the mark lands on
+              the trailing edge, and it uses the same `size-7` disc as the
+              agent avatars opposite it.
+
+              `hideHeader` means this message continues the previous one, so
+              the mark is held (invisible, not removed) to keep the bubbles
+              on one vertical line.
+            */}
+            <div className="flex w-full flex-row-reverse items-start gap-2">
+              <div
+                className={cn(
+                  'mt-0.5 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-muted',
+                  hideHeader && 'invisible'
+                )}
+                aria-hidden={hideHeader || undefined}
+              >
+                <SignalMark size={16} still title={currentUser.name || 'You'} />
+              </div>
             <div className="max-w-[82%] flex flex-col items-end">
               <div
                 className={cn(
@@ -674,7 +697,22 @@ export const ChatMessage = memo(function ChatMessage({
                     These scope the known offenders back onto the bubble's
                     own pair instead of the page's.
                   */
-                  '[&_.markdown-content]:text-background',
+                  /*
+                    Element by element, because the markdown renderer puts
+                    `text-foreground` on the ELEMENTS, not on its container:
+                    `p`, `ul`, `ol` and `h1`-`h4` each carry it (see
+                    markdown-content.tsx). A rule on `.markdown-content` loses
+                    to a class on the `<p>` itself, which is why the first
+                    attempt at this left the text exactly as invisible as
+                    before. `[&_p]` is a descendant selector, so it outranks
+                    the element's own single class.
+                  */
+                  '[&_p]:text-background [&_li]:text-background',
+                  '[&_ul]:text-background [&_ol]:text-background',
+                  '[&_h1]:text-background [&_h2]:text-background [&_h3]:text-background [&_h4]:text-background',
+                  '[&_ul]:marker:text-background/55 [&_ol]:marker:text-background/55',
+                  '[&_blockquote]:text-background/85 [&_blockquote]:border-background/30',
+                  '[&_del]:text-background/60',
                   '[&_a]:text-background [&_strong]:text-background [&_em]:text-background',
                   '[&_code]:bg-background/15 [&_code]:text-background [&_code]:border-background/20',
                   '[&_pre]:bg-background/15 [&_pre]:text-background',
@@ -800,6 +838,7 @@ export const ChatMessage = memo(function ChatMessage({
                   </Hint>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </ContextMenuTrigger>
