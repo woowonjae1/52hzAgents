@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { headerIconButtonClass } from '@/components/headers/header-chip';
 import { getApiBaseUrl } from '@/lib/config';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { basename } from '@/components/chat/project-folder-picker';
 import {
   deriveTitleFromMessages,
   rememberDerivedTitle,
@@ -999,14 +1000,47 @@ export function ChatView() {
               autoFocus
             />
           ) : (
+            /*
+              beUI stacks a muted subtitle under the title ("Checkout release"
+              over "Agent workspace · focused patch"). The second line here is
+              the two facts this header already had scattered across it: which
+              folder the thread is bound to, and how many agents are in it.
+            */
             <Hint label="Click to rename">
-              <h2
-                className="text-sm font-bold tracking-tight truncate hover:text-foreground-muted transition-colors text-foreground flex items-center gap-1.5"
-                onClick={startEditingTitle}
-              >
-                <span>{currentSession?.title || 'Channel'}</span>
-              </h2>
+              <div className="flex min-w-0 flex-col" onClick={startEditingTitle}>
+                <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
+                  {currentSession?.title || 'Channel'}
+                </h2>
+                <span className="truncate text-[11px] leading-tight text-muted-foreground">
+                  {[
+                    currentSessionWorkingDir ? basename(currentSessionWorkingDir) : null,
+                    activeHeaderAgents.length > 0
+                      ? `${activeHeaderAgents.length} agent${activeHeaderAgents.length > 1 ? 's' : ''}`
+                      : 'no agents',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </div>
             </Hint>
+          )}
+
+          {/*
+            beUI's connection pill, top-right of the shell: `bg-emerald-500/10`
+            when live. It replaces nothing — this header never said, in one
+            place, whether the workspace was actually connected.
+          */}
+          {!isDM && (
+            <span
+              className={cn(
+                'ml-auto hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex',
+                activeHeaderAgents.length > 0
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-muted text-muted-foreground'
+              )}
+            >
+              {activeHeaderAgents.length > 0 ? 'Connected' : 'Offline'}
+            </span>
           )}
 
           {/*

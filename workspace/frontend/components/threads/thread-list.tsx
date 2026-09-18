@@ -255,7 +255,7 @@ function DMSection({
  *   4. the project folder — disambiguated, because otherwise every unnamed
  *      thread in one folder shares a name
  */
-function getSmartSessionTitle(
+export function getSmartSessionTitle(
   session: WorkspaceSession,
   lastMsg?: LastMessageInfo | null,
   folderOrdinal?: number,

@@ -883,11 +883,11 @@ export function PromptComposer({
           }
           disabled={disabled}
           rows={1}
-          className="w-full resize-none bg-transparent px-4.5 pt-3.5 pb-2 text-[14px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:outline-hidden disabled:opacity-50 min-h-[46px]"
+          className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent px-2 pt-1.5 pb-1 text-sm leading-6 text-foreground placeholder:text-muted-foreground/55 focus:outline-hidden disabled:opacity-50 min-h-[38px]"
         />
 
         {/* Bottom Control Row */}
-        <div className="flex items-center justify-between gap-2 px-3.5 pb-3 pt-1">
+        <div className="mt-1 flex min-h-8 items-center justify-between gap-1 px-2 pb-1">
           <div className="flex items-center gap-1.5 min-w-0">
             <AgentModelSwitcher
               agentName={masterAgentName}
@@ -981,14 +981,14 @@ export function PromptComposer({
             />
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex min-w-0 items-center gap-2.5">
             <AnimatePresence initial={false}>
               {showHint && (
                 <motion.span
                   initial={{ opacity: 0, x: 4 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 4 }}
-                  className="hidden sm:inline select-none text-3xs font-mono text-muted-foreground/70"
+                  className="hidden min-w-0 truncate select-none text-3xs font-mono text-muted-foreground/70 lg:inline"
                 >
                   Enter to send · Shift+Enter for new line
                   {historyRef.current.length > 0 && ' · ↑ last message'}

@@ -20,7 +20,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
-import { ThreadList } from '@/components/threads/thread-list';
+import { ThreadSidebar } from '@/components/threads/thread-sidebar';
 import { FileList } from '@/components/files/file-list';
 import { TasksView } from '@/components/tasks/tasks-view';
 import { RoutineList } from '@/components/routines/routine-list';
@@ -53,7 +53,7 @@ export function SidebarContent() {
     <div className="flex flex-col h-full min-h-0 bg-surface0">
       {/* Explorer List Area (Defaults to Threads/Chats) */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        {viewMode === 'files' ? <FileList /> : viewMode === 'routines' ? <RoutineList /> : <ThreadList />}
+        {viewMode === 'files' ? <FileList /> : viewMode === 'routines' ? <RoutineList /> : <ThreadSidebar />}
       </div>
 
       {/* Account row if on openagents domain */}

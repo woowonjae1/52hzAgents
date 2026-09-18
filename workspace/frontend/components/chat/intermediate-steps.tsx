@@ -29,6 +29,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { AgentDisclosure } from '@/components/agents/agent-disclosure';
 import { WorkingIndicator } from './working-indicator';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
@@ -908,34 +909,48 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   }).length;
   const thoughtCount = runs.filter((r) => r.kind === 'thinking').length;
 
-  const parts: string[] = [];
-  if (toolCount > 0) parts.push(`${toolCount} tool call${toolCount === 1 ? '' : 's'}`);
-  if (thoughtCount > 0) parts.push(`${thoughtCount} thought${thoughtCount === 1 ? '' : 's'}`);
-  if (parts.length === 0) {
-    parts.push(`${renderable.length} step${renderable.length === 1 ? '' : 's'}`);
-  }
+  /*
+    beUI labels this "Completed 3 steps" — one count, no breakdown — and
+    draws it as bare text with a chevron, not as a row with an icon and a
+    surface. The `EventLine` wrapper it replaces was the latter, and it made
+    the disclosure look like one of the tool cards it is introducing.
+  */
+  const stepCount = toolCount + thoughtCount || renderable.length;
 
   return (
-    <EventLine
-      className="mb-2"
-      icon={<Wrench />}
-      label={parts.join(', ')}
-      defaultOpen={defaultOpen}
-      actions={
-        <EventLineAction
-          title="Open in Trace Panel"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            setActiveRightTab('trace');
-          }}
+    <div className="mb-2 min-w-0">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="group flex min-w-0 items-center gap-1.5 text-left text-sm font-medium text-foreground/90 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
         >
-          <Activity className="size-3" />
-        </EventLineAction>
-      }
-    >
-      <StepRuns steps={renderable} />
-    </EventLine>
+          <span className="truncate">
+            Completed {stepCount} step{stepCount === 1 ? '' : 's'}
+          </span>
+          <ChevronDown
+            className={cn(
+              'size-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:text-muted-foreground',
+              open && 'rotate-180'
+            )}
+          />
+        </button>
+        <button
+          type="button"
+          title="Open in Trace Panel"
+          onClick={() => setActiveRightTab('trace')}
+          className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Activity className="size-3.5" />
+        </button>
+      </div>
+      <AgentDisclosure open={open}>
+        <div className="pt-1.5">
+          <StepRuns steps={renderable} />
+        </div>
+      </AgentDisclosure>
+    </div>
   );
 });
 
