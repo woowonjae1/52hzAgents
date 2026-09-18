@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { resolveAgentIconName } from '@/lib/agent-catalog';
 import { stripAddressPrefix } from '@/lib/types';
+import { Hint } from '@/components/ui/hint';
 
 const KNOWN_AGENTS = [
   'amp', 'anthropic', 'antigravity', 'agy', 'cerebras', 'claude', 'cline', 'codex', 'copilot', 'cursor',
@@ -11,18 +12,24 @@ const KNOWN_AGENTS = [
   'perplexity', 'pi', 'replicate', 'sambanova', 'sensenova', 'stability', 'together', 'xai', 'yaml-agent'
 ];
 
+function findKnownAgent(key: string): string | undefined {
+  if (!key) return undefined;
+  // Exact match first
+  const exact = KNOWN_AGENTS.find(k => k === key);
+  if (exact) return exact;
+  // Partial match with word-boundary protection for short tokens like 'pi'
+  return KNOWN_AGENTS.find(k => {
+    if (k.length <= 2) {
+      return new RegExp(`(^|[^a-z0-9])${k}([^a-z0-9]|$)`, 'i').test(key);
+    }
+    return key.includes(k);
+  });
+}
+
 const PNG_AGENTS: string[] = [];
 
 interface AgentAvatarProps {
   name: string;
-  /**
-   * The agent's reported type ("claude", "openclaw", "cloud:openai"…). Prefer
-   * passing this whenever the agent record is at hand: it is the canonical
-   * identity, whereas the display name is whatever the user called the agent.
-   * Matching on the name alone means an agent named "worker-1" or "小助手" never
-   * gets its brand icon, which is why chat messages showed a letter tile while
-   * the sidebar — which looks agents up properly — showed the real icon.
-   */
   agentType?: string | null;
   size?: number;
   status?: string;
@@ -42,8 +49,8 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
   const typeKey = resolveAgentIconName((agentType || '').replace(/^cloud:/, '').trim());
   const nameKey = resolveAgentIconName(lowercaseName);
   const matchedAgent =
-    (typeKey ? KNOWN_AGENTS.find(k => typeKey.includes(k)) : undefined) ||
-    KNOWN_AGENTS.find(k => nameKey.includes(k));
+    (typeKey ? findKnownAgent(typeKey) : undefined) ||
+    findKnownAgent(nameKey);
   const isPng = matchedAgent ? PNG_AGENTS.includes(matchedAgent) : false;
   const isOffline = status === 'offline';
   const identityFill = deriveIdentityColor(cleanName || 'agent');
@@ -119,3 +126,89 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
     </div>
   );
 }
+
+export interface AgentStackItem {
+  name: string;
+  agentType?: string | null;
+  status?: string;
+}
+
+export interface AgentAvatarStackProps {
+  agents: AgentStackItem[];
+  max?: number;
+  size?: number;
+  className?: string;
+  showTooltip?: boolean;
+}
+
+export function AgentAvatarStack({
+  agents,
+  max = 3,
+  size = 18,
+  className,
+  showTooltip = true,
+}: AgentAvatarStackProps) {
+  const shown = agents.slice(0, max);
+  const extra = agents.length - max;
+
+  if (shown.length === 0) return null;
+
+  if (shown.length === 1) {
+    const single = (
+      <AgentAvatar
+        name={shown[0].name}
+        agentType={shown[0].agentType}
+        status={shown[0].status}
+        size={size}
+        className={className}
+      />
+    );
+    if (showTooltip) {
+      return (
+        <Hint label={`@${stripAddressPrefix(shown[0].name)}`} side="top">
+          {single}
+        </Hint>
+      );
+    }
+    return single;
+  }
+
+  const stackContent = (
+    <div className={cn('inline-flex items-center -space-x-1.5 shrink-0 select-none', className)}>
+      {shown.map((agent, idx) => (
+        <div
+          key={`${agent.name}-${idx}`}
+          className="rounded-full ring-1.5 ring-surface0 dark:ring-surface-sidebar bg-surface-sidebar relative"
+          style={{ zIndex: shown.length - idx }}
+        >
+          <AgentAvatar
+            name={agent.name}
+            agentType={agent.agentType}
+            size={size}
+            status={agent.status}
+          />
+        </div>
+      ))}
+      {extra > 0 && (
+        <div
+          className="rounded-full bg-surface3 flex items-center justify-center font-mono font-medium tracking-tighter text-foreground-muted ring-1.5 ring-surface0 dark:ring-surface-sidebar leading-none select-none relative z-0 px-0.5"
+          style={{ height: size, minWidth: size, fontSize: Math.max(8, Math.round(size * 0.48)) }}
+        >
+          +{extra}
+        </div>
+      )}
+    </div>
+  );
+
+  if (showTooltip) {
+    const label = agents.map((a) => `@${stripAddressPrefix(a.name)}`).join(', ');
+    return (
+      <Hint label={`Agents: ${label}`} side="top">
+        {stackContent}
+      </Hint>
+    );
+  }
+
+  return stackContent;
+}
+

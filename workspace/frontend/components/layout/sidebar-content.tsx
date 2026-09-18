@@ -12,6 +12,7 @@ import {
   LogOut,
   LogIn,
   CheckCircle2,
+  Inbox,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,7 +31,7 @@ export function SidebarContent() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
-  const { token, agents, todos } = useWorkspace();
+  const { token, agents, todos, unreadNotificationCount } = useWorkspace();
   const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -107,8 +108,33 @@ export function SidebarContent() {
           <span>Settings</span>
         </button>
 
-        {/* Right group: Tasks, Agents, Token, Theme */}
+        {/* Right group: Inbox, Tasks, Agents, Token, Theme */}
         <div className="flex items-center gap-0.5">
+          {/* Inbox & Notifications */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode(viewMode === 'inbox' ? 'threads' : 'inbox')}
+                aria-label="Inbox & Notifications"
+                className={cn(
+                  'size-7 rounded-lg flex items-center justify-center transition-colors relative',
+                  viewMode === 'inbox'
+                    ? 'bg-surface2 text-foreground'
+                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
+                )}
+              >
+                <Inbox className="size-3.5" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-status-danger" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {unreadNotificationCount > 0 ? `Inbox (${unreadNotificationCount} unread)` : 'Inbox'}
+            </TooltipContent>
+          </Tooltip>
+
           {/* Tasks & Issues */}
           <Tooltip>
             <TooltipTrigger asChild>

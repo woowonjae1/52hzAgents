@@ -2,13 +2,43 @@
 
 import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Circle, Loader2, Timer, MessageSquareMore, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Circle, Loader2, Timer, MessageSquareMore, X, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import type { TimerItem, WorkspaceMessage } from '@/lib/types';
 import { stripAddressPrefix } from '@/lib/types';
-
+import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
+
+function parseQueuedMessage(rawContent: string): {
+  targetAgent: string | null;
+  cleanPreview: string;
+} {
+  let text = (rawContent || '').trim();
+  let targetAgent: string | null = null;
+
+  // Extract leading @agentName (e.g. "@pi ...")
+  const agentMatch = text.match(/^@([a-zA-Z0-9_-]+)\s*/);
+  if (agentMatch) {
+    targetAgent = agentMatch[1];
+    text = text.slice(agentMatch[0].length).trim();
+  }
+
+  // Clean markdown headers, bold, code ticks, blockquotes
+  const clean = text
+    .replace(/^#+\s*/gm, '') // Remove markdown headers (###, ##, #)
+    .replace(/\*\*([^*]+)\*\*/g, '$1') // Remove bold
+    .replace(/\*([^*]+)\*/g, '$1') // Remove italics
+    .replace(/`([^`]+)`/g, '$1') // Remove inline code ticks
+    .replace(/^>\s*/gm, '') // Remove blockquotes
+    .replace(/\s+/g, ' ') // Collapse multiple spaces/newlines
+    .trim();
+
+  return {
+    targetAgent,
+    cleanPreview: clean || '排队消息',
+  };
+}
 
 function timeUntil(dateStr: string): string {
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -252,22 +282,54 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
       )}
 
       {/* Queued messages */}
-      {queuedMessages.map((q) => (
-        <div key={q.queueId} className="flex items-center gap-1.5 text-foreground-muted">
-          <MessageSquareMore className="size-3 shrink-0" />
-          <span className="truncate">
-            Queued: {q.content.length > 60 ? q.content.slice(0, 60) + '…' : q.content}
-          </span>
-          <Hint label="Cancel queued message">
-            <button
-              onClick={() => handleCancelQueued(q.queueId)}
-              className="shrink-0 p-0.5 rounded hover:bg-surface3 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="size-3" />
-            </button>
-          </Hint>
+      {queuedMessages.length > 0 && (
+        <div className="flex flex-col gap-1 w-full pt-0.5">
+          {queuedMessages.map((q) => {
+            const parsed = parseQueuedMessage(q.content);
+            return (
+              <div
+                key={q.queueId}
+                className="flex items-center justify-between gap-2.5 px-2.5 py-1.5 rounded-lg border border-border/70 bg-surface1/85 hover:bg-surface2/85 shadow-2xs backdrop-blur-xs text-xs transition-colors group"
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  {/* Status Badge */}
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-tight bg-brand-subtle text-brand border border-brand/20 shrink-0 select-none">
+                    <Clock className="size-2.5 animate-pulse" />
+                    <span>排队中</span>
+                  </span>
+
+                  {/* Target Agent Pill */}
+                  {parsed.targetAgent && (
+                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface2 text-foreground text-3xs font-medium shrink-0 border border-border/60 select-none">
+                      <AgentAvatar name={parsed.targetAgent} size={14} />
+                      <span>@{parsed.targetAgent}</span>
+                    </div>
+                  )}
+
+                  {/* Clean Content Preview */}
+                  <span
+                    className="text-foreground/80 group-hover:text-foreground truncate text-xs font-normal leading-tight"
+                    title={parsed.cleanPreview}
+                  >
+                    {parsed.cleanPreview}
+                  </span>
+                </div>
+
+                {/* Cancel Action */}
+                <Hint label="取消此排队消息">
+                  <button
+                    type="button"
+                    onClick={() => handleCancelQueued(q.queueId)}
+                    className="size-5 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors shrink-0"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Hint>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
     </div>
   );
 }

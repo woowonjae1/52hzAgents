@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { timeAgo, formatRowTime, formatCompactRelativeTime } from '@/lib/helpers';
-import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { AgentAvatar, AgentAvatarStack, type AgentStackItem } from '@/components/agents/agent-avatar';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { workspaceApi } from '@/lib/api';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
@@ -42,42 +42,91 @@ import { FIND_EVENT } from '@/components/layout/global-shortcuts';
 
   The separating ring is what keeps overlapping logos readable, so it stays
   even though logos are otherwise unframed now — but it is `ring-surface-sidebar`
-  (the colour this list actually sits on), not the hardcoded `ring-white` it
-  was, which drew a white halo around every avatar in dark mode. The single
-  case also used `size={30}` against the stack's 18, so a one-agent channel
-  and a two-agent channel disagreed on row height.
-*/
+/**
+ * Extract participating agents from session metadata, mentions in title,
+ * master agent, and recent messages.
+ */
+function extractSessionAgents(
+  session: WorkspaceSession,
+  allWorkspaceAgents: WorkspaceAgent[],
+  lastMsg?: LastMessageInfo | null,
+): AgentStackItem[] {
+  const agentMap = new Map<string, AgentStackItem>();
+
+  const addAgent = (rawName: string) => {
+    const clean = stripAddressPrefix(rawName).trim();
+    if (!clean) return;
+    const lower = clean.toLowerCase();
+    if (['user', 'human', 'system', 'you', 'assistant', 'unknown'].includes(lower)) return;
+    if (agentMap.has(lower)) return;
+
+    const matched = allWorkspaceAgents.find(
+      (a) => a.agentName.toLowerCase() === lower
+    );
+    if (matched) {
+      agentMap.set(lower, {
+        name: matched.agentName,
+        agentType: matched.agentType,
+        status: matched.status,
+      });
+    } else {
+      agentMap.set(lower, {
+        name: clean,
+        agentType: clean,
+      });
+    }
+  };
+
+  // 1. Explicit participants
+  if (Array.isArray(session.participants) && session.participants.length > 0) {
+    for (const p of session.participants) {
+      addAgent(p);
+    }
+  }
+
+  // 2. Master agent
+  if (session.master) {
+    addAgent(session.master);
+  }
+
+  // 3. Mentions in title (e.g. "@antigravity ...", "@pi ...")
+  const title = (session.title || '').trim();
+  if (title) {
+    const mentionMatches = title.match(/@([\w.-]+)/g);
+    if (mentionMatches) {
+      for (const m of mentionMatches) {
+        addAgent(m.slice(1));
+      }
+    }
+    // Direct chat title matching an agent name (e.g. "antigravity", "pi")
+    const lowerTitle = title.toLowerCase();
+    const matchedByTitle = allWorkspaceAgents.find(
+      (a) => a.agentName.toLowerCase() === lowerTitle
+    );
+    if (matchedByTitle) {
+      addAgent(matchedByTitle.agentName);
+    }
+  }
+
+  // 4. Last message speaker if it's an agent
+  if (lastMsg?.senderName) {
+    addAgent(lastMsg.senderName);
+  }
+
+  return Array.from(agentMap.values());
+}
+
 function AvatarStack({
   agents,
   max = 3,
   size = 18,
 }: { agents: WorkspaceAgent[]; max?: number; size?: number }) {
-  const shown = agents.slice(0, max);
-  const extra = agents.length - max;
-
-  if (shown.length === 0) return null;
-
-  if (shown.length === 1) {
-    return <AgentAvatar name={shown[0].agentName} agentType={shown[0].agentType} size={size} />;
-  }
-
-  return (
-    <div className="flex -space-x-1">
-      {shown.map((agent) => (
-        <div key={agent.agentName} className="rounded-full ring-2 ring-surface-sidebar">
-          <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={size} />
-        </div>
-      ))}
-      {extra > 0 && (
-        <div
-          className="px-0.5 rounded-full bg-surface3 flex items-center justify-center font-mono font-medium tracking-tighter text-foreground-muted ring-2 ring-surface-sidebar leading-none select-none"
-          style={{ height: size, minWidth: size, fontSize: Math.max(8, Math.round(size * 0.5)) }}
-        >
-          +{extra}
-        </div>
-      )}
-    </div>
-  );
+  const items: AgentStackItem[] = agents.map((a) => ({
+    name: a.agentName,
+    agentType: a.agentType,
+    status: a.status,
+  }));
+  return <AgentAvatarStack agents={items} max={max} size={size} />;
 }
 
 interface SearchHit {
@@ -156,8 +205,8 @@ function DMSection({
                     : 'border border-transparent hover:bg-surface2/60 text-foreground-muted hover:text-foreground'
                 )}
               >
-                <div className="shrink-0 flex items-center justify-center border border-border rounded-full size-[30px] bg-card">
-                  <MessageCircle className="size-3.5 text-muted-foreground" />
+                <div className="shrink-0 flex items-center justify-center">
+                  <AgentAvatarStack agents={[{ name: agentA, agentType: agentA }, { name: agentB, agentType: agentB }]} size={20} />
                 </div>
                 <div className="flex-1 min-w-0 space-y-0.5">
                   <div className="flex items-center gap-1.5">
@@ -316,6 +365,11 @@ const ThreadRow = memo(function ThreadRow({
 
   const displayAgent = (lastSpeaker && lastSpeaker !== 'you') ? lastSpeaker : fallbackAgent;
 
+  const sessionAgents = useMemo(
+    () => extractSessionAgents(session, agents, lastMsg),
+    [session, agents, lastMsg]
+  );
+
   let preview: React.ReactNode;
   let previewIsStatus = false;
   if (isSearching && contentHit) {
@@ -405,24 +459,8 @@ const ThreadRow = memo(function ThreadRow({
         onSelect(session.sessionId);
       }}
       className={cn(
-        'w-full flex items-center justify-between gap-2 ps-6 pe-2 py-1.5 rounded-lg text-left transition-colors relative group select-none cursor-pointer',
+        'w-full flex items-center justify-between gap-2 ps-4 pe-2 py-1.5 rounded-lg text-left transition-colors relative group select-none cursor-pointer',
         'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
-        /*
-          Accent position three of three: WHERE YOU ARE.
-
-          Selection was carried by fill alone — `--surface3` at 80% on light,
-          `--surface2` on dark — which asks a sidebar row to be told apart from
-          its hover state by a few values of grey. It was already marginal;
-          `--surface-sidebar` moving to `#15151a` in dark broke it outright,
-          because `--surface2` (`#18181e`) is now three values off the rail it
-          sits on and the selected thread simply stopped being visible.
-
-          The tinted fill plus the rail is what the DM rows below already do
-          (`before:bg-primary`), so this is the sidebar agreeing with itself
-          rather than a new idea — and the rail is the part that survives being
-          glanced at, since an edge marker does not have to compete with the
-          row's own text for contrast the way a wash does.
-        */
         isSelected
           ? 'bg-brand-subtle text-foreground font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-brand'
           : 'hover:bg-surface2/60 text-foreground/85 hover:text-foreground',
@@ -440,6 +478,15 @@ const ThreadRow = memo(function ThreadRow({
         )}
         {session.starred && (
           <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
+        )}
+        {sessionAgents.length > 0 ? (
+          <AgentAvatarStack agents={sessionAgents} size={18} />
+        ) : session.workingDir ? (
+          <span className="size-4 shrink-0 flex items-center justify-center text-foreground-extra-muted text-xs font-mono font-semibold">
+            #
+          </span>
+        ) : (
+          <MessageSquare className="size-3.5 text-foreground-extra-muted shrink-0" />
         )}
         {isEditing ? (
           <input
@@ -1435,9 +1482,10 @@ export function ThreadList() {
                         )}
                       >
                         <div className="shrink-0">
-                          <AvatarStack agents={
-                            agents.filter((a) => session.participants.includes(a.agentName))
-                          } />
+                          <AgentAvatarStack
+                            agents={extractSessionAgents(session, agents, lastMsg)}
+                            size={18}
+                          />
                         </div>
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">

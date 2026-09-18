@@ -291,6 +291,15 @@ export function InboxView() {
             <Inbox className="size-8 opacity-30" />
             <p className="text-sm">No notifications yet</p>
             <p className="text-xs opacity-60">Agent notifications will appear here</p>
+            {unreadNotificationCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllNotificationsRead}
+                className="mt-2 text-xs px-3 py-1.5 rounded-md bg-surface2 hover:bg-surface3 text-foreground font-medium transition-colors"
+              >
+                Clear unread badge ({unreadNotificationCount})
+              </button>
+            )}
           </div>
         ) : (
           <div className="p-4 space-y-6">

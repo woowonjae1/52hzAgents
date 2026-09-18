@@ -5,6 +5,8 @@ import { PanelLeft } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { useWorkspace } from '@/lib/workspace-context';
+import { NotificationBell } from '@/components/notifications/notification-bell';
+
 export function SidebarHeader() {
   const { sidebarToggle } = useLayout();
   const { workspace } = useWorkspace();
@@ -31,8 +33,9 @@ export function SidebarHeader() {
         </div>
       </div>
 
-      {/* Right: Sidebar Collapse Toggle */}
-      <div className="flex items-center gap-1.5 shrink-0">
+      {/* Right: Notification Bell & Sidebar Collapse Toggle */}
+      <div className="flex items-center gap-1 shrink-0">
+        <NotificationBell />
         <Hint label="Collapse Sidebar">
           <button
             onClick={sidebarToggle}
