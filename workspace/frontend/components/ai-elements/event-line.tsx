@@ -66,7 +66,7 @@ export interface EventLineProps {
   /** Lucide node. Sized by this component — pass the bare icon, no className. */
   icon?: ReactNode;
   /** What was done, in a couple of words: "Ran command", "Read file", "Plan". */
-  label: string;
+  label: ReactNode;
   /** What it was done to. Truncated rather than wrapped, never more than a line. */
   detail?: string;
   /**
@@ -78,16 +78,14 @@ export interface EventLineProps {
   detailMono?: boolean;
   state?: EventState;
   /**
-   * Right-aligned trailing text: a duration, a count, a progress fraction.
-   * Tabular so it does not jitter as it updates in place.
+   * Status text or a timestamp on the right edge of the header row.
+   * If omitted and `state === 'running'`, falls back to live elapsed time
+   * from `startTime`.
    */
   meta?: ReactNode;
   /**
-   * Epoch ms the event began. While `state` is `running` and no explicit `meta`
-   * is given, the row shows a live clock here instead — so the same slot that
-   * reports "took 8.8s" afterwards reports "4.2s and counting" during. The
-   * number stays put rather than appearing at the end, which is what made the
-   * old dots-then-duration handoff feel like two different rows.
+   * Unix ms timestamp when the event started. When `state === 'running'`,
+   * drives a live seconds-elapsed display in the header (`1.2s`, `15s`).
    */
   startTime?: number | null;
   /** Controls that sit at the end of the row (copy, dismiss). Not the disclosure. */
@@ -109,7 +107,8 @@ export interface EventLineProps {
  * state; how a failure is phrased is decided here so all six event kinds phrase
  * it the same way.
  */
-function stateLabel(label: string, state: EventState): string {
+function stateLabel(label: ReactNode, state: EventState): ReactNode {
+  if (typeof label !== 'string') return label;
   if (state === 'blocked') return 'Blocked';
   if (state === 'failed') return `${label}, didn't work`;
   if (state === 'cancelled') return `${label}, cancelled`;

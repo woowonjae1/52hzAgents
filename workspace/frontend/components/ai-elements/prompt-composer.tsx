@@ -19,6 +19,7 @@ import {
   FileEdit,
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
+import { ActionSwapRollIcon } from '@/components/motion/action-swap-roll';
 import { cn } from '@/lib/utils';
 import { isComposing } from '@/lib/ime';
 import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession } from '@/lib/types';
@@ -1013,31 +1014,13 @@ export function PromptComposer({
                     : 'bg-surface1 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
                 )}
               >
-                <AnimatePresence mode="wait" initial={false}>
+                <ActionSwapRollIcon value={isWorking ? 'stop' : 'arrow'}>
                   {isWorking ? (
-                    <motion.div
-                      key="stop"
-                      initial={{ scale: 0.6, rotate: -30 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      exit={{ scale: 0.6, rotate: 30 }}
-                      transition={{ duration: 0.12 }}
-                      className="flex items-center justify-center"
-                    >
-                      <Square className="size-3 fill-current" />
-                    </motion.div>
+                    <Square className="size-3 fill-current" />
                   ) : (
-                    <motion.div
-                      key="arrow"
-                      initial={{ scale: 0.6, y: 2 }}
-                      animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0.6, y: -2 }}
-                      transition={{ duration: 0.12 }}
-                      className="flex items-center justify-center"
-                    >
-                      <ArrowUp className="size-4 stroke-[2.5]" />
-                    </motion.div>
+                    <ArrowUp className="size-4 stroke-[2.5]" />
                   )}
-                </AnimatePresence>
+                </ActionSwapRollIcon>
               </button>
             </Hint>
           </div>

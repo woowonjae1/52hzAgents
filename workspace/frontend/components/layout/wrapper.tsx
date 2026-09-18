@@ -125,7 +125,7 @@ function WrapperInner() {
     syncDesktopAttributes();
   }, []);
 
-  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
+  const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, setSidebarOpen, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, agents, loading, workspace } = useWorkspace();
   const { activeArtifact, isCanvasOpen, closeCanvas } = useArtifacts();
   const hasAgents = agents.length > 0;
@@ -169,26 +169,58 @@ function WrapperInner() {
     closeCanvas();
   }, [setActiveRightTab, closeCanvas]);
 
-  // ShellFit container query: auto-collapse sidebar if the parent container box width drops below 680px
+  /*
+    ── ShellFit ──
+
+    Fold the sidebar away while the shell is too narrow to carry both panes,
+    and BRING IT BACK when it is not. The second half was missing: the old
+    version only ever ran `if (isNarrow && isSidebarOpen) sidebarToggle()`, so
+    narrowing the window once folded the sidebar permanently — widening it
+    again left you to reopen it by hand, every time, forever.
+
+    It was missing because `sidebarToggle` was the only control the layout
+    exposed. A handler that wants a KNOWN state and can only say "the other
+    one" cannot express "open if there is room"; worse, a toggle fired from a
+    measurement will happily open a sidebar the user just closed. `setSidebarOpen`
+    exists now for exactly this.
+
+    MOUNT IS NOT A CROSSING IN THE OPENING DIRECTION. A shell that merely has
+    room says nothing about whether the user wanted the sidebar open — they may
+    have collapsed it deliberately three sessions ago, and it is restored from
+    storage. So the first measurement only acts when it is too narrow, which is
+    the fold condition itself. `first` is what encodes that.
+
+    Only CROSSINGS are acted on, so a manual toggle at either size stays put
+    until the shell actually changes shape.
+
+    `openRef` rather than `isSidebarOpen` in the dependency list: reading the
+    value through a ref keeps the observer subscribed once, instead of being
+    disconnected and rebuilt every single time the sidebar opens or closes.
+  */
+  const sidebarOpenRef = React.useRef(isSidebarOpen);
+  sidebarOpenRef.current = isSidebarOpen;
   React.useEffect(() => {
     if (isMobile) return;
     const el = desktopContainerRef.current;
     if (!el) return;
 
     const observer = new ResizeObserver(([entry]) => {
-      const width = entry.contentRect.width;
-      const isNarrow = width < MIN_DOCKED_WIDTH;
+      const isNarrow = entry.contentRect.width < MIN_DOCKED_WIDTH;
       if (narrowStateRef.current === isNarrow) return;
+      const first = narrowStateRef.current === null;
       narrowStateRef.current = isNarrow;
+      if (first && !isNarrow) return;
 
-      if (isNarrow && isSidebarOpen) {
-        sidebarToggle();
-      }
+      const wanted = !isNarrow;
+      // Already where the shell wants it — setting it again would only be a
+      // write nobody asked for.
+      if (sidebarOpenRef.current === wanted) return;
+      setSidebarOpen(wanted);
     });
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [isMobile, isSidebarOpen, sidebarToggle]);
+  }, [isMobile, setSidebarOpen]);
 
   if (loading && !workspace) {
     return <WorkspaceLoadingScreen />;

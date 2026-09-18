@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { EventLine, EventLineAction } from './event-line';
+import { ThinkingShimmer } from '@/components/agents/loading-states/thinking-shimmer';
 import { formatElapsed } from '@/lib/use-elapsed';
 import { cn } from '@/lib/utils';
 
@@ -52,7 +53,15 @@ export function Reasoning({
     <EventLine
       className={className}
       icon={<Brain className={cn(isStreaming && 'text-primary animate-pulse')} />}
-      label={isStreaming ? 'Thinking' : 'Thought'}
+      label={
+        isStreaming ? (
+          <ThinkingShimmer duration={1.8} className="text-foreground font-medium tracking-tight">
+            Thinking…
+          </ThinkingShimmer>
+        ) : (
+          'Thought'
+        )
+      }
       meta={
         !isStreaming
           ? durationText
@@ -84,8 +93,9 @@ export function Reasoning({
         </div>
       ) : (
         <div className="py-1 text-xs text-foreground-extra-muted flex items-center gap-1.5 font-mono">
-          <span className="inline-block size-1.5 rounded-full bg-primary/60 animate-ping" />
-          <span>Generating reasoning stream…</span>
+          <ThinkingShimmer duration={1.5} className="text-primary/90 text-xs">
+            Generating reasoning stream…
+          </ThinkingShimmer>
         </div>
       )}
     </EventLine>
