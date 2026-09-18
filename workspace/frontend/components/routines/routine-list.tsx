@@ -184,7 +184,7 @@ export function RoutineList() {
           <DialogHeader>
             <DialogTitle>Delete schedule</DialogTitle>
             <DialogDescription>
-              Delete “{deletingRoutine?.name}”? Every future automated trigger for it stops.
+              Delete &ldquo;{deletingRoutine?.name}&rdquo;? Every future automated trigger for it stops.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

@@ -68,7 +68,7 @@ function classifyGooseError(text) {
   if (has('401', '403', 'unauthorized', 'invalid api key', 'invalid_api_key',
     'authentication', 'incorrect api key', 'no api key', 'missing api key')) {
     return "Goose authentication failed. Check this agent's provider API key "
-      + '(GOOSE_PROVIDER__API_KEY) and host �?the key may be missing, invalid, or expired.';
+      + '(GOOSE_PROVIDER__API_KEY) and host — the key may be missing, invalid, or expired.';
   }
   if (has('429', 'rate limit', 'rate_limit', 'too many requests', 'quota', 'overloaded')) {
     return "Goose hit the provider's rate limit or quota. Wait and retry, or use a "
@@ -215,13 +215,13 @@ class GooseStreamParser {
       } else if (itype === 'toolResponse') {
         events.push(GooseStreamParser._toolResultEvent(item));
       }
-      // image / redactedThinking / systemNotification / etc �?ignore
+      // image / redactedThinking / systemNotification / etc → ignore
     }
     if (role === 'assistant' && texts.length) {
       const joined = texts.filter(Boolean).join('\n').trim();
       if (joined) {
         // Intermediate assistant text is interim narration (assistant output),
-        // not model-internal reasoning �?surface it as `progress` (�?status),
+        // not model-internal reasoning — surface it as `progress` (→ status),
         // NOT `thinking`. Only genuine `thinking` content items emit `thinking`.
         if (this._pendingFinal) events.push({ kind: 'progress', text: this._pendingFinal });
         this._pendingFinal = joined;

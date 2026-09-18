@@ -1,8 +1,8 @@
 /**
- * Direct LLM API adapter â€?shared base for NanoClaw and Cursor.
+ * Direct LLM API adapter â€” shared base for NanoClaw and Cursor.
  *
  * Calls OpenAI-compatible chat completions API directly with SSE streaming.
- * No CLI binary needed â€?just OPENAI_API_KEY + OPENAI_BASE_URL.
+ * No CLI binary needed â€” just OPENAI_API_KEY + OPENAI_BASE_URL.
  *
  * Port of Python: sdk/src/52hzAgents/adapters/nanoclaw.py & cursor.py
  */

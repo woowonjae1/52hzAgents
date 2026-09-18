@@ -61,14 +61,4 @@ npm run dev
 The native frontend uses http://localhost:3001. The production/Compose
 frontend uses http://localhost:3000.
 
-## Build the Go `agn` client
 
-```powershell
-cd D:\code\52hzAgent\openagents-develop\packages\agn_go
-go test ./...
-go build -o agn.exe .
-.\agn.exe version
-```
-
-To invoke it from any PowerShell window, add this directory to your user PATH,
-or copy `agn.exe` to a directory already in PATH.

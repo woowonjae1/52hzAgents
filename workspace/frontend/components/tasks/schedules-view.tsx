@@ -545,7 +545,7 @@ export function SchedulesView() {
           <DialogHeader>
             <DialogTitle>Delete schedule</DialogTitle>
             <DialogDescription>
-              Delete “{deletingRoutine?.name}”? All future runs stop and its configuration is removed. This cannot be undone.
+              Delete &ldquo;{deletingRoutine?.name}&rdquo;? All future runs stop and its configuration is removed. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

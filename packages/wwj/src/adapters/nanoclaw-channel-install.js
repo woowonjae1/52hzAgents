@@ -4,7 +4,7 @@
  * The channel source ships with this package (nanoclaw-channel/52hzAgents.ts).
  * Installing it means: copy it to `<home>/src/channels/52hzAgents.ts` and add a
  * marker-delimited `import './52hzAgents.js';` block to `src/channels/index.ts`
- * so it self-registers on host startup â€?the same thing NanoClaw's own
+ * so it self-registers on host startup â€” the same thing NanoClaw's own
  * `/add-<channel>` skills do. We never touch the database.
  *
  * This is an EXPLICIT, opt-in action (not run automatically on every adapter
@@ -31,8 +31,8 @@ const { execFileSync } = require('child_process');
 const { looksLikeNanoclaw } = require('./nanoclaw-control');
 
 // The EXACT NanoClaw revision this channel was verified against. Auto-install is
-// gated on this precise commit (NOT a semver range): a different commit â€?even
-// with the same version number â€?is treated as unverified.
+// gated on this precise commit (NOT a semver range): a different commit â€” even
+// with the same version number â€” is treated as unverified.
 const VERIFIED = {
   remote: 'https://github.com/nanocoai/nanoclaw',
   version: '2.1.19',
@@ -49,9 +49,9 @@ const VERIFIED = {
 // the verified commit; a future release can add {commit, fingerprint} entries.
 const AUTO_INSTALL_COMMITS = new Set([VERIFIED.commit]);
 
-// A line present in the shipped channel header â€?used to recognise a file we own.
+// A line present in the shipped channel header â€” used to recognise a file we own.
 const OURS_MARKER = '52hzAgents-CHANNEL v1';
-const BARREL_BEGIN = '// >>> 52hzAgents channel (52hzAgents Workspace bridge) â€?managed, do not edit';
+const BARREL_BEGIN = '// >>> openagents channel (52hzAgents Workspace bridge) â€” managed, do not edit';
 const BARREL_IMPORT = "import './52hzAgents.js';";
 const BARREL_END = '// <<< 52hzAgents channel';
 const BARREL_BLOCK = `${BARREL_BEGIN}\n${BARREL_IMPORT}\n${BARREL_END}\n`;
@@ -117,7 +117,7 @@ function computeInterfaceFingerprint(adapterTs) {
 }
 
 /**
- * Structural / interface pre-flight â€?a HARD gate that even `force` cannot
+ * Structural / interface pre-flight â€” a HARD gate that even `force` cannot
  * bypass (installing into a checkout with a moved channel API would produce a
  * broken host). Returns {ok, reason, fingerprint}.
  */
@@ -145,7 +145,8 @@ function checkStructure(home) {
 
 /**
  * Pre-flight compatibility. Auto-install (`ok:true`, code `verified`) requires
- * BOTH a sound structure AND the EXACT verified commit. A different commit â€? * even with the same version number â€?is `commit-mismatch`; an undeterminable
+ * BOTH a sound structure AND the EXACT verified commit. A different commit â€”
+ * even with the same version number â€” is `commit-mismatch`; an undeterminable
  * commit is `unknown`; a moved interface is `incompatible`. None of these
  * auto-install; the checkout is left untouched.
  * @param {string} home
@@ -192,7 +193,7 @@ function isChannelInstalled(home) {
 /** Does a dest file exist that we did NOT write (a user's own channel)? */
 function _destIsForeign(home) {
   const dest = readFileSafe(channelDestPath(home));
-  if (dest == null) return false; // no file â†?not foreign
+  if (dest == null) return false; // no file â†’ not foreign
   return !dest.includes(OURS_MARKER);
 }
 
@@ -219,7 +220,7 @@ function installChannel(home, opts = {}) {
   const compat = checkCompatibility(home, opts);
   const forced = opts.force === true; // OFF by default; admin/CLI only, never a Workspace user
 
-  // Structure is a HARD gate â€?never bypassable, even with force (installing
+  // Structure is a HARD gate â€” never bypassable, even with force (installing
   // into a checkout with a moved channel API would just break the host).
   if (!compat.structureOk) {
     return {
@@ -242,11 +243,11 @@ function installChannel(home, opts = {}) {
       error: compat.reason,
       version: compat.version,
       commit: compat.commit,
-      hint: 'unverified NanoClaw commit â€?pass force:true (admin/CLI only) to override',
+      hint: 'unverified NanoClaw commit â€” pass force:true (admin/CLI only) to override',
     };
   }
   if (!compat.ok && forced) {
-    // Redacted diagnostic â€?no secrets, no full paths, commit truncated.
+    // Redacted diagnostic â€” no secrets, no full paths, commit truncated.
     const diag = {
       code: compat.code,
       version: compat.version,

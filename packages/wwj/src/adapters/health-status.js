@@ -11,7 +11,7 @@
  * Hard rule: REASON.NOT_INSTALLED is ONLY for a binary that cannot be resolved
  * at all. An installed-but-signed-out agent is REASON.LOGIN_REQUIRED. A binary
  * that resolved at install time but fails to start at run time is
- * REASON.RUNTIME_MISSING / REASON.SPAWN_FAILED �?never NOT_INSTALLED.
+ * REASON.RUNTIME_MISSING / REASON.SPAWN_FAILED — never NOT_INSTALLED.
  *
  * Everything here is pure and dependency-free so it can be required from the
  * daemon, the adapters AND the Electron launcher (via
@@ -24,7 +24,7 @@ const REASON = {
   LOGIN_REQUIRED: 'login_required', // installed, but no usable login / API key
   VERSION_INCOMPATIBLE: 'version_incompatible',
   RUNTIME_MISSING: 'runtime_missing', // resolved at install time, gone at run time
-  SPAWN_FAILED: 'spawn_failed', // child_process spawn errored (ENOENT/EACCES/�?
+  SPAWN_FAILED: 'spawn_failed', // child_process spawn errored (ENOENT/EACCES/…)
   WORKSPACE_JOIN_FAILED: 'workspace_join_failed',
   HEARTBEAT_FAILED: 'heartbeat_failed',
   SESSION_REVOKED: 'session_revoked',
@@ -60,7 +60,7 @@ function readinessReason(installed, ready) {
 /**
  * Whether a resolved binary path must be launched through a shell. On Windows,
  * `.cmd`/`.bat` shims (npm/pnpm/yarn global bins, and amp.cmd) are NOT directly
- * executable via CreateProcess �?Node's spawn needs shell:true or it throws
+ * executable via CreateProcess — Node's spawn needs shell:true or it throws
  * EINVAL/ENOENT. Mirrors the amp adapter's own _spawnAmp handling so the
  * launcher probe, the Test-connection path and the daemon all behave the same.
  */
@@ -78,7 +78,7 @@ function redactDiagnostic(input, maxLen = 300) {
   let s = String(input == null ? '' : input);
   try {
     s = s
-      // key=value / key: value for sensitive keys (token, api_key, secret, �?
+      // key=value / key: value for sensitive keys (token, api_key, secret, …)
       .replace(
         /((?:access[_-]?|api[_-]?|auth[_-]?)?(?:tokens?|keys?|secrets?|passwords?|cookies?)\s*[=:]\s*)(\S+)/gi,
         '$1<redacted>',
@@ -106,7 +106,7 @@ function httpStatusOf(err) {
   return typeof sc === 'number' ? sc : null;
 }
 
-/** Classify a workspace JOIN failure �?{ reason, message } (redacted). */
+/** Classify a workspace JOIN failure → { reason, message } (redacted). */
 function classifyJoinError(err) {
   const sc = httpStatusOf(err);
   let detail;
@@ -120,7 +120,7 @@ function classifyJoinError(err) {
   };
 }
 
-/** Classify a workspace HEARTBEAT failure �?{ reason, message } (redacted). */
+/** Classify a workspace HEARTBEAT failure → { reason, message } (redacted). */
 function classifyHeartbeatError(err) {
   const sc = httpStatusOf(err);
   const detail =
@@ -134,7 +134,8 @@ function classifyHeartbeatError(err) {
 }
 
 /**
- * Classify a child_process spawn failure (the CLI could not be started) �? * { reason, message } (redacted). `label` names the agent ("Amp"), `bin` is the
+ * Classify a child_process spawn failure (the CLI could not be started) →
+ * { reason, message } (redacted). `label` names the agent ("Amp"), `bin` is the
  * resolved path included for diagnostics (it is a filesystem path, not a secret).
  */
 function classifySpawnError(err, opts) {

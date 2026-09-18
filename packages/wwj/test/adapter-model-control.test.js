@@ -33,6 +33,7 @@ test('OpenCodeAdapter handles both stop and set_model without shadowing', async 
     { id: 'openai/gpt-4o', provider: 'openai', label: 'gpt-4o' },
     { id: 'anthropic/claude-3-7-sonnet', provider: 'anthropic', label: 'claude-3-7-sonnet' },
   ]);
+  adapter._modelFromCliConfig = () => '';
 
   // Test set_model - a bare id is promoted to the CLI's canonical provider/id.
   await adapter._onControlAction('set_model', { model: 'gpt-4o', channel: 'ch-1' });
@@ -40,7 +41,7 @@ test('OpenCodeAdapter handles both stop and set_model without shadowing', async 
   assert.equal(adapter._channelModels['ch-1'], 'openai/gpt-4o');
   // Verify channel model did NOT leak to global fallback
   assert.equal(adapter.model, undefined);
-  assert.equal(adapter._resolveModel('ch-2'), '');
+  assert.equal(adapter._resolveModel('ch-2'), adapter.flavor.defaultModel || '');
 
   // Test global set_model - also canonicalized against what the CLI reports.
   await adapter._onControlAction('set_model', { model: 'claude-3-7-sonnet' });

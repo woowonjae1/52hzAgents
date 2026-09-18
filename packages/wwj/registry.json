@@ -38,7 +38,7 @@
       },
       {
         "name": "AIDER_MODEL",
-        "description": "Model to use, e.g. sonnet, gpt-4o, claude-3-5-sonnet-20241022, openrouter/anthropic/claude-3.5-sonnet, gemini/gemini-1.5-pro, deepseek/deepseek-chat. May be left blank to let Aider auto-select â€?but if you set LLM_API_KEY, the provider must be determinable (via AIDER_PROVIDER or the model name).",
+        "description": "Model to use, e.g. sonnet, gpt-4o, claude-3-5-sonnet-20241022, openrouter/anthropic/claude-3.5-sonnet, gemini/gemini-1.5-pro, deepseek/deepseek-chat. May be left blank to let Aider auto-select â€”but if you set LLM_API_KEY, the provider must be determinable (via AIDER_PROVIDER or the model name).",
         "required": false,
         "placeholder": "gpt-4o"
       },
@@ -50,7 +50,7 @@
       },
       {
         "name": "LLM_BASE_URL",
-        "description": "Endpoint URL â€?ONLY for AIDER_PROVIDER=openai-compatible (self-hosted / relay / local). Becomes OPENAI_API_BASE; leave blank for hosted providers.",
+        "description": "Endpoint URL â€”ONLY for AIDER_PROVIDER=openai-compatible (self-hosted / relay / local). Becomes OPENAI_API_BASE; leave blank for hosted providers.",
         "required": false,
         "placeholder": "https://my-endpoint.example/v1"
       }
@@ -64,7 +64,7 @@
         "DEEPSEEK_API_KEY"
       ],
       "saved_env_key": "LLM_API_KEY",
-      "not_ready_message": "No model API key â€?set a model + LLM_API_KEY (or a provider key such as OPENAI_API_KEY) â€?press e to configure"
+      "not_ready_message": "No model API key â€”set a model + LLM_API_KEY (or a provider key such as OPENAI_API_KEY) â€”press e to configure"
     }
   },
   {
@@ -100,7 +100,7 @@
     "env_config": [
       {
         "name": "AMP_API_KEY",
-        "description": "Amp API key (create one at https://ampcode.com/settings) â€?leave blank if you have run `amp login`",
+        "description": "Amp API key (create one at https://ampcode.com/settings) â€”leave blank if you have run `amp login`",
         "required": false,
         "password": true
       },
@@ -112,7 +112,7 @@
     ],
     "check_ready": {
       "login_command": "amp login",
-      "not_ready_message": "Amp is installed but not signed in â€?run: amp login or set AMP_API_KEY"
+      "not_ready_message": "Amp is installed but not signed in â€”run: amp login or set AMP_API_KEY"
     }
   },
   {
@@ -261,7 +261,7 @@
       ],
       "saved_env_key": "CLINE_API_KEY",
       "login_command": "cline auth",
-      "not_ready_message": "Not configured â€?set an API key (press e) or run: cline auth"
+      "not_ready_message": "Not configured â€”set an API key (press e) or run: cline auth"
     }
   },
   {
@@ -384,7 +384,7 @@
     "env_config": [
       {
         "name": "COPILOT_GITHUB_TOKEN",
-        "description": "GitHub token with Copilot access (optional â€?you can also sign in by running `copilot`, or rely on GH_TOKEN / GITHUB_TOKEN / gh auth)",
+        "description": "GitHub token with Copilot access (optional â€”you can also sign in by running `copilot`, or rely on GH_TOKEN / GITHUB_TOKEN / gh auth)",
         "required": false,
         "password": true
       },
@@ -454,7 +454,7 @@
     ],
     "check_ready": {
       "binary": "agent",
-      "not_ready_message": "Cursor CLI not found â€?install with: curl https://cursor.com/install -fsSL | bash"
+      "not_ready_message": "Cursor CLI not found â€”install with: curl https://cursor.com/install -fsSL | bash"
     },
     "resolve_env": {
       "rules": [
@@ -520,7 +520,7 @@
       ],
       "saved_env_key": "GEMINI_API_KEY",
       "login_command": "gemini",
-      "not_ready_message": "Needs sign-in â€?run `gemini` to sign in, or set GEMINI_API_KEY.",
+      "not_ready_message": "Needs sign-in â€”run `gemini` to sign in, or set GEMINI_API_KEY.",
       "unreadable_message": "Gemini credentials were found but could not be read. Check permissions on ~/.gemini, or run `gemini` to sign in again.",
       "auth_detected_labels": {
         "cli_login": "Google account sign-in detected",
@@ -532,7 +532,7 @@
   {
     "name": "goose",
     "label": "Goose",
-    "description": "An open-source AI developer agent by Block (CLI â€?Beta)",
+    "description": "An open-source AI developer agent by Block (CLI â€”Beta)",
     "homepage": "https://github.com/block/goose",
     "tags": [
       "coding",
@@ -579,7 +579,7 @@
       },
       {
         "name": "GOOSE_PROVIDER__HOST",
-        "description": "Custom provider endpoint/host URL (optional â€?for proxies or self-hosted/OpenAI-compatible endpoints).",
+        "description": "Custom provider endpoint/host URL (optional â€”for proxies or self-hosted/OpenAI-compatible endpoints).",
         "required": false
       },
       {
@@ -591,13 +591,13 @@
     ],
     "check_ready": {
       "require_binary": true,
-      "not_ready_message": "Goose CLI not found. Install it: wwj install goose â€?then set a provider/model (or run `goose configure` once)."
+      "not_ready_message": "Goose CLI not found. Install it: wwj install goose â€”then set a provider/model (or run `goose configure` once)."
     }
   },
   {
     "name": "nanoclaw",
     "label": "NanoClaw",
-    "description": "Containerized agent runtime â€?each Agent Group runs in its own Docker container (Claude Agent SDK). Bridged to the Workspace via a native 52hzAgents channel.",
+    "description": "Containerized agent runtime â€”each Agent Group runs in its own Docker container (Claude Agent SDK). Bridged to the Workspace via a native 52hzAgents channel.",
     "homepage": "https://github.com/nanocoai/nanoclaw",
     "tags": [
       "coding",
@@ -647,7 +647,7 @@
         "NANOCLAW_AGENT_GROUP"
       ],
       "saved_env_key": "NANOCLAW_AGENT_GROUP",
-      "not_ready_message": "Set NANOCLAW_AGENT_GROUP (and NANOCLAW_HOME) â€?press e to configure"
+      "not_ready_message": "Set NANOCLAW_AGENT_GROUP (and NANOCLAW_HOME) â€”press e to configure"
     }
   },
   {
@@ -735,7 +735,7 @@
         "OPENAI_API_KEY"
       ],
       "saved_env_key": "LLM_API_KEY",
-      "not_ready_message": "Not configured â€?press e to configure"
+      "not_ready_message": "Not configured â€”press e to configure"
     }
   },
   {
@@ -781,7 +781,7 @@
       },
       {
         "name": "LLM_MODEL",
-        "description": "Model name (required â€?OpenCode hangs without one)",
+        "description": "Model name (required â€”OpenCode hangs without one)",
         "required": true,
         "placeholder": "gpt-4o, claude-sonnet-4-20250514, etc."
       }
@@ -809,7 +809,7 @@
       ],
       "saved_env_key": "LLM_API_KEY",
       "min_version": "1.17.0",
-      "not_ready_message": "Not configured â€?press e to configure"
+      "not_ready_message": "Not configured â€”press e to configure"
     }
   },
   {
@@ -833,9 +833,9 @@
     "install": {
       "binary": "kimi",
       "api_only": true,
-      "macos": "echo 'Kimi uses direct API mode â€?no binary install needed'",
-      "linux": "echo 'Kimi uses direct API mode â€?no binary install needed'",
-      "windows": "echo 'Kimi uses direct API mode â€?no binary install needed'"
+      "macos": "echo 'Kimi uses direct API mode â€”no binary install needed'",
+      "linux": "echo 'Kimi uses direct API mode â€”no binary install needed'",
+      "windows": "echo 'Kimi uses direct API mode â€”no binary install needed'"
     },
     "adapter": {
       "module": "wwj.adapters.kimi",
@@ -872,13 +872,13 @@
         "MOONSHOT_API_KEY"
       ],
       "saved_env_key": "KIMI_API_KEY",
-      "not_ready_message": "No API key â€?press e to configure"
+      "not_ready_message": "No API key â€”press e to configure"
     }
   },
   {
     "name": "hermes",
     "label": "Hermes Agent",
-    "description": "Nous Hermes Agent â€?self-improving AI with tools, profiles, memory, and messaging",
+    "description": "Nous Hermes Agent â€”self-improving AI with tools, profiles, memory, and messaging",
     "homepage": "https://github.com/NousResearch/hermes-agent",
     "tags": [
       "coding",
@@ -910,7 +910,7 @@
       "creds_file": "~/.hermes/config.yaml",
       "status_command": "hermes status",
       "login_command": "hermes setup",
-      "not_ready_message": "Hermes not configured â€?run: hermes setup"
+      "not_ready_message": "Hermes not configured â€”run: hermes setup"
     }
   },
   {
@@ -1104,7 +1104,7 @@
       },
       {
         "name": "MSWEA_MINI_CONFIG_PATH",
-        "description": "Path to a FULL mini config file (YAML). Optional. This REPLACES mini's built-in default config (agent prompt templates, step/environment settings) â€?it does not merge â€?so provide a complete file (a good starting point is the output of `mini-extra config setup`). Leave blank to use mini's default config.",
+        "description": "Path to a FULL mini config file (YAML). Optional. This REPLACES mini's built-in default config (agent prompt templates, step/environment settings) â€”it does not merge â€”so provide a complete file (a good starting point is the output of `mini-extra config setup`). Leave blank to use mini's default config.",
         "required": false,
         "placeholder": "/path/to/mini.yaml"
       },
@@ -1116,31 +1116,31 @@
       },
       {
         "name": "ANTHROPIC_API_KEY",
-        "description": "Anthropic API key â€?used when the model is an Anthropic model. Leave blank if using another provider or a key already in your environment.",
+        "description": "Anthropic API key â€”used when the model is an Anthropic model. Leave blank if using another provider or a key already in your environment.",
         "required": false,
         "password": true
       },
       {
         "name": "ANTHROPIC_BASE_URL",
-        "description": "Custom endpoint for native `anthropic/â€¦` models (an enterprise gateway or Anthropic-protocol relay). Leave blank for hosted Anthropic. Note: most third-party relays are OpenAI-compatible â€?for those use an `openai/â€¦` model + OPENAI_BASE_URL instead.",
+        "description": "Custom endpoint for native `anthropic/â€¦` models (an enterprise gateway or Anthropic-protocol relay). Leave blank for hosted Anthropic. Note: most third-party relays are OpenAI-compatible â€”for those use an `openai/â€¦` model + OPENAI_BASE_URL instead.",
         "required": false,
         "placeholder": "https://your-anthropic-gateway.example"
       },
       {
         "name": "OPENAI_API_KEY",
-        "description": "OpenAI API key â€?used when the model is an OpenAI model. Leave blank if using another provider or a key already in your environment.",
+        "description": "OpenAI API key â€”used when the model is an OpenAI model. Leave blank if using another provider or a key already in your environment.",
         "required": false,
         "password": true
       },
       {
         "name": "OPENAI_BASE_URL",
-        "description": "Custom endpoint for OpenAI-compatible models (a relay/proxy or self-hosted gateway) â€?applies only to `openai/â€¦` models. Leave blank for hosted OpenAI, or for native providers like `deepseek/â€¦` / `anthropic/â€¦`.",
+        "description": "Custom endpoint for OpenAI-compatible models (a relay/proxy or self-hosted gateway) â€”applies only to `openai/â€¦` models. Leave blank for hosted OpenAI, or for native providers like `deepseek/â€¦` / `anthropic/â€¦`.",
         "required": false,
         "placeholder": "https://your-relay.example/v1"
       },
       {
         "name": "DEEPSEEK_API_KEY",
-        "description": "DeepSeek API key â€?used when the model is a `deepseek/â€¦` model (e.g. deepseek/deepseek-chat or deepseek/deepseek-reasoner). Connects directly to api.deepseek.com; no base URL needed.",
+        "description": "DeepSeek API key â€”used when the model is a `deepseek/â€¦` model (e.g. deepseek/deepseek-chat or deepseek/deepseek-reasoner). Connects directly to api.deepseek.com; no base URL needed.",
         "required": false,
         "password": true
       },

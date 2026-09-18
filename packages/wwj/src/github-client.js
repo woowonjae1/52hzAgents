@@ -49,7 +49,7 @@ class GitHubClient {
     const state = opts.state || 'open';
     const perPage = opts.perPage || 20;
     const page = opts.page || 1;
-    // GitHub's /issues endpoint returns PRs too â€?filter to issue-only.
+    // GitHub's /issues endpoint returns PRs too â€” filter to issue-only.
     const items = await this._get(
       `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/issues?state=${state}&per_page=${perPage}&page=${page}`,
       token,
@@ -96,7 +96,7 @@ class GitHubClient {
         }
       }
     } catch {
-      // not a URL â€?fall through
+      // not a URL â€” fall through
     }
     // Plain "owner/name"
     const plain = v.match(/^([^/\s]+)\/([^/\s]+?)(?:\.git)?$/);

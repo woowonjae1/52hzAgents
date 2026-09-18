@@ -126,7 +126,7 @@ class CursorAdapter extends BaseAdapter {
 
   stop() {
     this._stopAllProcesses(
-      'Task interrupted â€?daemon restarting. Send another message to continue.'
+      'Task interrupted â€” daemon restarting. Send another message to continue.'
     ).catch(() => {});
     super.stop();
   }

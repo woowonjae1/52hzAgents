@@ -21,7 +21,7 @@
  *     {
  *       "questions": [
  *         {
- *           "title": "用哪种鉴权方式?",
+ *           "title": "用哪种鉴权方式？",
  *           "options": [
  *             { "label": "JWT", "description": "无状态, 适合多实例" },
  *             { "label": "Session", "description": "可即时吊销" }

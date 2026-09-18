@@ -16,7 +16,7 @@ test('extracts a well-formed block and strips it from the text', () => {
     '我看了一下，有两种做法。\n\n' +
     block(JSON.stringify({
       questions: [{
-        title: '用哪种鉴权方式?',
+        title: '用哪种鉴权方式？',
         options: [
           { label: 'JWT', description: '无状态' },
           { label: 'Session', description: '可吊销' },
@@ -28,7 +28,7 @@ test('extracts a well-formed block and strips it from the text', () => {
   const r = extractDecisionQuestions(content);
   assert.equal(r.invalid, 0);
   assert.equal(r.questions.length, 1);
-  assert.equal(r.questions[0].title, '用哪种鉴权方式?');
+  assert.equal(r.questions[0].title, '用哪种鉴权方式？');
   assert.equal(r.questions[0].options.length, 2);
   assert.equal(r.questions[0].allowCustom, true);
   assert.equal(r.text, '我看了一下，有两种做法。');
