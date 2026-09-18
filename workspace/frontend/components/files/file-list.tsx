@@ -16,7 +16,8 @@ import { downloadUrl } from '@/lib/download';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn, mergeRefs } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
+import { FileTree, FileTreeFolder, FileTreeFile } from '@/components/motion/file-tree';
 import { formatSize, getFileIcon, timeAgo, basename } from './file-utils';
 import { stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceFile } from '@/lib/types';
@@ -133,6 +134,106 @@ export function FileList() {
     if (isMobile) openMobileDetail();
     else setActiveRightTab('file');
   }, [recentFiles, setSelectedFileId, isMobile, openMobileDetail, setActiveRightTab]);
+
+  /*
+    THE PANEL IS A TREE NOW, NOT A FLAT LIST.
+
+    `filename` has always carried the full path ("reports/2026/q3.md"); the
+    old list threw everything but the basename away, so two files called
+    `index.ts` in different folders were two identical rows. `fileTreeNodes`
+    splits those paths back into the hierarchy the agent actually wrote, and
+    `FileTree` draws it with its own roving-tabindex keyboard navigation —
+    which is why `useListKeyboardNav` no longer wraps these rows.
+
+    Folders are derived, not stored: they exist because a file underneath
+    them does. So the expanded set is seeded to "everything" on first build
+    and only diverges once the reader collapses something.
+  */
+  const fileTreeNodes = useMemo(() => {
+    type Dir = { dirs: Map<string, Dir>; files: WorkspaceFile[] };
+    const root: Dir = { dirs: new Map(), files: [] };
+
+    for (const file of recentFiles) {
+      const segments = file.filename.split('/').filter(Boolean);
+      let dir = root;
+      for (const segment of segments.slice(0, -1)) {
+        let next = dir.dirs.get(segment);
+        if (!next) {
+          next = { dirs: new Map(), files: [] };
+          dir.dirs.set(segment, next);
+        }
+        dir = next;
+      }
+      dir.files.push(file);
+    }
+
+    const render = (dir: Dir, prefix: string): React.ReactNode[] => [
+      ...Array.from(dir.dirs.entries()).map(([name, child]) => {
+        const path = prefix ? `${prefix}/${name}` : name;
+        return (
+          <FileTreeFolder key={`dir:${path}`} value={`dir:${path}`} name={name}>
+            {render(child, path)}
+          </FileTreeFolder>
+        );
+      }),
+      ...dir.files.map((file) => (
+        <FileTreeFile
+          key={file.id}
+          value={file.id}
+          name={basename(file.filename)}
+          icon={getFileIcon(file.contentType, file.filename)}
+        />
+      )),
+    ];
+
+    return render(root, '');
+  }, [recentFiles]);
+
+  const allFolderIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const file of recentFiles) {
+      const segments = file.filename.split('/').filter(Boolean).slice(0, -1);
+      let path = '';
+      for (const segment of segments) {
+        path = path ? `${path}/${segment}` : segment;
+        ids.add(`dir:${path}`);
+      }
+    }
+    return Array.from(ids);
+  }, [recentFiles]);
+
+  const [collapsedFolderIds, setCollapsedFolderIds] = useState<Set<string>>(new Set());
+  const expandedFolderIds = useMemo(
+    () => allFolderIds.filter((id) => !collapsedFolderIds.has(id)),
+    [allFolderIds, collapsedFolderIds]
+  );
+  const setExpandedFolderIds = useCallback(
+    (next: string[]) => {
+      const open = new Set(next);
+      setCollapsedFolderIds(new Set(allFolderIds.filter((id) => !open.has(id))));
+    },
+    [allFolderIds]
+  );
+
+  const selectedFile = useMemo(
+    () => recentFiles.find((f) => f.id === selectedFileId) ?? null,
+    [recentFiles, selectedFileId]
+  );
+
+  const openSelectedFile = useCallback(() => {
+    const index = recentFiles.findIndex((f) => f.id === selectedFileId);
+    if (index >= 0) openFile(index);
+  }, [recentFiles, selectedFileId, openFile]);
+
+  /* Folder rows report their own value; only a file id is a selection. */
+  const handleTreeSelect = useCallback(
+    (value: string) => {
+      if (value.startsWith('dir:')) return;
+      const index = recentFiles.findIndex((f) => f.id === value);
+      if (index >= 0) openFile(index);
+    },
+    [recentFiles, openFile]
+  );
 
   const { cursor, setCursor, listNavProps, rowProps } = useListKeyboardNav({
     count: recentFiles.length,
@@ -433,19 +534,59 @@ export function FileList() {
         </div>
       ) : (
         <div
-          {...listNavProps}
-          ref={mergeRefs(listNavProps.ref, scrollRef)}
+          ref={scrollRef}
           className="flex-1 overflow-y-auto px-1 outline-none"
         >
           {/*
             Right-clicking the blank space below the rows. Direct child of the
             scroll container, visually hidden — see RowActions `background`.
+
+            The per-row hover menu went away with the flat rows: a `FileTree`
+            row is a single button with no trailing slot. Those four actions
+            are not lost, they moved here and act on the SELECTED file, so the
+            gesture is select-then-act instead of hover-then-act. Nothing is
+            offered when no file is selected rather than offered and inert.
           */}
           <RowActions
             background
             label="File list actions"
             items={[
-              { label: 'Upload file…', icon: Upload, onSelect: () => fileInputRef.current?.click() },
+              ...(selectedFile
+                ? [
+                    { label: 'Open', icon: FolderOpen, onSelect: () => openSelectedFile() },
+                    {
+                      label: 'Download',
+                      icon: Download,
+                      onSelect: () =>
+                        downloadUrl(
+                          workspaceApi.getFileUrl(selectedFile.id),
+                          basename(selectedFile.filename)
+                        ),
+                    },
+                    {
+                      label: 'Copy link',
+                      icon: LinkIcon,
+                      onSelect: () => {
+                        navigator.clipboard.writeText(workspaceApi.getFileUrl(selectedFile.id));
+                        toast.success('Link copied');
+                      },
+                    },
+                    {
+                      label: 'Delete',
+                      icon: Trash2,
+                      destructive: true,
+                      separatorBefore: true,
+                      onSelect: () =>
+                        deleteFileUndoable(selectedFile.id, basename(selectedFile.filename)),
+                    },
+                  ]
+                : []),
+              {
+                label: 'Upload file…',
+                icon: Upload,
+                separatorBefore: Boolean(selectedFile),
+                onSelect: () => fileInputRef.current?.click(),
+              },
               { label: 'Select all', icon: CheckSquare, onSelect: handleSelectAll },
               ...(['name', 'size', 'date'] as FileSortKey[]).map((key) => ({
                 // The arrow marks the active column and its direction, so the
@@ -461,88 +602,16 @@ export function FileList() {
               })),
             ]}
           />
-          {recentFiles.map((file, idx) => {
-            const isBatchSelected = selectedFileIds.has(file.id);
-            const isCurrentActive = selectedFileId === file.id;
-
-            return (
-              <div
-                key={file.id}
-                {...rowProps(idx, isBatchSelected || isCurrentActive)}
-                onClick={(e) => handleRowClick(e, file, idx)}
-                /* Double-click opens. Single-click selects. That split is what
-                   every file manager does and what nothing in this app did. */
-                onDoubleClick={(e) => { e.stopPropagation(); openFile(idx); }}
-                {...fileDragProps({
-                  filename: file.filename,
-                  contentType: file.contentType,
-                  url: workspaceApi.getFileUrl(file.id),
-                })}
-                className={cn(
-                  'skip-offscreen-row w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-left transition-colors group select-none',
-                  cursor === idx && 'ring-1 ring-border-accent',
-                  isBatchSelected
-                    ? 'bg-primary/10 ring-1 ring-primary/30'
-                    : isCurrentActive
-                    ? 'bg-surface2'
-                    : 'hover:bg-surface2'
-                )}
-              >
-                {/* Selection checkbox — visible when selected or on row hover */}
-                <div
-                  onClick={(e) => handleCheckboxClick(e, file.id, idx)}
-                  className={cn(
-                    'shrink-0 transition-opacity',
-                    isBatchSelected || selectedFileIds.size > 0
-                      ? 'opacity-100'
-                      : 'opacity-0 group-hover:opacity-100'
-                  )}
-                >
-                  <Checkbox checked={isBatchSelected} />
-                </div>
-
-                {getFileIcon(file.contentType, file.filename)}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{basename(file.filename)}</p>
-                  <p className="text-2xs text-muted-foreground">
-                    {formatSize(file.size)} · {stripAddressPrefix(file.uploadedBy || 'unknown')}
-                    {file.createdAt && ` · ${timeAgo(file.createdAt)}`}
-                  </p>
-                </div>
-                {/*
-                  A hover-only trash can was this row's entire action set, and
-                  it is why right-click here fell through to the shell's bare
-                  "Select All" — RowContextMenu looks for a dropdown trigger
-                  that is a DIRECT CHILD of the row, and there was none.
-                */}
-                <RowActions
-                  label={`Actions for ${basename(file.filename)}`}
-                  items={[
-                    { label: 'Open', icon: FolderOpen, onSelect: () => openFile(idx) },
-                    {
-                      label: 'Download',
-                      icon: Download,
-                      onSelect: () => downloadUrl(workspaceApi.getFileUrl(file.id), basename(file.filename)),
-                    },
-                    {
-                      label: 'Copy link',
-                      icon: LinkIcon,
-                      onSelect: () => {
-                        navigator.clipboard.writeText(workspaceApi.getFileUrl(file.id));
-                        toast.success('Link copied');
-                      },
-                    },
-                    {
-                      label: 'Delete',
-                      icon: Trash2,
-                      destructive: true,
-                      onSelect: () => deleteFileUndoable(file.id, basename(file.filename)),
-                    },
-                  ]}
-                />
-              </div>
-            );
-          })}
+          <FileTree
+            ariaLabel="Workspace files"
+            value={selectedFileId ?? null}
+            onValueChange={handleTreeSelect}
+            expandedIds={expandedFolderIds}
+            onExpandedChange={setExpandedFolderIds}
+            classNames={{ item: 'h-8 text-[13px]' }}
+          >
+            {fileTreeNodes}
+          </FileTree>
         </div>
       )}
 

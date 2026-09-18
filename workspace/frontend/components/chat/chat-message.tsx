@@ -4,7 +4,7 @@ import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu';
@@ -15,7 +15,7 @@ import { ToolCallsDisclosure } from './intermediate-steps';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { ToolCard } from '@/components/ai-elements/tool-card';
 import { ToolConfirmation } from '@/components/ai-elements/tool-confirmation';
-import { TodoList, type TodoItem } from '@/components/ai-elements/todo-list';
+import { TodoList, type TodoItem } from '@/components/agents/todo-list';
 import { FileDiff, type DiffLine } from '@/components/ai-elements/file-diff';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { MessageActions } from '@/components/ai-elements/message-actions';
@@ -609,14 +609,17 @@ export const ChatMessage = memo(function ChatMessage({
             )}
           >
             {/* Contained bubble card aligned to right */}
-            <div className="max-w-[88%] sm:max-w-[80%] flex flex-col items-end">
+            <div className="max-w-[82%] flex flex-col items-end">
               <div
                 className={cn(
                   // On the ramp — see the note in prompt-composer.tsx. The
                   // notched corner keeps its relationship to the others
                   // (`--radius-base`, the ramp's own small step) rather than
                   // being a second arbitrary number.
-                  'relative rounded-2xl rounded-br-base px-4.5 py-3',
+                  /* beUI bubble metrics: `rounded-2xl px-3.5 py-2.5 text-sm
+                     leading-6`, and no notched corner — the reference does
+                     not taper the trailing edge. */
+                  'relative rounded-2xl px-3.5 py-2.5 text-sm leading-6',
                   /*
                     OPAQUE, AND ON THE ELEVATION RAMP.
 
@@ -648,8 +651,15 @@ export const ChatMessage = memo(function ChatMessage({
                     is what Claude's own transcript does. See the composer for
                     the rule this follows.
                   */
-                  'bg-surface2 dark:bg-surface3 text-foreground',
-                  'border border-border/80 dark:border-white/[0.08]',
+                  /*
+                    beUI's `solid` variant: `bg-foreground` with
+                    `text-background`. That is the inversion the reference
+                    uses to separate what you said from what came back —
+                    stronger than the one-step surface lift this had, and it
+                    drops the border, because a fully inverted plate does not
+                    need one to be found.
+                  */
+                  'bg-foreground text-background',
                   'transition-all duration-150 break-words'
                 )}
               >
@@ -820,7 +830,7 @@ export const ChatMessage = memo(function ChatMessage({
             isLast && 'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-150',
           )}
         >
-      <div className="flex items-start gap-3">
+      <div className="flex w-full items-start gap-2">
         {hideHeader ? (
           <div className="size-7 shrink-0" aria-hidden />
         ) : (
@@ -829,7 +839,7 @@ export const ChatMessage = memo(function ChatMessage({
               name={message.senderName}
               agentType={agent?.agentType}
               size={28}
-              className="ring-1 ring-border/70 dark:ring-white/[0.1] shadow-xs rounded-full"
+              className="rounded-full"
             />
           </div>
         )}
@@ -837,14 +847,12 @@ export const ChatMessage = memo(function ChatMessage({
         <div className="flex-1 min-w-0 space-y-1.5">
           {/* Identity Header */}
           {!hideHeader && (
-          <div className="flex items-baseline gap-2 select-none mb-0.5">
-            <span className="text-sm font-medium text-foreground tracking-tight">
+          <div className="flex items-center gap-1.5 px-1 text-[11px] leading-none text-muted-foreground select-none">
+            <span className="font-medium text-foreground">
               {message.senderName}
             </span>
             {timestamp && (
-              <span className="text-3xs text-foreground-extra-muted font-mono ml-auto tabular-nums">
-                {timestamp}
-              </span>
+              <span className="ml-auto tabular-nums">{timestamp}</span>
             )}
           </div>
           )}
@@ -863,7 +871,7 @@ export const ChatMessage = memo(function ChatMessage({
 
           {/* Multi-step Plan / Todo List */}
           {planItems && planItems.length > 0 ? (
-            <TodoList items={planItems} />
+            <TodoList items={planItems} title="Plan" />
           ) : null}
 
           {/* Canvas Artifact Card for Long Deliverables / Documents */}
@@ -883,8 +891,22 @@ export const ChatMessage = memo(function ChatMessage({
               </div>
             </div>
           ) : cleanContent ? (
-            <div className="reading-prose text-foreground font-normal select-text selectable">
-              <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
+            /*
+              beUI's `soft` bubble, and only around the ANSWER.
+
+              In the reference shell the prose sits on `bg-muted` while tool
+              results, diffs, plans and approval cards are siblings OUTSIDE
+              the bubble — they are already cards and would read as a card
+              inside a card. So the bubble stops here rather than wrapping
+              the whole content column.
+
+              `w-fit max-w-[82%]` are the bubble's own numbers: a one-word
+              reply should not draw a full-width plate.
+            */
+            <div className="w-fit max-w-[82%] rounded-2xl bg-muted px-3.5 py-2.5 text-sm leading-6 text-foreground">
+              <div className="reading-prose font-normal select-text selectable">
+                <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
+              </div>
             </div>
           ) : null}
 

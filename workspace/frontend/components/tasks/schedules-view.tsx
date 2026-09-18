@@ -29,7 +29,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { RoutineHistoryDrawer } from '@/components/routines/routine-history-drawer';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { useScrollRestore } from '@/hooks/use-scroll-restore';

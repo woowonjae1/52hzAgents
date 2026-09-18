@@ -11,7 +11,7 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import {
   EventLine,
   EventLineAction,

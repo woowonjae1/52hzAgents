@@ -4,7 +4,7 @@ import { Hint } from '@/components/ui/hint';
 import { useState } from 'react';
 import { FileCode2, Undo2, FileDiff } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 import { EventLine } from '@/components/ai-elements/event-line';
 import { MultiDiffInspector } from '@/components/diff/multi-diff-inspector';

@@ -6,7 +6,7 @@ import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { useEffect, useMemo } from 'react';
 import { cn, mergeRefs } from '@/lib/utils';
 import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight, Check, Copy } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';

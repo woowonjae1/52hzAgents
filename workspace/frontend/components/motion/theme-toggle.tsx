@@ -160,14 +160,49 @@ export function useThemeToggle({
       root.dataset.beuiVt = variant;
     }
 
+    /*
+      THE THEME MUST NOT DEPEND ON THE ANIMATION.
+
+      `startViewTransition` does not run its callback immediately — it waits
+      for a rendering opportunity. A window that is occluded, minimised or
+      otherwise not painting never gets one, so the callback (and with it the
+      only `setTheme` call) can be deferred indefinitely: as shipped, clicking
+      this button on a non-painting page did nothing at all, silently, and
+      `document.visibilityState` still read "visible" the whole time.
+
+      So the update is idempotent and also runs on a short timer. Whichever
+      fires first wins; the loser is a no-op. Same for tearing down the
+      `data-beui-vt` hook, because a transition that never starts is a
+      `finished` promise that never settles.
+    */
+    let applied = false;
+    const applyTheme = () => {
+      if (applied) return;
+      applied = true;
+      setTheme(next);
+    };
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      delete root.dataset.beuiVt;
+    };
+
     const vt = (
       document as Document & {
         startViewTransition(cb: () => void): { finished: Promise<void> };
       }
-    ).startViewTransition(() => setTheme(next));
+    ).startViewTransition(applyTheme);
+
+    const fallback = window.setTimeout(() => {
+      applyTheme();
+      cleanup();
+    }, 200);
 
     vt.finished.finally(() => {
-      delete root.dataset.beuiVt;
+      window.clearTimeout(fallback);
+      cleanup();
     });
   };
 
@@ -184,12 +219,23 @@ export function ThemeToggle({
   const { isDark, mounted, toggle } = useThemeToggle({ variant, start });
 
   return (
+    /*
+      `{...rest}` SPREADS FIRST, NOT LAST.
+
+      The props type omits `onClick`, but the spread used to come after it —
+      so any parent that clones this element with a click handler of its own
+      overwrote `toggle` and the button became inert. Radix does exactly that:
+      wrapping this in a `<TooltipTrigger asChild>` (which attaches its own
+      `onClick` to dismiss the tooltip) silently killed theme switching, with
+      no type error, because the clobbered prop is the one the type says
+      callers cannot pass.
+    */
     <button
+      {...rest}
       type="button"
       aria-label={mounted && isDark ? "Switch to light mode" : "Switch to dark mode"}
       onClick={toggle}
       className={cn("flex items-center justify-center", className)}
-      {...rest}
     >
       {mounted ? (
         <ActionSwapIcon

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ActionSwapRollIcon } from '@/components/motion/action-swap-roll';
+import { Magnetic } from '@/components/motion/magnetic';
 import { cn } from '@/lib/utils';
 import { isComposing } from '@/lib/ime';
 import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession } from '@/lib/types';
@@ -723,8 +724,19 @@ export function PromptComposer({
             just reads as one belonging to the same family as the banner above
             it and the sidebar rows beside it.
           */
-          'relative rounded-2xl overflow-hidden transition-all duration-200',
-          'bg-surface2',
+          /*
+            beUI `PromptInput`, value for value:
+            `relative w-full rounded-2xl border border-border/80 bg-background
+            p-2 transition-colors focus-within:border-foreground/25`.
+
+            The reference puts the composer on the PAGE ground, not on a
+            lifted surface, and separates it with a hairline alone — no
+            shadow, no brand focus colour. `bg-surface2` + `shadow-xs` +
+            `focus-within:border-brand-border` were this app's own three
+            mechanisms for the same edge; the replication drops all three.
+          */
+          'relative w-full rounded-2xl overflow-hidden transition-colors',
+          'bg-background',
           /*
             One token, no `dark:` variant. This read `border-border/80
             dark:border-white/[0.10]`, and that hardcoded white was simply
@@ -733,7 +745,7 @@ export function PromptComposer({
             same-specificity rule competing with the focus colour below for no
             gain. `--border` covers both themes on its own.
           */
-          'border border-border',
+          'border border-border/80',
           /*
             ── Flat in the page; elevation is reserved for what floats ──
 
@@ -754,9 +766,8 @@ export function PromptComposer({
 
             The mention popover keeps `shadow-xl`. It really does float.
           */
-          'shadow-xs focus-within:shadow-sm',
-          'focus-within:border-brand-border',
-          isDragging && 'border-brand ring-2 ring-brand/20'
+          'focus-within:border-foreground/25',
+          isDragging && 'border-primary ring-2 ring-primary/20'
         )}
       >
 
@@ -985,6 +996,22 @@ export function PromptComposer({
               )}
             </AnimatePresence>
 
+            {/*
+              `Magnetic` WRAPS the hint, and the hint still wraps the button.
+
+              Two things forced this order. beUI's own `MagneticButton`
+              bundles its `Button` and that button's variant classes, which
+              would overwrite the three states this control already draws
+              (working / can-send / inert) — so only the pull is taken, not
+              the button. And `Magnetic` renders its own `motion.div` without
+              forwarding a ref or spreading props, so putting it INSIDE
+              `Hint` would hand the tooltip that div instead of the button
+              and quietly drop the ref and `aria-describedby`.
+
+              `Magnetic` is a no-op under `prefers-reduced-motion` and on
+              touch, so nothing below changes on either.
+            */}
+            <Magnetic strength={0.2}>
             <Hint label={isWorking ? 'Stop response' : 'Send message (Enter)'}>
               <button
                 type="button"
@@ -1023,6 +1050,7 @@ export function PromptComposer({
                 </ActionSwapRollIcon>
               </button>
             </Hint>
+            </Magnetic>
           </div>
         </div>
       </div>

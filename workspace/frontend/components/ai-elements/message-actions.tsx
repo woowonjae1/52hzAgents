@@ -2,7 +2,7 @@
 
 import { Copy, Check, RotateCw, Download, ThumbsUp, ThumbsDown, FileText, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -19,8 +19,8 @@ export interface MessageActionsProps {
 
 /** 统一的幽灵图标按钮样式 */
 const ghostButton = cn(
-  'inline-flex items-center justify-center size-7 rounded-md',
-  'text-foreground-extra-muted hover:text-foreground hover:bg-surface2',
+  'grid size-7 place-items-center rounded-md',
+  'text-muted-foreground hover:text-foreground hover:bg-muted',
   'transition-colors duration-150',
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
 );
@@ -63,7 +63,7 @@ export function MessageActions({
 
   if (variant === 'toolbar') {
     return (
-      <div className={cn('flex items-center gap-0.5 text-foreground-extra-muted select-none mt-1.5 -ml-1', className)}>
+      <div className={cn('flex min-h-5 items-center gap-1 px-1 mt-1.5 text-[11px] text-muted-foreground select-none', className)}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button type="button" onClick={handleCopy} className={ghostButton} aria-label="Copy content">

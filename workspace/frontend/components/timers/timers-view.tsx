@@ -4,7 +4,7 @@ import { Hint } from '@/components/ui/hint';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock3, Loader2, Plus, RefreshCw, Timer, X, Copy } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Button } from '@/components/ui/button';
 import { RowActions } from '@/components/ui/row-actions';
 import { runUndoable } from '@/lib/undoable';

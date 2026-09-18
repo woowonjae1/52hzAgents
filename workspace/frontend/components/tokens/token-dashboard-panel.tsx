@@ -20,7 +20,7 @@ import type { WorkspaceTokenStats, ChannelContextHealth, AgentTokenStat } from '
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 function fmtTokens(n?: number | null): string {
   if (!n || n <= 0) return '0';

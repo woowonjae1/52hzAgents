@@ -186,15 +186,21 @@ export function EventLine({
   const row = (
     <span
       className={cn(
-        'inline-flex min-w-0 max-w-full flex-1 items-baseline gap-1.5 text-xs',
-        isBad ? 'text-destructive' : 'text-foreground-muted',
+        /*
+          beUI `ToolResult` trigger, value for value: `min-h-9`, `gap-2`,
+          `rounded-md`, `py-1`, `text-sm`. This row was `text-xs` and baseline
+          aligned on a 1.5 gap — deliberately tighter than the reference,
+          which is the thing being replaced.
+        */
+        'group inline-flex min-h-9 min-w-0 max-w-full flex-1 items-center gap-2 rounded-md py-1 text-sm',
+        isBad ? 'text-rose-600 dark:text-rose-400' : 'text-muted-foreground',
         // The shimmer is the ONLY running signal. No spinner, no pulsing badge,
         // no glowing border — see the `.event-running` note in globals.css.
         running && 'event-running'
       )}
     >
       <GlyphSlot icon={icon} expandable={expandable} />
-      <span className={cn('shrink-0', !isBad && 'text-foreground font-medium')}>
+      <span className={cn('min-w-0 shrink-0 truncate', !isBad && 'font-medium text-foreground/90')}>
         {stateLabel(label, state)}
       </span>
       {detail && (
@@ -217,8 +223,15 @@ export function EventLine({
             // across the full width of a ~1000px transcript, and a 900px-wide
             // rounded rectangle is a card no matter what it is called. Capped, it
             // truncates and the row keeps its compact shape.
-            'min-w-0 max-w-[46ch] truncate rounded-base bg-surface2 px-1.5',
-            'text-foreground-muted',
+            /*
+              NO CHIP. beUI renders the argument as bare
+              `min-w-0 truncate font-mono text-[11px] text-muted-foreground/55`
+              — no fill, no radius, no padding. The `bg-surface2` chip and its
+              `46ch` cap were this app's own device for separating "what was
+              done" from "what it was done to"; the replication drops both and
+              lets the weight and colour do it.
+            */
+            'min-w-0 truncate text-[11px] text-muted-foreground/55',
             detailMono && 'font-mono'
           )}
         >
@@ -229,9 +242,9 @@ export function EventLine({
   );
 
   const trailing = (trailingMeta || actions) && (
-    <span className="ml-auto flex shrink-0 items-baseline gap-2 pl-2">
+    <span className="ml-auto flex shrink-0 items-center gap-2 pl-2">
       {trailingMeta && (
-        <span className="text-3xs font-mono tabular-nums text-foreground-extra-muted">
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground/60">
           {trailingMeta}
         </span>
       )}
@@ -243,7 +256,7 @@ export function EventLine({
   if (!children || alwaysOpen) {
     return (
       <div className={cn('my-1.5 min-w-0', className)}>
-        <div className="flex min-w-0 items-baseline">
+        <div className="flex min-w-0 items-center">
           {row}
           {trailing}
         </div>
@@ -254,7 +267,7 @@ export function EventLine({
 
   return (
     <details className={cn('event-line my-1.5 min-w-0', className)} open={defaultOpen}>
-    <summary className="flex min-w-0 list-none items-baseline">
+    <summary className="flex min-w-0 list-none items-center">
         {row}
         {trailing}
       </summary>
@@ -281,11 +294,21 @@ export function EventLine({
  */
 export function EventLineBody({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-1.5 grid min-w-0 grid-cols-[1rem_1fr] gap-x-1.5">
-      <span aria-hidden className="mx-auto h-full w-px bg-border" />
+    /*
+      beUI puts the expanded body in `overflow-hidden rounded-xl bg-muted/80`
+      — a filled card. The 1px rail in a `[1rem_1fr]` grid that used to live
+      here was the opposite decision, taken so an expanded tool call would not
+      read as a box; the replication takes the box back.
+
+      The heading clamp stays regardless of which treatment wraps it. Bodies
+      here carry markdown a model wrote for another model, where `#` is a
+      section marker inside a tool result, not a page title — left alone, one
+      tool returning `# Results` renders a 34px heading inside a 12px column.
+    */
+    <div className="mt-1.5 min-w-0 overflow-hidden rounded-xl bg-muted/80 p-2.5">
       <div
         className={cn(
-          'min-w-0 pb-0.5',
+          'min-w-0',
           'text-xs [&_h1]:text-xs [&_h2]:text-xs [&_h3]:text-xs [&_h4]:text-xs',
           '[&_h1]:font-medium [&_h2]:font-medium [&_h3]:font-medium [&_h4]:font-medium'
         )}

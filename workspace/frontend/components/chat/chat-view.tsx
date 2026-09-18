@@ -54,7 +54,7 @@ import { PipelineStepper } from './pipeline-stepper';
 import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 const PROMPT_SUGGESTIONS = [
   {

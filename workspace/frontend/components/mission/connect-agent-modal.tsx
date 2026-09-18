@@ -7,7 +7,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Terminal, Copy, Check, Play, Zap, Loader2, Globe, ShieldCheck, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 import { useAgentCatalog } from '@/lib/agent-catalog';
 

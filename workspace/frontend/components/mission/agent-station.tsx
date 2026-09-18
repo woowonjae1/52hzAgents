@@ -16,7 +16,7 @@ import {
   RotateCw,
 } from 'lucide-react';
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 
 export type StationStatus = 'working' | 'ready' | 'offline' | 'blocked' | 'stalled';

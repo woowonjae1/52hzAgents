@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { FileCode, Copy, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { EventLine, EventLineAction } from './event-line';
 

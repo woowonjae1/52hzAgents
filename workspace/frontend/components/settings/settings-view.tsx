@@ -50,7 +50,7 @@ import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout, type SettingsTab } from '@/components/layout/layout-context';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { getBridge } from '@/lib/desktop';
 import { AgentAvatar } from '@/components/agents/agent-avatar';

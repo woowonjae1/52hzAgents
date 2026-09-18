@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { clearErrors, getErrors, subscribeErrors, type LoggedError } from '@/lib/error-log';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 /** Fired by the palette, the shortcut sheet, or an error toast's own action. */
 export const ERROR_LOG_EVENT = 'app:error-log';

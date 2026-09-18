@@ -5,7 +5,7 @@ import { SkeletonRows } from '@/components/ui/skeleton';
 import { runUndoable } from '@/lib/undoable';
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, Folder, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X, ListFilter } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
@@ -301,6 +301,12 @@ function getSmartSessionTitle(
   return 'New chat';
 }
 
+/*
+  A private MIME type, not `text/plain`: the sidebar must not treat a dragged
+  file, a URL or a selection from the transcript as a thread being refiled.
+*/
+const THREAD_DRAG_TYPE = 'application/x-52hz-thread';
+
 interface ThreadRowProps {
   session: WorkspaceSession;
   isSelected: boolean;
@@ -328,6 +334,8 @@ interface ThreadRowProps {
   onUpdateStarred: (sessionId: string, starred: boolean) => void;
   onUpdateStatus: (sessionId: string, status: 'active' | 'archived' | 'deleted') => void;
   setEditTitleValue: (v: string) => void;
+  /** Alt+Shift+Up/Down: move this thread to the previous/next project group. */
+  onMoveToAdjacentFolder?: (sessionId: string, direction: -1 | 1) => void;
 }
 
 const ThreadRow = memo(function ThreadRow({
@@ -351,6 +359,7 @@ const ThreadRow = memo(function ThreadRow({
   onUpdateStarred,
   onUpdateStatus,
   setEditTitleValue,
+  onMoveToAdjacentFolder,
 }: ThreadRowProps) {
   const activityMs = session.lastEventAt;
   const displayTime = formatCompactRelativeTime(
@@ -471,8 +480,30 @@ const ThreadRow = memo(function ThreadRow({
       role="option"
       aria-selected={isSelected}
       tabIndex={isSelected ? 0 : -1}
+      /*
+        DRAG TO REFILE, AND A KEYBOARD PATH TO THE SAME THING.
+
+        A project group is just the set of threads sharing a `workingDir`, so
+        dropping a row on another group's header rebinds that one field. The
+        keyboard equivalent is Alt+Shift+Up/Down, because a move that only
+        exists as a drag is a move half the people using this cannot make.
+      */
+      draggable={!isEditing}
+      onDragStart={(e) => {
+        if (isEditing) {
+          e.preventDefault();
+          return;
+        }
+        e.dataTransfer.setData(THREAD_DRAG_TYPE, session.sessionId);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
       onKeyDown={(e) => {
         if (isEditing) return;
+        if (e.altKey && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+          e.preventDefault();
+          onMoveToAdjacentFolder?.(session.sessionId, e.key === 'ArrowUp' ? -1 : 1);
+          return;
+        }
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onSelect(session.sessionId);
@@ -483,12 +514,21 @@ const ThreadRow = memo(function ThreadRow({
         onSelect(session.sessionId);
       }}
       className={cn(
-        'w-full flex items-center justify-between gap-2 ps-4 pe-2 py-1.5 rounded-lg text-left transition-colors relative group select-none cursor-pointer',
-        'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+        /*
+          beUI's `ai-sidebar` resource row, value for value: `min-h-9`,
+          `gap-2.5`, `rounded-xl`, `pr-3`, `text-sm`, muted by default and
+          lifting to `bg-muted text-foreground` when selected or hovered.
+
+          The brand-tinted fill and the 3px left rule are gone with it — the
+          reference marks the active row with the same `bg-muted` plate it
+          uses for hover and nothing else.
+        */
+        'group relative flex min-h-9 w-full min-w-0 cursor-pointer select-none items-center justify-between gap-2.5 rounded-xl ps-4 pr-3 text-left text-sm transition-colors',
+        'focus-visible:outline-hidden focus-visible:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
         isSelected
-          ? 'bg-brand-subtle text-foreground font-medium before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-r-full before:bg-brand'
-          : 'hover:bg-surface2/60 text-foreground/85 hover:text-foreground',
-        'has-data-[state=open]:bg-surface2/60',
+          ? 'bg-muted font-medium text-foreground'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+        'has-data-[state=open]:bg-muted has-data-[state=open]:text-foreground',
         isActive && 'thread-wip',
         isCompleted && !isSelected && 'bg-surface2/40'
       )}
@@ -664,7 +704,7 @@ interface VirtualExpanderItem {
 type VirtualListItem = VirtualGroupHeaderItem | VirtualSessionItem | VirtualExpanderItem;
 
 export function ThreadList() {
-  const { loading, sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
+  const { loading, sessions, currentSessionId, setCurrentSessionId, agents, lastMessageBySession, activeSessionIds, completedSessionIds, updateSession, moveSessionToFolder, renameSession, dmConversations, createSession, userSentMessageTimestamps, recordUserMessageSent, todos } = useWorkspace();
   const { sidebarToggle, isMobile, openMobileDetail, setViewMode, viewMode } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -1016,6 +1056,41 @@ export function ThreadList() {
 
   const listContainerRef = useRef<HTMLDivElement>(null);
 
+  /*
+    REFILING A THREAD.
+
+    The project groups in this list are derived from `workingDir`, so the
+    order below is the order the headers are rendered in — the pinned band is
+    skipped because it is a filter, not a folder, and dropping a thread on it
+    would have nothing to write.
+  */
+  const folderOrder = useMemo(() => {
+    const dirs: (string | null)[] = [];
+    for (const item of virtualListItems) {
+      if (item.type !== 'header' || item.pinned) continue;
+      const dir = item.dir ?? null;
+      if (!dirs.some((d) => d === dir)) dirs.push(dir);
+    }
+    return dirs;
+  }, [virtualListItems]);
+
+  const [dropFolderKey, setDropFolderKey] = useState<string | null>(null);
+
+  const handleMoveToAdjacentFolder = useCallback(
+    (sessionId: string, direction: -1 | 1) => {
+      if (folderOrder.length < 2) return;
+      const session = sessions.find((s) => s.sessionId === sessionId);
+      if (!session) return;
+      const current = session.workingDir ?? null;
+      const at = folderOrder.findIndex((d) => d === current);
+      if (at < 0) return;
+      const next = folderOrder[at + direction];
+      if (next === undefined) return;
+      void moveSessionToFolder(sessionId, next);
+    },
+    [folderOrder, sessions, moveSessionToFolder]
+  );
+
   const rowVirtualizer = useVirtualizer({
     count: virtualListItems.length,
     getScrollElement: () => listContainerRef.current,
@@ -1338,7 +1413,36 @@ export function ThreadList() {
                   ) : item.type === 'header' ? (
                     <div
                       onClick={() => toggleCollapseGroup(item.key.replace(/^header-/, ''))}
-                      className="flex items-center justify-between gap-1.5 px-2.5 pt-2 pb-1 select-none group cursor-pointer"
+                      /*
+                        The pinned band is a filter, not a folder — there is no
+                        `workingDir` to write, so it does not accept a drop.
+                      */
+                      onDragOver={(e) => {
+                        if (item.pinned) return;
+                        if (!e.dataTransfer.types.includes(THREAD_DRAG_TYPE)) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDropFolderKey(item.key);
+                      }}
+                      onDragLeave={() => {
+                        setDropFolderKey((current) => (current === item.key ? null : current));
+                      }}
+                      onDrop={(e) => {
+                        setDropFolderKey(null);
+                        if (item.pinned) return;
+                        const sessionId = e.dataTransfer.getData(THREAD_DRAG_TYPE);
+                        if (!sessionId) return;
+                        e.preventDefault();
+                        void moveSessionToFolder(sessionId, item.dir ?? null);
+                      }}
+                      className={cn(
+                        /* beUI section item: `h-8`, `gap-2`, `rounded-lg`,
+                           `px-2.5`, `text-xs`. Drop target uses the
+                           reference's own `primary/10` + `ring-primary/45`. */
+                        'group flex h-8 cursor-pointer select-none items-center justify-between gap-2 rounded-lg px-2.5 text-xs',
+                        dropFolderKey === item.key &&
+                          'bg-primary/10 ring-1 ring-primary/45 ring-inset'
+                      )}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         {item.pinned ? (
@@ -1391,6 +1495,7 @@ export function ThreadList() {
                       onUpdateStarred={handleUpdateStarred}
                       onUpdateStatus={handleUpdateStatus}
                       setEditTitleValue={setEditTitleValue}
+                      onMoveToAdjacentFolder={handleMoveToAdjacentFolder}
                     />
                   )}
                 </div>

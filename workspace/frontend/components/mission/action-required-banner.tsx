@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Check, X, Square, Clock, Terminal, ShieldAlert, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 
 export interface PendingActionItem {

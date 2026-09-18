@@ -1,6 +1,6 @@
 'use client';
 
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 /**
  * WHERE ERRORS GO AFTER THE TOAST.

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { getBridge, syncDesktopAttributes, WINDOW_CONTROLS_INSET } from '@/lib/desktop';
 import { useLayout, type ViewMode } from './layout-context';
 import { useArtifacts } from '@/lib/artifacts-context';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Rocket, Copy, Check, Key, Cloud, Loader2, Plug } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { capture } from '@/lib/analytics';

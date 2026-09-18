@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { UserPlus, Copy, Check, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/helpers';
 import type { WorkspaceInvitation } from '@/lib/types';

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { runUndoable } from '@/lib/undoable';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from './api';
 import { capture, group } from './analytics';
 import { useOpenAgentsAuth } from './openagents-auth-context';
@@ -213,6 +214,8 @@ interface WorkspaceContextValue {
   createSession: (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string }) => Promise<WorkspaceSession>;
   renameSession: (sessionId: string, title: string) => Promise<void>;
   updateSession: (sessionId: string, updates: { starred?: boolean; status?: string }) => Promise<void>;
+  /** Rebind a thread to another project folder; `null` returns it to Direct chats. */
+  moveSessionToFolder: (sessionId: string, workingDir: string | null) => Promise<void>;
   addParticipant: (sessionId: string, agentName: string) => Promise<void>;
   removeParticipant: (sessionId: string, agentName: string) => Promise<void>;
   setSessionMaster: (sessionId: string, agentName: string) => Promise<void>;
@@ -1906,6 +1909,33 @@ export function WorkspaceProvider({
     }
   }, []);
 
+  /*
+    MOVING A THREAD BETWEEN PROJECT GROUPS.
+
+    The sidebar's "projects" are not stored anywhere — they are the distinct
+    `workingDir` values of the threads, grouped. So a move is a PATCH of that
+    one field, and `null` drops the thread back into the ungrouped "Direct
+    chats" band. Optimistic, with a revert, because the group a row sits in
+    has to follow the drag immediately or the gesture reads as broken.
+  */
+  const moveSessionToFolder = useCallback(async (sessionId: string, workingDir: string | null) => {
+    const previousSession = sessions.find((s) => s.sessionId === sessionId);
+    if (!previousSession) return;
+    if ((previousSession.workingDir ?? null) === workingDir) return;
+
+    setSessions((prev) =>
+      prev.map((s) => (s.sessionId === sessionId ? { ...s, workingDir } : s))
+    );
+    try {
+      await workspaceApi.updateChannel(sessionId, { workingDir: workingDir ?? '' });
+    } catch (e) {
+      setSessions((prev) =>
+        prev.map((s) => (s.sessionId === sessionId ? previousSession : s))
+      );
+      toast.error(e instanceof Error ? e.message : 'Could not move that thread');
+    }
+  }, [sessions]);
+
   const updateSession = useCallback(async (sessionId: string, updates: { starred?: boolean; status?: string }) => {
     // Capture previous state for rollback
     const previousSession = sessions.find((s) => s.sessionId === sessionId);
@@ -2052,6 +2082,7 @@ export function WorkspaceProvider({
     createSession,
     renameSession,
     updateSession,
+    moveSessionToFolder,
     addParticipant,
     removeParticipant,
     setSessionMaster,
@@ -2117,7 +2148,7 @@ export function WorkspaceProvider({
     stoppingSessionIds, completedSessionIds, monitorMode, acknowledgeCompletion, agentModes,
     updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, setCurrentSessionId,
     consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession,
-    renameSession, updateSession, addParticipant, removeParticipant, setSessionMaster,
+    renameSession, updateSession, moveSessionToFolder, addParticipant, removeParticipant, setSessionMaster,
     setSessionOrchestration, renameWorkspace, refreshWorkspace, refreshAgents, refreshFiles,
     uploadFile, deleteFile, deleteFileUndoable, browserTabs, selectedBrowserTabId, setSelectedBrowserTabId,
     refreshBrowserTabs, openBrowserTab, closeBrowserTab, navigateBrowserTab,

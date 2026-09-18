@@ -38,7 +38,7 @@ import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/type
 import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
 import { PrioritySelector } from './priority-selector';
 import { RowActions } from '@/components/ui/row-actions';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { StatusSelector, StatusGlyph } from './status-selector';
 import { TasksDisplayOptions, type TasksDisplaySettings } from './tasks-display-options';
 import { TasksBoard } from './tasks-board';

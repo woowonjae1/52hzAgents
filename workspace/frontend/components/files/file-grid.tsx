@@ -9,7 +9,7 @@ import {
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn, mergeRefs } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 import { fileDragProps } from '@/lib/file-drag';
 import { downloadUrl } from '@/lib/download';

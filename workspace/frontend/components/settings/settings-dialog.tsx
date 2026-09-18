@@ -18,7 +18,7 @@ import { Settings, Copy, Check, Bot, Globe, Loader2, Plug } from 'lucide-react';
 import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import type { Workspace, WorkspaceAgent } from '@/lib/types';
 

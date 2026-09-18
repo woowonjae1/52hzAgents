@@ -35,7 +35,7 @@ import {
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 import { Kbd } from '@/components/ui/kbd';
 import { shortcutKeys } from '@/lib/shortcuts';

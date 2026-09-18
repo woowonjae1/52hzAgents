@@ -197,7 +197,10 @@
   --radius: 8px;
 
   /* ChatGPT & Claude desktop standardized reading column width (~860px max) */
-  --chat-column: min(860px, 100%);
+  /* beUI's chat shell is `max-w-3xl` (48rem). 860px was ~7ch wider per
+     line than that, which is what made the transcript read looser than
+     the reference. The composer shares this var, so both move together. */
+  --chat-column: min(48rem, 100%);
 
   /*
     ── The reading scale ──

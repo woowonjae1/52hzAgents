@@ -24,7 +24,7 @@ import { SubagentList } from '@/components/ai-elements/subagent-list';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
 import { WorkingIndicator } from '@/components/chat/working-indicator';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export interface SubagentInfo {
   index: number;

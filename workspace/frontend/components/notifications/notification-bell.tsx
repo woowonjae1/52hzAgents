@@ -10,7 +10,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { stripAddressPrefix } from '@/lib/types';
 import type { NotificationItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '';

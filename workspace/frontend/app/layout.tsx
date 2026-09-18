@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { ThemeProvider } from 'next-themes';
-import { Toaster } from '@/components/ui/sonner';
+import { AnimatedToaster } from '@/components/ui/animated-toaster';
 import { AuthProvider } from '@/lib/auth-context';
 import { OpenAgentsAuthProvider } from '@/lib/openagents-auth-context';
 import { MARK_COLOR_PREPAINT_SCRIPT } from '@/lib/mark-color-store';
@@ -127,13 +127,13 @@ export default function RootLayout({
             `setTheme()` into a no-op, which is what broke the light/dark
             toggle — pass `defaultTheme` alone to pick a default the user can
             still override. */}
-        <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark">
           <AuthProvider>
             <OpenAgentsAuthProvider>
               {children}
             </OpenAgentsAuthProvider>
           </AuthProvider>
-          <Toaster />
+          <AnimatedToaster />
         </ThemeProvider>
       </body>
     </html>

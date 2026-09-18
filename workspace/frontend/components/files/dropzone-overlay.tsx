@@ -4,7 +4,7 @@ import { UploadCloud } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export function DropzoneOverlay() {
   const [isDragging, setIsDragging] = useState(false);

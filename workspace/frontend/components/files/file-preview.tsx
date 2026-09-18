@@ -5,7 +5,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { downloadUrl } from '@/lib/download';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { FileGrid } from './file-grid';
 import { basename } from './file-utils';

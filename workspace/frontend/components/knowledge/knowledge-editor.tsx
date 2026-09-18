@@ -37,7 +37,7 @@ import { MarkdownContent } from '@/components/chat/markdown-content';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import type { KnowledgeEntry } from '@/lib/types';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { isComposing } from '@/lib/ime';
 
 interface KnowledgeEditorProps {

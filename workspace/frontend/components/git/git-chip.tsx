@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { headerChipClass } from '@/components/headers/header-chip';
 import { workspaceApi } from '@/lib/api';
 import { type GitStatus } from '@/lib/use-git-status';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { MultiDiffInspector } from '@/components/diff/multi-diff-inspector';
 
 function StatusLetter({ letter }: { letter: string }) {

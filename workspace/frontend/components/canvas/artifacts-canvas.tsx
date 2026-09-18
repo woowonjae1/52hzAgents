@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSplitter } from '@/hooks/use-splitter';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
 import { MarkdownContent } from '../chat/markdown-content';
 import { AgentAvatar } from '../agents/agent-avatar';

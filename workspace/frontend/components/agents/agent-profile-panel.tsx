@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { workspaceApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { AgentApproval, AgentLogEntry, AgentRuntime, CloudAgentConfig, AgentUsage } from '@/lib/types';
 import { isComposing } from '@/lib/ime';
 

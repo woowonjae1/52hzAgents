@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { PreviewRail, type PreviewRailItem } from '@/components/motion/preview-rail';
 import { deduplicateAndSortMessages } from '@/lib/types';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { useLayout } from '@/components/layout/layout-context';
@@ -602,6 +603,58 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     },
   });
 
+  /*
+    THE TRANSCRIPT RAIL.
+
+    beUI ships a `MessageScroller` that drives `PreviewRail` by querying
+    `[data-slot="message"]` out of the DOM. That cannot work here: this
+    transcript is virtualized, so the DOM only ever holds the dozen rows in
+    view and the rail would show a dozen ticks for a thousand-message thread,
+    changing as you scroll. The rail is built from `groups` instead — the same
+    array the virtualizer is counting — so every message has a tick whether or
+    not it is currently mounted.
+
+    Only `chat` and `speech_act` groups get one. Day separators are not
+    destinations, and thinking/steps traces are the noise the rail exists to
+    scroll past.
+  */
+  const { railItems, railIndexById, railIdByIndex } = useMemo(() => {
+    const items: PreviewRailItem[] = [];
+    const indexById = new Map<string, number>();
+    const idByIndex = new Map<number, string>();
+
+    groups.forEach((group, index) => {
+      if (group.type !== 'chat' && group.type !== 'speech_act') return;
+      const message = group.message;
+      const text = (message.content || '').replace(/\s+/g, ' ').trim();
+      if (!text) return;
+
+      const id = groupKey(group, index);
+      const sender = message.senderName || 'Message';
+      items.push({
+        id,
+        label: sender,
+        description: text.length > 96 ? `${text.slice(0, 96).trim()}…` : text,
+        ariaLabel: `Jump to ${sender}: ${text.slice(0, 48)}`,
+      });
+      indexById.set(id, index);
+      idByIndex.set(index, id);
+    });
+
+    return { railItems: items, railIndexById: indexById, railIdByIndex: idByIndex };
+  }, [groups]);
+
+  const handleRailSelect = useCallback(
+    (item: PreviewRailItem) => {
+      const index = railIndexById.get(item.id);
+      if (index === undefined) return;
+      // A deliberate jump is not "tailing" — same rule as the reveal event.
+      userScrolledUpRef.current = true;
+      virtualizer.scrollToIndex(index, { align: 'center' });
+    },
+    [railIndexById, virtualizer]
+  );
+
   // A settle-to-bottom pass is in progress. Any real user scroll gesture
   // cancels it (see the wheel/touch/mousedown listeners below) so we never
   // fight the user, and it self-terminates once the height stabilizes.
@@ -809,8 +862,47 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     return () => window.removeEventListener(TRANSCRIPT_REVEAL_EVENT, onReveal);
   }, [groups, virtualizer]);
 
+  /*
+    Which tick is lit. Derived during render from the rows the virtualizer has
+    mounted (it re-renders on scroll anyway), picking the one nearest the
+    vertical centre of the viewport. No scroll listener of its own.
+  */
+  const activeRailId = (() => {
+    if (railItems.length === 0) return '';
+    const viewportHeight = containerRef.current?.clientHeight ?? 0;
+    const centre = (virtualizer.scrollOffset ?? 0) + viewportHeight / 2;
+    let nearestId = '';
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    for (const row of virtualizer.getVirtualItems()) {
+      const id = railIdByIndex.get(row.index);
+      if (!id) continue;
+      const distance = Math.abs(row.start + row.size / 2 - centre);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestId = id;
+      }
+    }
+    return nearestId;
+  })();
+
   return (
     <div className="relative flex-1 min-h-0">
+      <PreviewRail
+        items={railItems.length > 1 ? railItems : []}
+        label="Transcript navigation"
+        activeId={activeRailId}
+        onItemSelect={handleRailSelect}
+        previewSide="after"
+        highlightActive
+        itemSize={14}
+        className="h-full min-h-0 overflow-hidden"
+        previewContainerClassName="left-8 right-3"
+        previewClassName="mr-1 w-64 max-w-full [&_[data-slot=preview-rail-card]]:h-20 [&_[data-slot=preview-rail-card]]:overflow-hidden [&_[data-slot=preview-rail-card]]:p-3 [&_[data-slot=preview-rail-title]]:line-clamp-1 [&_[data-slot=preview-rail-title]]:text-xs [&_[data-slot=preview-rail-title]]:leading-4 [&_[data-slot=preview-rail-description]]:line-clamp-2 [&_[data-slot=preview-rail-description]]:text-xs [&_[data-slot=preview-rail-description]]:leading-4"
+        railClassName={cn(
+          'absolute inset-y-3 left-1 w-7 content-center py-1 [&_[data-slot=preview-rail-item]]:w-7 [&_[data-slot=preview-rail-item]]:justify-start [&_[data-slot=preview-rail-tick]]:h-px [&_[data-slot=preview-rail-tick]]:w-4 [&_[data-slot=preview-rail-tick]]:origin-left',
+          railItems.length > 1 ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        )}
+      >
       <div
         ref={containerRef}
         className={cn('h-full overflow-y-auto scroll-fade-top', className)}
@@ -849,12 +941,11 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
           </div>
         )}
         <div
-          className="mx-auto w-full max-w-(--chat-column)"
+          /* beUI's viewport padding: `px-3 py-5 sm:px-5`. */
+          className="mx-auto w-full max-w-(--chat-column) px-3 py-5 sm:px-5"
           style={{
             height: virtualizer.getTotalSize(),
             position: 'relative',
-            paddingLeft: '1rem',
-            paddingRight: '1rem',
           }}
         >
           {virtualizer.getVirtualItems().map((virtualRow) => {
@@ -989,12 +1080,12 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     );
                   })()
                 ) : group.type === 'daybreak' ? (
-                  <div className="flex items-center gap-3 py-3 select-none" role="separator">
-                    <span className="h-px flex-1 bg-border/70" />
-                    <span className="text-3xs font-medium uppercase tracking-wide text-foreground-extra-muted shrink-0">
+                  <div className="py-3 select-none" role="separator">
+                    {/* beUI `MessageMarker`: a centred pill, not a rule with a
+                        label punched through it. */}
+                    <div className="mx-auto flex w-fit max-w-[88%] items-center gap-1.5 rounded-full bg-muted/70 px-2.5 py-1 text-center text-xs text-muted-foreground">
                       {group.label}
-                    </span>
-                    <span className="h-px flex-1 bg-border/70" />
+                    </div>
                   </div>
                 ) : group.type === 'speech_act' ? (
                   <SpeechActEvent
@@ -1021,6 +1112,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
           })}
         </div>
       </div>
+      </PreviewRail>
 
       {showScrollBtn && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2">

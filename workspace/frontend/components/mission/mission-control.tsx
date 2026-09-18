@@ -25,7 +25,7 @@ import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { workspaceApi } from '@/lib/api';
 import { eventToMessage, type ONMEvent, stripAddressPrefix } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 /*
   The filter affordance that replaced the metric cards. Deliberately flat: no

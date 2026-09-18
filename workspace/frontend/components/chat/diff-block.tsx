@@ -3,7 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { Check, Copy, ChevronDown, FileDiff } from 'lucide-react';
 
 interface DiffBlockProps {

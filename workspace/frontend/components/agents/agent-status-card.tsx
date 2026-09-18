@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import type { WorkspaceAgent } from '@/lib/types';
 
 interface AgentStatusCardProps {

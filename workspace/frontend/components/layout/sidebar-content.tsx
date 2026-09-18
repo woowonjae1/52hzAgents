@@ -5,8 +5,6 @@ import { useState, useEffect } from 'react';
 import {
   Users,
   Settings,
-  Moon,
-  Sun,
   KeyRound,
   Check,
   LogOut,
@@ -15,11 +13,12 @@ import {
   Inbox,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { ThemeToggle } from '@/components/motion/theme-toggle';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLayout } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { ThreadList } from '@/components/threads/thread-list';
 import { FileList } from '@/components/files/file-list';
@@ -28,7 +27,7 @@ import { RoutineList } from '@/components/routines/routine-list';
 
 export function SidebarContent() {
   const { viewMode, setViewMode, openSettings } = useLayout();
-  const { resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
   const { token, agents, todos, unreadNotificationCount } = useWorkspace();
@@ -37,7 +36,6 @@ export function SidebarContent() {
   useEffect(() => { setMounted(true); }, []);
 
   const isDark = mounted && resolvedTheme === 'dark';
-  const toggleTheme = () => setTheme(isDark ? 'light' : 'dark');
 
   const handleCopyToken = () => {
     if (!token) {
@@ -196,14 +194,12 @@ export function SidebarContent() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={toggleTheme}
-                aria-label={isDark ? 'Light mode' : 'Dark mode'}
-                className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
-              >
-                {isDark ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-              </button>
+              <ThemeToggle
+                variant="circle-blur"
+                start="bottom-right"
+                className="size-7 rounded-lg text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
+                iconClassName="size-3.5"
+              />
             </TooltipTrigger>
             <TooltipContent side="top">{isDark ? 'Light mode' : 'Dark mode'}</TooltipContent>
           </Tooltip>

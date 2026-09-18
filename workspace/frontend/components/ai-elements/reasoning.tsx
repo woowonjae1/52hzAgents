@@ -2,7 +2,7 @@
 
 import { Brain, Copy, Check, Sparkles } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { EventLine, EventLineAction } from './event-line';
 import { ThinkingShimmer } from '@/components/agents/loading-states/thinking-shimmer';

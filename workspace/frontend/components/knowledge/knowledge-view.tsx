@@ -46,7 +46,7 @@ import { ScreenTitle } from '@/components/headers/screen-title';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
 import { KnowledgeEditor } from './knowledge-editor';
 import {

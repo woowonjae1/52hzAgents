@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { MermaidBlock } from './mermaid-block';
 import { DiffBlock } from './diff-block';
 import { getMermaidSource, hasOpenMermaidFence } from './mermaid-utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { getApiBaseUrl } from '@/lib/config';
 
 /**

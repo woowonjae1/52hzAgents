@@ -7,7 +7,7 @@ import { useMessagePolling } from '@/hooks/use-polling';
 import { workspaceApi } from '@/lib/api';
 import { Terminal, Search, Cpu, TerminalSquare, RefreshCw, ArrowDownToLine, Eraser } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 import { isComposing } from '@/lib/ime';
 
 // Strip markdown so log lines read as plain terminal output.

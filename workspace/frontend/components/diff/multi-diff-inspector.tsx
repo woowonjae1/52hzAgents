@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { Hint } from '@/components/ui/hint';
 import { DiffBlock } from '@/components/chat/diff-block';
 import { workspaceApi } from '@/lib/api';
-import { toast } from 'sonner';
+import { toast } from '@/lib/toast';
 
 export interface DiffFileItem {
   path: string;
