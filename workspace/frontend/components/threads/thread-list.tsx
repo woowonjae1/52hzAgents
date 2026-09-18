@@ -90,40 +90,47 @@ function extractSessionAgents(
     addAgent(session.master);
   }
 
-  // 3. Mentions in title, smartTitle, and last message content
-  const stringsToCheck = [
-    session.title,
-    smartTitle,
-    lastMsg?.content,
-  ].filter(Boolean) as string[];
-
+  // 3. Explicit @mentions in the title or the last message.
+  const stringsToCheck = [session.title, smartTitle, lastMsg?.content].filter(Boolean) as string[];
   for (const str of stringsToCheck) {
-    const mentionMatches = str.match(/@([a-zA-Z0-9_.-]+)/g);
-    if (mentionMatches) {
-      for (const m of mentionMatches) {
-        addAgent(m.slice(1));
-      }
-    }
-    const cleanStr = str.trim().toLowerCase();
-    for (const a of allWorkspaceAgents) {
-      const aName = a.agentName.toLowerCase();
-      if (
-        cleanStr === aName ||
-        cleanStr.startsWith(`${aName} `) ||
-        cleanStr.endsWith(` ${aName}`) ||
-        cleanStr.includes(`@${aName}`)
-      ) {
-        addAgent(a.agentName);
-      }
-    }
+    for (const m of str.match(/@([a-zA-Z0-9_.-]+)/g) ?? []) addAgent(m.slice(1));
   }
 
-  // 4. Last message speaker if it's an agent
-  if (lastMsg?.senderName) {
-    addAgent(lastMsg.senderName);
-  }
+  /*
+    WHAT WAS HERE: a scan of every agent in the workspace against every one of
+    those strings, matching if the name appeared as a prefix, a suffix, or
+    anywhere at all. A thread whose preview happened to contain the word "pi"
+    picked up @pi as a participant. That is not evidence, it is a coincidence,
+    and it was one of the two reasons every row in the sidebar ended up
+    claiming the same crowd. Explicit `@mentions` above already cover the case
+    it was reaching for, without guessing.
+  */
 
-  return Array.from(agentMap.values());
+  // 4. Whoever actually spoke last.
+  if (lastMsg?.senderName) addAgent(lastMsg.senderName);
+
+  /*
+    ORDERED BY EVIDENCE, STRONGEST FIRST.
+
+    Insertion order put `session.participants` at the head — and in this
+    workspace every thread is assigned the whole roster, so all eight threads
+    rendered the same first three logos and the same `+5`. Eight identical
+    stacks down the sidebar is not a signal; it is a column of noise occupying
+    the space where the rows differ from each other.
+
+    The agent who spoke last is the one thing that varies per row, and it is
+    what you are scanning for when you look at this list. It leads. Membership
+    is still in the list, just behind everything the thread actually did.
+  */
+  const lastSpeaker = lastMsg?.senderName
+    ? stripAddressPrefix(lastMsg.senderName).trim().toLowerCase()
+    : null;
+  const ordered = Array.from(agentMap.entries()).sort(([ka], [kb]) => {
+    if (ka === lastSpeaker) return -1;
+    if (kb === lastSpeaker) return 1;
+    return 0;
+  });
+  return ordered.map(([, v]) => v);
 }
 
 function AvatarStack({
@@ -370,8 +377,22 @@ const ThreadRow = memo(function ThreadRow({
 
   const smartTitle = getSmartSessionTitle(session, lastMsg, folderOrdinal);
 
+  /*
+    A thread nothing has been said in shows no avatars.
+
+    Three rows titled "New chat" each carrying the same five-agent stack is
+    what the sidebar looked like after clicking New chat three times: brand-new
+    empty threads presented as established, busy ones, and indistinguishable
+    from each other. The stack answers "who has been working here", and in an
+    empty thread the honest answer is nobody — the assignment roster is not an
+    activity.
+
+    Capped at TWO rather than the component's default three. With the ordering
+    above, two is enough to tell one row from another, and the third slot was
+    where the rows started looking alike again.
+  */
   const sessionAgents = useMemo(
-    () => extractSessionAgents(session, agents, lastMsg, smartTitle),
+    () => (lastMsg ? extractSessionAgents(session, agents, lastMsg, smartTitle).slice(0, 2) : []),
     [session, agents, lastMsg, smartTitle]
   );
 
@@ -483,7 +504,7 @@ const ThreadRow = memo(function ThreadRow({
           <Star className="size-3 shrink-0 fill-amber-500 text-status-warning" />
         )}
         {sessionAgents.length > 0 ? (
-          <AgentAvatarStack agents={sessionAgents} size={18} />
+          <AgentAvatarStack agents={sessionAgents} max={2} size={18} />
         ) : session.workingDir ? (
           <span className="size-4 shrink-0 flex items-center justify-center text-foreground-extra-muted text-xs font-mono font-semibold">
             #

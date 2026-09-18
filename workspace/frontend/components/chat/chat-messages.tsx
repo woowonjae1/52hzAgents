@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { deduplicateAndSortMessages } from '@/lib/types';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -110,7 +111,8 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
     pendingSteps.clear();
   };
 
-  const visibleMessages = messages.filter(
+  const dedupedMessages = deduplicateAndSortMessages(messages);
+  const visibleMessages = dedupedMessages.filter(
     (msg) =>
       !msg.content.startsWith('__queue_cancel:') &&
       msg.senderType !== 'pipeline' &&

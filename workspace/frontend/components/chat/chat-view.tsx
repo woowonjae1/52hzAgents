@@ -51,7 +51,7 @@ import { ContextHealthIndicator } from './context-health-indicator';
 import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { PipelineStepper } from './pipeline-stepper';
-import { eventToMessage, stripAddressPrefix } from '@/lib/types';
+import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { toast } from 'sonner';
@@ -133,13 +133,13 @@ function messagesForSession(sessionId: string, msgs: WorkspaceMessage[]): Worksp
 }
 
 function cacheMessages(sessionId: string, msgs: WorkspaceMessage[]) {
-  const scopedMessages = messagesForSession(sessionId, msgs);
-  messageCache.set(sessionId, scopedMessages);
-  if (scopedMessages.length > 0) {
-    cacheLastSeenId.set(sessionId, scopedMessages[scopedMessages.length - 1].messageId);
-  } else {
-    cacheLastSeenId.delete(sessionId);
+  const scopedMessages = deduplicateAndSortMessages(messagesForSession(sessionId, msgs));
+  if (scopedMessages.length === 0) {
+    // Never overwrite an existing populated cache with empty during session transitions
+    return;
   }
+  messageCache.set(sessionId, scopedMessages);
+  cacheLastSeenId.set(sessionId, scopedMessages[scopedMessages.length - 1].messageId);
   // Evict oldest entries if cache grows too large
   if (messageCache.size > CACHE_MAX_SESSIONS) {
     const oldest = messageCache.keys().next().value;
@@ -573,7 +573,7 @@ export function ChatView() {
 
   // Merge real messages with optimistic messages for display
   const displayMessages = useMemo(
-    () => [...sessionMessages, ...sessionOptimisticMessages],
+    () => deduplicateAndSortMessages([...sessionMessages, ...sessionOptimisticMessages]),
     [sessionMessages, sessionOptimisticMessages]
   );
 

@@ -73,6 +73,7 @@ func eventCursorTestRouter(t *testing.T, sameMillisecond int) (*gin.Engine, mode
 type eventListResponse struct {
 	Events []struct {
 		ID      string            `json:"id"`
+		EventID string            `json:"event_id"`
 		Payload map[string]string `json:"payload"`
 	} `json:"events"`
 	HasMore  bool   `json:"has_more"`
@@ -166,5 +167,32 @@ func TestListEventsDescendingCursorBoundsAreNotInverted(t *testing.T) {
 	}
 	if desc.NewestID != asc.NewestID {
 		t.Fatalf("desc newest_id = %s, want %s", desc.NewestID, asc.NewestID)
+	}
+}
+
+// Every event returned by ListEvents must include event_id matching id so the
+// web client's history-loading does not drop messageId and duplicate cached items.
+func TestListEventsIncludesEventID(t *testing.T) {
+	const total = 3
+	router, workspace, token, ids := eventCursorTestRouter(t, total)
+	resp := listEvents(t, router, token, fmt.Sprintf("network=%s&limit=%d", workspace.ID, total))
+
+	if len(resp.Events) != total {
+		t.Fatalf("got %d events, want %d", len(resp.Events), total)
+	}
+	expectedMap := make(map[string]bool, total)
+	for _, id := range ids {
+		expectedMap[id] = true
+	}
+	for i, ev := range resp.Events {
+		if ev.ID == "" {
+			t.Fatalf("event %d missing id", i)
+		}
+		if ev.EventID != ev.ID {
+			t.Fatalf("event %d event_id %q does not match id %q", i, ev.EventID, ev.ID)
+		}
+		if !expectedMap[ev.ID] {
+			t.Fatalf("event %d id %q not found in expected ids", i, ev.ID)
+		}
 	}
 }

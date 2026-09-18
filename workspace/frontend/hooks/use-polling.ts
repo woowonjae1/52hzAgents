@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { workspaceApi } from '@/lib/api';
-import { eventToMessage, stripAddressPrefix } from '@/lib/types';
+import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { ONMEvent, WorkspaceMessage } from '@/lib/types';
 
 interface UsePollingOptions {
@@ -165,15 +165,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
         const historicMessages = eventsToScopedMessages(result.events, sessionId, dmPair).reverse();
         setMessages((prev) => {
           if (prev.length === 0) return historicMessages;
-          const seenIds = new Set(historicMessages.map((m) => m.messageId));
-          const merged = [...historicMessages];
-          for (const m of prev) {
-            if (!seenIds.has(m.messageId)) {
-              merged.push(m);
-              seenIds.add(m.messageId);
-            }
-          }
-          return merged;
+          return deduplicateAndSortMessages([...historicMessages, ...prev]);
         });
 
         if (historicMessages.length > 0) {
@@ -234,9 +226,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
           newestIdRef.current = lastMsg.messageId;
 
           setMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => m.messageId));
-            const unique = newMessages.filter((m) => !existingIds.has(m.messageId));
-            return unique.length > 0 ? [...prev, ...unique] : prev;
+            return deduplicateAndSortMessages([...prev, ...newMessages]);
           });
         }
       }
@@ -270,9 +260,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
         setHasOlder(olderMessages.length > 0 && result.has_more);
 
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.messageId));
-          const unique = olderMessages.filter((m) => !existingIds.has(m.messageId));
-          return unique.length > 0 ? [...unique, ...prev] : prev;
+          return deduplicateAndSortMessages([...olderMessages, ...prev]);
         });
       } else {
         setHasOlder(false);
@@ -366,8 +354,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
             if (!msg) return;
             newestIdRef.current = msg.messageId;
             setMessages((prev) => {
-              if (prev.some((m) => m.messageId === msg.messageId)) return prev;
-              return [...prev, msg];
+              return deduplicateAndSortMessages([...prev, msg]);
             });
             // Successful receipt confirms live channel
             sseRetryCountRef.current = 0;

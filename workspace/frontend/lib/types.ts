@@ -603,6 +603,7 @@ export interface SharedSnapshotMessage {
 }
 
 export interface ONMEvent {
+  id?: string;
   event_id: string;
   type: string;
   source: string;
@@ -623,9 +624,10 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
   const senderName = (payload.sender_name as string) || (source.includes(':') ? source.split(':')[1] : source) || 'System';
   const sessionId = (event.target || '').replace(/^channel\//, '');
   const clientMsgId = (metadata.client_message_id as string) || (payload.client_message_id as string) || (event.client_message_id as string) || undefined;
+  const messageId = event.event_id || (event as { id?: string }).id || '';
 
   return {
-    messageId: event.event_id,
+    messageId,
     sessionId: sessionId,
     senderId: source,
     senderType: senderType,
@@ -638,6 +640,77 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
     createdAt: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
     clientMessageId: clientMsgId,
   };
+}
+
+/**
+ * Deduplicate workspace messages based on:
+ * 1. Exact messageId match
+ * 2. Exact clientMessageId match
+ * 3. Semantic match (same senderName, same content, within 15 seconds for chat messages)
+ *
+ * Authoritative / earlier-in-list messages take precedence.
+ */
+export function deduplicateMessages(messages: WorkspaceMessage[]): WorkspaceMessage[] {
+  const result: WorkspaceMessage[] = [];
+  const seenIds = new Set<string>();
+  const seenClientIds = new Set<string>();
+
+  for (const m of messages) {
+    if (!m) continue;
+
+    // 1. Check exact messageId match
+    if (m.messageId && seenIds.has(m.messageId)) {
+      continue;
+    }
+
+    // 2. Check clientMessageId match
+    if (m.clientMessageId && seenClientIds.has(m.clientMessageId)) {
+      continue;
+    }
+
+    // 3. Check semantic duplicate for chat messages: same sender, same content, within 15 seconds
+    const isChatMsg = !m.messageType || m.messageType === 'chat' || m.senderType === 'human' || m.senderType === 'user';
+    if (isChatMsg) {
+      const mTime = m.createdAt ? new Date(m.createdAt).getTime() : 0;
+      const isSemanticDup = result.some((existing) => {
+        const isExistingChat = !existing.messageType || existing.messageType === 'chat' || existing.senderType === 'human' || existing.senderType === 'user';
+        if (!isExistingChat) return false;
+        if (existing.senderName !== m.senderName || existing.content !== m.content) {
+          return false;
+        }
+        if (existing.clientMessageId && m.clientMessageId && existing.clientMessageId !== m.clientMessageId) {
+          return false;
+        }
+        const existingTime = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
+        if (mTime && existingTime) {
+          return Math.abs(mTime - existingTime) < 15_000;
+        }
+        return true;
+      });
+
+      if (isSemanticDup) {
+        continue;
+      }
+    }
+
+    if (m.messageId) seenIds.add(m.messageId);
+    if (m.clientMessageId) seenClientIds.add(m.clientMessageId);
+    result.push(m);
+  }
+
+  return result;
+}
+
+/**
+ * Deduplicate workspace messages and sort them chronologically by createdAt.
+ */
+export function deduplicateAndSortMessages(messages: WorkspaceMessage[]): WorkspaceMessage[] {
+  const deduped = deduplicateMessages(messages);
+  return deduped.sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return ta - tb;
+  });
 }
 
 export interface NetworkProfile {

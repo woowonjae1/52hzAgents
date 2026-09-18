@@ -199,7 +199,7 @@ func eventResponse(record models.EventRecord) gin.H {
 		clientMessageID = *record.ClientMessageID
 	}
 	return gin.H{
-		"id": record.ID, "type": record.Type, "source": record.Source,
+		"id": record.ID, "event_id": record.ID, "type": record.Type, "source": record.Source,
 		"target": record.Target, "payload": payload, "metadata": metadata,
 		"timestamp": record.Timestamp, "visibility": record.Visibility,
 		"client_message_id": clientMessageID,
