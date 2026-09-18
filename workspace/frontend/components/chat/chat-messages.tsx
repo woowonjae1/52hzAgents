@@ -17,6 +17,19 @@ import { useWorkspace } from '@/lib/workspace-context';
 
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
+/**
+ * "Show me this message in the thread."
+ *
+ * Dispatched by the trace panel when a step is clicked. It carries a
+ * `messageId` and nothing else: only this component knows how the transcript
+ * is grouped and virtualised, so only it can turn an id into a scroll
+ * position. An event rather than shared state because the two panels are
+ * siblings with no common owner below the shell, and because the correct
+ * behaviour when the message is outside the loaded window is to do nothing —
+ * which a listener expresses for free.
+ */
+export const TRANSCRIPT_REVEAL_EVENT = 'transcript:reveal';
+
 // ── Message Grouping ──
 
 /** Two messages belong to one burst if they are less than this far apart. */
@@ -762,6 +775,37 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
       el.removeEventListener('mousedown', cancelSettle);
     };
   }, [hasOlder, loadingOlder, loadOlder]);
+
+  /*
+    Reveal a message the trace panel pointed at. `groups` is the same array the
+    virtualiser indexes, so finding the group that contains the id gives the
+    row directly — no DOM query, and it works for a row that is not currently
+    mounted, which is the whole reason a scroll-into-view would not have done.
+
+    `align: 'center'` rather than 'start': the point of jumping here is to read
+    what surrounds the step, so landing it against the top edge with its
+    context above the fold would defeat the request.
+  */
+  useEffect(() => {
+    const onReveal = (e: Event) => {
+      const id = (e as CustomEvent<{ messageId?: string }>).detail?.messageId;
+      if (!id) return;
+      const index = groups.findIndex((g) =>
+        g.type === 'chat'
+          ? g.message.messageId === id || g.steps?.some((st) => st.messageId === id)
+          : g.type === 'thinking' || g.type === 'steps'
+            ? g.messages.some((m) => m.messageId === id)
+            : g.type === 'speech_act'
+              ? g.message.messageId === id
+              : false,
+      );
+      if (index < 0) return;
+      userScrolledUpRef.current = true; // a deliberate jump is not "tailing"
+      virtualizer.scrollToIndex(index, { align: 'center' });
+    };
+    window.addEventListener(TRANSCRIPT_REVEAL_EVENT, onReveal);
+    return () => window.removeEventListener(TRANSCRIPT_REVEAL_EVENT, onReveal);
+  }, [groups, virtualizer]);
 
   return (
     <div className="relative flex-1 min-h-0">

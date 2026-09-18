@@ -776,8 +776,13 @@ function createMainWindow() {
 
   // Flicker-free launch: show window gracefully once initial frame is ready to paint
   mainWindow.once('ready-to-show', () => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-      mainWindow.show();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (!mainWindow.isVisible()) mainWindow.show();
+      try {
+        if (process.platform === 'win32') {
+          mainWindow.setOverlayIcon(null, '');
+        }
+      } catch {}
     }
   });
 

@@ -320,6 +320,7 @@ class PiAdapter extends BaseAdapter {
       shell: !isDirectJs && IS_WINDOWS && Boolean(spawnBin && (spawnBin.endsWith('.cmd') || spawnBin.endsWith('.bat'))),
     });
     this._channelProcesses[channelName] = proc;
+    try { await this.sendStatus(channelName, 'Thinking…'); } catch {}
 
     // Real-time JSON Lines event streaming (not buffered stdout)
     const responseChunks = [];
@@ -330,7 +331,40 @@ class PiAdapter extends BaseAdapter {
     let lineBuffer = '';
     let _pendingLines = Promise.resolve();
 
+    let thinkingDeltaBuf = '';
+    let lastThinkingFlush = 0;
+    const flushThinkingDelta = async (force = false) => {
+      if (!thinkingDeltaBuf.trim()) {
+        thinkingDeltaBuf = '';
+        return;
+      }
+      const now = Date.now();
+      if (force || now - lastThinkingFlush >= 120 || thinkingDeltaBuf.length >= 80) {
+        const chunk = thinkingDeltaBuf;
+        thinkingDeltaBuf = '';
+        lastThinkingFlush = now;
+        try { await this.sendThinking(channelName, chunk); } catch {}
+      }
+    };
+
+    let textDeltaBuf = '';
+    let lastTextFlush = 0;
+    const flushTextDelta = async (force = false) => {
+      if (!textDeltaBuf.trim()) {
+        textDeltaBuf = '';
+        return;
+      }
+      const now = Date.now();
+      if (force || now - lastTextFlush >= 120 || textDeltaBuf.length >= 80) {
+        const chunk = textDeltaBuf;
+        textDeltaBuf = '';
+        lastTextFlush = now;
+        try { await this.sendThinking(channelName, chunk, { isReplyPreview: true }); } catch {}
+      }
+    };
+
     const flushThinking = async () => {
+      await flushThinkingDelta(true);
       const text = currentThinking.trim();
       currentThinking = '';
       if (text) {
@@ -358,11 +392,17 @@ class PiAdapter extends BaseAdapter {
       // Official Pi CLI emits message_update with assistantMessageEvent.type = 'thinking_delta' | 'thinking_end'
       if (eventType === 'thinking') {
         const text = event.text || event.content || event.delta || '';
-        if (text) currentThinking += text;
+        if (text) {
+          currentThinking += text;
+          thinkingDeltaBuf += text;
+          await flushThinkingDelta(false);
+        }
       } else if (eventType === 'message_update' && event.assistantMessageEvent) {
         const ame = event.assistantMessageEvent;
         if (ame.type === 'thinking_delta' && ame.delta) {
           currentThinking += ame.delta;
+          thinkingDeltaBuf += ame.delta;
+          await flushThinkingDelta(false);
         } else if (ame.type === 'thinking_end') {
           if (ame.content) currentThinking = ame.content;
           await flushThinking();
@@ -372,18 +412,26 @@ class PiAdapter extends BaseAdapter {
         }
       }
 
-      // 2. Assistant reply accumulation (in memory only, never send per-token thinking messages)
+      // 2. Assistant reply accumulation & streaming preview
       // Official Pi CLI emits message_update with assistantMessageEvent.type = 'text_delta' | 'text_end'
       if (eventType === 'assistant' || eventType === 'text_delta') {
         const text = event.text || event.content || event.delta || '';
-        if (text) streamedText += text;
+        if (text) {
+          await flushThinking();
+          streamedText += text;
+          textDeltaBuf += text;
+          await flushTextDelta(false);
+        }
       } else if (eventType === 'message_update' && event.assistantMessageEvent) {
         const ame = event.assistantMessageEvent;
         if (ame.type === 'text_delta' && ame.delta) {
           await flushThinking();
           streamedText += ame.delta;
+          textDeltaBuf += ame.delta;
+          await flushTextDelta(false);
         } else if (ame.type === 'text_end') {
           if (ame.content) streamedText = ame.content;
+          await flushTextDelta(true);
         }
       }
 
@@ -396,6 +444,7 @@ class PiAdapter extends BaseAdapter {
         eventType === 'tool_execution_start'
       ) {
         await flushThinking();
+        await flushTextDelta(true);
         const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
         const input = event.args || event.input || {};
         const detail = input.command || input.path || input.query || (typeof input === 'string' ? input : '');
@@ -406,6 +455,7 @@ class PiAdapter extends BaseAdapter {
       // 4. Final response extraction from message_end / turn_end
       if (eventType === 'message_end' || eventType === 'turn_end') {
         await flushThinking();
+        await flushTextDelta(true);
         const msg = event.message;
         if (msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
           const textParts = msg.content
@@ -452,6 +502,7 @@ class PiAdapter extends BaseAdapter {
       try { await processLine(lineBuffer); } catch {}
     }
     await flushThinking();
+    await flushTextDelta(true);
 
     delete this._channelProcesses[channelName];
 

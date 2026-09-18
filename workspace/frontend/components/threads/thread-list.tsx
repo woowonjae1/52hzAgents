@@ -50,6 +50,7 @@ function extractSessionAgents(
   session: WorkspaceSession,
   allWorkspaceAgents: WorkspaceAgent[],
   lastMsg?: LastMessageInfo | null,
+  smartTitle?: string,
 ): AgentStackItem[] {
   const agentMap = new Map<string, AgentStackItem>();
 
@@ -89,22 +90,31 @@ function extractSessionAgents(
     addAgent(session.master);
   }
 
-  // 3. Mentions in title (e.g. "@antigravity ...", "@pi ...")
-  const title = (session.title || '').trim();
-  if (title) {
-    const mentionMatches = title.match(/@([\w.-]+)/g);
+  // 3. Mentions in title, smartTitle, and last message content
+  const stringsToCheck = [
+    session.title,
+    smartTitle,
+    lastMsg?.content,
+  ].filter(Boolean) as string[];
+
+  for (const str of stringsToCheck) {
+    const mentionMatches = str.match(/@([a-zA-Z0-9_.-]+)/g);
     if (mentionMatches) {
       for (const m of mentionMatches) {
         addAgent(m.slice(1));
       }
     }
-    // Direct chat title matching an agent name (e.g. "antigravity", "pi")
-    const lowerTitle = title.toLowerCase();
-    const matchedByTitle = allWorkspaceAgents.find(
-      (a) => a.agentName.toLowerCase() === lowerTitle
-    );
-    if (matchedByTitle) {
-      addAgent(matchedByTitle.agentName);
+    const cleanStr = str.trim().toLowerCase();
+    for (const a of allWorkspaceAgents) {
+      const aName = a.agentName.toLowerCase();
+      if (
+        cleanStr === aName ||
+        cleanStr.startsWith(`${aName} `) ||
+        cleanStr.endsWith(` ${aName}`) ||
+        cleanStr.includes(`@${aName}`)
+      ) {
+        addAgent(a.agentName);
+      }
     }
   }
 
@@ -281,13 +291,6 @@ function getSmartSessionTitle(
     }
   }
 
-  // Dated rather than bare: "New Chat" repeated is the same collision again.
-  if (session.createdAt) {
-    const d = new Date(session.createdAt);
-    if (!Number.isNaN(d.getTime())) {
-      return `New chat · ${d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' })}`;
-    }
-  }
   return 'New chat';
 }
 
@@ -365,9 +368,11 @@ const ThreadRow = memo(function ThreadRow({
 
   const displayAgent = (lastSpeaker && lastSpeaker !== 'you') ? lastSpeaker : fallbackAgent;
 
+  const smartTitle = getSmartSessionTitle(session, lastMsg, folderOrdinal);
+
   const sessionAgents = useMemo(
-    () => extractSessionAgents(session, agents, lastMsg),
-    [session, agents, lastMsg]
+    () => extractSessionAgents(session, agents, lastMsg, smartTitle),
+    [session, agents, lastMsg, smartTitle]
   );
 
   let preview: React.ReactNode;
@@ -414,8 +419,6 @@ const ThreadRow = memo(function ThreadRow({
   } else {
     preview = 'No messages yet';
   }
-
-  const smartTitle = getSmartSessionTitle(session, lastMsg, folderOrdinal);
 
   const normalizeForCompare = (s: string) =>
     s
@@ -1466,6 +1469,9 @@ export function ThreadList() {
                       ? `${lastMsg.senderName === 'user' ? 'You' : lastMsg.senderName}: ${lastMsg.content}`
                       : 'No messages yet';
 
+                    const itemSmartTitle = getSmartSessionTitle(session, lastMsg);
+                    const directAgents = extractSessionAgents(session, agents, lastMsg, itemSmartTitle);
+
                     return (
                       <div
                         key={session.sessionId}
@@ -1481,16 +1487,20 @@ export function ThreadList() {
                           'has-data-[state=open]:bg-surface2/60'
                         )}
                       >
-                        <div className="shrink-0">
-                          <AgentAvatarStack
-                            agents={extractSessionAgents(session, agents, lastMsg)}
-                            size={18}
-                          />
+                        <div className="shrink-0 flex items-center justify-center">
+                          {directAgents.length > 0 ? (
+                            <AgentAvatarStack
+                              agents={directAgents}
+                              size={18}
+                            />
+                          ) : (
+                            <MessageSquare className="size-4 text-foreground-extra-muted shrink-0" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0 space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs flex-1 min-w-0 truncate font-normal text-foreground">
-                              {getSmartSessionTitle(session, lastMsg)}
+                              {itemSmartTitle}
                             </span>
                             <span className="text-2xs text-muted-foreground shrink-0 tabular-nums">
                               {displayTime}
@@ -1515,20 +1525,21 @@ export function ThreadList() {
                                 e.stopPropagation();
                                 updateSession(session.sessionId, { status: 'active' });
                               }}
+                              className="text-xs"
                             >
-                              <ArchiveRestore className="size-4" />
-                              <span>Unarchive</span>
+                              <ArchiveRestore className="size-3.5 mr-2" />
+                              Unarchive
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteSession(session.sessionId, session.title || 'Untitled conversation');
+                                updateSession(session.sessionId, { status: 'deleted' });
                               }}
+                              className="text-xs text-status-danger focus:text-status-danger"
                             >
-                              <Trash2 className="size-4" />
-                              <span>Delete</span>
+                              <Trash2 className="size-3.5 mr-2" />
+                              Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

@@ -2,7 +2,7 @@
 
 import { Hint } from '@/components/ui/hint';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   Activity,
   Brain,
@@ -13,9 +13,11 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { cn } from '@/lib/utils';
+import { TRANSCRIPT_REVEAL_EVENT } from '@/components/chat/chat-messages';
 import { useWorkspace } from '@/lib/workspace-context';
-import { useMessagePolling } from '@/hooks/use-polling';
+import { useSessionMessages } from '@/components/chat/chat-view';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { SubagentList } from '@/components/ai-elements/subagent-list';
@@ -192,9 +194,22 @@ function parseTraceStep(content: string): ParsedStep {
 
 type StepFilterType = 'all' | 'tools' | 'thinking' | 'subagents';
 
+/** A step and its single parse, kept together so nothing re-parses it. */
+interface TraceEntry {
+  step: WorkspaceMessage;
+  parsed: ParsedStep;
+}
+
 export function TracePanel() {
   const { currentSessionId, sessions, agents, activeSessionIds } = useWorkspace();
-  const { messages } = useMessagePolling({ sessionId: currentSessionId });
+  /*
+    The SHARED transcript, not a second stream. This called
+    `useMessagePolling` directly, which owns an SSE connection and its own
+    cursors — so every time the Studio panel showed the trace, the channel was
+    being polled twice and two independent copies of the same messages were
+    advancing side by side. See SessionMessagesProvider in chat-view.tsx.
+  */
+  const { messages } = useSessionMessages();
   const [filterType, setFilterType] = useState<StepFilterType>('all');
   const [agentFilter, setAgentFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -209,36 +224,50 @@ export function TracePanel() {
 
   const isWorking = Boolean(currentSessionId && activeSessionIds.has(currentSessionId));
 
-  // Extract all steps from current session messages
-  const traceSteps = useMemo(() => {
+  /*
+    PARSE ONCE.
+
+    `parseTraceStep` is regex-heavy, and it was being run three times per step
+    per render: once while filtering, once while counting for the header, and
+    once more inside each card. On a long agent run — which is exactly when
+    this panel is open — that is thousands of redundant regex passes on every
+    incoming event.
+
+    The step and its parse travel together from here on.
+  */
+  const traceSteps = useMemo<TraceEntry[]>(() => {
     const raw = messages || [];
-    return raw.filter((m) => {
-      if (m.messageType === 'status' || m.messageType === 'thinking' || m.messageType === 'todos') return true;
-      if (m.metadata?.tool_approval_request || m.metadata?.turn_changes) return true;
-      return false;
-    });
+    return raw
+      .filter((m) => {
+        if (m.messageType === 'status' || m.messageType === 'thinking' || m.messageType === 'todos') return true;
+        if (m.metadata?.tool_approval_request || m.metadata?.turn_changes) return true;
+        return false;
+      })
+      .map((step) => ({
+        step,
+        parsed:
+          step.messageType === 'thinking'
+            ? ({ type: 'thinking', text: step.content } as ParsedStep)
+            : parseTraceStep(step.content),
+      }));
   }, [messages]);
 
   // Extract unique agents who produced trace steps
   const traceAgents = useMemo(() => {
     const set = new Set<string>();
-    traceSteps.forEach((s) => {
-      if (s.senderName) set.add(s.senderName);
+    traceSteps.forEach(({ step }) => {
+      if (step.senderName) set.add(step.senderName);
     });
     return Array.from(set);
   }, [traceSteps]);
 
   // Filtered steps
   const filteredSteps = useMemo(() => {
-    return traceSteps.filter((step) => {
+    return traceSteps.filter(({ step, parsed }) => {
       // Filter by agent
       if (agentFilter !== 'all' && step.senderName !== agentFilter) {
         return false;
       }
-
-      const parsed = step.messageType === 'thinking'
-        ? { type: 'thinking' as const, text: step.content }
-        : parseTraceStep(step.content);
 
       // Filter by type
       if (filterType === 'tools' && parsed.type !== 'tool_call') return false;
@@ -259,31 +288,81 @@ export function TracePanel() {
   }, [traceSteps, agentFilter, filterType, searchQuery]);
 
   // Aggregate statistics
+  /*
+    Counted over what is ON SCREEN, not over everything held in memory. The
+    header used to read "N events recorded" from the unfiltered list while the
+    list below showed the filtered one, so narrowing to "tools" left the
+    heading confidently reporting a number that matched nothing visible.
+  */
   const stats = useMemo(() => {
     let tools = 0;
     let thinking = 0;
     let subagents = 0;
-
-    traceSteps.forEach((s) => {
-      if (s.messageType === 'thinking') {
-        thinking++;
-      } else {
-        const parsed = parseTraceStep(s.content);
-        if (parsed.type === 'tool_call') tools++;
-        else if (parsed.type === 'thinking') thinking++;
-        else if (parsed.type === 'subagents') subagents++;
-      }
+    filteredSteps.forEach(({ parsed }) => {
+      if (parsed.type === 'tool_call') tools++;
+      else if (parsed.type === 'thinking') thinking++;
+      else if (parsed.type === 'subagents') subagents++;
     });
+    return { tools, thinking, subagents, total: filteredSteps.length, all: traceSteps.length };
+  }, [filteredSteps, traceSteps.length]);
 
-    return { tools, thinking, subagents, total: traceSteps.length };
-  }, [traceSteps]);
+  /*
+    VIRTUALISED, like the transcript next to it.
 
-  // Auto-scroll when new steps arrive and auto-scroll is enabled
+    This rendered `filteredSteps.map(...)` in full. A single long agent run
+    emits status messages continuously, so the panel that exists specifically
+    to be open DURING long runs was the one list in the app with unbounded DOM
+    — thousands of cards, each with an avatar and a collapsible `Reasoning`
+    block, all live while more arrive.
+
+    Dynamic measurement rather than a fixed row height: a tool call is one
+    line, an expanded reasoning block is fifty. `estimateSize` is deliberately
+    small (72px) because most steps ARE one-liners; over-estimating makes the
+    scrollbar lie in the other direction, which is worse while tailing.
+  */
+  const virtualizer = useVirtualizer({
+    count: filteredSteps.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 72,
+    overscan: 12,
+    getItemKey: (index) => filteredSteps[index]?.step.messageId ?? index,
+  });
+
+  /*
+    ── The link back to the conversation ──
+
+    Opening the trace from an inline step already worked; coming back did not.
+    Clicking a trace entry did nothing, so the panel could tell you WHAT
+    happened but never where it sat in the thread — and reading a trace almost
+    always ends with wanting the surrounding turn.
+
+    A window event rather than shared state: the transcript is virtualised and
+    owns its own scroller, so only it can turn a message id into a scroll
+    position. Fire-and-forget is also the honest shape — if the message is not
+    in the loaded window, nothing happens, which is the correct outcome.
+  */
+  const revealInTranscript = useCallback((messageId: string) => {
+    if (!messageId) return;
+    window.dispatchEvent(new CustomEvent(TRANSCRIPT_REVEAL_EVENT, { detail: { messageId } }));
+  }, []);
+
+  /*
+    Tail the stream — WITHOUT `behavior: 'smooth'`.
+
+    Steps arrive in bursts while an agent works, and each burst fired another
+    smooth scroll before the previous animation had finished. Queued smooth
+    scrolls fight each other: the panel drifts, overshoots, and lags behind the
+    content it is supposed to be pinned to. A log tail is not a place the user
+    needs easing — it should simply already be at the bottom.
+
+    Writing `scrollTop` directly rather than `scrollIntoView` for the same
+    reason `scrollIntoView` is wrong here: it scrolls every scrollable
+    ANCESTOR too, so a trace update could move the panel's own container.
+  */
   useEffect(() => {
-    if (isAutoScroll && bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [filteredSteps.length, isAutoScroll]);
+    if (!isAutoScroll || filteredSteps.length === 0) return;
+    virtualizer.scrollToIndex(filteredSteps.length - 1, { align: 'end' });
+  }, [filteredSteps.length, isAutoScroll, virtualizer]);
 
   const handleScroll = () => {
     const el = containerRef.current;
@@ -295,7 +374,16 @@ export function TracePanel() {
   return (
     <div className="flex flex-col h-full bg-surface0 text-foreground text-xs select-text overflow-hidden">
       {/* ── Top Header Bar ── */}
-      <div className="flex items-center justify-between pl-4 pr-12 py-2.5 border-b border-border bg-surface1/60 backdrop-blur-md shrink-0 select-none">
+      {/*
+        `.app-header` owns the height, fill, underline and the caption-button
+        reserve for every top-level band in this app. This one hand-rolled all
+        four — `bg-surface1/60`, a plain `--border`, and a hardcoded `pr-12`
+        standing in for `--window-controls-inset` — so the trace was the only
+        panel whose header was neither the chrome colour nor aligned with the
+        headers beside it. The `backdrop-blur-md` went with them: it is the
+        property that cost this app its draggable window once already.
+      */}
+      <div className="app-header justify-between shrink-0 select-none">
         <div className="flex items-center gap-2 min-w-0">
           <div className="size-6.5 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
             <Activity className="size-3.5" />
@@ -312,7 +400,9 @@ export function TracePanel() {
               )}
             </div>
             <span className="text-3xs text-foreground-extra-muted font-mono">
-              {stats.total} events recorded
+              {stats.total === stats.all
+                ? `${stats.all} events`
+                : `${stats.total} of ${stats.all} events`}
             </span>
           </div>
         </div>
@@ -451,7 +541,7 @@ export function TracePanel() {
       <div
         ref={containerRef}
         onScroll={handleScroll}
-        className="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-2.5"
+        className="flex-1 min-h-0 overflow-y-auto p-3.5"
       >
         {filteredSteps.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 text-foreground-muted select-none">
@@ -466,15 +556,36 @@ export function TracePanel() {
             </p>
           </div>
         ) : (
-          filteredSteps.map((step, idx) => (
-            <TraceStepCard
-              key={step.messageId || `step-${idx}`}
-              step={step}
-              agents={agents}
-              isWorking={isWorking}
-              isLatest={idx === filteredSteps.length - 1}
-            />
-          ))
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+            {virtualizer.getVirtualItems().map((row) => {
+              const entry = filteredSteps[row.index];
+              if (!entry) return null;
+              return (
+                <div
+                  key={row.key}
+                  ref={virtualizer.measureElement}
+                  data-index={row.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${row.start}px)`,
+                    paddingBottom: '0.625rem',
+                  }}
+                >
+                  <TraceStepCard
+                    step={entry.step}
+                    parsed={entry.parsed}
+                    agents={agents}
+                    isWorking={isWorking}
+                    isLatest={row.index === filteredSteps.length - 1}
+                    onReveal={revealInTranscript}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
@@ -485,23 +596,24 @@ export function TracePanel() {
 // ── Single Trace Step Card Component ──
 function TraceStepCard({
   step,
+  parsed,
   agents,
   isWorking = false,
   isLatest = false,
+  onReveal,
 }: {
   step: WorkspaceMessage;
+  /** Parsed once by the panel — see the note on `traceSteps`. */
+  parsed: ParsedStep;
   agents?: WorkspaceAgent[];
   isWorking?: boolean;
   isLatest?: boolean;
+  onReveal?: (messageId: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const timeStr = step.createdAt
     ? new Date(step.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '';
-
-  const parsed = step.messageType === 'thinking'
-    ? { type: 'thinking' as const, text: step.content }
-    : parseTraceStep(step.content);
 
   const handleCopyArgs = (argsStr: string) => {
     navigator.clipboard.writeText(argsStr);
@@ -515,7 +627,20 @@ function TraceStepCard({
     const isActiveThinking = isWorking && isLatest;
 
     return (
-      <div className="rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5">
+      <div
+        className={cn(
+          "rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5",
+          // Double-click, not click: single clicks inside these cards
+          // belong to the copy buttons and the reasoning disclosure,
+          // and stealing them to navigate would make the panel hostile
+          // to the reading it exists for.
+          onReveal && step.messageId && "cursor-pointer hover:border-brand-border",
+        )}
+        onDoubleClick={
+          onReveal && step.messageId ? () => onReveal(step.messageId) : undefined
+        }
+        title={onReveal && step.messageId ? "Double-click to show in the thread" : undefined}
+      >
         <div className="flex items-center justify-between text-3xs select-none">
           <div className="flex items-center gap-1.5 text-foreground-muted">
             <AgentAvatar name={step.senderName} size={14} />
@@ -546,7 +671,20 @@ function TraceStepCard({
       steps: a.steps,
     }));
     return (
-      <div className="rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5">
+      <div
+        className={cn(
+          "rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5",
+          // Double-click, not click: single clicks inside these cards
+          // belong to the copy buttons and the reasoning disclosure,
+          // and stealing them to navigate would make the panel hostile
+          // to the reading it exists for.
+          onReveal && step.messageId && "cursor-pointer hover:border-brand-border",
+        )}
+        onDoubleClick={
+          onReveal && step.messageId ? () => onReveal(step.messageId) : undefined
+        }
+        title={onReveal && step.messageId ? "Double-click to show in the thread" : undefined}
+      >
         <div className="flex items-center justify-between text-3xs select-none">
           <div className="flex items-center gap-1.5 text-foreground-muted">
             <AgentAvatar name={step.senderName} size={14} />
@@ -562,7 +700,20 @@ function TraceStepCard({
 
   if (parsed.type === 'tool_call') {
     return (
-      <div className="rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5">
+      <div
+        className={cn(
+          "rounded-xl border border-border/60 bg-surface1/60 p-2.5 space-y-1.5",
+          // Double-click, not click: single clicks inside these cards
+          // belong to the copy buttons and the reasoning disclosure,
+          // and stealing them to navigate would make the panel hostile
+          // to the reading it exists for.
+          onReveal && step.messageId && "cursor-pointer hover:border-brand-border",
+        )}
+        onDoubleClick={
+          onReveal && step.messageId ? () => onReveal(step.messageId) : undefined
+        }
+        title={onReveal && step.messageId ? "Double-click to show in the thread" : undefined}
+      >
         <div className="flex items-center justify-between text-3xs select-none">
           <div className="flex items-center gap-1.5 text-foreground-muted">
             <AgentAvatar name={step.senderName} size={14} />

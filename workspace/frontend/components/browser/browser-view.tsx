@@ -33,16 +33,42 @@ export function BrowserView() {
   const [namingSession, setNamingSession] = useState(false);
   const [confirmUnpersist, setConfirmUnpersist] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
-  const prevBlobRef = useRef<string | null>(null);
   const failCountRef = useRef(0);
 
   const tab = browserTabs.find((t) => t.id === selectedBrowserTabId);
+  /*
+    The screenshot poll and the validator care about exactly one thing on the
+    tab — whether it has a live URL — but depended on the whole `tab` OBJECT,
+    which `browserTabs.find` re-derives from a freshly-parsed array on every
+    refresh. A new identity every few seconds tore the 2s poll down and rebuilt
+    it every few seconds: interval cleared, blob revoked, `loading` set back to
+    true, screenshot refetched. That is the flicker, and it also meant the
+    "poll every 2 seconds" was really "poll whenever the tab list moves".
+  */
+  const tabLiveUrl = tab?.liveUrl ?? null;
 
   // Validate live session on mount / tab switch. The backend checks if the
   // BF session is still alive and auto-reconnects if dead, returning fresh
   // tab data (including a new live_url).
+  const validatedTabRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!selectedBrowserTabId || !tab?.liveUrl) return;
+    /*
+      THIS HAS TO RE-RUN WHEN THE TAB ARRIVES, NOT ONLY WHEN THE ID CHANGES.
+
+      The dependency list was `[selectedBrowserTabId]` while the body read
+      `tab?.liveUrl`. Selecting a tab before `browserTabs` has loaded — the
+      normal case on a cold open, or any time the panel mounts with a
+      remembered selection — meant `tab` was undefined, the guard returned
+      early, and the effect never ran again once the list landed. The session
+      was then simply never validated: no reconnect, no `sessionDead`, just a
+      stale `live_url` in an iframe that quietly shows nothing.
+
+      `validatedTabRef` keeps it to once per tab, since the dependency now
+      changes again when validation itself refreshes the list.
+    */
+    if (!selectedBrowserTabId || !tabLiveUrl) return;
+    if (validatedTabRef.current === selectedBrowserTabId) return;
+    validatedTabRef.current = selectedBrowserTabId;
     let cancelled = false;
 
     const validate = async () => {
@@ -59,11 +85,11 @@ export function BrowserView() {
 
     validate();
     return () => { cancelled = true; };
-  }, [selectedBrowserTabId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedBrowserTabId, tabLiveUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll screenshot every 2 seconds (only when no live URL)
   useEffect(() => {
-    if (!selectedBrowserTabId || !tab || tab.liveUrl) {
+    if (!selectedBrowserTabId || tabLiveUrl) {
       setScreenshotUrl(null);
       return;
     }
@@ -98,11 +124,14 @@ export function BrowserView() {
         failCountRef.current = 0;
         setSessionDead(false);
 
-        if (prevBlobRef.current) URL.revokeObjectURL(prevBlobRef.current);
-
-        const blobUrl = URL.createObjectURL(blob);
-        prevBlobRef.current = blobUrl;
-        setScreenshotUrl(blobUrl);
+        /*
+          Do NOT revoke the previous blob here. `screenshotUrl` still points at
+          it until React commits the next render, so revoking first left the
+          <img> holding a dead URL for a frame — a blink every two seconds,
+          which on a screenshot feed reads as the remote browser flickering.
+          The effect below revokes each URL once it has actually been replaced.
+        */
+        setScreenshotUrl(URL.createObjectURL(blob));
         setLoading(false);
       } catch {
         failCountRef.current++;
@@ -148,12 +177,19 @@ export function BrowserView() {
       cancelled = true;
       stopPolling();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (prevBlobRef.current) {
-        URL.revokeObjectURL(prevBlobRef.current);
-        prevBlobRef.current = null;
-      }
     };
-  }, [selectedBrowserTabId, tab]);
+  }, [selectedBrowserTabId, tabLiveUrl]);
+
+  /*
+    Revoke each object URL when it is replaced, not when it is created. A
+    cleanup keyed to the value runs AFTER the render that stopped using it, so
+    the <img> is never pointed at a revoked URL — and the last one is still
+    released on unmount, which is what the old cleanup was for.
+  */
+  useEffect(() => {
+    if (!screenshotUrl) return;
+    return () => URL.revokeObjectURL(screenshotUrl);
+  }, [screenshotUrl]);
 
   const handleReconnect = async () => {
     if (!tab || reconnecting) return;

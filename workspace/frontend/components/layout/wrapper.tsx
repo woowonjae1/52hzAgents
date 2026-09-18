@@ -5,7 +5,7 @@ import { Sidebar } from './sidebar';
 import { MobileHeader } from './mobile-header';
 import { useLayout } from './layout-context';
 import { cn } from '@/lib/utils';
-import { ChatView } from '@/components/chat/chat-view';
+import { ChatView, SessionMessagesProvider } from '@/components/chat/chat-view';
 import { ThreadList } from '@/components/threads/thread-list';
 import { FileList } from '@/components/files/file-list';
 import { FilePreview } from '@/components/files/file-preview';
@@ -101,7 +101,22 @@ export function WorkspaceLoadingScreen() {
 
 const MIN_DOCKED_WIDTH = 680;
 
+/*
+  The session poll is mounted ABOVE the shell rather than inside ChatView,
+  because the Studio panel's trace is a sibling of ChatView, not a child — and
+  it needs the same transcript. One provider here is what stops the two of them
+  opening two streams for the same channel. It also survives the loading branch
+  below, so completing the initial load does not remount the stream.
+*/
 export function Wrapper() {
+  return (
+    <SessionMessagesProvider>
+      <WrapperInner />
+    </SessionMessagesProvider>
+  );
+}
+
+function WrapperInner() {
   /* Route every error toast into the log the Recent Errors dialog reads.
      Here rather than in a provider because this is the one component that
      mounts for every workspace route and exactly once. */

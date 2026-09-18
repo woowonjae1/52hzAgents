@@ -4,6 +4,7 @@ import { Hint } from '@/components/ui/hint';
 import { KeyCombo } from '@/components/ui/kbd';
 import { shortcutKeys } from '@/lib/shortcuts';
 import { SHORTCUTS_EVENT } from '@/components/layout/global-shortcuts';
+import * as React from 'react';
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
@@ -149,6 +150,63 @@ function cacheMessages(sessionId: string, msgs: WorkspaceMessage[]) {
   }
 }
 
+/*
+  ── ONE POLL PER SESSION, SHARED ──
+
+  `useMessagePolling` is not a selector over a cache — it owns an SSE
+  connection, a pair of message-id cursors and its own `messages` state. Two
+  components calling it for the same session therefore opened TWO streams and
+  kept TWO independently-advancing copies of the same transcript, which is what
+  `TracePanel` was doing: every time the Studio panel showed the trace, the
+  request rate for that channel doubled and the two caches could disagree
+  mid-flight about what the newest message was.
+
+  Trace is a second VIEW of the conversation, not a second source of it, so the
+  poll is lifted to a provider that wraps both panes (see wrapper.tsx) and both
+  read the same array.
+
+  It lives in this file rather than its own because the seeding it does —
+  `messageCache`, for instant thread switching — is module-private here, and
+  splitting the provider from the cache it reads would be the more surprising
+  arrangement of the two.
+*/
+type SessionMessagesValue = ReturnType<typeof useMessagePolling>;
+const SessionMessagesContext = React.createContext<SessionMessagesValue | null>(null);
+
+export function SessionMessagesProvider({ children }: { children: React.ReactNode }) {
+  const { currentSessionId } = useWorkspace();
+
+  // Cached messages for this session, read once per session switch.
+  const initialMessagesRef = useRef<WorkspaceMessage[] | undefined>(undefined);
+  const initialMessagesSessionRef = useRef<string | null>(null);
+  if (currentSessionId !== initialMessagesSessionRef.current) {
+    initialMessagesRef.current = currentSessionId
+      ? messagesForSession(currentSessionId, messageCache.get(currentSessionId) || [])
+      : undefined;
+    initialMessagesSessionRef.current = currentSessionId;
+  }
+
+  const value = useMessagePolling({
+    sessionId: currentSessionId,
+    initialMessages: initialMessagesRef.current,
+  });
+
+  return (
+    <SessionMessagesContext.Provider value={value}>{children}</SessionMessagesContext.Provider>
+  );
+}
+
+/**
+ * The shared transcript for the current session. Throws rather than falling
+ * back to its own poll: a silent second stream is the exact bug this replaced,
+ * and it is invisible until someone profiles the network tab.
+ */
+export function useSessionMessages(): SessionMessagesValue {
+  const ctx = React.useContext(SessionMessagesContext);
+  if (!ctx) throw new Error('useSessionMessages must be used inside <SessionMessagesProvider>');
+  return ctx;
+}
+
 const PREFETCH_COUNT = 6;
 const CACHE_REFRESH_INTERVAL = 5_000; // refresh caches every 5s
 
@@ -256,20 +314,10 @@ export function ChatView() {
     return () => clearInterval(interval);
   }, [sessions]);
 
-  // Look up cached messages for the current session (read once per session switch)
-  const initialMessagesRef = useRef<WorkspaceMessage[] | undefined>(undefined);
-  const initialMessagesSessionRef = useRef<string | null>(null);
-  if (currentSessionId !== initialMessagesSessionRef.current) {
-    initialMessagesRef.current = currentSessionId
-      ? messagesForSession(currentSessionId, messageCache.get(currentSessionId) || [])
-      : undefined;
-    initialMessagesSessionRef.current = currentSessionId;
-  }
-
-  const { messages, loading, forceRefresh, generation, loadOlder, hasOlder, loadingOlder } = useMessagePolling({
-    sessionId: currentSessionId,
-    initialMessages: initialMessagesRef.current,
-  });
+  // The single poll for this session — shared with TracePanel. See
+  // SessionMessagesProvider above.
+  const { messages, loading, forceRefresh, generation, loadOlder, hasOlder, loadingOlder } =
+    useSessionMessages();
 
   // Persisted (not just component state): dismissing this once shouldn't mean
   // seeing it again on every reload — that's what made it feel like a
@@ -422,9 +470,6 @@ export function ChatView() {
   // Who is answering in THIS channel. The sidebar roster reports reachability
   // (online / offline); "working" belongs next to the conversation it is
   // happening in, which is also the only place the distinction is actionable.
-  const channelAgentNames = currentSession?.participants ?? [];
-  const workingHere = channelAgentNames.filter((name) => workingAgentNames.has(name));
-
   const onlineAgents = useMemo(() => agents.filter((a) => a.status === 'online'), [agents]);
   const hasOnlineAgents = onlineAgents.length > 0;
   const sessionParticipants = currentSession?.participants || [];
@@ -435,6 +480,20 @@ export function ChatView() {
   );
   const canChatInCurrentSession = hasSpecificParticipants ? sessionOnlineAgents.length > 0 : hasOnlineAgents;
   const isMissingParticipant = hasSpecificParticipants && sessionOnlineAgents.length === 0;
+
+  // Only display agents who are currently connected / online or actively working in this session,
+  // rather than cluttering with offline historical agents from the database roster.
+  const activeHeaderAgents = useMemo(() => {
+    const onlineSet = new Set(onlineAgents.map((a) => a.agentName));
+    if (sessionParticipants.length > 0) {
+      const active = sessionParticipants.filter((name) => onlineSet.has(name) || workingAgentNames.has(name));
+      return active;
+    }
+    return onlineAgents.map((a) => a.agentName);
+  }, [sessionParticipants, onlineAgents, workingAgentNames]);
+
+  const channelAgentNames = currentSession?.participants ?? [];
+  const workingHere = activeHeaderAgents.filter((name) => workingAgentNames.has(name));
 
   const activeModelAgentName = useMemo(() => {
     if (currentSession?.master) {
@@ -959,7 +1018,7 @@ export function ChatView() {
             (`.event-running`), on the words themselves. One signal for "still
             going", everywhere in the app.
           */}
-          {!isDM && channelAgentNames.length > 0 && (
+          {!isDM && activeHeaderAgents.length > 0 && (
             <div className="hidden sm:flex items-baseline gap-2 shrink min-w-0 max-w-[45%]">
               {workingHere.length > 0 ? (
                 <span className="event-running inline-flex items-baseline gap-1.5 text-xs min-w-0 text-foreground-muted">
@@ -967,40 +1026,26 @@ export function ChatView() {
                   <span className="shrink-0">working</span>
                 </span>
               ) : (
-                /*
-                  FACES, THEN A COUNT — not eight comma-separated names.
-
-                  `amp, antigravity, claude, cline, kilo, openclaw, opencode,
-                  pi` is 60-odd characters of header that the eye reads as one
-                  grey smear: it takes the space of a title, gives no sense of
-                  who is actually here, and the `max-w-[45%]` clipped it
-                  mid-name anyway. Four avatars carry the same information at a
-                  glance — these agents already have stable identity colours
-                  everywhere else in the app — and the overflow count is
-                  honest about what it is hiding.
-
-                  Full roster on hover, because occasionally you do want the
-                  names, and that is what a tooltip is for.
-                */
-                <Hint label={`${channelAgentNames.length} participants — ${channelAgentNames.join(', ')}`}>
+                <Hint label={`${activeHeaderAgents.length} connected agent${activeHeaderAgents.length > 1 ? 's' : ''} — ${activeHeaderAgents.join(', ')}`}>
                   <span className="flex items-center gap-1.5 min-w-0 text-xs text-foreground-muted">
                     <span className="flex items-center -space-x-1.5">
-                      {channelAgentNames.slice(0, 4).map((name) => (
+                      {activeHeaderAgents.slice(0, 4).map((name) => (
                         <AgentAvatar
                           key={name}
                           name={name}
                           agentType={agents.find((a) => a.agentName === name)?.agentType}
                           size={18}
+                          status="online"
                           className="ring-1 ring-surface0 rounded-full shrink-0"
                         />
                       ))}
                     </span>
-                    {channelAgentNames.length > 4 && (
+                    {activeHeaderAgents.length > 4 && (
                       <span className="shrink-0 text-3xs font-mono tabular-nums text-foreground-extra-muted">
-                        +{channelAgentNames.length - 4}
+                        +{activeHeaderAgents.length - 4}
                       </span>
                     )}
-                    <span className="shrink-0 text-3xs font-mono text-foreground-extra-muted">idle</span>
+                    <span className="shrink-0 text-3xs font-mono text-emerald-500 font-medium">online</span>
                   </span>
                 </Hint>
               )}
