@@ -105,42 +105,25 @@ function extractSessionAgents(
   }
 
   /*
-    5. Participants -- but ONLY when that list is a real choice.
-
-    THE ROSTER IS NOT A PARTICIPANT LIST, AND WAS BEING READ AS ONE.
+    THERE IS NO STEP 5. `participants` IS NOT EVIDENCE OF ANYTHING.
 
     The backend puts every agent in the workspace into `participants` on a
     plain new channel: 14 of 15 threads here came back with the identical
-    eight names. Sorted, so `amp` -- offline for a week, never launched --
-    was first, and therefore the face on nearly every row in the sidebar.
-    The rows were not wrong about which agent; they were answering a question
-    the data cannot answer.
+    eight names, sorted, so `amp` -- offline for a week, never launched --
+    led every one of them and became the face on nearly every sidebar row.
 
-    The test is "is this a STRICT SUBSET of agents we know about", and each
-    half of that is load-bearing:
+    Two attempts to rescue the field failed, both for the same reason. "Is
+    this list the whole roster" needed the roster to have more than one entry
+    to mean anything, and this workspace runs one agent online. "Is this a
+    strict subset of the roster" then survived the roster-size problem but
+    still answered a question nobody asked: a subset is who was ASSIGNED,
+    and the row is supposed to say who WORKED.
 
-      - strict subset, not "differs from the roster". The first attempt asked
-        whether the list equalled the whole roster, which needed the roster to
-        have more than one entry to mean anything -- and this workspace shows
-        `1 agent`. Eight participants against a one-agent roster passed the
-        test as "not the whole roster" and went straight to the avatars.
-      - every name known. A list carrying agents that are not in the roster at
-        all is a historical record, not a choice someone just made.
-
-    What survives is what the New chat dialog produces: two names out of
-    eight, picked by the user. That IS worth showing -- it says "this thread
-    is for these two". An empty roster means no opinion, which the subset test
-    gives for free.
+    The three rules above are the whole answer, and each is something that
+    actually happened: you named an agent, an agent spoke, or you made one
+    master. An assignment nobody has acted on yet is not activity, so it gets
+    the neutral message icon the caller already renders for an empty thread.
   */
-  const roster = new Set(allWorkspaceAgents.map((a) => a.agentName.toLowerCase()));
-  const picked = (session.participants ?? []).map((p) =>
-    stripAddressPrefix(p).trim().toLowerCase()
-  );
-  const isCuratedSubset =
-    picked.length > 0 && picked.length < roster.size && picked.every((p) => roster.has(p));
-  if (isCuratedSubset) {
-    for (const p of session.participants) addAgent(p);
-  }
 
   /*
     Nothing else. There is no "fall back to every participant" and no "fall
@@ -387,23 +370,14 @@ const ThreadRow = memo(function ThreadRow({
     activityMs || (session.createdAt ? new Date(session.createdAt).getTime() : 0),
   );
 
-  const rawSender = lastMsg?.senderName ? stripAddressPrefix(lastMsg.senderName).trim() : '';
-  const lastSpeaker: WorkspaceAgent | 'you' | null = !lastMsg
-    ? null
-    : rawSender === 'user' || rawSender === 'human'
-      ? 'you'
-      : agents.find((a) => a.agentName.toLowerCase() === rawSender.toLowerCase()) ?? null;
-
-  // Fallback to thread's assigned master agent or first participant if lastSpeaker is not found
-  const fallbackAgentName = !lastSpeaker
-    ? (session.master || (session.participants && session.participants.length > 0 ? session.participants[0] : null))
-    : null;
-  const cleanFallback = fallbackAgentName ? stripAddressPrefix(fallbackAgentName).trim() : '';
-  const fallbackAgent = cleanFallback
-    ? agents.find((a) => a.agentName.toLowerCase() === cleanFallback.toLowerCase()) ?? null
-    : null;
-
-  const displayAgent = (lastSpeaker && lastSpeaker !== 'you') ? lastSpeaker : fallbackAgent;
+  /*
+    A `displayAgent` chain used to sit here: last speaker, else `master`, else
+    `session.participants[0]`. Nothing read it -- it terminated in a const the
+    row never rendered -- so it was six bindings of dead code whose last step
+    was literally "the alphabetically first name in the roster". That is the
+    amp selector, spelled out. extractSessionAgents above is the one place
+    that answers this question now.
+  */
 
   const smartTitle = getSmartSessionTitle(session, lastMsg, folderOrdinal);
 

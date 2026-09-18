@@ -56,6 +56,62 @@ a number nobody measured.
 const UnknownWindow = 0
 
 /*
+AgentSourcePrefixRe-equivalent, as a function: the wire spells an author as
+`<realm>:<name>`, and only some realms are agents.
+
+`handlers` already has getAgentNameFromSource, but handlers imports this
+package, so reaching back for it would be a cycle. The realms are the ones in
+the frontend's ADDRESS_PREFIX_RE, minus the two that are not agents.
+*/
+func AgentNameFromSource(source string) string {
+	i := strings.Index(source, ":")
+	if i < 0 {
+		return ""
+	}
+	realm, name := strings.ToLower(source[:i]), strings.TrimSpace(source[i+1:])
+	switch realm {
+	case "52hzagents", "52hz", "openagents", "agent":
+		return name
+	default:
+		// human:, system:, and anything unrecognised.
+		return ""
+	}
+}
+
+/*
+TrustReportedCapability decides whether an agent's self-report may be believed.
+
+The rest of this file is careful never to invent a capability -- UnknownWindow
+exists precisely so an unmeasured agent cannot become a denominator. That care
+was being spent at the wrong layer: the adapters upstream happily write a
+placeholder, and a placeholder that arrives through the "the agent told us"
+channel was trusted absolutely.
+
+Two signals, both seen in live data on 2026-09-18:
+
+  - `model == agentName`. Three agents reported their CURRENT MODEL as their
+    own name ("amp", "claude", "cline"). An adapter that echoes the agent name
+    into the model field is not reporting a model, so nothing else in that
+    record is a measurement either -- including the window that came with it.
+  - no turns. `amp` had never been launched in this workspace (zero tokens,
+    ever) and reported a 1,000,000-token window. A window is a property of a
+    running model; an agent that has never run has not measured one.
+
+Rejecting a report does not mean guessing. It means falling back to the model
+table, and then to UnknownWindow -- which ChannelBudget skips.
+*/
+func TrustReportedCapability(agentName, model string, totalTokens int64) bool {
+	if totalTokens <= 0 {
+		return false
+	}
+	m := strings.ToLower(strings.TrimSpace(model))
+	if m == "" || m == strings.ToLower(strings.TrimSpace(agentName)) {
+		return false
+	}
+	return true
+}
+
+/*
 Reserve is what CANNOT be spent on history: the system prompt, the tool
 schemas, and room for the model's own reply.
 

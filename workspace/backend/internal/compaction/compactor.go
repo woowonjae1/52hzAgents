@@ -66,6 +66,29 @@ func ResolveChannelAdaptiveCompactorConfig(workspaceID, channelName string) *Com
 // agentBudgetsForChannel resolves who is in the channel and what each one can
 // hold. Returns nil when the channel or the DB is unavailable, which
 // ResolveConfig handles as "use the conservative default".
+/*
+agentBudgetsForChannel resolves who the channel's compaction must fit, and
+what each of them can hold.
+
+IT ASKS WHO WORKED HERE, NOT WHO IS ON THE ROSTER.
+
+This used to read `channel_members`, which sounds like the answer and is not:
+the backend puts every agent in the workspace into a new channel's membership,
+so on 2026-09-18 fourteen of fifteen channels listed the identical eight names.
+Sizing a channel's history to the smallest of THOSE means an agent that has
+never opened the thread -- in this workspace, never been launched at all --
+sets the budget for the one doing the work. That is the same roster-as-truth
+mistake the sidebar had, one layer down, where the cost is capability rather
+than an icon.
+
+Participation is: the master agent, plus every agent that has actually sent a
+message here. An agent assigned and silent constrains nothing, because it is
+not reading this history either.
+
+Falling back to online workspace members when nothing is found is kept -- a
+channel whose first turn is still in flight has no senders yet, and the agents
+about to receive it are the online ones.
+*/
 func agentBudgetsForChannel(workspaceID, rawName string) []AgentBudget {
 	if db.DB == nil {
 		return nil
@@ -75,23 +98,37 @@ func agentBudgetsForChannel(workspaceID, rawName string) []AgentBudget {
 		return nil
 	}
 
+	seen := map[string]bool{}
 	var agentNames []string
-	if channel.MasterAgent != nil && *channel.MasterAgent != "" {
-		agentNames = append(agentNames, *channel.MasterAgent)
+	addName := func(n string) {
+		n = strings.TrimSpace(n)
+		if n == "" || seen[strings.ToLower(n)] {
+			return
+		}
+		seen[strings.ToLower(n)] = true
+		agentNames = append(agentNames, n)
 	}
-	var cmList []models.ChannelMember
-	if err := db.DB.Where("channel_id = ?", channel.ID).Find(&cmList).Error; err == nil {
-		for _, cm := range cmList {
-			if cm.AgentName != "" {
-				agentNames = append(agentNames, cm.AgentName)
-			}
+
+	if channel.MasterAgent != nil {
+		addName(*channel.MasterAgent)
+	}
+
+	// Everyone who has actually spoken in this channel. DISTINCT over source
+	// keeps this one row per author however long the thread is.
+	var sources []string
+	if err := db.DB.Model(&models.EventRecord{}).
+		Where("network_id = ? AND target = ? AND type LIKE ?", workspaceID, "channel/"+rawName, "workspace.message%").
+		Distinct().Pluck("source", &sources).Error; err == nil {
+		for _, src := range sources {
+			addName(AgentNameFromSource(src))
 		}
 	}
+
 	if len(agentNames) == 0 {
 		var members []models.WorkspaceMember
 		if err := db.DB.Where("workspace_id = ? AND status = ?", workspaceID, "online").Find(&members).Error; err == nil {
 			for _, m := range members {
-				agentNames = append(agentNames, m.AgentName)
+				addName(m.AgentName)
 			}
 		}
 	}
@@ -101,11 +138,20 @@ func agentBudgetsForChannel(workspaceID, rawName string) []AgentBudget {
 		b := AgentBudget{AgentName: name, Window: UnknownWindow}
 		var usage models.AgentUsageRecord
 		if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, name).First(&usage).Error; err == nil {
-			if usage.ContextWindowSize > 0 {
-				b.Window = usage.ContextWindowSize
-				b.Reported = true
-			} else if usage.CurrentModel != nil {
-				b.Window = ModelContextWindow(*usage.CurrentModel)
+			model := ""
+			if usage.CurrentModel != nil {
+				model = *usage.CurrentModel
+			}
+			// A self-report is the best source ONLY if it is a report at all.
+			// See TrustReportedCapability for the two ways it turned out not
+			// to be one.
+			if TrustReportedCapability(name, model, usage.TotalTokens) {
+				if usage.ContextWindowSize > 0 {
+					b.Window = usage.ContextWindowSize
+					b.Reported = true
+				} else {
+					b.Window = ModelContextWindow(model)
+				}
 			}
 		}
 		budgets = append(budgets, b)
@@ -353,6 +399,29 @@ func ginH(workspaceID, eventType, target string, payload map[string]interface{},
 
 // GetCompactedChannelHistory returns a combined view: latest summary checkpoint + recent active messages.
 func GetCompactedChannelHistory(workspaceID, channelName string, recentLimit int) (string, []MessageItem, error) {
+	return getChannelHistory(workspaceID, channelName, recentLimit, false)
+}
+
+/*
+getChannelHistory renders a channel's history for ONE reader.
+
+`crossCheckpoint` is the per-recipient half of the fix described on
+ChannelBudget: compaction picks one threshold for the whole channel, sized to
+its smallest participant, and until now every reader got that same summary --
+so a 1M-window agent read a digest compressed to fit a 128k one.
+
+Compaction never deleted anything; it only moved where retrieval STOPS. So a
+reader whose own budget can hold more is allowed to read straight through the
+checkpoint into the raw messages behind it, bounded by its own recentLimit.
+The cost is the same `recentLimit` rows either way -- older raw turns instead
+of a summary plus newer ones -- so this does not enlarge any prompt.
+
+The summary is then returned only when it still covers something the reader
+did not reach: if the oldest row we handed back is at or before the
+checkpoint, the reader has the real messages and the digest of them would be
+duplicate context, which is worse than none.
+*/
+func getChannelHistory(workspaceID, channelName string, recentLimit int, crossCheckpoint bool) (string, []MessageItem, error) {
 	if recentLimit <= 0 {
 		recentLimit = 15
 	}
@@ -382,12 +451,21 @@ func GetCompactedChannelHistory(workspaceID, channelName string, recentLimit int
 	var eventRecords []models.EventRecord
 	query := db.DB.Where("network_id = ? AND target = ? AND type LIKE ?", workspaceID, target, "workspace.message%")
 
-	// If we have a compaction checkpoint, we only need messages that came after ToEventID or recentLimit
+	// The checkpoint boundary, when there is one. `haveBoundary` stays false
+	// if the row it names has since been pruned, in which case there is
+	// nothing to compare against and the summary is kept as-is.
+	var boundary models.EventRecord
+	haveBoundary := false
 	if hasSummary && latestCompaction.ToEventID != "" {
-		var boundary models.EventRecord
 		if db.DB.Where("id = ? AND network_id = ?", latestCompaction.ToEventID, workspaceID).First(&boundary).Error == nil {
-			query = query.Where("(timestamp > ? OR (timestamp = ? AND id > ?))", boundary.Timestamp, boundary.Timestamp, boundary.ID)
+			haveBoundary = true
 		}
+	}
+
+	// A reader that cannot afford to look behind the checkpoint is served the
+	// summary plus what came after it, as before. One that can is not clamped.
+	if haveBoundary && !crossCheckpoint {
+		query = query.Where("(timestamp > ? OR (timestamp = ? AND id > ?))", boundary.Timestamp, boundary.Timestamp, boundary.ID)
 	}
 
 	// Take the newest recentLimit rows, then restore chronological order. Ordering
@@ -402,6 +480,18 @@ func GetCompactedChannelHistory(workspaceID, channelName string, recentLimit int
 	}
 
 	recentMessages := ExtractMessageItems(eventRecords)
+
+	// Did this reader actually reach back past the checkpoint? If so the raw
+	// turns it just read ARE what the summary summarises, and sending both
+	// spends the budget twice to say the same thing.
+	if crossCheckpoint && haveBoundary && len(eventRecords) > 0 {
+		oldest := eventRecords[0]
+		if oldest.Timestamp < boundary.Timestamp ||
+			(oldest.Timestamp == boundary.Timestamp && oldest.ID <= boundary.ID) {
+			summary = ""
+		}
+	}
+
 	return summary, recentMessages, nil
 }
 
@@ -434,7 +524,20 @@ func GetCompactedChannelHistoryForAgent(workspaceID, channelName, agentName stri
 		recentLimit = 25
 	}
 
-	return GetCompactedChannelHistory(workspaceID, channelName, recentLimit)
+	/*
+		This reader crosses the shared checkpoint when its own window is
+		bigger than the one the channel was compacted for.
+
+		Equal is not bigger: if this agent IS the constraint, the summary was
+		sized for it and reading behind it would be exactly the overflow
+		compaction exists to prevent. Unknown on either side means we have not
+		measured the comparison, and an unmeasured budget is not licence to
+		read more -- so it stays clamped, which is the old behaviour.
+	*/
+	channelBudget := ChannelWindow(workspaceID, channelName)
+	crossCheckpoint := window > 0 && channelBudget > 0 && window > channelBudget
+
+	return getChannelHistory(workspaceID, channelName, recentLimit, crossCheckpoint)
 }
 
 // ChannelContextDiagnostics returns diagnostic multi-agent window analysis for a channel.
@@ -443,4 +546,3 @@ func ChannelContextDiagnostics(workspaceID, channelName string) ChannelDiagnosti
 	budgets := agentBudgetsForChannel(workspaceID, rawName)
 	return AnalyzeChannelBudgets(budgets)
 }
-
