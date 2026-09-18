@@ -105,48 +105,41 @@ function extractSessionAgents(
   }
 
   /*
-    5. Participants — but ONLY when that list is a real choice.
+    5. Participants -- but ONLY when that list is a real choice.
 
     THE ROSTER IS NOT A PARTICIPANT LIST, AND WAS BEING READ AS ONE.
 
     The backend puts every agent in the workspace into `participants` on a
     plain new channel: 14 of 15 threads here came back with the identical
-    eight names. Sorted, so `amp` — offline since a week before these threads
-    existed, never launched in any of them — was first, and therefore the face
-    on nearly every row in the sidebar. The rows were not wrong about which
-    agent; they were answering a question the data cannot answer.
+    eight names. Sorted, so `amp` -- offline for a week, never launched --
+    was first, and therefore the face on nearly every row in the sidebar.
+    The rows were not wrong about which agent; they were answering a question
+    the data cannot answer.
 
-    A list that is the whole roster carries no information, so it is skipped.
-    A list that is a subset was picked by the user in the New chat dialog, and
-    that IS worth showing: it says "this thread is for these two".
+    The test is "is this a STRICT SUBSET of agents we know about", and each
+    half of that is load-bearing:
 
-    The online filter that used to sit here is gone with the fallbacks below.
-    It was there to suppress the roster's offline noise, but it also meant the
-    avatars changed every time an agent's process went up or down — a thread
-    pi worked on last week stopped showing pi the moment pi exited.
+      - strict subset, not "differs from the roster". The first attempt asked
+        whether the list equalled the whole roster, which needed the roster to
+        have more than one entry to mean anything -- and this workspace shows
+        `1 agent`. Eight participants against a one-agent roster passed the
+        test as "not the whole roster" and went straight to the avatars.
+      - every name known. A list carrying agents that are not in the roster at
+        all is a historical record, not a choice someone just made.
+
+    What survives is what the New chat dialog produces: two names out of
+    eight, picked by the user. That IS worth showing -- it says "this thread
+    is for these two". An empty roster means no opinion, which the subset test
+    gives for free.
   */
-  const rosterSize = allWorkspaceAgents.length;
-  if (rosterSize > 0 && Array.isArray(session.participants) && session.participants.length > 0) {
-    /*
-      `rosterSize > 0` is load-bearing, not a null guard.
-
-      Whether a participant list means anything can only be judged against the
-      roster, and the roster arrives one fetch later than the threads do. On
-      that first paint `allWorkspaceAgents` is `[]`, every subset test passes
-      vacuously, and the raw list goes straight to the avatars — which is the
-      frame the roster bug was visible in. No roster means no opinion.
-    */
-    const isWholeRoster =
-      rosterSize > 1 &&
-      session.participants.length >= rosterSize &&
-      allWorkspaceAgents.every((a) =>
-        session.participants.some(
-          (p) => stripAddressPrefix(p).trim().toLowerCase() === a.agentName.toLowerCase()
-        )
-      );
-    if (!isWholeRoster) {
-      for (const p of session.participants) addAgent(p);
-    }
+  const roster = new Set(allWorkspaceAgents.map((a) => a.agentName.toLowerCase()));
+  const picked = (session.participants ?? []).map((p) =>
+    stripAddressPrefix(p).trim().toLowerCase()
+  );
+  const isCuratedSubset =
+    picked.length > 0 && picked.length < roster.size && picked.every((p) => roster.has(p));
+  if (isCuratedSubset) {
+    for (const p of session.participants) addAgent(p);
   }
 
   /*
