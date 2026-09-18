@@ -88,7 +88,18 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`mention-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 my-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs align-baseline"
+              /*
+                `align-middle`, NOT `align-baseline`.
+
+                An `inline-flex` box takes its baseline from its FIRST flex
+                item, and the first item here is the colour dot — a span with
+                no text in it. With nothing to read a baseline from, the
+                browser falls back to the box's bottom margin edge, which
+                lifted the whole pill above the line it was sitting in.
+                `align-middle` centres the chip on the text instead and does
+                not depend on the children at all.
+              */
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs leading-[1.35] align-middle"
               style={{ color }}
             >
               <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />
@@ -173,8 +184,17 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
   };
 
   return (
-    <div className="not-prose my-3 overflow-hidden rounded-lg border border-border/70 bg-[#f8f9fa] dark:bg-[#0c0d11] text-foreground font-mono">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-surface2/60 dark:bg-[#121318] text-3xs font-medium text-foreground-muted select-none border-b border-border/50">
+    /*
+      ON THE RAMP, NOT TWO HARDCODED GREYS.
+
+      `#f8f9fa` sat FOUR units away from the assistant bubble it now lives
+      inside (`bg-muted`, `#f4f4f6`) — a code block you could not see the
+      edge of. `--surface3` is `--muted` stepped 8% toward the text colour,
+      so it is one deliberate step from the bubble in light AND dark rather
+      than a literal that happened to work on the old ground.
+    */
+    <div className="not-prose my-3 overflow-hidden rounded-lg border border-border/70 bg-surface3 text-foreground font-mono">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-surface4/70 text-3xs font-medium text-foreground-muted select-none border-b border-border/50">
         <div className="flex items-center gap-2 min-w-0">
           {filename ? (
             <div className="flex items-center gap-1.5 text-foreground font-medium truncate">
@@ -259,7 +279,9 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
       if (isInline) {
         return (
           <code
-            className="bg-surface2/70 text-foreground font-mono px-1.5 py-0.5 rounded text-[0.875em] border border-border/50 inline align-baseline font-normal"
+            /* Same reason as the block above: `--surface2` is `--card`,
+               which on a `bg-muted` bubble is the wrong direction. */
+            className="bg-surface3 text-foreground font-mono px-1.5 py-0.5 rounded text-[0.875em] border border-border/50 inline align-baseline font-normal"
             {...props}
           >
             {children}

@@ -625,12 +625,15 @@ export const ChatMessage = memo(function ChatMessage({
             <div className="flex w-full flex-row-reverse items-start gap-2">
               <div
                 className={cn(
-                  'mt-0.5 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full bg-muted',
+                  /* The mark FILLS the disc, the way the agent avatars
+                     opposite it do. 16px inside a 28px circle read as a dot
+                     with a lot of ring around it. */
+                  'mt-0.5 grid size-7 shrink-0 place-items-center overflow-hidden rounded-full',
                   hideHeader && 'invisible'
                 )}
                 aria-hidden={hideHeader || undefined}
               >
-                <SignalMark size={16} still title={currentUser.name || 'You'} />
+                <SignalMark size={26} still title={currentUser.name || 'You'} />
               </div>
             <div className="max-w-[82%] flex flex-col items-end">
               <div

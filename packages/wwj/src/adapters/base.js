@@ -861,7 +861,24 @@ class BaseAdapter {
           if (msgId) this._processedIds.add(msgId);
           const channel = msg.sessionId || this.channelName || 'general';
           const queueId = msg.metadata?.queue_id || (msg.content || '').replace('__queue_cancel:', '');
-          if (queueId) this._cancelQueuedMessage(channel, queueId);
+          if (queueId) {
+            // `cancelQueuedMessage`, NOT `_cancelQueuedMessage`.
+            //
+            // The underscored name has never existed -- this was the only
+            // reference to it in the repo. So dismissing a queued message from
+            // the composer threw `TypeError: this._cancelQueuedMessage is not a
+            // function` inside the poll loop, which took the adapter down with
+            // it: the agent dropped offline and had to be reconnected by hand.
+            //
+            // Awaited and guarded for the same reason. A rejected promise here
+            // is an unhandled rejection in the same loop, and cancelling one
+            // queued item must never be able to end the session.
+            try {
+              await this.cancelQueuedMessage(channel, queueId);
+            } catch (e) {
+              this._log(`Cancel queued message failed: ${e.message}`);
+            }
+          }
           continue;
         }
 
@@ -882,6 +899,41 @@ class BaseAdapter {
         const isSelf = msg.senderName === this.agentName || msg.senderId === `52hz:${this.agentName}` || msg.senderId === `agent:${this.agentName}`;
 
         if (isSelf) continue;
+
+        /*
+          AN OPEN DECISION CARD HOLDS THE FLOOR.
+
+          When an agent ends a turn with a ```decision block, the workspace
+          renders an ApprovalCard and waits for a person to pick. Nothing
+          stopped the OTHER agents in the channel from answering meanwhile,
+          so the question was routinely overtaken by a reply to it before
+          anyone had chosen -- and whatever the human then picked landed in a
+          conversation that had already moved on.
+
+          Per channel and best effort: the gate opens when a message carrying
+          decision questions goes by, and closes on an explicit
+          `decision_response`, or on the human simply saying something else,
+          which is them moving on. The agent that ASKED is never gated by its
+          own question.
+        */
+        const decisionChannel = msg.sessionId || this.channelName || 'general';
+        this._openDecisions = this._openDecisions || {};
+        const carriesDecision =
+          (Array.isArray(msg.metadata?.questions) && msg.metadata.questions.length > 0) ||
+          (Array.isArray(msg.metadata?.decision_questions) && msg.metadata.decision_questions.length > 0);
+
+        if (carriesDecision) {
+          this._openDecisions[decisionChannel] = { by: msg.senderName || msg.senderId || 'agent' };
+        } else if (msg.metadata?.decision_response || isHuman) {
+          delete this._openDecisions[decisionChannel];
+        }
+
+        const openDecision = this._openDecisions[decisionChannel];
+        if (openDecision && !carriesDecision && openDecision.by !== this.agentName) {
+          this._log(`Holding: decision card from ${openDecision.by} in ${decisionChannel} is unanswered`);
+          if (msgId) this._processedIds.add(msgId);
+          continue;
+        }
 
         const hopChannel = msg.sessionId || this.channelName || 'general';
         this._agentHopCounts = this._agentHopCounts || {};

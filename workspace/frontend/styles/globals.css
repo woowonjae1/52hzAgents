@@ -261,8 +261,21 @@
 .dark {
   /* Surfaces (layers) - Obsidian & Zinc depth */
   --surface0: var(--background);
-  --surface1: var(--muted);
-  --surface2: var(--card);
+  /*
+    THE BOTTOM TWO STEPS SWAP IN DARK, AND THAT IS NOT A TYPO.
+
+    shadcn's `--card` is LIGHTER than `--background` in light (#fff over
+    #fafafa) but DARKER than `--muted` in dark (#111115 under #18181e).
+    Aliased to the same pair in both themes, the ramp stopped being monotonic
+    in dark: measured, `--surface2` resolved to oklab L 0.17 while
+    `--surface1` sat at 0.22, so the 432 call sites that mean "one step up
+    from surface1" were stepping DOWN.
+
+    Mapped per theme the ramp reads 0.22 -> 0.27 -> 0.33 in dark, which is
+    where this app's own literals had it before any of this.
+  */
+  --surface1: var(--card);
+  --surface2: var(--muted);
   --surface3: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
   --surface4: color-mix(in oklab, var(--muted) 84%, var(--foreground) 16%);
   --surface-diff-empty: color-mix(in oklab, var(--muted) 96%, var(--foreground) 4%);

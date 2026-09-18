@@ -92,6 +92,15 @@ export interface AISidebarProps {
     item: SidebarResource,
     controls: SidebarResourceMenuControls,
   ) => ReactNode;
+  /*
+    A trailing slot on the row, between the label and the overflow menu.
+
+    beUI's resource row is label-only, which is right for files in a project
+    but loses everything a conversation list puts on the right: when it last
+    spoke, whether it is unread. Rather than fork the row, the row gets one
+    slot and the caller decides what belongs in it.
+  */
+  renderMeta?: (item: SidebarResource) => ReactNode;
   ariaLabel?: string;
   className?: string;
 }
@@ -348,6 +357,7 @@ interface ResourceRowProps {
   onToggle: () => void;
   renderIcon?: (item: SidebarResource) => ReactNode;
   renderMenu?: AISidebarProps["renderMenu"];
+  renderMeta?: AISidebarProps["renderMeta"];
   setRef: (node: HTMLDivElement | null) => void;
 }
 
@@ -375,6 +385,7 @@ function ResourceRow({
   onToggle,
   renderIcon,
   renderMenu,
+  renderMeta,
   setRef,
 }: ResourceRowProps) {
   const reduce = useReducedMotion() ?? false;
@@ -538,6 +549,12 @@ function ResourceRow({
         <MarqueeLabel active={hovered || menuOpen}>{row.item.label}</MarqueeLabel>
       )}
 
+      {!renaming && renderMeta ? (
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
+          {renderMeta(row.item)}
+        </span>
+      ) : null}
+
       {!renaming && !row.item.disabled ? (
         <MorphPopover
           open={menuOpen}
@@ -588,6 +605,7 @@ export function AISidebar({
   defaultExpandedIds = [],
   renderIcon,
   renderMenu,
+  renderMeta,
   ariaLabel = "Resources",
   className,
 }: AISidebarProps) {
@@ -955,6 +973,7 @@ export function AISidebar({
             }}
             renderIcon={renderIcon}
             renderMenu={renderMenu}
+            renderMeta={renderMeta}
             setRef={(node) => {
               if (node) rowRefs.current.set(row.item.id, node);
               else rowRefs.current.delete(row.item.id);

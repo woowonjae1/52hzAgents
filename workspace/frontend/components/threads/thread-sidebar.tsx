@@ -13,6 +13,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { basename } from '@/components/chat/project-folder-picker';
 import { getSmartSessionTitle } from './thread-list';
+import { formatCompactRelativeTime } from '@/lib/helpers';
 import { FileList } from '@/components/files/file-list';
 import { RoutineList } from '@/components/routines/routine-list';
 import { toast } from '@/lib/toast';
@@ -48,6 +49,7 @@ export function ThreadSidebar() {
     currentSessionId,
     setCurrentSessionId,
     lastMessageBySession,
+    userSentMessageTimestamps,
     createSession,
     renameSession,
     updateSession,
@@ -97,6 +99,21 @@ export function ThreadSidebar() {
   }, [active, lastMessageBySession, query]);
 
   const defaultExpandedIds = React.useMemo(() => items.map((i) => i.id), [items]);
+
+  /*
+    Activity newer than the last thing YOU did in that thread. The thread you
+    are currently looking at is never unread — you are reading it.
+  */
+  const unreadIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    for (const session of active) {
+      if (session.sessionId === currentSessionId) continue;
+      const seen = userSentMessageTimestamps[session.sessionId];
+      if (!seen) continue;
+      if ((session.lastEventAt ?? 0) > seen) ids.add(session.sessionId);
+    }
+    return ids;
+  }, [active, currentSessionId, userSentMessageTimestamps]);
 
   const handleActiveChange = React.useCallback(
     (id: string) => {
@@ -167,6 +184,31 @@ export function ThreadSidebar() {
       );
     },
     [byId]
+  );
+
+  /*
+    The right-hand column the beUI row did not have: when this thread last
+    moved, and an unread dot when it moved since you last looked at it. These
+    are the two things the list this replaced put there, and the two things
+    that make a conversation list scannable rather than a folder of names.
+  */
+  const renderMeta = React.useCallback(
+    (item: SidebarResource) => {
+      if (item.kind !== 'file') return null;
+      const session = byId.get(item.id);
+      if (!session) return null;
+      const at = session.lastEventAt || (session.createdAt ? new Date(session.createdAt).getTime() : 0);
+      if (!at) return null;
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          {unreadIds.has(item.id) && (
+            <span aria-label="Unread" className="size-1.5 rounded-full bg-primary" />
+          )}
+          {formatCompactRelativeTime(at)}
+        </span>
+      );
+    },
+    [byId, unreadIds]
   );
 
   const renderMenu = React.useCallback(
@@ -301,6 +343,7 @@ export function ThreadSidebar() {
           onMove={handleMove}
           onRename={handleRename}
           renderIcon={renderIcon}
+          renderMeta={renderMeta}
           renderMenu={renderMenu}
         />
         )}

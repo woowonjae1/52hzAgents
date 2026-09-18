@@ -169,9 +169,14 @@ export function MessageActions({
         // 悬停消息时淡入；同时兼容外层未命名 group 与 chat-message 的具名 group
         'opacity-0 group-hover:opacity-100 group-hover/usermsg:opacity-100 group-hover/agentmsg:opacity-100',
         'focus-within:opacity-100 transition-opacity duration-200',
-        'inline-flex items-center gap-0.5 p-0.5 rounded-lg',
-        'bg-surface1/90 dark:bg-surface1/70 backdrop-blur-md',
-        'border border-border',
+        /*
+          NO PLATE. beUI's `MessageFooter` is a bare row of glyphs; this one
+          carried a blurred, bordered surface of its own, which sat directly
+          under the message it belongs to and read as a second card colliding
+          with the first. The hover fade is the affordance — it does not also
+          need a background to be found.
+        */
+        'inline-flex items-center gap-0.5 mt-1 rounded-lg',
         className
       )}
     >
