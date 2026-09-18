@@ -1,0 +1,2 @@
+# Placeholder so `//go:embed all:dist` compiles on a clean checkout.
+# The build script overwrites this directory with `frontend/out`.

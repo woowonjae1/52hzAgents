@@ -1,0 +1,82 @@
+# Compiles the Go backend from a checkout that has never been built in.
+#
+# WHY THIS EXISTS
+#
+# `internal/webui` embeds the frontend export with `//go:embed all:dist`, which
+# is resolved at COMPILE time: a pattern matching no files is a build error, not
+# an empty embed. The directory is gitignored and staged by build-desktop.ps1,
+# so on any machine that has packaged the desktop app once it is full and
+# everything compiles. On a fresh clone it was empty, and `go build ./...`,
+# `go test ./...`, dev-sqlite.ps1 and dev.ps1 all failed.
+#
+# That shipped and survived eight days because no CI job compiled this module.
+# Every developer machine had been polluted by a previous build, so the repo
+# looked fine from every angle anyone was looking from.
+#
+# A GitHub-hosted runner clones into an empty workspace, so `actions/checkout`
+# here IS the clean-tree test. (That is not automatic on a self-hosted runner,
+# which may reuse a directory across jobs and reintroduce exactly the blind spot
+# this job exists to remove -- keep this on `ubuntu-latest`.)
+name: backend-build
+
+on:
+  push:
+    paths:
+      - 'workspace/backend/**'
+      - '.github/workflows/backend-build.yml'
+  pull_request:
+    paths:
+      - 'workspace/backend/**'
+      - '.github/workflows/backend-build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workspace/backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: workspace/backend/go.mod
+          cache-dependency-path: workspace/backend/go.sum
+
+      # Names the failure mode directly, so a future breakage of the embed
+      # placeholder reads as itself rather than as a generic build error.
+      - name: Embed placeholder is present
+        run: |
+          test -f internal/webui/dist/.gitkeep \
+            || { echo "::error::internal/webui/dist/.gitkeep is missing from the checkout -- //go:embed all:dist will not compile. Check that the root .gitignore still re-includes this directory."; exit 1; }
+
+      - run: go build ./...
+
+      - run: go vet ./...
+
+      # `ok` at package level is not evidence here: several suites in this repo
+      # skip wholesale when cgo is unavailable, and a skipped suite prints the
+      # same `ok` as a passing one. So skips are surfaced -- but NOT as a hard
+      # gate, because the count is environment-dependent: four suites skip on a
+      # cgo-less Windows dev box and run on this runner, so any pinned number
+      # would be wrong on one of them. Read the summary; a suite that skips here
+      # is one that has never run anywhere.
+      - name: go test
+        run: |
+          set -o pipefail
+          go test ./... -v 2>&1 | tee test.log
+
+      - name: Report skipped suites
+        if: always()
+        run: |
+          if grep -q '^--- SKIP' test.log; then
+            {
+              echo "### Skipped test suites"
+              echo ''
+              echo 'These printed `ok` at package level without running:'
+              echo ''
+              grep '^--- SKIP' test.log | sed 's/^/- /'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No skipped suites.' >> "$GITHUB_STEP_SUMMARY"
+          fi

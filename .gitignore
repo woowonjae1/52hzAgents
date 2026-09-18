@@ -12,6 +12,14 @@ __pycache__/
 sdk/studio/build/
 develop-eggs/
 dist/
+# `dist/` above excludes the DIRECTORY, and git never descends into an excluded
+# directory -- so `!internal/webui/dist/.gitkeep` in workspace/backend/.gitignore
+# could never fire, and the placeholder it protects was never committed. A clean
+# clone therefore failed to build: `//go:embed all:dist` is resolved at compile
+# time, and a pattern matching nothing is a compile error, not an empty embed.
+# Re-include the directory here; the nested .gitignore still decides that only
+# .gitkeep inside it is tracked.
+!workspace/backend/internal/webui/dist/
 downloads/
 eggs/
 .eggs/
