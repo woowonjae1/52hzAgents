@@ -78,59 +78,59 @@ function extractSessionAgents(
     }
   };
 
-  // 1. Explicit participants
-  if (Array.isArray(session.participants) && session.participants.length > 0) {
-    for (const p of session.participants) {
-      addAgent(p);
-    }
-  }
-
-  // 2. Master agent
-  if (session.master) {
-    addAgent(session.master);
-  }
-
-  // 3. Explicit @mentions in the title or the last message.
+  // 1. Explicit @mentions in title, smartTitle, or message content (strongest intent)
   const stringsToCheck = [session.title, smartTitle, lastMsg?.content].filter(Boolean) as string[];
   for (const str of stringsToCheck) {
     for (const m of str.match(/@([a-zA-Z0-9_.-]+)/g) ?? []) addAgent(m.slice(1));
   }
 
-  /*
-    WHAT WAS HERE: a scan of every agent in the workspace against every one of
-    those strings, matching if the name appeared as a prefix, a suffix, or
-    anywhere at all. A thread whose preview happened to contain the word "pi"
-    picked up @pi as a participant. That is not evidence, it is a coincidence,
-    and it was one of the two reasons every row in the sidebar ended up
-    claiming the same crowd. Explicit `@mentions` above already cover the case
-    it was reaching for, without guessing.
-  */
+  // 2. Direct match of title to an agent name (e.g. "pi", "antigravity")
+  for (const str of [session.title, smartTitle].filter(Boolean) as string[]) {
+    const clean = str.trim().toLowerCase();
+    for (const a of allWorkspaceAgents) {
+      if (clean === a.agentName.toLowerCase() || clean.startsWith(`${a.agentName.toLowerCase()} `)) {
+        addAgent(a.agentName);
+      }
+    }
+  }
 
-  // 4. Whoever actually spoke last.
-  if (lastMsg?.senderName) addAgent(lastMsg.senderName);
+  // 3. Last message speaker if it was an agent (strongest activity)
+  if (lastMsg?.senderName) {
+    addAgent(lastMsg.senderName);
+  }
 
-  /*
-    ORDERED BY EVIDENCE, STRONGEST FIRST.
+  // 4. Session master agent (strongest leadership)
+  if (session.master) {
+    addAgent(session.master);
+  }
 
-    Insertion order put `session.participants` at the head — and in this
-    workspace every thread is assigned the whole roster, so all eight threads
-    rendered the same first three logos and the same `+5`. Eight identical
-    stacks down the sidebar is not a signal; it is a column of noise occupying
-    the space where the rows differ from each other.
+  // 5. Explicit participants that are currently ONLINE (skip offline historical noise)
+  if (Array.isArray(session.participants) && session.participants.length > 0) {
+    for (const p of session.participants) {
+      const lower = stripAddressPrefix(p).trim().toLowerCase();
+      const matched = allWorkspaceAgents.find((a) => a.agentName.toLowerCase() === lower);
+      if (matched && matched.status === 'online') {
+        addAgent(p);
+      }
+    }
+  }
 
-    The agent who spoke last is the one thing that varies per row, and it is
-    what you are scanning for when you look at this list. It leads. Membership
-    is still in the list, just behind everything the thread actually did.
-  */
-  const lastSpeaker = lastMsg?.senderName
-    ? stripAddressPrefix(lastMsg.senderName).trim().toLowerCase()
-    : null;
-  const ordered = Array.from(agentMap.entries()).sort(([ka], [kb]) => {
-    if (ka === lastSpeaker) return -1;
-    if (kb === lastSpeaker) return 1;
-    return 0;
-  });
-  return ordered.map(([, v]) => v);
+  // 6. If no agent identified yet, add other participants
+  if (agentMap.size === 0 && Array.isArray(session.participants) && session.participants.length > 0) {
+    for (const p of session.participants) {
+      addAgent(p);
+    }
+  }
+
+  // 7. If still empty (e.g. a brand new direct chat), default to the primary online agent
+  if (agentMap.size === 0) {
+    const online = allWorkspaceAgents.find((a) => a.status === 'online');
+    if (online) {
+      addAgent(online.agentName);
+    }
+  }
+
+  return Array.from(agentMap.values());
 }
 
 function AvatarStack({
@@ -392,7 +392,7 @@ const ThreadRow = memo(function ThreadRow({
     where the rows started looking alike again.
   */
   const sessionAgents = useMemo(
-    () => (lastMsg ? extractSessionAgents(session, agents, lastMsg, smartTitle).slice(0, 2) : []),
+    () => extractSessionAgents(session, agents, lastMsg, smartTitle).slice(0, 2),
     [session, agents, lastMsg, smartTitle]
   );
 

@@ -27,7 +27,27 @@ export const ThinkingMessage = memo(function ThinkingMessage({ sender, messages,
   const texts = messages.map((m) => m.content).filter((t) => t && !isPlaceholder(t));
   if (texts.length === 0) return null;
 
-  const combinedContent = texts.join('\n\n');
+  const combinedContent = (() => {
+    let result = '';
+    for (const text of texts) {
+      if (!text) continue;
+      if (!result) {
+        result = text;
+        continue;
+      }
+      if (result.endsWith('\n\n') || text.startsWith('\n\n')) {
+        result = result + text;
+      } else if (result.endsWith('\n') || text.startsWith('\n')) {
+        result = result + '\n' + text.trimStart();
+      } else if (/[。！？.!?\n]$/.test(result.trimEnd())) {
+        result = result.trimEnd() + '\n\n' + text.trimStart();
+      } else {
+        const needsSpace = /[a-zA-Z0-9]$/.test(result) && /^[a-zA-Z0-9]/.test(text);
+        result = result + (needsSpace ? ' ' : '') + text;
+      }
+    }
+    return result;
+  })();
   const isReplyPreview = messages.every((m) => m.metadata?.reply_preview === true);
   const startTime = messages[0]?.createdAt ? new Date(messages[0].createdAt).getTime() : undefined;
   // Both ends of the run, so the settled block can report how long the thought

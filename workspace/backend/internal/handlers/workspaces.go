@@ -156,6 +156,11 @@ func GetWorkspace(c *gin.Context) {
 	var members []models.WorkspaceMember
 	db.DB.Where("workspace_id = ?", ws.ID).Find(&members)
 
+	staleThreshold := time.Now().Add(-45 * time.Second)
+	db.DB.Model(&models.WorkspaceMember{}).
+		Where("workspace_id = ? AND status IN (?) AND (last_heartbeat IS NULL OR last_heartbeat < ?)", ws.ID, []string{"online", "busy", "idle"}, staleThreshold).
+		Update("status", "offline")
+
 	// 查询外部协作人列表。
 	var collaborators []models.WorkspaceCollaborator
 	db.DB.Where("workspace_id = ?", ws.ID).Find(&collaborators)
@@ -189,12 +194,19 @@ func decodeJSONMap(raw []byte) map[string]interface{} {
 
 func mapWorkspaceMembers(members []models.WorkspaceMember) []gin.H {
 	result := make([]gin.H, 0, len(members))
+	now := time.Now()
 	for _, member := range members {
+		status := member.Status
+		if status == "online" || status == "busy" || status == "idle" {
+			if member.LastHeartbeat == nil || now.Sub(*member.LastHeartbeat) > 45*time.Second {
+				status = "offline"
+			}
+		}
 		result = append(result, gin.H{
 			"agentName": member.AgentName, "role": member.Role,
 			"agentType": member.AgentType, "serverHost": member.ServerHost,
 			"workingDir": member.WorkingDir, "description": member.Description,
-			"enabledSkills": decodeJSONMap(member.EnabledSkills), "status": member.Status,
+			"enabledSkills": decodeJSONMap(member.EnabledSkills), "status": status,
 			"autostart":       member.Autostart,
 			"lastHeartbeatAt": member.LastHeartbeat, "joinedAt": member.JoinedAt,
 		})

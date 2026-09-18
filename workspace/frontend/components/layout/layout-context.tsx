@@ -37,6 +37,14 @@ interface LayoutState {
   isMobile: boolean;
   isSidebarOpen: boolean;
   sidebarToggle: () => void;
+  /**
+   * Set the sidebar to a KNOWN state. `sidebarToggle` was the only way to move
+   * it, which is fine for a button and wrong for anything reacting to a
+   * measurement: a resize handler that wants "closed" and can only say "the
+   * other one" is a race, and it is why ShellFit in wrapper.tsx could only
+   * ever fold the sidebar and never bring it back.
+   */
+  setSidebarOpen: (open: boolean) => void;
   /** Sidebar width in px — resizable between 200 and 600, as in Paseo. */
   sidebarWidth: number;
   setSidebarWidth: (width: number) => void;
@@ -311,6 +319,13 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     return !open;
   }), []);
 
+  const setSidebarOpen = useCallback((next: boolean) => setIsSidebarOpen((open) => {
+    // Persist only a real change, so a no-op call cannot churn localStorage.
+    if (open === next) return open;
+    writeLayout({ sidebarOpen: next });
+    return next;
+  }), []);
+
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -340,6 +355,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       isMobile,
       isSidebarOpen,
       sidebarToggle,
+      setSidebarOpen,
       sidebarWidth,
       setSidebarWidth,
       isSidebarResizing,
@@ -373,7 +389,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       setNewThreadOpen,
       openNewThread,
   }), [
-    isMobile, isSidebarOpen, sidebarToggle, sidebarWidth, setSidebarWidth,
+    isMobile, isSidebarOpen, sidebarToggle, setSidebarOpen, sidebarWidth, setSidebarWidth,
     isSidebarResizing, viewMode, setViewMode, canGoBack, canGoForward, goBack, goForward,
     settingsTab, openSettings,
     selectedAgentName, isAgentPanelOpen, mobilePane, openMobileDetail,

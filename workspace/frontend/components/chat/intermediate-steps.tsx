@@ -655,12 +655,34 @@ function isToolCallStep(msg: WorkspaceMessage): boolean {
 }
 
 /**
- * Fragments of one thought, rejoined as paragraphs. A blank line rather than a
- * single break because the fragments are markdown: run two of them together
- * with `\n` and a fragment ending mid-list swallows the next fragment's heading.
+ * Fragments of one thought, rejoined cleanly.
+ * Complete sentences / paragraphs receive blank lines, while mid-sentence streaming
+ * fragments are connected seamlessly without breaking into jagged lines.
  */
 function joinThoughts(messages: WorkspaceMessage[]): string {
-  return messages.map((m) => m.content).join('\n\n');
+  if (messages.length === 0) return '';
+  if (messages.length === 1) return messages[0].content;
+
+  let result = '';
+  for (let i = 0; i < messages.length; i++) {
+    const text = messages[i].content;
+    if (!text) continue;
+    if (!result) {
+      result = text;
+      continue;
+    }
+    if (result.endsWith('\n\n') || text.startsWith('\n\n')) {
+      result = result + text;
+    } else if (result.endsWith('\n') || text.startsWith('\n')) {
+      result = result + '\n' + text.trimStart();
+    } else if (/[。！？.!?\n]$/.test(result.trimEnd())) {
+      result = result.trimEnd() + '\n\n' + text.trimStart();
+    } else {
+      const needsSpace = /[a-zA-Z0-9]$/.test(result) && /^[a-zA-Z0-9]/.test(text);
+      result = result + (needsSpace ? ' ' : '') + text;
+    }
+  }
+  return result;
 }
 
 /**
