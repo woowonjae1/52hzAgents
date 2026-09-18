@@ -13,6 +13,8 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { basename } from '@/components/chat/project-folder-picker';
 import { getSmartSessionTitle } from './thread-list';
+import { FileList } from '@/components/files/file-list';
+import { RoutineList } from '@/components/routines/routine-list';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +53,7 @@ export function ThreadSidebar() {
     updateSession,
     moveSessionToFolder,
   } = useWorkspace();
-  const { setViewMode, isMobile, openMobileDetail } = useLayout();
+  const { viewMode, setViewMode, isMobile, openMobileDetail } = useLayout();
 
   const [showSearch, setShowSearch] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -100,9 +102,15 @@ export function ThreadSidebar() {
     (id: string) => {
       if (id.startsWith('dir:')) return;
       setCurrentSessionId(id);
+      /*
+        Picking a thread is also how you LEAVE inbox/tasks/files. Without
+        this the row highlighted but the main pane stayed on whatever view
+        you were in, with no way back to the conversation.
+      */
+      setViewMode('threads');
       if (isMobile) openMobileDetail();
     },
-    [setCurrentSessionId, isMobile, openMobileDetail]
+    [setCurrentSessionId, setViewMode, isMobile, openMobileDetail]
   );
 
   /*
@@ -163,7 +171,27 @@ export function ThreadSidebar() {
 
   const renderMenu = React.useCallback(
     (item: SidebarResource, controls: SidebarResourceMenuControls) => {
-      if (item.kind !== 'file') return null;
+      if (item.kind !== 'file') {
+        /*
+          The old group header carried a `+`. beUI's folder row has no
+          trailing slot, so the same action lives in its menu — without it a
+          project folder became a place you could not start a thread in.
+        */
+        const dir = item.id === DIRECT_CHATS ? undefined : item.id.slice('dir:'.length);
+        return (
+          <button
+            type="button"
+            className={ROW_CLASS}
+            onClick={() => {
+              void createSession({ workingDir: dir });
+              controls.close();
+            }}
+          >
+            <SquarePen className="size-3.5 shrink-0" />
+            New chat here
+          </button>
+        );
+      }
       const session = byId.get(item.id);
       return (
         <>
@@ -208,7 +236,7 @@ export function ThreadSidebar() {
         </>
       );
     },
-    [byId, updateSession]
+    [byId, updateSession, createSession]
   );
 
   return (
@@ -230,7 +258,11 @@ export function ThreadSidebar() {
           <Search className="size-3.5 shrink-0" />
           Search
         </button>
-        <button type="button" className={ROW_CLASS} onClick={() => setViewMode('routines')}>
+        <button
+          type="button"
+          className={cn(ROW_CLASS, viewMode === 'routines' && 'bg-muted')}
+          onClick={() => setViewMode(viewMode === 'routines' ? 'threads' : 'routines')}
+        >
           <History className="size-3.5 shrink-0" />
           Runs
         </button>
@@ -255,6 +287,11 @@ export function ThreadSidebar() {
       <div className="my-1 h-px bg-border" />
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {viewMode === 'files' ? (
+          <FileList />
+        ) : viewMode === 'routines' ? (
+          <RoutineList />
+        ) : (
         <AISidebar
           ariaLabel="Conversations"
           items={items}
@@ -266,6 +303,7 @@ export function ThreadSidebar() {
           renderIcon={renderIcon}
           renderMenu={renderMenu}
         />
+        )}
       </div>
     </div>
   );

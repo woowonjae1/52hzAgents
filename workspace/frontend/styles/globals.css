@@ -19,12 +19,12 @@
  */
 :root {
   /* Surfaces (layers) - Clean Porcelain */
-  --surface0: #fafafa;
-  --surface1: #f4f4f6;
-  --surface2: #ffffff;
-  --surface3: #e8e8ed;
-  --surface4: #dcdee4;
-  --surface-diff-empty: #f1f2f5;
+  --surface0: var(--background);
+  --surface1: var(--muted);
+  --surface2: var(--card);
+  --surface3: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface4: color-mix(in oklab, var(--muted) 84%, var(--foreground) 16%);
+  --surface-diff-empty: color-mix(in oklab, var(--muted) 96%, var(--foreground) 4%);
   /*
     CHROME IS A DIFFERENT MATERIAL FROM CONTENT, NOT A NEIGHBOURING STEP.
 
@@ -41,11 +41,11 @@
     ground stays neutral. The tonal difference is what sells it as another
     substance; lightness alone just reads as a dimmer copy of the same one.
   */
-  --surface-sidebar: #e9ebf0;
-  --surface-sidebar-hover: #dfe2e9;
+  --surface-sidebar: var(--background);
+  --surface-sidebar-hover: var(--muted);
   /* Pressed / selected-without-brand, one step beyond hover. */
-  --surface-sidebar-active: #d4d9e3;
-  --surface-workspace: #fafafa;
+  --surface-sidebar-active: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface-workspace: var(--background);
   /*
    * THE ONE GROUND FOR ANYTHING THAT FLOATS — dialog, sheet, dropdown, popover,
    * tooltip, toast.
@@ -61,19 +61,19 @@
    * means a step up from `--surface0`. That is not the same value in both, so it
    * is a token, not a constant.
    */
-  --surface-overlay: #ffffff;
+  --surface-overlay: var(--popover);
 
   /* Text */
   --foreground: #09090b;
-  --foreground-muted: #64748b;
-  --foreground-extra-muted: #94a3b8;
+  --foreground-muted: var(--muted-foreground);
+  --foreground-extra-muted: color-mix(in oklab, var(--muted-foreground) 72%, transparent);
 
   /* Controls */
-  --scrollbar-handle: #d4d4d8;
+  --scrollbar-handle: color-mix(in oklab, var(--foreground) 18%, transparent);
 
   /* Borders - Hairline calibrated for crisp desktop boundaries */
   --border: rgba(0, 0, 0, 0.095);
-  --border-accent: rgba(0, 0, 0, 0.16);
+  --border-accent: color-mix(in oklab, var(--foreground) 16%, transparent);
   /*
     THE ONE SEAM: chrome against content.
 
@@ -84,12 +84,12 @@
     drawing the same hairline as a table rule. This is the only boundary in the
     shell that is allowed to be seen without being looked for.
   */
-  --border-chrome: rgba(0, 0, 0, 0.14);
+  --border-chrome: color-mix(in oklab, var(--foreground) 12%, transparent);
 
   /* Brand — Modern Indigo/Monochrome */
-  --accent: #09090b;
-  --accent-bright: #000000;
-  --accent-foreground: #ffffff;
+  --accent: var(--primary);
+  --accent-bright: var(--primary);
+  --accent-foreground: var(--primary-foreground);
 
   /*
     ── Brand accent ──
@@ -112,27 +112,27 @@
     It is deliberately desaturated: a 60%-saturation blue at these sizes reads
     as a web framework's default button.
   */
-  --brand: #1c6ea4;
-  --brand-hover: #18608f;
-  --brand-foreground: #ffffff;
+  --brand: var(--primary);
+  --brand-hover: var(--primary);
+  --brand-foreground: var(--primary-foreground);
   /* Fill behind a selected row — tinted, not saturated. */
-  --brand-subtle: rgba(28, 110, 164, 0.10);
-  --brand-border: rgba(28, 110, 164, 0.28);
+  --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
+  --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
 
   /* Semantic */
-  --destructive: #ef4444;
+  --destructive: #e11d48;
   --destructive-foreground: #ffffff;
-  --success: #10b981;
+  --success: #059669;
   --success-foreground: #ffffff;
 
   /* Diff */
-  --diff-addition: #10b981;
-  --diff-deletion: #ef4444;
+  --diff-addition: #059669;
+  --diff-deletion: #e11d48;
 
   /* Status, full tier */
-  --status-success: #10b981;
-  --status-danger: #ef4444;
-  --status-warning: #f59e0b;
+  --status-success: #059669;
+  --status-danger: #e11d48;
+  --status-warning: #d97706;
   --status-merged: #8b5cf6;
 
   /* Status, muted tier */
@@ -260,12 +260,12 @@
  */
 .dark {
   /* Surfaces (layers) - Obsidian & Zinc depth */
-  --surface0: #09090b;
-  --surface1: #111115;
-  --surface2: #18181e;
-  --surface3: #22222c;
-  --surface4: #2e2e3a;
-  --surface-diff-empty: #131317;
+  --surface0: var(--background);
+  --surface1: var(--muted);
+  --surface2: var(--card);
+  --surface3: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface4: color-mix(in oklab, var(--muted) 84%, var(--foreground) 16%);
+  --surface-diff-empty: color-mix(in oklab, var(--muted) 96%, var(--foreground) 4%);
   /*
     Same decision as `:root`, taken in the direction this ground allows.
 
@@ -281,36 +281,36 @@
     row can no longer be told apart by `bg-surface2` alone — see the brand
     tint, which is what marks selection now.
   */
-  --surface-sidebar: #15151a;
-  --surface-sidebar-hover: #1e1e26;
-  --surface-sidebar-active: #282833;
-  --surface-workspace: #09090b;
+  --surface-sidebar: var(--background);
+  --surface-sidebar-hover: var(--muted);
+  --surface-sidebar-active: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface-workspace: var(--background);
   /* The value the five hardcoded overlay hexes were all groping for. */
-  --surface-overlay: #16161c;
+  --surface-overlay: var(--popover);
 
   /* Text */
   --foreground: #f4f4f6;
-  --foreground-muted: #a1a1aa;
-  --foreground-extra-muted: #71717a;
+  --foreground-muted: var(--muted-foreground);
+  --foreground-extra-muted: color-mix(in oklab, var(--muted-foreground) 72%, transparent);
 
   /* Controls */
-  --scrollbar-handle: #3f3f46;
+  --scrollbar-handle: color-mix(in oklab, var(--foreground) 18%, transparent);
 
   /* Borders - Fine translucent micro-borders with light spill */
   --border: rgba(255, 255, 255, 0.09);
-  --border-accent: rgba(255, 255, 255, 0.16);
+  --border-accent: color-mix(in oklab, var(--foreground) 16%, transparent);
   /*
     The chrome seam, dark. A LIT line, not a dark one: chrome is the raised
     material here, so the boundary is the lit edge of the thing standing up,
     which is the same reason the dark elevation ramp leads with an inset
     highlight. A black rule between two near-blacks is invisible.
   */
-  --border-chrome: rgba(255, 255, 255, 0.10);
+  --border-chrome: color-mix(in oklab, var(--foreground) 12%, transparent);
 
   /* Brand — Luminous Monochrome + Subtle Violet Accent */
-  --accent: #f4f4f6;
-  --accent-bright: #ffffff;
-  --accent-foreground: #09090b;
+  --accent: var(--primary);
+  --accent-bright: var(--primary);
+  --accent-foreground: var(--primary-foreground);
 
   /*
     Brand accent, dark. `#1C6EA4` holds on white and goes muddy on obsidian —
@@ -319,25 +319,25 @@
     subtle fill needs roughly half again the alpha for equivalent presence
     against a dark ground.
   */
-  --brand: #4a9cd4;
-  --brand-hover: #63aede;
-  --brand-foreground: #09090b;
-  --brand-subtle: rgba(74, 156, 212, 0.16);
-  --brand-border: rgba(74, 156, 212, 0.34);
+  --brand: var(--primary);
+  --brand-hover: var(--primary);
+  --brand-foreground: var(--primary-foreground);
+  --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
+  --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
 
   /* Semantic */
-  --destructive: #f87171;
+  --destructive: #fb7185;
   --destructive-foreground: #ffffff;
   --success: #34d399;
   --success-foreground: #ffffff;
 
   /* Diff */
   --diff-addition: #34d399;
-  --diff-deletion: #f87171;
+  --diff-deletion: #fb7185;
 
   /* Status, full tier */
   --status-success: #34d399;
-  --status-danger: #f87171;
+  --status-danger: #fb7185;
   --status-warning: #fbbf24;
   --status-merged: #a78bfa;
 
@@ -967,13 +967,13 @@ html {
    same place the opaque chrome sits.
 */
 :root[data-desktop][data-platform='darwin'].dark {
-  --surface-sidebar: rgba(21, 21, 26, 0.76);
-  --surface-sidebar-hover: rgba(30, 30, 38, 0.84);
+  --surface-sidebar: var(--background);
+  --surface-sidebar-hover: var(--muted);
 }
 
 :root[data-desktop][data-platform='darwin']:not(.dark) {
-  --surface-sidebar: rgba(231, 234, 240, 0.80);
-  --surface-sidebar-hover: rgba(219, 223, 231, 0.88);
+  --surface-sidebar: var(--background);
+  --surface-sidebar-hover: var(--muted);
 }
 
 /*
@@ -1195,21 +1195,21 @@ html {
  * because this follows an OS event the user already saw happen.
  */
 :root[data-desktop][data-window-inactive]:not(.dark) {
-  --surface-sidebar: #eef0f3;
-  --surface-sidebar-hover: #e6e9ee;
-  --border-chrome: rgba(0, 0, 0, 0.09);
-  --brand: #7d93a3;
-  --brand-subtle: rgba(125, 147, 163, 0.10);
-  --brand-border: rgba(125, 147, 163, 0.26);
+  --surface-sidebar: var(--background);
+  --surface-sidebar-hover: var(--muted);
+  --border-chrome: color-mix(in oklab, var(--foreground) 12%, transparent);
+  --brand: var(--primary);
+  --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
+  --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
 }
 
 :root[data-desktop][data-window-inactive].dark {
-  --surface-sidebar: #131317;
-  --surface-sidebar-hover: #1a1a20;
-  --border-chrome: rgba(255, 255, 255, 0.07);
-  --brand: #6b7f8e;
-  --brand-subtle: rgba(107, 127, 142, 0.14);
-  --brand-border: rgba(107, 127, 142, 0.28);
+  --surface-sidebar: var(--background);
+  --surface-sidebar-hover: var(--muted);
+  --border-chrome: color-mix(in oklab, var(--foreground) 12%, transparent);
+  --brand: var(--primary);
+  --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
+  --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
 }
 
 :root[data-desktop] aside,
@@ -1264,9 +1264,9 @@ html {
  * in precisely the way this fixes the sidebar.
  */
 [data-app-sidebar] {
-  --surface2: var(--surface-sidebar-hover);
-  --surface3: var(--surface-sidebar-active);
-  --surface1: var(--surface-sidebar);
+  --surface2: var(--card);
+  --surface3: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface1: var(--muted);
 }
 
 /**

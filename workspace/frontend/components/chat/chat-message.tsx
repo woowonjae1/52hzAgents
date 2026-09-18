@@ -660,10 +660,29 @@ export const ChatMessage = memo(function ChatMessage({
                     need one to be found.
                   */
                   'bg-foreground text-background',
+                  /*
+                    AN INVERTED BUBBLE HAS TO INVERT WHAT IS INSIDE IT TOO.
+
+                    `text-background` on the bubble only reaches children that
+                    inherit. The markdown renderer was built for a normal
+                    ground, so its inline chips, links and code spans carry
+                    `text-foreground` and `bg-surface2` of their own — on a
+                    `bg-foreground` plate those land as the bubble's own
+                    colour and the message reads as an empty pill, in BOTH
+                    themes, because the inversion flips with the theme.
+
+                    These scope the known offenders back onto the bubble's
+                    own pair instead of the page's.
+                  */
+                  '[&_.markdown-content]:text-background',
+                  '[&_a]:text-background [&_strong]:text-background [&_em]:text-background',
+                  '[&_code]:bg-background/15 [&_code]:text-background [&_code]:border-background/20',
+                  '[&_pre]:bg-background/15 [&_pre]:text-background',
+                  '[&_[class*=bg-surface]]:bg-background/15 [&_[class*=bg-surface]]:text-background [&_[class*=bg-surface]]:border-background/25',
                   'transition-all duration-150 break-words'
                 )}
               >
-                <div className="reading-prose font-normal select-text">
+                <div className="reading-prose font-normal select-text text-background">
                   <MarkdownContent
                     content={message.content}
                     agentNames={agentNames}
