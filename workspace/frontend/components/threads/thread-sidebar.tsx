@@ -174,7 +174,7 @@ export function ThreadSidebar() {
 
   const renderIcon = React.useCallback(
     (item: SidebarResource) => {
-      if (item.kind !== 'file') return <Folder className="size-4" />;
+      if (item.kind !== 'file') return undefined;
       const session = byId.get(item.id);
       if (!session) return <MessageSquare className="size-3.5 text-foreground-extra-muted shrink-0" />;
 

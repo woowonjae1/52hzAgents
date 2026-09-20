@@ -20,7 +20,8 @@ import { TodoList, type TodoItem } from '@/components/agents/todo-list';
 import { FileDiff, type DiffLine } from '@/components/ai-elements/file-diff';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { MessageActions } from '@/components/ai-elements/message-actions';
-import { SourcesCard, type SourceItem } from '@/components/ai-elements/sources-card';
+import { StreamingResponse, type StreamingResponseStatus } from '@/components/agents/streaming-response';
+import { Citations, Citation, type CitationItem } from '@/components/agents/citations';
 import { TurnChangesCapsule } from './turn-changes-capsule';
 import { workspaceApi } from '@/lib/api';
 import { downloadUrl } from '@/lib/download';
@@ -187,6 +188,8 @@ interface ChatMessageProps {
    * every other message reveals one on hover. See the note at the toolbar.
    */
   isLast?: boolean;
+  /** Whether the message is currently streaming live content */
+  isStreaming?: boolean;
   /** Current session working directory for resolving local path links */
   workingDir?: string;
   onRegenerate?: (message: WorkspaceMessage) => void;
@@ -214,6 +217,7 @@ export const ChatMessage = memo(function ChatMessage({
   hideHeader = false,
   isDecisionAnswered = false,
   isLast = false,
+  isStreaming = false,
   workingDir,
   onRegenerate,
   onQuoteReply,
@@ -335,11 +339,90 @@ export const ChatMessage = memo(function ChatMessage({
   const explicitThinking = (message.metadata?.thinking || message.metadata?.reasoning) as string | undefined;
   const activeThinking: string | null = inlineThinking || stepsThinking || (typeof explicitThinking === 'string' ? explicitThinking : null);
 
-  // Extract sources if any
-  const sources = useMemo<SourceItem[]>(() => {
-    const rawSources = (message.metadata?.sources || []) as SourceItem[];
-    return rawSources;
-  }, [message.metadata]);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+
+  const sourceIdPrefix = useMemo(
+    () => `citation-${(message.messageId || 'msg').replace(/[^a-zA-Z0-9_-]/g, '')}`,
+    [message.messageId]
+  );
+
+  // Extract sources/citations into CitationItem[]
+  const citationSources = useMemo<CitationItem[]>(() => {
+    const list: CitationItem[] = [];
+    const seenUrls = new Set<string>();
+    const seenTitles = new Set<string>();
+
+    const addSource = (title: string, url?: string, domain?: string, id?: string) => {
+      const cleanTitle = title.trim();
+      const cleanUrl = url?.trim();
+      if (!cleanTitle && !cleanUrl) return;
+
+      if (cleanUrl && seenUrls.has(cleanUrl)) return;
+      if (!cleanUrl && seenTitles.has(cleanTitle)) return;
+      if (cleanUrl) seenUrls.add(cleanUrl);
+      if (cleanTitle) seenTitles.add(cleanTitle);
+
+      let resolvedDomain = domain;
+      if (!resolvedDomain && cleanUrl) {
+        try {
+          resolvedDomain = new URL(cleanUrl).hostname.replace(/^www\./, '');
+        } catch {
+          resolvedDomain = undefined;
+        }
+      }
+
+      list.push({
+        id: id || String(list.length + 1),
+        title: cleanTitle || resolvedDomain || 'Source document',
+        domain: resolvedDomain,
+        url: cleanUrl,
+      });
+    };
+
+    // 1. From message metadata sources/citations
+    const rawSources = (message.metadata?.sources || message.metadata?.citations || []) as any[];
+    if (Array.isArray(rawSources)) {
+      for (const [idx, s] of rawSources.entries()) {
+        const title = s.title || s.name || s.slug || '';
+        const url = s.url;
+        const domain = s.domain || (s.slug ? `@knowledge:${s.slug}` : undefined);
+        addSource(title, url, domain, s.id ? String(s.id) : String(idx + 1));
+      }
+    }
+
+    // 2. From tool steps (e.g. workspace_search_knowledge, web_search, fetch)
+    for (const step of steps || []) {
+      const text = step.content || '';
+      // Knowledge results format: ### [1] Title > Section (@knowledge:slug)
+      const knowledgeMatches = text.matchAll(/###\s*\[(\d+)\]\s*([^>\n]+)(?:>\s*([^\n(]+))?(?:\(@knowledge:([a-zA-Z0-9_-]+)\))?/g);
+      for (const m of knowledgeMatches) {
+        const id = m[1];
+        const title = (m[2] || '').trim() + (m[3] ? ` > ${m[3].trim()}` : '');
+        const slug = m[4] ? m[4].trim() : undefined;
+        addSource(title, undefined, slug ? `@knowledge:${slug}` : 'Knowledge', id);
+      }
+
+      // Web search results or URLs in steps
+      const meta = step.metadata || {};
+      const toolName = String(meta.tool_name || meta.tool || meta.tool_call || '').toLowerCase();
+      if (toolName.includes('search') || toolName.includes('web') || toolName.includes('fetch')) {
+        const urlMatches = text.matchAll(/https?:\/\/[^\s)\]"'>]+/g);
+        for (const u of urlMatches) {
+          addSource('', u[0]);
+        }
+      }
+    }
+
+    // 3. From markdown footnote references [1]: https://...
+    if (cleanContent) {
+      const refMatches = cleanContent.matchAll(/^\[(\d+)\]:\s*(https?:\/\/[^\s]+)(?:\s+"([^"]+)")?/gm);
+      for (const m of refMatches) {
+        addSource(m[3] || '', m[2], undefined, m[1]);
+      }
+    }
+
+    return list;
+  }, [message.metadata, steps, cleanContent]);
 
   // Extract execution plan / todo list if any
   const planItems = useMemo<TodoItem[] | null>(() => {
@@ -496,6 +579,12 @@ export const ChatMessage = memo(function ChatMessage({
       lower.startsWith('error: rate limit')
     );
   }, [cleanContent, message.messageType, message.metadata]);
+
+  const streamingStatus: StreamingResponseStatus = isErrorMessage
+    ? 'error'
+    : isStreaming
+      ? 'streaming'
+      : 'complete';
 
   if (isSystem) {
     const isQueued = message.content.includes('queued');
@@ -964,23 +1053,32 @@ export const ChatMessage = memo(function ChatMessage({
               </div>
             </div>
           ) : cleanContent ? (
-            /*
-              beUI's `soft` bubble, and only around the ANSWER.
-
-              In the reference shell the prose sits on `bg-muted` while tool
-              results, diffs, plans and approval cards are siblings OUTSIDE
-              the bubble — they are already cards and would read as a card
-              inside a card. So the bubble stops here rather than wrapping
-              the whole content column.
-
-              `w-fit max-w-[82%]` are the bubble's own numbers: a one-word
-              reply should not draw a full-width plate.
-            */
-            <div className="w-fit max-w-[82%] rounded-2xl bg-muted px-3.5 py-2.5 text-sm leading-6 text-foreground">
+            <StreamingResponse
+              status={streamingStatus}
+              copyText={cleanContent}
+              onRetry={handleRegenerate}
+              sources={citationSources}
+              sourceIdPrefix={sourceIdPrefix}
+              sourcesOpen={sourcesOpen}
+              onSourcesOpenChange={setSourcesOpen}
+              showActions={true}
+              announce={false}
+              className="py-0.5"
+            >
               <div className="reading-prose font-normal select-text selectable">
-                <MarkdownContent content={cleanContent} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
+                <MarkdownContent
+                  content={cleanContent}
+                  agentNames={agentNames}
+                  sessionId={message.sessionId}
+                  workingDir={workingDir}
+                  citationSources={citationSources}
+                  sourceIdPrefix={sourceIdPrefix}
+                  onSelectCitation={() => setSourcesOpen(true)}
+                />
               </div>
-            </div>
+            </StreamingResponse>
+          ) : citationSources.length > 0 ? (
+            <Citations citations={citationSources} defaultOpen={false} idPrefix={sourceIdPrefix} />
           ) : null}
 
           {/* Interactive File Diff */}
@@ -1051,10 +1149,6 @@ export const ChatMessage = memo(function ChatMessage({
           {/* Attachments */}
           <Attachments items={attachments} />
 
-          {/* Knowledge & Sources Citations */}
-          {sources.length > 0 && (
-            <SourcesCard sources={sources} />
-          )}
 
           {/* Action Tool Confirmation */}
           {approvalRequest && (
@@ -1120,27 +1214,29 @@ export const ChatMessage = memo(function ChatMessage({
             opacity does — an invisible toolbar that still swallows clicks over
             the gap between turns is worse than a visible one.
           */}
-          <div
-            className={cn(
-              'transition-opacity duration-150',
-              isLast
-                ? 'pt-0.5'
-                // `start-10` puts the floating copy on the text column rather
-                // than the avatar gutter: 28px avatar + the row's 12px gap.
-                // It tracks the wrapper's horizontal padding, so it went to 13
-                // while the hover plate added `px-3` and back to 10 now that
-                // the plate is gone.
-                : 'absolute start-10 end-0 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-            )}
-          >
-            <MessageActions
-              content={cleanContent || message.content}
-              senderType="agent"
-              variant="toolbar"
-              onOpenCanvas={inferredArtifact ? () => openArtifact(inferredArtifact) : undefined}
-              onRegenerate={handleRegenerate}
-            />
-          </div>
+          {!cleanContent && (
+            <div
+              className={cn(
+                'transition-opacity duration-150',
+                isLast
+                  ? 'pt-0.5'
+                  // `start-10` puts the floating copy on the text column rather
+                  // than the avatar gutter: 28px avatar + the row's 12px gap.
+                  // It tracks the wrapper's horizontal padding, so it went to 13
+                  // while the hover plate added `px-3` and back to 10 now that
+                  // the plate is gone.
+                  : 'absolute start-10 end-0 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+              )}
+            >
+              <MessageActions
+                content={message.content}
+                senderType="agent"
+                variant="toolbar"
+                onOpenCanvas={inferredArtifact ? () => openArtifact(inferredArtifact) : undefined}
+                onRegenerate={handleRegenerate}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>

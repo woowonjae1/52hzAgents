@@ -173,6 +173,12 @@ export function StreamingResponse({
         )}
       >
         {children}
+        {streaming ? (
+          <span
+            aria-hidden="true"
+            className="inline-block size-1.5 ml-1 -translate-y-0.5 rounded-full bg-primary animate-pulse align-middle"
+          />
+        ) : null}
       </div>
 
       <AnimatePresence initial={false}>

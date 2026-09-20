@@ -1072,6 +1072,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         hideHeader={group.continuesFrom}
                         isDecisionAnswered={isDecisionAnswered}
                         isLast={index === groups.length - 1}
+                        isStreaming={index === groups.length - 1 && isChannelActive && !hasTerminalStatus}
                         workingDir={workingDir}
                         onRegenerate={onRegenerate}
                         onQuoteReply={onQuoteReply}

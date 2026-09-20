@@ -25,6 +25,7 @@ import { BookOpen, Check, Copy, ChevronDown, ChevronUp, FileCode } from 'lucide-
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
 import { workspaceApi } from '@/lib/api';
 import { downloadUrl } from '@/lib/download';
+import { Citation, type CitationItem } from '@/components/agents/citations';
 import { getBridge, copyTextToClipboard } from '@/lib/desktop';
 
 // Stable plugin arrays — avoids re-creating on every render
@@ -49,16 +50,30 @@ interface MarkdownContentProps {
   agentNames?: string[];
   sessionId?: string;
   workingDir?: string;
+  citationSources?: CitationItem[];
+  sourceIdPrefix?: string;
+  onSelectCitation?: (citationId: string) => void;
 }
 
-/** Walk React children and colorize @agentname and @knowledge:slug tokens in text nodes. */
-function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNode {
+/** Walk React children and colorize @agentname, @knowledge:slug, and [1] citation tokens in text nodes. */
+function renderMentions(
+  children: ReactNode,
+  agentNames: string[] = [],
+  citationSources?: CitationItem[],
+  sourceIdPrefix?: string,
+  onSelectCitation?: (citationId: string) => void,
+): ReactNode {
   if (!children) return children;
 
   const escaped = agentNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const agentTokens = escaped.length > 0 ? `[@/](?:${escaped.join('|')})(?![\\w-])` : '';
   const knowledgeTokens = `@knowledge:[a-zA-Z0-9_-]+`;
-  const pattern = agentTokens ? `(${knowledgeTokens}|${agentTokens})` : `(${knowledgeTokens})`;
+  const citationTokens = citationSources && citationSources.length > 0 ? `\\[\\^?\\d+\\]` : '';
+
+  const tokens = [citationTokens, knowledgeTokens, agentTokens].filter(Boolean);
+  if (tokens.length === 0) return children;
+
+  const pattern = `(${tokens.join('|')})`;
   const mentionRegex = new RegExp(pattern, 'gi');
 
   let keyCounter = 0;
@@ -69,6 +84,32 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
       if (parts.length === 1) return node;
       return parts.map((part) => {
         keyCounter++;
+
+        // Inline citation badge: [1], [2], [^1]
+        const citeMatch = part.match(/^\[\^?(\d+)\]$/);
+        if (citeMatch && citationSources && citationSources.length > 0) {
+          const indexNum = parseInt(citeMatch[1], 10);
+          const matchedItem = citationSources.find((c) => c.id === String(indexNum)) || citationSources[indexNum - 1];
+          if (matchedItem) {
+            return (
+              <span
+                key={`citation-${keyCounter}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectCitation?.(matchedItem.id);
+                }}
+                className="inline-block align-baseline"
+              >
+                <Citation
+                  citationId={matchedItem.id}
+                  index={indexNum}
+                  idPrefix={sourceIdPrefix || 'response-source'}
+                />
+              </span>
+            );
+          }
+        }
+
         if (part.toLowerCase().startsWith('@knowledge:')) {
           const slug = part.replace(/^@knowledge:/i, '');
           return (
@@ -88,17 +129,6 @@ function renderMentions(children: ReactNode, agentNames: string[] = []): ReactNo
           return (
             <span
               key={`mention-${keyCounter}`}
-              /*
-                `align-middle`, NOT `align-baseline`.
-
-                An `inline-flex` box takes its baseline from its FIRST flex
-                item, and the first item here is the colour dot — a span with
-                no text in it. With nothing to read a baseline from, the
-                browser falls back to the box's bottom margin edge, which
-                lifted the whole pill above the line it was sitting in.
-                `align-middle` centres the chip on the text instead and does
-                not depend on the children at all.
-              */
               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs leading-[1.35] align-middle"
               style={{ color }}
             >
@@ -225,7 +255,15 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
   );
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ content, agentNames = [], sessionId, workingDir }: MarkdownContentProps) {
+export const MarkdownContent = memo(function MarkdownContent({
+  content,
+  agentNames = [],
+  sessionId,
+  workingDir,
+  citationSources = [],
+  sourceIdPrefix,
+  onSelectCitation,
+}: MarkdownContentProps) {
   const hasStreamingMermaidFence = hasOpenMermaidFence(content);
 
   const components: Components = useMemo(() => ({
@@ -244,7 +282,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     ),
     p: ({ children }) => (
       <p className="text-foreground mb-2.5 last:mb-0 font-normal">
-        {renderMentions(children, agentNames)}
+        {renderMentions(children, agentNames, citationSources, sourceIdPrefix, onSelectCitation)}
       </p>
     ),
     ul: ({ children }) => (
@@ -253,7 +291,11 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     ol: ({ children }) => (
       <ol className="list-decimal pl-5 my-2 space-y-1 text-foreground font-normal marker:text-foreground-muted">{children}</ol>
     ),
-    li: ({ children }) => <li className="pl-0.5">{renderMentions(children, agentNames)}</li>,
+    li: ({ children }) => (
+      <li className="pl-0.5">
+        {renderMentions(children, agentNames, citationSources, sourceIdPrefix, onSelectCitation)}
+      </li>
+    ),
     blockquote: ({ children }) => (
       <blockquote className="border-l-2 border-border/80 pl-3.5 my-2.5 text-foreground/85 italic bg-transparent py-0.5">
         {children}
@@ -484,6 +526,35 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
         );
       }
 
+      // Check if this link is a numeric citation like [1] or 1
+      const textChild = String(children).trim();
+      const numMatch = textChild.match(/^\[?\^?(\d+)\]?$/);
+      if (numMatch) {
+        const num = numMatch[1];
+        const matchedItem = citationSources?.find((c) => c.id === num) || citationSources?.[parseInt(num, 10) - 1];
+        return (
+          <a
+            href={href || (matchedItem ? `#${sourceIdPrefix || 'response-source'}-${matchedItem.id}` : undefined)}
+            onClick={(e) => {
+              if (matchedItem) {
+                onSelectCitation?.(matchedItem.id);
+              }
+              const bridge = getBridge();
+              if (href && isHttp && bridge?.openPath) {
+                e.preventDefault();
+                bridge.openPath(href);
+              }
+            }}
+            target={href && isHttp ? "_blank" : undefined}
+            rel={href && isHttp ? "noopener noreferrer" : undefined}
+            aria-label={`View citation ${num}`}
+            className="mx-0.5 inline-flex min-w-4 -translate-y-0.5 items-center justify-center rounded-md bg-muted/60 px-1 py-0.5 text-[10px] font-semibold leading-none text-muted-foreground no-underline outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {num}
+          </a>
+        );
+      }
+
       // A real external URL. `target`/`rel` belong only here.
       return (
         <a
@@ -508,7 +579,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
     strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
     del: ({ children }) => <del className="text-muted-foreground">{children}</del>,
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [agentNames, hasStreamingMermaidFence, sessionId, workingDir]);
+  }), [agentNames, citationSources, sourceIdPrefix, onSelectCitation, hasStreamingMermaidFence, sessionId, workingDir]);
 
   return (
     <MarkdownErrorBoundary fallbackContent={content}>
@@ -534,10 +605,14 @@ export const MarkdownContent = memo(function MarkdownContent({ content, agentNam
 function arePropsEqual(prev: MarkdownContentProps, next: MarkdownContentProps): boolean {
   const prevNames = prev.agentNames || [];
   const nextNames = next.agentNames || [];
+  const prevSources = prev.citationSources || [];
+  const nextSources = next.citationSources || [];
   return (
     prev.content === next.content &&
     prev.sessionId === next.sessionId &&
     prev.workingDir === next.workingDir &&
+    prev.sourceIdPrefix === next.sourceIdPrefix &&
+    prevSources.length === nextSources.length &&
     prevNames.length === nextNames.length &&
     prevNames.every((name, i) => name === nextNames[i])
   );

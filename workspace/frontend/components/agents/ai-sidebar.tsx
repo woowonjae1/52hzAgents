@@ -30,7 +30,7 @@ import {
   MorphPopoverContent,
   MorphPopoverTrigger,
 } from "@/components/motion/popover-morph";
-import { EASE_OUT, SPRING_LAYOUT } from "@/lib/ease";
+import { EASE_OUT, SPRING_LAYOUT, SPRING_SWAP } from "@/lib/ease";
 import { useTouchCapable } from "@/lib/hooks/use-touch-capable";
 import { cn } from "@/lib/utils";
 
@@ -87,7 +87,7 @@ export interface AISidebarProps {
   defaultActiveId?: string | null;
   onActiveChange?: (id: string) => void;
   defaultExpandedIds?: string[];
-  renderIcon?: (item: SidebarResource) => ReactNode;
+  renderIcon?: (item: SidebarResource, expanded?: boolean) => ReactNode;
   renderMenu?: (
     item: SidebarResource,
     controls: SidebarResourceMenuControls,
@@ -255,16 +255,48 @@ function renameResource(
   }));
 }
 
-function defaultIcon(item: SidebarResource, expanded: boolean) {
-  const Icon =
-    item.kind === "folder" || item.kind === "project"
-      ? expanded
-        ? FolderOpen
-        : Folder
-      : item.kind === "bookmark"
-          ? Bookmark
-          : FileText;
-  return <Icon className="size-4" />;
+function DefaultResourceIcon({
+  item,
+  expanded,
+  reduce = false,
+}: {
+  item: SidebarResource;
+  expanded: boolean;
+  reduce?: boolean;
+}) {
+  if (item.kind === "folder" || item.kind === "project") {
+    if (reduce) {
+      const Icon = expanded ? FolderOpen : Folder;
+      return <Icon className="size-4" />;
+    }
+    return (
+      <div className="relative size-4 grid place-items-center">
+        <AnimatePresence initial={false} mode="wait">
+          <motion.span
+            key={expanded ? "open" : "closed"}
+            initial={{ opacity: 0, scale: 0.75, rotate: expanded ? -12 : 12 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.75, rotate: expanded ? 12 : -12 }}
+            transition={SPRING_SWAP}
+            className="grid place-items-center"
+          >
+            {expanded ? (
+              <FolderOpen className="size-4 text-primary/85 transition-colors" />
+            ) : (
+              <Folder className="size-4 text-muted-foreground transition-colors" />
+            )}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  const Icon = item.kind === "bookmark" ? Bookmark : FileText;
+  return <Icon className="size-4 text-muted-foreground/80" />;
+}
+
+function defaultIcon(item: SidebarResource, expanded: boolean, reduce?: boolean) {
+  return <DefaultResourceIcon item={item} expanded={expanded} reduce={reduce} />;
 }
 
 function MarqueeLabel({ active, children }: { active: boolean; children: string }) {
@@ -355,7 +387,7 @@ interface ResourceRowProps {
   onRenameStart: () => void;
   onSelect: () => void;
   onToggle: () => void;
-  renderIcon?: (item: SidebarResource) => ReactNode;
+  renderIcon?: AISidebarProps["renderIcon"];
   renderMenu?: AISidebarProps["renderMenu"];
   renderMeta?: AISidebarProps["renderMeta"];
   setRef: (node: HTMLDivElement | null) => void;
@@ -516,8 +548,8 @@ function ResourceRow({
       )}
       style={{ paddingLeft: `${12 + row.depth * 16}px` }}
     >
-      <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center">
-        {renderIcon?.(row.item) ?? defaultIcon(row.item, expanded)}
+      <span aria-hidden="true" className="relative grid size-5 shrink-0 place-items-center">
+        {renderIcon?.(row.item, expanded) ?? defaultIcon(row.item, expanded, reduce)}
       </span>
 
       {renaming ? (
