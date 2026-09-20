@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Hint } from '@/components/ui/hint';
 import { DiffBlock } from '@/components/chat/diff-block';
+import { Kbd } from '@/components/ui/kbd';
 import { workspaceApi } from '@/lib/api';
 import { toast } from '@/lib/toast';
 
@@ -84,16 +85,23 @@ export function MultiDiffInspector({
   const [copiedDiff, setCopiedDiff] = useState(false);
   const [showRollbackConfirm, setShowRollbackConfirm] = useState(false);
 
-  // Sync selected file when initialFilePath changes or dialog opens
+  // Sync selected file and fresh cache when dialog opens or initialFilePath changes
   useEffect(() => {
-    if (isOpen) {
-      if (initialFilePath && files.some((f) => f.path === initialFilePath)) {
-        setSelectedFile(initialFilePath);
-      } else if (files.length > 0 && !files.some((f) => f.path === selectedFile)) {
-        setSelectedFile(files[0].path);
-      }
+    if (!isOpen) return;
+    setDiffCache({});
+    if (initialFilePath && files.some((f) => f.path === initialFilePath)) {
+      setSelectedFile(initialFilePath);
+    } else if (files.length > 0) {
+      setSelectedFile((prev) => (files.some((f) => f.path === prev) ? prev : files[0].path));
     }
-  }, [isOpen, initialFilePath, files, selectedFile]);
+  }, [isOpen, initialFilePath]);
+
+  // Keep selectedFile valid if files list changes dynamically
+  useEffect(() => {
+    if (isOpen && files.length > 0) {
+      setSelectedFile((prev) => (files.some((f) => f.path === prev) ? prev : files[0].path));
+    }
+  }, [isOpen, files]);
 
   // Fetch diff for currently selected file
   const fetchDiffForFile = useCallback(
@@ -290,7 +298,7 @@ export function MultiDiffInspector({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Filter files (J/K to navigate)…"
+                    placeholder="筛选文件 (↑/↓ 切换)…"
                     className="w-full bg-surface2 border border-border rounded-lg pl-8 pr-2.5 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted outline-none focus:border-accent transition-colors"
                   />
                   {searchQuery && (
@@ -318,7 +326,7 @@ export function MultiDiffInspector({
                     key={file.path}
                     onClick={() => setSelectedFile(file.path)}
                     className={cn(
-                      'w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left ui-transition font-mono',
+                      'w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-left ui-transition font-mono cursor-pointer',
                       isSelected
                         ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs font-medium'
                         : 'hover:bg-surface2 text-foreground-muted hover:text-foreground'
@@ -359,9 +367,19 @@ export function MultiDiffInspector({
             </div>
 
             {/* Keyboard shortcut footer */}
-            <div className="px-3 py-2 border-t border-border bg-surface2/40 text-4xs text-foreground-extra-muted flex items-center justify-between">
-              <span>Use <kbd className="px-1 py-0.5 rounded bg-surface3 border border-border">J</kbd> / <kbd className="px-1 py-0.5 rounded bg-surface3 border border-border">K</kbd> to navigate files</span>
-              <span><kbd className="px-1 py-0.5 rounded bg-surface3 border border-border">Esc</kbd> to close</span>
+            <div className="px-3 py-2 border-t border-border bg-surface2/40 flex items-center justify-between text-2xs text-foreground-extra-muted select-none">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Kbd className="min-w-4.5 h-4 px-1 text-3xs">↑</Kbd>
+                  <Kbd className="min-w-4.5 h-4 px-1 text-3xs">↓</Kbd>
+                </div>
+                <span className="text-foreground-muted truncate">切换文件</span>
+                <span className="text-foreground-extra-muted/60 text-3xs shrink-0">或 J/K</span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Kbd className="h-4 px-1.5 text-3xs">Esc</Kbd>
+                <span className="text-foreground-muted">关闭</span>
+              </div>
             </div>
           </div>
 

@@ -253,7 +253,10 @@ export function GitChip({
       {/* Multi-file Diff Inspector */}
       <MultiDiffInspector
         isOpen={inspectorOpen}
-        onClose={() => setInspectorOpen(false)}
+        onClose={() => {
+          setInspectorOpen(false);
+          setSelectedDiffFile(null);
+        }}
         channelId={channelId}
         files={status.files}
         initialFilePath={selectedDiffFile || undefined}
