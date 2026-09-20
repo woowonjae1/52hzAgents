@@ -121,7 +121,11 @@ export function AgentTerminal() {
 
   const activeOperator = useMemo(() => {
     if (!activeSession) return 'system';
-    return activeSession.master || activeSession.participants?.[0] || 'system';
+    if (activeSession.master) return activeSession.master;
+    if (activeSession.participants && activeSession.participants.length === 1) {
+      return activeSession.participants[0];
+    }
+    return 'system';
   }, [activeSession]);
 
   // Sync polled backend messages into terminal lines.

@@ -1,18 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, History, Folder, Star, Archive, Trash2 } from 'lucide-react';
+import { SquarePen, Search, History, Folder, Star, Archive, Trash2, MessageSquare } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
   type SidebarResourceMenuControls,
   type SidebarResourceMove,
 } from '@/components/agents/ai-sidebar';
-import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { AgentAvatar, AgentAvatarStack } from '@/components/agents/agent-avatar';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { basename } from '@/components/chat/project-folder-picker';
-import { getSmartSessionTitle } from './thread-list';
+import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
 import { formatCompactRelativeTime } from '@/lib/helpers';
 import { FileList } from '@/components/files/file-list';
 import { RoutineList } from '@/components/routines/routine-list';
@@ -48,6 +48,7 @@ export function ThreadSidebar() {
     sessions,
     currentSessionId,
     setCurrentSessionId,
+    agents,
     lastMessageBySession,
     userSentMessageTimestamps,
     createSession,
@@ -175,15 +176,44 @@ export function ThreadSidebar() {
     (item: SidebarResource) => {
       if (item.kind !== 'file') return <Folder className="size-4" />;
       const session = byId.get(item.id);
-      return (
-        <AgentAvatar
-          name={session?.master || session?.participants?.[0] || item.label}
-          size={16}
-          className="rounded-full"
-        />
-      );
+      if (!session) return <MessageSquare className="size-3.5 text-foreground-extra-muted shrink-0" />;
+
+      const lastMsg = lastMessageBySession[session.sessionId];
+      const sessionAgents = extractSessionAgents(session, agents, lastMsg, item.label);
+
+      if (sessionAgents.length > 0) {
+        if (sessionAgents.length === 1) {
+          return (
+            <AgentAvatar
+              name={sessionAgents[0].name}
+              agentType={sessionAgents[0].agentType}
+              status={sessionAgents[0].status}
+              size={16}
+              className="rounded-full shrink-0"
+            />
+          );
+        }
+        return (
+          <AgentAvatarStack
+            agents={sessionAgents}
+            max={2}
+            size={16}
+            className="shrink-0"
+          />
+        );
+      }
+
+      if (session.workingDir) {
+        return (
+          <span className="size-4 shrink-0 flex items-center justify-center text-foreground-extra-muted text-xs font-mono font-semibold">
+            #
+          </span>
+        );
+      }
+
+      return <MessageSquare className="size-3.5 text-foreground-extra-muted shrink-0" />;
     },
-    [byId]
+    [byId, lastMessageBySession, agents]
   );
 
   /*

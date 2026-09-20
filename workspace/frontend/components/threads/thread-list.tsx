@@ -46,7 +46,7 @@ import { FIND_EVENT } from '@/components/layout/global-shortcuts';
  * Extract participating agents from session metadata, mentions in title,
  * master agent, and recent messages.
  */
-function extractSessionAgents(
+export function extractSessionAgents(
   session: WorkspaceSession,
   allWorkspaceAgents: WorkspaceAgent[],
   lastMsg?: LastMessageInfo | null,
@@ -84,11 +84,17 @@ function extractSessionAgents(
     for (const m of str.match(/@([a-zA-Z0-9_.-]+)/g) ?? []) addAgent(m.slice(1));
   }
 
-  // 2. Direct match of title to an agent name (e.g. "pi", "antigravity")
+  // 2. Direct match of title to an agent name (e.g. "pi", "antigravity", "pi: ...")
   for (const str of [session.title, smartTitle].filter(Boolean) as string[]) {
     const clean = str.trim().toLowerCase();
     for (const a of allWorkspaceAgents) {
-      if (clean === a.agentName.toLowerCase() || clean.startsWith(`${a.agentName.toLowerCase()} `)) {
+      const aLower = a.agentName.toLowerCase();
+      if (
+        clean === aLower ||
+        clean.startsWith(`${aLower} `) ||
+        clean.startsWith(`${aLower}:`) ||
+        clean.startsWith(`${aLower}：`)
+      ) {
         addAgent(a.agentName);
       }
     }
@@ -104,36 +110,23 @@ function extractSessionAgents(
     addAgent(session.master);
   }
 
-  /*
-    THERE IS NO STEP 5. `participants` IS NOT EVIDENCE OF ANYTHING.
+  // 5. Specific assigned participants (only if not the entire default workspace roster)
+  if (agentMap.size === 0 && session.participants && session.participants.length > 0 && allWorkspaceAgents.length > 1) {
+    if (session.participants.length < allWorkspaceAgents.length) {
+      for (const p of session.participants) {
+        addAgent(p);
+      }
+    }
+  }
 
-    The backend puts every agent in the workspace into `participants` on a
-    plain new channel: 14 of 15 threads here came back with the identical
-    eight names, sorted, so `amp` -- offline for a week, never launched --
-    led every one of them and became the face on nearly every sidebar row.
+  // 6. If no agent identified yet and exactly one agent is online in the workspace
+  if (agentMap.size === 0 && allWorkspaceAgents.length > 0) {
+    const onlineAgents = allWorkspaceAgents.filter((a) => a.status === 'online');
+    if (onlineAgents.length === 1) {
+      addAgent(onlineAgents[0].agentName);
+    }
+  }
 
-    Two attempts to rescue the field failed, both for the same reason. "Is
-    this list the whole roster" needed the roster to have more than one entry
-    to mean anything, and this workspace runs one agent online. "Is this a
-    strict subset of the roster" then survived the roster-size problem but
-    still answered a question nobody asked: a subset is who was ASSIGNED,
-    and the row is supposed to say who WORKED.
-
-    The three rules above are the whole answer, and each is something that
-    actually happened: you named an agent, an agent spoke, or you made one
-    master. An assignment nobody has acted on yet is not activity, so it gets
-    the neutral message icon the caller already renders for an empty thread.
-  */
-
-  /*
-    Nothing else. There is no "fall back to every participant" and no "fall
-    back to whichever agent happens to be online" — those were the two steps
-    that invented an answer when there wasn't one, and between them they put a
-    never-used agent's logo on a thread it had never seen.
-
-    An empty result is correct for a thread nobody has spoken in. The caller
-    renders a neutral message icon for it, which is what an empty thread is.
-  */
   return Array.from(agentMap.values());
 }
 
