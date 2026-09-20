@@ -293,7 +293,11 @@ class PiAdapter extends BaseAdapter {
     return args;
   }
 
-  async _runPi(prompt, channelName) {
+  _spawnProc(spawnBin, spawnArgs, opts) {
+    return spawn(spawnBin, spawnArgs, opts);
+  }
+
+  async _runPi(prompt, channelName, userMessage = '') {
     const sessionPath = this._sessionPathFor(channelName);
     const args = this._buildPiCmd(prompt, channelName);
     this._log(`Running pi (channel=${channelName}, session=${sessionPath})`);
@@ -301,7 +305,7 @@ class PiAdapter extends BaseAdapter {
     const env = { ...getEnhancedEnv(), ...(this.agentEnv || process.env) };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.ELECTRON_NO_ASAR;
-    const cwd = await this._resolveWorkingDir(channelName);
+    const cwd = await this._resolveWorkingDir(channelName, userMessage);
 
     let spawnBin = this._piBin;
     let spawnArgs = args;
@@ -311,7 +315,7 @@ class PiAdapter extends BaseAdapter {
     }
 
     const isDirectJs = Boolean(this._piJsPath);
-    const proc = spawn(spawnBin, spawnArgs, {
+    const proc = this._spawnProc(spawnBin, spawnArgs, {
       env,
       cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -329,6 +333,7 @@ class PiAdapter extends BaseAdapter {
     let currentThinking = '';
     let stderrBuf = '';
     let lineBuffer = '';
+    let lastErrorMessage = '';
     let _pendingLines = Promise.resolve();
 
     const flushThinking = async () => {
@@ -367,27 +372,27 @@ class PiAdapter extends BaseAdapter {
         if (ame.type === 'thinking_delta' && ame.delta) {
           currentThinking += ame.delta;
         } else if (ame.type === 'thinking_end') {
-          if (ame.content) currentThinking = ame.content;
-          await flushThinking();
-        } else if (ame.type === 'text_start' || ame.type === 'toolcall_start') {
-          // If thinking completed and transitions to text or tool, flush buffered thought
+          // Complete thought content arrives on thinking_end. Flush once here.
+          currentThinking = ame.content || currentThinking;
           await flushThinking();
         }
       }
 
-      // 2. Assistant reply accumulation
+      // 2. Assistant reply accumulation & real-time preview streaming
       // Official Pi CLI emits message_update with assistantMessageEvent.type = 'text_delta' | 'text_end'
       if (eventType === 'assistant' || eventType === 'text_delta') {
         const text = event.text || event.content || event.delta || '';
         if (text) {
           await flushThinking();
           streamedText += text;
+          try { await this.sendThinking(channelName, text, { isReplyPreview: true }); } catch {}
         }
       } else if (eventType === 'message_update' && event.assistantMessageEvent) {
         const ame = event.assistantMessageEvent;
         if (ame.type === 'text_delta' && ame.delta) {
           await flushThinking();
           streamedText += ame.delta;
+          try { await this.sendThinking(channelName, ame.delta, { isReplyPreview: true }); } catch {}
         } else if (ame.type === 'text_end') {
           if (ame.content) streamedText = ame.content;
         }
@@ -409,21 +414,27 @@ class PiAdapter extends BaseAdapter {
         try { await this.sendStatus(channelName, label); } catch {}
       }
 
-      // 4. Final response extraction from message_end / turn_end
+      // 4. Final response extraction & error detection from message_end / turn_end
       if (eventType === 'message_end' || eventType === 'turn_end') {
         await flushThinking();
         const msg = event.message;
-        if (msg && msg.role === 'assistant' && Array.isArray(msg.content)) {
-          const textParts = msg.content
-            .filter((p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.trim())
-            .map((p) => p.text.trim());
-          if (textParts.length > 0) {
-            finalAnswer = textParts.join('\n\n');
+        if (msg) {
+          if (msg.stopReason === 'error' || msg.errorMessage) {
+            lastErrorMessage = msg.errorMessage || `Model request stopped with reason: ${msg.stopReason}`;
+            this._log(`Pi model error: ${lastErrorMessage}`);
+          }
+          if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+            const textParts = msg.content
+              .filter((p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.trim())
+              .map((p) => p.text.trim());
+            if (textParts.length > 0) {
+              finalAnswer = textParts.join('\n\n');
+            }
           }
         }
       }
 
-      // Result / completion / legacy message
+      // 5. Result / completion / legacy message
       if (eventType === 'result' || eventType === 'response' || (eventType === 'message' && typeof event.text === 'string')) {
         const text = event.text || event.content || event.result || '';
         if (typeof text === 'string' && text.trim()) {
@@ -431,10 +442,15 @@ class PiAdapter extends BaseAdapter {
         }
       }
 
-      // Error events
+      // 6. Error events & retry failures
       if (eventType === 'error') {
-        const errMsg = event.message || event.error || event.text || 'Unknown error';
-        this._log(`Pi error event: ${errMsg}`);
+        const errMsg = event.message || event.error || event.text || '';
+        if (errMsg) lastErrorMessage = typeof errMsg === 'object' ? JSON.stringify(errMsg) : String(errMsg);
+        this._log(`Pi error event: ${lastErrorMessage || 'Unknown error'}`);
+      } else if (eventType === 'auto_retry_end' && event.success === false) {
+        const errMsg = event.finalError || event.errorMessage || '';
+        if (errMsg) lastErrorMessage = typeof errMsg === 'object' ? JSON.stringify(errMsg) : String(errMsg);
+        this._log(`Pi retry failed: ${lastErrorMessage}`);
       }
     };
 
@@ -464,8 +480,12 @@ class PiAdapter extends BaseAdapter {
     const resolvedAnswer = (finalAnswer || streamedText || responseChunks.join('\n')).trim();
 
     if (exitCode !== 0) {
-      const detail = (stderrBuf || resolvedAnswer).trim().slice(0, 600);
+      const detail = (stderrBuf || lastErrorMessage || resolvedAnswer).trim().slice(0, 600);
       throw new Error(`pi exited with code ${exitCode}: ${detail}`);
+    }
+
+    if (!resolvedAnswer && lastErrorMessage) {
+      throw new Error(lastErrorMessage);
     }
 
     return resolvedAnswer;
@@ -664,16 +684,16 @@ class PiAdapter extends BaseAdapter {
     try {
       const context = await this._buildContextPrefix(msgChannel);
       const prompt = context ? `${context}\n\n---\n\nUser message:\n${content}` : content;
-      const responseText = await this._runPi(prompt, msgChannel);
+      const responseText = await this._runPi(prompt, msgChannel, content);
 
       if (responseText) {
         await this.sendResponse(msgChannel, responseText);
       } else {
-        await this.sendResponse(msgChannel, 'No response generated. Please try again.');
+        await this.sendError(msgChannel, 'Pi produced no response — the model returned an empty completion. Please check model settings.');
       }
     } catch (e) {
       this._log(`Pi adapter error: ${e.message}`);
-      await this.sendError(msgChannel, `Error processing message: ${e.message}`);
+      await this.sendError(msgChannel, `Pi error: ${e.message}`);
     }
   }
 }
