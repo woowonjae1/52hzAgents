@@ -190,6 +190,7 @@ test('PiAdapter _handleMessage routes model error to sendError', async () => {
     endpoint: 'http://localhost:3000',
     token: 'test-token',
     client,
+    retryDelayMs: 0,
   });
 
   // Mock _runPi throwing an upstream error
@@ -214,6 +215,53 @@ test('PiAdapter _handleMessage routes model error to sendError', async () => {
     (m) => !m.opts?.messageType || m.opts?.messageType === 'chat'
   );
   assert.equal(chatMessages.length, 0);
+});
+
+test('PiAdapter retries on transient upstream 422 error and succeeds on subsequent attempt', async () => {
+  const client = createMockClient();
+  const adapter = new PiAdapter({
+    agentName: 'pi-test',
+    workspaceId: 'ws-1',
+    endpoint: 'http://localhost:3000',
+    token: 'test-token',
+    client,
+    retryDelayMs: 0,
+  });
+
+  let callCount = 0;
+  adapter._runPi = async () => {
+    callCount++;
+    if (callCount === 1) {
+      throw new Error('422: {"message":"Inference request failed.","type":"atria_api_error","code":"upstream_error"}');
+    }
+    return 'Success after retry';
+  };
+  adapter._autoTitleChannel = async () => {};
+  const statusUpdates = [];
+  adapter.sendStatus = async (ch, status) => {
+    statusUpdates.push(status);
+  };
+
+  await adapter._handleMessage({
+    sessionId: 'ch-retry-success-test',
+    content: '@pi check recent commit',
+  });
+
+  assert.equal(callCount, 2, 'Should have retried once and succeeded on second attempt');
+  const chatMessages = client.sentMessages.filter(
+    (m) => !m.opts?.messageType || m.opts?.messageType === 'chat'
+  );
+  assert.equal(chatMessages.length, 1);
+  assert.equal(chatMessages[0].content, 'Success after retry');
+
+  // Ensure no error messages were sent to the user
+  const errorMessages = client.sentMessages.filter(
+    (m) => m.opts && m.opts.messageType === 'error'
+  );
+  assert.equal(errorMessages.length, 0);
+
+  // Status should contain retry notification
+  assert.ok(statusUpdates.some((s) => s.includes('retrying (1/2)')));
 });
 
 test('PiAdapter captures auto_retry_end failure', async () => {

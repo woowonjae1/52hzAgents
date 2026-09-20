@@ -50,6 +50,8 @@ class PiAdapter extends BaseAdapter {
     this.piModel = opts.piModel || env.PI_MODEL || '';
     this.piProvider = opts.piProvider || env.PI_PROVIDER || '';
     this.piApprove = opts.piApprove !== false; // default true
+    this.maxRetries = opts.maxRetries !== undefined ? opts.maxRetries : 2;
+    this.retryDelayMs = opts.retryDelayMs !== undefined ? opts.retryDelayMs : 1500;
 
     this._channelProcesses = {};
 
@@ -666,6 +668,23 @@ class PiAdapter extends BaseAdapter {
     await super._onControlAction(action, payload);
   }
 
+  _isTransientError(err) {
+    if (!err || !err.message) return false;
+    const msg = String(err.message).toLowerCase();
+    return (
+      msg.includes('upstream_error') ||
+      msg.includes('atria_api_error') ||
+      msg.includes('inference request failed') ||
+      /\b(422|429|500|502|503|504)\b/.test(msg) ||
+      msg.includes('rate limit') ||
+      msg.includes('overloaded') ||
+      msg.includes('timed out') ||
+      msg.includes('timeout') ||
+      msg.includes('etimedout') ||
+      msg.includes('econnreset')
+    );
+  }
+
   // ------------------------------------------------------------------
   // Message handler
   // ------------------------------------------------------------------
@@ -684,7 +703,45 @@ class PiAdapter extends BaseAdapter {
     try {
       const context = await this._buildContextPrefix(msgChannel);
       const prompt = context ? `${context}\n\n---\n\nUser message:\n${content}` : content;
-      const responseText = await this._runPi(prompt, msgChannel, content);
+
+      const sessionPath = this._sessionPathFor(msgChannel);
+      const preExists = fs.existsSync(sessionPath);
+      const preSize = preExists ? fs.statSync(sessionPath).size : 0;
+      const rollbackSession = () => {
+        try {
+          if (!preExists) {
+            if (fs.existsSync(sessionPath)) fs.unlinkSync(sessionPath);
+          } else if (fs.existsSync(sessionPath)) {
+            fs.truncateSync(sessionPath, preSize);
+          }
+        } catch (rbErr) {
+          this._log(`Session rollback error: ${rbErr.message}`);
+        }
+      };
+
+      const maxRetries = this.maxRetries;
+      let responseText = '';
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          responseText = await this._runPi(prompt, msgChannel, content);
+          if (responseText) break;
+        } catch (err) {
+          const isTransient = this._isTransientError(err);
+          if (isTransient && attempt < maxRetries) {
+            rollbackSession();
+            const delayMs = (attempt + 1) * this.retryDelayMs;
+            this._log(`Transient model error on attempt ${attempt + 1}: ${err.message}. Retrying in ${delayMs}ms...`);
+            try {
+              await this.sendStatus(msgChannel, `Model service transient error, retrying (${attempt + 1}/${maxRetries})...`);
+            } catch {}
+            if (delayMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+            continue;
+          }
+          throw err;
+        }
+      }
 
       if (responseText) {
         await this.sendResponse(msgChannel, responseText);
