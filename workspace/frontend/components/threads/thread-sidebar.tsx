@@ -50,6 +50,7 @@ export function ThreadSidebar() {
     setCurrentSessionId,
     agents,
     lastMessageBySession,
+    activeSessionIds,
     userSentMessageTimestamps,
     createSession,
     renameSession,
@@ -227,18 +228,29 @@ export function ThreadSidebar() {
       if (item.kind !== 'file') return null;
       const session = byId.get(item.id);
       if (!session) return null;
+      const isRunning = activeSessionIds.has(item.id);
+      const isUnread = unreadIds.has(item.id);
       const at = session.lastEventAt || (session.createdAt ? new Date(session.createdAt).getTime() : 0);
-      if (!at) return null;
+
       return (
         <span className="inline-flex items-center gap-1.5">
-          {unreadIds.has(item.id) && (
+          {isRunning ? (
+            <span
+              aria-label="Agent working"
+              title="Agent is actively working"
+              className="relative flex size-2 items-center justify-center"
+            >
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-primary" />
+            </span>
+          ) : isUnread ? (
             <span aria-label="Unread" className="size-1.5 rounded-full bg-primary" />
-          )}
-          {formatCompactRelativeTime(at)}
+          ) : null}
+          {at ? formatCompactRelativeTime(at) : null}
         </span>
       );
     },
-    [byId, unreadIds]
+    [byId, activeSessionIds, unreadIds]
   );
 
   const renderMenu = React.useCallback(
