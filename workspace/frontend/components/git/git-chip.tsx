@@ -217,6 +217,7 @@ export function GitChip({
     if (!channelId) return;
     setSelectedDiffFile(filePath);
     setInspectorOpen(true);
+    setOpen(false);
   };
 
   const handleDiscard = async (filePath: string) => {

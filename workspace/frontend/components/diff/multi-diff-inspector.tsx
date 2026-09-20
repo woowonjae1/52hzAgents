@@ -81,6 +81,7 @@ export function MultiDiffInspector({
   const [diffCache, setDiffCache] = useState<Record<string, string>>({});
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedDiff, setCopiedDiff] = useState(false);
   const [showRollbackConfirm, setShowRollbackConfirm] = useState(false);
 
   // Sync selected file when initialFilePath changes or dialog opens
@@ -182,10 +183,20 @@ export function MultiDiffInspector({
     });
   };
 
+  const handleCopyDiff = () => {
+    const text = diffCache[selectedFile];
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedDiff(true);
+      toast.success('Diff copied');
+      setTimeout(() => setCopiedDiff(false), 2000);
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-150">
       <div
         className="w-full max-w-6xl h-[88vh] flex flex-col rounded-2xl bg-surface1 border border-border shadow-xl overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
@@ -357,13 +368,25 @@ export function MultiDiffInspector({
           {/* Right Column: Diff Viewer */}
           <div className="flex-1 flex flex-col min-w-0 bg-surface0">
             {/* Active file sub-header */}
-            <div className="px-4 py-2.5 border-b border-border bg-surface1/60 flex items-center justify-between shrink-0">
+            <div className="px-4 py-2 border-b border-border bg-surface1/60 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 {activeItem && <StatusBadge status={activeItem.status} />}
-                <span className="text-xs font-mono font-medium text-foreground truncate select-all">
-                  {selectedFile || 'No file selected'}
-                </span>
-                <Hint label={copied ? 'Copied' : 'Copy file path'}>
+                <div className="flex items-center min-w-0 font-mono text-xs truncate">
+                  {selectedFile ? (() => {
+                    const parts = selectedFile.split('/');
+                    const fname = parts.pop();
+                    const dpath = parts.join('/');
+                    return (
+                      <>
+                        {dpath && <span className="text-foreground-extra-muted truncate">{dpath}/</span>}
+                        <span className="font-semibold text-foreground truncate">{fname}</span>
+                      </>
+                    );
+                  })() : (
+                    <span className="text-foreground-muted">No file selected</span>
+                  )}
+                </div>
+                <Hint label={copied ? 'Copied path' : 'Copy file path'}>
                   <button
                     onClick={handleCopyPath}
                     className="p-1 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
@@ -373,29 +396,39 @@ export function MultiDiffInspector({
                 </Hint>
               </div>
 
-              {activeItem && (
-                <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
-                  {activeItem.additions > 0 && (
-                    <span className="text-diff-addition font-semibold">+{activeItem.additions}</span>
-                  )}
-                  {activeItem.deletions > 0 && (
-                    <span className="text-diff-deletion font-semibold">−{activeItem.deletions}</span>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-3 shrink-0">
+                {activeItem && (
+                  <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
+                    {activeItem.additions > 0 && (
+                      <span className="text-diff-addition font-semibold">+{activeItem.additions}</span>
+                    )}
+                    {activeItem.deletions > 0 && (
+                      <span className="text-diff-deletion font-semibold">−{activeItem.deletions}</span>
+                    )}
+                  </div>
+                )}
+                {diffCache[selectedFile] && (
+                  <Hint label={copiedDiff ? 'Copied diff' : 'Copy raw diff'}>
+                    <button
+                      onClick={handleCopyDiff}
+                      className="p-1 rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors"
+                    >
+                      {copiedDiff ? <Check className="size-3 text-status-success" /> : <FileDiff className="size-3.5" />}
+                    </button>
+                  </Hint>
+                )}
+              </div>
             </div>
 
             {/* Diff content scroll area */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto bg-surface0">
               {loadingFile === selectedFile ? (
                 <div className="h-64 flex flex-col items-center justify-center gap-2 text-foreground-muted text-xs">
                   <Loader2 className="size-5 animate-spin text-primary" />
                   <span>Loading diff…</span>
                 </div>
               ) : diffCache[selectedFile] ? (
-                <div className="max-w-none">
-                  <DiffBlock code={diffCache[selectedFile]} />
-                </div>
+                <DiffBlock code={diffCache[selectedFile]} embedded />
               ) : (
                 <div className="h-64 flex flex-col items-center justify-center text-xs text-foreground-extra-muted">
                   Select a file from the list to inspect changes
