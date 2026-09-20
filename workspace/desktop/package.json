@@ -13,7 +13,7 @@
     "dist": "electron-builder --win",
     "build-icons": "node build-icons.js",
     "build-frontend": "npm --prefix ../frontend run build",
-    "sync-public": "node -e \"const fs=require('fs'),path=require('path');function cp(s,d){fs.mkdirSync(d,{recursive:true});for(const e of fs.readdirSync(s,{withFileTypes:true})){const sp=path.join(s,e.name),dp=path.join(d,e.name);if(e.isDirectory())cp(sp,dp);else fs.copyFileSync(sp,dp);}}const src='../frontend/out';if(!fs.existsSync(src)){console.error('frontend/out missing - run build-frontend first');process.exit(1);}fs.rmSync('resources/public',{recursive:true,force:true});cp(src,'resources/public');console.log('Frontend export synced to resources/public');\"",
+    "sync-public": "node -e \"const fs=require('fs'),path=require('path');const src='../frontend/out',dest='resources/public';if(!fs.existsSync(src)){console.error('frontend/out missing - run build-frontend first');process.exit(1);}if(fs.existsSync(dest))fs.rmSync(dest,{recursive:true,force:true,maxRetries:3});fs.cpSync(src,dest,{recursive:true});console.log('Frontend export cleanly synced to resources/public');\"",
     "sync-all": "npm run build-icons && npm run build-frontend && npm run sync-public && npm run sync-wwj"
   },
   "devDependencies": {
@@ -28,6 +28,10 @@
     "directories": {
       "output": "release-dist"
     },
+    "electronLanguages": [
+      "en-US",
+      "zh-CN"
+    ],
     "files": [
       "main.js",
       "preload.js",

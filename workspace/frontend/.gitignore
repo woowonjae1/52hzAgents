@@ -5,3 +5,7 @@ node_modules/
 
 # InsForge CLI local link (contains api_key — never commit)
 .insforge/
+
+# Playwright
+test-results/
+playwright-report/

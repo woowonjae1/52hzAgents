@@ -30,6 +30,9 @@ try {
 } catch {}
 
 New-Item -ItemType Directory -Force -Path $BinDir | Out-Null
+if (Test-Path $PublicDir) {
+    Remove-Item -Path $PublicDir -Recurse -Force -ErrorAction SilentlyContinue
+}
 New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
 New-Item -ItemType Directory -Force -Path $WwjDir | Out-Null
 
@@ -78,12 +81,15 @@ try {
         throw "next build exited 0 but produced no 'out' directory (next.config.mjs uses output: 'export') - aborting."
     }
 
-    # Copy exported / public assets
-    if (Test-Path $NextPublic) {
-        Copy-Item -Recurse -Force "$NextPublic\*" $PublicDir
+    # Ensure PublicDir is thoroughly cleaned before receiving fresh export
+    if (Test-Path $PublicDir) {
+        Remove-Item -Path $PublicDir -Recurse -Force -ErrorAction SilentlyContinue
     }
+    New-Item -ItemType Directory -Force -Path $PublicDir | Out-Null
     Copy-Item -Recurse -Force "$NextOut\*" $PublicDir
-    Write-Host "  -> Frontend assets ready in resources/public (built $(Get-Date -Format 'HH:mm:ss'))." -ForegroundColor Green
+    $PubFileCount = (Get-ChildItem $PublicDir -Recurse -File).Count
+    $PubSizeMB = [math]::Round(((Get-ChildItem $PublicDir -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB), 2)
+    Write-Host "  -> Frontend assets ready in resources/public ($PubFileCount files, $PubSizeMB MB, built $(Get-Date -Format 'HH:mm:ss'))." -ForegroundColor Green
 } finally {
     Pop-Location
 }
@@ -151,11 +157,23 @@ for ($i = 0; $i -lt 5; $i++) {
 
 Push-Location $DesktopDir
 try {
-    if ($Target -eq "installer") {
-        npx electron-builder --win nsis
-    } else {
-        npx electron-builder --dir
+    switch ($Target.ToLower()) {
+        "installer" {
+            npx electron-builder --win nsis portable
+        }
+        "nsis" {
+            npx electron-builder --win nsis
+        }
+        "portable" {
+            npx electron-builder --win portable
+        }
+        default {
+            npx electron-builder --dir
+        }
     }
+
+    # Hygiene: strip unnecessary Chromium license HTML from unpacked build outputs (-9.1MB)
+    Get-ChildItem -Path "$DesktopDir\release-dist" -Recurse -Filter "LICENSES.chromium.html" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
     Write-Host "`n=================================================" -ForegroundColor Cyan
     Write-Host "  Build Completed Successfully!                  " -ForegroundColor Green
     Write-Host "  Output Directory: $DesktopDir\release-dist     " -ForegroundColor Green
