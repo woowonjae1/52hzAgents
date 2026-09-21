@@ -33,7 +33,6 @@ const MAX_HISTORY_ENTRIES = 12;
 const PI_MIN_RETRY_DELAY_MS = 1000;   // floor, so a configured 0 cannot mean "no wait"
 const PI_MAX_RETRY_DELAY_MS = 30000;  // ceiling on the exponential
 const PI_RESUME_MIN_CHARS = 400;      // work worth resuming rather than replaying
-const PI_OVERLOAD_FATAL_MS = 45000;   // past this, a 422 is about size, not luck
 
 // Pi's own configuration directory. `models.json` declares the providers and
 // models this install can reach; `settings.json` names the active one. Both are
@@ -750,7 +749,10 @@ class PiAdapter extends BaseAdapter {
       msg.includes('upstream_error') ||
       msg.includes('atria_api_error') ||
       msg.includes('inference request failed') ||
-      /\b422\b/.test(msg)
+      msg.includes('upstream_request_rejected') ||
+      msg.includes('invalid_request_error') ||
+      msg.includes('unprocessable entity') ||
+      /\b(400|422)\b/.test(msg)
     );
   }
 
@@ -779,12 +781,39 @@ class PiAdapter extends BaseAdapter {
     likely caused the failure. Keeping the session and sending a short
     continuation does neither.
   */
-  _classifyFailure(err, attempt) {
+  _classifyFailure(err) {
     if (!this._isTransientError(err)) return 'fatal';
+
+    /*
+      THE 4xx FAMILY IS NEVER RETRYABLE HERE, AND RESUME MAKES IT WORSE.
+
+      The first version of this got both halves wrong, and a real turn paid
+      for it: four attempts over 268s against
+      `{"code":"upstream_request_rejected","type":"invalid_request_error"}`.
+
+      Wrong half one: the resume branch was tested BEFORE the fatal branch, so
+      any 422 that had produced work resumed regardless of what the error
+      said. `invalid_request_error` is the API stating the request is not
+      acceptable — retrying an invalid request cannot succeed by construction,
+      and elapsed time is irrelevant to that.
+
+      Wrong half two, and the real mistake: resume was justified by "the
+      continuation prompt is smaller than the original, which is what a
+      size-driven 422 needs". That is false for a `--session` CLI. The session
+      file holds the whole conversation and is re-sent every turn, so NOT
+      rolling it back leaves the failed partial turn in there and then appends
+      a continuation on top. Each resumed attempt sends a LARGER request than
+      the one that just failed. If the request was already unacceptable, every
+      resume is further over the line — which is why that turn's reasoning
+      came back visibly duplicated and still died.
+
+      So resume is now reserved for failures where the request was fine and
+      the far end was not: 5xx, rate limits, dropped sockets.
+    */
+    if (this._isDeterministicOverload(err)) return 'fatal';
+
     const produced = err && err.piProducedChars ? err.piProducedChars : 0;
-    const elapsed = err && err.piElapsedMs ? err.piElapsedMs : 0;
     if (produced >= PI_RESUME_MIN_CHARS) return 'resume';
-    if (this._isDeterministicOverload(err) && elapsed >= PI_OVERLOAD_FATAL_MS) return 'fatal';
     return 'restart';
   }
 

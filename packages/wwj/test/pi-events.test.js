@@ -217,7 +217,12 @@ test('PiAdapter _handleMessage routes model error to sendError', async () => {
   assert.equal(chatMessages.length, 0);
 });
 
-test('PiAdapter retries on transient upstream 422 error and succeeds on subsequent attempt', async () => {
+/*
+  A 503 retries. A 422 deliberately does NOT -- this test used to assert the
+  opposite, and that assumption cost a real turn four attempts over 268s
+  against `invalid_request_error`. See `_classifyFailure` in pi.js.
+*/
+test('PiAdapter retries a transient 503 and succeeds on the next attempt', async () => {
   const client = createMockClient();
   const adapter = new PiAdapter({
     agentName: 'pi-test',
@@ -235,7 +240,7 @@ test('PiAdapter retries on transient upstream 422 error and succeeds on subseque
   adapter._runPi = async () => {
     callCount++;
     if (callCount === 1) {
-      throw new Error('422: {"message":"Inference request failed.","type":"atria_api_error","code":"upstream_error"}');
+      throw new Error('503 Service Unavailable');
     }
     return 'Success after retry';
   };

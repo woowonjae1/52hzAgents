@@ -47,26 +47,44 @@ test('a non-transient error is fatal regardless of shape', () => {
   );
 });
 
-test('a fast failure with nothing produced restarts', () => {
+test('a fast network failure with nothing produced restarts', () => {
+  // Only the network/5xx side restarts. A fast 422 does NOT — see below;
+  // this test used to assert that it did, which was the bug.
   const a = makeAdapter();
-  assert.equal(
-    a._classifyFailure(failure(UPSTREAM_422, { producedChars: 0, elapsedMs: 800 })),
-    'restart',
-  );
   assert.equal(
     a._classifyFailure(failure('ECONNRESET', { producedChars: 0, elapsedMs: 200 })),
     'restart',
   );
+  assert.equal(
+    a._classifyFailure(failure('504 gateway timeout', { producedChars: 0, elapsedMs: 200 })),
+    'restart',
+  );
 });
 
-test('a long 422 with nothing produced is fatal, not a fourth attempt', () => {
-  // The observed case. Re-sending the identical oversized prompt fails
-  // identically; the only thing three more attempts buy is three more minutes.
+test('a 422 is fatal on the first attempt, whatever it produced', () => {
+  // The whole 4xx family says "this request is not acceptable". Retrying it
+  // cannot succeed, and with a --session CLI a resume sends MORE, not less.
   const a = makeAdapter();
-  assert.equal(
-    a._classifyFailure(failure(UPSTREAM_422, { producedChars: 0, elapsedMs: 90_000 })),
-    'fatal',
+  for (const produced of [0, 20_000]) {
+    for (const elapsed of [800, 90_000]) {
+      assert.equal(
+        a._classifyFailure(failure(UPSTREAM_422, { producedChars: produced, elapsedMs: elapsed })),
+        'fatal',
+        `produced=${produced} elapsed=${elapsed}`,
+      );
+    }
+  }
+});
+
+test('invalid_request_error / upstream_request_rejected is fatal', () => {
+  // Observed for real: four attempts over 268s against this, because the
+  // resume branch was tested before the fatal branch.
+  const a = makeAdapter();
+  const err = failure(
+    '422: {"code":"upstream_request_rejected","message":"Unprocessable Entity","type":"invalid_request_error"}',
+    { producedChars: 15_000, elapsedMs: 134_000 },
   );
+  assert.equal(a._classifyFailure(err), 'fatal');
 });
 
 test('a long 503 with nothing produced still restarts — it is a real blip', () => {
@@ -77,23 +95,16 @@ test('a long 503 with nothing produced still restarts — it is a real blip', ()
   );
 });
 
-test('work worth keeping resumes instead of restarting', () => {
+test('work worth keeping resumes, but only when the request itself was fine', () => {
   const a = makeAdapter();
-  // 4605 words of reasoning is not something to throw away and redo.
   assert.equal(
-    a._classifyFailure(failure(UPSTREAM_422, { producedChars: 20_000, elapsedMs: 90_000 })),
+    a._classifyFailure(failure('503 <html>', { producedChars: 20_000, elapsedMs: 90_000 })),
     'resume',
   );
-});
-
-test('resume beats the fatal-overload rule', () => {
-  // Partial work means the continuation prompt is smaller than the original,
-  // which is exactly what a size-driven 422 needs — so it is worth an attempt.
-  const a = makeAdapter();
-  const verdict = a._classifyFailure(
-    failure(UPSTREAM_422, { producedChars: 500, elapsedMs: 300_000 }),
+  assert.equal(
+    a._classifyFailure(failure('ECONNRESET', { producedChars: 5_000, elapsedMs: 30_000 })),
+    'resume',
   );
-  assert.equal(verdict, 'resume');
 });
 
 test('output just under the bar is not treated as resumable', () => {
