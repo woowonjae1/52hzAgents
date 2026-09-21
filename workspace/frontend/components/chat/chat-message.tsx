@@ -190,6 +190,8 @@ interface ChatMessageProps {
   isLast?: boolean;
   /** Whether the message is currently streaming live content */
   isStreaming?: boolean;
+  /** Whether the message is an intermediate progress message (followed by more work) */
+  isIntermediate?: boolean;
   /** Current session working directory for resolving local path links */
   workingDir?: string;
   onRegenerate?: (message: WorkspaceMessage) => void;
@@ -218,6 +220,7 @@ export const ChatMessage = memo(function ChatMessage({
   isDecisionAnswered = false,
   isLast = false,
   isStreaming = false,
+  isIntermediate = false,
   workingDir,
   onRegenerate,
   onQuoteReply,
@@ -1024,7 +1027,7 @@ export const ChatMessage = memo(function ChatMessage({
             <Reasoning
               content={activeThinking}
               isStreaming={Boolean(isStreamingThink)}
-              defaultExpanded={Boolean(isStreamingThink)}
+              defaultExpanded={false}
             />
           ) : null}
 
@@ -1061,7 +1064,7 @@ export const ChatMessage = memo(function ChatMessage({
               sourceIdPrefix={sourceIdPrefix}
               sourcesOpen={sourcesOpen}
               onSourcesOpenChange={setSourcesOpen}
-              showActions={true}
+              showActions={!isIntermediate}
               announce={false}
               className="py-0.5"
             >

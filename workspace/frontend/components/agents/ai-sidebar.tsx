@@ -616,7 +616,13 @@ function ResourceRow({
             radius={12}
             className="w-40 p-1.5"
           >
-            <div data-sidebar-resource-menu={row.item.id}>{menu}</div>
+            <div
+              data-sidebar-resource-menu={row.item.id}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {menu}
+            </div>
           </MorphPopoverContent>
         </MorphPopover>
       ) : null}
@@ -662,6 +668,23 @@ export function AISidebar({
   useEffect(() => {
     if (items) setInternalItems(items);
   }, [items]);
+
+  // Keep parent folder expanded when selectedId is inside it,
+  // ensuring the active session is never hidden inside a collapsed folder.
+  useEffect(() => {
+    if (!selectedId) return;
+    for (const item of renderedItems) {
+      if (item.children?.some((child) => child.id === selectedId)) {
+        setExpandedIds((prev) => {
+          if (prev.has(item.id)) return prev;
+          const next = new Set(prev);
+          next.add(item.id);
+          return next;
+        });
+        break;
+      }
+    }
+  }, [selectedId, renderedItems]);
 
   const flat = useMemo(
     () => flattenResources(renderedItems, expandedIds),

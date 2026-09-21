@@ -49,7 +49,10 @@ type MessageGroup =
   // `continuesFrom` is set when this message is preceded by its own thinking or
   // steps group. That group already printed the avatar and sender name, so this
   // one suppresses its header instead of printing a second identical one.
-  | { type: 'chat'; message: WorkspaceMessage; steps?: WorkspaceMessage[]; continuesFrom?: boolean }
+  // `isIntermediate` is set when this chat message is followed by more work
+  // (thinking/status) from the same sender — i.e. it is a mid-run announcement
+  // rather than the final answer. Used to suppress the action bar.
+  | { type: 'chat'; message: WorkspaceMessage; steps?: WorkspaceMessage[]; continuesFrom?: boolean; isIntermediate?: boolean }
   | { type: 'speech_act'; message: WorkspaceMessage; actType: string; summary?: string }
   // `settled` means the agent has since posted its reply, so the trace below is
   // history rather than live output.
@@ -211,6 +214,29 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
   });
 
   flushOrphanSteps();
+
+  /*
+    MARK INTERMEDIATE CHAT MESSAGES.
+
+    A chat message followed by more thinking/steps from the same sender is a
+    mid-run announcement (e.g. "wttr.in 免费接口只给 3 天，我换用 Open-Meteo 拉完整 5 天数据：")
+    rather than the final answer. The action bar (copy/regenerate/thumbs) on these
+    is misleading — the user thinks it is the complete reply and stops reading.
+    Mark them so ChatMessage can suppress the toolbar.
+  */
+  for (let i = 0; i < groups.length - 1; i++) {
+    const g = groups[i];
+    if (g.type !== 'chat') continue;
+    const next = groups[i + 1];
+    if (!next) continue;
+    const nextSender =
+      next.type === 'thinking' ? next.sender
+      : next.type === 'steps' ? next.messages[0]?.senderName
+      : null;
+    if (nextSender && nextSender === g.message.senderName) {
+      g.isIntermediate = true;
+    }
+  }
 
   /*
     Inserted as a second pass rather than inline in the loop above, because a
@@ -719,6 +745,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
       prevScrollTopRef.current = null;
       lastScrollTopRef.current = 0;
       userScrolledUpRef.current = false;
+      settlingRef.current = false; // cancel any in-flight settle from the old session
       scrollDebug('session-switch', el, { messageCount: messages.length, totalCount });
       requestAnimationFrame(() => scrollToBottom());
       return;
@@ -1073,6 +1100,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         isDecisionAnswered={isDecisionAnswered}
                         isLast={index === groups.length - 1}
                         isStreaming={index === groups.length - 1 && isChannelActive && !hasTerminalStatus}
+                        isIntermediate={group.isIntermediate}
                         workingDir={workingDir}
                         onRegenerate={onRegenerate}
                         onQuoteReply={onQuoteReply}

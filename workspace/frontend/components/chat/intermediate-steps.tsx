@@ -668,7 +668,16 @@ function joinThoughts(messages: WorkspaceMessage[]): string {
   for (let i = 0; i < messages.length; i++) {
     const text = messages[i].content;
     if (!text) continue;
+    const trimmed = text.trim();
+    if (!trimmed) continue;
     if (!result) {
+      result = text;
+      continue;
+    }
+    // If the accumulated result already contains this fragment, skip it
+    if (result.includes(trimmed)) continue;
+    // If the new fragment is a complete superset of the accumulated result, replace it
+    if (trimmed.includes(result.trim())) {
       result = text;
       continue;
     }
@@ -804,22 +813,82 @@ function runDuration(messages: WorkspaceMessage[]): number | undefined {
 }
 
 function coalesceThinking(steps: WorkspaceMessage[]): StepRun[] {
-  const runs: StepRun[] = [];
+  // Group by tool step boundaries:
+  // Non-step messages (tool calls) separate execution phases.
+  // Within each phase, consolidate thinking runs and reply previews
+  // so a single phase doesn't fragment into 10 interleaved micro-boxes.
+  const phases: {
+    thinking: WorkspaceMessage[];
+    replies: WorkspaceMessage[];
+    tools: WorkspaceMessage[];
+  }[] = [];
+
+  let currentPhase = {
+    thinking: [] as WorkspaceMessage[],
+    replies: [] as WorkspaceMessage[],
+    tools: [] as WorkspaceMessage[],
+  };
+
+  const isPunctuationOnly = (text?: string | null) => {
+    if (!text) return true;
+    const trimmed = text.trim();
+    return !trimmed || /^[.\s,，。！？!?\-_/\\:：;；…·]+$/.test(trimmed);
+  };
+
   for (const step of steps) {
-    const isThinking = step.messageType === 'thinking' && !isPlaceholderThinking(step);
-    if (!isThinking) {
-      runs.push({ kind: 'step', message: step });
+    if (isPlaceholderThinking(step)) continue;
+
+    const isThinkingMsg = step.messageType === 'thinking';
+    if (!isThinkingMsg) {
+      // Tool call or status message ends current thinking/reply phase
+      currentPhase.tools.push(step);
+      phases.push(currentPhase);
+      currentPhase = { thinking: [], replies: [], tools: [] };
       continue;
     }
-    // A reply preview and real reasoning never merge into one run, even when
-    // they arrive back to back — they are different kinds of text and are drawn
-    // differently. Absent flag means "unknown", which is treated as reasoning:
-    // showing a duplicate beats hiding the model's actual thinking.
-    const kind: 'thinking' | 'reply' = step.metadata?.reply_preview === true ? 'reply' : 'thinking';
-    const last = runs[runs.length - 1];
-    if (last && last.kind === kind) last.messages.push(step);
-    else runs.push({ kind, messages: [step] });
+
+    const isReply = step.metadata?.reply_preview === true;
+    const content = step.content?.trim() || '';
+
+    // If it's pure punctuation or empty, merge into current reply or thinking if available, else skip
+    if (isPunctuationOnly(content)) {
+      if (currentPhase.replies.length > 0) {
+        currentPhase.replies.push(step);
+      } else if (currentPhase.thinking.length > 0) {
+        currentPhase.thinking.push(step);
+      }
+      continue;
+    }
+
+    if (isReply) {
+      currentPhase.replies.push(step);
+    } else {
+      // If a tiny thinking fragment (< 15 chars) arrives while replies are already streaming
+      // and without any prior thinking in this phase, treat as continuation of reply preview
+      if (currentPhase.replies.length > 0 && content.length <= 15 && currentPhase.thinking.length === 0) {
+        currentPhase.replies.push(step);
+      } else {
+        currentPhase.thinking.push(step);
+      }
+    }
   }
+  if (currentPhase.thinking.length > 0 || currentPhase.replies.length > 0 || currentPhase.tools.length > 0) {
+    phases.push(currentPhase);
+  }
+
+  const runs: StepRun[] = [];
+  for (const phase of phases) {
+    if (phase.thinking.length > 0) {
+      runs.push({ kind: 'thinking', messages: phase.thinking });
+    }
+    if (phase.replies.length > 0) {
+      runs.push({ kind: 'reply', messages: phase.replies });
+    }
+    for (const tool of phase.tools) {
+      runs.push({ kind: 'step', message: tool });
+    }
+  }
+
   return foldParallelTools(runs);
 }
 

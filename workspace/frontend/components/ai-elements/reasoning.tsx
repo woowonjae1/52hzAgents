@@ -73,7 +73,7 @@ export function Reasoning({
       }
       startTime={startTime}
       state={isStreaming ? 'running' : 'idle'}
-      defaultOpen={defaultExpanded || isStreaming}
+      defaultOpen={defaultExpanded}
       actions={
         content ? (
           <EventLineAction onClick={handleCopy} title="Copy reasoning text">
