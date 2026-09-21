@@ -19,8 +19,6 @@ import {
   Folder, 
   Sparkles,
   ArrowLeft,
-  ToggleLeft,
-  ToggleRight,
   BookOpen,
   CalendarClock,
   ChevronRight,
@@ -45,6 +43,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -562,27 +561,49 @@ export function SettingsView() {
                   </span>
                 </div>
 
+                {/*
+                  Both rows in this card need the desktop app to do anything —
+                  autostart is an OS login item and the Quick Bar is a global
+                  hotkey, neither of which a web page can register. They used to
+                  render identically in the browser, the toggle simply dead at
+                  30% opacity and the shortcut printed as if it worked; the only
+                  clue was the pill above. Now each says so on its own line,
+                  because that is where the user is looking when they click it.
+                */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-surface0 border border-border/60">
-                    <div>
+                  <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-surface0 border border-border/60">
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">Launch at login</p>
                       <p className="text-xs text-foreground-muted mt-0.5">Start 52hzAgents in the system tray when the computer boots.</p>
+                      {!isDesktop && (
+                        <p className="text-2xs text-foreground-extra-muted mt-1">
+                          Only available in the desktop app.
+                        </p>
+                      )}
                     </div>
-                    <button
-                      onClick={handleToggleAutostart}
+                    <Switch
+                      checked={autostart}
+                      onCheckedChange={handleToggleAutostart}
                       disabled={!isDesktop}
-                      className="text-primary hover:opacity-80 transition-opacity disabled:opacity-30"
-                    >
-                      {autostart ? <ToggleRight className="size-7 text-primary" /> : <ToggleLeft className="size-7 text-foreground-muted" />}
-                    </button>
+                      aria-label="Launch at login"
+                      className="shrink-0"
+                    />
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-surface0 border border-border/60 flex items-center justify-between">
-                    <div>
+                  <div className="p-3.5 rounded-xl bg-surface0 border border-border/60 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground">Quick Bar shortcut</p>
                       <p className="text-xs text-foreground-muted mt-0.5">Summon the command bar from anywhere in the system.</p>
+                      {!isDesktop && (
+                        <p className="text-2xs text-foreground-extra-muted mt-1">
+                          Only available in the desktop app.
+                        </p>
+                      )}
                     </div>
-                    <kbd className="px-2.5 py-1 rounded bg-surface2 border border-border text-xs font-mono font-medium text-foreground">
+                    <kbd className={cn(
+                      'px-2.5 py-1 rounded bg-surface2 border border-border text-xs font-mono font-medium shrink-0',
+                      isDesktop ? 'text-foreground' : 'text-foreground-extra-muted',
+                    )}>
                       Alt + Space
                     </kbd>
                   </div>
@@ -840,8 +861,8 @@ export function SettingsView() {
               </div>
 
               {/* Split Browser Toggle */}
-              <div className="p-5 rounded-2xl bg-surface1 border border-border/60 flex items-center justify-between">
-                <div>
+              <div className="p-5 rounded-2xl bg-surface1 border border-border/60 flex items-center justify-between gap-4">
+                <div className="min-w-0">
                   <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <Globe className="size-4 text-primary" />
                     Split browser
@@ -850,16 +871,15 @@ export function SettingsView() {
                     Show the browser side by side with the thread — for web work, debugging automation, and watching a run.
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    const next = !splitBrowser;
+                <Switch
+                  checked={splitBrowser}
+                  onCheckedChange={(next) => {
                     setSplitBrowser(next);
                     toast.success(next ? 'Split browser on' : 'Split browser off');
                   }}
-                  className="text-primary hover:opacity-80 transition-opacity"
-                >
-                  {splitBrowser ? <ToggleRight className="size-7 text-primary" /> : <ToggleLeft className="size-7 text-foreground-muted" />}
-                </button>
+                  aria-label="Split browser"
+                  className="shrink-0"
+                />
               </div>
 
               {/* Side Panels List */}
@@ -878,33 +898,28 @@ export function SettingsView() {
                           : 'bg-surface1 border-border/60 hover:border-border'
                       )}
                     >
+                      {/*
+                        One control, one statement of state. The card used to
+                        say it three times — an Open/Closed pill top-right, a
+                        static "Side panel" caption (true of all seven, so it
+                        distinguished nothing), and the button — across seven
+                        cards. The button alone carries it: "Close" can only
+                        mean it is open, and the card's own selected fill, ring
+                        and filled icon tile say so again visually. Dropping the
+                        footer takes its `border-t` with it, which was drawing a
+                        line beside padding that already did the separating.
+                      */}
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
                           <div className={cn(
                             'size-9 rounded-xl flex items-center justify-center shrink-0 transition-colors',
                             isActive ? 'bg-primary text-primary-foreground' : 'bg-surface2 text-foreground-muted'
                           )}>
                             <Icon className="size-4.5" />
                           </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-foreground">{panel.name}</h4>
-                          </div>
+                          <h4 className="text-sm font-semibold text-foreground">{panel.name}</h4>
                         </div>
 
-                        <span className={cn(
-                          'text-3xs px-2 py-0.5 rounded-full font-medium',
-                          isActive ? 'bg-primary/15 text-primary' : 'bg-surface2 text-foreground-extra-muted'
-                        )}>
-                          {isActive ? 'Open' : 'Closed'}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-foreground-muted leading-relaxed">
-                        {panel.desc}
-                      </p>
-
-                      <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-                        <span className="text-2xs text-foreground-extra-muted">Side panel</span>
                         <Button
                           variant={isActive ? 'primary' : 'outline'}
                           size="sm"
@@ -912,11 +927,15 @@ export function SettingsView() {
                             setActiveRightTab(isActive ? null : panel.id);
                             toast.success(isActive ? `${panel.name} closed` : `${panel.name} opened`);
                           }}
-                          className="h-7.5 px-3 text-xs"
+                          className="h-7.5 px-3 text-xs shrink-0"
                         >
                           {isActive ? 'Close' : 'Open'}
                         </Button>
                       </div>
+
+                      <p className="text-xs text-foreground-muted leading-relaxed">
+                        {panel.desc}
+                      </p>
                     </div>
                   );
                 })}
@@ -941,7 +960,7 @@ export function SettingsView() {
                 {/* Export Markdown */}
                 <div className="p-5 rounded-2xl bg-surface1 border border-border/60 space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                    <div className="size-10 rounded-xl bg-surface2 text-foreground-muted flex items-center justify-center">
                       <FileText className="size-5" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground">Export this thread as Markdown</h3>
@@ -963,7 +982,7 @@ export function SettingsView() {
                 {/* Public Share Link */}
                 <div className="p-5 rounded-2xl bg-surface1 border border-border/60 space-y-4 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="size-10 rounded-xl bg-status-success/10 text-status-success flex items-center justify-center">
+                    <div className="size-10 rounded-xl bg-surface2 text-foreground-muted flex items-center justify-center">
                       <Share2 className="size-5" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground">Read-only share link</h3>
@@ -972,24 +991,42 @@ export function SettingsView() {
                     </p>
                   </div>
 
+                  {/*
+                    `workspaceShareUrl` is '' until the workspace loads (and
+                    stays '' if it never does). The field then rendered as an
+                    empty box beside a live Copy button that put nothing on the
+                    clipboard and still said "Share link copied" — a success
+                    message for a no-op. Both the field and the button now wait
+                    for a real URL.
+                  */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Input
                         readOnly
+                        aria-label="Read-only share link"
                         value={workspaceShareUrl}
+                        placeholder="Link appears once the workspace loads"
                         className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
                       />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          copyShare(workspaceShareUrl);
-                          toast.success('Share link copied');
-                        }}
-                        className="h-9 px-3 shrink-0"
-                      >
-                        {shareCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
-                      </Button>
+                      {/* Static label: `disabled:pointer-events-none` on Button
+                          means a hover hint can never fire while disabled, so
+                          the "why" lives in the field's placeholder, which is
+                          on screen rather than behind a hover. */}
+                      <Hint label="Copy share link">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!workspaceShareUrl}
+                          aria-label="Copy share link"
+                          onClick={() => {
+                            copyShare(workspaceShareUrl);
+                            toast.success('Share link copied');
+                          }}
+                          className="h-9 px-3 shrink-0"
+                        >
+                          {shareCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
+                        </Button>
+                      </Hint>
                     </div>
                   </div>
                 </div>

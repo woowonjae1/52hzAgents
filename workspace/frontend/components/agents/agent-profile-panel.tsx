@@ -1,8 +1,9 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { Switch } from '@/components/ui/switch';
 import { useState, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, ToggleLeft, ToggleRight, Cpu, ChevronDown, Coins, ChevronRight } from 'lucide-react';
+import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, Cpu, ChevronDown, Coins, ChevronRight } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -414,18 +415,14 @@ export function AgentProfilePanel() {
                 </div>
               </div>
               <Hint label={agent.autostart ? 'Click to turn off' : 'Click to turn on'}>
-                <button
-                  type="button"
-                  onClick={handleToggleAutostart}
+                <Switch
+                  size="sm"
+                  checked={agent.autostart}
+                  onCheckedChange={handleToggleAutostart}
                   disabled={togglingAutostart}
-                  className="text-primary hover:opacity-80 transition-opacity disabled:opacity-50 shrink-0"
-                >
-                  {agent.autostart ? (
-                    <ToggleRight className="size-6 text-primary" />
-                  ) : (
-                    <ToggleLeft className="size-6 text-foreground-muted" />
-                  )}
-                </button>
+                  aria-label="Connect on launch"
+                  className="shrink-0"
+                />
               </Hint>
             </div>
           </div>
