@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, History, Folder, Star, Archive, Trash2, MessageSquare } from 'lucide-react';
+import { SquarePen, Search, History, Folder, FolderPlus, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2 } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -11,7 +11,7 @@ import {
 import { AgentAvatar, AgentAvatarStack } from '@/components/agents/agent-avatar';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
-import { basename } from '@/components/chat/project-folder-picker';
+import { basename, browseForFolder } from '@/components/chat/project-folder-picker';
 import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
 import { formatCompactRelativeTime } from '@/lib/helpers';
 import { FileList } from '@/components/files/file-list';
@@ -57,11 +57,52 @@ export function ThreadSidebar() {
     updateSession,
     moveSessionToFolder,
   } = useWorkspace();
-  const { viewMode, setViewMode, isMobile, openMobileDetail } = useLayout();
+  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen } = useLayout();
 
   const [showSearch, setShowSearch] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const [browsingFolder, setBrowsingFolder] = React.useState(false);
+
+  /*
+    Opening the native folder dialog is the same call in both cases; what
+    differs is what we do with the path. `addProjectFolder` creates the first
+    thread in a directory — which is also what MAKES the folder, since a
+    folder row here is just the set of threads sharing a `workingDir`.
+    `changeSessionFolder` re-points a thread that already exists, seeded at
+    wherever it currently lives.
+  */
+  const pickFolder = React.useCallback(async (seed?: string) => {
+    if (browsingFolder) return null;
+    setBrowsingFolder(true);
+    try {
+      return await browseForFolder(seed);
+    } catch (e) {
+      toast.error(
+        e instanceof Error
+          ? `Could not reach the local wwj daemon (${e.message}). Make sure \`wwj up\` is running.`
+          : 'Could not open the folder picker.',
+      );
+      return null;
+    } finally {
+      setBrowsingFolder(false);
+    }
+  }, [browsingFolder]);
+
+  const addProjectFolder = React.useCallback(async () => {
+    const dir = await pickFolder();
+    if (!dir) return;
+    setSidebarOpen(true);
+    await createSession({ workingDir: dir });
+  }, [pickFolder, createSession, setSidebarOpen]);
+
+  const changeSessionFolder = React.useCallback(async (sessionId: string, current: string | null) => {
+    const dir = await pickFolder(current ?? undefined);
+    if (!dir) return;
+    await moveSessionToFolder(sessionId, dir);
+    toast.success(`Thread moved to ${basename(dir)}`);
+  }, [pickFolder, moveSessionToFolder]);
+
 
   const active = React.useMemo(
     () => sessions.filter((s) => s.status !== 'deleted' && s.status !== 'archived'),
@@ -266,7 +307,9 @@ export function ThreadSidebar() {
           <button
             type="button"
             className={ROW_CLASS}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
+              setSidebarOpen(true);
               void createSession({ workingDir: dir });
               controls.close();
             }}
@@ -279,14 +322,22 @@ export function ThreadSidebar() {
       const session = byId.get(item.id);
       return (
         <>
-          <button type="button" className={ROW_CLASS} onClick={() => controls.rename()}>
+          <button
+            type="button"
+            className={ROW_CLASS}
+            onClick={(e) => {
+              e.stopPropagation();
+              controls.rename();
+            }}
+          >
             <SquarePen className="size-3.5 shrink-0" />
             Rename
           </button>
           <button
             type="button"
             className={ROW_CLASS}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               void updateSession(item.id, { starred: !session?.starred });
               controls.close();
             }}
@@ -295,10 +346,45 @@ export function ThreadSidebar() {
             {session?.starred ? 'Unstar' : 'Star'}
           </button>
           <div className="my-1 h-px bg-border" />
+          {/*
+            Re-point a thread that already exists. Dragging it onto another
+            folder row already worked, but only between folders the tree
+            happens to show — and the tree only shows folders some thread is
+            already in, so a new directory was unreachable from here.
+          */}
           <button
             type="button"
             className={ROW_CLASS}
-            onClick={() => {
+            disabled={browsingFolder}
+            onClick={(e) => {
+              e.stopPropagation();
+              void changeSessionFolder(item.id, session?.workingDir ?? null);
+              controls.close();
+            }}
+          >
+            <Folder className="size-3.5 shrink-0" />
+            {session?.workingDir ? 'Change project folder…' : 'Set project folder…'}
+          </button>
+          {session?.workingDir && (
+            <button
+              type="button"
+              className={ROW_CLASS}
+              onClick={(e) => {
+                e.stopPropagation();
+                void moveSessionToFolder(item.id, null);
+                controls.close();
+              }}
+            >
+              <FolderMinus className="size-3.5 shrink-0" />
+              Remove from project
+            </button>
+          )}
+          <div className="my-1 h-px bg-border" />
+          <button
+            type="button"
+            className={ROW_CLASS}
+            onClick={(e) => {
+              e.stopPropagation();
               void updateSession(item.id, { status: 'archived' });
               controls.close();
             }}
@@ -309,7 +395,8 @@ export function ThreadSidebar() {
           <button
             type="button"
             className={cn(ROW_CLASS, 'text-destructive')}
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               void updateSession(item.id, { status: 'deleted' });
               controls.close();
             }}
@@ -320,7 +407,7 @@ export function ThreadSidebar() {
         </>
       );
     },
-    [byId, updateSession, createSession]
+    [byId, updateSession, createSession, setSidebarOpen, browsingFolder, changeSessionFolder, moveSessionToFolder]
   );
 
   return (
@@ -341,6 +428,24 @@ export function ThreadSidebar() {
         >
           <Search className="size-3.5 shrink-0" />
           Search
+        </button>
+        {/*
+          A project folder in this tree is derived: it exists only because some
+          thread already has that `workingDir`. So there was no way to open a
+          directory the workspace had not seen before — the folder rows offer
+          "New chat here", but only for folders that already exist. This is the
+          entry that creates one.
+        */}
+        <button
+          type="button"
+          className={ROW_CLASS}
+          disabled={browsingFolder}
+          onClick={() => void addProjectFolder()}
+        >
+          {browsingFolder
+            ? <Loader2 className="size-3.5 shrink-0 animate-spin" />
+            : <FolderPlus className="size-3.5 shrink-0" />}
+          New project
         </button>
         <button
           type="button"
