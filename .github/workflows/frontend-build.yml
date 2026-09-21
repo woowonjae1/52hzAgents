@@ -1,0 +1,78 @@
+# Type-checks and builds the workspace frontend.
+#
+# WHY THIS EXISTS
+#
+# Until this job, `workspace/frontend` had no automated gate of any kind. Seven
+# workflows guarded the Go backend, the CLI and the connector; not one of them
+# touched the largest surface in the repo.
+#
+# Nothing filled the gap locally either:
+#   - `next dev` uses SWC, which strips types without checking them, so the app
+#     a developer is looking at runs happily with type errors in it. (`next
+#     build` DOES type-check as of Next 16 -- verified here by building with a
+#     deliberate error, which failed the build -- but nobody was running a
+#     production build either, which is the point.)
+#   - `npm run lint` is declared in package.json but no eslint config file
+#     exists anywhere in the repo, so under eslint v9 the script cannot run at
+#     all. It has been dead, and nothing noticed because nothing called it.
+#
+# The cost of that shows up as the same cleanups being done repeatedly: three
+# separate UI passes each found that newer code had reversed the previous
+# pass's conventions. A gate does not fix taste, but it does stop the
+# mechanical half of the regression -- dead imports, broken props, a component
+# deleted out from under its last caller -- from ever reaching main.
+#
+# Deliberately NOT here (yet): eslint, because there is no config to run and
+# adding one produces a large backlog that has to be triaged before it can
+# gate anything; and Playwright (`npm test`), which needs a backend and a
+# browser download and belongs in its own job.
+name: frontend-build
+
+on:
+  push:
+    paths:
+      - 'workspace/frontend/**'
+      - '.github/workflows/frontend-build.yml'
+  pull_request:
+    paths:
+      - 'workspace/frontend/**'
+      - '.github/workflows/frontend-build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workspace/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workspace/frontend/package-lock.json
+
+      - run: npm ci
+
+      # Redundant with the build's own type-check, and kept anyway: it fails in
+      # about half the time and reports a type error AS a type error, rather
+      # than as "Next.js build worker exited with code: 1". Keep it first so
+      # the cheap, legible failure is the one people see.
+      - name: Type check
+        run: npm run typecheck
+
+      # The step that earns its place: it catches the class tsc cannot see -- a
+      # module that resolves at type level but not at bundle time, a
+      # client/server boundary violation, a route that fails to prerender.
+      # `output: 'export'` in next.config.mjs means this is a full static
+      # export, so all seven routes are actually rendered here rather than
+      # deferred to a running server.
+      - name: Build
+        run: npm run build
+        env:
+          # The app prefers window.location.origin at runtime and only falls
+          # back to this, but prerendering has no window -- so give the build
+          # a definite value instead of letting it bake in whatever a missing
+          # .env.local resolves to.
+          NEXT_PUBLIC_API_URL: http://localhost:8000

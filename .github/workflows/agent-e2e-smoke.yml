@@ -7,20 +7,23 @@ on:
         description: "Agent type to test (claude default; hermes also supported)"
         required: false
         default: claude
-  push:
-    branches: [develop]
-    paths:
-      - "packages/agent-connector/**"
-      - "workspace/**"
-      - "tests/e2e/**"
-      - ".github/workflows/agent-e2e-smoke.yml"
-  pull_request:
-    branches: [develop]
-    paths:
-      - "packages/agent-connector/**"
-      - "workspace/**"
-      - "tests/e2e/**"
-      - ".github/workflows/agent-e2e-smoke.yml"
+  # NOT A PATH BUG -- DO NOT "FIX" BY REPOINTING THESE.
+  #
+  # Every input this workflow needs is gone, not moved:
+  #   - `packages/agent-connector` was renamed to `packages/wwj`
+  #   - `tests/e2e/agent-smoke.js`, the entrypoint, does not exist anywhere in
+  #     the repo
+  #   - the CLI it links is no longer `agn`; wwj's bin is `wwj`
+  # So unlike wwj-tests.yml, which was a live suite behind a dead path filter,
+  # there is no test here to restore -- the e2e smoke test was deleted and this
+  # file was left standing over the hole, where it read as coverage.
+  #
+  # Left in place rather than deleted so the shape of the old smoke test is
+  # recoverable if someone rewrites it, but the push/pull_request triggers are
+  # removed: a filter matching a deleted directory never fires and never
+  # errors, which is exactly how this went unnoticed. `workflow_dispatch`
+  # above is now the only way in, and it will fail fast on the missing
+  # entrypoint — which is the honest result.
 
 env:
   AGENT_TYPE: ${{ inputs.agent_type || 'claude' }}

@@ -1,0 +1,109 @@
+# Runs the adapter test suite in packages/wwj.
+#
+# WHY THIS FILE IS NAMED DIFFERENTLY THAN ITS HISTORY
+#
+# This was `agent-connector.yml`, pointed at `packages/agent-connector`. That
+# package was renamed to `packages/wwj` (`@woowonjae/wwj`) and the workflow was
+# not moved with it, so BOTH the path filter and `working-directory` referenced
+# a directory that no longer exists. The filter can never match, so push and
+# pull_request never fired it; `workflow_dispatch` would have failed on the
+# missing directory. The result was that the entire adapter layer -- every
+# adapter, the base class, 111 tests -- had no CI gate at all, and looked
+# guarded because a workflow with a plausible name sat next to it.
+#
+# A path filter naming a directory that does not exist is silent by design:
+# GitHub reports no error for a workflow that simply never triggers.
+name: wwj-tests
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'packages/wwj/**'
+      - '.github/workflows/wwj-tests.yml'
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'packages/wwj/**'
+      - '.github/workflows/wwj-tests.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node-version: ['20', '22', '24']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: npm
+        cache-dependency-path: packages/wwj/package-lock.json
+
+    # Needed even though most suites only touch pure logic: `openclaw.js`
+    # requires `ws` at module load and `tui.js` requires `blessed`, so one test
+    # reaching the adapter index is enough to need a real install. A local run
+    # can never show this — node_modules is always present — which is the same
+    # blind spot that let this workflow point at a deleted directory for as
+    # long as it did.
+    - name: Install
+      working-directory: packages/wwj
+      run: npm ci
+
+    - name: Run tests
+      working-directory: packages/wwj
+      # shell: bash ensures the `test/*.test.js` glob is expanded by bash
+      # even on Windows runners (PowerShell doesn't expand globs).
+      # The mini.test.js exclusion is inherited from the agent-connector days;
+      # no such file exists in packages/wwj, so it is currently a no-op kept
+      # only because the suite may regain one.
+      shell: bash
+      run: node --test $(ls test/*.test.js | grep -v 'mini\.test\.js')
+
+  # DISABLED PENDING A DECISION -- do not re-enable by deleting `if: false`
+  # alone. This job used to publish `@openagents-org/agent-connector` from
+  # `packages/agent-connector`. That package is now `@woowonjae/wwj`, a
+  # different name on a different path, so repointing it would not be a fix --
+  # it would start publishing a NEW package to npm on every push to develop.
+  # Whether `@woowonjae/wwj` should be published at all, and under whose
+  # credentials, is for a human to decide. Until then this stays off rather
+  # than red: `working-directory` below is still the dead path.
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    if: false
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Publish to npm
+      working-directory: packages/agent-connector
+      # Skip when this exact version is already on npm so a push to develop that
+      # doesn't bump the version doesn't fail the job with E403 ("cannot publish
+      # over previously published versions"). Only an actual version bump
+      # publishes.
+      run: |
+        NAME=$(node -p "require('./package.json').name")
+        VERSION=$(node -p "require('./package.json').version")
+        if npm view "$NAME@$VERSION" version >/dev/null 2>&1; then
+          echo "$NAME@$VERSION already published — skipping publish."
+          exit 0
+        fi
+        npm publish --access public --provenance
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
