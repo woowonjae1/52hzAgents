@@ -226,6 +226,9 @@ test('PiAdapter retries on transient upstream 422 error and succeeds on subseque
     token: 'test-token',
     client,
     retryDelayMs: 0,
+    // Pinned, not inherited: this test asserts on the "(n/max)" the status
+    // prints, and the constructor default has moved before now.
+    maxRetries: 2,
   });
 
   let callCount = 0;
@@ -236,6 +239,9 @@ test('PiAdapter retries on transient upstream 422 error and succeeds on subseque
     }
     return 'Success after retry';
   };
+  // The retry policy now floors the backoff so a configured 0 cannot mean
+  // "no wait"; keep the test fast without disabling the path under test.
+  adapter._retryDelayFor = () => 0;
   adapter._autoTitleChannel = async () => {};
   const statusUpdates = [];
   adapter.sendStatus = async (ch, status) => {
@@ -261,7 +267,10 @@ test('PiAdapter retries on transient upstream 422 error and succeeds on subseque
   assert.equal(errorMessages.length, 0);
 
   // Status should contain retry notification
-  assert.ok(statusUpdates.some((s) => s.includes('retrying (1/2)')));
+  assert.ok(
+    statusUpdates.some((s) => /retrying .*\(1\/2\)/i.test(s)),
+    `expected a retry status, got: ${JSON.stringify(statusUpdates)}`,
+  );
 });
 
 test('PiAdapter captures auto_retry_end failure', async () => {

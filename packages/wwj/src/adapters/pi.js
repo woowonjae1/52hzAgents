@@ -29,6 +29,12 @@ const { whereBinary, whichBinary, getRuntimePrefix, getEnhancedEnv } = require('
 const IS_WINDOWS = process.platform === 'win32';
 const MAX_HISTORY_ENTRIES = 12;
 
+// Retry policy. See `_classifyFailure` / `_retryDelayFor` for why each exists.
+const PI_MIN_RETRY_DELAY_MS = 1000;   // floor, so a configured 0 cannot mean "no wait"
+const PI_MAX_RETRY_DELAY_MS = 30000;  // ceiling on the exponential
+const PI_RESUME_MIN_CHARS = 400;      // work worth resuming rather than replaying
+const PI_OVERLOAD_FATAL_MS = 45000;   // past this, a 422 is about size, not luck
+
 // Pi's own configuration directory. `models.json` declares the providers and
 // models this install can reach; `settings.json` names the active one. Both are
 // read-only here - the workspace never writes Pi's config.
@@ -50,8 +56,8 @@ class PiAdapter extends BaseAdapter {
     this.piModel = opts.piModel || env.PI_MODEL || '';
     this.piProvider = opts.piProvider || env.PI_PROVIDER || '';
     this.piApprove = opts.piApprove !== false; // default true
-    this.maxRetries = opts.maxRetries !== undefined ? opts.maxRetries : 2;
-    this.retryDelayMs = opts.retryDelayMs !== undefined ? opts.retryDelayMs : 1500;
+    this.maxRetries = opts.maxRetries !== undefined ? opts.maxRetries : 3;
+    this.retryDelayMs = opts.retryDelayMs !== undefined ? opts.retryDelayMs : 2000;
 
     this._channelProcesses = {};
 
@@ -333,15 +339,28 @@ class PiAdapter extends BaseAdapter {
     let finalAnswer = '';
     let streamedText = '';
     let currentThinking = '';
+    let hasFlushedThinkingInCurrentTurn = false;
     let stderrBuf = '';
     let lineBuffer = '';
     let lastErrorMessage = '';
     let _pendingLines = Promise.resolve();
+    /*
+      How much real work this attempt got through before it died. The retry
+      policy in `_handleMessage` needs it: an attempt that streamed six
+      minutes of reasoning must not be thrown away and restarted, while one
+      that died instantly with nothing to show can safely be re-run whole.
+      Counted in characters of reasoning + reply actually emitted.
+    */
+    let producedChars = 0;
+    const startedAt = Date.now();
 
     const flushThinking = async () => {
       const text = currentThinking.trim();
       currentThinking = '';
-      if (text) {
+      // Skip empty or lone punctuation fragments (e.g. '.', '。', ',') which are not genuine reasoning
+      if (text && !/^[.\s,，。！？!?\-_/\\:：;；]+$/.test(text)) {
+        hasFlushedThinkingInCurrentTurn = true;
+        producedChars += text.length;
         try { await this.sendThinking(channelName, text); } catch {}
       }
     };
@@ -362,6 +381,11 @@ class PiAdapter extends BaseAdapter {
 
       const eventType = event.type || '';
 
+      if (eventType === 'turn_start') {
+        hasFlushedThinkingInCurrentTurn = false;
+        currentThinking = '';
+      }
+
       // 1. Thinking / Reasoning
       // Official Pi CLI emits message_update with assistantMessageEvent.type = 'thinking_delta' | 'thinking_end'
       if (eventType === 'thinking') {
@@ -375,7 +399,7 @@ class PiAdapter extends BaseAdapter {
           currentThinking += ame.delta;
         } else if (ame.type === 'thinking_end') {
           // Complete thought content arrives on thinking_end. Flush once here.
-          currentThinking = ame.content || currentThinking;
+          currentThinking = (ame.content && ame.content.trim()) || currentThinking;
           await flushThinking();
         }
       }
@@ -385,14 +409,18 @@ class PiAdapter extends BaseAdapter {
       if (eventType === 'assistant' || eventType === 'text_delta') {
         const text = event.text || event.content || event.delta || '';
         if (text) {
-          await flushThinking();
+          if (!hasFlushedThinkingInCurrentTurn && currentThinking.trim()) {
+            await flushThinking();
+          }
           streamedText += text;
           try { await this.sendThinking(channelName, text, { isReplyPreview: true }); } catch {}
         }
       } else if (eventType === 'message_update' && event.assistantMessageEvent) {
         const ame = event.assistantMessageEvent;
         if (ame.type === 'text_delta' && ame.delta) {
-          await flushThinking();
+          if (!hasFlushedThinkingInCurrentTurn && currentThinking.trim()) {
+            await flushThinking();
+          }
           streamedText += ame.delta;
           try { await this.sendThinking(channelName, ame.delta, { isReplyPreview: true }); } catch {}
         } else if (ame.type === 'text_end') {
@@ -409,6 +437,11 @@ class PiAdapter extends BaseAdapter {
         eventType === 'tool_execution_start'
       ) {
         await flushThinking();
+        hasFlushedThinkingInCurrentTurn = false;
+        // Since a tool is executing, text streamed prior to this tool was
+        // intermediate commentary, NOT the final answer. Clear streamedText
+        // so it cannot masquerade as the resolved answer if an error follows.
+        streamedText = '';
         const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
         const input = event.args || event.input || {};
         const detail = input.command || input.path || input.query || (typeof input === 'string' ? input : '');
@@ -419,11 +452,15 @@ class PiAdapter extends BaseAdapter {
       // 4. Final response extraction & error detection from message_end / turn_end
       if (eventType === 'message_end' || eventType === 'turn_end') {
         await flushThinking();
+        hasFlushedThinkingInCurrentTurn = false;
         const msg = event.message;
         if (msg) {
           if (msg.stopReason === 'error' || msg.errorMessage) {
             lastErrorMessage = msg.errorMessage || `Model request stopped with reason: ${msg.stopReason}`;
             this._log(`Pi model error: ${lastErrorMessage}`);
+          } else {
+            // A successful message turn clears any stale transient error
+            lastErrorMessage = '';
           }
           if (msg.role === 'assistant' && Array.isArray(msg.content)) {
             const textParts = msg.content
@@ -480,14 +517,25 @@ class PiAdapter extends BaseAdapter {
     delete this._channelProcesses[channelName];
 
     const resolvedAnswer = (finalAnswer || streamedText || responseChunks.join('\n')).trim();
+    producedChars += streamedText.length + resolvedAnswer.length;
+
+    // Carry the attempt's shape on the error itself. `_handleMessage` decides
+    // restart-vs-resume-vs-give-up from these two numbers, and it cannot
+    // recover them once the subprocess is gone.
+    const fail = (message) => {
+      const err = new Error(message);
+      err.piProducedChars = producedChars;
+      err.piElapsedMs = Date.now() - startedAt;
+      return err;
+    };
 
     if (exitCode !== 0) {
       const detail = (stderrBuf || lastErrorMessage || resolvedAnswer).trim().slice(0, 600);
-      throw new Error(`pi exited with code ${exitCode}: ${detail}`);
+      throw fail(`pi exited with code ${exitCode}: ${detail}`);
     }
 
-    if (!resolvedAnswer && lastErrorMessage) {
-      throw new Error(lastErrorMessage);
+    if (lastErrorMessage) {
+      throw fail(lastErrorMessage);
     }
 
     return resolvedAnswer;
@@ -685,6 +733,79 @@ class PiAdapter extends BaseAdapter {
     );
   }
 
+  /*
+    A 422 `upstream_error` / `atria_api_error` is transient in shape but, on a
+    turn that has already been running for minutes, is almost always about the
+    size of the request rather than a blip upstream. Re-sending the identical
+    prompt then fails identically: the observed case burned all four attempts
+    over four minutes and surfaced only the last error. Treated as fatal once
+    the attempt has run long enough to rule out a blip — UNLESS there is
+    partial work to resume from, in which case the continuation prompt is
+    smaller than the original and stands a real chance.
+  */
+  _isDeterministicOverload(err) {
+    if (!err || !err.message) return false;
+    const msg = String(err.message).toLowerCase();
+    return (
+      msg.includes('upstream_error') ||
+      msg.includes('atria_api_error') ||
+      msg.includes('inference request failed') ||
+      /\b422\b/.test(msg)
+    );
+  }
+
+  /*
+    Exponential backoff with jitter, and a floor.
+
+    The old delay was `(attempt + 1) * retryDelayMs`, which with a configured
+    `retryDelayMs: 0` is zero for every attempt — the whole retry budget then
+    burns in about two milliseconds against an upstream that is plainly not
+    ready yet (seen in daemon.log: three attempts inside 2ms). A retry with no
+    wait is not a retry.
+  */
+  _retryDelayFor(attempt) {
+    const base = Math.max(this.retryDelayMs || 0, PI_MIN_RETRY_DELAY_MS);
+    const backoff = Math.min(base * Math.pow(2, attempt), PI_MAX_RETRY_DELAY_MS);
+    return Math.round(backoff * (0.75 + Math.random() * 0.5));
+  }
+
+  /*
+    restart | resume | fatal.
+
+    `resume` is the case this whole policy exists for: the attempt streamed
+    real reasoning before dying, so the session file holds genuine progress.
+    Rolling that back and re-sending the original prompt is a restart, not a
+    retry — it discards the work AND re-incurs the full request size that
+    likely caused the failure. Keeping the session and sending a short
+    continuation does neither.
+  */
+  _classifyFailure(err, attempt) {
+    if (!this._isTransientError(err)) return 'fatal';
+    const produced = err && err.piProducedChars ? err.piProducedChars : 0;
+    const elapsed = err && err.piElapsedMs ? err.piElapsedMs : 0;
+    if (produced >= PI_RESUME_MIN_CHARS) return 'resume';
+    if (this._isDeterministicOverload(err) && elapsed >= PI_OVERLOAD_FATAL_MS) return 'fatal';
+    return 'restart';
+  }
+
+  /*
+    One error line that accounts for the whole turn. A four-minute,
+    four-attempt failure used to surface as `Pi error: 422: {...}` — true of
+    the last attempt and silent about the other three, which is why it read
+    as "it just hangs then dies".
+  */
+  _formatTurnFailure(err) {
+    const parts = [`Pi error: ${err.message}`];
+    const log = err.piAttemptLog || [];
+    if (log.length > 1) {
+      const secs = Math.round((err.piTurnMs || 0) / 1000);
+      parts.push(`\n\nFailed after ${log.length} attempts over ${secs}s:`);
+      for (const line of log) parts.push(`\n  ${line}`);
+    }
+    return parts.join('');
+  }
+
+
   // ------------------------------------------------------------------
   // Message handler
   // ------------------------------------------------------------------
@@ -720,26 +841,59 @@ class PiAdapter extends BaseAdapter {
       };
 
       const maxRetries = this.maxRetries;
+      const turnStartedAt = Date.now();
+      /*
+        Every attempt's outcome, so the final error can say what actually
+        happened. Previously the three intermediate failures went only to
+        daemon.log and `sendStatus` — and each status overwrites the last —
+        so a four-attempt, four-minute failure reached the user as one red
+        line with no hint that it had been retried at all.
+      */
+      const attemptLog = [];
       let responseText = '';
+      // Set once an attempt dies with work worth keeping: the next attempt
+      // then resumes pi's own session instead of replaying the prompt.
+      let resumeFrom = null;
+
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const attemptPrompt = resumeFrom
+          ? `Your previous turn was cut off by an upstream model error after producing roughly ${resumeFrom.producedChars} characters of work. Your session still holds that work. Continue from where you stopped and deliver the final answer. Do not start over and do not repeat what you already worked through.`
+          : prompt;
         try {
-          responseText = await this._runPi(prompt, msgChannel, content);
+          responseText = await this._runPi(attemptPrompt, msgChannel, content);
           if (responseText) break;
+          attemptLog.push(`#${attempt + 1} empty completion`);
         } catch (err) {
-          const isTransient = this._isTransientError(err);
-          if (isTransient && attempt < maxRetries) {
-            rollbackSession();
-            const delayMs = (attempt + 1) * this.retryDelayMs;
-            this._log(`Transient model error on attempt ${attempt + 1}: ${err.message}. Retrying in ${delayMs}ms...`);
-            try {
-              await this.sendStatus(msgChannel, `Model service transient error, retrying (${attempt + 1}/${maxRetries})...`);
-            } catch {}
-            if (delayMs > 0) {
-              await new Promise((resolve) => setTimeout(resolve, delayMs));
-            }
-            continue;
+          const mode = attempt < maxRetries ? this._classifyFailure(err, attempt) : 'fatal';
+          const secs = Math.round((err.piElapsedMs || 0) / 1000);
+          attemptLog.push(`#${attempt + 1} after ${secs}s: ${err.message}`.slice(0, 300));
+
+          if (mode === 'fatal') {
+            err.piAttemptLog = attemptLog;
+            err.piTurnMs = Date.now() - turnStartedAt;
+            throw err;
           }
-          throw err;
+
+          if (mode === 'resume') {
+            // Deliberately NOT rolling the session back — the partial turn in
+            // it is the thing being resumed.
+            resumeFrom = { producedChars: err.piProducedChars || 0 };
+            this._log(`Attempt ${attempt + 1} died after ${secs}s with ${resumeFrom.producedChars} chars of work; resuming session rather than restarting.`);
+          } else {
+            resumeFrom = null;
+            rollbackSession();
+            this._log(`Attempt ${attempt + 1} failed fast (${secs}s, no output); restarting from a clean session.`);
+          }
+
+          const delayMs = this._retryDelayFor(attempt);
+          this._log(`Transient model error on attempt ${attempt + 1}: ${err.message}. ${mode} in ${delayMs}ms...`);
+          try {
+            await this.sendStatus(
+              msgChannel,
+              `${mode === 'resume' ? 'Resuming' : 'Retrying'} after model error (${attempt + 1}/${maxRetries})…`,
+            );
+          } catch {}
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
       }
 
@@ -750,7 +904,7 @@ class PiAdapter extends BaseAdapter {
       }
     } catch (e) {
       this._log(`Pi adapter error: ${e.message}`);
-      await this.sendError(msgChannel, `Pi error: ${e.message}`);
+      await this.sendError(msgChannel, this._formatTurnFailure(e));
     }
   }
 }

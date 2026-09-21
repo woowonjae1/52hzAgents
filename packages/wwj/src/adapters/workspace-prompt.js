@@ -936,13 +936,35 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
 
       `\`${curl} -s -H "${h}" "${baseUrl}/v1/todos?network=${workspaceId}&channel=${channelName}"\`\n\n` +
 
-      '**IMPORTANT:** When you receive a task with multiple steps or a list of things to do, ' +
+      '**When to use it.** The to-do board is shared with the user and with ' +
 
-      'ALWAYS create a to-do list first before starting work. This lets the user see your ' +
+      'other agents, and it outlives your turn. Put work on it only when it ' +
 
-      'progress in real time. Update statuses as you work through each item.\n' +
+      'has to survive past this reply:\n' +
 
-      'You can assign items to other agents: `"assignee": "other-agent-name"`\n'
+      '- work that will take more than one turn to finish, or\n' +
+
+      '- work you are handing to another agent (`"assignee"`), or\n' +
+
+      '- work the user explicitly asked you to track.\n\n' +
+
+      '**When NOT to use it.** If you can finish everything in this one reply, ' +
+
+      'do not write a to-do list. Your internal plan for a single turn is not a ' +
+
+      'task — it belongs in your reasoning, not on a board the user has to clean ' +
+
+      'up later. Breaking one request into five internal steps does not make it ' +
+
+      'five tasks.\n\n' +
+
+      '**Close what you open.** Anything you set to `in_progress` must end the ' +
+
+      'turn as `completed` or `cancelled`. Never leave a row `in_progress` when ' +
+
+      'you stop working — if you could not finish, set it back to `pending` and ' +
+
+      'say why in your reply.\n'
 
     );
 
@@ -1270,13 +1292,19 @@ function buildGuardrails() {
 
     'as your text response.\n' +
 
-    '\nIMPORTANT: When the user gives you a numbered list, bulleted list, or ' +
+    '\nTO-DO SCOPE: The to-do board is shared and outlives your turn, so it is ' +
 
-    'multiple tasks in a single message, you MUST create a to-do list BEFORE ' +
+    'for work that has to survive past this reply - work spanning more than one ' +
 
-    'doing any work. This is mandatory  - no exceptions, even for simple tasks. ' +
+    'turn, work handed to another agent, or work the user asked you to track. ' +
 
-    'The to-do list lets the user track your progress in real time.\n' +
+    'If you can finish it all in this reply, do not open tasks: your plan for a ' +
+
+    'single turn belongs in your reasoning, not on a board someone else has to ' +
+
+    'clean up. Anything you mark in_progress must end the turn completed, ' +
+
+    'cancelled, or back at pending - never in_progress.\n' +
 
     '\nCRITICAL SCHEDULE RULE: When the user requests a scheduled, delayed, or recurring task (e.g. "每天10点给我推送...", "半小时后提醒我...", "定时任务..."), you MUST DIRECTLY AND IMMEDIATELY invoke your scheduling tool (such as `schedule` with DurationSeconds or CronExpression, or workspace_create_routine / workspace_create_timer). ' +
 
@@ -1318,7 +1346,7 @@ function buildClaudeMcpToolBlock() {
 
     'Use workspace_get_agents to see other agents.\n' +
 
-    'Use workspace_put_todos to track your progress. ALWAYS create a to-do list when given multiple tasks or multi-step work.\n' +
+    'Use workspace_put_todos for work that outlives this turn (multi-turn work, work handed to another agent, or tracking the user asked for); work you finish in this reply does not go on the board, and nothing may be left in_progress when you stop. Assign with `"assignee": "other-agent-name"`.\n' +
 
     'Use workspace_create_timer to set a reminder that wakes you up later.\n' +
 

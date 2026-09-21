@@ -6,7 +6,7 @@ import { runUndoable } from '@/lib/undoable';
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { toast } from '@/lib/toast';
-import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, Folder, FolderPlus, FolderOpen, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X, ListFilter } from 'lucide-react';
+import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, Folder, FolderPlus, FolderOpen, FolderMinus, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X, ListFilter } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
@@ -330,6 +330,22 @@ interface ThreadRowProps {
   onSaveEdit: (sessionId: string, title: string) => void;
   onUpdateStarred: (sessionId: string, starred: boolean) => void;
   onUpdateStatus: (sessionId: string, status: 'active' | 'archived' | 'deleted') => void;
+  /*
+    Re-point an EXISTING thread at a folder, or detach it with null.
+
+    `workingDir` was write-once from the UI's side: the two places that set it
+    (the launch screen and the New chat dialog) both run at creation, and
+    every other site only reads it to group and display. Drag-and-drop could
+    move a thread BETWEEN groups, but a group only exists if some thread is
+    already in that folder — so a directory you had not used before was
+    unreachable without starting a new thread. The row already shows the
+    folder; now it can change it.
+  */
+  onChangeFolder: (sessionId: string, current: string | null) => void;
+  /** Detach without opening a picker. Separate from `onChangeFolder`,
+      whose second argument seeds the browse dialog rather than setting a
+      value — one callback doing both reads as the same action twice. */
+  onClearFolder: (sessionId: string) => void;
   setEditTitleValue: (v: string) => void;
   /** Alt+Shift+Up/Down: move this thread to the previous/next project group. */
   onMoveToAdjacentFolder?: (sessionId: string, direction: -1 | 1) => void;
@@ -355,6 +371,8 @@ const ThreadRow = memo(function ThreadRow({
   onSaveEdit,
   onUpdateStarred,
   onUpdateStatus,
+  onChangeFolder,
+  onClearFolder,
   setEditTitleValue,
   onMoveToAdjacentFolder,
 }: ThreadRowProps) {
@@ -631,6 +649,27 @@ const ThreadRow = memo(function ThreadRow({
                 : <><Archive className="size-4" /><span>Archive</span></>
               }
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onChangeFolder(session.sessionId, session.workingDir ?? null);
+              }}
+            >
+              <FolderOpen className="size-4" />
+              <span>{session.workingDir ? 'Change project folder…' : 'Set project folder…'}</span>
+            </DropdownMenuItem>
+            {session.workingDir && (
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClearFolder(session.sessionId);
+                }}
+              >
+                <FolderMinus className="size-4" />
+                <span>Remove from project</span>
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
@@ -1120,6 +1159,44 @@ export function ThreadList() {
   // to appear. Without this the button looked dead and people clicked it twice.
   const [browsingFolder, setBrowsingFolder] = useState(false);
 
+  /*
+    Re-point an existing thread. `moveSessionToFolder` already does the work —
+    optimistic update, PATCH, rollback on failure — and the backend's
+    PatchChannel has always accepted `working_dir`. The only thing missing was
+    a way to name a directory that is not already one of the groups, which
+    drag-and-drop cannot express.
+
+    The current directory seeds the dialog so "change" starts where the thread
+    already is rather than at the filesystem root.
+  */
+  const handleChangeFolder = useCallback(async (sessionId: string, current: string | null) => {
+    if (browsingFolder) return;
+    setBrowsingFolder(true);
+    try {
+      const dir = await browseForFolder(current ?? undefined);
+      if (!dir) return;
+      await moveSessionToFolder(sessionId, dir);
+      toast.success(`Thread moved to ${basename(dir)}`);
+    } catch (e) {
+      toast.error(
+        e instanceof Error
+          ? `Could not reach the local wwj daemon (${e.message}). Make sure \`wwj up\` is running.`
+          : 'Could not open the folder picker.',
+      );
+    } finally {
+      setBrowsingFolder(false);
+    }
+  }, [browsingFolder, moveSessionToFolder]);
+
+  const handleClearFolder = useCallback(async (sessionId: string) => {
+    try {
+      await moveSessionToFolder(sessionId, null);
+      toast.success('Thread removed from its project');
+    } catch {
+      toast.error('Could not remove the thread from its project');
+    }
+  }, [moveSessionToFolder]);
+
   const addProjectFolder = async () => {
     if (browsingFolder) return;
     setBrowsingFolder(true);
@@ -1482,6 +1559,8 @@ export function ThreadList() {
                       onSaveEdit={handleSaveEdit}
                       onUpdateStarred={handleUpdateStarred}
                       onUpdateStatus={handleUpdateStatus}
+                      onChangeFolder={handleChangeFolder}
+                      onClearFolder={handleClearFolder}
                       setEditTitleValue={setEditTitleValue}
                       onMoveToAdjacentFolder={handleMoveToAdjacentFolder}
                     />

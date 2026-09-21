@@ -1183,6 +1183,8 @@ class BaseAdapter {
     } catch (e) {
       this._log(`Error in channel worker for ${channel}: ${e.message}`);
       try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
+    } finally {
+      await this._releaseStaleTodos(channel, 'turn ended');
     }
 
     // Drain queue
@@ -1201,6 +1203,8 @@ class BaseAdapter {
       } catch (e) {
         this._log(`Error processing queued message in ${channel}: ${e.message}`);
         try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
+      } finally {
+        await this._releaseStaleTodos(channel, 'queued turn ended');
       }
     }
     this._channelBusy.delete(channel);
@@ -1412,6 +1416,50 @@ class BaseAdapter {
       });
     } catch {
       // Best-effort cleanup
+    }
+  }
+
+  /*
+    A turn that ends leaves its to-do list behind.
+
+    The workspace prompt has agents write the list BEFORE doing the work, so a
+    turn that dies strands an `in_progress` row with no process behind it —
+    observed on the board as a task sitting "In Progress" for 19 hours after a
+    pi turn failed on an upstream 422. Nothing is running, so nothing may
+    claim to be.
+
+    Runs after EVERY turn, not only failed ones: `_channelWorker` serialises
+    turns per channel, so by the time this fires the turn is over either way.
+    An agent that finished properly has already closed its rows and this is a
+    no-op; one that crashed, was stopped, or simply forgot gets corrected.
+
+    Demote, don't annotate or cancel: the server's status vocabulary is only
+    pending|in_progress|completed|cancelled (no `blocked`), the task itself is
+    usually still real and worth keeping — so cancelling it would throw away
+    work the user may want — and the only actual lie is "this is running".
+    Contrast `cleanupTodos`, which DOES cancel everything and is for teardown.
+  */
+  async _releaseStaleTodos(channelName, reason) {
+    try {
+      if (!this.client || !this.workspaceId) return;
+      const source = `52hz:${this.agentName}`;
+      const data = await this.client.getTodos(this.workspaceId, channelName, this.token, {
+        agent: this.agentName,
+      });
+      const todos = (data && data.todos) || [];
+      const mine = todos.filter((t) => !t.source || t.source === source || t.createdBy === source);
+      if (!mine.some((t) => t.status === 'in_progress')) return;
+
+      const next = mine.map((t) => ({
+        content: t.content,
+        status: t.status === 'in_progress' ? 'pending' : t.status,
+        assignee: t.assignee,
+        priority: t.priority,
+      }));
+      await this.client.putTodos(this.workspaceId, channelName, this.token, next, { source });
+      this._log(`Released stale in_progress to-dos after turn ended: ${reason}`);
+    } catch (e) {
+      this._log(`Could not release stale to-dos: ${e.message}`);
     }
   }
 
