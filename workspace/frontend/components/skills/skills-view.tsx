@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { ScreenMark } from '@/components/headers/screen-mark';
 import { workspaceApi } from '@/lib/api';
 import { RowActions } from '@/components/ui/row-actions';
 import type { WorkspaceCustomSkill } from '@/lib/types';
@@ -622,7 +623,7 @@ export function SkillsView() {
             </button>
           </Hint>
           <div className="h-3.5 w-px bg-border/60" />
-          <Sparkles className="size-4 text-status-warning" />
+          <ScreenMark icon={Sparkles} />
           <ScreenTitle>Skill Hub</ScreenTitle>
           <span className="text-xs text-muted-foreground">{allSkills.length} skills</span>
           <button
@@ -683,7 +684,7 @@ export function SkillsView() {
             {activeCategory === 'all' && !search && (
               <div>
                 <div className="flex items-center gap-2 mb-2.5">
-                  <Star className="size-3.5 text-status-warning fill-status-warning" />
+                  <Star className="size-3.5 text-muted-foreground fill-muted-foreground" />
                   <h3 className="text-xs font-medium text-muted-foreground">Featured</h3>
                 </div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-3">

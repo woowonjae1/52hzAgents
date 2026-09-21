@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, Trash2, Plus } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { ScreenMark } from '@/components/headers/screen-mark';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -46,7 +47,7 @@ export function RoutinesView() {
       {/* Header */}
       <div className="shrink-0 px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 text-status-merged" />
+          <ScreenMark icon={CalendarClock} />
           <ScreenTitle>Routines</ScreenTitle>
           {activeRoutines.length > 0 && (
             <span className="text-xs text-muted-foreground">

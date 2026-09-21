@@ -94,7 +94,7 @@ export function RoutineHistoryDrawer({
         <SheetHeader className="px-6 py-5 border-b border-border shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="size-8 rounded-lg bg-status-merged/10 text-status-merged flex items-center justify-center shrink-0">
+              <div className="size-8 rounded-lg bg-surface2 text-foreground-muted flex items-center justify-center shrink-0">
                 <History className="size-4" />
               </div>
               <div className="min-w-0">

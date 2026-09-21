@@ -6,6 +6,7 @@ import { CalendarClock, RefreshCw, Trash2, Plus, ArrowLeft, History } from 'luci
 import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { ScreenMark } from '@/components/headers/screen-mark';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -78,7 +79,7 @@ export function RoutineList() {
             </button>
           </Hint>
           <div className="h-3.5 w-px bg-border/60" />
-          <CalendarClock className="size-3.5 text-status-merged" />
+          <ScreenMark icon={CalendarClock} />
           <ScreenTitle>Scheduled tasks</ScreenTitle>
           {activeRoutines.length > 0 && (
             <span className="text-xs text-muted-foreground font-mono">({activeRoutines.length})</span>

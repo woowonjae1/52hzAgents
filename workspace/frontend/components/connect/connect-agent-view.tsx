@@ -80,8 +80,11 @@ function getProviderBrand(name: string) {
 }
 
 function CategoryIcon({ category, className }: { category: string; className?: string }) {
-  if (category === 'image') return <ImageIcon className={cn('text-status-merged', className)} />;
-  if (category === 'audio') return <Volume2 className={cn('text-status-warning', className)} />;
+  // All three are muted: the glyph already distinguishes text from image from
+  // audio, and borrowing the warning/merged status hues to decorate a category
+  // spends colour that means something elsewhere.
+  if (category === 'image') return <ImageIcon className={cn('text-foreground-muted', className)} />;
+  if (category === 'audio') return <Volume2 className={cn('text-foreground-muted', className)} />;
   return <MessageSquare className={cn('text-foreground-muted', className)} />;
 }
 

@@ -43,6 +43,7 @@ import { cn, mergeRefs } from '@/lib/utils';
 import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { ScreenMark } from '@/components/headers/screen-mark';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
@@ -419,9 +420,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
             </Hint>
             <div className="h-3.5 w-px bg-border/80" />
             <div className="flex items-center gap-2">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface2 text-foreground-muted">
-                <BookOpen className="size-4" />
-              </span>
+              <ScreenMark icon={BookOpen} />
               <ScreenTitle className="text-sm font-semibold tracking-tight text-foreground">
                 Knowledge
               </ScreenTitle>
