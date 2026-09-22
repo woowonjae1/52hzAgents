@@ -1466,9 +1466,33 @@ export function ChatView() {
                   className="mb-2.5 flex items-center justify-between gap-3 px-3.5 py-2 rounded-2xl bg-surface1 border border-border text-foreground text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <AlertTriangle className="size-3.5 shrink-0 text-status-warning" />
-                    <span className="truncate">
-                      The agents assigned to this thread ({sessionParticipants.map(p => `@${p}`).join(', ')}) are offline
-                    </span>
+                    {/*
+                      THE NAMES WERE COSTING THE WHOLE LINE AND BUYING NOTHING.
+
+                      This listed every assigned agent inline — eight @names on
+                      a real thread, which overran the row and truncated, so the
+                      end of the sentence ("are offline") was the part that got
+                      cut. And the names are not actionable HERE: the buttons to
+                      the right add ONLINE agents, so reading the offline ones
+                      one by one changes nothing you can do.
+
+                      Few enough to be useful, name them. More than that, the
+                      count is the fact and the roster is a detail — kept on the
+                      tooltip rather than deleted, since "which ones" is a fair
+                      question, just not one worth the whole row.
+                    */}
+                    {sessionParticipants.length <= 2 ? (
+                      <span className="truncate">
+                        {sessionParticipants.map((p) => `@${p}`).join(' and ')}{' '}
+                        {sessionParticipants.length === 1 ? 'is' : 'are'} offline
+                      </span>
+                    ) : (
+                      <Hint label={sessionParticipants.map((p) => `@${p}`).join(', ')}>
+                        <span className="truncate cursor-default">
+                          All {sessionParticipants.length} agents in this thread are offline
+                        </span>
+                      </Hint>
+                    )}
                   </div>
                   <div className="shrink-0 flex items-center gap-1.5">
                     {onlineAgents.slice(0, 2).map((a) => (

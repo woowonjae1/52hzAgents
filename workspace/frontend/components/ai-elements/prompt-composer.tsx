@@ -925,6 +925,18 @@ export function PromptComposer({
               />
             )}
 
+            {/*
+              THE SAME TWO KINDS OF THING AS THE HEADER ROW, NOW SAID THE SAME WAY.
+
+              This row mixes state and actions with one flat gap: the model and
+              the mode REPORT how the next message will be handled, while
+              mention, schedule and attach PERFORM something. The thread header
+              already solved exactly this — see its "row of assorted widgets"
+              note — with a hairline, so the same divider is reused here rather
+              than a second convention being invented for the same idea.
+            */}
+            <span className="h-3.5 w-px bg-border shrink-0 mx-0.5" aria-hidden />
+
             <Hint label="Mention an agent (@)">
               <button
                 type="button"
