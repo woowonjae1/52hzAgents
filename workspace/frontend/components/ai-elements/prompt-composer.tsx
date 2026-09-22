@@ -28,6 +28,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
 import { composerPillClass } from './composer-pill';
 import { OrchestrationControl } from '@/components/chat/orchestration-control';
+import { ContextHealthIndicator } from '@/components/chat/context-health-indicator';
 
 export type OrchestrationMode = 'dynamic' | 'master' | 'parallel';
 
@@ -1009,6 +1010,16 @@ export function PromptComposer({
             all three for anyone who wants them.
           */}
           <div className="flex min-w-0 items-center gap-2.5">
+            {/*
+              The context ring sits with send, not in the thread header.
+
+              It measures what the next message will cost, so it belongs beside
+              the control that sends it — and next to send it needs no label to
+              explain what it is about, which is what the header version had to
+              spend a word on.
+            */}
+            {session && <ContextHealthIndicator channelName={session.sessionId} variant="composer" />}
+
             {/*
               `Magnetic` WRAPS the hint, and the hint still wraps the button.
 

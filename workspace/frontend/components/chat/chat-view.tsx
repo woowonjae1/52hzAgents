@@ -49,7 +49,7 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
-import { ContextHealthIndicator } from './context-health-indicator';
+
 import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { PipelineStepper } from './pipeline-stepper';
@@ -1112,8 +1112,12 @@ export function ChatView() {
             one recipe the grouping no longer needs a container to be legible.
           */}
           <div className="flex items-center gap-1.5">
+            {/*
+              Context moved to the composer — it is a budget for the message you
+              are about to send, not a fact about the thread's name. See
+              ContextHealthIndicator's `composer` variant.
+            */}
             <AgentQuotaCapsule agentName={activeModelAgentName} />
-            <ContextHealthIndicator channelName={currentSessionId} />
             <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
           </div>
 

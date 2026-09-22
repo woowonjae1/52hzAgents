@@ -6,8 +6,7 @@ import {
   ChevronDown,
   Copy,
   RotateCcw,
-  ThumbsDown,
-  ThumbsUp,
+
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
@@ -145,11 +144,6 @@ export function StreamingResponse({
     copyTimer.current = window.setTimeout(() => setCopied(false), 1600);
   }, [copyText, onCopy]);
 
-  const setFeedback = (next: Exclude<StreamingResponseFeedback, null>) => {
-    const value = currentFeedback === next ? null : next;
-    if (feedback === undefined) setInternalFeedback(value);
-    onFeedbackChange?.(value);
-  };
 
   const setSourcesOpen = useCallback(
     (next: boolean) => {
@@ -208,24 +202,15 @@ export function StreamingResponse({
                   <RotateCcw className="size-3.5" />
                 </ResponseAction>
               ) : null}
-              {complete ? (
-                <>
-                  <ResponseAction
-                    label="Helpful"
-                    active={currentFeedback === "up"}
-                    onClick={() => setFeedback("up")}
-                  >
-                    <ThumbsUp className="size-3.5" />
-                  </ResponseAction>
-                  <ResponseAction
-                    label="Not helpful"
-                    active={currentFeedback === "down"}
-                    onClick={() => setFeedback("down")}
-                  >
-                    <ThumbsDown className="size-3.5" />
-                  </ResponseAction>
-                </>
-              ) : null}
+              {/*
+                Helpful / Not helpful removed here too — this is the bar the
+                transcript actually renders, so deleting them from
+                message-actions.tsx alone left them on screen.
+
+                They set local state and nothing read it: not sent, not stored,
+                not used to change what any agent does next. A rating control
+                earns its place once something consumes the rating.
+              */}
               {hasSources ? (
                 <button
                   type="button"

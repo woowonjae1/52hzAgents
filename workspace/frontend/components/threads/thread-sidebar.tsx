@@ -287,7 +287,14 @@ export function ThreadSidebar() {
           ) : isUnread ? (
             <span aria-label="Unread" className="size-1.5 rounded-full bg-primary" />
           ) : null}
-          {at ? formatCompactRelativeTime(at) : null}
+          {/*
+            The relative time is gone from the row, for the same reason it went
+            from the other list: twenty-five rows of "4d", "6d", "2h" restate
+            the order the list is already sorted in, and "4d versus 6d" changes
+            nothing anyone does. What is left in this slot is exceptional state
+            only — working, or unread — which is the kind of thing worth
+            carrying twenty-five times.
+          */}
         </span>
       );
     },

@@ -14,6 +14,17 @@ import { headerChipClass } from '@/components/headers/header-chip';
 interface ContextHealthIndicatorProps {
   channelName?: string;
   className?: string;
+  /**
+   * 'composer' is a bare ring with no label, sitting with the send controls.
+   *
+   * Context budget belongs next to the thing that spends it. In the header it
+   * was one of six chips competing for a strip that names the thread, and it
+   * had to carry the word "Context" to explain why it was there at all. Beside
+   * the composer it needs no label: it is obviously about the message you are
+   * writing, so the ring alone reads, and the numbers stay on hover where they
+   * already were.
+   */
+  variant?: 'header' | 'composer';
 }
 
 function fmtTokens(n: number): string {
@@ -23,7 +34,11 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
-export function ContextHealthIndicator({ channelName, className }: ContextHealthIndicatorProps) {
+export function ContextHealthIndicator({
+  channelName,
+  className,
+  variant = 'header',
+}: ContextHealthIndicatorProps) {
   const { workspaceId } = useWorkspace();
   const { setActiveRightTab } = useLayout();
   const [stats, setStats] = React.useState<WorkspaceTokenStats | null>(null);
@@ -220,6 +235,46 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
               : 'Context window not reported by any participant yet'
           }
         >
+          {variant === 'composer' ? (
+            <button
+              type="button"
+              aria-label="Context used"
+              className={cn(
+                'inline-flex size-6 shrink-0 items-center justify-center rounded-full',
+                'text-foreground-extra-muted hover:text-foreground transition-colors',
+                className
+              )}
+            >
+              {/*
+                A ring that fills as the window does. Grey until it matters —
+                the status colour is spent only once the budget is actually
+                tight, which is the same rule the header chip already followed
+                for its numbers.
+              */}
+              <svg viewBox="0 0 20 20" className="size-4 -rotate-90" aria-hidden>
+                <circle cx="10" cy="10" r="7" fill="none" strokeWidth="2.5" className="stroke-border" />
+                {knownWindow && budgetPct > 0 && (
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="7"
+                    fill="none"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(Math.min(budgetPct, 100) / 100) * 43.98} 43.98`}
+                    className={cn(
+                      'transition-all duration-500',
+                      status === 'critical'
+                        ? 'stroke-status-danger'
+                        : status === 'warning'
+                          ? 'stroke-status-warning'
+                          : 'stroke-foreground-muted'
+                    )}
+                  />
+                )}
+              </svg>
+            </button>
+          ) : (
           <button
             type="button"
             className={cn(
@@ -265,6 +320,7 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
               </>
             )}
           </button>
+          )}
         </Hint>
       </PopoverTrigger>
 
