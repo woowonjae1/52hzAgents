@@ -586,7 +586,7 @@ const ThreadRow = memo(function ThreadRow({
           />
         ) : (
           <span
-            title={hoverPreview ? `${smartTitle} — ${hoverPreview}` : smartTitle}
+            title={[smartTitle, displayTime, hoverPreview].filter(Boolean).join(' · ')}
             onDoubleClick={(e) => {
               e.stopPropagation();
               onStartEdit(session.sessionId, smartTitle);
@@ -602,12 +602,17 @@ const ThreadRow = memo(function ThreadRow({
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        <span className={cn(
-          'text-3xs tabular-nums transition-colors',
-          isSelected ? 'text-foreground/70' : 'text-foreground-extra-muted'
-        )}>
-          {displayTime}
-        </span>
+        {/*
+          THE TIMESTAMP IS GONE FROM THE ROW.
+
+          Twenty-five rows each carrying "4d", "6d", "1h" — and the list is
+          already sorted by that same value, so the column restated the order
+          it was sorted in. "4d" versus "6d" changes nothing anyone does; the
+          only genuinely useful case, "is this the one I was just in", is
+          carried better by position and by the unread dot.
+
+          Still reachable: it is on the row's own tooltip, beside the preview.
+        */}
 
         {/* Hover actions */}
         <DropdownMenu>

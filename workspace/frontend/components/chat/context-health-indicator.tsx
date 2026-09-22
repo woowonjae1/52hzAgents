@@ -232,7 +232,9 @@ export function ContextHealthIndicator({ channelName, className }: ContextHealth
             <span className="relative flex size-2 shrink-0 items-center justify-center">
               <span className={cn('relative inline-flex size-1.5 rounded-full', statusBadge.dotClass)} />
             </span>
-            <span className="text-foreground-muted font-normal">Ctx</span>
+            {/* "Ctx" is an abbreviation of a term the reader may not have met.
+                The chip is small, but the word fits and now says what it is. */}
+            <span className="text-foreground-muted font-normal">Context</span>
             {/*
               ONE NUMBER PAIR, AND ONLY WHEN IT MATTERS.
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Check, RotateCw, Download, ThumbsUp, ThumbsDown, FileText, Sparkles } from 'lucide-react';
+import { Copy, Check, RotateCw, Download, FileText, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
@@ -35,7 +35,7 @@ export function MessageActions({
   className,
 }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
-  const [feedback, setFeedback] = useState<'like' | 'dislike' | null>(null);
+
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,10 +46,6 @@ export function MessageActions({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleFeedback = (type: 'like' | 'dislike') => {
-    setFeedback((prev) => (prev === type ? null : type));
-    toast.success(type === 'like' ? 'Thank you for the feedback!' : 'Feedback noted');
-  };
 
   const handleExport = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -62,8 +58,23 @@ export function MessageActions({
   };
 
   if (variant === 'toolbar') {
+    /*
+      Revealed on hover, like the other variant already was.
+
+      A transcript of twenty messages carried eighty permanently visible icons,
+      none of which is part of reading. The actions matter once you have decided
+      to act on a particular message, which is exactly when the pointer is on
+      it. focus-within keeps them reachable by keyboard.
+    */
     return (
-      <div className={cn('flex min-h-5 items-center gap-1 px-1 mt-1.5 text-[11px] text-muted-foreground select-none', className)}>
+      <div
+        className={cn(
+          'flex min-h-5 items-center gap-1 px-1 mt-1.5 text-[11px] text-muted-foreground select-none',
+          'opacity-0 transition-opacity focus-within:opacity-100',
+          'group-hover:opacity-100 group-hover/usermsg:opacity-100 group-hover/agentmsg:opacity-100',
+          className
+        )}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <button type="button" onClick={handleCopy} className={ghostButton} aria-label="Copy content">
@@ -96,37 +107,15 @@ export function MessageActions({
           </Tooltip>
         )}
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => handleFeedback('like')}
-              className={cn(ghostButton, feedback === 'like' && 'text-primary bg-primary/10')}
-              aria-label="Helpful"
-            >
-              <ThumbsUp className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4}>
-            Helpful
-          </TooltipContent>
-        </Tooltip>
+        {/*
+          Helpful / Unhelpful are gone.
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => handleFeedback('dislike')}
-              className={cn(ghostButton, feedback === 'dislike' && 'text-status-danger bg-status-danger/10')}
-              aria-label="Unhelpful"
-            >
-              <ThumbsDown className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4}>
-            Unhelpful
-          </TooltipContent>
-        </Tooltip>
+          They set a local flag and showed a toast. Nothing read the value —
+          it was not sent anywhere, not stored, and not used to change what the
+          agent does next. Two permanent buttons under every message in the
+          transcript, collecting nothing. A rating control is worth having only
+          once something consumes the rating.
+        */}
 
         {onOpenCanvas && (
           <Tooltip>

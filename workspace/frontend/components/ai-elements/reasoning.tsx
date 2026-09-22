@@ -9,6 +9,8 @@ import { ThinkingShimmer } from '@/components/agents/loading-states/thinking-shi
 import { formatElapsed } from '@/lib/use-elapsed';
 import { cn } from '@/lib/utils';
 
+const LONG_THOUGHT_MS = 60_000;
+
 export interface ReasoningProps {
   content: string;
   isStreaming?: boolean;
@@ -33,10 +35,20 @@ export function Reasoning({
     [durationMs]
   );
 
-  const wordCount = useMemo(() => {
-    if (!content) return 0;
-    return content.trim().split(/\s+/).length;
-  }, [content]);
+  // Long enough that "why is this taking so long" is a real question.
+  const notablyLong = (durationMs ?? 0) >= LONG_THOUGHT_MS;
+
+  /*
+    THE WORD COUNT IS GONE, AND THE DURATION ONLY SPEAKS WHEN IT HAS NEWS.
+
+    Every thought carried "39.7s · ~1048 words". Nobody has ever made a decision
+    because a thought was 1048 words rather than 900 — it is measurable, not
+    useful, and it sat on every message in the transcript.
+
+    Elapsed time does carry something, but only at the tail: 4s is the normal
+    case and saying so on every row is the same noise. Above the threshold it
+    is genuinely worth knowing, so that is when it appears.
+  */
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -62,15 +74,7 @@ export function Reasoning({
           'Thought'
         )
       }
-      meta={
-        !isStreaming
-          ? durationText
-            ? `${durationText} · ~${wordCount} words`
-            : wordCount > 0
-            ? `~${wordCount} words`
-            : undefined
-          : undefined
-      }
+      meta={!isStreaming && notablyLong ? durationText ?? undefined : undefined}
       startTime={startTime}
       state={isStreaming ? 'running' : 'idle'}
       defaultOpen={defaultExpanded}
@@ -84,7 +88,7 @@ export function Reasoning({
     >
       {content ? (
         <div className="relative my-1.5 border-l-2 border-border/80 pl-3.5 py-1">
-          <div className="max-h-[420px] overflow-y-auto pr-2 text-[13px] leading-[1.65] text-foreground/80 selection:bg-primary/20 space-y-2 [&_h1]:text-xs [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mt-2.5 [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mt-2 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-medium [&_h3]:text-foreground/90 [&_h3]:mt-1.5 [&_h3]:mb-0.5 [&_strong]:font-semibold [&_strong]:text-foreground [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5 [&_li]:my-0.5 [&_code]:text-3xs [&_code]:font-mono [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-surface2 [&_code]:border [&_code]:border-border/60 [&_code]:text-foreground [&_pre]:text-xs [&_pre]:my-2 [&_pre]:p-2.5 [&_pre]:rounded-lg [&_pre]:bg-surface2/90 [&_pre]:border [&_pre]:border-border/60 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic">
+          <div className="text-sm leading-[1.7] text-foreground/80 selection:bg-primary/20 space-y-2 [&_h1]:text-xs [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mt-2.5 [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mt-2 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-medium [&_h3]:text-foreground/90 [&_h3]:mt-1.5 [&_h3]:mb-0.5 [&_strong]:font-semibold [&_strong]:text-foreground [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:space-y-0.5 [&_li]:my-0.5 [&_code]:text-3xs [&_code]:font-mono [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:bg-surface2 [&_code]:border [&_code]:border-border/60 [&_code]:text-foreground [&_pre]:text-xs [&_pre]:my-2 [&_pre]:p-2.5 [&_pre]:rounded-lg [&_pre]:bg-surface2/90 [&_pre]:border [&_pre]:border-border/60 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic">
             <MarkdownContent content={content} />
             {isStreaming && (
               <span className="inline-block w-1.5 h-3.5 bg-primary/70 animate-pulse ml-1 translate-y-0.5" />

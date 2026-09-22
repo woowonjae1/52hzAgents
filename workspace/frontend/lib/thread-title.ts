@@ -119,13 +119,28 @@ export function isUnusableTitleSource(text: string): boolean {
 
 /** Markdown, emoji and whitespace out; one line in. */
 export function cleanTitleText(raw: string): string {
-  return raw
+  const stripped = raw
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/[`*_#~>]/g, '')
     .replace(/[\u{1F300}-\u{1FAFF}]|[\u{2600}-\u{27BF}]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
+
+  /*
+    @mentions are addressing, not subject matter.
+
+    A title taken from the first message kept them, so threads read
+    "@openclaw 查询湖南天气 @antigravity" — two of the three words naming who
+    was asked rather than what was asked. In the list the agents are already
+    shown as avatars beside the title, so the names were being said twice and
+    the actual topic was what got truncated away.
+
+    Only stripped when something survives: "@pi" alone is a thread whose whole
+    subject IS the agent, and an empty title is worse than a redundant one.
+  */
+  const withoutMentions = stripped.replace(/(^|\s)@[\w.\-]+/g, '$1').replace(/\s+/g, ' ').trim();
+  return withoutMentions.length >= 2 ? withoutMentions : stripped;
 }
 
 export function truncateTitle(text: string, max = MAX_TITLE): string {
