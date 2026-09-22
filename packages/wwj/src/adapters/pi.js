@@ -33,6 +33,11 @@ const MAX_HISTORY_ENTRIES = 12;
 const PI_MIN_RETRY_DELAY_MS = 1000;   // floor, so a configured 0 cannot mean "no wait"
 const PI_MAX_RETRY_DELAY_MS = 30000;  // ceiling on the exponential
 const PI_RESUME_MIN_CHARS = 400;      // work worth resuming rather than replaying
+// Total subprocess silence that means "hung", not "thinking". Matches goose's
+// DEFAULT_INACTIVITY_TIMEOUT; generous on purpose, since a long turn can go
+// minutes between events.
+const PI_DEFAULT_INACTIVITY_SEC = 900;
+const PI_WATCHDOG_TICK_MS = 15000;
 
 // Pi's own configuration directory. `models.json` declares the providers and
 // models this install can reach; `settings.json` names the active one. Both are
@@ -198,6 +203,55 @@ class PiAdapter extends BaseAdapter {
     return path.join(this._sessionDir, `${safeName}.jsonl`);
   }
 
+  _contextPathFor(channelName) {
+    const safeName = channelName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return path.join(this._sessionDir, `${safeName}.context.md`);
+  }
+
+  /**
+   * Put the per-turn context somewhere it cannot accumulate, and hand back the
+   * path for `--append-system-prompt`.
+   *
+   * THIS IS THE FIX FOR THE THING THAT KILLED LONG TASKS. The context prefix is
+   * ~20.6k characters and was prepended to every user message. Pi persists each
+   * user message in the session file and re-sends the whole session every turn,
+   * so turn N carried N copies of it: a real 494KB session on this machine held
+   * 10 copies — 42% of the file was the same prompt repeated, and all of it was
+   * re-uploaded on every single turn. That is the growth that produced the
+   * `upstream_request_rejected` 422s, and no retry policy can fix it, because
+   * by then the request is already too big.
+   *
+   * The system prompt is the right home for it and pi gives us one:
+   * `--append-system-prompt` takes text OR a file path (pi's `resolvePromptInput`
+   * reads the file when the string is an existing path), and — verified against
+   * the real session files — the system prompt is NOT written into the session.
+   * So the prefix is rebuilt fresh every turn, appears exactly once per request,
+   * and never lands in the conversation.
+   *
+   * Passing it as a file rather than as an argument also gets 20.6k characters
+   * off a Windows command line that has a hard 32,767-character limit.
+   *
+   * @returns {string|null} path, or null when the caller must fall back to inline
+   */
+  _writeContextFile(channelName, text) {
+    if (!text) return null;
+    const file = this._contextPathFor(channelName);
+    try {
+      fs.writeFileSync(file, text, 'utf-8');
+      return file;
+    } catch (e) {
+      this._log(`Could not write context file (${e.message}); falling back to the inline prefix.`);
+      return null;
+    }
+  }
+
+  /** Seconds of total subprocess silence before a turn is treated as hung. */
+  _inactivityTimeout() {
+    const env = this.agentEnv || process.env;
+    const n = parseFloat(env.PI_INACTIVITY_TIMEOUT);
+    return Number.isFinite(n) && n >= 30 ? n : PI_DEFAULT_INACTIVITY_SEC;
+  }
+
   // ------------------------------------------------------------------
   // Prompt assembly
   // ------------------------------------------------------------------
@@ -276,7 +330,7 @@ class PiAdapter extends BaseAdapter {
   // Subprocess lifecycle
   // ------------------------------------------------------------------
 
-  _buildPiCmd(prompt, channelName) {
+  _buildPiCmd(prompt, channelName, contextFile = null) {
     if (!this._piBin) {
       throw new Error('pi CLI not found. Install with: npm install -g @earendil-works/pi-coding-agent');
     }
@@ -295,8 +349,25 @@ class PiAdapter extends BaseAdapter {
     if (this.piApprove) args.push('--approve');
     const activeModel = this._resolveModel(channelName) || this.piModel;
     if (activeModel) args.push('--model', activeModel);
+    // The workspace context goes in the system prompt, not in the conversation
+    // — see _writeContextFile. pi reads this because the value is a real path.
+    if (contextFile) args.push('--append-system-prompt', contextFile);
+    /*
+      pi's positional parser reads a token starting with `@` as a FILE
+      reference and one starting with `-` as a flag (cli/args.js:214 and :234),
+      and `--` does NOT rescue it — tokens after `--` are still @-scanned
+      (args.js:24-31). This never showed before, because the message token
+      always began with the 20.6k context prefix; the user's own text was
+      buried in the middle. With the prefix moved to the system prompt the
+      message IS the token, and the very first real turn hit it:
+      "@pi 你好" came back as `File not found: D:\code\...\pi 你好`.
+
+      A constant lead-in keeps a message a message. Only applied when it is
+      needed, so ordinary prompts stay verbatim.
+    */
+    const safePrompt = /^[@-]/.test(prompt) ? `User message:\n${prompt}` : prompt;
     // -p consumes the very next token as the message, so it must come last.
-    args.push('-p', prompt);
+    args.push('-p', safePrompt);
     return args;
   }
 
@@ -304,9 +375,9 @@ class PiAdapter extends BaseAdapter {
     return spawn(spawnBin, spawnArgs, opts);
   }
 
-  async _runPi(prompt, channelName, userMessage = '') {
+  async _runPi(prompt, channelName, userMessage = '', contextFile = null) {
     const sessionPath = this._sessionPathFor(channelName);
-    const args = this._buildPiCmd(prompt, channelName);
+    const args = this._buildPiCmd(prompt, channelName, contextFile);
     this._log(`Running pi (channel=${channelName}, session=${sessionPath})`);
 
     const env = { ...getEnhancedEnv(), ...(this.agentEnv || process.env) };
@@ -352,6 +423,8 @@ class PiAdapter extends BaseAdapter {
     */
     let producedChars = 0;
     const startedAt = Date.now();
+    // Last sign of life from the subprocess, for the watchdog further down.
+    let lastActivity = Date.now();
 
     const flushThinking = async () => {
       const text = currentThinking.trim();
@@ -364,7 +437,7 @@ class PiAdapter extends BaseAdapter {
       }
     };
 
-    proc.stderr.on('data', (d) => { stderrBuf += d.toString('utf-8'); });
+    proc.stderr.on('data', (d) => { lastActivity = Date.now(); stderrBuf += d.toString('utf-8'); });
 
     // Process JSON Lines events in real-time
     const processLine = async (line) => {
@@ -443,9 +516,16 @@ class PiAdapter extends BaseAdapter {
         streamedText = '';
         const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
         const input = event.args || event.input || {};
-        const detail = input.command || input.path || input.query || (typeof input === 'string' ? input : '');
-        const label = detail ? `${toolName} > ${detail}` : toolName;
-        try { await this.sendStatus(channelName, label); } catch {}
+        // Structured, not a sentence: the workspace renders a named card with
+        // expandable arguments off this. It used to get `bash > git status`.
+        try {
+          await this.sendToolCall(channelName, {
+            name: toolName,
+            args: input,
+            status: 'running',
+            id: event.id || event.toolCallId || event.tool_call_id,
+          });
+        } catch {}
       }
 
       // 4. Final response extraction & error detection from message_end / turn_end
@@ -493,6 +573,7 @@ class PiAdapter extends BaseAdapter {
     };
 
     proc.stdout.on('data', (chunk) => {
+      lastActivity = Date.now();
       lineBuffer += chunk.toString('utf-8');
       const lines = lineBuffer.split('\n');
       lineBuffer = lines.pop();
@@ -501,10 +582,31 @@ class PiAdapter extends BaseAdapter {
       }
     });
 
+    /*
+      Inactivity watchdog. Until now this method awaited `proc.on('exit')` and
+      nothing else, so pi was the only adapter with NO upper bound on a turn:
+      a subprocess that stopped producing output never came back, the channel
+      worker stayed busy behind it, and the turn neither finished nor failed.
+      goose and claude have had one of these for a while; pi never did.
+
+      Silence, not elapsed time, is the test — a long turn is supposed to take
+      a long time, it is just not supposed to go quiet for a quarter of an hour.
+    */
+    const inactivitySec = this._inactivityTimeout();
+    let killedForInactivity = false;
+    const watchdog = setInterval(() => {
+      if (proc.exitCode !== null) return;
+      if ((Date.now() - lastActivity) / 1000 <= inactivitySec) return;
+      killedForInactivity = true;
+      this._log(`Pi produced no output for ${inactivitySec}s — treating as hung and killing.`);
+      this._stopProcess(proc).catch(() => {});
+    }, PI_WATCHDOG_TICK_MS);
+
     const exitCode = await new Promise((resolve) => {
       proc.on('exit', resolve);
       proc.on('error', () => resolve(-1));
     });
+    clearInterval(watchdog);
 
     // Process remaining buffer
     try { await _pendingLines; } catch {}
@@ -527,6 +629,21 @@ class PiAdapter extends BaseAdapter {
       err.piElapsedMs = Date.now() - startedAt;
       return err;
     };
+
+    if (proc._wwjStoppedByUser) {
+      const err = fail('Execution stopped by user.');
+      err.piUserStop = true;
+      throw err;
+    }
+
+    if (killedForInactivity) {
+      const err = fail(`pi timed out: no output for ${inactivitySec}s, so the turn was treated as hung and the process killed.`);
+      // Marked rather than pattern-matched. The message says "timed out" so
+      // _isTransientError accepts it, but the classifier must not then read the
+      // produced-character count and decide to resume — see _classifyFailure.
+      err.piInactivityKill = true;
+      throw err;
+    }
 
     if (exitCode !== 0) {
       const detail = (stderrBuf || lastErrorMessage || resolvedAnswer).trim().slice(0, 600);
@@ -706,6 +823,10 @@ class PiAdapter extends BaseAdapter {
     }
     if (action === 'stop') {
       for (const [channel, proc] of Object.entries(this._channelProcesses)) {
+        // Marked before the kill so `_runPi` can tell "the user stopped this"
+        // from "the stream dropped" — otherwise widening the transient list
+        // above could make a deliberate stop retry itself.
+        proc._wwjStoppedByUser = true;
         await this._stopProcess(proc);
         delete this._channelProcesses[channel];
         try { await this.sendStatus(channel, 'Execution stopped by user'); } catch {}
@@ -728,7 +849,24 @@ class PiAdapter extends BaseAdapter {
       msg.includes('timed out') ||
       msg.includes('timeout') ||
       msg.includes('etimedout') ||
-      msg.includes('econnreset')
+      msg.includes('econnreset') ||
+      /*
+        The dropped-stream family. A real 14-minute turn died on
+        `Pi model error: terminated` (daemon.log 06:17:43 -> 06:31:40) and got
+        ZERO retries, because none of the strings above match the bare word
+        "terminated" — undici's error when a streaming response is cut off
+        mid-flight. `socket hang up`, `other side closed` and `premature close`
+        are the same event under different runtimes.
+
+        These are the textbook case the policy reserves resume for: the request
+        was fine, the far end went away. Losing fourteen minutes of work to a
+        dropped socket, without even one retry, is the exact failure this whole
+        policy exists to prevent — it was just missing the words for it.
+      */
+      msg.includes('terminated') ||
+      msg.includes('socket hang up') ||
+      msg.includes('other side closed') ||
+      msg.includes('premature close')
     );
   }
 
@@ -782,6 +920,9 @@ class PiAdapter extends BaseAdapter {
     continuation does neither.
   */
   _classifyFailure(err) {
+    // A stop is a decision, not a failure. Checked before anything else so no
+    // amount of transient-looking text in the message can restart it.
+    if (err && err.piUserStop) return 'fatal';
     if (!this._isTransientError(err)) return 'fatal';
 
     /*
@@ -811,6 +952,15 @@ class PiAdapter extends BaseAdapter {
       the far end was not: 5xx, rate limits, dropped sockets.
     */
     if (this._isDeterministicOverload(err)) return 'fatal';
+
+    /*
+      A hang is always a restart, however much work it produced. Resume leaves
+      the partial turn in the session and asks pi to continue it — but the
+      session is exactly the state that just stopped responding, so resuming
+      re-sends it and invites the same stall. Rolling back is bounded and
+      predictable; keeping the work is not worth risking the turn never ending.
+    */
+    if (err && err.piInactivityKill) return 'restart';
 
     const produced = err && err.piProducedChars ? err.piProducedChars : 0;
     if (produced >= PI_RESUME_MIN_CHARS) return 'resume';
@@ -852,7 +1002,12 @@ class PiAdapter extends BaseAdapter {
 
     try {
       const context = await this._buildContextPrefix(msgChannel);
-      const prompt = context ? `${context}\n\n---\n\nUser message:\n${content}` : content;
+      const contextFile = this._writeContextFile(msgChannel, context);
+      // Inline only as a fallback: a turn that silently lost the workspace
+      // rules would be a worse failure than a large request.
+      const prompt = (context && !contextFile)
+        ? `${context}\n\n---\n\nUser message:\n${content}`
+        : content;
 
       const sessionPath = this._sessionPathFor(msgChannel);
       const preExists = fs.existsSync(sessionPath);
@@ -889,7 +1044,7 @@ class PiAdapter extends BaseAdapter {
           ? `Your previous turn was cut off by an upstream model error after producing roughly ${resumeFrom.producedChars} characters of work. Your session still holds that work. Continue from where you stopped and deliver the final answer. Do not start over and do not repeat what you already worked through.`
           : prompt;
         try {
-          responseText = await this._runPi(attemptPrompt, msgChannel, content);
+          responseText = await this._runPi(attemptPrompt, msgChannel, content, contextFile);
           if (responseText) break;
           attemptLog.push(`#${attempt + 1} empty completion`);
         } catch (err) {
