@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 import type { WorkspaceSession, WorkspaceAgent } from '@/lib/types';
 import { isComposing } from '@/lib/ime';
 
-type Mode = 'dynamic' | 'master' | 'workflow';
+type Mode = 'dynamic' | 'master' | 'parallel';
 
 const MODES: { value: Mode; label: string; icon: React.ElementType; description: string }[] = [
   {
@@ -43,12 +43,23 @@ const MODES: { value: Mode; label: string; icon: React.ElementType; description:
     description: 'Everything goes to the leader, who delegates and collects results.',
   },
   {
-    value: 'workflow',
-    label: 'Custom workflow',
+    value: 'parallel',
+    label: 'Parallel',
     icon: Waypoints,
-    description: 'Write a plan in plain language; the router follows it.',
+    description: 'Everyone assigned starts at once. For work already split cleanly.',
   },
 ];
+
+/*
+  'workflow' was removed rather than renamed. It never had its own branch in the
+  router: it was dynamic mode with the plan text appended to the same
+  single-next-speaker prompt, so it promised a workflow engine and delivered a
+  hint. Its one real asset, the plan the user writes, is kept — it is now the
+  assignment that parallel mode splits up.
+
+  Threads still stored as 'workflow' fall back to dynamic below, which is the
+  behaviour they already had.
+*/
 
 interface Props {
   session: WorkspaceSession;
@@ -65,19 +76,27 @@ interface Props {
  * custom workflow opens an editor with @agent autocomplete.
  */
 export function OrchestrationControl({ session, agents, onChange, variant = 'standalone' }: Props) {
-  const mode = (session.orchestrationMode || 'dynamic') as Mode;
+  const stored = (session.orchestrationMode || 'dynamic') as Mode | 'workflow';
+  // A thread saved under the removed 'workflow' mode reads as dynamic, which is
+  // what it effectively already was.
+  const mode: Mode = stored === 'workflow' ? 'dynamic' : stored;
   const active = MODES.find((m) => m.value === mode) || MODES[0];
-  const [planOpen, setPlanOpen] = React.useState(false);
 
+  /*
+    Picking a mode just picks the mode.
+
+    The first version of parallel opened the old workflow plan editor, which
+    made it workflow with a new label — and worse, the text that editor saves
+    (orchestration_instruction) is not what parallel reads. Parallel wakes the
+    assignees on the TASK BOARD, so a paragraph typed into a dialog changed
+    nothing at all while looking like the thing that configured the mode.
+
+    The split is expressed by assigning tasks, which is where the user already
+    does it. ParallelBatchPanel shows what the board currently implies, and what
+    is missing, instead of asking for the same thing twice.
+  */
   const selectMode = (next: Mode) => {
-    if (next === 'workflow') {
-      // Entering workflow mode always opens the plan editor so the user can
-      // author (or review) the plan the router will follow.
-      setPlanOpen(true);
-      if (mode !== 'workflow') onChange({ mode: 'workflow' });
-    } else {
-      onChange({ mode: next });
-    }
+    onChange({ mode: next });
   };
 
   const ActiveIcon = active.icon;
@@ -108,20 +127,7 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
           </DropdownMenuItem>
         );
       })}
-      {mode === 'workflow' && (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              setPlanOpen(true);
-            }}
-            className="text-xs"
-          >
-            Edit workflow plan…
-          </DropdownMenuItem>
-        </>
-      )}
+
     </>
   );
 
@@ -157,13 +163,6 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
         </DropdownMenu>
       )}
 
-      <WorkflowPlanDialog
-        open={planOpen}
-        onOpenChange={setPlanOpen}
-        agents={agents}
-        initialValue={session.orchestrationInstruction || ''}
-        onSave={(instruction) => onChange({ mode: 'workflow', instruction: instruction || null })}
-      />
     </>
   );
 }
@@ -281,11 +280,12 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Custom collaboration workflow</DialogTitle>
+          <DialogTitle>How the work is split</DialogTitle>
           <DialogDescription>
-            Describe, in plain language, how the agents should collaborate. Use{' '}
-            <span className="font-mono">@</span> to reference an agent. The router follows this plan
-            when deciding who responds next.
+            Say who does what, in plain language. Use <span className="font-mono">@</span> to
+            reference an agent, and name the folder each one owns — parallel mode will not start a
+            batch whose scopes overlap, because agents working on the same files overwrite each
+            other silently.
           </DialogDescription>
         </DialogHeader>
 
@@ -301,8 +301,9 @@ export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, o
             rows={6}
             autoFocus
             placeholder={
-              'e.g. First @tester writes test cases for the requirement. Then @coder ' +
-              'implements the code. Finally @reviewer runs the tests and fixes any bugs.'
+              'e.g. @frontend takes workspace/frontend — rebuild the task board. ' +
+              '@backend takes workspace/backend — add the batch endpoint. ' +
+              '@docs takes docs/ — write up both.'
             }
             className="w-full resize-none rounded-md border bg-transparent p-3 text-sm outline-none focus:border-primary"
           />

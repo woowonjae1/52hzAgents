@@ -356,7 +356,16 @@ type TodoRecord struct {
 	// column those writes failed and every scheduled task stayed in_progress.
 	CompletedAt *time.Time `gorm:"" json:"completed_at,omitempty"`
 	// Error records the failure reason if the task failed or was cancelled due to an issue.
-	Error     *string   `gorm:"type:text" json:"error,omitempty"`
+	Error *string `gorm:"type:text" json:"error,omitempty"`
+	// Scope is the path prefix this task owns, and it is what makes parallel
+	// orchestration safe to enter. Two agents working at once will clobber each
+	// other unless their writes are disjoint, and "the division of labour is
+	// clear" is a human intention that nothing checks. Declaring the scope turns
+	// it into something the server can verify before it wakes anybody.
+	//
+	// Nil means "unscoped": fine in every other mode, and a hard stop in
+	// parallel, because an unscoped task overlaps everything by definition.
+	Scope     *string   `gorm:"type:text" json:"scope,omitempty"`
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
@@ -583,6 +592,48 @@ type CloudAgentConfig struct {
 
 func (CloudAgentConfig) TableName() string {
 	return "cloud_agent_configs"
+}
+
+// ---------------------------------------------------------------------------
+// Router LLM configuration
+// ---------------------------------------------------------------------------
+
+// RouterConfig is the LLM that dynamic orchestration uses to pick the next
+// speaker, stored per workspace.
+//
+// It exists because the router was configurable only through ROUTER_LLM_*
+// environment variables, read once into config.GlobalConfig at process start:
+// anything set in the UI could not take effect, and changing providers meant
+// restarting the server. A row here overrides the environment; the environment
+// remains the default, so existing deployments keep working untouched.
+//
+// Provider is "openai" or "anthropic", where "openai" plus a BaseURL covers any
+// OpenAI-compatible endpoint - which is what a custom provider normally is.
+type RouterConfig struct {
+	ID          string    `gorm:"primaryKey;type:text" json:"id"`
+	WorkspaceID string    `gorm:"type:uuid;not null;uniqueIndex:uq_router_config_workspace" json:"workspace_id"`
+	Enabled     bool      `gorm:"not null;default:false" json:"enabled"`
+	Provider    string    `gorm:"type:text;not null;default:openai" json:"provider"`
+	Model       string    `gorm:"type:text" json:"model"`
+	APIKey      string    `gorm:"type:text" json:"api_key"`
+	BaseURL     *string   `gorm:"type:text" json:"base_url"`
+	// LastStatus / LastError / LastCheckedAt make a failing router visible.
+	//
+	// routeWithLLM returns handled=false on any error, and routing then falls
+	// back to @mentions and round-robin — which looks exactly like a router
+	// that was never configured. A wrong key or an unreachable base URL was
+	// therefore indistinguishable from "off", and the only symptom was that
+	// nothing seemed to happen. Written only when the status CHANGES, so a
+	// healthy router does not cost a database write per message.
+	LastStatus    string     `gorm:"type:text" json:"last_status,omitempty"`
+	LastError     *string    `gorm:"type:text" json:"last_error,omitempty"`
+	LastCheckedAt *time.Time `json:"last_checked_at,omitempty"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (RouterConfig) TableName() string {
+	return "router_configs"
 }
 
 // ---------------------------------------------------------------------------

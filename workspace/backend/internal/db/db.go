@@ -81,6 +81,7 @@ func InitDB() {
 		&models.AgentApprovalRecord{},
 		&models.AuditRecord{},
 		&models.CloudAgentConfig{},
+		&models.RouterConfig{},
 		&models.ShareSnapshot{},
 		&models.Agent{},
 		&models.ChannelCompactionRecord{},

@@ -1536,12 +1536,33 @@ class BaseAdapter {
       const mine = todos.filter((t) => !t.source || t.source === source || t.createdBy === source);
       if (!mine.some((t) => t.status === 'in_progress')) return;
 
+      /*
+        A SCOPED TASK BELONGS TO A PARALLEL BATCH, AND A BATCH OUTLIVES A TURN.
+
+        This demotion exists because agents write a board and then leave rows
+        stranded at in_progress. That is right for every mode where one agent
+        speaks per turn — but a parallel batch is precisely work that stays
+        in_progress across several turns while other agents run beside it, and
+        demoting it every turn would make the board lie in the other direction.
+
+        The scope is the signal, rather than asking the server for the channel's
+        orchestration mode: a scope only exists because somebody declared this
+        task part of a split, it needs no extra request per turn, and a channel
+        that leaves parallel mode simply stops creating them.
+      */
       const next = mine.map((t) => ({
         content: t.content,
-        status: t.status === 'in_progress' ? 'pending' : t.status,
+        status: t.status === 'in_progress' && !t.scope ? 'pending' : t.status,
         assignee: t.assignee,
         priority: t.priority,
+        // Carried through because PutTodos is delete-and-reinsert: a field that
+        // is not sent back is erased. Priority was lost exactly this way once,
+        // and losing a scope would leave every batch permanently blocked as
+        // "unscoped", which reads as a conflict that cannot be resolved.
+        scope: t.scope,
+        due_date: t.dueDate || t.due_date,
       }));
+      if (!next.some((t, i) => t.status !== mine[i].status)) return;
       await this.client.putTodos(this.workspaceId, channelName, this.token, next, { source });
       this._log(`Released stale in_progress to-dos after turn ended: ${reason}`);
     } catch (e) {

@@ -36,8 +36,11 @@ Rules:
 Output exactly one line: next:<agent-name> or stop`
 
 func routeWithLLM(workspaceID string, channel *models.Channel, req *SendEventRequest, participants []string) ([]string, bool) {
-	settings := config.GlobalConfig
-	if settings == nil || !settings.RouterLLMEnabled || settings.RouterLLMAPIKey == "" || len(participants) < 2 {
+	// Resolved per call, not read once at startup: the workspace's own router
+	// configuration must take effect the moment it is saved. See
+	// resolveRouterSettings in router_config.go for which source wins.
+	settings := resolveRouterSettings(workspaceID)
+	if settings == nil || len(participants) < 2 {
 		return nil, false
 	}
 
@@ -84,6 +87,9 @@ func routeWithLLM(workspaceID string, channel *models.Channel, req *SendEventReq
 	prompt := fmt.Sprintf(routerPrompt, strings.Join(participantLines, "\n"), master, plan, strings.Join(history, "\n"), req.Source, truncateRouterText(content, 500))
 
 	decision, err := requestRouterDecision(settings, prompt)
+	// Remember the outcome either way: a router that fails here falls back
+	// silently, which is indistinguishable from one that was never set up.
+	recordRouterOutcome(workspaceID, err)
 	if err != nil {
 		return nil, false
 	}

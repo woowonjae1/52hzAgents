@@ -47,6 +47,10 @@ type PutTodoItem struct {
 	Priority string     `json:"priority"`
 	DueDate  *time.Time `json:"due_date"` // 可选截止时间
 	Error    *string    `json:"error"`    // 失败/取消原因
+	// Scope 是这条任务独占的路径前缀，parallel 模式据此判断分工是否真的不重叠。
+	// PutTodos 是删后重插，任何没有在这里读取的字段都会在下一次保存时丢失 ——
+	// Priority 就是这么丢过一次。
+	Scope *string `json:"scope"`
 }
 
 // validTodoStatuses / validTodoPriorities 是服务端唯一的真值来源。
@@ -207,6 +211,7 @@ func PutTodos(c *gin.Context) {
 			DueDate:     item.DueDate,
 			CompletedAt: completedAt,
 			Error:       item.Error,
+			Scope:       item.Scope,
 			Position:    i, // 依次赋予当前的排序索引。
 			CreatedAt:   now,
 			UpdatedAt:   now,

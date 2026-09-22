@@ -115,3 +115,55 @@ test('a to-do API failure cannot take the turn down with it', async () => {
   assert.equal(a.handled.length, 1);
   assert.equal(a.errors.length, 0, 'a board problem is not a turn failure');
 });
+
+/*
+  Parallel batches are the exception this demotion must not touch.
+
+  The rule elsewhere is that nothing may end a turn in_progress, because agents
+  write a board and then strand it. A parallel batch inverts that: the work
+  legitimately stays in_progress across turns while other agents run beside it.
+  A scope is what marks a task as part of such a batch.
+*/
+
+test('a scoped task survives the end of a turn', async () => {
+  const client = makeClient([
+    { content: 'rebuild the board', status: 'in_progress', assignee: 'pi', scope: 'workspace/frontend' },
+    { content: 'add the endpoint', status: 'in_progress', assignee: 'pi', scope: 'workspace/backend' },
+  ]);
+  const adapter = makeAdapter(client);
+
+  await adapter._releaseStaleTodos('general', 'turn ended');
+
+  // Nothing to change means nothing is written at all — a needless rewrite of
+  // the board is itself a way to lose fields.
+  assert.equal(client.puts.length, 0, 'a fully scoped board is left alone');
+});
+
+test('an unscoped task is still released', async () => {
+  const client = makeClient([
+    { content: 'stranded', status: 'in_progress', assignee: 'pi' },
+    { content: 'scoped', status: 'in_progress', assignee: 'pi', scope: 'workspace/backend' },
+  ]);
+  const adapter = makeAdapter(client);
+
+  await adapter._releaseStaleTodos('general', 'turn ended');
+
+  assert.equal(client.puts.length, 1);
+  const written = client.puts[0].next;
+  assert.equal(written[0].status, 'pending', 'the unscoped row is demoted');
+  assert.equal(written[1].status, 'in_progress', 'the scoped row is not');
+});
+
+test('the scope survives a release, because PutTodos reinserts', async () => {
+  const client = makeClient([
+    { content: 'stranded', status: 'in_progress', assignee: 'pi' },
+    { content: 'scoped', status: 'in_progress', assignee: 'pi', scope: 'workspace/backend' },
+  ]);
+  const adapter = makeAdapter(client);
+
+  await adapter._releaseStaleTodos('general', 'turn ended');
+
+  // A field not sent back is erased server-side. A lost scope would leave the
+  // batch permanently "unscoped", which reads as an unresolvable conflict.
+  assert.equal(client.puts[0].next[1].scope, 'workspace/backend');
+});

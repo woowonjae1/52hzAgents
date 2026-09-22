@@ -877,9 +877,47 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 	}
 
 	mode := strings.ToLower(strings.TrimSpace(channel.OrchestrationMode))
+	if mode == "parallel" {
+		/*
+			Naming several agents IS the assignment.
+
+			The board is the durable way to split work, but it is not the only
+			one: in parallel mode "@a @b do this" is a human saying both, now,
+			and that is the whole point of the mode. Requiring a scoped board
+			row before anything can run would make the quick case impossible
+			and push people back to the modes this one exists to replace.
+
+			Mentions are checked first and skip the scope test on purpose. The
+			scope check protects a batch the BOARD implies, where nobody has
+			looked at the overlap; naming two agents in one sentence is the
+			human having looked.
+		*/
+		if isHumanSource(req.Source) && len(mentions) > 0 {
+			return mentions, true, nil
+		}
+		wake, conflicts := parallelTargets(workspaceID, channel.Name, participants, agentNameFromSource(req.Source))
+		if len(conflicts) > 0 {
+			// Refuse the batch rather than start it. Waking agents whose scopes
+			// overlap is the one failure this mode exists to prevent, and it is
+			// silent: the work looks fine until two of them write the same file.
+			// The conflicts are served by GetParallelBatch for the UI to show.
+			for _, conflict := range conflicts {
+				fmt.Printf("[parallel] channel=%s refused: %s\n", channel.Name, conflict.String())
+			}
+			return []string{noResponseAgent}, true, nil
+		}
+		if len(wake) > 0 {
+			return wake, true, nil
+		}
+		// No open batch. Fall through, so a channel parked in parallel mode
+		// still answers an ordinary question between batches.
+	}
 	if mode == "master" && channel.MasterAgent != nil && *channel.MasterAgent != "" {
 		targets = masterTargets(req.Source, *channel.MasterAgent, participants, mentions)
 	} else if len(participants) >= 2 {
+		// Dynamic keeps its own rule: the router picks one next speaker. Waking
+		// several at once is what parallel mode is for, and blurring that here
+		// is what made the modes indistinguishable in the first place.
 		if llmTargets, handled := routeWithLLM(workspaceID, channel, req, participants); handled {
 			targets = llmTargets
 		} else {

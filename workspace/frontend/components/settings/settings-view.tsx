@@ -57,6 +57,7 @@ import { SignalMark } from '@/components/brand/signal-mark';
 import { useMarkColor } from '@/hooks/use-mark-color';
 import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { SkillsView } from '@/components/skills/skills-view';
+import { RouterProviderSettings } from './router-provider-settings';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { RoutineList } from '@/components/routines/routine-list';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
@@ -673,6 +674,8 @@ export function SettingsView() {
           {/* Tab 2: Manage Agents & Runtimes */}
           {settingsTab === 'agents' && (
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
+              {/* How agents get chosen belongs beside who the agents are. */}
+              {!showConnectAgent && <RouterProviderSettings />}
               {showConnectAgent ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">

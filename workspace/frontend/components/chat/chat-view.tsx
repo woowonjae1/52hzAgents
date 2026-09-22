@@ -32,6 +32,7 @@ import {
 import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy, Coins } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 import { OrchestrationControl } from './orchestration-control';
+import { ParallelBatchPanel } from './parallel-batch-panel';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
 import { headerIconButtonClass } from '@/components/headers/header-chip';
@@ -1241,6 +1242,21 @@ export function ChatView() {
 
       {/* Pipeline Stepper Widget */}
       <PipelineStepper channelId={currentSessionId} />
+
+      {/*
+        Parallel batches get their own view because the transcript stops being
+        one. Sits beside the pipeline stepper for the same reason that exists:
+        process that several messages belong to is not readable from the
+        messages themselves.
+      */}
+      {currentSessionId && (
+        <div className="px-3 pb-2">
+          <ParallelBatchPanel
+            channelName={currentSessionId}
+            active={(currentSession?.orchestrationMode || '') === 'parallel'}
+          />
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
