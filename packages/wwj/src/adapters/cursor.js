@@ -573,19 +573,21 @@ class CursorAdapter extends BaseAdapter {
             // else: skip buffer flush / duplicate flush events
           }
 
-          // tool_call events: map to sendStatus with call_id correlation
+          // tool_call events: sent as structure, with the call id carried along
           if (eventType === 'tool_call') {
             const subtype = event.subtype || '';
             if (subtype === 'started') {
               hasToolUseSinceLastText = true;
               lastResponseText.length = 0;
               const tc = event.tool_call || {};
-              const toolName = _extractToolName(tc);
-              const toolDetail = _extractToolDetail(tc);
-              const label = toolDetail
-                ? `${toolName} > ${toolDetail}`
-                : toolName;
-              await this.sendStatus(msgChannel, label);
+              await this.sendToolCall(msgChannel, {
+                name: _extractToolName(tc),
+                args: _extractToolArgs(tc),
+                status: 'running',
+                // Omitted when absent — sendToolCall drops a falsy id.
+                id: event.call_id || undefined,
+                summary: _extractToolDetail(tc) || undefined,
+              });
               everPostedAnything = true;
             }
             // completed events are informational; no action needed for v1
@@ -743,11 +745,26 @@ function _extractToolName(tc) {
   return 'tool';
 }
 
-function _extractToolDetail(tc) {
+/**
+ * The call's own arguments, unwrapped from Cursor's per-tool nesting
+ * (`readToolCall.args`, `bashToolCall.args`, …). The wrapper itself is Cursor's
+ * envelope, not the call, so it is the inner object that belongs on the card.
+ */
+function _extractToolArgs(tc) {
   const call = tc.readToolCall || tc.writeToolCall || tc.editToolCall
     || tc.bashToolCall || tc.terminalToolCall || tc.globToolCall || tc.grepToolCall;
-  if (!call || !call.args) return '';
-  const args = call.args;
+  if (call && call.args) return call.args;
+  if (tc.function && tc.function.arguments !== undefined) return tc.function.arguments;
+  // A `<name>ToolCall` key this list does not know yet: show its payload rather
+  // than nothing, the same way _extractToolName already falls back to its name.
+  const key = Object.keys(tc).find((k) => k.endsWith('ToolCall'));
+  if (key && tc[key] && typeof tc[key] === 'object') return tc[key].args ?? tc[key];
+  return undefined;
+}
+
+function _extractToolDetail(tc) {
+  const args = _extractToolArgs(tc);
+  if (!args || typeof args !== 'object') return '';
   return args.command || args.path || args.file_path || args.pattern || args.query || '';
 }
 

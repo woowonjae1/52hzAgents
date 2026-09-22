@@ -739,7 +739,15 @@ class OpenClawAdapter extends BaseAdapter {
         if (toolStart) {
           const label = toolLabels[toolStart[1]] || `Using ${toolStart[1]}...`;
           this._log(`Tool: ${label}`);
-          this.sendStatus(channel, label).catch(() => {});
+          // No args: unlike every other adapter, this one recovers its tool
+          // calls by regex over a log line, and the line carries the name and
+          // nothing else. The name is still structure worth sending — it is
+          // what names the card — and the label stays as the readable line.
+          this.sendToolCall(channel, {
+            name: toolStart[1],
+            status: 'running',
+            summary: label,
+          }).catch(() => {});
         }
         if (line.match(/embedded run agent start/)) {
           this.sendStatus(channel, 'thinking...').catch(() => {});

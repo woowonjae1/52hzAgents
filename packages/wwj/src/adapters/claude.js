@@ -1678,7 +1678,13 @@ class ClaudeAdapter extends BaseAdapter {
             } else {
               inputPreview = String(block.input || '').slice(0, 150);
             }
-            await this.sendStatus(pp.msgChannel, `${toolName} › ${inputPreview}`);
+            await this.sendToolCall(pp.msgChannel, {
+              name: toolName,
+              args: block.input,
+              status: 'running',
+              id: block.id,
+              summary: inputPreview,
+            });
             pp.everPostedAnything = true;
           }
         }

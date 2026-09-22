@@ -538,7 +538,10 @@ class OpenCodeAdapter extends BaseAdapter {
     const input = OpenCodeAdapter._toolInputFromItem(item);
     const preview = OpenCodeAdapter._toolInputPreview(input);
 
-    return OpenCodeAdapter._formatToolStatus(toolName, preview);
+    // Structure, not a rendered string: `_formatToolStatus` built markdown the
+    // frontend then had to recognise with a regex. Kept below because the
+    // sentence is still the message body for clients that ignore metadata.
+    return { name: toolName, args: input, summary: preview || undefined };
   }
 
   static _safeToolName(name) {
@@ -563,30 +566,17 @@ class OpenCodeAdapter extends BaseAdapter {
     }
   }
 
-  static _markdownFence(body) {
-    const runs = String(body || '').match(/`+/g) || [];
-    const maxRun = runs.reduce((max, run) => Math.max(max, run.length), 2);
-    return '`'.repeat(Math.max(3, maxRun + 1));
-  }
-
-  static _formatToolStatus(toolName, preview) {
-    const header = `**Using tool:** \`${toolName}\``;
-    const body = String(preview || '').trim();
-    if (!body) return header;
-    const fence = OpenCodeAdapter._markdownFence(body);
-    return `${header}\n${fence}\n${body}\n${fence}`;
-  }
 
   async _handleStreamEvent(event, msgChannel, responseState = null) {
-    const status = OpenCodeAdapter._toolStatusFromEvent(event);
-    if (status) {
+    const toolCall = OpenCodeAdapter._toolStatusFromEvent(event);
+    if (toolCall) {
       // A tool call resets `finalText` (the "text since the last tool"), so the
       // final answer is the text emitted AFTER the last tool. But we keep
       // `allText` intact: if the run ends on a tool with no closing text, the
       // earlier assistant text is still recoverable instead of being reported
       // as an empty response (see _finalTextFromStdout).
       if (responseState) responseState.finalText = '';
-      await this.sendStatus(msgChannel, status);
+      await this.sendToolCall(msgChannel, { ...toolCall, status: 'running' });
       return;
     }
 

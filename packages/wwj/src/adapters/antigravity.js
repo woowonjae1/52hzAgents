@@ -732,11 +732,15 @@ class AntigravityAdapter extends BaseAdapter {
 
             if (!reportedSteps.has(stepKey)) {
               reportedSteps.add(stepKey);
-              if (preview) {
-                try { await this.sendStatus(channel, `${toolName} \u00b7 ${preview}`); } catch {}
-              } else {
-                try { await this.sendStatus(channel, `${toolName}`); } catch {}
-              }
+              try {
+                await this.sendToolCall(channel, {
+                  name: toolName,
+                  args: params,
+                  status: su.state === 'failed' ? 'failed' : 'running',
+                  id: su.step_index !== undefined ? String(su.step_index) : undefined,
+                  summary: preview || undefined,
+                });
+              } catch {}
             }
 
             // Mirror the CLI's local scheduling into the workspace, so the

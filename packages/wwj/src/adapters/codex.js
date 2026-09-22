@@ -765,17 +765,30 @@ class CodexAdapter extends BaseAdapter {
             hasToolUseSinceLastText = true;
             const cmdText = (item.command || '').slice(0, 200);
             const exitCode = item.exit_code;
-            const output = (item.output || '').slice(0, 500);
-            let status = `**Running:** \`${cmdText}\``;
-            if (exitCode !== undefined && exitCode !== null) {
-              status += ` (exit ${exitCode})`;
-            }
-            try { await this.sendStatus(msgChannel, status); } catch {}
+            // codex reports a command once it has already run, exit code
+            // included, so this card can land resolved instead of stuck on
+            // "running". The 200-char slice was only ever for the sentence; the
+            // whole command goes in the arguments.
+            try {
+              await this.sendToolCall(msgChannel, {
+                name: 'shell',
+                args: { command: item.command || '' },
+                status: (exitCode === undefined || exitCode === null || exitCode === 0) ? 'ok' : 'failed',
+              });
+            } catch {}
             this._log(`Command: ${cmdText} → exit ${exitCode}`);
           } else if (item.type === 'file_change') {
             hasToolUseSinceLastText = true;
             const filename = item.filename || '';
-            try { await this.sendStatus(msgChannel, `**Editing:** \`${filename}\``); } catch {}
+            // Also a tool call, and one the frontend was already recovering from
+            // the `**Editing:**` markdown by regex. Sent as structure instead.
+            try {
+              await this.sendToolCall(msgChannel, {
+                name: 'edit',
+                args: { path: filename },
+                status: 'ok',
+              });
+            } catch {}
             this._log(`File change: ${filename}`);
           }
         } else if (eventType === 'turn.failed') {

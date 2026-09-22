@@ -74,6 +74,24 @@ function guessContentType(filename) {
 // round trip on every single message.
 const WORKING_DIR_CACHE_TTL_MS = 15000;
 
+/*
+  The human-readable half of a tool call: the one field worth putting in the
+  sentence. Which field that is depends on the tool, and every adapter had
+  already grown the same little ladder inline before sending its status string.
+*/
+function toolCallDetail(args) {
+  if (args === undefined || args === null) return '';
+  if (typeof args === 'string') return args.length > 120 ? args.slice(0, 117) + '...' : args;
+  if (typeof args !== 'object') return String(args);
+  for (const key of ['command', 'cmd', 'path', 'file_path', 'filePath', 'file', 'url', 'query', 'pattern']) {
+    const value = args[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.length > 120 ? value.slice(0, 117) + '...' : value;
+    }
+  }
+  return '';
+}
+
 class BaseAdapter {
   /**
    * @param {object} opts
@@ -1334,6 +1352,74 @@ class BaseAdapter {
           // not been updated is distinguishable from one asserting "this really
           // is reasoning".
           ...(isReplyPreview ? { reply_preview: true } : {}),
+        },
+        sessionId: this._sessionId,
+      });
+    } catch (e) {
+      if (e instanceof SessionRevokedError) this._onSessionRevoked();
+    }
+  }
+
+  /**
+   * Report a tool call as STRUCTURE rather than as a sentence.
+   *
+   * The workspace has always been able to render one properly — a named card
+   * with expandable arguments and a failed badge — off
+   * `metadata.tool_name` / `tool_args` / `tool_status` / `tool_summary`.
+   * Nothing ever set them. All seventeen adapters parsed the tool call out of
+   * their CLI's event stream, threw the structure away, and sent a sentence:
+   * pi sent `sendStatus(channel, 'bash > git status')`. The frontend's
+   * `parseMessageStep` therefore always fell through to `parseStepContent`,
+   * the branch its own comment calls "legacy text", which only recognises a
+   * literal `**Using tool:** \`name\` \`\`\`args\`\`\`` shape that two of the
+   * seventeen happened to emit.
+   *
+   * So this is not a new capability, it is the missing end of an existing one.
+   * Adapters already hold `name` and `args` at the call site; they just need
+   * somewhere structured to put them.
+   *
+   * `status` is 'running' | 'ok' | 'failed'.
+   *
+   * ONE CALL PER MESSAGE, because one message is one line. `parseMessageStep`
+   * turns every message it is handed into its own `EventLine`, and nothing in
+   * the frontend reads `tool_call_id` — grep it, `intermediate-steps.tsx` never
+   * mentions the key. So sending a 'running' and then an 'ok' for the same call
+   * draws TWO lines; it does not resolve the first. Send the status the adapter
+   * is actually sure of, once: a CLI that reports a command after it ran (codex)
+   * can send 'ok'/'failed' immediately, while one that only announces a start
+   * (claude, amp) sends 'running' and leaves it there. `id` is still carried, so
+   * the day the frontend does correlate a pair, this side already feeds it.
+   *
+   * @param {string} channel
+   * @param {object} call
+   * @param {string} call.name
+   * @param {object|string} [call.args]
+   * @param {'running'|'ok'|'failed'} [call.status]
+   * @param {string} [call.id]     - stable across the start/end pair
+   * @param {string} [call.summary] - one line; derived by the workspace if omitted
+   */
+  async sendToolCall(channel, call) {
+    const name = call && typeof call.name === 'string' ? call.name.trim() : '';
+    if (!name) return;
+
+    // A readable line is still sent as the message body: it is what a client
+    // that does not understand the metadata shows, and what lands in exports
+    // and the daemon log.
+    const detail = toolCallDetail(call.args);
+    const text = detail ? `${name} ${detail}` : name;
+
+    try {
+      await this.client.sendMessage(this.workspaceId, channel, this.token, text, {
+        senderType: 'agent',
+        senderName: this.agentName,
+        messageType: 'thinking',
+        metadata: {
+          agent_mode: this._mode,
+          tool_name: name,
+          ...(call.args !== undefined && call.args !== null ? { tool_args: call.args } : {}),
+          ...(call.status ? { tool_status: call.status } : {}),
+          ...(call.id ? { tool_call_id: String(call.id) } : {}),
+          ...(call.summary ? { tool_summary: String(call.summary) } : {}),
         },
         sessionId: this._sessionId,
       });

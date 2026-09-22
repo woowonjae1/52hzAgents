@@ -614,8 +614,17 @@ class GooseAdapter extends BaseAdapter {
     }
     if (kind === 'tool') {
       const name = event.name || 'tool';
+      // Summary stays redacted, as it always was; the arguments go through whole
+      // like every other adapter's, since the card is what renders them.
       const summary = this._safe(event.summary || '');
-      await this.sendStatus(channel, `🔧 ${name}${summary ? ` — ${summary}` : ''}`);
+      await this.sendToolCall(channel, {
+        name,
+        args: event.args,
+        // `ok: false` is the parser saying it could not read the call at all,
+        // not the tool reporting a failure — either way the call did not run.
+        status: event.ok === false ? 'failed' : 'running',
+        summary: summary || undefined,
+      });
     } else if (kind === 'progress') {
       // Intermediate assistant narration is assistant output, not internal
       // reasoning — post it as transient status, never as a "thinking" message.

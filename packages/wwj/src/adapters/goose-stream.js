@@ -229,20 +229,31 @@ class GooseStreamParser {
     }
   }
 
+  /*
+    `args` is carried alongside the summary because the summary is one field out
+    of the arguments, chosen by _summarizeArgs — it was the only thing that used
+    to survive the parser, which meant the adapter had nothing structured left
+    to send. The summary stays: it is the line, and args is the payload.
+  */
   static _toolEvent(item) {
     const toolCall = item.toolCall;
     if (!toolCall || typeof toolCall !== 'object') {
       return { kind: 'tool', name: 'tool', summary: '' };
     }
     if (toolCall.status === 'error') {
-      return { kind: 'tool', name: 'tool', summary: '(tool call could not be parsed)' };
+      return { kind: 'tool', name: 'tool', summary: '(tool call could not be parsed)', ok: false };
     }
     const value = toolCall.value;
     if (!value || typeof value !== 'object') {
       return { kind: 'tool', name: 'tool', summary: '' };
     }
     const name = String(value.name || 'tool');
-    return { kind: 'tool', name, summary: GooseStreamParser._summarizeArgs(name, value.arguments) };
+    return {
+      kind: 'tool',
+      name,
+      args: value.arguments,
+      summary: GooseStreamParser._summarizeArgs(name, value.arguments),
+    };
   }
 
   static _toolResultEvent(item) {

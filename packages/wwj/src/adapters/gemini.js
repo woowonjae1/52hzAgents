@@ -508,7 +508,13 @@ class GeminiAdapter extends BaseAdapter {
                 else if (inp.query) inputPreview = inp.query;
                 else inputPreview = JSON.stringify(inp).slice(0, 150);
               }
-              await this.sendStatus(msgChannel, `${toolName} › ${inputPreview}`);
+              await this.sendToolCall(msgChannel, {
+                name: toolName,
+                args: event.parameters,
+                status: 'running',
+                id: event.tool_call_id || event.id,
+                summary: inputPreview,
+              });
             } else if (eventType === 'result') {
                if (event.session_id) {
                  this._channelSessions[msgChannel] = event.session_id;

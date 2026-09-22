@@ -622,18 +622,45 @@ class CopilotAdapter extends BaseAdapter {
             break;
           case 'tool_start':
             sawToolSinceText = true;
-            try { await this.sendStatus(channel, this._describeTool(ev)); } catch {}
+            // No id: the parser's tool_start carries none and neither does its
+            // tool_result, so there is nothing to correlate a pair on. 'running'
+            // is therefore the only honest status here.
+            try {
+              await this.sendToolCall(channel, {
+                name: ev.tool,
+                args: ev.input,
+                status: 'running',
+                summary: this._toolPreview(ev) || undefined,
+              });
+            } catch {}
             break;
           case 'shell':
             sawToolSinceText = true;
+            // `shell` and `file_change` are this CLI's specialisations of a tool
+            // call, and the frontend already reverse-engineered them back out of
+            // the `**Running:**` / `**Editing:**` markdown below — recovering a
+            // command truncated to 200 chars, and no arguments at all. Same card,
+            // without the round trip, and with the command whole.
             try {
-              const ec = (ev.exitCode != null) ? ` (exit ${ev.exitCode})` : '';
-              await this.sendStatus(channel, `**Running:** \`${redactSensitive(String(ev.command)).slice(0, 200)}\`${ec}`);
+              await this.sendToolCall(channel, {
+                name: 'shell',
+                // Redaction kept: this value was redacted before it was shown,
+                // and the card shows it too, just in an expandable pane.
+                args: { command: redactSensitive(String(ev.command)) },
+                status: ev.exitCode == null ? 'running' : (ev.exitCode === 0 ? 'ok' : 'failed'),
+              });
             } catch {}
             break;
           case 'file_change':
             sawToolSinceText = true;
-            try { await this.sendStatus(channel, `**${ev.action === 'read' ? 'Reading' : 'Editing'}:** \`${ev.path}\``); } catch {}
+            // The event reports a change already made, so it lands resolved.
+            try {
+              await this.sendToolCall(channel, {
+                name: ev.action === 'read' ? 'read' : 'edit',
+                args: { path: ev.path },
+                status: 'ok',
+              });
+            } catch {}
             break;
           case 'tool_result':
             // Tool output is operational detail, not an assistant reply — keep it
@@ -701,7 +728,12 @@ class CopilotAdapter extends BaseAdapter {
     });
   }
 
-  _describeTool(ev) {
+  /**
+   * The one field worth putting in the sentence beside the tool's name. Used to
+   * return `name › preview`; the name is now structure, so this returns only
+   * the preview half.
+   */
+  _toolPreview(ev) {
     let preview = '';
     const inp = ev.input;
     if (inp && typeof inp === 'object') {
@@ -711,7 +743,7 @@ class CopilotAdapter extends BaseAdapter {
     } else if (inp != null) {
       preview = String(inp).slice(0, 120);
     }
-    return `${ev.tool} › ${redactSensitive(String(preview))}`;
+    return redactSensitive(String(preview));
   }
 
   // ------------------------------------------------------------------

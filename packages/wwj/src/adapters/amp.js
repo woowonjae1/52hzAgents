@@ -576,8 +576,13 @@ class AmpAdapter extends BaseAdapter {
               hasToolUseSinceText = true;
               lastTurnText = [];
               const toolName = block.name || '';
-              const toolInput = String(JSON.stringify(block.input || {})).slice(0, 200);
-              try { await this.sendStatus(msgChannel, `**Using tool:** \`${toolName}\`\n\`\`\`\n${toolInput}\n\`\`\``); } catch {}
+              /*
+                Was hand-rolled markdown (`**Using tool:** \`name\` + fenced
+                args) that the frontend recognised only by re-parsing with a
+                regex — and truncated to 200 chars before sending, so the
+                arguments were already lossy. The structure was right here.
+              */
+              try { await this.sendToolCall(msgChannel, { name: toolName, args: block.input, status: 'running', id: block.id }); } catch {}
             }
           }
         } else if (eventType === 'result') {

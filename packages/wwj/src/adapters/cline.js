@@ -881,13 +881,42 @@ class ClineAdapter extends BaseAdapter {
             case 'tool_start':
               state.anyOutput = true;
               state.hadToolSinceText = true;
+              // cline's stream is the only one of the eleven that carries a real
+              // tool call id AND the full input, so this is the one adapter that
+              // could correlate a start with its end — see sendToolCall for why
+              // it still does not send the pair.
               try {
-                await this.sendStatus(channel, e.preview ? `${e.label}: ${e.preview}` : e.label);
+                await this.sendToolCall(channel, {
+                  name: e.toolName,
+                  args: e.input,
+                  status: 'running',
+                  id: e.toolCallId || undefined,
+                  // `label` is cline's friendly name ("Reading file"); the card
+                  // shows the raw `toolName`, so the label is worth keeping as
+                  // the line whenever there is no argument preview to show.
+                  summary: e.preview || e.label || undefined,
+                });
               } catch {}
               break;
             case 'tool_end':
+              // Still failures only. A success sent here would draw a second
+              // line rather than resolve the first one.
               if (!e.ok && e.error) {
-                try { await this.sendStatus(channel, `${e.toolName} failed: ${e.error}`); } catch {}
+                try {
+                  if (e.toolName) {
+                    await this.sendToolCall(channel, {
+                      name: e.toolName,
+                      status: 'failed',
+                      id: e.toolCallId || undefined,
+                      summary: e.error,
+                    });
+                  } else {
+                    // The parser defaults toolName to ''; sendToolCall drops a
+                    // nameless call, and an unexplained failure is worse than an
+                    // unnamed one.
+                    await this.sendStatus(channel, `Tool failed: ${e.error}`);
+                  }
+                } catch {}
               }
               break;
             case 'ask':
