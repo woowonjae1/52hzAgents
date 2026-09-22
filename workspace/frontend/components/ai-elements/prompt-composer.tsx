@@ -12,7 +12,6 @@ import {
   Sparkles,
   BookOpen,
   AtSign,
-  Crown,
   Waypoints,
   ChevronDown,
   ChevronRight,
@@ -28,9 +27,9 @@ import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catal
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
 import { composerPillClass } from './composer-pill';
-import { WorkflowPlanDialog } from '@/components/chat/orchestration-control';
+import { OrchestrationControl } from '@/components/chat/orchestration-control';
 
-export type OrchestrationMode = 'dynamic' | 'master' | 'workflow';
+export type OrchestrationMode = 'dynamic' | 'master' | 'parallel';
 
 export interface PendingFile {
   file: File;
@@ -147,7 +146,7 @@ export function PromptComposer({
   const [isFocused, setIsFocused] = React.useState(false);
 
   // Real Multi-Agent Orchestration & Workflow State
-  const currentMode: OrchestrationMode = (session?.orchestrationMode as OrchestrationMode) || 'dynamic';
+
   const onlineAgents = agents.filter((a) => a.status === 'online');
   const masterAgentName =
     session?.master ||
@@ -157,7 +156,7 @@ export function PromptComposer({
     agents[0]?.agentName ||
     'claude';
   const [masterDropdownOpen, setMasterDropdownOpen] = React.useState(false);
-  const [workflowPlanOpen, setWorkflowPlanOpen] = React.useState(false);
+
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -895,32 +894,35 @@ export function PromptComposer({
               sessionId={session?.sessionId}
             />
 
-            {currentMode !== 'dynamic' && (
-              <Hint label={currentMode === 'master' ? `Master Agent: @${masterAgentName}` : 'Custom Workflow Plan'}>
-              <div
-                // `--surface1`, not `--surface2`: same reason as the pills —
-                // this chip sits ON the composer, which is `--surface2`.
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-3xs font-mono bg-surface1 text-foreground-muted select-none"
-              >
-                {currentMode === 'master' ? (
-                  <>
-                    <Crown className="size-3 text-foreground-muted shrink-0" />
-                    <span className="truncate max-w-[120px]">Master: @{masterAgentName}</span>
-                  </>
-                ) : (
-                  <>
-                    <Waypoints className="size-3 text-foreground-muted shrink-0" />
-                    <button
-                      type="button"
-                      onClick={() => setWorkflowPlanOpen(true)}
-                      className="hover:text-foreground underline"
-                    >
-                      Workflow Plan
-                    </button>
-                  </>
-                )}
-              </div>
-              </Hint>
+            {/*
+              THE MODE MOVED HERE, AND BECAME A CONTROL.
+
+              It used to be two half-things. A ghost button in the thread
+              header — first in a row of six that the header's own comment
+              calls "a row of assorted widgets" — and, down here, a read-only
+              chip that only appeared when the mode was not dynamic. So the
+              place you could SEE the mode and the place you could CHANGE it
+              were different places, and neither said what it did.
+
+              The mode decides what pressing Enter does: who wakes, and how
+              many of them. That is a property of sending, not of the thread's
+              title bar, so it belongs beside the model select — the other
+              control that answers "what happens when I send this". beUI's
+              composer carries model select, add and send; this is the third
+              thing that genuinely belongs in that set.
+
+              Always rendered, including for dynamic. A control that appears
+              only in the non-default state cannot be used to LEAVE the
+              default, which is why the old chip needed a second control
+              elsewhere in the first place.
+            */}
+            {session && onOrchestrationChange && (
+              <OrchestrationControl
+                session={session}
+                agents={agents}
+                onChange={onOrchestrationChange}
+                variant="composer"
+              />
             )}
 
             <Hint label="Mention an agent (@)">
@@ -1054,18 +1056,11 @@ export function PromptComposer({
         </div>
       </div>
 
-      {/* Workflow Plan Dialog */}
-      {session && (
-        <WorkflowPlanDialog
-          open={workflowPlanOpen}
-          onOpenChange={setWorkflowPlanOpen}
-          agents={agents}
-          initialValue={session.orchestrationInstruction || ''}
-          onSave={(instruction) =>
-            onOrchestrationChange?.({ mode: 'workflow', instruction: instruction || null })
-          }
-        />
-      )}
+      {/*
+        The workflow plan dialog is gone with the mode it configured. It wrote
+        `mode: 'workflow'`, which no longer exists — and the text it saved was
+        never read by anything but the router's own prompt.
+      */}
     </div>
   );
 }

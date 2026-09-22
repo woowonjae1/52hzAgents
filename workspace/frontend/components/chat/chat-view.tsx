@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy, Coins } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
-import { OrchestrationControl } from './orchestration-control';
+
 import { ParallelBatchPanel } from './parallel-batch-panel';
 import { useLayout } from '@/components/layout/layout-context';
 import { cn } from '@/lib/utils';
@@ -1088,19 +1088,11 @@ export function ChatView() {
           )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Orchestration Mode Header Control */}
-          {currentSession && !isDM && (
-            <OrchestrationControl
-              session={currentSession}
-              agents={agents}
-              onChange={(updates) => {
-                if (currentSessionId) {
-                  setSessionOrchestration(currentSessionId, updates);
-                }
-              }}
-              variant="standalone"
-            />
-          )}
+          {/*
+            The mode control moved to the composer, next to the model select:
+            it governs what sending does, not what the thread is called. See
+            OrchestrationControl's `composer` variant.
+          */}
 
           {/*
             THE ROW HAS TWO KINDS OF THING IN IT, AND NOW SAYS SO.

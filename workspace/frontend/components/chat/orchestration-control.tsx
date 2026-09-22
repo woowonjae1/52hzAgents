@@ -65,9 +65,12 @@ interface Props {
   session: WorkspaceSession;
   agents: WorkspaceAgent[];
   onChange: (updates: { mode?: Mode; instruction?: string | null; verificationCmd?: string | null }) => void;
-  /** 'submenu' nests this under a parent DropdownMenu (the thread header's
-   * overflow menu) instead of rendering its own standalone trigger button. */
-  variant?: 'standalone' | 'submenu';
+  /**
+   * 'composer' is the real home: a chip in the composer's bottom row, beside
+   * the model select. 'submenu' nests the items under a parent DropdownMenu.
+   * 'standalone' is the old header button, kept for any caller still using it.
+   */
+  variant?: 'standalone' | 'submenu' | 'composer';
 }
 
 /**
@@ -133,7 +136,41 @@ export function OrchestrationControl({ session, agents, onChange, variant = 'sta
 
   return (
     <>
-      {variant === 'submenu' ? (
+      {variant === 'composer' ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Hint label="How this thread coordinates agents">
+              {/*
+                Matches the chip idiom of the row it sits in — `--surface1` on
+                the composer's `--surface2`, mono, 3xs — rather than the ghost
+                button it used in the header. It reads as one of the send
+                controls because that is now what it is.
+
+                The label is always shown, Dynamic included. The mode is only
+                worth having in reach if you can tell which one you are in
+                without opening anything.
+              */}
+              <button
+                type="button"
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md shrink-0',
+                  'text-3xs font-mono select-none transition-colors',
+                  'bg-surface1 text-foreground-muted hover:text-foreground',
+                  mode !== 'dynamic' && 'text-foreground'
+                )}
+              >
+                <ActiveIcon className="size-3 shrink-0" />
+                <span className="truncate max-w-[110px]">{active.label}</span>
+              </button>
+            </Hint>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="top" className="w-72">
+            <DropdownMenuLabel>Collaboration mode</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {items}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : variant === 'submenu' ? (
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="gap-2 text-xs">
             <ActiveIcon className="size-3.5 text-foreground-muted" />
