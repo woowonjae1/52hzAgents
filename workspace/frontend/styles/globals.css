@@ -1999,3 +1999,36 @@ textarea,
   -webkit-user-select: text;
 }
 
+
+/*
+  GLASS PILL — the selected / primary item in the sidebar.
+
+  The reference shells (Claude's Home, Codex's New) mark "here" with a raised,
+  slightly translucent pill: a lit top edge, a hairline rim and a very soft
+  drop, so it reads as a sheet lifted off the surface rather than a grey fill.
+  Real window glass (Windows Mica) is off for an Electron drag bug — see the
+  note at workspace/desktop/main.js `backgroundMaterial` — so the material is
+  carried here, by the pill, where it cannot seam against the titlebar band.
+
+  A plain class on purpose: Tailwind v4 silently drops custom @utility names
+  that collide with its namespaces (see the .ui-transition note above).
+*/
+.glass-pill {
+  background: color-mix(in oklab, #ffffff 72%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 0 0 1px color-mix(in oklab, var(--foreground) 7%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 2px 8px -2px rgba(0, 0, 0, 0.06);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  color: var(--foreground);
+}
+.dark .glass-pill {
+  background: color-mix(in oklab, #ffffff 7%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 4px 12px -4px rgba(0, 0, 0, 0.5);
+}

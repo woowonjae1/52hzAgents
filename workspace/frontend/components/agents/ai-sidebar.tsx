@@ -31,7 +31,7 @@ import {
   MorphPopoverTrigger,
 } from "@/components/motion/popover-morph";
 import { EASE_OUT, SPRING_LAYOUT, SPRING_SWAP } from "@/lib/ease";
-import { useTouchCapable } from "@/lib/hooks/use-touch-capable";
+import { useTouchCapable, useHoverCapable } from "@/lib/hooks/use-touch-capable";
 import { cn } from "@/lib/utils";
 
 export type SidebarResourceKind =
@@ -422,6 +422,9 @@ function ResourceRow({
 }: ResourceRowProps) {
   const reduce = useReducedMotion() ?? false;
   const canTouch = useTouchCapable();
+  const canHover = useHoverCapable();
+  // Pin the menu open only where nothing can hover to reveal it.
+  const pinMenu = canTouch && !canHover;
   const [hovered, setHovered] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const skipRenameBlurRef = useRef(false);
@@ -543,7 +546,10 @@ function ResourceRow({
         "data-[drop=inside]:bg-primary/10 data-[drop=inside]:ring-1 data-[drop=inside]:ring-primary/45",
         "data-[drop=before]:before:absolute data-[drop=before]:before:-top-0.5 data-[drop=before]:before:right-2 data-[drop=before]:before:left-2 data-[drop=before]:before:h-0.5 data-[drop=before]:before:rounded-full data-[drop=before]:before:bg-primary",
         "data-[drop=after]:after:absolute data-[drop=after]:after:-bottom-0.5 data-[drop=after]:after:right-2 data-[drop=after]:after:left-2 data-[drop=after]:after:h-0.5 data-[drop=after]:after:rounded-full data-[drop=after]:after:bg-primary",
-        !acceptsChildren && active && "bg-muted text-foreground",
+        !acceptsChildren && active && "glass-pill",
+        // Group headers (Direct chats, project folders) sit a step quieter
+        // than the threads they hold, so the column reads as sections.
+        acceptsChildren && "text-xs font-medium text-muted-foreground/80",
         row.item.disabled && "cursor-not-allowed opacity-45",
       )}
       style={{ paddingLeft: `${12 + row.depth * 16}px` }}
@@ -603,7 +609,7 @@ function ResourceRow({
                 "grid size-7 shrink-0 place-items-center rounded-lg outline-none transition-opacity hover:bg-foreground/5 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring group-hover/resource:opacity-100 group-data-[menu-open=true]/resource:opacity-100",
                 // A finger never hovers, and this menu is the only path to
                 // rename and move without a drag — keep it on screen there.
-                canTouch ? "opacity-100" : "opacity-0",
+                pinMenu ? "opacity-100" : "opacity-0",
               )}
             >
               <MoreHorizontal aria-hidden="true" className="size-4" />

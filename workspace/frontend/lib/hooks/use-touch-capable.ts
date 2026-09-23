@@ -29,3 +29,28 @@ export function useTouchCapable() {
 
   return canTouch;
 }
+
+/**
+ * Whether ANY input can hover (mouse, trackpad, pen with hover).
+ *
+ * Not the inverse of useTouchCapable. A Windows laptop with a touchscreen, or
+ * one that merely reports touch points, is touch-capable AND has a trackpad --
+ * using touch as the test for "cannot hover" pinned every sidebar row's `···`
+ * on screen for a mouse user. Hover-revealed controls should stay visible only
+ * when nothing can hover.
+ */
+export function useHoverCapable() {
+  const [canHover, setCanHover] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia?.("(any-hover: hover)");
+    if (!mq) return;
+    const update = () => setCanHover(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+
+  return canHover;
+}

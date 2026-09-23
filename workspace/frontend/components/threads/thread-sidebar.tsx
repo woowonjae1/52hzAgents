@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, History, Folder, FolderPlus, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2 } from 'lucide-react';
+import { SquarePen, Search, History, Folder, FolderPlus, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -18,6 +18,7 @@ import { formatCompactRelativeTime } from '@/lib/helpers';
 import { FileList } from '@/components/files/file-list';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { Hint } from '@/components/ui/hint';
 
 /*
   THE SIDEBAR, AS beUI DRAWS IT.
@@ -39,6 +40,10 @@ const DIRECT_CHATS = 'dir:';
 function folderId(dir: string | null | undefined) {
   return dir ? `dir:${dir}` : DIRECT_CHATS;
 }
+
+/** Top nav rows: same height, type and radius as the thread rows below. */
+const NAV_ROW_CLASS =
+  'flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring';
 
 const ROW_CLASS =
   'flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring';
@@ -438,40 +443,34 @@ export function ThreadSidebar() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-1 px-2 py-2">
-      {/* beUI's shell opens with three nav rows before the resource tree. */}
+      {/*
+        THE TOP OF THE SIDEBAR IS A SHORT, QUIET LIST OF PLACES.
+
+        Every row is a destination or one action, drawn the same way: one
+        glyph, one word, the same height and type as the thread rows below, so
+        the eye reads one column instead of two sizes of button. The primary
+        action leads and carries the only fill at rest -- the reference
+        shells (ChatGPT's New chat, Claude's New) mark "start here" this way
+        rather than with a button.
+
+        "New project" left this list: it CREATES something, and creation sits
+        beside the list it creates into (the Projects header below).
+      */}
       <nav className="flex flex-col gap-0.5">
-        <button type="button" className={ROW_CLASS} onClick={() => void createSession()}>
-          <SquarePen className="size-3.5 shrink-0" />
+        <button type="button" className={cn(NAV_ROW_CLASS, 'glass-pill font-medium')} onClick={() => void createSession()}>
+          <SquarePen className="size-4 shrink-0" />
           New chat
         </button>
         <button
           type="button"
-          className={ROW_CLASS}
+          className={cn(NAV_ROW_CLASS, showSearch && 'bg-muted text-foreground')}
           onClick={() => {
             setShowSearch((open) => !open);
             requestAnimationFrame(() => searchRef.current?.focus());
           }}
         >
-          <Search className="size-3.5 shrink-0" />
+          <Search className="size-4 shrink-0" />
           Search
-        </button>
-        {/*
-          A project folder in this tree is derived: it exists only because some
-          thread already has that `workingDir`. So there was no way to open a
-          directory the workspace had not seen before — the folder rows offer
-          "New chat here", but only for folders that already exist. This is the
-          entry that creates one.
-        */}
-        <button
-          type="button"
-          className={ROW_CLASS}
-          disabled={browsingFolder}
-          onClick={() => void addProjectFolder()}
-        >
-          {browsingFolder
-            ? <Loader2 className="size-3.5 shrink-0 animate-spin" />
-            : <FolderPlus className="size-3.5 shrink-0" />}
-          New project
         </button>
         {/*
           "Runs" opened routines. The label said run history; the target was
@@ -480,7 +479,7 @@ export function ThreadSidebar() {
         */}
         <button
           type="button"
-          className={cn(ROW_CLASS, viewMode === 'tasks' && tasksTab === 'runs' && 'bg-muted')}
+          className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && tasksTab === 'runs' && 'bg-muted text-foreground')}
           onClick={() => {
             if (viewMode === 'tasks' && tasksTab === 'runs') {
               setViewMode('threads');
@@ -490,7 +489,7 @@ export function ThreadSidebar() {
             }
           }}
         >
-          <History className="size-3.5 shrink-0" />
+          <History className="size-4 shrink-0" />
           Runs
         </button>
       </nav>
@@ -511,7 +510,26 @@ export function ThreadSidebar() {
         />
       )}
 
-      <div className="my-1 h-px bg-border" />
+      {/*
+        A section label, not a divider line. A project folder in this tree is
+        derived -- it exists only because some thread already has that
+        `workingDir` -- so the `+` here is the one way to open a directory the
+        workspace has not seen before.
+      */}
+      <div className="mt-3 mb-0.5 flex h-7 items-center justify-between pl-2.5 pr-1">
+        <span className="text-[11px] font-medium text-muted-foreground/80">Projects</span>
+        <Hint label={browsingFolder ? 'Opening folder…' : 'New project'}>
+          <button
+            type="button"
+            aria-label="New project"
+            disabled={browsingFolder}
+            onClick={() => void addProjectFolder()}
+            className="grid size-6 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+          >
+            {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+          </button>
+        </Hint>
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === 'files' ? (
