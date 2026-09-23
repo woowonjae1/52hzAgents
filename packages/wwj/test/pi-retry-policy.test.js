@@ -192,6 +192,9 @@ test('a failed turn hands back its in_progress rows', async () => {
     { content: 'Write adapter tests', status: 'completed' },
   ]);
   const a = makeAdapter({ client });
+  // The turn failed — that is this test's whole premise — so it is marked as
+  // such, the way sendError marks it for a real pi turn.
+  a._markTurnFailed('ch-1');
 
   await a._releaseStaleTodos('ch-1', 'Pi error: 422');
 
@@ -200,8 +203,8 @@ test('a failed turn hands back its in_progress rows', async () => {
   assert.equal(opts.source, '52hz:pi-test');
   assert.deepEqual(
     next.map((t) => t.status),
-    ['pending', 'pending', 'completed'],
-    'in_progress demoted; pending and completed untouched',
+    ['cancelled', 'pending', 'completed'],
+    'the failed row closes as cancelled; pending and completed untouched',
   );
   assert.equal(next[0].content, 'Fix command timeout', 'content is not rewritten');
   assert.equal(next[0].priority, 'high', 'priority survives');

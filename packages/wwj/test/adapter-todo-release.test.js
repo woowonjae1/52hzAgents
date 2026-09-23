@@ -49,7 +49,10 @@ function makeAdapter(client, behaviour) {
   });
 }
 
-test('a crashed turn hands its in_progress rows back, for any adapter', async () => {
+test('a crashed turn closes its in_progress rows as cancelled, with the reason', async () => {
+  // Demoting to `pending` used to be the answer, and it left a permanent
+  // "waiting" reminder for work that had failed. The turn failed, so the row
+  // is closed — and says why, in the field the server keeps for it.
   const client = makeClient([
     { content: 'Fix command timeout', status: 'in_progress', priority: 'high' },
     { content: 'Fix stream queue hang', status: 'pending' },
@@ -62,8 +65,37 @@ test('a crashed turn hands its in_progress rows back, for any adapter', async ()
   assert.equal(client.puts.length, 1, 'and the board is corrected');
   assert.deepEqual(
     client.puts[0].next.map((t) => t.status),
-    ['pending', 'pending'],
+    ['cancelled', 'pending'],
+    'the failed row closes; the untouched pending row stays pending',
   );
+  assert.ok(client.puts[0].next[0].error, 'a cancelled row carries its reason');
+});
+
+test('a failure reported through sendError counts as a failed turn', async () => {
+  // Most adapters do not throw: they catch, sendError, and return. That must
+  // close the row as cancelled too, not as completed.
+  const client = makeClient([{ content: 'Fix command timeout', status: 'in_progress' }]);
+  const a = makeAdapter(client, async function () {
+    BaseAdapter.prototype._markTurnFailed.call(this, 'ch-1');
+  });
+
+  await a._channelWorker('ch-1', { content: 'do the thing' });
+
+  assert.equal(client.puts[0].next[0].status, 'cancelled');
+});
+
+test('a failed turn does not leak into the next one', async () => {
+  const client = makeClient([{ content: 'Task', status: 'in_progress' }]);
+  let first = true;
+  const a = makeAdapter(client, async () => {
+    if (first) { first = false; throw new Error('boom'); }
+  });
+  a._channelQueues['ch-1'] = [{ content: 'second' }];
+
+  await a._channelWorker('ch-1', { content: 'first' });
+
+  assert.equal(client.puts[0].next[0].status, 'cancelled', 'first turn failed');
+  assert.equal(client.puts[1].next[0].status, 'completed', 'second turn succeeded');
 });
 
 test('a turn that forgot to close its own rows is corrected too', async () => {
@@ -77,7 +109,9 @@ test('a turn that forgot to close its own rows is corrected too', async () => {
 
   assert.equal(a.errors.length, 0);
   assert.equal(client.puts.length, 1);
-  assert.equal(client.puts[0].next[0].status, 'pending');
+  // A clean turn most likely did the work and forgot to close the row. It is
+  // completed — clearable — instead of parked as "waiting" forever.
+  assert.equal(client.puts[0].next[0].status, 'completed');
 });
 
 test('a tidy turn is left completely alone', async () => {
@@ -150,7 +184,7 @@ test('an unscoped task is still released', async () => {
 
   assert.equal(client.puts.length, 1);
   const written = client.puts[0].next;
-  assert.equal(written[0].status, 'pending', 'the unscoped row is demoted');
+  assert.equal(written[0].status, 'completed', 'the unscoped row is closed');
   assert.equal(written[1].status, 'in_progress', 'the scoped row is not');
 });
 

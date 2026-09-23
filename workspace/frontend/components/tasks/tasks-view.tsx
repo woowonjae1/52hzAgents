@@ -298,6 +298,41 @@ export function TasksView() {
 
   const [taskToDelete, setTaskToDelete] = useState<TodoItem | null>(null);
 
+  /*
+    Clearing finished work.
+
+    Completed and cancelled rows had no way off the board except one at a time
+    through a confirm dialog — so once agents started closing their own rows
+    (see _releaseStaleTodos), the Completed group only ever grew. Clearing is
+    two clicks on purpose: the first arms it and names the count, the second
+    does it, and the armed state falls away on its own if you walk off.
+  */
+  const [clearArmed, setClearArmed] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  useEffect(() => {
+    if (!clearArmed) return;
+    const t = setTimeout(() => setClearArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [clearArmed]);
+
+  const clearFinished = async (items: TodoItem[]) => {
+    if (!clearArmed) {
+      setClearArmed(true);
+      return;
+    }
+    setClearArmed(false);
+    setClearing(true);
+    try {
+      await mutate('Some finished tasks could not be cleared', async () => {
+        for (const todo of items) {
+          await deleteTodo(todo.id);
+        }
+      });
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const removeTask = (todo: TodoItem) => {
     setTaskToDelete(todo);
   };
@@ -685,6 +720,21 @@ export function TasksView() {
                             {group.items.length}
                           </span>
                         </div>
+                        {group.id === 'completed' ? (
+                          <button
+                            type="button"
+                            onClick={() => clearFinished(group.items)}
+                            disabled={clearing}
+                            className={cn(
+                              'px-2 py-0.5 rounded-md text-2xs font-medium transition-colors disabled:opacity-50',
+                              clearArmed
+                                ? 'bg-status-danger/10 text-status-danger hover:bg-status-danger/15'
+                                : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2'
+                            )}
+                          >
+                            {clearing ? 'Clearing…' : clearArmed ? `Clear ${group.items.length}?` : 'Clear'}
+                          </button>
+                        ) : (
                         <Hint label={`Add task to ${group.title}`}>
                           <button
                             type="button"
@@ -699,6 +749,7 @@ export function TasksView() {
                             <Plus className="size-3.5" />
                           </button>
                         </Hint>
+                        )}
                       </div>
 
                       {/* Issue rows */}

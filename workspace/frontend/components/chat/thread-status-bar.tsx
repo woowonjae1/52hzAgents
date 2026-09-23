@@ -2,7 +2,7 @@
 
 import { Hint } from '@/components/ui/hint';
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Circle, Loader2, Timer, MessageSquareMore, X, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { Circle, Loader2, PauseCircle, Timer, MessageSquareMore, X, ChevronDown, ChevronUp, Clock } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import type { TimerItem, WorkspaceMessage } from '@/lib/types';
@@ -122,8 +122,6 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     return queued.reverse();
   }, [messages, cancelledQueueIds]);
 
-  const pendingCount = channelTodos.filter((t) => t.status === 'pending').length;
-  const inProgressCount = channelTodos.filter((t) => t.status === 'in_progress').length;
   const activeTimers = timers.filter((t) => t.status === 'active');
 
   // Live active agent working/thinking state in this channel
@@ -134,6 +132,30 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     lastMsg.messageType === 'status' || lastMsg.messageType === 'thinking' || lastMsg.messageType === 'loading'
   );
   const isWorking = isActive || Boolean(isLastMsgWorking);
+
+  /*
+    "RUNNING" IS A FACT ABOUT AN AGENT, NOT A WORD ON THE BOARD.
+
+    Two signals here used to claim work was happening, and neither checked:
+    - the spinner came from `status === 'in_progress'` — text an agent wrote,
+      which nothing updates once that agent stops;
+    - "pi in progress" came from `workingAgentNames.has(assignee)`, which is
+      true while pi works in ANY channel. So every row assigned to pi claimed
+      to be running here whenever pi was busy somewhere else.
+
+    A task is running only while its assignee is working in THIS channel. An
+    in_progress row with nobody behind it is stopped, and is drawn as stopped —
+    which is what ends the permanent "still running" reminder.
+  */
+  const isLiveHere = (assignee?: string | null) =>
+    isWorking && Boolean(assignee) && workingAgentNames.has(assignee as string);
+  const runningCount = channelTodos.filter(
+    (t) => t.status === 'in_progress' && isLiveHere(t.assignee)
+  ).length;
+  const stoppedCount = channelTodos.filter(
+    (t) => t.status === 'in_progress' && !isLiveHere(t.assignee)
+  ).length;
+  const pendingCount = channelTodos.filter((t) => t.status === 'pending').length;
 
   const activeAgentName = (lastInfo?.senderName) || (lastMsg?.senderName) || 'Agent';
   const rawStatusText = (lastMsg && (lastMsg.messageType === 'status' || lastMsg.messageType === 'thinking'))
@@ -167,7 +189,8 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
 
   const [tasksExpanded, setTasksExpanded] = useState(false);
 
-  const hasContent = pendingCount > 0 || inProgressCount > 0 || activeTimers.length > 0 || queuedMessages.length > 0;
+  const hasContent =
+    pendingCount > 0 || runningCount > 0 || stoppedCount > 0 || activeTimers.length > 0 || queuedMessages.length > 0;
   if (!hasContent) return null;
 
   return (
@@ -188,8 +211,10 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
           <div className="max-h-48 overflow-y-auto divide-y divide-border/60">
             {channelTodos.map((todo) => (
               <div key={todo.id || todo.content} className="flex items-start gap-2 py-1.5 px-1">
-                {todo.status === 'in_progress' ? (
+                {todo.status === 'in_progress' && isLiveHere(todo.assignee) ? (
                   <Loader2 className="mt-0.5 size-3.5 text-foreground-muted animate-spin shrink-0" />
+                ) : todo.status === 'in_progress' ? (
+                  <PauseCircle className="mt-0.5 size-3.5 text-foreground-extra-muted shrink-0" />
                 ) : (
                   <Circle className="mt-0.5 size-3.5 text-muted-foreground shrink-0" />
                 )}
@@ -203,13 +228,13 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                         assignee had picked the work up or the baton was dropped.
                         This reports the assignee's own live state. */}
                     {todo.assignee && (
-                      workingAgentNames.has(todo.assignee) ? (
-                        <span className="flex items-center gap-1 text-status-warning font-medium">
+                      isLiveHere(todo.assignee) && todo.status === 'in_progress' ? (
+                        <span className="flex items-center gap-1 text-foreground-muted font-medium">
                           <Loader2 className="size-2.5 animate-spin" />
-                          {todo.assignee} in progress
+                          {todo.assignee} working
                         </span>
                       ) : todo.status === 'in_progress' ? (
-                        <span className="text-foreground-muted font-medium">In progress</span>
+                        <span className="text-foreground-extra-muted">Stopped — nobody is working on it</span>
                       ) : (
                         <span className="text-foreground-extra-muted">Waiting on {todo.assignee}</span>
                       )
@@ -223,9 +248,9 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
       )}
 
       {/* Todos and timers row */}
-      {(inProgressCount > 0 || pendingCount > 0 || activeTimers.length > 0) && (
+      {(runningCount > 0 || stoppedCount > 0 || pendingCount > 0 || activeTimers.length > 0) && (
         <div className="flex items-center gap-2.5">
-          {(inProgressCount > 0 || pendingCount > 0) && (
+          {(runningCount > 0 || stoppedCount > 0 || pendingCount > 0) && (
             <span className="flex items-center gap-1">
               <Hint label="Click to view all task details">
                 <button
@@ -233,13 +258,22 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                   onClick={() => setTasksExpanded((prev) => !prev)}
                   className="flex items-center gap-1 hover:text-foreground transition-colors group"
                 >
-                  {inProgressCount > 0 && (
+                  {runningCount > 0 && (
                     <>
                       <Loader2 className="size-3 text-foreground-muted animate-spin" />
-                      <span className="group-hover:underline">{inProgressCount} in progress</span>
+                      <span className="group-hover:underline">{runningCount} running</span>
                     </>
                   )}
-                  {inProgressCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
+                  {runningCount > 0 && (stoppedCount > 0 || pendingCount > 0) && (
+                    <span className="text-muted-foreground/30">·</span>
+                  )}
+                  {stoppedCount > 0 && (
+                    <>
+                      <PauseCircle className="size-3" />
+                      <span className="group-hover:underline">{stoppedCount} stopped</span>
+                    </>
+                  )}
+                  {stoppedCount > 0 && pendingCount > 0 && <span className="text-muted-foreground/30">·</span>}
                   {pendingCount > 0 && (
                     <>
                       <Circle className="size-3" />

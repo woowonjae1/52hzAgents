@@ -1191,8 +1191,27 @@ class BaseAdapter {
     return content;
   }
 
+  /*
+    Whether the turn in progress on a channel ended in an error.
+
+    _releaseStaleTodos needs it to close a stranded row HONESTLY: a turn that
+    failed did not do the work, and a turn that succeeded almost certainly did.
+    Set from two places because failures arrive two ways — thrown out of
+    _handleMessage (caught below), or caught inside an adapter and reported via
+    sendError, which is how pi, claude and most others end a failed turn.
+  */
+  _markTurnFailed(channel) {
+    if (!this._turnFailed) this._turnFailed = new Set();
+    this._turnFailed.add(channel);
+  }
+
+  _beginTurn(channel) {
+    if (this._turnFailed) this._turnFailed.delete(channel);
+  }
+
   async _channelWorker(channel, msg) {
     this._channelBusy.add(channel);
+    this._beginTurn(channel);
     try {
       if (msg && typeof msg.content === 'string') {
         msg.content = await this._resolveKnowledgeMentions(msg.content);
@@ -1200,6 +1219,7 @@ class BaseAdapter {
       await this._handleMessage(msg);
     } catch (e) {
       this._log(`Error in channel worker for ${channel}: ${e.message}`);
+      this._markTurnFailed(channel);
       try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
     } finally {
       await this._releaseStaleTodos(channel, 'turn ended');
@@ -1213,6 +1233,7 @@ class BaseAdapter {
       if (nextMsg._queueId) {
         try { await this.sendStatus(channel, 'processing queued message', { queue_id: nextMsg._queueId, queue_status: 'processed' }); } catch {}
       }
+      this._beginTurn(channel);
       try {
         if (nextMsg && typeof nextMsg.content === 'string') {
           nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content);
@@ -1220,6 +1241,7 @@ class BaseAdapter {
         await this._handleMessage(nextMsg);
       } catch (e) {
         this._log(`Error processing queued message in ${channel}: ${e.message}`);
+        this._markTurnFailed(channel);
         try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
       } finally {
         await this._releaseStaleTodos(channel, 'queued turn ended');
@@ -1550,9 +1572,32 @@ class BaseAdapter {
         task part of a split, it needs no extra request per turn, and a channel
         that leaves parallel mode simply stops creating them.
       */
+      /*
+        CLOSE THE ROW, DON'T PARK IT.
+
+        This used to demote a stranded in_progress row to `pending`. That fixed
+        the lie ("something is running") by telling a different one: the task
+        now sat on the board as "waiting", forever, reminding the user about work
+        that had either been done or had failed. Nothing ever moved it on again.
+
+        The turn's outcome says which:
+        - it ended in an error → the work was not done. `cancelled`, with the
+          reason in `error` — the server has no `failed` status, and `error` is
+          the field it keeps for exactly this.
+        - it ended cleanly → the commoner case, and the one this function was
+          first written for, is an agent that finished and forgot to close its
+          own row. `completed`, which the board lets the user clear.
+        A wrong `completed` costs one click to reopen; a wrong `pending` cost
+        a permanent reminder nobody could explain.
+      */
+      const failed = Boolean(this._turnFailed && this._turnFailed.has(channelName));
+      const closedStatus = failed ? 'cancelled' : 'completed';
       const next = mine.map((t) => ({
         content: t.content,
-        status: t.status === 'in_progress' && !t.scope ? 'pending' : t.status,
+        status: t.status === 'in_progress' && !t.scope ? closedStatus : t.status,
+        ...(t.status === 'in_progress' && !t.scope && failed
+          ? { error: 'The turn ended with an error before this was finished.' }
+          : (t.error ? { error: t.error } : {})),
         assignee: t.assignee,
         priority: t.priority,
         // Carried through because PutTodos is delete-and-reinsert: a field that
@@ -1609,6 +1654,7 @@ class BaseAdapter {
   }
 
   async sendError(channel, error) {
+    this._markTurnFailed(channel);
     try {
       await this.client.sendMessage(this.workspaceId, channel, this.token, error, {
         senderType: 'agent',
