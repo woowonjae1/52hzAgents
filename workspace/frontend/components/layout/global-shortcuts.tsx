@@ -200,25 +200,6 @@ export function GlobalShortcuts() {
           }
           return;
         }
-        /*
-          CTRL+W closes the browser tab you are looking at — and ONLY when the
-          browser view owns the screen. Binding it globally would mean the one
-          key everyone uses to close a window silently closed something else.
-        */
-        if (key === 'w' && !e.shiftKey && h.viewMode === 'browser' && h.selectedBrowserTabId) {
-          e.preventDefault();
-          void h.closeBrowserTab(h.selectedBrowserTabId);
-          return;
-        }
-        // Ctrl+Tab / Ctrl+Shift+Tab cycle those tabs, as in any tabbed window.
-        if (e.key === 'Tab' && h.viewMode === 'browser' && h.browserTabs.length > 1) {
-          e.preventDefault();
-          const at = h.browserTabs.findIndex((t) => t.id === h.selectedBrowserTabId);
-          const step = e.shiftKey ? -1 : 1;
-          const next = (at + step + h.browserTabs.length) % h.browserTabs.length;
-          h.setSelectedBrowserTabId(h.browserTabs[next].id);
-          return;
-        }
         return; // every other chord belongs to the browser or to a field
       }
 

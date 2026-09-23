@@ -54,7 +54,6 @@ export const GOTO_SEQUENCE: Record<string, { view: string; label: string }> = {
   e: { view: 'skills', label: 'Skills' },
   r: { view: 'routines', label: 'Routines' },
   i: { view: 'inbox', label: 'Inbox' },
-  b: { view: 'browser', label: 'Browser' },
   n: { view: 'connect', label: 'Connect agents' },
   s: { view: 'settings', label: 'Settings' },
 };

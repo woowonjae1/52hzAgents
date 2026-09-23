@@ -9,8 +9,6 @@ import { ChatView, SessionMessagesProvider } from '@/components/chat/chat-view';
 import { ThreadList } from '@/components/threads/thread-list';
 import { FileList } from '@/components/files/file-list';
 import { FilePreview } from '@/components/files/file-preview';
-import { BrowserTabList } from '@/components/browser/browser-tab-list';
-import { BrowserView } from '@/components/browser/browser-view';
 import { LocalPreview } from '@/components/preview/local-preview';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
@@ -226,7 +224,7 @@ function WrapperInner() {
     return (
       <div className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
         <MobileHeader />
-        <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[calc(48px+env(safe-area-inset-bottom))]">
+        <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[env(safe-area-inset-bottom)]">
           {/* Full-screen views (no list/detail split) */}
           {viewMode === 'mission' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
@@ -257,7 +255,6 @@ function WrapperInner() {
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm flex flex-col">
               {viewMode === 'threads' && <ThreadList />}
               {viewMode === 'files' && <FileList />}
-              {viewMode === 'browser' && <BrowserTabList />}
             </div>
           ) : (
             /* Detail pane — full width, edge-to-edge on mobile */
@@ -268,7 +265,6 @@ function WrapperInner() {
                 </main>
               )}
               {viewMode === 'files' && <FilePreview />}
-              {viewMode === 'browser' && <BrowserView />}
               {isAgentPanelOpen && <AgentProfilePanel />}
             </div>
           )}
@@ -367,7 +363,6 @@ function WrapperInner() {
                 {viewMode === 'inbox' && <InboxView />}
 
                 {viewMode === 'settings' && <SettingsView />}
-                {viewMode === 'browser' && <BrowserView />}
                 {/* Agent profile slide-over panel */}
                 {isAgentPanelOpen && <AgentProfilePanel />}
               </div>
@@ -423,32 +418,45 @@ function WrapperInner() {
                             <span>Canvas</span>
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab('preview')}
+                        {/*
+                          THE CLOSE BUTTON LIVES ON THE TAB, AND SHOWS ON HOVER.
+
+                          It sat at the far right of this header, a few pixels
+                          from the window's own minimise / maximise / close
+                          controls, so closing the panel and closing the app
+                          were one slip apart. On the tab it closes the thing
+                          it is attached to, like a browser tab, and stays out
+                          of sight until the pointer (or keyboard focus) is on
+                          the tab. Esc still closes the panel.
+                        */}
+                        <div
                           className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0",
+                            "group/tab inline-flex items-center rounded-md text-2xs font-medium transition-colors shrink-0",
                             effectiveStudioTab === 'preview'
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
                           )}
                         >
-                          <Globe className="size-3.5" />
-                          <span>Preview</span>
-                        </button>
-
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0 ml-1">
-                        <Hint label="Close Studio (Esc)">
                           <button
                             type="button"
-                            onClick={handleCloseStudio}
-                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
+                            onClick={() => setActiveRightTab('preview')}
+                            className="inline-flex items-center gap-1.5 py-1 pl-2.5 pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
                           >
-                            <X className="size-3.5" />
+                            <Globe className="size-3.5" />
+                            <span>Preview</span>
                           </button>
-                        </Hint>
+                          <Hint label="Close (Esc)">
+                            <button
+                              type="button"
+                              aria-label="Close Preview"
+                              onClick={handleCloseStudio}
+                              className="mr-1 grid size-4 place-items-center rounded text-foreground-muted opacity-0 outline-none transition-opacity hover:bg-surface2 hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </Hint>
+                        </div>
+
                       </div>
                     </div>
                   )}

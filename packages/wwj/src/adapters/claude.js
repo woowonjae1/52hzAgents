@@ -65,6 +65,9 @@ class ClaudeAdapter extends BaseAdapter {
     /** @type {'mcp' | 'skills'} Tool integration mode */
     this.toolMode = opts.toolMode || 'skills';
     this._channelSessions = {}; // channel → Claude CLI session_id
+    // Registers its own Write/Edit outputs (see _flushProducedFiles), so the
+    // base post-turn directory scan is skipped.
+    this._tracksProducedFiles = true;
     this._channelProcesses = {}; // channel → child process
     this._stoppingChannels = new Set();
     // Channels that have already announced "Execution stopped by user." for the

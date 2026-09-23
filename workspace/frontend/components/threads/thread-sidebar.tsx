@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, History, Folder, FolderPlus, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus } from 'lucide-react';
+import { SquarePen, Search, History, Folder, FolderPlus, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -473,6 +473,19 @@ export function ThreadSidebar() {
           Search
         </button>
         {/*
+          The workspace's shared files: what you uploaded and what agents
+          produced (adapters register files they write each turn). The tree
+          below swaps to the file list while this is on.
+        */}
+        <button
+          type="button"
+          className={cn(NAV_ROW_CLASS, viewMode === 'files' && 'bg-muted text-foreground')}
+          onClick={() => setViewMode(viewMode === 'files' ? 'threads' : 'files')}
+        >
+          <FileText className="size-4 shrink-0" />
+          Files
+        </button>
+        {/*
           "Runs" opened routines. The label said run history; the target was
           Settings › Scheduled Tasks (what 'routines' resolved to). Tasks has a
           Runs page of its own, so the button now goes where it says.
@@ -516,6 +529,7 @@ export function ThreadSidebar() {
         `workingDir` -- so the `+` here is the one way to open a directory the
         workspace has not seen before.
       */}
+      {viewMode !== 'files' && (
       <div className="mt-3 mb-0.5 flex h-7 items-center justify-between pl-2.5 pr-1">
         <span className="text-[11px] font-medium text-muted-foreground/80">Projects</span>
         <Hint label={browsingFolder ? 'Opening folder…' : 'New project'}>
@@ -530,6 +544,7 @@ export function ThreadSidebar() {
           </button>
         </Hint>
       </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === 'files' ? (

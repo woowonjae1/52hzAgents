@@ -191,15 +191,6 @@ export function CommandPalette() {
         action: () => setViewMode('knowledge'),
       },
       {
-        id: 'nav-browser',
-        shortcut: ['G', 'B'],
-        category: 'Navigation',
-        title: 'Agent Browser',
-        subtitle: 'Watch and control automated browser instances',
-        icon: <Globe className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('browser'),
-      },
-      {
         // One entry: routines and one-shot timers are the same thing on two
         // clocks, and both live in Tasks › Schedules. 'routines' resolves there.
         id: 'nav-schedules',

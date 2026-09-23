@@ -75,7 +75,6 @@ const GO_TARGETS: Record<string, ViewMode> = {
   skills: 'skills',
   routines: 'routines',
   inbox: 'inbox',
-  browser: 'browser',
 };
 
 export function DesktopIntegration() {

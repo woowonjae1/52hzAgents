@@ -254,6 +254,53 @@ class BaseAdapter {
     }
   }
 
+  /*
+    FILES AN AGENT WROTE THIS TURN GO TO THE WORKSPACE'S FILES PANEL.
+
+    Only claude ever did this -- it watches its own Write/Edit tool calls and
+    calls registerProducedFile. Every other adapter (pi, codex, gemini, ...)
+    registered nothing, so their output never appeared in Files. After each
+    turn, the channel's working directory is scanned for files modified since
+    the turn began and each is registered; registerProducedFile already skips
+    dotfiles, internal dirs, empty and >50MB files, and dedupes by
+    path|size|mtime. Bounded (entries visited, files registered) so a huge repo
+    cannot stall the channel. Adapters that track writes precisely set
+    `_tracksProducedFiles` and skip this.
+  */
+  async _registerFilesTouchedSince(channel, sinceMs) {
+    if (this._tracksProducedFiles) return;
+    let dir;
+    try { dir = await this._resolveWorkingDir(channel); } catch { return; }
+    if (!dir) return;
+    const SKIP_DIRS = new Set(['node_modules', '__pycache__', 'dist', 'build', 'out', 'target', 'coverage', 'venv', '.venv']);
+    const SKIP_FILES = /(^package-lock\.json$|^yarn\.lock$|^pnpm-lock\.yaml$|\.log$|\.lock$|\.tmp$)/i;
+    const MAX_VISITED = 8000;
+    const MAX_FILES = 20;
+    const found = [];
+    const stack = [dir];
+    let visited = 0;
+    while (stack.length > 0 && visited < MAX_VISITED && found.length < MAX_FILES) {
+      const current = stack.pop();
+      let entries;
+      try { entries = fs.readdirSync(current, { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        if (++visited >= MAX_VISITED || found.length >= MAX_FILES) break;
+        if (entry.name.startsWith('.')) continue;
+        const full = path.join(current, entry.name);
+        if (entry.isDirectory()) {
+          if (!SKIP_DIRS.has(entry.name.toLowerCase())) stack.push(full);
+        } else if (entry.isFile() && !SKIP_FILES.test(entry.name)) {
+          try {
+            if (fs.statSync(full).mtimeMs >= sinceMs) found.push(full);
+          } catch {}
+        }
+      }
+    }
+    for (const file of found) {
+      await this.registerProducedFile(channel, file);
+    }
+  }
+
   // ------------------------------------------------------------------
   // Runtime status reporting (daemon surfaces this in daemon.status.json)
   // ------------------------------------------------------------------
@@ -1248,6 +1295,7 @@ class BaseAdapter {
   async _channelWorker(channel, msg) {
     this._channelBusy.add(channel);
     this._beginTurn(channel);
+    const turnStartedAt = Date.now();
     try {
       if (msg && typeof msg.content === 'string') {
         msg.content = await this._resolveKnowledgeMentions(msg.content);
@@ -1259,6 +1307,7 @@ class BaseAdapter {
       try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
     } finally {
       await this._releaseStaleTodos(channel, 'turn ended');
+      this._registerFilesTouchedSince(channel, turnStartedAt).catch(() => {});
     }
 
     // Drain queue
@@ -1270,6 +1319,7 @@ class BaseAdapter {
         try { await this.sendStatus(channel, 'processing queued message', { queue_id: nextMsg._queueId, queue_status: 'processed' }); } catch {}
       }
       this._beginTurn(channel);
+      const queuedStartedAt = Date.now();
       try {
         if (nextMsg && typeof nextMsg.content === 'string') {
           nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content);
@@ -1281,6 +1331,7 @@ class BaseAdapter {
         try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
       } finally {
         await this._releaseStaleTodos(channel, 'queued turn ended');
+        this._registerFilesTouchedSince(channel, queuedStartedAt).catch(() => {});
       }
     }
     this._channelBusy.delete(channel);

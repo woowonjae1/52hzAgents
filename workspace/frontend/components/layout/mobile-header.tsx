@@ -42,11 +42,6 @@ export function MobileHeader() {
   // Open the shared agent picker so the user chooses who joins the new session.
   const handleNewThread = () => openNewThread();
 
-  const tabs: { mode: ViewMode; icon: typeof MessageSquare; label: string }[] = [
-    { mode: 'threads', icon: MessageSquare, label: 'Channels' },
-    { mode: 'files', icon: FileText, label: 'Files' },
-    { mode: 'browser', icon: Globe, label: 'Browser' },
-  ];
 
   return (
     <>
@@ -91,26 +86,11 @@ export function MobileHeader() {
         </div>
       </header>
 
-      {/* Bottom navigation tabs */}
-      <nav className="fixed bottom-0 start-0 end-0 z-50 bg-background/95 backdrop-blur-sm border-t safe-bottom">
-        <div className="flex items-center justify-around h-12">
-          {tabs.map(({ mode, icon: Icon, label }) => (
-            <button
-              key={mode}
-              onClick={() => handleViewSwitch(mode)}
-              className={cn(
-                'flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors',
-                viewMode === mode
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
-              )}
-            >
-              <Icon className="size-5" />
-              <span className="text-3xs font-medium">{label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
+      {/*
+        No bottom tab bar. It held Channels (the thread list -- already the
+        default pane and in the menu), Files (now a row in the sidebar menu)
+        and Browser (removed), so what was left was one tab.
+      */}
     </>
   );
 }
