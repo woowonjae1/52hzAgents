@@ -19,7 +19,6 @@ import {
   Sparkles,
   ArrowLeft,
   BookOpen,
-  CalendarClock,
   ChevronRight,
   Shield,
   PanelRight,
@@ -30,7 +29,6 @@ import {
   Crown,
   FileText,
   Layers,
-  Radio,
   Plug,
   MonitorPlay,
   Power,
@@ -56,7 +54,6 @@ import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { SkillsView } from '@/components/skills/skills-view';
 import { RouterProviderSettings } from './router-provider-settings';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
-import { RoutineList } from '@/components/routines/routine-list';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { eventToMessage } from '@/lib/types';
@@ -88,7 +85,7 @@ export function SettingsView() {
     { id: 'export', label: 'Export & Share', icon: Download },
     { id: 'skills', label: 'Skills Hub', icon: Sparkles },
     { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
-    { id: 'routines', label: 'Scheduled Tasks', icon: CalendarClock },
+
   ];
 
   /*
@@ -270,12 +267,7 @@ export function SettingsView() {
       desc: 'Browse and download the project code and Markdown the agents write.',
     },
 
-    {
-      id: 'radar',
-      name: 'Agent Radar Topology',
-      icon: Radio,
-      desc: 'The collaboration network, how the agents are connected, and their live heartbeats.',
-    },
+
 
 
   ];
@@ -375,7 +367,9 @@ export function SettingsView() {
         <div className="flex-1 min-w-0 h-full overflow-y-auto bg-surface0">
           {settingsTab === 'skills' && <SkillsView />}
           {settingsTab === 'knowledge' && <KnowledgeView />}
-          {settingsTab === 'routines' && <RoutineList />}
+          {/* "Scheduled Tasks" moved to Tasks › Schedules, which already listed
+              every routine and timer — the same schedules were editable here
+              too. Anything that asks for it lands there via resolveView. */}
 
           {/* Tab 1: General Settings */}
           {settingsTab === 'general' && (

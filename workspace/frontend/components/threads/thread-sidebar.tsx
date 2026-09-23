@@ -15,7 +15,6 @@ import { basename, browseForFolder } from '@/components/chat/project-folder-pick
 import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
 import { formatCompactRelativeTime } from '@/lib/helpers';
 import { FileList } from '@/components/files/file-list';
-import { RoutineList } from '@/components/routines/routine-list';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +56,7 @@ export function ThreadSidebar() {
     updateSession,
     moveSessionToFolder,
   } = useWorkspace();
-  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen } = useLayout();
+  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab } = useLayout();
 
   const [showSearch, setShowSearch] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -454,10 +453,22 @@ export function ThreadSidebar() {
             : <FolderPlus className="size-3.5 shrink-0" />}
           New project
         </button>
+        {/*
+          "Runs" opened routines. The label said run history; the target was
+          Settings › Scheduled Tasks (what 'routines' resolved to). Tasks has a
+          Runs page of its own, so the button now goes where it says.
+        */}
         <button
           type="button"
-          className={cn(ROW_CLASS, viewMode === 'routines' && 'bg-muted')}
-          onClick={() => setViewMode(viewMode === 'routines' ? 'threads' : 'routines')}
+          className={cn(ROW_CLASS, viewMode === 'tasks' && tasksTab === 'runs' && 'bg-muted')}
+          onClick={() => {
+            if (viewMode === 'tasks' && tasksTab === 'runs') {
+              setViewMode('threads');
+            } else {
+              setTasksTab('runs');
+              setViewMode('tasks');
+            }
+          }}
         >
           <History className="size-3.5 shrink-0" />
           Runs
@@ -485,8 +496,6 @@ export function ThreadSidebar() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === 'files' ? (
           <FileList />
-        ) : viewMode === 'routines' ? (
-          <RoutineList />
         ) : (
         <AISidebar
           ariaLabel="Conversations"

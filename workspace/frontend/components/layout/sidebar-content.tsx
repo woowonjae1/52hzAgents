@@ -23,7 +23,6 @@ import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { ThreadSidebar } from '@/components/threads/thread-sidebar';
 import { FileList } from '@/components/files/file-list';
 import { TasksView } from '@/components/tasks/tasks-view';
-import { RoutineList } from '@/components/routines/routine-list';
 
 export function SidebarContent() {
   const { viewMode, setViewMode, openSettings } = useLayout();

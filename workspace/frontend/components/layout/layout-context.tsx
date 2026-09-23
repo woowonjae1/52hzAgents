@@ -21,12 +21,36 @@ import {
 
 export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
 
-export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' | 'knowledge' | 'routines';
+export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' | 'knowledge';
+
+export type TasksTab = 'tasks' | 'schedules' | 'runs';
+
+/*
+  ONE HOME PER MODULE.
+
+  Several view names are aliases, resolved here rather than rendered: every way
+  into a view — sidebar, command palette, shortcuts, the desktop menu, a layout
+  restored from storage — goes through setViewMode, so this is the one place a
+  duplicate can be collapsed without chasing each caller.
+
+  - 'skills', 'knowledge' → Settings. This was already true (applyViewMode sent
+    them there) — the wrapper's own branches for them were unreachable.
+  - 'routines', 'timers' → Tasks › Schedules. Each had a home of its own AND
+    Schedules, which lists both routines and one-shot timers; so the same
+    schedule was editable from three places. Settings › "Scheduled Tasks" was
+    the third, and is gone.
+*/
+function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTab; tasksTab?: TasksTab } {
+  if (mode === 'skills' || mode === 'knowledge') return { view: 'settings', settingsTab: mode };
+  if (mode === 'routines' || mode === 'timers') return { view: 'tasks', tasksTab: 'schedules' };
+  return { view: mode };
+}
 
 // The Studio holds what THIS thread produced, and nothing else:
 // 'preview' — a dev server on this machine; 'file' — the thread's files;
-// 'canvas' — the active markdown / code / artifact deliverable; and 'radar',
-// pending its move into the Agents view.
+// 'canvas' — the active markdown / code / artifact deliverable. ('radar', an
+// agent inspector, was here too; nothing ever opened it — no caller set the
+// tab — so it is gone, and agents live in the Agents view.)
 //
 // This comment used to describe 'browser' as a remote agent-browser session
 // that "shares nothing" with 'preview'. The renderer disagreed — both drew the
@@ -41,10 +65,10 @@ export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' 
   each opened the Studio panel onto an empty pane. Removing them from the type
   is what made the compiler find every one of those callers.
 */
-export type RightPanelTab = 'preview' | 'file' | 'radar' | 'canvas' | null;
+export type RightPanelTab = 'preview' | 'file' | 'canvas' | null;
 
 // 'canvas' is deliberately absent: it points at one message's artifact.
-const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'radar']);
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -81,6 +105,9 @@ interface LayoutState {
   settingsTab: SettingsTab;
   setSettingsTab: (tab: SettingsTab) => void;
   openSettings: (tab?: SettingsTab) => void;
+  /** Which Tasks sub-page to show — set when a view alias resolves into Tasks. */
+  tasksTab: TasksTab;
+  setTasksTab: (tab: TasksTab) => void;
   selectedAgentName: string | null;
   setSelectedAgentName: (name: string | null) => void;
   isAgentPanelOpen: boolean;
@@ -175,9 +202,18 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     storeSidebarWidth(clamped);
   }, []);
   const [isSidebarResizing, setSidebarResizing] = useState(false);
-  const [viewMode, setViewModeState] = useState<ViewMode>(() => readLayout().viewMode ?? 'threads');
-  const [settingsTab, setSettingsTabState] = useState<SettingsTab>(
-    () => readLayout().settingsTab ?? 'general',
+  // Restored through resolveView too: a layout saved on 'timers' or 'routines'
+  // would otherwise reopen a view that no longer renders.
+  const [viewMode, setViewModeState] = useState<ViewMode>(
+    () => resolveView(readLayout().viewMode ?? 'threads').view,
+  );
+  const [settingsTab, setSettingsTabState] = useState<SettingsTab>(() => {
+    const saved = readLayout().settingsTab as string | undefined;
+    // 'routines' was a Settings section; it lives in Tasks › Schedules now.
+    return saved && saved !== 'routines' ? (saved as SettingsTab) : 'general';
+  });
+  const [tasksTab, setTasksTab] = useState<TasksTab>(
+    () => resolveView(readLayout().viewMode ?? 'threads').tasksTab ?? 'tasks',
   );
 
   const setSettingsTab = useCallback((tab: SettingsTab) => {
@@ -203,14 +239,16 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   */
   /** Change the view WITHOUT touching history — used by back/forward itself. */
   const applyViewMode = useCallback((mode: ViewMode) => {
-    if (mode === 'skills' || mode === 'knowledge' || mode === 'routines') {
-      setSettingsTabState(mode);
-      setViewModeState('settings');
-      writeLayout({ viewMode: 'settings', settingsTab: mode });
+    const { view, settingsTab: tab, tasksTab: sub } = resolveView(mode);
+    if (tab) {
+      setSettingsTabState(tab);
+      setViewModeState(view);
+      writeLayout({ viewMode: view, settingsTab: tab });
       return;
     }
-    setViewModeState(mode);
-    writeLayout({ viewMode: mode });
+    if (sub) setTasksTab(sub);
+    setViewModeState(view);
+    writeLayout({ viewMode: view });
   }, []);
 
   const [nav, setNav] = useState<{ stack: ViewMode[]; index: number }>(() => ({
@@ -398,6 +436,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
       goBack,
       goForward,
       settingsTab,
+      tasksTab,
+      setTasksTab,
       setSettingsTab,
       openSettings,
       selectedAgentName,
@@ -422,7 +462,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   }), [
     isMobile, isSidebarOpen, sidebarToggle, setSidebarOpen, sidebarWidth, setSidebarWidth,
     isSidebarResizing, viewMode, setViewMode, canGoBack, canGoForward, goBack, goForward,
-    settingsTab, openSettings,
+    settingsTab, openSettings, tasksTab,
     selectedAgentName, isAgentPanelOpen, mobilePane, openMobileDetail,
     openMobileList, isDetailExpanded, toggleDetailExpanded, splitBrowser,
     handleSetSplitBrowser, showBrowserPreview, setShowBrowserPreview,

@@ -131,7 +131,13 @@ export function TasksView() {
   } = useWorkspace();
   const { setViewMode } = useLayout();
 
-  const [activeSubTab, setActiveSubTab] = useState<'tasks' | 'schedules' | 'runs'>('tasks');
+  /*
+    The sub-page lives in layout state, not here, because it can be chosen from
+    outside: "Schedules" in the command palette, or a restored 'timers' view,
+    resolves to Tasks AND to this tab. Local state would open on the task list
+    every time and drop that half of the request.
+  */
+  const { tasksTab: activeSubTab, setTasksTab: setActiveSubTab } = useLayout();
   const [searchQuery, setSearchQuery] = useState('');
   const [scope, setScope] = useState<TaskScope>('workspace');
   const [displaySettings, setDisplaySettings] = useState<TasksDisplaySettings>(DEFAULT_SETTINGS);

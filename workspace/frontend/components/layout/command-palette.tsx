@@ -19,7 +19,6 @@ import {
   Globe,
   Activity,
   Repeat,
-  Timer,
   Inbox,
   Radio,
   Settings,
@@ -158,8 +157,8 @@ export function CommandPalette() {
       {
         id: 'nav-mission',
         category: 'Navigation',
-        title: 'Agent Dashboard',
-        subtitle: 'Agent radar and orchestration topology',
+        title: 'Agents',
+        subtitle: 'Who is online, and what each one is working on',
         icon: <Compass className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'M'],
         action: () => setViewMode('mission'),
@@ -201,21 +200,15 @@ export function CommandPalette() {
         action: () => setViewMode('browser'),
       },
       {
-        id: 'nav-routines',
+        // One entry: routines and one-shot timers are the same thing on two
+        // clocks, and both live in Tasks › Schedules. 'routines' resolves there.
+        id: 'nav-schedules',
         shortcut: ['G', 'R'],
         category: 'Navigation',
-        title: 'Routines & Automation',
-        subtitle: 'Scheduled and recurring cron tasks',
+        title: 'Schedules',
+        subtitle: 'Recurring routines and one-shot timers',
         icon: <Repeat className="size-4 text-foreground-muted" />,
         action: () => setViewMode('routines'),
-      },
-      {
-        id: 'nav-timers',
-        category: 'Navigation',
-        title: 'Timers & Reminders',
-        subtitle: 'One-shot agent timers',
-        icon: <Timer className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('timers'),
       },
       {
         id: 'nav-inbox',

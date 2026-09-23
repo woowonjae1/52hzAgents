@@ -16,13 +16,8 @@ import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { TasksView } from '@/components/tasks/tasks-view';
-import { TimersView } from '@/components/timers/timers-view';
-import { RoutineList } from '@/components/routines/routine-list';
-import { SkillsView } from '@/components/skills/skills-view';
 import { InboxView } from '@/components/inbox/inbox-view';
-import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { MissionControl } from '@/components/mission/mission-control';
-import { RadarPanel } from '@/components/mission/radar-panel';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
 import { EmptyState } from '@/components/chat/empty-state';
@@ -249,21 +244,9 @@ function WrapperInner() {
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <TasksView />
             </div>
-          ) : viewMode === 'timers' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <TimersView />
-            </div>
           ) : viewMode === 'inbox' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <InboxView />
-            </div>
-          ) : viewMode === 'skills' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <SkillsView />
-            </div>
-          ) : viewMode === 'knowledge' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <KnowledgeView />
             </div>
           ) : viewMode === 'settings' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
@@ -275,12 +258,11 @@ function WrapperInner() {
               {viewMode === 'threads' && <ThreadList />}
               {viewMode === 'files' && <FileList />}
               {viewMode === 'browser' && <BrowserTabList />}
-              {viewMode === 'routines' && <RoutineList />}
             </div>
           ) : (
             /* Detail pane — full width, edge-to-edge on mobile */
             <div className="relative h-full bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              {(viewMode === 'threads' || viewMode === 'routines') && (
+              {viewMode === 'threads' && (
                 <main className="h-full">
                   <ChatView />
                 </main>
@@ -381,10 +363,9 @@ function WrapperInner() {
                 {viewMode === 'connect' && <ConnectAgentView />}
                 {viewMode === 'files' && <FilePreview />}
                 {viewMode === 'tasks' && <TasksView />}
-                {viewMode === 'timers' && <TimersView />}
+
                 {viewMode === 'inbox' && <InboxView />}
-                {viewMode === 'skills' && <SkillsView />}
-                {viewMode === 'knowledge' && <KnowledgeView />}
+
                 {viewMode === 'settings' && <SettingsView />}
                 {viewMode === 'browser' && <BrowserView />}
                 {/* Agent profile slide-over panel */}
@@ -477,7 +458,7 @@ function WrapperInner() {
                     {effectiveStudioTab === 'canvas' && <ArtifactsCanvas embedded />}
                     {effectiveStudioTab === 'preview' && <LocalPreview />}
                     {effectiveStudioTab === 'file' && <FilePreview />}
-                    {effectiveStudioTab === 'radar' && <RadarPanel />}
+
                     {/*
                       Trace is gone. It rendered the same messages as the chat
                       a second time, filtered to steps; the filter moved onto
