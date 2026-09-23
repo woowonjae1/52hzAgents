@@ -293,6 +293,10 @@ export function AgentModelSwitcher({
   // Filtered models for display
   const displayedModels = React.useMemo(() => {
     let list = activeModels;
+    // A short list shows no search or filter controls, so none may apply: a
+    // query typed for another agent's long list must not silently empty this
+    // one from somewhere the user cannot see.
+    if (activeModels.length <= 8) return list;
 
     if (activeCategory === 'free') {
       list = list.filter(
@@ -405,6 +409,11 @@ export function AgentModelSwitcher({
     );
   };
 
+  // Progressive disclosure: each piece of the picker appears only when it has
+  // something to do. Eight is about what can be scanned without searching.
+  const multiAgent = primary.length + secondary.length > 1;
+  const manyModels = activeModels.length > 8;
+
   return (
     <Popover open={isOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -446,36 +455,31 @@ export function AgentModelSwitcher({
         </Hint>
       </PopoverTrigger>
 
+      {/*
+        SIZED BY WHAT IT HOLDS.
+
+        This was a fixed 680×480 panel with the same furniture whatever it
+        contained: a title bar (title, subtitle, "N online", a close button a
+        popover does not need), an agent rail, an agent header with a count and
+        a "Current:" chip that restated the checkmark on the selected row, a
+        search field and a row of provider chips — to choose between two models
+        for one agent. Each piece now appears only when there is something for
+        it to do: the rail with more than one agent, search and filters with
+        more models than fit in a glance.
+      */}
       <PopoverContent
         align="start"
         sideOffset={6}
-        className="p-0 w-[580px] sm:w-[680px] h-[480px] max-h-[85vh] rounded-xl border border-border bg-surface1 shadow-xl overflow-hidden flex flex-col"
+        className={cn(
+          'p-0 max-h-[min(480px,85vh)] rounded-xl border border-border bg-surface1 shadow-xl overflow-hidden flex flex-col',
+          multiAgent ? 'w-[520px]' : 'w-[320px]',
+        )}
       >
-        {/* Header Bar */}
-        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-border/60 bg-surface2/40 shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-primary" />
-            <span className="text-xs font-semibold text-foreground">Agent Models</span>
-            <span className="text-3xs text-muted-foreground hidden sm:inline">· Configure AI model per agent</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-3xs font-medium px-2 py-0.5 rounded-full bg-surface3 text-muted-foreground border border-border/60">
-              {onlineAgents.length} online
-            </span>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface3 transition-colors"
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        </div>
-
         {/* Master-Detail Body */}
         <div className="flex-1 flex min-h-0 divide-x divide-border/60">
-          {/* Left Rail: Agent Selector */}
-          <div className="w-[200px] sm:w-[220px] shrink-0 bg-surface2/20 flex flex-col min-h-0 overflow-y-auto p-2 space-y-2">
+          {/* Left Rail: Agent Selector — only when there is a choice to make */}
+          {multiAgent && (
+          <div className="w-[180px] shrink-0 bg-surface2/20 flex flex-col min-h-0 overflow-y-auto p-2 space-y-2">
             {primary.length > 0 && (
               <div className="space-y-1">
                 {participantSet.size > 0 && (
@@ -496,41 +500,28 @@ export function AgentModelSwitcher({
               </div>
             )}
           </div>
+          )}
 
           {/* Right Panel: Selected Agent Models */}
           <div className="flex-1 flex flex-col min-w-0 bg-surface1 min-h-0">
             {activeAgent ? (
               <>
-                {/* Active Agent Info Header */}
-                <div className="px-3.5 py-2.5 border-b border-border/60 flex items-center justify-between gap-2 shrink-0 bg-surface1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <AgentAvatar
-                      name={activeAgent.agentName}
-                      agentType={activeAgent.agentType}
-                      size={20}
-                    />
-                    <span className="text-xs font-semibold text-foreground truncate">
-                      @{activeAgent.agentName}
-                    </span>
-                    <span className="text-3xs text-muted-foreground">
-                      ({activeModels.length} {activeModels.length === 1 ? 'model' : 'models'})
-                    </span>
-                  </div>
-                  <div className="text-3xs text-muted-foreground shrink-0 flex items-center gap-1">
-                    <span>Current:</span>
-                    <Hint label={activeCurrentModel || 'Default'}>
-                      <span
-                        className="font-medium text-foreground bg-surface2 px-1.5 py-0.5 rounded border border-border/60 truncate max-w-[150px]"
-                      >
-                        {activeCurrentModel
-                          ? (activeCurrentModel.includes('/') ? activeCurrentModel.slice(activeCurrentModel.indexOf('/') + 1) : activeCurrentModel)
-                          : 'Default'}
-                      </span>
-                    </Hint>
-                  </div>
+                {/* Whose model this is. The count and the "Current:" chip are
+                    gone — the list is right below, and the selected row has
+                    its own checkmark. */}
+                <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5 shrink-0">
+                  <AgentAvatar
+                    name={activeAgent.agentName}
+                    agentType={activeAgent.agentType}
+                    size={16}
+                  />
+                  <span className="text-2xs font-medium text-foreground-muted truncate">
+                    Model for @{activeAgent.agentName}
+                  </span>
                 </div>
 
-                {/* Search & Category Chips */}
+                {/* Search & Category Chips — only once there is a list to search */}
+                {manyModels && (
                 <div className="p-2.5 border-b border-border/60 space-y-2 shrink-0 bg-surface1">
                   <div className="relative flex items-center">
                     <Search className="size-3.5 absolute left-2.5 text-muted-foreground/70 pointer-events-none" />
@@ -581,6 +572,7 @@ export function AgentModelSwitcher({
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Model Items List */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0">
