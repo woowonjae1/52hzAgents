@@ -34,6 +34,9 @@ import { toast } from '@/lib/toast';
   here that asks the reader to act, and `--destructive` is the token this
   project reserves for exactly that.
 */
+/** Events shown in Live activity — after reply previews are dropped. */
+const FEED_SIZE = 40;
+
 function FilterChip({
   label,
   count,
@@ -186,16 +189,34 @@ export function MissionControl() {
   const fetchFeed = useCallback(async () => {
     const titleFor = (channel: string) => sessions.find((s) => s.sessionId === channel)?.title || channel;
     try {
-      const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 40 });
-      const lines: TimelineEventItem[] = res.events.map((ev: ONMEvent, idx: number) => {
+      /*
+        THE FEED WAS FULL OF ONE REPLY, CUT INTO TOKENS.
+
+        Most adapters stream the answer as it is written, one `thinking`
+        message per delta with `reply_preview` set; the finished reply then
+        lands as a message of its own. This feed took the last 40 raw messages,
+        so a single 40-token answer filled all of it with fragments — "把伞。",
+        "备", "可", "，出门" — newest first, which is the sentence read
+        backwards, and pushed every real event out. Previews are dropped (the
+        reply they preview is in the feed as itself), and more is fetched than
+        is shown, because the limit is spent before the filter runs.
+
+        Agent replies were also typed 'command', so every answer wore the
+        terminal icon and counted under "Tool calls". A tool call is the
+        message that carries `tool_name`; a reply is just a reply.
+      */
+      const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 160 });
+      const lines: TimelineEventItem[] = [];
+      for (let idx = 0; idx < res.events.length && lines.length < FEED_SIZE; idx++) {
+        const ev = res.events[idx] as ONMEvent;
         const m = eventToMessage(ev);
+        if (m.messageType === 'thinking' && m.metadata?.reply_preview) continue;
         const channel = (ev.target || '').replace(/^channel\//, '');
         let type: TimelineEventItem['type'] = 'info';
-        if (m.messageType === 'thinking') type = 'thinking';
+        if (m.messageType === 'thinking') type = m.metadata?.tool_name ? 'command' : 'thinking';
         else if (m.metadata?.tool_approval_request) type = 'approval';
         else if (m.messageType === 'status') type = /failed|error|stopped|denied/i.test(m.content) ? 'error' : 'success';
-        else if (m.senderType === 'agent') type = 'command';
-        return {
+        lines.push({
           id: m.messageId || ev.event_id || `activity-${idx}-${ev.timestamp || Date.now()}`,
           time: m.createdAt ? new Date(m.createdAt) : new Date(ev.timestamp),
           sender: m.senderName || stripAddressPrefix(ev.source),
@@ -203,8 +224,8 @@ export function MissionControl() {
           channelId: channel,
           content: m.content,
           type,
-        };
-      });
+        });
+      }
       setActivityFeed(lines);
     } catch {
       /* keep last feed */
