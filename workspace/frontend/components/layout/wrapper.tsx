@@ -26,7 +26,7 @@ import { RadarPanel } from '@/components/mission/radar-panel';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
 import { EmptyState } from '@/components/chat/empty-state';
-import { TracePanel } from '@/components/trace/trace-panel';
+
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
 import { CommandPalette } from './command-palette';
@@ -43,7 +43,7 @@ import { Hint } from '@/components/ui/hint';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { SignalMark } from '@/components/brand/signal-mark';
-import { Network, X, PanelLeft, FileText, Globe, Activity } from 'lucide-react';
+import { Network, X, PanelLeft, FileText, Globe } from 'lucide-react';
 
 /**
  * THE FIRST FRAME IS THE WINDOW, NOT A SPLASH.
@@ -455,19 +455,7 @@ function WrapperInner() {
                           <Globe className="size-3.5" />
                           <span>Preview</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab('trace')}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0",
-                            effectiveStudioTab === 'trace'
-                              ? "bg-surface3 text-foreground font-semibold border border-border"
-                              : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                          )}
-                        >
-                          <Activity className="size-3.5" />
-                          <span>Trace</span>
-                        </button>
+
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0 ml-1">
@@ -490,7 +478,12 @@ function WrapperInner() {
                     {effectiveStudioTab === 'preview' && <LocalPreview />}
                     {effectiveStudioTab === 'file' && <FilePreview />}
                     {effectiveStudioTab === 'radar' && <RadarPanel />}
-                    {effectiveStudioTab === 'trace' && <TracePanel />}
+                    {/*
+                      Trace is gone. It rendered the same messages as the chat
+                      a second time, filtered to steps; the filter moved onto
+                      the transcript (see transcript-filter.tsx) and the second
+                      copy went with the panel.
+                    */}
                   </div>
                 </aside>
               )}

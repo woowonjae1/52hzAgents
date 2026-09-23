@@ -35,7 +35,6 @@ import {
   MonitorPlay,
   Power,
   Palette,
-  Activity,
   Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -278,12 +277,7 @@ export function SettingsView() {
       desc: 'The collaboration network, how the agents are connected, and their live heartbeats.',
     },
 
-    {
-      id: 'trace',
-      name: 'Execution Trace & Reasoning',
-      icon: Activity,
-      desc: 'Multi-step reasoning, tool calls, subagent dispatch, and the live execution tree for this thread.',
-    },
+
   ];
 
   return (

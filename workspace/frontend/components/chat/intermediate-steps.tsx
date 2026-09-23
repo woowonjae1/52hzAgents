@@ -35,7 +35,6 @@ import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
 import { SubagentList } from '@/components/ai-elements/subagent-list';
 import { MarkdownContent } from './markdown-content';
-import { useLayout } from '@/components/layout/layout-context';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
 
 // ── Content Parsing ──
@@ -966,7 +965,6 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   defaultOpen = false,
 }: ToolCallsDisclosureProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const { setActiveRightTab } = useLayout();
 
   const renderable = (steps || []).filter((s) => !isPlaceholderThinking(s));
   if (renderable.length === 0) return null;
@@ -1005,14 +1003,7 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
             )}
           />
         </button>
-        <button
-          type="button"
-          title="Open in Trace Panel"
-          onClick={() => setActiveRightTab('trace')}
-          className="ml-auto grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Activity className="size-3.5" />
-        </button>
+
       </div>
       <AgentDisclosure open={open}>
         <div className="pt-1.5">
@@ -1032,7 +1023,6 @@ interface IntermediateStepsProps {
 }
 
 export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents, isActive = false }: IntermediateStepsProps) {
-  const { setActiveRightTab } = useLayout();
   if (!steps || steps.length === 0) return null;
   const renderableSteps = steps.filter((s) => !isPlaceholderThinking(s));
   if (renderableSteps.length === 0) return null;
@@ -1081,16 +1071,7 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
               <ActivityIndicator
                 startTime={steps[0]?.createdAt ? new Date(steps[0].createdAt).getTime() : undefined}
               />
-              <Hint label="Open Trace Panel">
-                <button
-                  type="button"
-                  onClick={() => setActiveRightTab('trace')}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                >
-                  <Activity className="size-2.5" />
-                  <span>Trace</span>
-                </button>
-              </Hint>
+
             </div>
           )}
         </div>

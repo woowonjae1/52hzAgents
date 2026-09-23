@@ -29,7 +29,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy } from 'lucide-react';
+import { Download, Filter, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, CheckCircle2, Copy } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 
 import { ParallelBatchPanel } from './parallel-batch-panel';
@@ -45,6 +45,13 @@ import {
   getDerivedTitle,
   stripTitleMentions,
 } from '@/lib/thread-title';
+import {
+  TranscriptFilterBar,
+  applyTranscriptFilter,
+  isTranscriptFilterActive,
+  EMPTY_TRANSCRIPT_FILTER,
+  type TranscriptFilterState,
+} from './transcript-filter';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { GitChip } from '@/components/git/git-chip';
@@ -563,6 +570,35 @@ export function ChatView() {
     () => deduplicateAndSortMessages([...sessionMessages, ...sessionOptimisticMessages]),
     [sessionMessages, sessionOptimisticMessages]
   );
+
+  /*
+    Transcript filter — the useful half of the old Trace panel, applied to the
+    transcript itself. Reset whenever the thread changes: a filter is a question
+    about ONE conversation, and carrying "only @pi" into the next thread would
+    silently hide most of it.
+  */
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [transcriptFilter, setTranscriptFilter] = useState<TranscriptFilterState>(EMPTY_TRANSCRIPT_FILTER);
+  useEffect(() => {
+    setFilterOpen(false);
+    setTranscriptFilter(EMPTY_TRANSCRIPT_FILTER);
+  }, [currentSessionId]);
+  const filterActive = isTranscriptFilterActive(transcriptFilter);
+  const filteredMessages = useMemo(
+    () => applyTranscriptFilter(displayMessages, transcriptFilter),
+    [displayMessages, transcriptFilter]
+  );
+  const speakingAgents = useMemo(
+    () =>
+      Array.from(
+        new Set(displayMessages.filter((m) => m.senderType === 'agent' && m.senderName).map((m) => m.senderName))
+      ).sort(),
+    [displayMessages]
+  );
+  const closeFilter = useCallback(() => {
+    setFilterOpen(false);
+    setTranscriptFilter(EMPTY_TRANSCRIPT_FILTER);
+  }, []);
 
   const startEditingTitle = () => {
     setTitleDraft(currentSession?.title || '');
@@ -1131,9 +1167,9 @@ export function ChatView() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
 
-              <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}>
-                <Activity className="size-4 mr-2 text-foreground-muted" />
-                <span>Execution Trace</span>
+              <DropdownMenuItem onClick={() => (filterOpen || filterActive ? closeFilter() : setFilterOpen(true))}>
+                <Filter className="size-4 mr-2 text-foreground-muted" />
+                <span>{filterOpen || filterActive ? 'Clear filter' : 'Filter this thread'}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
@@ -1371,10 +1407,25 @@ export function ChatView() {
             </div>
           </div>
         ) : (
+          <>
+          {(filterOpen || filterActive) && (
+            <div className="px-4 lg:px-8 pt-2">
+              <TranscriptFilterBar
+                value={transcriptFilter}
+                onChange={setTranscriptFilter}
+                onClose={closeFilter}
+                agentNames={speakingAgents}
+                shown={filteredMessages.length}
+                total={displayMessages.length}
+              />
+            </div>
+          )}
           <ChatMessages
-            messages={displayMessages}
+            messages={filteredMessages}
             agents={agents}
-            showAllSteps={showAllSteps}
+            // A kind filter IS a step view: collapsing the steps it selected
+            // would show a filtered transcript with nothing in it.
+            showAllSteps={showAllSteps || transcriptFilter.kind !== 'all'}
             scrollKey={scrollKey}
             loadOlder={loadOlder}
             hasOlder={hasOlder}
@@ -1385,6 +1436,7 @@ export function ChatView() {
             onReusePrompt={handleReusePrompt}
             className="flex-1 overflow-y-auto px-4 lg:px-8 py-4"
           />
+          </>
         )}
 
         {/* Input — hidden for read-only DM views */}

@@ -23,11 +23,16 @@ export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'browser'
 
 export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' | 'knowledge' | 'routines';
 
-// 'browser' watches the browser an agent is driving (remote session, expires,
-// reconnects). 'preview' points at a dev server on this machine. They look
-// alike and share nothing. 'trace' renders full multi-agent execution steps.
-// 'tokens' renders the workspace token governance & channel context health dashboard.
-// 'canvas' renders the active markdown / code / artifact deliverable.
+// The Studio holds what THIS thread produced, and nothing else:
+// 'preview' — a dev server on this machine; 'file' — the thread's files;
+// 'canvas' — the active markdown / code / artifact deliverable; and 'radar',
+// pending its move into the Agents view.
+//
+// This comment used to describe 'browser' as a remote agent-browser session
+// that "shares nothing" with 'preview'. The renderer disagreed — both drew the
+// same <LocalPreview /> — so the comment had outlived the feature. The agents'
+// browser is the Browser view, not a Studio tab. 'trace' and 'tokens' are gone
+// too; see the RightPanelTab note below.
 /*
   Four values removed: 'tasks', 'terminal', 'routines' and 'tokens'. None had a
   renderer — the Studio pane dispatches on this and drew nothing for them — yet
@@ -36,10 +41,10 @@ export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' 
   each opened the Studio panel onto an empty pane. Removing them from the type
   is what made the compiler find every one of those callers.
 */
-export type RightPanelTab = 'preview' | 'file' | 'radar' | 'trace' | 'canvas' | null;
+export type RightPanelTab = 'preview' | 'file' | 'radar' | 'canvas' | null;
 
 // 'canvas' is deliberately absent: it points at one message's artifact.
-const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'radar', 'trace']);
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'radar']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';

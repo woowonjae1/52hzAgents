@@ -16,7 +16,6 @@ import {
   Sparkles,
   Send,
   Globe,
-  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSplitter } from '@/hooks/use-splitter';
@@ -224,16 +223,7 @@ export function ArtifactsCanvas({ className, embedded }: { className?: string; e
               <Globe className="size-3.5" />
             </button>
           </Hint>
-          {/* Quick jump to Trace */}
-          <Hint label="Switch to Execution Trace">
-            <button
-              type="button"
-              onClick={() => setActiveRightTab('trace')}
-              className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
-            >
-              <Activity className="size-3.5" />
-            </button>
-          </Hint>
+
 
           {/* Action icons */}
           <Hint label="Copy content">
