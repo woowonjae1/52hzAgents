@@ -1,5 +1,34 @@
 import { getApiBaseUrl } from '../config';
 
+/*
+  THE ERROR MESSAGE IS SHOWN TO PEOPLE, SO IT HAS TO BE A SENTENCE.
+
+  This threw `API ${status}: ${body}` with the whole response body, and views
+  render `err.message` as-is. When the server answered with an HTML error page
+  — a proxy, a 404 from the dev server, a crashed backend — the Runs page
+  printed the entire document, several screens of red markup, as its error.
+  And the backend's own JSON errors surfaced as `API 400: {"error":"..."}`.
+
+  The `API ${status}:` prefix is kept on purpose: agents.ts branches on
+  `startsWith('API 404:')`. Only the tail changes, and the status is also on
+  `err.status` for anything that should not be parsing strings.
+*/
+function readableErrorBody(status: number, body: string): string {
+  const text = (body || '').trim();
+  if (!text) return `request failed with status ${status}`;
+  if (text.startsWith('<')) {
+    return "the server returned a page instead of data";
+  }
+  try {
+    const parsed = JSON.parse(text) as { error?: unknown; message?: unknown };
+    const msg = parsed && (parsed.error ?? parsed.message);
+    if (typeof msg === 'string' && msg.trim()) return msg.trim();
+  } catch {
+    /* not JSON — fall through to the bounded raw text */
+  }
+  return text.length > 240 ? `${text.slice(0, 240)}…` : text;
+}
+
 export class BaseWorkspaceApi {
   protected token: string = '';
   protected bearerToken: string = '';
@@ -62,7 +91,11 @@ export class BaseWorkspaceApi {
 
         if (!res.ok) {
           const body = await res.text();
-          throw new Error(`API ${res.status}: ${body}`);
+          const err = new Error(`API ${res.status}: ${readableErrorBody(res.status, body)}`) as Error & {
+            status?: number;
+          };
+          err.status = res.status;
+          throw err;
         }
 
         const json = await res.json();
