@@ -139,8 +139,21 @@ export function cleanTitleText(raw: string): string {
     Only stripped when something survives: "@pi" alone is a thread whose whole
     subject IS the agent, and an empty title is worse than a redundant one.
   */
-  const withoutMentions = stripped.replace(/(^|\s)@[\w.\-]+/g, '$1').replace(/\s+/g, ' ').trim();
-  return withoutMentions.length >= 2 ? withoutMentions : stripped;
+  return stripTitleMentions(stripped);
+}
+
+/**
+ * Drop @mentions from a title, but only when something survives.
+ *
+ * Separate from cleanTitleText because it has to run on titles that are NOT
+ * derived: a thread named at creation from its first message stores that text
+ * as an explicit title, so it never passes through the cleaner and kept every
+ * @name. cleanTitleText also strips `#`, `*` and `_`, which a title the user
+ * typed may legitimately contain — this touches nothing but the mentions.
+ */
+export function stripTitleMentions(title: string): string {
+  const withoutMentions = title.replace(/(^|\s)@[\w.\-]+/g, '$1').replace(/\s+/g, ' ').trim();
+  return withoutMentions.length >= 2 ? withoutMentions : title;
 }
 
 export function truncateTitle(text: string, max = MAX_TITLE): string {

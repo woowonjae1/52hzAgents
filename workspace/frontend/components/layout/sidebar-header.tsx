@@ -15,11 +15,33 @@ export function SidebarHeader() {
     <div
       className="app-header justify-between px-4"
       style={{
-        paddingInlineStart: 'max(1rem, var(--traffic-lights-inset, 0px))',
+        // 0.875rem, the chat header's own inline padding — so the toggle below
+        // lands on the same x as the expand button that replaces it.
+        paddingInlineStart: 'max(0.875rem, var(--traffic-lights-inset, 0px))',
       }}
     >
-      {/* Left: Brand logo with status dot */}
-      <div className="flex items-center gap-3 min-w-0">
+      {/*
+        THE TOGGLE NO LONGER JUMPS.
+
+        Collapse lived at the RIGHT edge of this header, ~280px in. Collapsing
+        the sidebar removed it, and the button that brings the sidebar back
+        appeared at the LEFT edge of the chat header instead — so the control
+        was never where your pointer had just been, and "close" and "open" were
+        two different buttons in two different places.
+
+        It now opens the row, at the same x, size and icon size as the expand
+        button in the chat header. Toggling changes the state, not the target.
+      */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <Hint label="Collapse sidebar">
+          <button
+            onClick={sidebarToggle}
+            aria-label="Collapse sidebar"
+            className="size-7 -ml-1 shrink-0 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+          >
+            <PanelLeft className="size-4" />
+          </button>
+        </Hint>
         <SignalMark size={22} className="shrink-0" title="52hzAgents" />
         <div className="flex items-center gap-1.5 min-w-0">
           <Hint label={workspace?.name || '52hzAgents'}>
@@ -33,17 +55,8 @@ export function SidebarHeader() {
         </div>
       </div>
 
-      {/* Right: Notification Bell & Sidebar Collapse Toggle */}
       <div className="flex items-center gap-1 shrink-0">
         <NotificationBell />
-        <Hint label="Collapse Sidebar">
-          <button
-            onClick={sidebarToggle}
-            className="size-7 rounded-lg hover:bg-surface2 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
-          >
-            <PanelLeft className="size-3.5" />
-          </button>
-        </Hint>
       </div>
     </div>
   );

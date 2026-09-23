@@ -43,6 +43,7 @@ import {
   deriveTitleFromMessages,
   rememberDerivedTitle,
   getDerivedTitle,
+  stripTitleMentions,
 } from '@/lib/thread-title';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
@@ -872,12 +873,13 @@ export function ChatView() {
     return (
       <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
         {/* Empty state header providing window drag region and sidebar toggle */}
-        <div className="app-header sticky top-0 z-10 px-3.5">
+        <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
           <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
             {!isMobile && !isSidebarOpen && (
-              <Hint label="Expand Sidebar">
+              <Hint label="Expand sidebar">
                 <button
                   onClick={sidebarToggle}
+                  aria-label="Expand sidebar"
                   className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1"
                 >
                   <PanelLeft className="size-4" />
@@ -964,13 +966,14 @@ export function ChatView() {
         longer reserves space for the native window buttons either: those live
         in AppTitlebar above, which is also the app's single drag region.
       */}
-      <div className="app-header sticky top-0 z-10 px-3.5">
+      <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
           {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
           {!isMobile && !isSidebarOpen && (
-            <Hint label="Expand Sidebar">
+            <Hint label="Expand sidebar">
               <button
                 onClick={sidebarToggle}
+                aria-label="Expand sidebar"
                 className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1"
               >
                 <PanelLeft className="size-4" />
@@ -1010,7 +1013,7 @@ export function ChatView() {
             <Hint label="Click to rename">
               <div className="flex min-w-0 flex-col" onClick={startEditingTitle}>
                 <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
-                  {currentSession?.title || 'Channel'}
+                  {currentSession?.title ? stripTitleMentions(currentSession.title) : 'Channel'}
                 </h2>
                 <span className="truncate text-[11px] leading-tight text-muted-foreground">
                   {[
@@ -1031,18 +1034,15 @@ export function ChatView() {
             when live. It replaces nothing — this header never said, in one
             place, whether the workspace was actually connected.
           */}
-          {!isDM && (
-            <span
-              className={cn(
-                'ml-auto hidden shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium sm:inline-flex',
-                activeHeaderAgents.length > 0
-                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  : 'bg-muted text-muted-foreground'
-              )}
-            >
-              {activeHeaderAgents.length > 0 ? 'Connected' : 'Offline'}
-            </span>
-          )}
+          {/*
+            The Connected / Offline pill is gone. It was computed from exactly
+            the same value as the subtitle under the title — `activeHeaderAgents
+            .length > 0` — so the header said "no agents" and "Offline" about one
+            fact, a line apart, and the composer banner said it a third time. It
+            was also the only green in the header. The subtitle keeps the fact;
+            this spacer keeps the right-hand group pushed right.
+          */}
+          <span className="ml-auto" aria-hidden />
 
           {/*
             Who is in this channel, and whether any of them is mid-task.

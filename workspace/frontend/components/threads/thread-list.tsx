@@ -31,6 +31,7 @@ import {
   getDerivedTitle,
   subscribeToTitles,
   cleanTitleText,
+  stripTitleMentions,
   truncateTitle,
   isUnusableTitleSource,
 } from '@/lib/thread-title';
@@ -266,7 +267,9 @@ export function getSmartSessionTitle(
     rawTitle === 'Untitled' ||
     rawTitle === 'New Chat';
 
-  if (!isGeneric) return rawTitle;
+  // Explicit titles are mostly the first message, stored at creation — which
+  // is why they still carried their @mentions after derived ones stopped.
+  if (!isGeneric) return stripTitleMentions(rawTitle);
 
   // Recorded from the transcript's first user message. Stable by construction:
   // written once, never overwritten.

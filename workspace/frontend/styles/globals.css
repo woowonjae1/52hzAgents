@@ -1137,7 +1137,17 @@ html {
     own rule precisely so that this one can be the only line up here. A line
     carrying that much load cannot be drawn at table-rule alpha.
   */
-  border-bottom: 1px solid var(--border-chrome);
+  /*
+    THE LINE IS GONE — TRANSPARENT, NOT REMOVED, SO NO HEADER CHANGES HEIGHT.
+
+    It was the one rule drawn across the top of every view, and it did the job
+    it was given: it said "chrome ends here". But a hairline is the loudest way
+    to say that, and the reference this app is compared against says it with no
+    line at all — the header and the content share a ground, and the transcript
+    FADES as it passes under the header (see `.app-header-fade`). The boundary
+    is still there; it is carried by the fade instead of by a stroke.
+  */
+  border-bottom: 1px solid transparent;
   /*
     CHROME COLOUR, NOT CONTENT COLOUR.
 
@@ -1156,6 +1166,29 @@ html {
   background: var(--surface-sidebar);
   user-select: none;
   -webkit-user-select: none;
+}
+
+/*
+  Content fades out as it scrolls up under the header.
+
+  A band below the header, from the header's own ground to transparent, laid
+  over the top of whatever sits beneath. Text passing under it dissolves into
+  the header instead of being cut by a line — which is what makes the header
+  read as part of the page rather than a bar bolted on top of it.
+
+  `::after` on the header rather than a mask on the scroller: the transcript's
+  scroll container is owned by a virtualised list, and masking it would also
+  fade the first message when the view is scrolled to the very top. This only
+  paints; `pointer-events: none` keeps everything beneath it clickable.
+*/
+.app-header-fade::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  height: 1.25rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--surface-sidebar), transparent);
 }
 
 :root[data-desktop] .app-header {
