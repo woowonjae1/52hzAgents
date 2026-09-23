@@ -1406,6 +1406,10 @@ class ClaudeAdapter extends BaseAdapter {
     });
 
     const pp = {
+      // The directory this process was started in. A long-lived process
+      // cannot change directory, so a turn that must run elsewhere (a parallel
+      // lane's worktree) replaces it rather than reusing it.
+      cwd: workingDir || null,
       proc,
       lineBuffer: '',
       pendingLines: Promise.resolve(),
@@ -1854,7 +1858,12 @@ class ClaudeAdapter extends BaseAdapter {
     // ── Persistent process fast-path ──
     // If we have a living persistent process for this channel, send via stdin
     // instead of spawning a new CLI (saves ~2s startup time).
-    const existingPP = this._persistentProcs[msgChannel];
+    let existingPP = this._persistentProcs[msgChannel];
+    if (existingPP && existingPP.alive && existingPP.cwd && resolvedWorkingDir && existingPP.cwd !== resolvedWorkingDir) {
+      this._log(`Working directory changed for ${msgChannel} (${existingPP.cwd} -> ${resolvedWorkingDir}); restarting the process`);
+      this._killPersistentProc(msgChannel);
+      existingPP = null;
+    }
     if (existingPP && existingPP.alive) {
       this._log(`Reusing persistent process for ${msgChannel}`);
       this._resetIdleTimer(msgChannel);

@@ -38,6 +38,7 @@ func StartScheduler() {
 				expireStalePipelineSteps()
 				expireStaleCouncilSessions()
 				expireStaleRoutineRuns()
+				handlers.ExpireStaleParallelLanes()
 				fireDueTimers()   // 执行到期 Timers 触发扫描。
 				fireDueRoutines() // 执行到期 Routines 触发扫描。
 			}()

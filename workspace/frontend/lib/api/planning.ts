@@ -75,11 +75,11 @@ export function normalizeRoutine(r: Record<string, unknown>): RoutineItem {
 
 /** The fields a caller may write on a todo. */
 export type TodoWritePayload = Pick<TodoItem, 'content' | 'status'> &
-  Partial<Pick<TodoItem, 'assignee' | 'priority' | 'dueDate' | 'error'>>;
+  Partial<Pick<TodoItem, 'assignee' | 'priority' | 'dueDate' | 'error' | 'scope'>>;
 
 /** A partial update of a single todo. */
 export type TodoPatch = Partial<
-  Pick<TodoItem, 'content' | 'status' | 'priority' | 'assignee' | 'position' | 'dueDate' | 'error'>
+  Pick<TodoItem, 'content' | 'status' | 'priority' | 'assignee' | 'position' | 'dueDate' | 'error' | 'scope'>
 >;
 
 /**
@@ -106,6 +106,7 @@ export function normalizeTodo(t: Record<string, unknown>): TodoItem {
     runId: (t.run_id ?? t.runId ?? t.RunID ?? null) as string | null,
     timerId: (t.timer_id ?? t.timerId ?? t.TimerID ?? null) as string | null,
     error: (t.error ?? t.Error ?? null) as string | null,
+    scope: (t.scope ?? t.Scope ?? null) as string | null,
     dueDate: (t.due_date ?? t.dueDate ?? t.DueDate ?? null) as string | null,
     completedAt: (t.completed_at ?? t.completedAt ?? t.CompletedAt ?? null) as string | null,
     createdAt: (t.created_at || t.createdAt || t.CreatedAt || null) as string | null,
@@ -121,6 +122,7 @@ function serializeTodo(todo: TodoWritePayload) {
     priority: todo.priority || 'none',
     ...(todo.dueDate ? { due_date: todo.dueDate } : {}),
     ...(todo.error !== undefined ? { error: todo.error } : {}),
+    ...(todo.scope !== undefined ? { scope: todo.scope ?? '' } : {}),
   };
 }
 
@@ -194,6 +196,7 @@ export class PlanningApi extends BaseWorkspaceApi {
           ? { due_date: patch.dueDate }
           : {}),
         ...(patch.error !== undefined ? { error: patch.error } : {}),
+        ...(patch.scope !== undefined ? { scope: patch.scope ?? '' } : {}),
       }),
     });
     return normalizeTodo(raw);

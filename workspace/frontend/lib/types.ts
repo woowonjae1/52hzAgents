@@ -394,6 +394,8 @@ export interface TodoItem {
   /** Set when this task is carried out by a one-off timer. */
   timerId?: string | null;
   error?: string | null;
+  /** Folder the task owns, for parallel mode. Empty: inferred from the text. */
+  scope?: string | null;
   dueDate?: string | null;
   completedAt?: string | null;
   createdAt: string | null;

@@ -50,5 +50,14 @@ func GetParallelBatch(c *gin.Context) {
 	db.DB.Where("workspace_id = ? AND channel_name = ?", workspace.ID, channelName).
 		Order("position asc, created_at asc").Find(&todos)
 
-	c.JSON(http.StatusOK, buildParallelBatch(strings.ToLower(strings.TrimSpace(channel.OrchestrationMode)), todos))
+	view := buildParallelBatch(strings.ToLower(strings.TrimSpace(channel.OrchestrationMode)), todos)
+	view.Isolated = channel.WorkingDir != nil && gitRepoRoot(*channel.WorkingDir) != ""
+	if view.Isolated && view.State == "blocked" {
+		// Worktrees make overlapping scopes harmless; the start is not blocked.
+		view.State = "running"
+	}
+	if run := latestBatchView(workspace.ID, channelName); run != nil {
+		view.Run = run
+	}
+	c.JSON(http.StatusOK, view)
 }

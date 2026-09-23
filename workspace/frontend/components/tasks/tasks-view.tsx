@@ -147,6 +147,7 @@ export function TasksView() {
   const [editing, setEditing] = useState<TodoItem | null>(null);
   const [content, setContent] = useState('');
   const [assignee, setAssignee] = useState('');
+  const [taskFolder, setTaskFolder] = useState('');
   const [status, setStatus] = useState<TodoStatus>('pending');
   const [priority, setPriority] = useState<TodoPriority>('none');
   const [channel, setChannel] = useState('general');
@@ -228,6 +229,7 @@ export function TasksView() {
     setEditing(null);
     setContent('');
     setAssignee('');
+    setTaskFolder('');
     setStatus(initialStatus || 'pending');
     setPriority('none');
     setChannel(selectedChannel);
@@ -240,6 +242,7 @@ export function TasksView() {
     setEditing(todo);
     setContent(todo.content);
     setAssignee(todo.assignee || '');
+    setTaskFolder(todo.scope || '');
     setStatus(todo.status);
     setPriority(todo.priority || 'none');
     setChannel(todo.channelName || 'general');
@@ -262,6 +265,7 @@ export function TasksView() {
         await updateTodo(editing.id, {
           content: content.trim(),
           assignee: assignee.trim(),
+          scope: taskFolder.trim(),
           status,
           priority,
           dueDate: due,
@@ -275,6 +279,7 @@ export function TasksView() {
             status,
             priority,
             assignee: assignee.trim(),
+            ...(taskFolder.trim() ? { scope: taskFolder.trim() } : {}),
             ...(due ? { dueDate: due } : {}),
           },
         });
@@ -1020,6 +1025,21 @@ export function TasksView() {
                     onChange={(e) => setAssignee(e.target.value)}
                     placeholder="agent or user name"
                     className="text-xs h-8"
+                  />
+                </div>
+
+                {/*
+                  The folder this task owns. Parallel mode in a folder that is
+                  not a git repository only starts agents whose folders do not
+                  overlap; left empty, it is inferred from paths in the task.
+                */}
+                <div className="space-y-1">
+                  <label className="font-medium text-foreground-muted">Folder (optional)</label>
+                  <Input
+                    value={taskFolder}
+                    onChange={(e) => setTaskFolder(e.target.value)}
+                    placeholder="e.g. workspace/frontend"
+                    className="text-xs h-8 font-mono"
                   />
                 </div>
 

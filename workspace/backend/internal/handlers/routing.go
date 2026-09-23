@@ -893,10 +893,16 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 			human having looked.
 		*/
 		if isHumanSource(req.Source) && len(mentions) > 0 {
+			if meta := startParallelBatch(tx, workspaceID, channel, "mention", mentions, laneTasksFromMessage(req, mentions), nil); meta != nil {
+				req.Metadata["parallel_batch"] = meta
+			}
 			return mentions, true, nil
 		}
+		// A git folder isolates every lane in its own worktree, so overlapping
+		// scopes cannot collide there and do not block the batch.
+		isolated := channel.WorkingDir != nil && gitRepoRoot(*channel.WorkingDir) != ""
 		wake, conflicts := parallelTargets(workspaceID, channel.Name, participants, agentNameFromSource(req.Source))
-		if len(conflicts) > 0 {
+		if len(conflicts) > 0 && !isolated {
 			// Refuse the batch rather than start it. Waking agents whose scopes
 			// overlap is the one failure this mode exists to prevent, and it is
 			// silent: the work looks fine until two of them write the same file.
@@ -907,6 +913,12 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 			return []string{noResponseAgent}, true, nil
 		}
 		if len(wake) > 0 {
+			if isHumanSource(req.Source) {
+				tasks, scopes := laneTasksFromBoard(loadOpenBatch(workspaceID, channel.Name), wake)
+				if meta := startParallelBatch(tx, workspaceID, channel, "board", wake, tasks, scopes); meta != nil {
+					req.Metadata["parallel_batch"] = meta
+				}
+			}
 			return wake, true, nil
 		}
 		// No open batch. Fall through, so a channel parked in parallel mode

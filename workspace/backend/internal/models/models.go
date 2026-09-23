@@ -750,3 +750,52 @@ type AgentTurnChange struct {
 func (AgentTurnChange) TableName() string {
 	return "agent_turn_changes"
 }
+
+// ParallelBatchRecord is one run of parallel mode in a channel: the agents that
+// were started together, how they were isolated, and what became of their work.
+//
+// Isolation "worktree" means every lane ran in its own git worktree on its own
+// branch, merged back when the batch finished. "shared" means the channel's
+// folder is not a git repository, so lanes shared one directory and the batch
+// was only allowed to start because their scopes did not overlap.
+type ParallelBatchRecord struct {
+	ID          string `gorm:"primaryKey;type:text" json:"id"`
+	WorkspaceID string `gorm:"type:uuid;not null;index:idx_parallel_batches_channel" json:"workspace_id"`
+	ChannelName string `gorm:"type:text;not null;index:idx_parallel_batches_channel" json:"channel_name"`
+	Isolation   string `gorm:"type:text;not null;default:'shared'" json:"isolation"`
+	// "board" (the channel's open tasks) or "mention" (a human named the agents).
+	Origin     string     `gorm:"type:text;not null;default:'mention'" json:"origin"`
+	RepoDir    string     `gorm:"type:text;not null;default:''" json:"repo_dir"`
+	BaseBranch string     `gorm:"type:text;not null;default:''" json:"base_branch"`
+	Status     string     `gorm:"type:text;not null;default:'running'" json:"status"` // running | done
+	Summary    string     `gorm:"type:text;not null;default:''" json:"summary"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	FinishedAt *time.Time `json:"finished_at,omitempty"`
+}
+
+func (ParallelBatchRecord) TableName() string { return "parallel_batches" }
+
+// ParallelLaneRecord is one agent's share of a batch.
+//
+// Status: running -> done | failed, then after the batch finishes a done lane
+// becomes merged (its branch is in the base branch), conflict (the merge was
+// refused; branch kept) or kept (the base tree had uncommitted work, so
+// nothing was merged automatically; branch kept).
+type ParallelLaneRecord struct {
+	ID           string     `gorm:"primaryKey;type:text" json:"id"`
+	BatchID      string     `gorm:"type:text;not null;index" json:"batch_id"`
+	Agent        string     `gorm:"type:text;not null" json:"agent"`
+	Task         string     `gorm:"type:text;not null;default:''" json:"task"`
+	Scope        string     `gorm:"type:text;not null;default:''" json:"scope"`
+	WorktreePath string     `gorm:"type:text;not null;default:''" json:"worktree_path"`
+	Branch       string     `gorm:"type:text;not null;default:''" json:"branch"`
+	Status       string     `gorm:"type:text;not null;default:'running'" json:"status"`
+	Error        string     `gorm:"type:text;not null;default:''" json:"error"`
+	Commit       string     `gorm:"type:text;not null;default:''" json:"commit"`
+	Reply        string     `gorm:"type:text;not null;default:''" json:"reply"`
+	Attempts     int        `gorm:"not null;default:1" json:"attempts"`
+	StartedAt    time.Time  `json:"started_at"`
+	FinishedAt   *time.Time `json:"finished_at,omitempty"`
+}
+
+func (ParallelLaneRecord) TableName() string { return "parallel_lanes" }

@@ -39,6 +39,44 @@ export interface ParallelBatch {
   conflicts: ScopeConflict[];
   done: number;
   total: number;
+  /** The channel folder is a git repository: lanes run in their own worktrees. */
+  isolated?: boolean;
+  /** The latest batch actually started in this channel. */
+  run?: ParallelRun;
+}
+
+export type ParallelLaneStatus = 'running' | 'done' | 'failed' | 'merged' | 'conflict' | 'kept';
+
+export interface ParallelLane {
+  id: string;
+  batch_id: string;
+  agent: string;
+  task: string;
+  scope: string;
+  worktree_path: string;
+  branch: string;
+  status: ParallelLaneStatus;
+  error: string;
+  commit: string;
+  reply: string;
+  attempts: number;
+  started_at: string;
+  finished_at?: string | null;
+}
+
+export interface ParallelRun {
+  batch: {
+    id: string;
+    channel_name: string;
+    isolation: 'worktree' | 'shared';
+    origin: 'board' | 'mention';
+    base_branch: string;
+    status: 'running' | 'done';
+    summary: string;
+    created_at: string;
+    finished_at?: string | null;
+  };
+  lanes: ParallelLane[];
 }
 
 export type RouterProvider = 'openai' | 'anthropic';
@@ -72,6 +110,14 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   async getParallelBatch(channelName: string): Promise<ParallelBatch> {
     const params = new URLSearchParams({ network: this.requireWorkspace(), channel: channelName });
     return this.request<ParallelBatch>(`/v1/parallel-batch?${params}`);
+  }
+
+  /** Run a failed lane again, on its own worktree. */
+  async retryParallelLane(batchId: string, agent: string): Promise<void> {
+    await this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/retry`,
+      { method: 'POST' }
+    );
   }
 
   async getRouterConfig(): Promise<RouterConfigResponse> {

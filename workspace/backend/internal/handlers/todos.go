@@ -312,6 +312,8 @@ type CreateTodoRequest struct {
 	Assignee string     `json:"assignee"`
 	DueDate  *time.Time `json:"due_date"`
 	Error    *string    `json:"error"`
+	// Folder the task owns, for parallel mode's overlap check. Empty = inferred.
+	Scope *string `json:"scope"`
 }
 
 // CreateTodo 处理 POST /v1/todos，追加一条代办项。
@@ -396,6 +398,7 @@ func CreateTodo(c *gin.Context) {
 		DueDate:     req.DueDate,
 		CompletedAt: completedAt,
 		Error:       req.Error,
+		Scope:       cleanScopePtr(req.Scope),
 		Position:    position,
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -424,6 +427,7 @@ type PatchTodoRequest struct {
 	DueDate  *time.Time `json:"due_date"`
 	ClearDue bool       `json:"clear_due_date"`
 	Error    *string    `json:"error"`
+	Scope    *string    `json:"scope"`
 }
 
 // PatchTodo 处理 PATCH /v1/todos/:todo_id，只更新一条代办项。
@@ -483,6 +487,10 @@ func PatchTodo(c *gin.Context) {
 			record.CompletedAt = nil
 			updates["completed_at"] = nil
 		}
+	}
+	if req.Scope != nil {
+		record.Scope = cleanScopePtr(req.Scope)
+		updates["scope"] = record.Scope
 	}
 	if req.Priority != nil {
 		priority := *req.Priority
@@ -633,4 +641,16 @@ func GetTodos(c *gin.Context) {
 
 	// 返回响应。
 	c.JSON(http.StatusOK, gin.H{"todos": todos})
+}
+
+// cleanScopePtr normalises a submitted scope; blank means "not declared".
+func cleanScopePtr(raw *string) *string {
+	if raw == nil {
+		return nil
+	}
+	v := normaliseScope(*raw)
+	if v == "" {
+		return nil
+	}
+	return &v
 }

@@ -188,6 +188,8 @@ func main() { // 服务程序运行主入口函数。
 		v1.GET("/agent-catalog", handlers.GetAgentCatalog)
 		v1.POST("/agents", handlers.CreateAgent)
 		v1.GET("/parallel-batch", handlers.GetParallelBatch)
+		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/complete", handlers.CompleteParallelLane) // 并行分道完成回报
+		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/retry", handlers.RetryParallelLane)       // 重跑失败的分道
 		v1.GET("/router-config", handlers.GetRouterConfig)
 		v1.PUT("/router-config", handlers.UpdateRouterConfig)
 		v1.POST("/router-config/test", handlers.TestRouterConfig)

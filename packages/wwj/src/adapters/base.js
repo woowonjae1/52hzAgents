@@ -1296,6 +1296,7 @@ class BaseAdapter {
     this._channelBusy.add(channel);
     this._beginTurn(channel);
     const turnStartedAt = Date.now();
+    const lane = this._enterParallelLane(channel, msg);
     try {
       if (msg && typeof msg.content === 'string') {
         msg.content = await this._resolveKnowledgeMentions(msg.content);
@@ -1308,6 +1309,7 @@ class BaseAdapter {
     } finally {
       await this._releaseStaleTodos(channel, 'turn ended');
       this._registerFilesTouchedSince(channel, turnStartedAt).catch(() => {});
+      if (lane) await this._exitParallelLane(channel, lane);
     }
 
     // Drain queue
@@ -1320,6 +1322,7 @@ class BaseAdapter {
       }
       this._beginTurn(channel);
       const queuedStartedAt = Date.now();
+      const queuedLane = this._enterParallelLane(channel, nextMsg);
       try {
         if (nextMsg && typeof nextMsg.content === 'string') {
           nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content);
@@ -1332,9 +1335,74 @@ class BaseAdapter {
       } finally {
         await this._releaseStaleTodos(channel, 'queued turn ended');
         this._registerFilesTouchedSince(channel, queuedStartedAt).catch(() => {});
+        if (queuedLane) await this._exitParallelLane(channel, queuedLane);
       }
     }
     this._channelBusy.delete(channel);
+  }
+
+  // ------------------------------------------------------------------
+  // Parallel batch lanes
+  // ------------------------------------------------------------------
+
+  /**
+   * If this message dispatches a lane of a parallel batch to THIS agent, set
+   * the turn up for it: run in the lane's worktree, and prefix the message
+   * with what this agent's part is and how to behave next to the others.
+   * Returns the lane (with batch id) or null.
+   */
+  _enterParallelLane(channel, msg) {
+    const pb = msg && msg.metadata && msg.metadata.parallel_batch;
+    if (!pb || !pb.batch_id || !pb.lanes || typeof pb.lanes !== 'object') return null;
+    const key = Object.keys(pb.lanes).find((k) => k.toLowerCase() === String(this.agentName).toLowerCase());
+    if (!key) return null;
+    const lane = { ...pb.lanes[key], batchId: pb.batch_id, isolation: pb.isolation, others: Object.keys(pb.lanes).length - 1 };
+
+    if (lane.working_dir) {
+      if (fs.existsSync(lane.working_dir)) {
+        this._turnDirOverride = this._turnDirOverride || {};
+        this._turnDirOverride[channel] = lane.working_dir;
+      } else {
+        this._log(`Parallel: lane worktree ${lane.working_dir} is missing; running in the channel folder`);
+      }
+    }
+    this._lastReply = this._lastReply || {};
+    delete this._lastReply[channel];
+
+    const lines = [
+      `[Parallel batch] You are one of ${lane.others + 1} agents working at the same time on separate parts.`,
+      '',
+      'Your part:',
+      lane.task || '(see the message below)',
+      '',
+    ];
+    if (lane.working_dir) {
+      lines.push(`Work only inside ${lane.working_dir} -- your own git worktree on branch ${lane.branch}. The other agents are editing their own copies. Do not commit, merge, push or switch branches: your changes are committed and merged for you when you finish.`);
+    } else if (lane.scope) {
+      lines.push(`The other agents share this folder. Change files only under ${lane.scope}.`);
+    } else {
+      lines.push('The other agents share this folder. Change only what your part needs.');
+    }
+    lines.push('Finish with a short summary of what you changed.', '', '---', '');
+    if (msg && typeof msg.content === 'string') msg.content = lines.join('\n') + msg.content;
+    this._log(`Parallel: lane of batch ${String(lane.batchId).slice(0, 8)}${lane.working_dir ? ` in ${lane.working_dir}` : ''}`);
+    return lane;
+  }
+
+  /** Report the lane's end to the backend, which commits and, last, merges. */
+  async _exitParallelLane(channel, lane) {
+    if (this._turnDirOverride) delete this._turnDirOverride[channel];
+    const failed = Boolean(this._turnFailed && this._turnFailed.has(channel));
+    const reply = (this._lastReply && this._lastReply[channel]) || '';
+    try {
+      await this.client.completeParallelLane(this.workspaceId, lane.batchId, this.agentName, {
+        status: failed ? 'failed' : 'done',
+        error: failed ? 'the turn ended with an error' : '',
+        reply: String(reply).slice(0, 4000),
+      }, this.token);
+    } catch (e) {
+      this._log(`Parallel: could not report lane completion: ${e && e.message ? e.message : e}`);
+    }
   }
 
   // ------------------------------------------------------------------
@@ -1373,6 +1441,9 @@ class BaseAdapter {
    * not once at adapter startup, since the binding is per-thread not per-agent.
    */
   async _resolveWorkingDir(channel, messageText = '') {
+    // A parallel lane runs this one turn in its own worktree. Checked before
+    // the cache, and never written to it, so the next turn is back home.
+    if (this._turnDirOverride && this._turnDirOverride[channel]) return this._turnDirOverride[channel];
     this._workingDirCache = this._workingDirCache || new Map();
     const cached = this._workingDirCache.get(channel);
     const now = Date.now();
@@ -1727,6 +1798,8 @@ class BaseAdapter {
       safe: if the first POST landed and only its response was lost, the server
       returns the existing event instead of posting a second copy.
     */
+    this._lastReply = this._lastReply || {};
+    this._lastReply[channel] = body;
     const clientMessageId = `${this.agentName}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const delays = [1000, 3000, 8000];
     for (let attempt = 0; ; attempt++) {

@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -58,6 +59,63 @@ func normaliseScope(raw string) string {
 	return value
 }
 
+// scopeHint matches a path-like word in a task description: two or more
+// segments joined by slashes ("workspace/frontend", "src/api/users.go"), or a
+// single segment followed by a slash ("docs/").
+var scopeHint = regexp.MustCompile("(?:^|[\\s(`\"'])((?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]*)")
+
+/*
+inferScope guesses a task's scope from its text when none was declared.
+
+Unscoped tasks used to count as the whole tree, and the board had no way to
+enter a scope, so every board-driven batch in a non-git folder was blocked.
+A task that names a folder ("rebuild the list in workspace/frontend") almost
+always means that folder. When the text names several, the deepest folder they
+share is used; when it names none, the task stays unscoped (the whole tree),
+which is the safe answer.
+*/
+func inferScope(content string) string {
+	var dirs []string
+	for _, m := range scopeHint.FindAllStringSubmatch(content, -1) {
+		p := normaliseScope(m[1])
+		if p == "" || strings.Contains(p, "://") || strings.HasPrefix(p, "http") {
+			continue
+		}
+		// A trailing file name is not the scope; its folder is.
+		if last := p[strings.LastIndex(p, "/")+1:]; strings.Contains(last, ".") && !strings.HasSuffix(m[1], "/") {
+			if i := strings.LastIndex(p, "/"); i > 0 {
+				p = p[:i]
+			} else {
+				continue
+			}
+		}
+		dirs = append(dirs, p)
+	}
+	if len(dirs) == 0 {
+		return ""
+	}
+	common := strings.Split(dirs[0], "/")
+	for _, d := range dirs[1:] {
+		parts := strings.Split(d, "/")
+		k := 0
+		for k < len(common) && k < len(parts) && common[k] == parts[k] {
+			k++
+		}
+		common = common[:k]
+	}
+	return strings.Join(common, "/")
+}
+
+// effectiveScope is the declared scope, else the one inferred from the text.
+func effectiveScope(t models.TodoRecord) string {
+	if t.Scope != nil {
+		if s := normaliseScope(*t.Scope); s != "" {
+			return s
+		}
+	}
+	return inferScope(t.Content)
+}
+
 // scopesOverlap reports whether two normalised scopes can touch the same file.
 // Equal scopes overlap, and so does any pair where one contains the other -
 // "src" and "src/api" are not disjoint however they were meant.
@@ -88,10 +146,8 @@ func detectScopeConflicts(todos []models.TodoRecord) []ScopeConflict {
 			continue
 		}
 		entry := scoped{assignee: assignee}
-		if todo.Scope != nil {
-			entry.scope = normaliseScope(*todo.Scope)
-			entry.declared = entry.scope != ""
-		}
+		entry.scope = effectiveScope(todo)
+		entry.declared = entry.scope != ""
 		entries = append(entries, entry)
 	}
 
@@ -213,6 +269,11 @@ type ParallelBatch struct {
 	Conflicts []ScopeConflict  `json:"conflicts"`
 	Done      int              `json:"done"`
 	Total     int              `json:"total"`
+	// Isolated: the channel's folder is a git repository, so lanes run in
+	// their own worktrees and scope conflicts do not block a start.
+	Isolated bool `json:"isolated"`
+	// Run is the latest batch actually started in the channel, with its lanes.
+	Run interface{} `json:"run,omitempty"`
 }
 
 // buildParallelBatch groups a channel's tasks into per-worker lanes.
@@ -240,8 +301,8 @@ func buildParallelBatch(mode string, all []models.TodoRecord) ParallelBatch {
 			lanes[key] = lane
 			order = append(order, key)
 		}
-		if todo.Scope != nil && normaliseScope(*todo.Scope) != "" {
-			lane.Scope = normaliseScope(*todo.Scope)
+		if sc := effectiveScope(todo); sc != "" {
+			lane.Scope = sc
 		}
 		lane.Tasks = append(lane.Tasks, todo)
 		lane.Total++

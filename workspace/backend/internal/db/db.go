@@ -78,6 +78,8 @@ func InitDB() {
 		&models.AgentRuntimeRecord{},
 		&models.AgentUsageRecord{},
 		&models.AgentContextRecord{},
+		&models.ParallelBatchRecord{},
+		&models.ParallelLaneRecord{},
 		&models.AgentLogRecord{},
 		&models.AgentApprovalRecord{},
 		&models.AuditRecord{},

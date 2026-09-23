@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
-import type { ParallelBatch, ParallelWorker } from '@/lib/api/orchestration';
+import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane } from '@/lib/api/orchestration';
+import { toast } from '@/lib/toast';
 
 /**
  * What a parallel batch is doing, as lanes.
@@ -64,13 +65,21 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
 
   if (!active || !batch) return null;
 
+  const run = batch.run;
+  const runLive = run?.batch.status === 'running';
+  const reload = async () => {
+    try {
+      setBatch(await workspaceApi.getParallelBatch(channelName));
+    } catch {}
+  };
+
   /*
     An empty board in parallel mode is the one state that must not render
     nothing. Switching to Parallel and seeing no change is what made the mode
     feel like it did not exist — so when there is nothing to run, this says what
     the mode is waiting for instead of disappearing.
   */
-  if (batch.total === 0) {
+  if (batch.total === 0 && !run) {
     return (
       <div
         className={cn(
@@ -80,15 +89,25 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
       >
         <p className="text-xs font-medium text-foreground">Waiting for the work to be split</p>
         <p className="text-2xs text-muted-foreground mt-1 leading-snug">
-          Assign tasks on the board, and give each one the folder it owns. Everyone assigned starts
-          at once — so a batch only runs when no two people own overlapping paths.
+          Name two or more agents in one message (<code className="text-2xs">@a do X @b do Y</code>) or
+          assign tasks on the board. Everyone starts at once.{' '}
+          {batch.isolated
+            ? 'This project is a git repository, so each agent works in its own worktree and the results are merged back when all of them finish.'
+            : 'This folder is not a git repository, so the agents share it: give each task the folder it owns (or name it in the task) so no two overlap.'}
         </p>
       </div>
     );
   }
 
+  // A batch that is running, or the last one's result, shown lane by lane.
+  // The board preview below is the NEXT batch, so it is hidden while one runs.
+  const showBoard = batch.total > 0 && !runLive;
+
   return (
-    <div className={cn('rounded-lg border border-border bg-surface-raised/60 p-3', className)}>
+    <div className={cn('space-y-2', className)}>
+    {run && <RunView run={run} onRetried={reload} />}
+    {showBoard && (
+    <div className="rounded-lg border border-border bg-surface-raised/60 p-3">
       <header className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-medium text-foreground">Working in parallel</span>
@@ -127,6 +146,102 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
       </div>
 
       {error && <p className="mt-2 text-2xs text-muted-foreground">Last refresh failed: {error}</p>}
+    </div>
+    )}
+    </div>
+  );
+}
+
+const LANE_STATUS: Record<ParallelLane['status'], { label: string; icon: React.ElementType; className: string }> = {
+  running: { label: 'Working', icon: Loader2, className: 'text-status-info' },
+  done: { label: 'Finished', icon: CheckCircle2, className: 'text-status-success' },
+  merged: { label: 'Merged', icon: GitMerge, className: 'text-status-success' },
+  kept: { label: 'Branch kept', icon: PauseCircle, className: 'text-status-warning' },
+  conflict: { label: 'Conflict', icon: AlertTriangle, className: 'text-status-warning' },
+  failed: { label: 'Failed', icon: XCircle, className: 'text-status-danger' },
+};
+
+/**
+ * The batch that actually ran: one row per agent with what became of its work.
+ * A failed lane can be run again on its own worktree without touching the rest.
+ */
+function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }) {
+  const [retrying, setRetrying] = React.useState<string | null>(null);
+  const live = run.batch.status === 'running';
+  const finished = run.lanes.filter((l) => l.status !== 'running').length;
+
+  const retry = async (agent: string) => {
+    setRetrying(agent);
+    try {
+      await workspaceApi.retryParallelLane(run.batch.id, agent);
+      toast.success(`Retrying @${agent}`);
+      onRetried();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not retry');
+    } finally {
+      setRetrying(null);
+    }
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-raised/60 p-3">
+      <header className="flex items-center justify-between gap-2 mb-2.5">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-medium text-foreground">
+            {live ? 'Working in parallel' : 'Last parallel batch'}
+          </span>
+          <span className="text-2xs text-muted-foreground truncate">
+            {run.batch.isolation === 'worktree'
+              ? `own worktrees${run.batch.base_branch ? ` · merges into ${run.batch.base_branch}` : ''}`
+              : 'shared folder'}
+          </span>
+        </div>
+        <span className="text-2xs tabular-nums text-muted-foreground shrink-0">
+          {finished}/{run.lanes.length} finished
+        </span>
+      </header>
+      <ul className="space-y-2">
+        {run.lanes.map((lane) => {
+          const st = LANE_STATUS[lane.status] ?? LANE_STATUS.running;
+          const Icon = st.icon;
+          const firstLine = lane.task.replace(/^- /, '').split(/\r?\n/)[0];
+          return (
+            <li key={lane.id} className="flex items-start gap-2">
+              <Icon className={cn('mt-0.5 size-3.5 shrink-0', st.className, lane.status === 'running' && 'animate-spin')} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-2xs font-medium text-foreground truncate">{lane.agent}</span>
+                  <span className={cn('text-2xs shrink-0', st.className)}>
+                    {st.label}
+                    {lane.attempts > 1 ? ` · attempt ${lane.attempts}` : ''}
+                  </span>
+                </div>
+                <p className="text-2xs text-muted-foreground truncate" title={lane.task}>
+                  {firstLine}
+                </p>
+                {lane.branch && lane.status !== 'merged' && (
+                  <code className="mt-0.5 flex items-center gap-1 text-2xs text-muted-foreground truncate">
+                    <GitBranch className="size-3 shrink-0" />
+                    {lane.branch}
+                  </code>
+                )}
+                {lane.error && <p className="mt-0.5 text-2xs text-status-danger/90 leading-snug">{lane.error}</p>}
+                {lane.status === 'failed' && (
+                  <button
+                    type="button"
+                    disabled={retrying === lane.agent}
+                    onClick={() => void retry(lane.agent)}
+                    className="mt-1 inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs text-foreground hover:bg-muted disabled:opacity-60"
+                  >
+                    <RotateCw className={cn('size-3', retrying === lane.agent && 'animate-spin')} />
+                    Retry this part
+                  </button>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
