@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle, Coins, ChevronRight, Info } from 'lucide-react';
+import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -459,20 +459,8 @@ export function ContextHealthIndicator({
             </p>
           )}
 
-          <div className="pt-1.5 border-t border-border/60 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                setActiveRightTab('tokens');
-              }}
-              className="text-3xs text-primary hover:underline flex items-center gap-1 font-medium"
-            >
-              <Coins className="size-3" />
-              <span>Open Token Governance Dashboard</span>
-              <ChevronRight className="size-2.5" />
-            </button>
-          </div>
+          {/* "Open Token Governance Dashboard" removed — that Studio tab
+              renders nothing, so the link opened an empty panel. */}
         </div>
       </PopoverContent>
     </Popover>

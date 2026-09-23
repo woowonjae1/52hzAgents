@@ -2,21 +2,20 @@
 
 import { Hint } from '@/components/ui/hint';
 import React, { useState, useEffect } from 'react';
-import { 
-  Settings, 
-  Copy, 
-  Check, 
-  Globe, 
-  Bot, 
-  Loader2, 
-  Users, 
-  ShieldCheck, 
-  Monitor, 
-  Terminal, 
-  Save, 
-  RefreshCw, 
-  Key, 
-  Folder, 
+import {
+  Settings,
+  Copy,
+  Check,
+  Globe,
+  Bot,
+  Loader2,
+  Users,
+  ShieldCheck,
+  Monitor,
+  Save,
+  RefreshCw,
+  Key,
+  Folder,
   Sparkles,
   ArrowLeft,
   BookOpen,
@@ -30,7 +29,6 @@ import {
   Plus,
   Crown,
   FileText,
-  ListTodo,
   Layers,
   Radio,
   Plug,
@@ -253,12 +251,13 @@ export function SettingsView() {
     : '';
 
   const PANELS_LIST: { id: RightPanelTab; name: string; icon: typeof Globe; desc: string }[] = [
-    {
-      id: 'browser',
-      name: 'Browser Sandbox Preview',
-      icon: Globe,
-      desc: 'A live view of the headless browser the agents drive — pages, DOM changes, and full-page interaction.',
-    },
+    /*
+      "Browser Sandbox Preview" is gone from this list. It was described as a
+      live view of the headless browser the agents drive, but its tab rendered
+      the same <LocalPreview /> as the entry below — the dev-server viewer. Two
+      entries promising two features, one component. The agents' browser is the
+      Browser view in the sidebar, not a Studio tab.
+    */
     {
       id: 'preview',
       name: 'Local Dev Server Preview',
@@ -271,24 +270,14 @@ export function SettingsView() {
       icon: FileText,
       desc: 'Browse and download the project code and Markdown the agents write.',
     },
-    {
-      id: 'tasks',
-      name: 'Task Matrix & Todos',
-      icon: ListTodo,
-      desc: 'One place for the task breakdown, progress, and status of a multi-agent run.',
-    },
+
     {
       id: 'radar',
       name: 'Agent Radar Topology',
       icon: Radio,
       desc: 'The collaboration network, how the agents are connected, and their live heartbeats.',
     },
-    {
-      id: 'terminal',
-      name: 'Agent Terminal Logs',
-      icon: Terminal,
-      desc: 'Raw stdout and logs from an external agent’s CLI process.',
-    },
+
     {
       id: 'trace',
       name: 'Execution Trace & Reasoning',

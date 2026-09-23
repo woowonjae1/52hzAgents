@@ -23,7 +23,6 @@ import {
   Inbox,
   Radio,
   Settings,
-  Terminal,
   CornerDownLeft,
   X,
   Sparkles,
@@ -319,14 +318,7 @@ export function CommandPalette() {
           }
         },
       },
-      {
-        id: 'act-token-dashboard',
-        category: 'Actions',
-        title: 'Token Dashboard',
-        subtitle: 'Inspect workspace token consumption, limits & channel health',
-        icon: <Activity className="size-4 text-foreground-muted" />,
-        action: () => setActiveRightTab('tokens'),
-      },
+
       {
         id: 'act-toggle-theme',
         category: 'Actions',
@@ -335,14 +327,7 @@ export function CommandPalette() {
         icon: theme === 'dark' ? <Sun className="size-4 text-foreground-muted" /> : <Moon className="size-4 text-foreground-muted" />,
         action: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
       },
-      {
-        id: 'act-terminal',
-        category: 'Actions',
-        title: 'Toggle Terminal',
-        subtitle: 'Open the agent interactive command console',
-        icon: <Terminal className="size-4 text-foreground-muted" />,
-        action: () => setActiveRightTab('terminal'),
-      },
+
       {
         id: 'act-sidebar',
         category: 'Actions',

@@ -29,7 +29,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Globe, Share2, Crown, AlertTriangle, Sparkles, Users, FileText, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy, Coins } from 'lucide-react';
+import { Download, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, Activity, CheckCircle2, Copy } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 
 import { ParallelBatchPanel } from './parallel-batch-panel';
@@ -86,23 +86,7 @@ const PROMPT_SUGGESTIONS = [
   },
 ];
 
-/**
- * Quick-open panels available in the thread header.
- *
- * `LocalPreview` (the dev-server viewer) has its own dedicated button beside
- * these. The rest — sandbox browser, radar, file tree, tasks, terminal, and trace — are
- * collapsed into a single dropdown to keep the thread header quiet — but they
- * stay in the header rather than moving into Settings, because these are view
- * switchers people toggle constantly, not configuration.
- */
-const SIDE_PANELS = [
-  { id: 'trace' as const, label: 'Trace', icon: Activity },
-  { id: 'browser' as const, label: 'Sandbox', icon: Globe },
-  { id: 'radar' as const, label: 'Agents', icon: Users },
-  { id: 'file' as const, label: 'Files', icon: FileText },
-  { id: 'tasks' as const, label: 'Tasks', icon: ListChecks },
-  { id: 'terminal' as const, label: 'Terminal', icon: Terminal },
-];
+
 
 // Module-level message cache — survives component re-renders/unmounts.
 // Keyed by sessionId, stores the last known messages for instant thread switching.
@@ -1146,10 +1130,7 @@ export function ChatView() {
               </Hint>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'tokens' ? null : 'tokens')}>
-                <Coins className="size-4 mr-2 text-foreground-muted" />
-                <span>Token & Context Dashboard</span>
-              </DropdownMenuItem>
+
               <DropdownMenuItem onClick={() => setActiveRightTab(activeRightTab === 'trace' ? null : 'trace')}>
                 <Activity className="size-4 mr-2 text-foreground-muted" />
                 <span>Execution Trace</span>

@@ -435,15 +435,8 @@ export function MissionControl() {
               {totalTokens > 0 && (
                 <>
                   {' · '}
-                  <Hint label="Token &amp; context dashboard">
-                    <button
-                      type="button"
-                      onClick={() => setActiveRightTab('tokens')}
-                      className="hover:text-primary hover:underline transition-colors font-medium"
-                    >
-                      {fmtTokens(totalTokens)} tokens
-                    </button>
-                  </Hint>
+                  {/* A count, not a link — the dashboard it opened is gone. */}
+                  <span className="font-medium">{fmtTokens(totalTokens)} tokens</span>
                 </>
               )}
             </p>

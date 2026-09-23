@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Gauge, RefreshCw, ChevronRight, AlertCircle, FileText } from 'lucide-react';
+import { Gauge, RefreshCw, AlertCircle, FileText } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -389,14 +389,10 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-foreground">Context window</span>
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                setActiveRightTab('tokens');
-              }}
-              className="inline-flex items-center gap-1 font-mono text-2xs text-foreground-muted hover:text-foreground transition-colors group"
-            >
+            {/* Was a button into the "token dashboard", a Studio tab that no
+                longer renders anything — so it opened an empty panel. The
+                reading is kept; the dead link is not. */}
+            <span className="inline-flex items-center gap-1 font-mono text-2xs text-foreground-muted">
               {contextWindow > 0 ? (
                 <>
                   <span>
@@ -407,8 +403,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
               ) : (
                 <span className="font-sans">Unknown capacity</span>
               )}
-              <ChevronRight className="size-3 text-foreground-muted group-hover:text-foreground transition-transform group-hover:translate-x-0.5" />
-            </button>
+            </span>
           </div>
           <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
             <div
@@ -537,22 +532,9 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           </div>
         )}
 
-        <div className="h-px bg-border/40" />
-
-        {/* Footer Link (Image 2 Bottom Section) */}
-        <div>
-          <button
-            type="button"
-            onClick={() => {
-              setIsOpen(false);
-              setActiveRightTab('tokens');
-            }}
-            className="w-full flex items-center justify-between text-xs font-medium text-foreground-muted hover:text-foreground transition-colors py-0.5 group"
-          >
-            <span>See detailed breakdown</span>
-            <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5 text-foreground-muted group-hover:text-foreground" />
-          </button>
-        </div>
+        {/* "See detailed breakdown" is gone: it opened the token dashboard
+            tab, which renders nothing. A link to an empty panel is worse than
+            no link. */}
       </PopoverContent>
     </Popover>
   );

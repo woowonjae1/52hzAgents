@@ -3,7 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { Switch } from '@/components/ui/switch';
 import { useState, useEffect, useCallback } from 'react';
-import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, Cpu, ChevronDown, Coins, ChevronRight } from 'lucide-react';
+import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, Cpu, ChevronDown, Coins } from 'lucide-react';
 import { useLayout } from '@/components/layout/layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -564,17 +564,7 @@ export function AgentProfilePanel() {
                 <Coins className="size-3 text-primary" />
                 <span className="text-xs font-medium">Token Usage & Context</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedAgentName(null);
-                  setActiveRightTab('tokens');
-                }}
-                className="text-3xs text-primary hover:underline flex items-center gap-0.5 font-medium"
-              >
-                <span>Full dashboard</span>
-                <ChevronRight className="size-2.5" />
-              </button>
+
             </div>
             <div className="p-3.5 space-y-2.5">
               <div className="grid grid-cols-2 gap-2 text-2xs">

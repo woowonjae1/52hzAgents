@@ -28,7 +28,18 @@ export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' 
 // alike and share nothing. 'trace' renders full multi-agent execution steps.
 // 'tokens' renders the workspace token governance & channel context health dashboard.
 // 'canvas' renders the active markdown / code / artifact deliverable.
-export type RightPanelTab = 'browser' | 'preview' | 'file' | 'tasks' | 'radar' | 'terminal' | 'routines' | 'trace' | 'tokens' | 'canvas' | null;
+/*
+  Four values removed: 'tasks', 'terminal', 'routines' and 'tokens'. None had a
+  renderer — the Studio pane dispatches on this and drew nothing for them — yet
+  seven buttons across the app set 'tokens' (a "token governance dashboard"
+  whose component no longer exists) and the command palette set 'terminal'. So
+  each opened the Studio panel onto an empty pane. Removing them from the type
+  is what made the compiler find every one of those callers.
+*/
+export type RightPanelTab = 'preview' | 'file' | 'radar' | 'trace' | 'canvas' | null;
+
+// 'canvas' is deliberately absent: it points at one message's artifact.
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'radar', 'trace']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
@@ -256,8 +267,19 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('x-split-browser', v ? '1' : '0');
   }, []);
 
+  /*
+    Only a tab that still renders is restored. Storage outlives the type: a user
+    who last closed the app on 'tokens' or 'terminal' has that string saved, and
+    restoring it verbatim would reopen the Studio onto the empty pane this
+    change exists to remove.
+  */
   const [activeRightTab, setActiveRightTabState] = useState<RightPanelTab>(
-    () => readLayout().activeRightTab ?? null,
+    () => {
+      const saved = readLayout().activeRightTab as string | null | undefined;
+      // 'browser' was merged into 'preview' — same component — so it maps across.
+      if (saved === 'browser') return 'preview';
+      return saved && RESTORABLE_RIGHT_TABS.has(saved) ? (saved as RightPanelTab) : null;
+    },
   );
   const setActiveRightTab = useCallback((tab: RightPanelTab) => {
     setActiveRightTabState(tab);
@@ -289,10 +311,14 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     setActiveRightTab('preview');
   }, []);
   
-  // Compatibility computed helper
-  const showBrowserPreview = activeRightTab === 'browser';
+  /*
+    Compatibility pair, now aimed at 'preview'. 'browser' and 'preview' were
+    two tab values that rendered the same <LocalPreview /> — the component
+    never read which one it was opened as — so they are one value now.
+  */
+  const showBrowserPreview = activeRightTab === 'preview';
   const setShowBrowserPreview = useCallback((v: boolean) => {
-    setActiveRightTab(v ? 'browser' : null);
+    setActiveRightTab(v ? 'preview' : null);
   }, []);
 
   const [newThreadOpen, setNewThreadOpen] = useState(false);

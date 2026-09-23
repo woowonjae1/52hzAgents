@@ -447,7 +447,7 @@ function WrapperInner() {
                           onClick={() => setActiveRightTab('preview')}
                           className={cn(
                             "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0",
-                            (effectiveStudioTab === 'preview' || effectiveStudioTab === 'browser')
+                            effectiveStudioTab === 'preview'
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
                           )}
@@ -487,7 +487,7 @@ function WrapperInner() {
                   {/* Studio Content Pane */}
                   <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
                     {effectiveStudioTab === 'canvas' && <ArtifactsCanvas embedded />}
-                    {(effectiveStudioTab === 'browser' || effectiveStudioTab === 'preview') && <LocalPreview />}
+                    {effectiveStudioTab === 'preview' && <LocalPreview />}
                     {effectiveStudioTab === 'file' && <FilePreview />}
                     {effectiveStudioTab === 'radar' && <RadarPanel />}
                     {effectiveStudioTab === 'trace' && <TracePanel />}
