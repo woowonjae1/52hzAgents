@@ -92,6 +92,9 @@ function toolCallDetail(args) {
   return '';
 }
 
+/** Lines kept in a channel recap (see _buildChannelContext). */
+const RECAP_TAIL_LINES = 20;
+
 class BaseAdapter {
   /**
    * @param {object} opts
@@ -158,13 +161,20 @@ class BaseAdapter {
     // daemon.js `stdio: ['ignore', logFd, logFd]`). When the desktop app spawns
     // the daemon itself there is no such redirection, so every adapter line was
     // silently lost — which makes any spawn/error diagnostics invisible.
-    this._logFile = logFile || path.join(os.homedir(), '.wwj', 'daemon.log');
+    //
+    // Not under `node --test` (it sets NODE_TEST_CONTEXT): the suite's fake
+    // agents ("pi-test", "test-agent", errors like "boom") were being appended
+    // to the user's real daemon.log, several hundred lines per run, mixed in
+    // with the genuine failures that log exists to diagnose.
+    this._logFile = logFile || (process.env.NODE_TEST_CONTEXT ? null : path.join(os.homedir(), '.wwj', 'daemon.log'));
     this._log = (msg) => {
       const ts = new Date().toISOString();
       const line = `${ts} INFO adapter [${this.agentName}]: ${msg}`;
-      try {
-        fs.appendFileSync(this._logFile, line + '\n', 'utf-8');
-      } catch {}
+      if (this._logFile) {
+        try {
+          fs.appendFileSync(this._logFile, line + '\n', 'utf-8');
+        } catch {}
+      }
       if (process.stdout.isTTY) {
         console.log(line);
       }
@@ -423,6 +433,25 @@ class BaseAdapter {
   // ------------------------------------------------------------------
 
   async _heartbeat() {
+    /*
+      NO SESSION MEANS JOIN AGAIN, NOT FAIL FOREVER.
+
+      `_sessionId` comes only from /v1/join, and run() joined exactly once. A
+      single failed join -- the backend still starting, one HTTP 500 -- left it
+      null for the life of the process, and client.heartbeat() throws locally on
+      a null session without sending anything. daemon.log 2026-09-22: one join
+      500 at 08:51:45, then 168 heartbeat failures over 84 minutes while the
+      backend was healthy, with the agent shown offline the whole time.
+    */
+    if (!this._sessionId) {
+      const joined = await this._joinWorkspace();
+      if (!joined || !this._sessionId) {
+        this._heartbeatFailStreak++;
+        this._log(`Rejoin failed; will retry on the next heartbeat (consecutive failures: ${this._heartbeatFailStreak})`);
+        return;
+      }
+      this._log('Rejoined workspace after an earlier join failure');
+    }
     try {
       await this.client.heartbeat(this.workspaceId, this.agentName, this.token, this._sessionId);
       this._heartbeatFailStreak = 0;
@@ -441,6 +470,13 @@ class BaseAdapter {
         this._running = false;
         return;
       }
+      // 404 "Agent member not registered": the backend no longer knows this
+      // member (database reset, member removed). Drop the session so the next
+      // heartbeat joins again. 409 is a different client holding the name and
+      // is handled above as revoked -- never fought over.
+      // 409 session_expired: the server holds no session for us (we left, or
+      // an older server cleared it on a heartbeat timeout). Same answer.
+      if (e && (e.statusCode === 404 || /session_expired/i.test(e.message || ''))) this._sessionId = null;
       // Only surface a hard error after repeated consecutive failures, so a
       // single transient blip (or an expected brief reconnect) isn't mislabeled.
       this._heartbeatFailStreak++;
@@ -1317,6 +1353,148 @@ class BaseAdapter {
   }
 
   // ------------------------------------------------------------------
+  // Context reporting
+  // ------------------------------------------------------------------
+
+  /**
+   * Report how full THIS agent's own context is in `channel`, as its CLI
+   * measured it on the turn that just ended.
+   *
+   * The context belongs to the agent: each adapter resumes a per-channel CLI
+   * session, and that session is what the model sees and what the CLI compacts.
+   * So adapters report what their CLI measured -- prompt tokens of the LAST
+   * model call (cache reads included), the window if the CLI states one -- and
+   * report nothing rather than a guess when it does not. The backend fills a
+   * missing window from the model name and labels it as a lookup.
+   *
+   * Fire-and-forget: it must never delay or fail a reply.
+   *
+   * @param {string} channel
+   * @param {{promptTokens?: number, contextWindow?: number, model?: string, compacted?: boolean}} ctx
+   */
+  reportContext(channel, ctx) {
+    if (!channel || !ctx || !this.client || typeof this.client.reportAgentContext !== 'function') return;
+    const promptTokens = Number(ctx.promptTokens) > 0 ? Math.round(Number(ctx.promptTokens)) : 0;
+    const contextWindow = Number(ctx.contextWindow) > 0 ? Math.round(Number(ctx.contextWindow)) : 0;
+    const compacted = !!ctx.compacted;
+    if (!promptTokens && !contextWindow && !compacted) return;
+    const payload = { channel, prompt_tokens: promptTokens, context_window: contextWindow, compacted };
+    if (ctx.model) payload.model = String(ctx.model);
+    this.client.reportAgentContext(this.workspaceId, this.agentName, payload, this.token).catch(() => {});
+  }
+
+  /**
+   * Build the channel-context prefix for one turn.
+   *
+   * Shared by the adapters that resume their own CLI session (claude, pi) and
+   * by hermes for a plain recent-conversation recap. The prefix goes into the
+   * USER message, not the system prompt: the session persists user messages,
+   * so what is pushed in once stays known -- which is what lets the cursor
+   * skip it next time. `_recapCursor` (channel -> last messageId accounted
+   * for) is in-memory, so after a restart the first turn is a full recap.
+   *
+   * We are only *delivered* messages that @mention us (see BaseAdapter's
+   * addressing filter), so everything else said in the channel — including
+   * whole analyses posted by sibling agents — never reaches the CLI session.
+   * A message like "@claude 你对以上分析怎么看" then resolves "以上" against
+   * our own last turn instead of the message it actually points at. Pushing
+   * the gap in is the only fix: the agent cannot know it is missing context,
+   * so `workspace_get_history` (a pull) is never called.
+   *
+   * Two shapes, both keyed off `_recapCursor`:
+   * - `full` (fresh CLI, or the cursor fell out of the fetch window): the
+   *   old behaviour — a tail recap of the recent conversation, own messages
+   *   included, since the new session has no history at all.
+   * - incremental (a live/resumed session): only what was posted after the
+   *   cursor, minus our own posts. Normally one to three lines.
+   *
+   * The cursor advances on every call, injected or not, so nothing replays.
+   * Returns null when there is nothing worth adding.
+   */
+  async _buildChannelContext(channelName, opts = {}) {
+    const {
+      currentMessage = '',
+      currentMessageId = null,
+      full = false,
+      // What a `full` recap opens with. The default fits an adapter whose
+      // session was lost; one that keeps no session says so instead.
+      fullIntro = 'You previously worked in this channel but your prior session is no ' +
+        'longer available, so here is the recent conversation for context:',
+    } = opts;
+    if (!this._recapCursor) this._recapCursor = {};
+
+    const messages = await this.client.getRecentMessages(
+      this.workspaceId, channelName, this.token, 60
+    );
+    if (!messages || messages.length === 0) return null;
+
+    const cursor = full ? null : this._recapCursor[channelName];
+
+    let startIdx = 0;
+    let incremental = false;
+    if (cursor) {
+      const idx = messages.findIndex((m) => m.messageId === cursor);
+      if (idx === -1) {
+        // Cursor aged out of the window — fall back to a tail recap rather
+        // than replaying all 60 messages.
+        startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
+      } else {
+        startIdx = idx + 1;
+        incremental = true;
+      }
+    } else {
+      startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
+    }
+
+    // Advance the cursor before any early return: these messages are now
+    // accounted for whether or not they made it into the prefix.
+    const ids = new Set();
+    for (const m of messages) if (m.messageId) ids.add(m.messageId);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].messageId) { this._recapCursor[channelName] = messages[i].messageId; break; }
+    }
+    // The message we are handling may not have propagated to the events API
+    // yet; pin the cursor to it so the next turn doesn't echo it back at us.
+    if (currentMessageId && !ids.has(currentMessageId)) {
+      this._recapCursor[channelName] = currentMessageId;
+    }
+
+    const lines = [];
+    for (let i = startIdx; i < messages.length; i++) {
+      const m = messages[i];
+      const mt = m.messageType || 'chat';
+      if (mt === 'status' || mt === 'thinking' || mt === 'loading') continue;
+      const text = (m.content || '').trim();
+      if (!text) continue;
+      // Exclude the message being handled — the caller appends it below.
+      if (currentMessageId ? m.messageId === currentMessageId : text === currentMessage) continue;
+      // Our own posts are already in a live session's history.
+      if (incremental && m.senderType !== 'human' && m.senderName === this.agentName) continue;
+      const who = m.senderType === 'human'
+        ? (m.senderName || 'user')
+        : (m.senderName || 'agent');
+      const truncated = text.length > 2000 ? text.slice(0, 2000) + '...' : text;
+      lines.push(`[${who}] ${truncated}`);
+    }
+    if (lines.length === 0) return null;
+
+    const tail = lines.slice(-RECAP_TAIL_LINES).join('\n');
+    if (!incremental) {
+      return `${fullIntro}\n\n${tail}`;
+    }
+    return (
+      '## Channel context you have not seen\n' +
+      'Posted in this channel after your last turn. These were not delivered ' +
+      'to you (only messages that @mention you are), so they are NOT in your ' +
+      'conversation history:\n\n' +
+      tail + '\n\n' +
+      'The message below is the one addressed to you. If it refers to "the ' +
+      'above", "that analysis", "the previous message" or anything similar, ' +
+      'it means the channel messages above — not your own earlier work.'
+    );
+  }
+
+  // ------------------------------------------------------------------
   // Message helpers
   // ------------------------------------------------------------------
 
@@ -1490,19 +1668,40 @@ class BaseAdapter {
     if (questions) metadata.questions = questions;
     if (preview) metadata.preview = preview;
 
-    try {
-      await this.client.sendMessage(this.workspaceId, channel, this.token, body, {
-        senderType: 'agent',
-        senderName: this.agentName,
-        sessionId: this._sessionId,
-        ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
-      });
-    } catch (e) {
-      if (e instanceof SessionRevokedError) {
-        this._onSessionRevoked();
+    /*
+      The final reply is retried on a transient failure. Every adapter calls
+      this as `try { await this.sendResponse(...) } catch {}`, so one network
+      blip or backend restart at the end of a long turn silently threw the
+      whole answer away. One client_message_id across attempts makes the retry
+      safe: if the first POST landed and only its response was lost, the server
+      returns the existing event instead of posting a second copy.
+    */
+    const clientMessageId = `${this.agentName}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    const delays = [1000, 3000, 8000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await this.client.sendMessage(this.workspaceId, channel, this.token, body, {
+          senderType: 'agent',
+          senderName: this.agentName,
+          sessionId: this._sessionId,
+          clientMessageId,
+          ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+        });
         return;
+      } catch (e) {
+        if (e instanceof SessionRevokedError) {
+          this._onSessionRevoked();
+          return;
+        }
+        const sc = e && e.statusCode;
+        const transient = sc == null || sc >= 500 || sc === 429;
+        if (!transient || attempt >= delays.length) {
+          this._log(`Reply could not be posted to ${channel} after ${attempt + 1} attempt(s): ${e && e.message}`);
+          throw e;
+        }
+        this._log(`Reply post failed (${e && e.message}); retrying in ${delays[attempt] / 1000}s`);
+        await new Promise((r) => setTimeout(r, delays[attempt]));
       }
-      throw e;
     }
   }
 

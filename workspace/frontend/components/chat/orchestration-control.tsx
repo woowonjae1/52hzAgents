@@ -2,30 +2,9 @@
 
 import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
-import { Waypoints, Crown, Sparkles, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { Waypoints, Crown, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkspaceSession, WorkspaceAgent } from '@/lib/types';
-import { isComposing } from '@/lib/ime';
 
 type Mode = 'dynamic' | 'master' | 'parallel';
 
@@ -34,13 +13,13 @@ const MODES: { value: Mode; label: string; icon: React.ElementType; description:
     value: 'dynamic',
     label: 'Dynamic',
     icon: Sparkles,
-    description: 'A router model picks the best next agent each turn.',
+    description: 'A router picks the best next agent each turn.',
   },
   {
     value: 'master',
-    label: 'Master / sub-agents',
+    label: 'Master',
     icon: Crown,
-    description: 'Everything goes to the leader, who delegates and collects results.',
+    description: 'The master agent receives everything, delegates, and collects results.',
   },
   {
     value: 'parallel',
@@ -54,335 +33,102 @@ const MODES: { value: Mode; label: string; icon: React.ElementType; description:
   'workflow' was removed rather than renamed. It never had its own branch in the
   router: it was dynamic mode with the plan text appended to the same
   single-next-speaker prompt, so it promised a workflow engine and delivered a
-  hint. Its one real asset, the plan the user writes, is kept — it is now the
-  assignment that parallel mode splits up.
+  hint. Threads still stored as 'workflow' fall back to dynamic below, which is
+  the behaviour they already had.
 
-  Threads still stored as 'workflow' fall back to dynamic below, which is the
-  behaviour they already had.
+  Its plan editor (with its own @agent autocomplete) went with it: nothing
+  rendered it, and parallel reads the task board, not a paragraph.
 */
 
 interface Props {
   session: WorkspaceSession;
   agents: WorkspaceAgent[];
   onChange: (updates: { mode?: Mode; instruction?: string | null; verificationCmd?: string | null }) => void;
-  /**
-   * 'composer' is the real home: a chip in the composer's bottom row, beside
-   * the model select. 'submenu' nests the items under a parent DropdownMenu.
-   * 'standalone' is the old header button, kept for any caller still using it.
-   */
-  variant?: 'standalone' | 'submenu' | 'composer';
 }
 
 /**
- * Lets the user pick how a multi-agent thread coordinates: dynamic router
- * (default), master/sub-agent, or a custom natural-language workflow. The
- * custom workflow opens an editor with @agent autocomplete.
+ * How a multi-agent thread coordinates, as a three-way segmented switch in the
+ * composer's bottom row.
+ *
+ * A SWITCH, NOT A MENU. There are exactly three options and switching between
+ * them is the whole job, so a dropdown cost two clicks and a paragraph of
+ * reading for what is a one-click choice — and hid the alternatives until it
+ * was opened. Now every option is visible, the active one carries its name,
+ * and the explanation moved to the hover, where it is read once and then
+ * never again.
  */
-export function OrchestrationControl({ session, agents, onChange, variant = 'standalone' }: Props) {
+export function OrchestrationControl({ session, onChange }: Props) {
   const stored = (session.orchestrationMode || 'dynamic') as Mode | 'workflow';
   // A thread saved under the removed 'workflow' mode reads as dynamic, which is
   // what it effectively already was.
   const mode: Mode = stored === 'workflow' ? 'dynamic' : stored;
-  const active = MODES.find((m) => m.value === mode) || MODES[0];
 
   /*
-    Picking a mode just picks the mode.
-
-    The first version of parallel opened the old workflow plan editor, which
-    made it workflow with a new label — and worse, the text that editor saves
-    (orchestration_instruction) is not what parallel reads. Parallel wakes the
-    assignees on the TASK BOARD, so a paragraph typed into a dialog changed
-    nothing at all while looking like the thing that configured the mode.
-
-    The split is expressed by assigning tasks, which is where the user already
-    does it. ParallelBatchPanel shows what the board currently implies, and what
-    is missing, instead of asking for the same thing twice.
+    Picking a mode just picks the mode. Parallel wakes the assignees on the
+    TASK BOARD; ParallelBatchPanel shows what the board currently implies
+    instead of asking for the split a second time here.
   */
-  const selectMode = (next: Mode) => {
-    onChange({ mode: next });
+  const select = (next: Mode) => {
+    if (next !== mode) onChange({ mode: next });
   };
 
-  const ActiveIcon = active.icon;
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const i = MODES.findIndex((m) => m.value === mode);
+    const next = MODES[(i + (e.key === 'ArrowRight' ? 1 : MODES.length - 1)) % MODES.length];
+    select(next.value);
+    // All three segments are always rendered, so focus can move now.
+    e.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${next.value}"]`)?.focus();
+  };
 
-  const items = (
-    <>
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Collaboration mode"
+      onKeyDown={onKeyDown}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-surface1 p-0.5"
+    >
       {MODES.map((m) => {
         const Icon = m.icon;
         const isActive = m.value === mode;
         return (
-          <DropdownMenuItem
+          <Hint
             key={m.value}
-            onSelect={(e) => {
-              // Keep the menu semantics simple; workflow opens a dialog.
-              e.preventDefault();
-              selectMode(m.value);
-            }}
-            className="flex items-start gap-2 py-2"
+            side="top"
+            label={
+              <span className="block max-w-56">
+                <span className="font-medium">{m.label}</span>
+                <span className="block text-foreground-muted">{m.description}</span>
+              </span>
+            }
           >
-            <Icon className="size-3.5 mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium">{m.label}</span>
-                {isActive && <Check className="size-3 text-primary" />}
-              </div>
-              <p className="text-2xs text-muted-foreground leading-snug">{m.description}</p>
-            </div>
-          </DropdownMenuItem>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={isActive}
+              aria-label={m.label}
+              data-mode={m.value}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => select(m.value)}
+              className={cn(
+                'inline-flex h-5 items-center gap-1 rounded-[5px] px-1.5',
+                'text-3xs font-mono select-none transition-colors',
+                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+                isActive
+                  ? 'bg-surface3 text-foreground shadow-xs'
+                  : 'text-foreground-extra-muted hover:text-foreground'
+              )}
+            >
+              <Icon className="size-3 shrink-0" />
+              {/* Only the active segment spells its name: the row stays
+                  narrow, and you can still tell which mode you are in
+                  without hovering anything. */}
+              {isActive && <span>{m.label}</span>}
+            </button>
+          </Hint>
         );
       })}
-
-    </>
-  );
-
-  return (
-    <>
-      {variant === 'composer' ? (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Hint label="How this thread coordinates agents">
-              {/*
-                Matches the chip idiom of the row it sits in — `--surface1` on
-                the composer's `--surface2`, mono, 3xs — rather than the ghost
-                button it used in the header. It reads as one of the send
-                controls because that is now what it is.
-
-                The label is always shown, Dynamic included. The mode is only
-                worth having in reach if you can tell which one you are in
-                without opening anything.
-              */}
-              <button
-                type="button"
-                className={cn(
-                  'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md shrink-0',
-                  'text-3xs font-mono select-none transition-colors',
-                  'bg-surface1 text-foreground-muted hover:text-foreground',
-                  mode !== 'dynamic' && 'text-foreground'
-                )}
-              >
-                <ActiveIcon className="size-3 shrink-0" />
-                <span className="truncate max-w-[110px]">{active.label}</span>
-              </button>
-            </Hint>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="top" className="w-72">
-            <DropdownMenuLabel>Collaboration mode</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {items}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ) : variant === 'submenu' ? (
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="gap-2 text-xs">
-            <ActiveIcon className="size-3.5 text-foreground-muted" />
-            Collaboration mode
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-72">{items}</DropdownMenuSubContent>
-        </DropdownMenuSub>
-      ) : (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Hint label="Collaboration mode">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 h-7 text-xs font-medium"
-              >
-                <ActiveIcon className="size-3.5" />
-                <span className="hidden lg:inline">{active.label}</span>
-              </Button>
-            </Hint>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel>Collaboration mode</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {items}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
-
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Plan editor with @agent autocomplete
-export interface WorkflowPlanDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  agents: WorkspaceAgent[];
-  initialValue: string;
-  onSave: (instruction: string) => void;
-}
-
-export function WorkflowPlanDialog({ open, onOpenChange, agents, initialValue, onSave }: WorkflowPlanDialogProps) {
-  const [value, setValue] = React.useState(initialValue);
-  const [showMentions, setShowMentions] = React.useState(false);
-  const [mentionFilter, setMentionFilter] = React.useState('');
-  const [mentionIndex, setMentionIndex] = React.useState(0);
-  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
-  const mentionListRef = React.useRef<HTMLDivElement>(null);
-
-  // Auto-scroll selected mention into view
-  React.useEffect(() => {
-    if (!showMentions || !mentionListRef.current) return;
-    const container = mentionListRef.current;
-    const selectedEl = container.querySelector('[data-selected="true"]') as HTMLElement | null;
-    if (selectedEl) {
-      selectedEl.scrollIntoView({ block: 'nearest' });
-    }
-  }, [mentionIndex, showMentions]);
-
-  // Reset the draft whenever the dialog is (re)opened.
-  React.useEffect(() => {
-    if (open) {
-      setValue(initialValue);
-      setShowMentions(false);
-    }
-  }, [open, initialValue]);
-
-  const filteredAgents = React.useMemo(
-    () =>
-      agents
-        .filter((a) => a.agentName.toLowerCase().includes(mentionFilter.toLowerCase()))
-        .sort((a, b) => {
-          if (a.status !== b.status) {
-            return a.status === 'online' ? -1 : 1;
-          }
-          if ((a.role === 'master') !== (b.role === 'master')) {
-            return a.role === 'master' ? -1 : 1;
-          }
-          return a.agentName.localeCompare(b.agentName);
-        }),
-    [agents, mentionFilter],
-  );
-
-  const detectMention = (el: HTMLTextAreaElement, text: string) => {
-    const cursor = el.selectionStart;
-    const before = text.slice(0, cursor);
-    const at = before.match(/@([\w-]*)$/);
-    if (at && agents.length > 0) {
-      setMentionFilter(at[1]);
-      setMentionIndex(0);
-      setShowMentions(true);
-    } else {
-      setShowMentions(false);
-    }
-  };
-
-  const insertMention = (name: string) => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const cursor = el.selectionStart;
-    const before = value.slice(0, cursor);
-    const after = value.slice(cursor);
-    const at = before.lastIndexOf('@');
-    if (at === -1) return;
-    const next = before.slice(0, at) + `@${name} ` + after;
-    setValue(next);
-    setShowMentions(false);
-    // Restore caret just after the inserted mention.
-    requestAnimationFrame(() => {
-      const pos = at + name.length + 2;
-      el.focus();
-      el.setSelectionRange(pos, pos);
-    });
-  };
-
-  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // ↑/↓/Enter/Tab belong to the IME's candidate list while one is open — the
-    // same guard the main composer carries, for the same mention popup.
-    if (isComposing(e)) return;
-    if (showMentions && filteredAgents.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setMentionIndex((p) => (p + 1) % filteredAgents.length);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setMentionIndex((p) => (p - 1 + filteredAgents.length) % filteredAgents.length);
-      } else if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        insertMention(filteredAgents[mentionIndex].agentName);
-      } else if (e.key === 'Escape') {
-        setShowMentions(false);
-      }
-    }
-  };
-
-  const save = () => {
-    onSave(value.trim());
-    onOpenChange(false);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>How the work is split</DialogTitle>
-          <DialogDescription>
-            Say who does what, in plain language. Use <span className="font-mono">@</span> to
-            reference an agent, and name the folder each one owns — parallel mode will not start a
-            batch whose scopes overlap, because agents working on the same files overwrite each
-            other silently.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="relative">
-          <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              detectMention(e.target, e.target.value);
-            }}
-            onKeyDown={onKeyDown}
-            rows={6}
-            autoFocus
-            placeholder={
-              'e.g. @frontend takes workspace/frontend — rebuild the task board. ' +
-              '@backend takes workspace/backend — add the batch endpoint. ' +
-              '@docs takes docs/ — write up both.'
-            }
-            className="w-full resize-none rounded-md border bg-transparent p-3 text-sm outline-none focus:border-primary"
-          />
-          {showMentions && filteredAgents.length > 0 && (
-            <div
-              ref={mentionListRef}
-              className="absolute left-3 right-3 z-50 mt-1 max-h-44 overflow-auto rounded-md border bg-popover shadow-md"
-            >
-              {filteredAgents.map((a, i) => (
-                <button
-                  key={a.agentName}
-                  type="button"
-                  data-selected={i === mentionIndex ? 'true' : undefined}
-                  onClick={() => insertMention(a.agentName)}
-                  className={cn(
-                    'flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-surface2',
-                    i === mentionIndex && 'bg-surface2',
-                  )}
-                >
-                  <span className="font-medium">@{a.agentName}</span>
-                  {a.role === 'master' && <Crown className="size-3 text-status-warning" />}
-                  <span
-                    className={cn(
-                      'ml-auto size-1.5 rounded-full',
-                      a.status === 'online' ? 'bg-status-success' : 'bg-foreground-extra-muted',
-                    )}
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={save}>
-            Save plan
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 }

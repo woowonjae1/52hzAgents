@@ -24,13 +24,6 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
-function fmtContextLimit(window?: number | null): string {
-  if (!window || window <= 0) return 'unknown';
-  if (window >= 1_000_000) return `${(window / 1_000_000).toFixed(0)}M`;
-  if (window >= 1_000) return `${Math.round(window / 1000)}k`;
-  return String(window);
-}
-
 const MONTH_MAP: Record<string, number> = {
   jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
   jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
@@ -167,13 +160,17 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
     return () => clearInterval(interval);
   }, [fetchUsageAndStats, selectedName]);
 
-  if (!selectedAgent) return null;
-
-  const usage = selectedName ? usageByAgent[selectedName] ?? null : null;
+  // Every hook runs before the early return below: a hook after it would be
+  // skipped whenever there is no agent, and React throws when the hook count
+  // changes between renders (no agents -> first agent connects).
   const agentStat = React.useMemo<AgentTokenStat | null>(() => {
     if (!tokenStats?.agents || !selectedName) return null;
     return tokenStats.agents.find((a) => a.agent_name.toLowerCase() === selectedName.toLowerCase()) || null;
   }, [tokenStats, selectedName]);
+
+  if (!selectedAgent) return null;
+
+  const usage = selectedName ? usageByAgent[selectedName] ?? null : null;
 
   const loading = loadingAgent === selectedName;
 
@@ -194,29 +191,7 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
   const promptTokens = agentStat?.total_prompt_tokens ?? usage?.total_prompt_tokens ?? 0;
   const completionTokens = agentStat?.total_completion_tokens ?? usage?.total_completion_tokens ?? 0;
 
-  const rawWindow = agentStat?.context_window_size ?? usage?.context_window_size ?? 0;
   const activeModel = agentStat?.current_model ?? usage?.current_model ?? selectedName ?? '';
-  const isClaude = (selectedName && selectedName.toLowerCase().includes('claude')) || (activeModel && activeModel.toLowerCase().includes('claude'));
-  const is1M = activeModel.toLowerCase().includes('[1m]') || activeModel.toLowerCase().includes('1m') || activeModel.toLowerCase().includes('fable');
-
-  const contextWindow = rawWindow > 0
-    ? rawWindow
-    : isClaude
-    ? (is1M ? 1_000_000 : 200_000)
-    : 0;
-
-  const contextTokens =
-    agentStat?.last_prompt_tokens && agentStat.last_prompt_tokens > 0
-      ? agentStat.last_prompt_tokens
-      : usage?.last_prompt_tokens && usage.last_prompt_tokens > 0
-      ? usage.last_prompt_tokens
-      : tokenStats?.channels && tokenStats.channels.length > 0 && tokenStats.channels[0].context_tokens > 0
-      ? tokenStats.channels[0].context_tokens
-      : 0;
-
-  const contextPct = contextWindow > 0 && contextTokens > 0
-    ? Math.min(100, Math.round((contextTokens / contextWindow) * 100))
-    : 0;
 
   const getBarColor = (pct: number) => {
     if (pct >= 85) return 'bg-status-danger';
@@ -385,38 +360,12 @@ export function AgentQuotaCapsule({ agentName, className }: AgentQuotaCapsulePro
           </div>
         )}
 
-        {/* Context Window Row & Sleek Progress Bar (Image 2 Top Section) */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-foreground">Context window</span>
-            {/* Was a button into the "token dashboard", a Studio tab that no
-                longer renders anything — so it opened an empty panel. The
-                reading is kept; the dead link is not. */}
-            <span className="inline-flex items-center gap-1 font-mono text-2xs text-foreground-muted">
-              {contextWindow > 0 ? (
-                <>
-                  <span>
-                    {fmtTokens(contextTokens)} / {fmtContextLimit(contextWindow)}
-                  </span>
-                  <span className="text-foreground-extra-muted">({contextPct}%)</span>
-                </>
-              ) : (
-                <span className="font-sans">Unknown capacity</span>
-              )}
-            </span>
-          </div>
-          <div className="h-1.5 w-full bg-surface3/80 rounded-full overflow-hidden">
-            <div
-              className={cn(
-                'h-full rounded-full ui-transition duration-500',
-                contextPct >= 85 ? 'bg-status-danger' : contextPct >= 60 ? 'bg-status-warning' : 'bg-primary'
-              )}
-              style={{ width: `${Math.min(Math.max(contextPct, contextTokens > 0 ? 3 : 0), 100)}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="h-px bg-border/40" />
+        {/*
+          No context bar here any more. It showed ONE number per agent -- its
+          last prompt anywhere, against a window guessed for Claude models --
+          while each agent's context is really per channel. The ring beside
+          send shows this thread's figures, as the agent measured them.
+        */}
 
         {/* Middle Section: Usage Limits or Cumulative Tokens (Image 2 Middle Section) */}
         {isClaudeQuota ? (

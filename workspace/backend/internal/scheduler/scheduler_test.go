@@ -362,14 +362,15 @@ func TestExpireStaleAgents_Watchdog(t *testing.T) {
 	// Run watchdog sweeper
 	expireStaleAgents()
 
-	// Verify stale agent is marked offline with cleared session_id
+	// Stale agent goes offline but KEEPS its session, so the same adapter's
+	// next heartbeat brings it back instead of being answered as revoked.
 	var updatedStale models.WorkspaceMember
 	db.DB.Where("workspace_id = ? AND agent_name = ?", wsID, "stale-agent").First(&updatedStale)
 	if updatedStale.Status != "offline" {
 		t.Errorf("expected stale-agent status to be offline, got %s", updatedStale.Status)
 	}
-	if updatedStale.SessionID != nil {
-		t.Errorf("expected stale-agent session_id to be nil, got %v", *updatedStale.SessionID)
+	if updatedStale.SessionID == nil || *updatedStale.SessionID != "sess-active" {
+		t.Errorf("expected stale-agent to keep session sess-active, got %v", updatedStale.SessionID)
 	}
 
 	// Verify fresh agent remains online

@@ -158,25 +158,9 @@ func (ChannelHumanMember) TableName() string {
 	return "channel_human_members"
 }
 
-// ChannelCompactionRecord stores a compressed summary checkpoint for a channel's
-// conversation history, allowing long-running multi-agent sessions without token exhaustion.
-type ChannelCompactionRecord struct {
-	ID                    string    `gorm:"primaryKey;type:uuid" json:"id"`
-	WorkspaceID           string    `gorm:"type:uuid;not null;index:idx_channel_compactions_ws" json:"workspace_id"`
-	ChannelID             string    `gorm:"type:uuid;not null;index:idx_channel_compactions_ch" json:"channel_id"`
-	ChannelName           string    `gorm:"type:text;not null" json:"channel_name"`
-	Summary               string    `gorm:"type:text;not null" json:"summary"`
-	FromEventID           string    `gorm:"type:text" json:"from_event_id"`
-	ToEventID             string    `gorm:"type:text" json:"to_event_id"`
-	CompactedCount        int       `gorm:"type:integer;not null" json:"compacted_count"`
-	EstimatedTokensBefore int       `gorm:"type:integer" json:"tokens_before"`
-	EstimatedTokensAfter  int       `gorm:"type:integer" json:"tokens_after"`
-	CreatedAt             time.Time `gorm:"autoCreateTime" json:"created_at"`
-}
-
-func (ChannelCompactionRecord) TableName() string {
-	return "channel_compactions"
-}
+// The channel compaction table (`channel_compactions`) was dropped from the
+// model with the compactor: no agent read its summaries. Existing databases
+// keep the table; nothing writes to it.
 
 type Invitation struct {
 	ID          string    `gorm:"primaryKey;type:uuid"`
@@ -515,9 +499,9 @@ type AgentUsageRecord struct {
 	AvailableEfforts *string `gorm:"type:text" json:"available_efforts"`
 	RawText          *string `gorm:"type:text" json:"raw_text"`
 	// Cumulative token metrics across all turns & sessions
-	TotalPromptTokens     int64     `gorm:"type:bigint;not null;default:0" json:"total_prompt_tokens"`
-	TotalCompletionTokens int64     `gorm:"type:bigint;not null;default:0" json:"total_completion_tokens"`
-	TotalTokens           int64     `gorm:"type:bigint;not null;default:0" json:"total_tokens"`
+	TotalPromptTokens     int64 `gorm:"type:bigint;not null;default:0" json:"total_prompt_tokens"`
+	TotalCompletionTokens int64 `gorm:"type:bigint;not null;default:0" json:"total_completion_tokens"`
+	TotalTokens           int64 `gorm:"type:bigint;not null;default:0" json:"total_tokens"`
 	// The size of the agent's MOST RECENT prompt, as the agent reported it.
 	//
 	// The cumulative totals above answer "what has this cost"; they say nothing
@@ -529,13 +513,43 @@ type AgentUsageRecord struct {
 	//
 	// Zero means no agent has reported a prompt size yet, which the panel must
 	// show as unknown rather than as 0%.
-	LastPromptTokens      int64     `gorm:"type:bigint;not null;default:0" json:"last_prompt_tokens"`
-	ContextWindowSize     int       `gorm:"type:integer;not null;default:0" json:"context_window_size"`
-	UpdatedAt             time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	LastPromptTokens  int64     `gorm:"type:bigint;not null;default:0" json:"last_prompt_tokens"`
+	ContextWindowSize int       `gorm:"type:integer;not null;default:0" json:"context_window_size"`
+	UpdatedAt         time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (AgentUsageRecord) TableName() string {
 	return "agent_usages"
+}
+
+// AgentContextRecord is how full ONE agent's own context is in ONE channel.
+//
+// Context belongs to the agent, not to the channel: every adapter resumes a
+// per-channel CLI session (claude --resume, codex exec resume, gemini -r,
+// pi --session) and that session is what the model actually sees and what the
+// CLI compacts on its own. So the key is (agent, channel), and the numbers are
+// what the agent's CLI measured on its last turn -- never an estimate from
+// channel text. A channel has no single context size; it has one per agent.
+type AgentContextRecord struct {
+	WorkspaceID string `gorm:"type:uuid;not null;uniqueIndex:idx_agent_context_key" json:"workspace_id"`
+	AgentName   string `gorm:"type:text;not null;uniqueIndex:idx_agent_context_key" json:"agent_name"`
+	ChannelName string `gorm:"type:text;not null;uniqueIndex:idx_agent_context_key" json:"channel_name"`
+	// Tokens in the prompt of the agent's last model call this turn, cache
+	// reads included -- that is the context, whether or not it was billed.
+	PromptTokens int64 `gorm:"type:bigint;not null;default:0" json:"prompt_tokens"`
+	// Zero means unknown.
+	ContextWindow int `gorm:"type:integer;not null;default:0" json:"context_window"`
+	// "reported" when the agent's CLI stated the window, "model" when it was
+	// looked up from the model name, "" when unknown. The UI shows the two
+	// differently, because only one of them is a measurement.
+	WindowSource string     `gorm:"type:text;not null;default:''" json:"window_source"`
+	Model        string     `gorm:"type:text;not null;default:''" json:"model"`
+	CompactedAt  *time.Time `json:"compacted_at,omitempty"`
+	UpdatedAt    time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (AgentContextRecord) TableName() string {
+	return "agent_contexts"
 }
 
 type AgentApprovalRecord struct {
@@ -610,13 +624,13 @@ func (CloudAgentConfig) TableName() string {
 // Provider is "openai" or "anthropic", where "openai" plus a BaseURL covers any
 // OpenAI-compatible endpoint - which is what a custom provider normally is.
 type RouterConfig struct {
-	ID          string    `gorm:"primaryKey;type:text" json:"id"`
-	WorkspaceID string    `gorm:"type:uuid;not null;uniqueIndex:uq_router_config_workspace" json:"workspace_id"`
-	Enabled     bool      `gorm:"not null;default:false" json:"enabled"`
-	Provider    string    `gorm:"type:text;not null;default:openai" json:"provider"`
-	Model       string    `gorm:"type:text" json:"model"`
-	APIKey      string    `gorm:"type:text" json:"api_key"`
-	BaseURL     *string   `gorm:"type:text" json:"base_url"`
+	ID          string  `gorm:"primaryKey;type:text" json:"id"`
+	WorkspaceID string  `gorm:"type:uuid;not null;uniqueIndex:uq_router_config_workspace" json:"workspace_id"`
+	Enabled     bool    `gorm:"not null;default:false" json:"enabled"`
+	Provider    string  `gorm:"type:text;not null;default:openai" json:"provider"`
+	Model       string  `gorm:"type:text" json:"model"`
+	APIKey      string  `gorm:"type:text" json:"api_key"`
+	BaseURL     *string `gorm:"type:text" json:"base_url"`
 	// LastStatus / LastError / LastCheckedAt make a failing router visible.
 	//
 	// routeWithLLM returns handled=false on any error, and routing then falls

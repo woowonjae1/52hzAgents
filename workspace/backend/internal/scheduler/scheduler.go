@@ -9,7 +9,6 @@ import (
 	"time" // 控制轮询间隔与到期比对。
 
 	"github.com/google/uuid" // 生成事件唯一 UUID 主键。
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"       // 数据库操作。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/handlers" // 引入 ComputeNextFiresAt 算法。
@@ -26,8 +25,6 @@ func StartScheduler() {
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop() // 方法结束时释放计时器。
 
-		compactionCounter := 0
-
 		// 无限循环监听计时器 Tick 信号，并带有 panic 容错恢复保护。
 		for range ticker.C {
 			func() {
@@ -43,13 +40,6 @@ func StartScheduler() {
 				expireStaleRoutineRuns()
 				fireDueTimers()   // 执行到期 Timers 触发扫描。
 				fireDueRoutines() // 执行到期 Routines 触发扫描。
-
-				// Auto-compact active channels every 60 seconds (12 ticks * 5s)
-				compactionCounter++
-				if compactionCounter >= 12 {
-					compactionCounter = 0
-					compactActiveChannels()
-				}
 			}()
 		}
 	}()
@@ -75,8 +65,17 @@ func expireStaleAgents() {
 
 	nowMs := time.Now().UnixMilli()
 	for _, m := range staleMembers {
+		/*
+			Offline, but the session is KEPT. Clearing it here meant any 60s gap
+			(laptop sleep, backend restart, a network blip) turned the agent's
+			next heartbeat into 409 session_revoked -- the answer reserved for
+			"another client took this name" -- and the adapter stopped for good.
+			A takeover needs no help from here: /v1/join always issues a new
+			session and that alone revokes the old one. Keeping it lets the same
+			adapter's next heartbeat flip the member straight back online.
+		*/
 		db.DB.Model(&models.WorkspaceMember{}).Where("workspace_id = ? AND agent_name = ?", m.WorkspaceID, m.AgentName).
-			Updates(map[string]interface{}{"status": "offline", "session_id": nil})
+			Updates(map[string]interface{}{"status": "offline"})
 
 		_ = handlers.PublishWorkspaceStateEvent(m.WorkspaceID, "workspace.member.status", "system:watchdog", "", map[string]interface{}{
 			"agent_name":      m.AgentName,
@@ -261,28 +260,6 @@ func fireDueRoutines() {
 			log.Printf("Failed to execute routine trigger for %s: %v", r.ID, err)
 		} else {
 			log.Printf("Routine %s (%s, Name: %s) successfully triggered in channel: %s", r.ID, r.ShortID, r.Name, r.ChannelName)
-		}
-	}
-}
-
-func compactActiveChannels() {
-	if db.DB == nil {
-		return
-	}
-	var activeChannels []models.Channel
-	// Scan active channels that have received events
-	if err := db.DB.Where("status = ? AND last_event_at IS NOT NULL", "active").Limit(20).Find(&activeChannels).Error; err != nil {
-		return
-	}
-
-	for _, ch := range activeChannels {
-		res, err := compaction.CompactChannel(ch.WorkspaceID, ch.Name, nil)
-		if err != nil {
-			log.Printf("scheduler: compaction error on channel %s: %v", ch.Name, err)
-			continue
-		}
-		if res != nil && !res.Skipped {
-			log.Printf("scheduler: auto-compacted channel %s (%d msgs, %d tokens saved)", ch.Name, res.CompactedCount, res.TokensSaved)
 		}
 	}
 }

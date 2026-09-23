@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/tokens"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -32,7 +32,6 @@ func tokenStatsTestRouter(t *testing.T) (*gin.Engine, models.Workspace, string) 
 		&models.Channel{},
 		&models.ChannelMember{},
 		&models.EventRecord{},
-		&models.ChannelCompactionRecord{},
 		&models.AgentUsageRecord{},
 	); err != nil {
 		t.Fatalf("migrate test db: %v", err)
@@ -111,12 +110,6 @@ func TestGetWorkspaceTokenStatsHandler(t *testing.T) {
 	if resp.Agents[0].AgentName != "codex-agent" || resp.Agents[0].TotalTokens != 1500 || resp.Agents[0].LastPromptTokens != 850 {
 		t.Errorf("unexpected agent token stat: %+v", resp.Agents[0])
 	}
-	if len(resp.Channels) != 1 {
-		t.Fatalf("expected 1 channel, got %d", len(resp.Channels))
-	}
-	if resp.Channels[0].ChannelName != "general" {
-		t.Errorf("expected channel general, got %s", resp.Channels[0].ChannelName)
-	}
 }
 
 func TestRecordAgentMessageTokenUsage(t *testing.T) {
@@ -169,7 +162,7 @@ func TestRecordAgentMessageTokenUsage(t *testing.T) {
 	// model table -- a guess the dashboard then rendered as a measured
 	// capacity. A test pinning that value made correcting it look like a
 	// regression, which is why it survived.
-	if usage.ContextWindowSize != compaction.UnknownWindow {
+	if usage.ContextWindowSize != tokens.UnknownWindow {
 		t.Errorf("unreported agent should have an unknown window, got %d", usage.ContextWindowSize)
 	}
 }

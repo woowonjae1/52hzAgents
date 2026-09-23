@@ -483,26 +483,24 @@ export interface AgentTokenStat {
   status: string;
 }
 
-export interface ChannelContextHealth {
-  channel_name: string;
-  message_count: number;
-  /**
-   * The largest recent prompt among the channel's participants when `measured`
-   * is true, and a character-heuristic estimate otherwise. Was
-   * `estimated_tokens`, which described the fallback as though it were the
-   * only case -- the agents report their real prompt sizes on every turn.
-   */
-  context_tokens: number;
-  measured: boolean;
-  /** 0 when no participant has reported a window. NOT a default -- see below. */
-  min_context_window: number;
-  bottleneck_agent?: string;
-  has_disparity?: boolean;
-  token_budget_percent: number;
-  /** 'unknown' is a real state: nobody has told us how big the window is. */
-  health_status: 'optimal' | 'warning' | 'critical' | 'unknown';
-  last_compacted_at?: string | null;
-  compaction_count: number;
+/**
+ * How full ONE agent's own context is in ONE channel, as that agent's CLI
+ * measured it on its last turn there. Context belongs to the agent -- each one
+ * resumes its own per-channel session -- so there is no single "channel
+ * context"; there is one of these per agent that has worked in the channel.
+ */
+export interface AgentContext {
+  agentName: string;
+  channelName: string;
+  /** Prompt tokens of the agent's last model call, cache reads included. */
+  promptTokens: number;
+  /** 0 when unknown. */
+  contextWindow: number;
+  /** 'reported' = stated by the CLI; 'model' = looked up from the model name. */
+  windowSource: 'reported' | 'model' | '';
+  model: string;
+  compactedAt: string | null;
+  updatedAt: string;
 }
 
 export interface WorkspaceTokenStats {
@@ -510,12 +508,7 @@ export interface WorkspaceTokenStats {
   total_tokens: number;
   total_prompt_tokens: number;
   total_completion_tokens: number;
-  // `compaction_saved_tokens` was removed from the API: compaction discards
-  // context rather than saving tokens, and the figure was a difference between
-  // two runs of a character heuristic presented as a precise total.
-  compaction_runs: number;
   agents: AgentTokenStat[];
-  channels: ChannelContextHealth[];
 }
 
 export interface ApiResponse<T = unknown> {

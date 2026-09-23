@@ -1,5 +1,6 @@
 import type {
   AgentApproval,
+  AgentContext,
   AgentCatalogEntry,
   AgentLogEntry,
   AgentRuntime,
@@ -251,6 +252,24 @@ export class AgentsApi extends BaseWorkspaceApi {
     } catch {
       return null;
     }
+  }
+
+  /** Every (agent, channel) context row, newest first; `channel` narrows it. */
+  async getAgentContexts(channel?: string): Promise<AgentContext[]> {
+    const q = channel ? `?channel=${encodeURIComponent(channel.replace(/^channel\//, ''))}` : '';
+    const res = await this.request<{ contexts?: Array<Record<string, unknown>> }>(
+      `/v1/workspaces/${this.workspaceId}/agent-contexts${q}`
+    );
+    return (res?.contexts || []).map((r) => ({
+      agentName: String(r.agent_name || ''),
+      channelName: String(r.channel_name || ''),
+      promptTokens: Number(r.prompt_tokens) || 0,
+      contextWindow: Number(r.context_window) || 0,
+      windowSource: (r.window_source === 'reported' || r.window_source === 'model' ? r.window_source : '') as AgentContext['windowSource'],
+      model: String(r.model || ''),
+      compactedAt: (r.compacted_at as string | null) ?? null,
+      updatedAt: String(r.updated_at || ''),
+    }));
   }
 
   async getWorkspaceTokenStats(): Promise<WorkspaceTokenStats | null> {

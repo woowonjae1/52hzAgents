@@ -27,7 +27,6 @@ const { buildOpenclawSystemPrompt } = require('./workspace-prompt');
 const { whereBinary, whichBinary, getRuntimePrefix, getEnhancedEnv } = require('../paths');
 
 const IS_WINDOWS = process.platform === 'win32';
-const MAX_HISTORY_ENTRIES = 12;
 
 // Retry policy. See `_classifyFailure` / `_retryDelayFor` for why each exists.
 const PI_MIN_RETRY_DELAY_MS = 1000;   // floor, so a configured 0 cannot mean "no wait"
@@ -275,30 +274,12 @@ class PiAdapter extends BaseAdapter {
     }
   }
 
-  async _getRecentHistoryText(channelName) {
-    try {
-      const messages = await this.client.pollMessages({
-        workspaceId: this.workspaceId,
-        channelName,
-        token: this.token,
-        limit: MAX_HISTORY_ENTRIES,
-      });
-      if (!Array.isArray(messages) || messages.length === 0) return '';
-      const lines = messages
-        .filter((m) => m.messageType !== 'status')
-        .map((m) => {
-          const sender = m.senderName || m.senderType || 'unknown';
-          const content = (m.content || '').trim();
-          if (!content) return null;
-          return `- ${sender}: ${content.slice(0, 400)}`;
-        })
-        .filter(Boolean);
-      return lines.length ? `## Recent Workspace Messages\n${lines.join('\n')}` : '';
-    } catch {
-      return '';
-    }
-  }
-
+  /**
+   * The system-prompt part of the context: rules and the agent roster. The
+   * channel recap is NOT here -- pi does not persist its system prompt, so
+   * anything said only there is forgotten next turn. It is prepended to the
+   * user message instead (see _handleMessage), like claude does.
+   */
   async _buildContextPrefix(channelName) {
     const parts = [
       buildOpenclawSystemPrompt({
@@ -317,12 +298,8 @@ class PiAdapter extends BaseAdapter {
       '- Keep status concise. Focus on useful output over theatre.',
     ];
 
-    const [agentsText, historyText] = await Promise.all([
-      this._getAgentsText(),
-      this._getRecentHistoryText(channelName),
-    ]);
+    const agentsText = await this._getAgentsText();
     if (agentsText) parts.push('\n' + agentsText);
-    if (historyText) parts.push('\n' + historyText);
     return parts.join('\n').trim();
   }
 
@@ -407,6 +384,9 @@ class PiAdapter extends BaseAdapter {
     // Real-time JSON Lines event streaming (not buffered stdout)
     const responseChunks = [];
     let finalAnswer = '';
+    let lastUsage = null;
+    let lastUsageModel = '';
+    let compactedThisTurn = false;
     let streamedText = '';
     let currentThinking = '';
     let hasFlushedThinkingInCurrentTurn = false;
@@ -541,6 +521,10 @@ class PiAdapter extends BaseAdapter {
             // A successful message turn clears any stale transient error
             lastErrorMessage = '';
           }
+          if (msg.role === 'assistant' && msg.usage && typeof msg.usage === 'object') {
+            lastUsage = msg.usage;
+            if (msg.model) lastUsageModel = msg.provider ? `${msg.provider}/${msg.model}` : msg.model;
+          }
           if (msg.role === 'assistant' && Array.isArray(msg.content)) {
             const textParts = msg.content
               .filter((p) => p && p.type === 'text' && typeof p.text === 'string' && p.text.trim())
@@ -558,6 +542,10 @@ class PiAdapter extends BaseAdapter {
         if (typeof text === 'string' && text.trim()) {
           responseChunks.push(text.trim());
         }
+      }
+
+      if (eventType === 'auto_compaction_start' || eventType === 'auto_compaction_end') {
+        compactedThisTurn = true;
       }
 
       // 6. Error events & retry failures
@@ -616,6 +604,24 @@ class PiAdapter extends BaseAdapter {
     await flushThinking();
 
     delete this._channelProcesses[channelName];
+
+    /*
+      Context = input + cacheRead + cacheWrite of the LAST assistant message:
+      every token the model saw on its final call. Pi re-sends the whole
+      session each call, so this is the session's real size. The window is the
+      one the user declared for that model in Pi's models.json; a model Pi
+      knows from its built-in catalog leaves it to the backend's lookup.
+    */
+    if (lastUsage || compactedThisTurn) {
+      const u = lastUsage || {};
+      const model = lastUsageModel || this._resolveModel(channelName) || this.piModel || '';
+      this.reportContext(channelName, {
+        promptTokens: (u.input || 0) + (u.cacheRead || 0) + (u.cacheWrite || 0),
+        contextWindow: this._piContextWindow(model),
+        model,
+        compacted: compactedThisTurn,
+      });
+    }
 
     const resolvedAnswer = (finalAnswer || streamedText || responseChunks.join('\n')).trim();
     producedChars += streamedText.length + resolvedAnswer.length;
@@ -701,6 +707,24 @@ class PiAdapter extends BaseAdapter {
       // A malformed config is Pi's problem to report, not ours to guess around.
       return null;
     }
+  }
+
+  /** `contextWindow` declared for `<provider>/<id>` (or a bare id) in models.json; 0 if none. */
+  _piContextWindow(ref) {
+    if (!ref) return 0;
+    const config = this._readPiConfig('models.json');
+    const providers = config && config.providers;
+    if (!providers || typeof providers !== 'object') return 0;
+    const slash = ref.indexOf('/');
+    const wantProvider = slash > 0 ? ref.slice(0, slash) : '';
+    const wantId = slash > 0 ? ref.slice(slash + 1) : ref;
+    for (const [providerName, provider] of Object.entries(providers)) {
+      if (wantProvider && providerName !== wantProvider) continue;
+      const models = Array.isArray(provider && provider.models) ? provider.models : [];
+      const hit = models.find((m) => m && typeof m === 'object' && m.id === wantId);
+      if (hit && Number(hit.contextWindow) > 0) return Number(hit.contextWindow);
+    }
+    return 0;
   }
 
   /**
@@ -1003,11 +1027,23 @@ class PiAdapter extends BaseAdapter {
     try {
       const context = await this._buildContextPrefix(msgChannel);
       const contextFile = this._writeContextFile(msgChannel, context);
+      // What was said in the channel that pi has not seen: the recent
+      // conversation for a fresh session, only the new messages for a resumed
+      // one. Small, so it rides in the user message, where pi's session keeps it.
+      let recap = null;
+      try {
+        recap = await this._buildChannelContext(msgChannel, {
+          currentMessage: content,
+          currentMessageId: msg.messageId,
+          full: !fs.existsSync(this._sessionPathFor(msgChannel)),
+        });
+      } catch {}
+      const userPart = recap ? `${recap}\n\n---\n\n${content}` : content;
       // Inline only as a fallback: a turn that silently lost the workspace
       // rules would be a worse failure than a large request.
       const prompt = (context && !contextFile)
-        ? `${context}\n\n---\n\nUser message:\n${content}`
-        : content;
+        ? `${context}\n\n---\n\nUser message:\n${userPart}`
+        : userPart;
 
       const sessionPath = this._sessionPathFor(msgChannel);
       const preExists = fs.existsSync(sessionPath);

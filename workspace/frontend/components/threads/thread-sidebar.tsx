@@ -9,7 +9,8 @@ import {
   type SidebarResourceMove,
 } from '@/components/agents/ai-sidebar';
 import { AgentAvatar, AgentAvatarStack } from '@/components/agents/agent-avatar';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useWorkspace, isUnusedSession } from '@/lib/workspace-context';
+import { useThreadSeen } from '@/lib/thread-seen';
 import { useLayout } from '@/components/layout/layout-context';
 import { basename, browseForFolder } from '@/components/chat/project-folder-picker';
 import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
@@ -21,7 +22,7 @@ import { cn } from '@/lib/utils';
 /*
   THE SIDEBAR, AS beUI DRAWS IT.
 
-  This is the replication of `agents/ai-sidebar` plus the New task / Search /
+  This is the replication of `agents/ai-sidebar` plus the New chat / Search /
   Runs nav above it. It REPLACES `ThreadList` rather than editing it, so the
   richer list it stands in for — unread dots, relative times, message
   previews, search-hit highlighting, the "See all (N)" expanders, and the
@@ -50,7 +51,7 @@ export function ThreadSidebar() {
     agents,
     lastMessageBySession,
     activeSessionIds,
-    userSentMessageTimestamps,
+    currentUser,
     createSession,
     renameSession,
     updateSession,
@@ -103,9 +104,17 @@ export function ThreadSidebar() {
   }, [pickFolder, moveSessionToFolder]);
 
 
+  // Unused threads (never spoken in) are hidden unless open: "New chat" now
+  // reuses one instead of stacking identical empty rows. See isUnusedSession.
   const active = React.useMemo(
-    () => sessions.filter((s) => s.status !== 'deleted' && s.status !== 'archived'),
-    [sessions]
+    () =>
+      sessions.filter(
+        (s) =>
+          s.status !== 'deleted' &&
+          s.status !== 'archived' &&
+          (s.sessionId === currentSessionId || !isUnusedSession(s, lastMessageBySession))
+      ),
+    [sessions, currentSessionId, lastMessageBySession]
   );
 
   // id -> session, so the callbacks below never scan the list again.
@@ -143,19 +152,30 @@ export function ThreadSidebar() {
   const defaultExpandedIds = React.useMemo(() => items.map((i) => i.id), [items]);
 
   /*
-    Activity newer than the last thing YOU did in that thread. The thread you
-    are currently looking at is never unread — you are reading it.
+    UNREAD MEANS "MOVED SINCE YOU LAST LOOKED", NOT "SINCE YOU LAST TYPED".
+
+    This compared a thread's newest event with the last time you SENT a message
+    there. An agent's reply always comes after your message, so every thread you
+    had ever spoken in lit up and stayed lit -- opening it did not clear it,
+    only typing again did -- and the dot column carried no information at all.
+
+    useThreadSeen is the tracker built for this (the mobile list already uses
+    it): the open thread is marked seen continuously, a thread met for the first
+    time starts as read, and a thread whose last word was yours is never unread.
   */
+  const { isUnread: isThreadUnread, primeUnknown } = useThreadSeen(currentSessionId);
+  React.useEffect(() => {
+    if (active.length > 0) primeUnknown(active.map((s) => s.sessionId));
+  }, [active, primeUnknown]);
   const unreadIds = React.useMemo(() => {
     const ids = new Set<string>();
     for (const session of active) {
-      if (session.sessionId === currentSessionId) continue;
-      const seen = userSentMessageTimestamps[session.sessionId];
-      if (!seen) continue;
-      if ((session.lastEventAt ?? 0) > seen) ids.add(session.sessionId);
+      const sender = lastMessageBySession[session.sessionId]?.senderName ?? '';
+      const lastIsSelf = sender === 'user' || (!!currentUser?.name && sender === currentUser.name);
+      if (isThreadUnread(session.sessionId, session.lastEventAt ?? 0, lastIsSelf)) ids.add(session.sessionId);
     }
     return ids;
-  }, [active, currentSessionId, userSentMessageTimestamps]);
+  }, [active, lastMessageBySession, currentUser?.name, isThreadUnread]);
 
   const handleActiveChange = React.useCallback(
     (id: string) => {
@@ -422,7 +442,7 @@ export function ThreadSidebar() {
       <nav className="flex flex-col gap-0.5">
         <button type="button" className={ROW_CLASS} onClick={() => void createSession()}>
           <SquarePen className="size-3.5 shrink-0" />
-          New task
+          New chat
         </button>
         <button
           type="button"

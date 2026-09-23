@@ -459,6 +459,7 @@ class GeminiAdapter extends BaseAdapter {
           };
           startTimeoutMonitor();
 
+          let geminiModel = '';
           const processLine = async (line) => {
             line = line.trim();
             if (!line) return;
@@ -480,6 +481,7 @@ class GeminiAdapter extends BaseAdapter {
               return;
             }
 
+            if (eventType === 'init' && event.model) geminiModel = event.model;
             if (eventType === 'init' && event.session_id) {
               this._channelSessions[msgChannel] = event.session_id;
               this._saveSessions();
@@ -516,6 +518,17 @@ class GeminiAdapter extends BaseAdapter {
                 summary: inputPreview,
               });
             } else if (eventType === 'result') {
+               /*
+                 `stats.input_tokens` is summed over every model call in the
+                 run, so it equals the context size only when there was ONE
+                 call -- no tool use. A tool-using turn reports no token count
+                 rather than a number inflated by its call count; the last
+                 measured value stays in place.
+               */
+               const st = event.stats || {};
+               if (st.tool_calls === 0 && st.input_tokens > 0) {
+                 this.reportContext(msgChannel, { promptTokens: st.input_tokens, model: geminiModel });
+               }
                if (event.session_id) {
                  this._channelSessions[msgChannel] = event.session_id;
                  this._saveSessions();

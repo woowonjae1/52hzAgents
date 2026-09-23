@@ -1,468 +1,162 @@
 'use client';
 
 import * as React from 'react';
-import { Layers, RefreshCw, Sparkles, CheckCircle2, AlertTriangle, AlertCircle, Info } from 'lucide-react';
-import { Hint } from '@/components/ui/hint';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useWorkspace } from '@/lib/workspace-context';
-import { useLayout } from '@/components/layout/layout-context';
-import { workspaceApi } from '@/lib/api';
-import type { ChannelContextHealth, WorkspaceTokenStats } from '@/lib/types';
+import { Hint } from '@/components/ui/hint';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { ContextRing } from '@/components/chat/context-ring';
+import { timeAgo } from '@/lib/helpers';
 import { cn } from '@/lib/utils';
-import { headerChipClass } from '@/components/headers/header-chip';
+import {
+  useAgentContexts,
+  contextPercent,
+  contextLevel,
+  fmtTokens,
+} from '@/lib/use-agent-contexts';
+import type { AgentContext } from '@/lib/types';
 
 interface ContextHealthIndicatorProps {
   channelName?: string;
   className?: string;
-  /**
-   * 'composer' is a bare ring with no label, sitting with the send controls.
-   *
-   * Context budget belongs next to the thing that spends it. In the header it
-   * was one of six chips competing for a strip that names the thread, and it
-   * had to carry the word "Context" to explain why it was there at all. Beside
-   * the composer it needs no label: it is obviously about the message you are
-   * writing, so the ring alone reads, and the numbers stay on hover where they
-   * already were.
-   */
-  variant?: 'header' | 'composer';
 }
 
-function fmtTokens(n: number): string {
-  if (!n || n <= 0) return '0';
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
+/*
+  CONTEXT IS PER AGENT. THIS USED TO PRETEND OTHERWISE.
 
-export function ContextHealthIndicator({
-  channelName,
-  className,
-  variant = 'header',
-}: ContextHealthIndicatorProps) {
-  const { workspaceId } = useWorkspace();
-  const { setActiveRightTab } = useLayout();
-  const [stats, setStats] = React.useState<WorkspaceTokenStats | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [compacting, setCompacting] = React.useState(false);
-  const [lastCompactedResult, setLastCompactedResult] = React.useState<string | null>(null);
-  const [isOpen, setIsOpen] = React.useState(false);
+  The old indicator showed one number for the channel: the largest prompt any
+  participant had sent, divided by the SMALLEST participant's window -- "this
+  channel is capped at 64k by @x". None of that was true. Every adapter resumes
+  its own per-channel CLI session, so a 1M-window agent in a room with a 64k one
+  still has 1M; the two never share a context. And no adapter reported a prompt
+  size, so the number was a character count of the channel's text against a
+  window looked up by model name. Its "Compact Context Now" button rolled a
+  channel summary that no agent reads.
 
+  Now each agent that has worked here reports what its own CLI measured on its
+  last turn, and this shows exactly that: one row per agent, its tokens over
+  its window. The ring beside send shows the fullest of them -- the one that
+  would overflow first -- and turns colour only when that one is actually tight.
+*/
+export function ContextHealthIndicator({ channelName, className }: ContextHealthIndicatorProps) {
   const rawChannel = (channelName || 'general').replace(/^channel\//, '');
+  const { rows, refresh } = useAgentContexts();
+  const [open, setOpen] = React.useState(false);
 
-  const fetchStats = React.useCallback(async () => {
-    if (!workspaceId) return;
-    try {
-      setLoading(true);
-      workspaceApi.setWorkspaceId(workspaceId);
-      const res = await workspaceApi.getWorkspaceTokenStats();
-      if (res) {
-        setStats(res);
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
-  }, [workspaceId]);
+  const here = React.useMemo(
+    () =>
+      rows
+        .filter((r) => r.channelName === rawChannel)
+        .sort((a, b) => (contextPercent(b) ?? -1) - (contextPercent(a) ?? -1)),
+    [rows, rawChannel]
+  );
+  const fullest: AgentContext | undefined = here[0];
+  const pct = fullest ? contextPercent(fullest) : null;
 
-  React.useEffect(() => {
-    fetchStats();
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.hidden) return;
-      fetchStats();
-    }, 30_000);
-    const onVisibilityChange = () => {
-      if (typeof document !== 'undefined' && !document.hidden) {
-        fetchStats();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [fetchStats]);
-
-  const channelHealth = React.useMemo<ChannelContextHealth | null>(() => {
-    if (!stats?.channels) return null;
-    return stats.channels.find((c) => c.channel_name === rawChannel) || null;
-  }, [stats, rawChannel]);
-
-  const triggerCompact = async () => {
-    if (!workspaceId || compacting) return;
-    try {
-      setCompacting(true);
-      setLastCompactedResult(null);
-      const res = await workspaceApi.request<{
-        tokens_before?: number;
-        tokens_after?: number;
-        saved_tokens?: number;
-        compacted_count?: number;
-      }>(`/v1/workspaces/${workspaceId}/channels/${encodeURIComponent(rawChannel)}/compact`, {
-        method: 'POST',
-      });
-      // Reports WHAT HAPPENED, not what was "saved". The compaction endpoint
-      // still returns saved_tokens; the count of messages folded into the
-      // summary is the fact the user can check, and it is the one that tells
-      // them whether the action did anything at all.
-      if (res?.compacted_count) {
-        setLastCompactedResult(
-          `Compacted ${res.compacted_count} message${res.compacted_count === 1 ? '' : 's'} into a summary`
-        );
-      } else {
-        setLastCompactedResult('Nothing to compact yet');
-      }
-      await fetchStats();
-    } catch (e: any) {
-      setLastCompactedResult(e?.message || 'Compaction failed');
-    } finally {
-      setCompacting(false);
-    }
-  };
-
-  /*
-    NO INVENTED FALLBACKS IN HERE.
-
-    `min_context_window || 64000` substituted a made-up window whenever the
-    backend reported that it did not know one -- so a channel whose agents had
-    never declared their capacity still showed a confident percentage, computed
-    against a number the frontend picked. That is the same failure the backend
-    had (its model table answered every unknown agent with 128k), and fixing it
-    on one side only moves the fiction across the wire.
-
-    Missing data now renders as 'unknown', which the badge has a real
-    presentation for.
-  */
-  const minWindow = channelHealth?.min_context_window ?? 0;
-  const knownWindow = minWindow > 0;
-  const budgetPct = knownWindow
-    ? Math.min(Math.round(channelHealth?.token_budget_percent || 0), 100)
-    : 0;
-  const estTokens = channelHealth?.context_tokens || 0;
-  const measured = channelHealth?.measured ?? false;
-
-  /*
-    AMBER MEANS "THIS IS ABOUT TO OVERFLOW". NOTHING ELSE.
-
-    The badge used to render `channelHealth.health_status` straight from the
-    backend, whose thresholds are tuned to its own 25% compaction safety
-    margin — so a thread holding 6.1k of a 64k window, ten percent full, came
-    up amber and labelled "Warning". It was not warning about capacity. It was
-    reporting the fact that a threshold had been configured at all, mostly
-    because a low-window agent was in the channel.
-
-    That is the expensive kind of wrong. A warning colour that fires at 10%
-    teaches exactly one lesson — the yellow dot means nothing, ignore it — and
-    the user who has learnt it will also ignore the one at 90%. A status colour
-    is a promise about what happens next; spending it on a configuration fact
-    leaves nothing to spend on the actual risk.
-
-    So the colour is derived here, from the one number it claims to be about,
-    and the bottleneck-agent fact is presented as a fact (see the popover) with
-    no colour attached to it.
-  */
-  const status: 'unknown' | 'calm' | 'warning' | 'critical' = !knownWindow
-    ? 'unknown'
-    : budgetPct >= 85
-    ? 'critical'
-    : budgetPct >= 60
-    ? 'warning'
-    : 'calm';
-
-  /** Below this the pill shows no number and no colour — see the chip. */
-  const isCalm = status === 'calm';
-
-  const statusBadge = {
-    /*
-      Healthy is not a green light, it is silence. A green dot reporting
-      "optimal" every second of every session is a claim on attention that
-      never pays it back; the chip below renders this state with no number and
-      no colour at all.
-    */
-    calm: {
-      dotClass: 'bg-foreground-extra-muted',
-      textClass: 'text-foreground-muted',
-      label: 'Healthy',
-      pillClass: 'border-border/60 hover:border-border text-foreground-muted',
-    },
-    warning: {
-      dotClass: 'bg-status-warning',
-      textClass: 'text-status-warning',
-      label: 'Warning',
-      pillClass: 'border-status-warning/40 bg-status-muted-warning text-status-warning',
-    },
-    critical: {
-      dotClass: 'bg-status-danger',
-      textClass: 'text-status-danger',
-      label: 'Critical',
-      pillClass: 'border-status-danger/40 bg-status-muted-danger text-status-danger',
-    },
-    /*
-      UNKNOWN IS UNCOLOURED, and that is the point.
-
-      No participant has reported a context window, so there is no percentage
-      to be optimal or critical about. Giving it green would claim health we
-      cannot see; giving it amber would claim a problem that may not exist.
-      The neutral treatment says exactly what is true -- we do not know yet --
-      and it is the state a fresh channel legitimately sits in until its first
-      turn reports a prompt size.
-    */
-    unknown: {
-      dotClass: 'bg-foreground-extra-muted',
-      textClass: 'text-foreground-muted',
-      label: 'Unknown',
-      pillClass: 'border-border/60 text-foreground-muted',
-    },
-  }[status];
+  const hint = !fullest
+    ? 'No agent has reported its context here yet'
+    : pct === null
+      ? `${fullest.agentName}: ${fmtTokens(fullest.promptTokens)} tokens, window unknown`
+      : `${fullest.agentName}: ${fmtTokens(fullest.promptTokens)} of ${fmtTokens(fullest.contextWindow)} (${pct}%)` +
+        (here.length > 1 ? ` · fullest of ${here.length}` : '');
 
   return (
     <Popover
-      open={isOpen}
-      onOpenChange={(open) => {
-        setIsOpen(open);
-        if (open) fetchStats();
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) void refresh();
       }}
     >
       <PopoverTrigger asChild>
-        {/*
-          The hover text always carries the real numbers, which is what makes
-          it safe for the chip itself to stop printing them.
-        */}
-        <Hint
-          label={
-            knownWindow
-              ? `Context: ${fmtTokens(estTokens)} of ${fmtTokens(minWindow)} used (${budgetPct}%)`
-              : 'Context window not reported by any participant yet'
-          }
-        >
-          {variant === 'composer' ? (
-            <button
-              type="button"
-              aria-label="Context used"
-              className={cn(
-                'inline-flex size-6 shrink-0 items-center justify-center rounded-full',
-                'text-foreground-extra-muted hover:text-foreground transition-colors',
-                className
-              )}
-            >
-              {/*
-                A ring that fills as the window does. Grey until it matters —
-                the status colour is spent only once the budget is actually
-                tight, which is the same rule the header chip already followed
-                for its numbers.
-              */}
-              <svg viewBox="0 0 20 20" className="size-4 -rotate-90" aria-hidden>
-                <circle cx="10" cy="10" r="7" fill="none" strokeWidth="2.5" className="stroke-border" />
-                {knownWindow && budgetPct > 0 && (
-                  <circle
-                    cx="10"
-                    cy="10"
-                    r="7"
-                    fill="none"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeDasharray={`${(Math.min(budgetPct, 100) / 100) * 43.98} 43.98`}
-                    className={cn(
-                      'transition-all duration-500',
-                      status === 'critical'
-                        ? 'stroke-status-danger'
-                        : status === 'warning'
-                          ? 'stroke-status-warning'
-                          : 'stroke-foreground-muted'
-                    )}
-                  />
-                )}
-              </svg>
-            </button>
-          ) : (
+        <Hint label={hint}>
           <button
             type="button"
+            aria-label="Agent context usage"
             className={cn(
-              headerChipClass,
-              'bg-surface2/80 hover:bg-surface3/90 shadow-xs',
-              statusBadge.pillClass,
+              'inline-flex size-6 shrink-0 items-center justify-center rounded-full',
+              'text-foreground-extra-muted hover:text-foreground transition-colors',
               className
             )}
           >
-            <span className="relative flex size-2 shrink-0 items-center justify-center">
-              <span className={cn('relative inline-flex size-1.5 rounded-full', statusBadge.dotClass)} />
-            </span>
-            {/* "Ctx" is an abbreviation of a term the reader may not have met.
-                The chip is small, but the word fits and now says what it is. */}
-            <span className="text-foreground-muted font-normal">Context</span>
-            {/*
-              ONE NUMBER PAIR, AND ONLY WHEN IT MATTERS.
-
-              This used to print `6.1k · 10%` permanently. Two problems at once:
-              a percentage of a window nobody had looked up, and a reading that
-              spent header space to say nothing was happening. Below 60% the
-              chip is a label and a grey dot — still clickable, still the door
-              to compaction — and the numbers live in the hover text and the
-              panel.
-
-              Above it, the two numbers that actually answer the question are
-              used over available, together. `48k / 64k` is a sentence; `48k`
-              beside `75%` is two facts the reader has to multiply.
-
-              The `animate-ping` that used to fire at critical is gone. A
-              pulsing dot in a chat header is a smoke alarm for a condition the
-              user resolves with one click, and it kept pulsing until they did.
-            */}
-            {!isCalm && knownWindow && (
-              <>
-                <span className={cn('font-mono font-semibold tabular-nums', statusBadge.textClass)}>
-                  {fmtTokens(estTokens)}
-                </span>
-                <span className="text-foreground-extra-muted">/</span>
-                <span className="font-mono font-medium tabular-nums text-foreground-muted">
-                  {fmtTokens(minWindow)}
-                </span>
-              </>
-            )}
+            <ContextRing pct={pct} />
           </button>
-          )}
         </Hint>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80 p-4 space-y-3.5 shadow-xl border-border bg-surface1/95 backdrop-blur-xl rounded-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-2 border-b border-border/60">
-          <div className="flex items-center gap-2">
-            <div className="size-7 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center text-foreground">
-              <Layers className="size-3.5" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                #{rawChannel}
-                <span className={cn('text-3xs font-medium px-1.5 py-0.5 rounded-full border', statusBadge.pillClass)}>
-                  {statusBadge.label}
-                </span>
-              </div>
-              <p className="text-3xs text-foreground-muted">Context window health & governance</p>
-            </div>
-          </div>
-          <Hint label="Refresh metrics">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                fetchStats();
-              }}
-              disabled={loading}
-              className="p-1 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} />
-            </button>
-          </Hint>
+      <PopoverContent align="end" className="w-80 p-3 space-y-2.5 rounded-xl">
+        <div>
+          <div className="text-xs font-semibold text-foreground">Context by agent</div>
+          <p className="text-3xs text-foreground-muted leading-snug mt-0.5">
+            Each agent keeps its own context in this thread and compacts it itself. Figures are
+            what each agent measured on its last turn here.
+          </p>
         </div>
 
-        {/*
-          THE MOST USEFUL SENTENCE ON THIS PANEL, FIRST.
-
-          In a multi-agent thread the weakest participant's context window caps
-          the whole channel — a 1M-window model in a room with a 64k one is a
-          64k room. Nobody can infer that, no other surface says it, and it is
-          the single thing on this panel that changes what a user does next
-          (drop the agent, or compact sooner). It was the fourth block down,
-          under two boxes of numbers.
-
-          Styled as a statement, not a warning: it was wearing an amber
-          triangle, which is how a permanent configuration fact ended up
-          looking like an incident. The colour budget belongs to the capacity
-          bar below, which is the thing that can actually go wrong.
-        */}
-        {channelHealth?.has_disparity && channelHealth?.bottleneck_agent && (
-          <div className="p-2.5 rounded-lg bg-surface2/60 border border-border/60 text-3xs text-foreground-muted flex items-start gap-1.5">
-            <Info className="size-3 text-foreground-muted shrink-0 mt-0.5" />
-            <span className="leading-snug">
-              This channel is capped at <span className="font-mono font-semibold text-foreground">{fmtTokens(minWindow)}</span> by{' '}
-              <span className="font-semibold text-foreground">@{channelHealth.bottleneck_agent}</span>, the participant with the
-              smallest context window.
-            </span>
-          </div>
+        {here.length === 0 ? (
+          <p className="text-2xs text-foreground-muted py-2">
+            No agent has reported yet. Each one reports after its next turn in this channel.
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {here.map((c) => (
+              <AgentContextRow key={c.agentName} ctx={c} />
+            ))}
+          </ul>
         )}
-
-        {/* Context Capacity Gauge */}
-        <div className="space-y-2 bg-surface2/50 border border-border/60 rounded-xl p-3">
-          <div className="flex items-center justify-between text-2xs">
-            <span className="font-medium text-foreground">
-              Active Context Window
-              {/* Says which of the two numbers this is. The load is measured
-                  from the agents' own reported prompt sizes when they have
-                  reported any, and estimated from message text when they have
-                  not -- those deserve different confidence, so they say so. */}
-              {!measured && (
-                <span className="ml-1 font-normal text-foreground-extra-muted">(estimated)</span>
-              )}
-            </span>
-            <span className="font-mono tabular-nums text-foreground">
-              {fmtTokens(estTokens)} / {knownWindow ? fmtTokens(minWindow) : 'unknown'}
-            </span>
-          </div>
-
-          <div className="h-2 w-full bg-surface3 rounded-full overflow-hidden p-[1px]">
-            <div
-              className={cn(
-                'h-full rounded-full ui-transition duration-500',
-                // Same 60 / 85 boundaries as the chip. These were 25 / 50,
-                // which is why a 10%-full channel showed an amber-adjacent bar
-                // next to a badge that said Warning.
-                budgetPct >= 85 ? 'bg-status-danger' : budgetPct >= 60 ? 'bg-status-warning' : 'bg-status-success'
-              )}
-              style={{ width: `${Math.min(Math.max(budgetPct, 2), 100)}%` }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-3xs text-foreground-muted">
-            {/* Named for what it is: the point auto-compaction kicks in,
-                which is a different number from the badge thresholds and was
-                previously unlabelled enough to read as the same one. */}
-            <span>Auto-compacts at 75%</span>
-            <span>{channelHealth?.message_count || 0} messages in window</span>
-          </div>
-        </div>
-
-        {/*
-          Only once there is a history to show. A bordered card reading
-          "Compactions — 0 runs" is a box built to hold a fact that does not
-          exist yet; the button directly below it already says compaction is
-          available, so the empty card was telling the user nothing twice.
-        */}
-        {(channelHealth?.compaction_count || 0) > 0 && (
-          <div className="text-2xs">
-            <div className="p-2.5 rounded-xl bg-surface2/40 border border-border/60">
-              <div className="text-3xs text-foreground-muted mb-0.5">Compactions</div>
-              <div className="font-semibold font-mono tabular-nums text-foreground">
-                {channelHealth?.compaction_count} runs
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Compact Action */}
-        <div className="pt-1 space-y-2">
-          <button
-            type="button"
-            onClick={triggerCompact}
-            disabled={compacting}
-            className={cn(
-              'w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-medium ui-transition duration-200 shadow-xs',
-              'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed'
-            )}
-          >
-            <Sparkles className={cn('size-3.5', compacting && 'animate-spin')} />
-            <span>{compacting ? 'Compacting Channel…' : 'Compact Context Now'}</span>
-          </button>
-
-          {lastCompactedResult && (
-            <p className="text-center text-3xs text-foreground-muted font-mono truncate">
-              {lastCompactedResult}
-            </p>
-          )}
-
-          {/* "Open Token Governance Dashboard" removed — that Studio tab
-              renders nothing, so the link opened an empty panel. */}
-        </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function AgentContextRow({ ctx }: { ctx: AgentContext }) {
+  const pct = contextPercent(ctx);
+  const level = contextLevel(pct);
+  return (
+    <li className="flex items-center gap-2 rounded-lg px-1.5 py-1.5 hover:bg-surface2/60">
+      <AgentAvatar name={ctx.agentName} size={20} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="max-w-[65%] shrink-0 truncate text-xs font-medium text-foreground">{ctx.agentName}</span>
+          {ctx.model && (
+            <span className="min-w-0 truncate text-3xs font-mono text-foreground-extra-muted">{ctx.model}</span>
+          )}
+        </div>
+        <div className="text-3xs text-foreground-muted truncate">
+          {ctx.compactedAt ? `Compacted ${timeAgo(ctx.compactedAt)}` : `Updated ${timeAgo(ctx.updatedAt)}`}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div
+          className={cn(
+            'font-mono tabular-nums text-2xs',
+            level === 'critical'
+              ? 'text-status-danger'
+              : level === 'warning'
+                ? 'text-status-warning'
+                : 'text-foreground'
+          )}
+        >
+          {fmtTokens(ctx.promptTokens)}
+          <span className="text-foreground-extra-muted"> / </span>
+          {ctx.contextWindow ? (
+            <Hint
+              label={
+                ctx.windowSource === 'reported'
+                  ? 'Window reported by the agent'
+                  : 'Window looked up from the model name'
+              }
+            >
+              <span className={cn(ctx.windowSource !== 'reported' && 'underline decoration-dotted underline-offset-2')}>
+                {fmtTokens(ctx.contextWindow)}
+              </span>
+            </Hint>
+          ) : (
+            <span className="text-foreground-extra-muted">?</span>
+          )}
+        </div>
+        {pct !== null && <div className="text-3xs text-foreground-extra-muted tabular-nums">{pct}%</div>}
+      </div>
+      <ContextRing pct={pct} size={18} />
+    </li>
   );
 }

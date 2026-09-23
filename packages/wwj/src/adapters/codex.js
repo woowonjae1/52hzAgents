@@ -322,6 +322,56 @@ class CodexAdapter extends BaseAdapter {
     } catch {}
   }
 
+  /**
+   * Report this channel's context from Codex's own rollout file.
+   *
+   * `exec --json`'s `turn.completed` usage sums every call in the turn, so it
+   * overstates the context by the number of tool calls. The rollout Codex
+   * writes for the thread records `last_token_usage` (the last call) and
+   * `model_context_window` on every `token_count` event -- the CLI's own
+   * measurement. No rollout, or no token_count in it: nothing is reported.
+   */
+  _reportCodexContext(msgChannel) {
+    try {
+      const threadId = this._channelThreads[msgChannel];
+      if (!threadId) return;
+      const file = this._findCodexRollout(threadId);
+      if (!file) return;
+      const size = fs.statSync(file).size;
+      const len = Math.min(size, 256 * 1024);
+      const buf = Buffer.alloc(len);
+      const fd = fs.openSync(file, 'r');
+      try { fs.readSync(fd, buf, 0, len, size - len); } finally { fs.closeSync(fd); }
+      const ctx = parseCodexRolloutTail(buf.toString('utf-8'));
+      if (ctx) this.reportContext(msgChannel, ctx);
+    } catch {}
+  }
+
+  /** `<CODEX_HOME>/sessions/YYYY/MM/DD/rollout-<ts>-<threadId>.jsonl`, newest day first. */
+  _findCodexRollout(threadId) {
+    if (!this._rolloutPaths) this._rolloutPaths = {};
+    const cached = this._rolloutPaths[threadId];
+    if (cached && fs.existsSync(cached)) return cached;
+    const root = path.join(this._codexHome(), 'sessions');
+    const desc = (dir) => {
+      try { return fs.readdirSync(dir).sort().reverse(); } catch { return []; }
+    };
+    const suffix = `${threadId}.jsonl`;
+    for (const y of desc(root)) {
+      for (const m of desc(path.join(root, y))) {
+        for (const d of desc(path.join(root, y, m))) {
+          const dayDir = path.join(root, y, m, d);
+          const hit = desc(dayDir).find((f) => f.startsWith('rollout-') && f.endsWith(suffix));
+          if (hit) {
+            this._rolloutPaths[threadId] = path.join(dayDir, hit);
+            return this._rolloutPaths[threadId];
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   /** Codex's own config directory — CODEX_HOME when set, else ~/.codex. */
   _codexHome() {
     const env = this.agentEnv || process.env;
@@ -818,6 +868,7 @@ class CodexAdapter extends BaseAdapter {
         }
 
         delete this._channelProcesses[msgChannel];
+        this._reportCodexContext(msgChannel);
 
         if (code !== 0) {
           this._log(`Codex CLI exited with code ${code}`);
@@ -952,4 +1003,41 @@ class CodexAdapter extends BaseAdapter {
   }
 }
 
+
+/**
+ * Pull the latest context measurement out of the tail of a Codex rollout.
+ * Context = input_tokens of the last call (Codex's input_tokens already
+ * includes the cached part). Exported for tests.
+ */
+function parseCodexRolloutTail(text) {
+  let usage = null;
+  let window = 0;
+  let model = '';
+  let compacted = false;
+  for (const line of String(text || '').split('\n')) {
+    if (!line.includes('"token_count"') && !line.includes('"turn_context"') && !line.includes('"compacted"')) continue;
+    let ev;
+    try { ev = JSON.parse(line); } catch { continue; }
+    const p = ev && ev.payload;
+    if (!p) continue;
+    if (ev.type === 'turn_context' && p.model) {
+      model = p.model;
+      compacted = false;
+    } else if (ev.type === 'compacted') {
+      compacted = true;
+    } else if (p.type === 'token_count' && p.info) {
+      if (p.info.last_token_usage) usage = p.info.last_token_usage;
+      if (p.info.model_context_window > 0) window = p.info.model_context_window;
+    }
+  }
+  if (!usage && !window) return null;
+  return {
+    promptTokens: usage ? (usage.input_tokens || 0) : 0,
+    contextWindow: window,
+    model: model || undefined,
+    compacted,
+  };
+}
+
 module.exports = CodexAdapter;
+module.exports.parseCodexRolloutTail = parseCodexRolloutTail;

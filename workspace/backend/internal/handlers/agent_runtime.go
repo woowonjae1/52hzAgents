@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/tokens"
 )
 
 type AgentRuntimeRequest struct {
@@ -183,7 +183,7 @@ func ReportAgentUsage(c *gin.Context) {
 	if req.ContextWindowSize != nil && *req.ContextWindowSize > 0 {
 		record.ContextWindowSize = *req.ContextWindowSize
 	} else if record.ContextWindowSize == 0 && req.CurrentModel != nil && *req.CurrentModel != "" {
-		record.ContextWindowSize = compaction.ModelContextWindow(*req.CurrentModel)
+		record.ContextWindowSize = tokens.ModelContextWindow(*req.CurrentModel)
 	}
 
 	var err error

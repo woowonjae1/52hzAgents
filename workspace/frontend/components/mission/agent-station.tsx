@@ -18,6 +18,8 @@ import {
 import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
+import { ContextRing } from '@/components/chat/context-ring';
+import { useAgentContexts, contextPercent, contextLevel, fmtTokens as fmtCtx } from '@/lib/use-agent-contexts';
 
 export type StationStatus = 'working' | 'ready' | 'offline' | 'blocked' | 'stalled';
 
@@ -91,6 +93,22 @@ export function AgentStation({
   const activeThread = threads[0];
   const [busy, setBusy] = React.useState(false);
 
+  /*
+    The agent's own context, per channel, newest first -- what its CLI measured
+    on its last turn in each. The card shows the most recent one: that is the
+    session the agent is in (or just left), and so the one a reader can act on.
+    Other channels are in the hover.
+  */
+  const { rows: contextRows } = useAgentContexts();
+  const myContexts = React.useMemo(
+    () => contextRows.filter((r) => r.agentName === agent.agentName),
+    [contextRows, agent.agentName]
+  );
+  const channelTitle = React.useCallback(
+    (name: string) => threads.find((t) => t.sessionId === name)?.title || name,
+    [threads]
+  );
+
   // Heartbeat timeout calculation
   const heartbeatDiffSec = React.useMemo(() => {
     if (!lastHeartbeatAt) return null;
@@ -100,6 +118,16 @@ export function AgentStation({
   }, [lastHeartbeatAt]);
 
   const isHeartbeatTimeout = heartbeatDiffSec !== null && heartbeatDiffSec > 30;
+  /*
+    AMBER IS FOR A LOSS WORTH NOTICING, NOT FOR EVERY OFFLINE AGENT.
+
+    Every card went amber -- badge and Reconnect button -- for an agent last
+    seen three weeks ago, eight times over, under a banner that already said
+    "all offline". A heartbeat that stopped in the last ten minutes is news
+    (a crash, a sleep); one that stopped weeks ago is just an agent that is
+    not running, and reads as plain grey Offline.
+  */
+  const isRecentHeartbeatLoss = isHeartbeatTimeout && heartbeatDiffSec! <= 10 * 60;
 
   // Single Source of Truth for Status Badge
   const statusBadge = React.useMemo(() => {
@@ -122,12 +150,19 @@ export function AgentStation({
     }
     if (isHeartbeatTimeout) {
       const hbTime = typeof lastHeartbeatAt === 'string' ? lastHeartbeatAt : new Date(lastHeartbeatAt!).toISOString();
-      return {
-        label: `Heartbeat lost · ${timeAgo(hbTime)}`,
-        dot: 'bg-status-warning',
-        ring: 'ring-status-warning/25',
-        badge: 'bg-status-warning/10 text-status-warning font-medium',
-      };
+      return isRecentHeartbeatLoss
+        ? {
+            label: `Heartbeat lost · ${timeAgo(hbTime)}`,
+            dot: 'bg-status-warning',
+            ring: 'ring-status-warning/25',
+            badge: 'bg-status-warning/10 text-status-warning font-medium',
+          }
+        : {
+            label: `Offline · ${timeAgo(hbTime)}`,
+            dot: 'bg-muted-foreground/50',
+            ring: 'ring-muted-foreground/10',
+            badge: 'bg-surface2/80 text-muted-foreground font-medium',
+          };
     }
     if (isWorking) {
       return {
@@ -159,7 +194,7 @@ export function AgentStation({
       ring: 'ring-muted-foreground/10',
       badge: 'bg-surface2/80 text-muted-foreground font-medium',
     };
-  }, [isBlocked, isStalled, isHeartbeatTimeout, isWorking, status, isCatalogPlaceholder, stalledMs, lastHeartbeatAt]);
+  }, [isBlocked, isStalled, isHeartbeatTimeout, isRecentHeartbeatLoss, isWorking, status, isCatalogPlaceholder, stalledMs, lastHeartbeatAt]);
 
   const handleApprove = async () => {
     if (!pendingApproval || !activeThread) return;
@@ -238,7 +273,7 @@ export function AgentStation({
         'border border-border/60 hover:border-border/60 hover:shadow-xs',
         isBlocked && 'ring-2 ring-status-warning/20 bg-status-warning/[0.02]',
         isStalled && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
-        isHeartbeatTimeout && 'border-status-warning/30',
+        isRecentHeartbeatLoss && 'border-status-warning/30',
         status === 'offline' && !isCatalogPlaceholder && 'opacity-85',
         isCatalogPlaceholder && 'bg-surface1/30',
         className
@@ -385,6 +420,10 @@ export function AgentStation({
             </div>
           )}
 
+          {myContexts.length > 0 && (
+            <AgentContextLine contexts={myContexts} channelTitle={channelTitle} />
+          )}
+
           <div className="flex items-center gap-1 text-2xs text-muted-foreground px-1 truncate">
             {isWorking ? (
               <span className="inline-flex items-center gap-1 font-medium truncate event-running">
@@ -406,7 +445,7 @@ export function AgentStation({
               </button>
             ) : (
               <span className="text-muted-foreground/60 italic text-3xs">
-                {isHeartbeatTimeout ? 'Heartbeat lost' : status === 'offline' ? 'Process not running' : 'Standing by'}
+                {isRecentHeartbeatLoss ? 'Heartbeat lost' : isHeartbeatTimeout || status === 'offline' ? 'Process not running' : 'Standing by'}
               </span>
             )}
           </div>
@@ -456,7 +495,7 @@ export function AgentStation({
           }}
           className={cn(
             'flex-1 inline-flex items-center justify-center gap-1 h-7 rounded-lg text-xs font-medium ui-transition',
-            isHeartbeatTimeout
+            isRecentHeartbeatLoss
               ? 'bg-status-warning/15 text-status-warning hover:bg-status-warning/25 font-semibold'
                 : 'bg-surface2/80 hover:bg-surface3 text-foreground'
           )}
@@ -478,5 +517,62 @@ export function AgentStation({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * One line: a ring for the agent's latest context, the two numbers that answer
+ * "how full" (used / window), and which channel it is. No line at all until
+ * the agent has reported -- an empty ring on every fresh card is a claim of 0%.
+ */
+function AgentContextLine({
+  contexts,
+  channelTitle,
+}: {
+  contexts: import('@/lib/types').AgentContext[];
+  channelTitle: (name: string) => string;
+}) {
+  const latest = contexts[0];
+  const pct = contextPercent(latest);
+  const level = contextLevel(pct);
+  const hint = (
+    <span className="block space-y-0.5">
+      <span className="block font-medium">Context by channel</span>
+      {contexts.slice(0, 6).map((c) => {
+        const p = contextPercent(c);
+        return (
+          <span key={c.channelName} className="flex justify-between gap-3 font-mono tabular-nums">
+            <span className="truncate">#{channelTitle(c.channelName)}</span>
+            <span>
+              {fmtCtx(c.promptTokens)} / {c.contextWindow ? fmtCtx(c.contextWindow) : '?'}
+              {p !== null ? ` · ${p}%` : ''}
+            </span>
+          </span>
+        );
+      })}
+      {latest.contextWindow > 0 && latest.windowSource !== 'reported' && (
+        <span className="block text-foreground-muted">Window looked up from the model name.</span>
+      )}
+    </span>
+  );
+  return (
+    <Hint label={hint}>
+      <div className="flex items-center gap-1.5 px-1 text-3xs text-muted-foreground min-w-0">
+        <ContextRing pct={pct} size={14} />
+        <span
+          className={cn(
+            'font-mono tabular-nums shrink-0',
+            level === 'critical' ? 'text-status-danger' : level === 'warning' ? 'text-status-warning' : 'text-foreground'
+          )}
+        >
+          {fmtCtx(latest.promptTokens)}
+          <span className="text-muted-foreground"> / {latest.contextWindow ? fmtCtx(latest.contextWindow) : '?'}</span>
+        </span>
+        <span className="truncate">in #{channelTitle(latest.channelName)}</span>
+        {contexts.length > 1 && (
+          <span className="shrink-0 text-muted-foreground/70">+{contexts.length - 1}</span>
+        )}
+      </div>
+    </Hint>
   );
 }

@@ -9,7 +9,7 @@ import { toast } from '@/lib/toast';
 import { PanelLeft, Pencil, RefreshCw, Search, Star, Archive, Trash2, MoreVertical, ArchiveRestore, Wrench, Loader2, CheckCircle2, MessageCircle, MessageSquare, Plus, Folder, FolderPlus, FolderOpen, FolderMinus, MessageSquarePlus, Command, History as HistoryIcon, CalendarClock, BookOpen, Sparkles, X, ListFilter } from 'lucide-react';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
-import { useWorkspace, type LastMessageInfo } from '@/lib/workspace-context';
+import { useWorkspace, isUnusedSession, type LastMessageInfo } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { timeAgo, formatRowTime, formatCompactRelativeTime } from '@/lib/helpers';
 import { AgentAvatar, AgentAvatarStack, type AgentStackItem } from '@/components/agents/agent-avatar';
@@ -868,8 +868,10 @@ export function ThreadList() {
   const sortedSessions = useMemo(() => {
     return [...sessions]
       .filter((s) => s.status !== 'deleted' && (!s.sessionId.startsWith('routine:') || s.sessionId === currentSessionId))
+      // Same rule as the desktop sidebar: never-used threads stay hidden unless open.
+      .filter((s) => s.sessionId === currentSessionId || !isUnusedSession(s, lastMessageBySession))
       .sort((a, b) => getSessionTime(b) - getSessionTime(a));
-  }, [sessions, currentSessionId, getSessionTime]);
+  }, [sessions, currentSessionId, getSessionTime, lastMessageBySession]);
 
   const activeSessions = sortedSessions.filter((s) => s.status === 'active');
   const archivedSessions = sortedSessions.filter((s) => s.status === 'archived');

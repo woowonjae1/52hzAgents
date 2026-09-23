@@ -28,7 +28,6 @@ const IS_WINDOWS = process.platform === 'win32';
 const HERMES_INSTALL_HINT = IS_WINDOWS
   ? 'powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.ps1 | iex"'
   : 'curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash';
-const MAX_HISTORY_ENTRIES = 12;
 
 class HermesAdapter extends BaseAdapter {
   /**
@@ -185,28 +184,13 @@ class HermesAdapter extends BaseAdapter {
     }
   }
 
+  // Was pollMessages({...}) -- one object where the client takes positional
+  // arguments, so the request always failed and this always returned ''.
   async _getRecentHistoryText(channelName) {
-    try {
-      const messages = await this.client.pollMessages({
-        workspaceId: this.workspaceId,
-        channelName,
-        token: this.token,
-        limit: MAX_HISTORY_ENTRIES,
-      });
-      if (!Array.isArray(messages) || messages.length === 0) return '';
-      const lines = messages
-        .filter((m) => m.messageType !== 'status')
-        .map((m) => {
-          const sender = m.senderName || m.senderType || 'unknown';
-          const content = (m.content || '').trim();
-          if (!content) return null;
-          return `- ${sender}: ${content.slice(0, 400)}`;
-        })
-        .filter(Boolean);
-      return lines.length ? `## Recent Workspace Messages\n${lines.join('\n')}` : '';
-    } catch {
-      return '';
-    }
+    return (await this._buildChannelContext(channelName, {
+      full: true,
+      fullIntro: '## Recent Workspace Messages',
+    })) || '';
   }
 
   async _buildContextPrefix(channelName) {

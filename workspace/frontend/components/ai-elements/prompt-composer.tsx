@@ -922,7 +922,6 @@ export function PromptComposer({
                 session={session}
                 agents={agents}
                 onChange={onOrchestrationChange}
-                variant="composer"
               />
             )}
 
@@ -931,31 +930,18 @@ export function PromptComposer({
 
               This row mixes state and actions with one flat gap: the model and
               the mode REPORT how the next message will be handled, while
-              mention, schedule and attach PERFORM something. The thread header
+              schedule and attach PERFORM something. The thread header
               already solved exactly this — see its "row of assorted widgets"
               note — with a hairline, so the same divider is reused here rather
               than a second convention being invented for the same idea.
             */}
             <span className="h-3.5 w-px bg-border shrink-0 mx-0.5" aria-hidden />
 
-            <Hint label="Mention an agent (@)">
-              <button
-                type="button"
-                onClick={() => {
-                  setMentionTrigger('@');
-                  setShowMentions((prev) => !prev);
-                  textareaRef.current?.focus();
-                }}
-                className={cn(
-                  pillButton,
-                  showMentions && 'bg-surface3 text-foreground font-medium border border-border'
-                )}
-              >
-                <AtSign className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                <span className="hidden sm:inline">Agent</span>
-              </button>
-            </Hint>
-
+            {/*
+              No "@ Agent" button. Typing `@` opens the same picker, and the
+              placeholder says so; the button was a second door to it that
+              spent the widest pill in the row on a keystroke.
+            */}
             {onCreateRoutine && (
               <Hint label="Create a scheduled task">
                 <button
@@ -1018,7 +1004,7 @@ export function PromptComposer({
               explain what it is about, which is what the header version had to
               spend a word on.
             */}
-            {session && <ContextHealthIndicator channelName={session.sessionId} variant="composer" />}
+            {session && <ContextHealthIndicator channelName={session.sessionId} />}
 
             {/*
               `Magnetic` WRAPS the hint, and the hint still wraps the button.

@@ -29,7 +29,6 @@ const IS_WINDOWS = process.platform === 'win32';
 const FILE_WRITING_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
 
 // Max transcript lines in a channel-context prefix.
-const RECAP_TAIL_LINES = 20;
 
 // The env keys Claude Code uses to pin which model runs. Read from
 // ~/.claude/settings.json's `env` block; nothing else in that block is touched
@@ -66,11 +65,6 @@ class ClaudeAdapter extends BaseAdapter {
     /** @type {'mcp' | 'skills'} Tool integration mode */
     this.toolMode = opts.toolMode || 'skills';
     this._channelSessions = {}; // channel → Claude CLI session_id
-    // channel → messageId of the last channel message already accounted for in
-    // the CLI session. Anything newer is pushed in as a context prefix on the
-    // next turn. In-memory only: after a restart the session may resume but we
-    // no longer know what it saw, so the first turn falls back to a full recap.
-    this._recapCursor = {};
     this._channelProcesses = {}; // channel → child process
     this._stoppingChannels = new Set();
     // Channels that have already announced "Execution stopped by user." for the
@@ -953,109 +947,6 @@ class ClaudeAdapter extends BaseAdapter {
   }
 
   /**
-   * Build the channel-context prefix for one turn.
-   *
-   * We are only *delivered* messages that @mention us (see BaseAdapter's
-   * addressing filter), so everything else said in the channel — including
-   * whole analyses posted by sibling agents — never reaches the CLI session.
-   * A message like "@claude 你对以上分析怎么看" then resolves "以上" against
-   * our own last turn instead of the message it actually points at. Pushing
-   * the gap in is the only fix: the agent cannot know it is missing context,
-   * so `workspace_get_history` (a pull) is never called.
-   *
-   * Two shapes, both keyed off `_recapCursor`:
-   * - `full` (fresh CLI, or the cursor fell out of the fetch window): the
-   *   old behaviour — a tail recap of the recent conversation, own messages
-   *   included, since the new session has no history at all.
-   * - incremental (a live/resumed session): only what was posted after the
-   *   cursor, minus our own posts. Normally one to three lines.
-   *
-   * The cursor advances on every call, injected or not, so nothing replays.
-   * Returns null when there is nothing worth adding.
-   */
-  async _buildChannelContext(channelName, opts = {}) {
-    const {
-      currentMessage = '',
-      currentMessageId = null,
-      full = false,
-    } = opts;
-
-    const messages = await this.client.getRecentMessages(
-      this.workspaceId, channelName, this.token, 60
-    );
-    if (!messages || messages.length === 0) return null;
-
-    const cursor = full ? null : this._recapCursor[channelName];
-
-    let startIdx = 0;
-    let incremental = false;
-    if (cursor) {
-      const idx = messages.findIndex((m) => m.messageId === cursor);
-      if (idx === -1) {
-        // Cursor aged out of the window — fall back to a tail recap rather
-        // than replaying all 60 messages.
-        startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
-      } else {
-        startIdx = idx + 1;
-        incremental = true;
-      }
-    } else {
-      startIdx = Math.max(0, messages.length - RECAP_TAIL_LINES);
-    }
-
-    // Advance the cursor before any early return: these messages are now
-    // accounted for whether or not they made it into the prefix.
-    const ids = new Set();
-    for (const m of messages) if (m.messageId) ids.add(m.messageId);
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].messageId) { this._recapCursor[channelName] = messages[i].messageId; break; }
-    }
-    // The message we are handling may not have propagated to the events API
-    // yet; pin the cursor to it so the next turn doesn't echo it back at us.
-    if (currentMessageId && !ids.has(currentMessageId)) {
-      this._recapCursor[channelName] = currentMessageId;
-    }
-
-    const lines = [];
-    for (let i = startIdx; i < messages.length; i++) {
-      const m = messages[i];
-      const mt = m.messageType || 'chat';
-      if (mt === 'status' || mt === 'thinking' || mt === 'loading') continue;
-      const text = (m.content || '').trim();
-      if (!text) continue;
-      // Exclude the message being handled — the caller appends it below.
-      if (currentMessageId ? m.messageId === currentMessageId : text === currentMessage) continue;
-      // Our own posts are already in a live session's history.
-      if (incremental && m.senderType !== 'human' && m.senderName === this.agentName) continue;
-      const who = m.senderType === 'human'
-        ? (m.senderName || 'user')
-        : (m.senderName || 'agent');
-      const truncated = text.length > 2000 ? text.slice(0, 2000) + '...' : text;
-      lines.push(`[${who}] ${truncated}`);
-    }
-    if (lines.length === 0) return null;
-
-    const tail = lines.slice(-RECAP_TAIL_LINES).join('\n');
-    if (!incremental) {
-      return (
-        'You previously worked in this channel but your prior session is no ' +
-        'longer available, so here is the recent conversation for context:\n\n' +
-        tail
-      );
-    }
-    return (
-      '## Channel context you have not seen\n' +
-      'Posted in this channel after your last turn. These were not delivered ' +
-      'to you (only messages that @mention you are), so they are NOT in your ' +
-      'conversation history:\n\n' +
-      tail + '\n\n' +
-      'The message below is the one addressed to you. If it refers to "the ' +
-      'above", "that analysis", "the previous message" or anything similar, ' +
-      'it means the channel messages above — not your own earlier work.'
-    );
-  }
-
-  /**
    * Post "Execution stopped by user." at most once per channel for a given
    * stop. The control-action handler and the in-flight message handler both
    * race to announce a stop; without this guard the user sees it twice. The
@@ -1607,6 +1498,13 @@ class ClaudeAdapter extends BaseAdapter {
 
       if (eventType === 'assistant') {
         pp.awaitingToolResult = false;
+        // The last main-thread call's usage IS the context size. Sub-agent
+        // (Task) calls carry parent_tool_use_id and run in their own context.
+        // `<synthetic>` is the CLI's stand-in for a failed request (all zeros).
+        if (!event.parent_tool_use_id && event.message && event.message.usage && event.message.model !== '<synthetic>') {
+          pp.lastUsage = event.message.usage;
+          if (event.message.model) pp.lastModel = event.message.model;
+        }
         const blocks = (event.message || {}).content || [];
         for (const block of blocks) {
           if (block.type === 'text' && block.text && block.text.trim()) {
@@ -1690,6 +1588,7 @@ class ClaudeAdapter extends BaseAdapter {
         }
       } else if (eventType === 'result') {
         pp.awaitingToolResult = false;
+        this._reportClaudeContext(pp, event);
         const sessionId = event.session_id;
         if (sessionId) {
           this._channelSessions[pp.msgChannel] = sessionId;
@@ -1727,6 +1626,7 @@ class ClaudeAdapter extends BaseAdapter {
       } else if (eventType === 'system') {
         const subtype = event.subtype || '';
         const message = event.message || '';
+        if (subtype === 'compact_boundary') pp.compactedThisTurn = true;
         if (subtype.includes('compact') || String(message).toLowerCase().includes('compact')) {
           await this.sendStatus(pp.msgChannel, String(message) || 'Compacting conversation...');
         }
@@ -1774,6 +1674,44 @@ class ClaudeAdapter extends BaseAdapter {
     this._channelProcesses[channel] = proc;
     this._resetIdleTimer(channel);
     return pp;
+  }
+
+  /**
+   * Report this channel's context from the turn's last main-thread usage.
+   *
+   * Context = input + cache reads + cache writes of the LAST call: all three
+   * are tokens the model saw, whether or not they were billed at full rate.
+   * The result's own `usage` is NOT used -- it sums every call in the turn, so
+   * a ten-tool turn would read as ten times its real size. The window comes
+   * from `modelUsage[model].contextWindow`, which Claude Code states itself.
+   */
+  _reportClaudeContext(pp, resultEvent) {
+    try {
+      const u = pp.lastUsage;
+      const promptTokens = u
+        ? (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0)
+        : 0;
+      let contextWindow = 0;
+      const mu = resultEvent && resultEvent.modelUsage;
+      if (mu && typeof mu === 'object') {
+        const own = pp.lastModel && mu[pp.lastModel];
+        if (own && own.contextWindow > 0) {
+          contextWindow = own.contextWindow;
+        } else {
+          for (const v of Object.values(mu)) {
+            if (v && v.contextWindow > contextWindow) contextWindow = v.contextWindow;
+          }
+        }
+      }
+      this.reportContext(pp.msgChannel, {
+        promptTokens,
+        contextWindow,
+        model: pp.lastModel,
+        compacted: !!pp.compactedThisTurn,
+      });
+    } catch {}
+    pp.lastUsage = null;
+    pp.compactedThisTurn = false;
   }
 
   /**
@@ -2097,6 +2035,20 @@ class ClaudeAdapter extends BaseAdapter {
             } else {
               try { await this.sendError(msgChannel, 'No response generated. Please try again.'); } catch {}
             }
+          } else if (!(result.error && /watchdog/i.test(result.error.message || ''))) {
+            /*
+              The CLI died AFTER streaming part of the answer. That partial text
+              went out only as a reply preview, so with no final message the
+              thread sat on "thinking…" forever and nobody was told. Post what
+              was written, marked as cut off. (The watchdog path has already
+              posted its own error, so it is skipped here.)
+            */
+            const partial = pp.lastResponseText.join('\n').trim();
+            const note = 'The agent process exited before finishing this reply.';
+            try {
+              if (partial) await this.sendResponse(msgChannel, `${partial}\n\n_${note}_`);
+              else await this.sendError(msgChannel, note);
+            } catch {}
           }
           break;
         }

@@ -2,7 +2,7 @@
 
 import { Hint } from '@/components/ui/hint';
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { workspaceApi } from '@/lib/api';
 import { Terminal, Search, Cpu, TerminalSquare, RefreshCw, ArrowDownToLine, Eraser } from 'lucide-react';
@@ -266,7 +266,10 @@ export function AgentTerminal() {
         const result = await workspaceApi.executeTerminalCommand(cmd);
         const hasError = result.output.includes('[SYSTEM ERROR]');
         setLocalLines((prev) => [...prev, { time: t(), type: hasError ? 'error' : 'success', sender: 'shell', content: result.output }]);
-        await workspaceApi.sendMessage(currentSessionId, `Please run this command: ${cmd}`, currentUser.name, [], [], currentUser.id);
+        // An unsent new chat has no thread on the server to post into yet.
+        if (!isDraftSessionId(currentSessionId)) {
+          await workspaceApi.sendMessage(currentSessionId, `Please run this command: ${cmd}`, currentUser.name, [], [], currentUser.id);
+        }
       } catch {
         setLocalLines((prev) => [...prev, { time: t(), type: 'error', sender: 'shell', content: '[exec failed] could not reach workspace host shell.' }]);
         toast.error('Command transmission failed');

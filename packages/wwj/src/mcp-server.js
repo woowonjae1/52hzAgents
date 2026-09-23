@@ -607,21 +607,8 @@ class McpServer {
         const limit = args.limit || 20;
         const channel = args.channel || this.channelName;
 
-        let summaryText = '';
-        try {
-          const compData = await this.ws._get(
-            `/v1/workspaces/${this.workspaceId}/channels/${channel}/summary`,
-            this.ws._wsHeaders(this.token)
-          );
-          if (compData && compData.has_summary && compData.summary && compData.summary.summary) {
-            summaryText = `=== [HISTORICAL CONTEXT SUMMARY (Compacted Checkpoint)] ===\n${compData.summary.summary.trim()}\n========================================================\n\n`;
-          }
-        } catch {
-          // Fallback seamlessly to raw message history
-        }
-
         const messages = await this.ws.getRecentMessages(this.workspaceId, channel, this.token, limit);
-        if (!messages.length && !summaryText) return text('No messages yet.');
+        if (!messages.length) return text('No messages yet.');
         const lines = messages.map((m) => {
           const mt = m.messageType || 'chat';
           if (mt === 'status') return null;
@@ -636,8 +623,8 @@ class McpServer {
           }
           return line;
         }).filter(Boolean);
-        if (!lines.length && !summaryText) return text('No messages yet.');
-        return text(summaryText + lines.join('\n'));
+        if (!lines.length) return text('No messages yet.');
+        return text(lines.join('\n'));
       }
 
       case 'workspace_get_agents': {

@@ -702,6 +702,27 @@ class Daemon {
     }
     this._writeStatus();
     this._log(`${name} adapter stopped (state: ${info.state})`);
+
+    /*
+      SUPERVISION. A workspace adapter that exits on its own used to stay dead
+      until someone pressed Reconnect: local agents had `_spawnLoop` with
+      restart + backoff, this path had nothing. Now any exit that was not asked
+      for is restarted with backoff (5s doubling to 5 min; reset after 10 min of
+      healthy running), EXCEPT a revoked session -- that is another client
+      holding this agent name, and restarting would make the two fight.
+    */
+    const revoked = info.errorReason === 'session_revoked';
+    if (!userStopped && !revoked && !this._shuttingDown) {
+      const ranMs = info.startedAt ? Date.now() - Date.parse(info.startedAt) : 0;
+      info.restartCount = ranMs > 10 * 60 * 1000 ? 0 : (info.restartCount || 0);
+      const delay = Math.min(5000 * 2 ** info.restartCount, 5 * 60 * 1000);
+      info.restartCount++;
+      this._log(`${name} adapter will restart in ${Math.round(delay / 1000)}s (attempt ${info.restartCount})`);
+      setTimeout(() => {
+        if (this._shuttingDown || this._stoppedAgents.has(name) || this._adapters[name]) return;
+        this._adapterLoop(name, agentCfg, info, network);
+      }, delay).unref?.();
+    }
   }
 
   // NOTE: Adapter-specific message handling (openclaw, claude, codex)

@@ -328,7 +328,15 @@ func UpdatePresence(c *gin.Context) {
 	}
 	// A heartbeat must belong to the currently active join session. Accepting a
 	// new session ID here lets a stale or competing bridge take over the member.
-	if member.SessionID == nil || *member.SessionID != req.SessionID {
+	// No session on record (the agent left, or an older server cleared it on
+	// timeout) is not a takeover: the adapter should simply join again.
+	// session_revoked stays reserved for a DIFFERENT live session, which the
+	// adapter must not fight over.
+	if member.SessionID == nil || *member.SessionID == "" {
+		c.JSON(http.StatusConflict, gin.H{"error": "session_expired"})
+		return
+	}
+	if *member.SessionID != req.SessionID {
 		c.JSON(http.StatusConflict, gin.H{"error": "session_revoked"})
 		return
 	}

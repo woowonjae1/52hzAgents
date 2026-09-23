@@ -212,6 +212,10 @@ interface WorkspaceContextValue {
   setSelectedFileId: (id: string | null) => void;
   setCurrentFilePath: (path: string) => void;
   createSession: (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string }) => Promise<WorkspaceSession>;
+  /** The open, not-yet-sent new chat, if any. Never in `sessions`. See isDraftSessionId. */
+  draftSession: WorkspaceSession | null;
+  /** Create the draft on the server (first send) and return the real session id. */
+  materializeDraft: (draftId: string) => Promise<string>;
   renameSession: (sessionId: string, title: string) => Promise<void>;
   updateSession: (sessionId: string, updates: { starred?: boolean; status?: string }) => Promise<void>;
   /** Rebind a thread to another project folder; `null` returns it to Direct chats. */
@@ -326,6 +330,43 @@ interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
 
+/*
+  A thread nobody has spoken in yet.
+
+  The backend replaces the placeholder title with one derived from the first
+  message (core.go, "Auto-update default placeholder title"), so a thread still
+  carrying an empty or placeholder title, with no message on record and no
+  folder bound, has never been used. These piled up -- one per click on "New
+  chat" -- as a column of identical rows.
+*/
+const PLACEHOLDER_TITLES = new Set(['', 'new chat', '新频道', 'untitled', 'untitled channel', 'new channel']);
+export function isUnusedSession(
+  s: WorkspaceSession,
+  lastMessageBySession: Record<string, LastMessageInfo>
+): boolean {
+  return (
+    PLACEHOLDER_TITLES.has((s.title || '').trim().toLowerCase()) &&
+    !s.workingDir &&
+    !lastMessageBySession[s.sessionId]
+  );
+}
+
+/*
+  A NEW CHAT IS A DRAFT UNTIL ITS FIRST MESSAGE IS SENT.
+
+  "New chat" used to create the channel on the server at the click, so every
+  click that was never followed by a message left an empty thread behind. Now
+  createSession() opens a draft that lives only in this context -- not in
+  `sessions`, not on the server, not in the sidebar -- and carries whatever the
+  user picks before sending (agents, leader, mode, project folder). The chat
+  view calls materializeDraft() on the first send, which creates the real
+  channel with those settings, swaps the id in, and only then posts the message.
+*/
+export const DRAFT_SESSION_PREFIX = 'draft:';
+export function isDraftSessionId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith(DRAFT_SESSION_PREFIX);
+}
+
 export function useWorkspace() {
   const ctx = useContext(WorkspaceContext);
   if (!ctx) throw new Error('useWorkspace must be used within WorkspaceProvider');
@@ -359,10 +400,16 @@ export function WorkspaceProvider({
   currentUserRef.current = currentUser;
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sessions, setSessions] = useState<WorkspaceSession[]>([]);
+  const [draftSession, setDraftSession] = useState<WorkspaceSession | null>(null);
+  const draftSessionRef = useRef<WorkspaceSession | null>(null);
+  draftSessionRef.current = draftSession;
+  // Extra create options the draft carries to the server (not session fields).
+  const draftCreateOptsRef = useRef<{ resumeFrom?: string }>({});
   const [currentSessionId, _setCurrentSessionId] = useState<string | null>(() => {
     if (typeof window !== 'undefined' && workspaceId) {
       try {
-        return localStorage.getItem(`last_session_id_${workspaceId}`) || localStorage.getItem('last_session_id') || null;
+        const stored = localStorage.getItem(`last_session_id_${workspaceId}`) || localStorage.getItem('last_session_id') || null;
+        return stored && isDraftSessionId(stored) ? null : stored;
       } catch {}
     }
     return null;
@@ -376,7 +423,8 @@ export function WorkspaceProvider({
     _setCurrentSessionId(id);
     if (typeof window !== 'undefined' && workspaceId) {
       try {
-        if (id) {
+        // A draft exists only in this tab until its first message is sent.
+        if (id && !isDraftSessionId(id)) {
           localStorage.setItem(`last_session_id_${workspaceId}`, id);
           localStorage.setItem('last_session_id', id);
         }
@@ -1526,7 +1574,9 @@ export function WorkspaceProvider({
         const keepCurrent =
           !switchedWorkspace &&
           cur != null &&
-          (channelSessions.some((s) => s.sessionId === cur) || cur.startsWith('dm:'));
+          // A draft is never in the server list; without this the next
+          // refresh would pull the user out of the chat they are typing in.
+          (channelSessions.some((s) => s.sessionId === cur) || cur.startsWith('dm:') || isDraftSessionId(cur));
         if (!keepCurrent) {
           const toMs = (s: WorkspaceSession) =>
             s.lastEventAt || (s.createdAt ? new Date(s.createdAt).getTime() : 0);
@@ -1797,38 +1847,89 @@ export function WorkspaceProvider({
 
 
   const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string }) => {
-    // Only set a channel leader when one is explicitly requested (e.g. the
-    // single-agent DM path). The default "dynamic" orchestration mode needs no
-    // leader, so threads created from the picker start with none — a leader can
-    // be assigned later from the thread's agent menu.
-    const masterAgent = opts?.master;
-    const participants = opts?.participants || agents.map((a) => a.agentName);
+    // A draft, not a channel: nothing reaches the server until the first
+    // message is sent (see DRAFT_SESSION_PREFIX). Opening a second new chat
+    // simply replaces an unsent one.
+    const draft: WorkspaceSession = {
+      sessionId: `${DRAFT_SESSION_PREFIX}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      workspaceId: workspaceId || '',
+      createdBy: null,
+      title: opts?.title || '',
+      status: 'active',
+      starred: false,
+      participants: opts?.participants || agents.map((a) => a.agentName),
+      // Only set a leader when one is explicitly requested (e.g. the
+      // single-agent DM path); dynamic mode needs none.
+      master: opts?.master ?? null,
+      orchestrationMode: 'dynamic',
+      orchestrationInstruction: null,
+      createdAt: new Date().toISOString(),
+      lastEventAt: null,
+      workingDir: opts?.workingDir ?? null,
+    };
+    draftCreateOptsRef.current = { resumeFrom: opts?.resumeFrom };
+    setDraftSession(draft);
+    setCurrentSessionId(draft.sessionId);
+    return draft;
+  }, [agents, workspaceId, setCurrentSessionId]);
 
-    let session = await workspaceApi.createChannel({
-      title: opts?.title,
-      master: masterAgent,
-      participants,
-      resumeFrom: opts?.resumeFrom,
-    });
-
-    // "Open Folder" binding rides a separate PATCH — channel creation itself
-    // goes through the ONM event pipeline (network.channel.create), which
-    // doesn't carry this field. Best-effort: a failed PATCH here still leaves
-    // a usable (unbound) thread rather than blocking creation.
-    if (opts?.workingDir) {
-      try {
-        await workspaceApi.updateChannel(session.sessionId, { workingDir: opts.workingDir });
-        session = { ...session, workingDir: opts.workingDir };
-      } catch {
-        // Thread exists but stayed unbound — surfaced via its missing folder badge.
-      }
+  const materializingRef = useRef<{ draftId: string; promise: Promise<string> } | null>(null);
+  const materializeDraft = useCallback((draftId: string): Promise<string> => {
+    // A double Enter must not create two channels.
+    if (materializingRef.current?.draftId === draftId) return materializingRef.current.promise;
+    const draft = draftSessionRef.current;
+    if (!draft || draft.sessionId !== draftId) {
+      return Promise.reject(new Error('This new chat is no longer open'));
     }
+    const promise = (async () => {
+      let session = await workspaceApi.createChannel({
+        title: draft.title || undefined,
+        master: draft.master || undefined,
+        participants: draft.participants,
+        resumeFrom: draftCreateOptsRef.current.resumeFrom,
+      });
 
-    capture('thread_created', { participant_count: participants.length, has_resume: !!opts?.resumeFrom, has_working_dir: !!opts?.workingDir });
-    setSessions((prev) => [session, ...prev]);
-    setCurrentSessionId(session.sessionId);
-    return session;
-  }, [agents]);
+      // The folder binding and a non-default mode ride a separate PATCH --
+      // channel creation goes through the event pipeline, which carries
+      // neither. Best-effort: a failed PATCH still leaves a usable thread.
+      const patch: { workingDir?: string; orchestrationMode?: string; verificationCmd?: string } = {};
+      if (draft.workingDir) patch.workingDir = draft.workingDir;
+      if (draft.orchestrationMode && draft.orchestrationMode !== 'dynamic') patch.orchestrationMode = draft.orchestrationMode;
+      if (draft.verificationCmd) patch.verificationCmd = draft.verificationCmd;
+      if (Object.keys(patch).length > 0) {
+        try {
+          await workspaceApi.updateChannel(session.sessionId, patch);
+          session = { ...session, ...patch };
+        } catch {
+          // Thread exists; an unapplied folder shows as its missing folder badge.
+        }
+      }
+
+      // Per-thread model picks were saved under the draft id.
+      try {
+        const prefix = `52hz_model_${draftId}_`;
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith(prefix)) continue;
+          const value = localStorage.getItem(key);
+          if (value !== null) localStorage.setItem(`52hz_model_${session.sessionId}_${key.slice(prefix.length)}`, value);
+          localStorage.removeItem(key);
+        }
+      } catch {}
+
+      capture('thread_created', { participant_count: draft.participants.length, has_resume: !!draftCreateOptsRef.current.resumeFrom, has_working_dir: !!draft.workingDir });
+      setSessions((prev) => [session, ...prev]);
+      setDraftSession((d) => (d && d.sessionId === draftId ? null : d));
+      draftCreateOptsRef.current = {};
+      if (currentSessionIdRef.current === draftId) setCurrentSessionId(session.sessionId);
+      return session.sessionId;
+    })();
+    materializingRef.current = { draftId, promise };
+    promise.finally(() => {
+      if (materializingRef.current?.promise === promise) materializingRef.current = null;
+    }).catch(() => {});
+    return promise;
+  }, [setCurrentSessionId]);
 
   const renameWorkspace = useCallback(async (name: string) => {
     setWorkspace((prev) => (prev ? { ...prev, name } : prev));
@@ -1840,6 +1941,10 @@ export function WorkspaceProvider({
   }, []);
 
   const renameSession = useCallback(async (sessionId: string, title: string) => {
+    if (isDraftSessionId(sessionId)) {
+      setDraftSession((d) => (d && d.sessionId === sessionId ? { ...d, title } : d));
+      return;
+    }
     setSessions((prev) =>
       prev.map((s) => (s.sessionId === sessionId ? { ...s, title } : s))
     );
@@ -1852,6 +1957,10 @@ export function WorkspaceProvider({
   }, []);
 
   const setSessionMaster = useCallback(async (sessionId: string, agentName: string) => {
+    if (isDraftSessionId(sessionId)) {
+      setDraftSession((d) => (d && d.sessionId === sessionId ? { ...d, master: agentName } : d));
+      return;
+    }
     // Optimistic: update the thread's leader locally, roll back on failure.
     let previous: string | null = null;
     setSessions((prev) =>
@@ -1874,6 +1983,19 @@ export function WorkspaceProvider({
     sessionId: string,
     updates: { mode?: string; instruction?: string | null; verificationCmd?: string | null },
   ) => {
+    if (isDraftSessionId(sessionId)) {
+      setDraftSession((d) =>
+        d && d.sessionId === sessionId
+          ? {
+              ...d,
+              orchestrationMode: updates.mode ?? d.orchestrationMode,
+              orchestrationInstruction: updates.instruction !== undefined ? updates.instruction : d.orchestrationInstruction,
+              verificationCmd: updates.verificationCmd !== undefined ? updates.verificationCmd : d.verificationCmd,
+            }
+          : d
+      );
+      return;
+    }
     // Optimistic: apply the mode/instruction/verificationCmd locally, roll back on failure.
     // Snapshot the pre-update session inside the state updater so we read
     // fresh state (this callback is memoized with no deps). Held on an
@@ -1919,6 +2041,10 @@ export function WorkspaceProvider({
     has to follow the drag immediately or the gesture reads as broken.
   */
   const moveSessionToFolder = useCallback(async (sessionId: string, workingDir: string | null) => {
+    if (isDraftSessionId(sessionId)) {
+      setDraftSession((d) => (d && d.sessionId === sessionId ? { ...d, workingDir } : d));
+      return;
+    }
     const previousSession = sessions.find((s) => s.sessionId === sessionId);
     if (!previousSession) return;
     if ((previousSession.workingDir ?? null) === workingDir) return;
@@ -1937,6 +2063,14 @@ export function WorkspaceProvider({
   }, [sessions]);
 
   const updateSession = useCallback(async (sessionId: string, updates: { starred?: boolean; status?: string }) => {
+    // Archiving or deleting an unsent draft just discards it.
+    if (isDraftSessionId(sessionId)) {
+      if (updates.status === 'deleted' || updates.status === 'archived') {
+        setDraftSession((d) => (d && d.sessionId === sessionId ? null : d));
+        if (currentSessionIdRef.current === sessionId) setCurrentSessionId(null);
+      }
+      return;
+    }
     // Capture previous state for rollback
     const previousSession = sessions.find((s) => s.sessionId === sessionId);
     // Optimistic update
@@ -1967,6 +2101,14 @@ export function WorkspaceProvider({
   }, [currentSessionId, sessions]);
 
   const addParticipant = useCallback(async (sessionId: string, agentName: string) => {
+    if (isDraftSessionId(sessionId)) {
+      setDraftSession((d) =>
+        d && d.sessionId === sessionId && !d.participants.includes(agentName)
+          ? { ...d, participants: [...d.participants, agentName] }
+          : d
+      );
+      return;
+    }
     // Optimistic update
     setSessions((prev) =>
       prev.map((s) =>
@@ -1990,6 +2132,12 @@ export function WorkspaceProvider({
   }, []);
 
   const removeParticipant = useCallback(async (sessionId: string, agentName: string) => {
+    if (isDraftSessionId(sessionId)) {
+      setDraftSession((d) =>
+        d && d.sessionId === sessionId ? { ...d, participants: d.participants.filter((p) => p !== agentName) } : d
+      );
+      return;
+    }
     // Optimistic update
     setSessions((prev) =>
       prev.map((s) =>
@@ -2080,6 +2228,8 @@ export function WorkspaceProvider({
     currentFilePath,
     setCurrentFilePath,
     createSession,
+    draftSession,
+    materializeDraft,
     renameSession,
     updateSession,
     moveSessionToFolder,
@@ -2147,7 +2297,7 @@ export function WorkspaceProvider({
     selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds, workingAgentNames,
     stoppingSessionIds, completedSessionIds, monitorMode, acknowledgeCompletion, agentModes,
     updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, setCurrentSessionId,
-    consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession,
+    consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession, draftSession, materializeDraft,
     renameSession, updateSession, moveSessionToFolder, addParticipant, removeParticipant, setSessionMaster,
     setSessionOrchestration, renameWorkspace, refreshWorkspace, refreshAgents, refreshFiles,
     uploadFile, deleteFile, deleteFileUndoable, browserTabs, selectedBrowserTabId, setSelectedBrowserTabId,

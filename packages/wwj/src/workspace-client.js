@@ -18,6 +18,22 @@ class SessionRevokedError extends Error {
   }
 }
 
+/**
+ * The error for a non-2xx JSON response. The backend (gin) puts its reason in
+ * `error`, not `message`, so reading only `message` turned every reason into a
+ * bare "HTTP 409" -- including `session_revoked`, which then never reached the
+ * revoked handling. `statusCode` is attached so callers can branch on it; the
+ * join path logged "(status: n/a)" for every failure because it never was.
+ */
+function httpError(statusCode, parsed) {
+  const reason = (parsed && (parsed.message || parsed.error)) || '';
+  const msg = typeof reason === 'string' && reason ? reason : `HTTP ${statusCode}`;
+  const err = msg.toLowerCase().includes('session_revoked') ? new SessionRevokedError(msg) : new Error(msg);
+  err.statusCode = statusCode;
+  return err;
+}
+
+
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: 100, keepAliveMsecs: 10000 });
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 100, keepAliveMsecs: 10000 });
 
@@ -171,6 +187,9 @@ class WorkspaceClient {
    */
   async sendMessage(workspaceId, channelName, token, content, {
     senderType = 'agent', senderName, messageType = 'chat', metadata, attachments, sessionId,
+    // Idempotency key: the server stores one event per (workspace, id), so a
+    // retried send with the same id cannot post the message twice.
+    clientMessageId,
   } = {}) {
     const sourcePrefix = senderType === 'agent' ? '52hz' : 'human';
     const source = senderName ? `${sourcePrefix}:${senderName}` : `${sourcePrefix}:unknown`;
@@ -184,6 +203,7 @@ class WorkspaceClient {
       target: `channel/${channelName}`,
       payload,
       metadata: metadata || {},
+      ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
     }, token, sessionId);
   }
 
@@ -984,12 +1004,7 @@ class WorkspaceClient {
           try {
             const parsed = JSON.parse(data);
             if (res.statusCode >= 400) {
-              const msg = parsed.message || `HTTP ${res.statusCode}`;
-              if (typeof msg === 'string' && msg.toLowerCase().includes('session_revoked')) {
-                reject(new SessionRevokedError(msg));
-              } else {
-                reject(new Error(msg));
-              }
+              reject(httpError(res.statusCode, parsed));
             } else {
               resolve(parsed);
             }
@@ -1027,12 +1042,7 @@ class WorkspaceClient {
           try {
             const parsed = JSON.parse(data);
             if (res.statusCode >= 400) {
-              const msg = parsed.message || `HTTP ${res.statusCode}`;
-              if (typeof msg === 'string' && msg.toLowerCase().includes('session_revoked')) {
-                reject(new SessionRevokedError(msg));
-              } else {
-                reject(new Error(msg));
-              }
+              reject(httpError(res.statusCode, parsed));
             } else {
               resolve(parsed);
             }
@@ -1130,6 +1140,24 @@ class WorkspaceClient {
       const data = await this._post(
         `/v1/workspaces/${encodeURIComponent(workspaceId)}/agents/${encodeURIComponent(agentName)}/usage`,
         usageData,
+        this._wsHeaders(token)
+      );
+      return data.data || data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * How full this agent's own context is in one channel, as its CLI measured
+   * it on the turn that just ended. Separate from reportAgentUsage because that
+   * endpoint replaces the quota fields wholesale.
+   */
+  async reportAgentContext(workspaceId, agentName, contextData, token) {
+    try {
+      const data = await this._post(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/agents/${encodeURIComponent(agentName)}/context`,
+        contextData,
         this._wsHeaders(token)
       );
       return data.data || data;

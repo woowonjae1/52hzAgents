@@ -282,37 +282,6 @@ export function CommandPalette() {
         action: () => setViewMode('tasks'),
       },
       {
-        id: 'act-compact-context',
-        category: 'Actions',
-        title: 'Compact Context',
-        subtitle: currentSessionId
-          ? `Summarize & compact context for #${currentSessionId.replace(/^channel\//, '')}`
-          : 'Compact active channel context window',
-        icon: <Sparkles className="size-4 text-foreground-muted" />,
-        action: async () => {
-          if (!currentSessionId) {
-            toast.error('Open a chat thread first to compact its context');
-            return;
-          }
-          const raw = currentSessionId.replace(/^channel\//, '');
-          try {
-            toast.info(`Compacting context for #${raw}...`);
-            const res = await workspaceApi.request<{ compacted_count?: number }>(
-              `/v1/workspaces/${workspaceId || 'default'}/channels/${encodeURIComponent(raw)}/compact`,
-              { method: 'POST' }
-            );
-            if (res?.compacted_count) {
-              toast.success(`Compacted ${res.compacted_count} messages into a summary`);
-            } else {
-              toast.info('Context is already compact — nothing to summarize');
-            }
-          } catch (e: any) {
-            toast.error(e?.message || 'Failed to compact context');
-          }
-        },
-      },
-
-      {
         id: 'act-toggle-theme',
         category: 'Actions',
         title: `Switch Theme to ${theme === 'dark' ? 'Light' : 'Dark'}`,

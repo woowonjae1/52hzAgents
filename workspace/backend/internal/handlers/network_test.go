@@ -208,3 +208,31 @@ func TestJoinAndLeaveNetwork_EventEmission(t *testing.T) {
 		t.Errorf("expected offline status in latest event, got: %+v", latestPayload)
 	}
 }
+
+// An empty session is "join again" (session_expired); only a DIFFERENT live
+// session is a takeover (session_revoked). The adapter stops on the second and
+// rejoins on the first, so mixing them up either strands a healthy agent
+// offline or makes two clients fight over one name.
+func TestUpdatePresence_ExpiredVersusRevoked(t *testing.T) {
+	ws, r := setupNetworkTestEnv(t)
+	other := "sess-other"
+	db.DB.Create(&models.WorkspaceMember{WorkspaceID: ws.ID, AgentName: "no-session", Status: "offline"})
+	db.DB.Create(&models.WorkspaceMember{WorkspaceID: ws.ID, AgentName: "taken", Status: "online", SessionID: &other})
+
+	post := func(agent string) (int, string) {
+		body, _ := json.Marshal(PresenceRequest{AgentName: agent, SessionID: "sess-mine"})
+		req := httptest.NewRequest(http.MethodPost, fmt.Sprintf("/v1/workspaces/%s/presence", ws.ID), bytes.NewReader(body))
+		req.Header.Set("X-Workspace-Token", "valid-token")
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w.Code, w.Body.String()
+	}
+
+	if code, body := post("no-session"); code != http.StatusConflict || !bytes.Contains([]byte(body), []byte("session_expired")) {
+		t.Fatalf("no session: want 409 session_expired, got %d %s", code, body)
+	}
+	if code, body := post("taken"); code != http.StatusConflict || !bytes.Contains([]byte(body), []byte("session_revoked")) {
+		t.Fatalf("other session: want 409 session_revoked, got %d %s", code, body)
+	}
+}

@@ -26,6 +26,8 @@ import { workspaceApi } from '@/lib/api';
 import { eventToMessage, type ONMEvent, stripAddressPrefix } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { toast } from '@/lib/toast';
+import { extractSessionAgents } from '@/components/threads/thread-list';
+import { useAgentContexts } from '@/lib/use-agent-contexts';
 
 /*
   The filter affordance that replaced the metric cards. Deliberately flat: no
@@ -80,7 +82,9 @@ export function MissionControl() {
     activeSessionIds,
     workingAgentNames,
     setCurrentSessionId,
+    lastMessageBySession: workspaceLastMessages,
   } = useWorkspace();
+  const { rows: contextRows } = useAgentContexts();
   // A dashboard you leave and come back to; it should not rewind.
   const scrollRef = useScrollRestore<HTMLDivElement>('mission');
   const { setViewMode, isSidebarOpen, setActiveRightTab } = useLayout();
@@ -207,11 +211,18 @@ export function MissionControl() {
       */
       const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 160 });
       const lines: TimelineEventItem[] = [];
+      // Some adapters post the same reasoning twice (streamed, then again at
+      // block end), which showed as back-to-back identical rows. The same
+      // text from the same speaker in the same thread is one event.
+      const seen = new Set<string>();
       for (let idx = 0; idx < res.events.length && lines.length < FEED_SIZE; idx++) {
         const ev = res.events[idx] as ONMEvent;
         const m = eventToMessage(ev);
         if (m.messageType === 'thinking' && m.metadata?.reply_preview) continue;
         const channel = (ev.target || '').replace(/^channel\//, '');
+        const dedupKey = `${m.senderName || ev.source}|${channel}|${(m.content || '').trim()}`;
+        if (seen.has(dedupKey)) continue;
+        seen.add(dedupKey);
         let type: TimelineEventItem['type'] = 'info';
         if (m.messageType === 'thinking') type = m.metadata?.tool_name ? 'command' : 'thinking';
         else if (m.metadata?.tool_approval_request) type = 'approval';
@@ -270,9 +281,31 @@ export function MissionControl() {
     const activeThreads = sessions.filter((s) => s.status !== 'archived');
     const now = Date.now();
 
+    /*
+      WHO WORKED IN A THREAD, NOT WHO IS ON THE ROSTER.
+
+      This filtered on `participants`, which for a plain channel is every agent
+      in the workspace -- so every card claimed all 25 channels and showed the
+      same newest thread. The answer now comes from things that happened: an
+      @mention, the last speaker, the master (extractSessionAgents, the same
+      rule the sidebar uses), or a context report the agent sent after a turn
+      in that channel.
+    */
+    const workedIn = new Map<string, Set<string>>();
+    const mark = (agentName: string, sessionId: string) => {
+      const key = agentName.toLowerCase();
+      if (!workedIn.has(key)) workedIn.set(key, new Set());
+      workedIn.get(key)!.add(sessionId);
+    };
+    for (const s of activeThreads) {
+      for (const a of extractSessionAgents(s, agents, workspaceLastMessages[s.sessionId])) mark(a.name, s.sessionId);
+    }
+    for (const r of contextRows) mark(r.agentName, r.channelName);
+
     return agents.map((agent): StationData => {
+      const mine = workedIn.get(agent.agentName.toLowerCase());
       const threads = activeThreads
-        .filter((s) => s.participants.includes(agent.agentName) || s.master === agent.agentName)
+        .filter((s) => mine?.has(s.sessionId))
         .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
 
       const isWorking = workingAgentNames.has(agent.agentName);
@@ -329,7 +362,7 @@ export function MissionControl() {
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
       return a.agent.agentName.localeCompare(b.agent.agentName);
     });
-  }, [agents, sessions, lastMessageBySession, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
+  }, [agents, sessions, lastMessageBySession, workspaceLastMessages, contextRows, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
 
   // Section 2: Available Catalog Presets
   const integrationStations: StationData[] = useMemo(() => {

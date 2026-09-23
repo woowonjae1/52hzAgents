@@ -14,11 +14,11 @@ import (
 	"github.com/gin-gonic/gin"     // Gin 框架的核心上下文及路由引擎。
 	"github.com/google/uuid"       // 用于生成客户端唯一的 Session ID。
 	"github.com/gorilla/websocket" // 业界主流的 WebSocket 升级和协议工具。
-	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/compaction"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"     // 本地 GORM 数据库连接包。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"    // 自研的内存级多路复用广播 Hub。
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models" // 表结构模型映射定义。
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/tokens"
 	"gorm.io/gorm"
 )
 
@@ -669,7 +669,7 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 	// 2. Fallback to estimation from content if not provided
 	if completionTokens == 0 && payload != nil {
 		if content, ok := payload["content"].(string); ok && content != "" {
-			completionTokens = int64(compaction.EstimateTokens(content))
+			completionTokens = int64(tokens.EstimateTokens(content))
 		}
 	}
 
@@ -686,7 +686,7 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 			NO WINDOW IS GUESSED HERE ANY MORE.
 
 			This used to seed the record with
-			`compaction.ModelContextWindow(agentName)` -- the AGENT NAME, not a
+			`tokens.ModelContextWindow(agentName)` -- the AGENT NAME, not a
 			model. Agent names are user-chosen ("worker-1", "rfc-bot"), so they
 			matched nothing in the table and every agent was persisted with the
 			old 128k default. That number then flowed into
@@ -706,7 +706,7 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 			TotalCompletionTokens: completionTokens,
 			TotalTokens:           totalDelta,
 			LastPromptTokens:      promptTokens,
-			ContextWindowSize:     compaction.UnknownWindow,
+			ContextWindowSize:     tokens.UnknownWindow,
 		}
 		_ = db.DB.Create(&record).Error
 	} else {
@@ -725,7 +725,7 @@ func recordAgentMessageTokenUsage(workspaceID, source string, payload, metadata 
 		// from the agent name, and never to a made-up default: an unrecognised
 		// model leaves this at zero.
 		if record.ContextWindowSize == 0 && record.CurrentModel != nil && *record.CurrentModel != "" {
-			if w := compaction.ModelContextWindow(*record.CurrentModel); w > 0 {
+			if w := tokens.ModelContextWindow(*record.CurrentModel); w > 0 {
 				updates["context_window_size"] = w
 			}
 		}

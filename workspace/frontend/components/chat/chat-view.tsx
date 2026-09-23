@@ -10,7 +10,7 @@ import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
 import { ThreadStatusBar } from './thread-status-bar';
 import { EmptyState } from './empty-state';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { useComposingSignal } from '@/hooks/use-composing-signal';
 import { isComposing } from '@/lib/ime';
@@ -181,7 +181,8 @@ export function SessionMessagesProvider({ children }: { children: React.ReactNod
   }
 
   const value = useMessagePolling({
-    sessionId: currentSessionId,
+    // A draft has nothing on the server to poll (see isDraftSessionId).
+    sessionId: isDraftSessionId(currentSessionId) ? null : currentSessionId,
     initialMessages: initialMessagesRef.current,
   });
 
@@ -241,7 +242,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent, workspaceId } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent, workspaceId, draftSession, materializeDraft } = useWorkspace();
   
   useEffect(() => {
     console.log('[52hzAgents Monitor] [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
@@ -395,7 +396,12 @@ export function ChatView() {
   }, [currentSessionId, notifyTyping]);
 
   const isDM = currentSessionId?.startsWith('dm:') ?? false;
-  const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
+  // The id to hand anything that talks to the server: null while the open
+  // chat is still an unsent draft, which has nothing there to fetch.
+  const serverSessionId = isDraftSessionId(currentSessionId) ? null : currentSessionId;
+  const currentSession =
+    sessions.find((s) => s.sessionId === currentSessionId) ??
+    (draftSession && draftSession.sessionId === currentSessionId ? draftSession : undefined);
 
   const [exporting, setExporting] = useState(false);
 
@@ -453,7 +459,7 @@ export function ChatView() {
 
   // Which repository the git chip and the context line report on: the folder
   // this channel is bound to, resolved server-side from the channel id.
-  const { status: gitStatus, refresh: refreshGit, channelId: gitChannelId } = useGitStatus(currentSession?.sessionId);
+  const { status: gitStatus, refresh: refreshGit, channelId: gitChannelId } = useGitStatus(isDraftSessionId(currentSession?.sessionId) ? undefined : currentSession?.sessionId);
   // The composer's folder pill answers "what directory is THIS channel bound
   // to", so it reads the channel's own binding. It used to read gitStatus.dir —
   // the agent *member's* working directory, which is fixed when that agent
@@ -700,13 +706,26 @@ export function ChatView() {
       if (!currentSessionId) return;
       if (!currentUser.id || !currentUser.name.trim()) return;
 
+      // A new chat exists only as a draft until now: create the real channel
+      // (with the agents, leader, mode and folder picked on the draft) and
+      // send into that. Everything below uses the real id.
+      let sessionId = currentSessionId;
+      if (isDraftSessionId(sessionId)) {
+        try {
+          sessionId = await materializeDraft(sessionId);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Could not start the conversation');
+          return;
+        }
+      }
+
       // Create optimistic messages for instant feedback
       const timestamp = Date.now();
       const clientMessageId = globalThis.crypto?.randomUUID?.() || `web-${timestamp}-${Math.random().toString(36).slice(2)}`;
       const userContent = content || (files.length > 0 ? files.map((f) => f.file.name).join(', ') : '');
       const userOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-user-${timestamp}`,
-        sessionId: currentSessionId,
+        sessionId: sessionId,
         senderId: currentUser.id,
         senderName: currentUser.name,
         senderType: 'human',
@@ -732,7 +751,7 @@ export function ChatView() {
 
       const loadingOptimisticMsg: WorkspaceMessage = {
         messageId: `optimistic-loading-${timestamp}`,
-        sessionId: currentSessionId,
+        sessionId: sessionId,
         senderName: predictedAgentName,
         senderType: 'agent',
         content: '',
@@ -745,13 +764,13 @@ export function ChatView() {
 
       // Add optimistic messages immediately and scroll to bottom
       setOptimisticMessages((prev) => [
-        ...prev.filter((m) => !(m.sessionId === currentSessionId && m.messageId.startsWith('optimistic-loading-'))),
+        ...prev.filter((m) => !(m.sessionId === sessionId && m.messageId.startsWith('optimistic-loading-'))),
         userOptimisticMsg,
         loadingOptimisticMsg,
       ]);
-      updateLastMessage(currentSessionId, currentUser.name, content || 'Sent an attachment', false);
-      recordUserMessageSent(currentSessionId);
-      setSessionActive(currentSessionId, true);
+      updateLastMessage(sessionId, currentUser.name, content || 'Sent an attachment', false);
+      recordUserMessageSent(sessionId);
+      setSessionActive(sessionId, true);
       setScrollKey((k) => k + 1);
 
       try {
@@ -759,7 +778,7 @@ export function ChatView() {
         let attachments: { fileId: string; filename: string; contentType: string; url: string }[] | undefined;
         if (files.length > 0) {
           const uploaded = await Promise.all(
-            files.map((pf) => workspaceApi.uploadFile(pf.file, currentSessionId))
+            files.map((pf) => workspaceApi.uploadFile(pf.file, sessionId))
           );
           attachments = uploaded.map((f) => ({
             fileId: f.id,
@@ -775,8 +794,8 @@ export function ChatView() {
           const modelSnapshot = getSnapshot();
           for (const agent of agents) {
             const saved =
-              (currentSessionId && localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName}`)) ||
-              (currentSessionId && localStorage.getItem(`52hz_model_${currentSessionId}_${agent.agentName.toLowerCase()}`)) ||
+              (sessionId && localStorage.getItem(`52hz_model_${sessionId}_${agent.agentName}`)) ||
+              (sessionId && localStorage.getItem(`52hz_model_${sessionId}_${agent.agentName.toLowerCase()}`)) ||
               currentModelFor(modelSnapshot, agent.agentName) ||
               localStorage.getItem(`52hz_model_default_${agent.agentName}`) ||
               localStorage.getItem(`52hz_model_default_${agent.agentName.toLowerCase()}`);
@@ -800,7 +819,7 @@ export function ChatView() {
         }
 
         const confirmation = await workspaceApi.sendMessage(
-          currentSessionId,
+          sessionId,
           content || (attachments ? attachments.map((a) => a.filename).join(', ') : ''),
           currentUser.name,
           mentions.length > 0 ? mentions : undefined,
@@ -831,10 +850,10 @@ export function ChatView() {
             .filter((m) => m.messageId !== loadingOptimisticMsg.messageId)
             .map((m) => m.messageId === userOptimisticMsg.messageId ? { ...m, deliveryStatus: 'failed' } : m)
         );
-        setSessionActive(currentSessionId, false);
+        setSessionActive(sessionId, false);
       }
     },
-    [currentSessionId, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive, updateLastMessage, recordUserMessageSent]
+    [currentSessionId, materializeDraft, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive, updateLastMessage, recordUserMessageSent]
   );
 
   const handleRegenerateMessage = useCallback(async (msg: WorkspaceMessage) => {
@@ -1135,7 +1154,7 @@ export function ChatView() {
             {/*
               Context moved to the composer — it is a budget for the message you
               are about to send, not a fact about the thread's name. See
-              ContextHealthIndicator's `composer` variant.
+              ContextHealthIndicator.
             */}
             <AgentQuotaCapsule agentName={activeModelAgentName} />
             <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
@@ -1254,7 +1273,7 @@ export function ChatView() {
       })()}
 
       {/* Pipeline Stepper Widget */}
-      <PipelineStepper channelId={currentSessionId} />
+      <PipelineStepper channelId={serverSessionId} />
 
       {/*
         Parallel batches get their own view because the transcript stops being
@@ -1262,10 +1281,10 @@ export function ChatView() {
         process that several messages belong to is not readable from the
         messages themselves.
       */}
-      {currentSessionId && (
+      {serverSessionId && (
         <div className="px-3 pb-2">
           <ParallelBatchPanel
-            channelName={currentSessionId}
+            channelName={serverSessionId}
             active={(currentSession?.orchestrationMode || '') === 'parallel'}
           />
         </div>
@@ -1576,7 +1595,7 @@ export function ChatView() {
                 </div>
               )}
 
-              {currentSessionId && <ThreadStatusBar channelName={currentSessionId} messages={displayMessages} />}
+              {serverSessionId && <ThreadStatusBar channelName={serverSessionId} messages={displayMessages} />}
               <ChatInput
                 onSend={handleSend}
                 agents={agents}
@@ -1612,11 +1631,11 @@ export function ChatView() {
           onCreateRoutine={createRoutine}
         />
 
-        {currentSessionId && (
+        {serverSessionId && (
           <ShareDialog
             open={shareDialogOpen}
             onOpenChange={setShareDialogOpen}
-            sessionId={currentSessionId}
+            sessionId={serverSessionId}
           />
         )}
       </div>
