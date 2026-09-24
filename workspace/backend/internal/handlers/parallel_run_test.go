@@ -272,3 +272,40 @@ func TestInferScope(t *testing.T) {
 		t.Fatalf("inferred disjoint scopes should not conflict: %+v", c)
 	}
 }
+
+func TestParallelMergesWithoutAHostGitIdentity(t *testing.T) {
+	// A fresh machine has no git identity. The lane commits always named one,
+	// but the --no-ff merge commit did not, so it failed with "Committer
+	// identity unknown" and every lane was reported as a merge conflict.
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	empty := filepath.Join(t.TempDir(), "gitconfig")
+	os.WriteFile(empty, nil, 0644)
+	t.Setenv("GIT_CONFIG_GLOBAL", empty)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	git(t, repo, "config", "--unset", "user.email")
+	git(t, repo, "config", "--unset", "user.name")
+	// No guessing from the hostname either: identity must come from config.
+	git(t, repo, "config", "user.useConfigOnly", "true")
+
+	batch, lanes := startTestBatch(t, ws, repo, "alpha", "beta")
+	for _, a := range []string{"alpha", "beta"} {
+		os.WriteFile(filepath.Join(lanes[a].WorktreePath, a+".txt"), []byte(a+"\n"), 0644)
+	}
+	finish(t, batch.ID, "alpha", false)
+	finish(t, batch.ID, "beta", false)
+
+	for a, l := range lanesOf(batch.ID) {
+		if l.Status != laneMerged {
+			t.Fatalf("lane %s = %s (%s)", a, l.Status, l.Error)
+		}
+	}
+	for _, f := range []string{"alpha.txt", "beta.txt"} {
+		if _, err := os.Stat(filepath.Join(repo, f)); err != nil {
+			t.Fatalf("%s not merged into the base tree", f)
+		}
+	}
+	if _, err := runGit(repo, "config", "user.email"); err == nil {
+		t.Fatal("the merge must not write an identity into the user's repo config")
+	}
+}

@@ -420,6 +420,19 @@ func finishLane(batch *models.ParallelBatchRecord, lane *models.ParallelLaneReco
 	}
 }
 
+// mergeIdentityArgs supplies a committer for the merge commit when the host
+// has no git identity. A --no-ff merge IS a commit; without one it failed with
+// "Committer identity unknown" and every lane was reported as a conflict.
+// A configured identity is left alone.
+func mergeIdentityArgs(repo string) []string {
+	if _, err := runGit(repo, "config", "user.email"); err == nil {
+		if _, err := runGit(repo, "config", "user.name"); err == nil {
+			return nil
+		}
+	}
+	return []string{"-c", "user.name=52hzAgents", "-c", "user.email=bot@52hzagents.local"}
+}
+
 // finalizeBatch merges finished lanes back and posts the summary.
 func finalizeBatch(batch *models.ParallelBatchRecord) {
 	var lanes []models.ParallelLaneRecord
@@ -443,7 +456,8 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 		case baseDirty != "":
 			lane.Status = laneKept
 		default:
-			if _, err := runGit(batch.RepoDir, "merge", "--no-ff", "--no-edit", lane.Branch); err != nil {
+			mergeArgs := append(mergeIdentityArgs(batch.RepoDir), "merge", "--no-ff", "--no-edit", lane.Branch)
+			if _, err := runGit(batch.RepoDir, mergeArgs...); err != nil {
 				_, _ = runGit(batch.RepoDir, "merge", "--abort")
 				lane.Status = laneConflict
 				lane.Error = "merge conflict: " + truncateRunes(err.Error(), 300)
