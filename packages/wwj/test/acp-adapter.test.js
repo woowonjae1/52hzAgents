@@ -383,3 +383,22 @@ test('command configuration sources and parsing', () => {
   const a = createAdapter('acp', { workspaceId: 'w', agentName: 'x', token: 't', client: {}, agentEnv: { ACP_COMMAND: 'gemini --experimental-acp' }, sessionsFile: path.join(tmpRoot, 'x.json') });
   assert.ok(a instanceof AcpAdapter, 'registered as type acp');
 });
+
+test('a finished parallel lane stops its agent process before reporting, so the worktree can be removed', async () => {
+  // The process is spawned with cwd = the lane worktree and would otherwise
+  // outlive the lane; on Windows a live process's cwd cannot be deleted, so
+  // the merge left the worktree directory behind.
+  const { adapter } = makeAdapter('happy', { env: { ACP_PERMISSION_MODE: 'auto' } });
+  await adapter._handleMessage(message());
+  const proc = adapter._conns['ch-1'].conn.proc;
+  let atReport = null;
+  adapter.client.completeParallelLane = async () => {
+    atReport = { exitCode: proc.exitCode, signalCode: proc.signalCode, conn: adapter._conns['ch-1'] };
+  };
+
+  await adapter._exitParallelLane('ch-1', { batchId: 'b-1' });
+
+  assert.ok(atReport, 'the lane was reported');
+  assert.ok(atReport.exitCode !== null || atReport.signalCode !== null, 'the process had exited before the report');
+  assert.equal(atReport.conn, undefined, 'the dead connection is dropped; the next turn respawns');
+});

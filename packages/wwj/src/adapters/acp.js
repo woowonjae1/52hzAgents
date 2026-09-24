@@ -484,6 +484,27 @@ class AcpAdapter extends BaseAdapter {
     }
   }
 
+  /**
+   * A lane's agent process was spawned in the lane worktree and would stay
+   * there (the process cwd never follows a later session/new), pinning a
+   * directory the merge is about to remove. Stop it and wait for the exit;
+   * the next turn spawns afresh wherever it runs.
+   */
+  async _releaseLaneProcess(channel) {
+    const entry = this._conns[channel];
+    if (!entry) return;
+    delete this._conns[channel];
+    const conn = entry.conn;
+    if (!conn || conn.closed || !conn.proc || conn.proc.exitCode !== null) return;
+    const exited = new Promise((resolve) => {
+      const t = setTimeout(resolve, 5000);
+      conn.proc.once('close', () => { clearTimeout(t); resolve(); });
+    });
+    conn.kill();
+    await exited;
+    this._log(`ACP: released the lane process for ${channel}`);
+  }
+
   async _onControlAction(action, payload) {
     if (action === 'stop') {
       const only = payload && typeof payload === 'object' ? payload.channel : null;

@@ -1729,12 +1729,23 @@ class BaseAdapter {
     return lane;
   }
 
+  /**
+   * Stop any long-lived process this adapter keeps for `channel` whose cwd is
+   * the lane's worktree. Per-turn CLIs have already exited; adapters that keep
+   * a process alive across turns (ACP) override this.
+   */
+  async _releaseLaneProcess(_channel) {}
+
   /** Report the lane's end to the backend, which commits and, last, merges. */
   async _exitParallelLane(channel, lane) {
     if (this._turnDirOverride) delete this._turnDirOverride[channel];
     if (this._turnEnvOverride) delete this._turnEnvOverride[channel];
     const failed = Boolean(this._turnFailed && this._turnFailed.has(channel));
     const reply = (this._lastReply && this._lastReply[channel]) || '';
+    // Before reporting: the last lane's report triggers the merge, which
+    // removes the worktree -- and a process still running with its cwd in
+    // there pins the directory (Windows refuses to delete it).
+    try { await this._releaseLaneProcess(channel); } catch {}
     try {
       await this.client.completeParallelLane(this.workspaceId, lane.batchId, this.agentName, {
         status: failed ? 'failed' : 'done',
