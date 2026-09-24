@@ -1745,7 +1745,9 @@ export function WorkspaceProvider({
               case 'workspace.agent.turn.updated': {
                 // Relayed, not stored here: lib/use-agent-turns owns the rows
                 // (and imports this module, so it cannot be imported back).
-                window.dispatchEvent(new CustomEvent('wwj:agent-turn-updated', { detail: event.payload }));
+                // Tagged with the route key: the row's workspace_id is a UUID
+                // the store (keyed by the route slug) cannot compare against.
+                window.dispatchEvent(new CustomEvent('wwj:agent-turn-updated', { detail: { ...event.payload, workspace: workspaceId } }));
                 break;
               }
 

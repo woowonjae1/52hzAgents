@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { workspaceApi } from '@/lib/api';
 import { useWorkspace } from '@/lib/workspace-context';
+import { turnForWorkspace, type AgentTurnEventDetail } from '@/lib/agent-turn-event';
 
 /*
   WHETHER AN AGENT IS MID-TURN, IN ITS OWN WORDS.
@@ -85,11 +86,9 @@ function refresh(): Promise<void> {
 }
 
 function applyEvent(ev: Event) {
-  const detail = (ev as CustomEvent).detail as { turn?: Record<string, unknown> } | undefined;
-  if (!detail?.turn || !currentWorkspace) return;
-  const wsId = String(detail.turn.workspace_id || '');
-  if (wsId && wsId !== currentWorkspace) return;
-  const t = mapAgentTurn(detail.turn);
+  const turn = turnForWorkspace((ev as CustomEvent).detail as AgentTurnEventDetail | undefined, currentWorkspace);
+  if (!turn) return;
+  const t = mapAgentTurn(turn);
   if (!t.agentName || !t.channelName) return;
   const rest = rows.filter((r) => !(r.agentName === t.agentName && r.channelName === t.channelName));
   rows = [t, ...rest];
