@@ -500,6 +500,10 @@ async function cmdConnect(connector, flags, positional) {
       print('Daemon notified to launch ' + name);
     } else {
       print('Daemon is not running. Auto-starting daemon with ' + name + '...');
+      // A booting daemon leaves agents idle unless marked autostart, so queue
+      // the start: the daemon drains it on its first tick. Without this the
+      // agent just connected stayed offline despite the message above.
+      connector.sendDaemonCommand(`start:${name}`);
       await cmdUp(connector, flags);
     }
   } catch (e) {
@@ -1019,4 +1023,8 @@ async function main() {
   }
 }
 
-main();
+// WWJ_CLI_NO_MAIN lets a test require this module for its commands without
+// dispatching the test runner's own argv.
+if (!process.env.WWJ_CLI_NO_MAIN) main();
+
+module.exports = { cmdConnect };
