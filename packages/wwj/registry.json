@@ -1187,5 +1187,53 @@
     "launch": {
       "args": []
     }
+  },
+  {
+    "name": "acp",
+    "label": "ACP Agent",
+    "description": "Any CLI that speaks the Agent Client Protocol (JSON-RPC over stdio): Gemini CLI (gemini --experimental-acp), OpenCode (opencode acp), claude-code-acp, codex-acp, GitHub Copilot CLI. You supply the command.",
+    "homepage": "https://agentclientprotocol.com",
+    "tags": [
+      "acp",
+      "custom",
+      "coding"
+    ],
+    "builtin": true,
+    "support": {
+      "install": true,
+      "workspace": true,
+      "collaboration": true
+    },
+    "install": {
+      "binary": "acp",
+      "api_only": true
+    },
+    "adapter": {
+      "module": "wwj.adapters.acp",
+      "class": "AcpAdapter"
+    },
+    "launch": {
+      "args": []
+    },
+    "env_config": [
+      {
+        "name": "ACP_COMMAND",
+        "description": "Command that starts the agent in ACP mode, e.g. \"gemini --experimental-acp\", \"opencode acp\", \"claude-code-acp\". A whole command line is accepted when ACP_ARGS is empty.",
+        "required": true,
+        "placeholder": "gemini --experimental-acp"
+      },
+      {
+        "name": "ACP_ARGS",
+        "description": "Arguments for ACP_COMMAND, as a JSON array or a plain command line. Leave blank when ACP_COMMAND already includes them.",
+        "required": false
+      },
+      {
+        "name": "ACP_PERMISSION_MODE",
+        "description": "How the agent's permission requests are answered: ask (post an approval card in the channel; default), auto (allow once without asking), deny (refuse).",
+        "required": false,
+        "default": "ask",
+        "placeholder": "ask"
+      }
+    ]
   }
 ]

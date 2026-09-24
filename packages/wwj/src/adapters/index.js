@@ -22,6 +22,7 @@ const PiAdapter = require('./pi');
 const AntigravityAdapter = require('./antigravity');
 const DeepSeekAdapter = require('./deepseek');
 const CustomAdapter = require('./custom');
+const AcpAdapter = require('./acp');
 const { AGENT_TYPE_ALIASES, resolveAgentType } = require('../agent-types');
 
 const ADAPTER_MAP = {
@@ -47,6 +48,10 @@ const ADAPTER_MAP = {
   // A user-supplied command, NOT OpenClaw. Pointing `custom` at OpenClawAdapter
   // meant "connect a custom agent" quietly launched OpenClaw instead.
   custom: CustomAdapter,
+  // Any CLI that speaks the Agent Client Protocol over stdio (gemini
+  // --experimental-acp, opencode acp, claude-code-acp, ...); the command is
+  // configuration (ACP_COMMAND or the agent's command/args).
+  acp: AcpAdapter,
 };
 
 /**
@@ -88,6 +93,7 @@ module.exports = {
   AmpAdapter,
   PiAdapter,
   CustomAdapter,
+  AcpAdapter,
   createAdapter,
   knownAgentTypes,
   ADAPTER_MAP,
