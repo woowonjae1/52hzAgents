@@ -19,14 +19,18 @@
 # this job exists to remove -- keep this on `ubuntu-latest`.)
 name: backend-build
 
+# The generated TypeScript wire types are checked by cmd/gentypes' test, so a
+# hand edit to them has to trigger this job too, not only a Go change.
 on:
   push:
     paths:
       - 'workspace/backend/**'
+      - 'workspace/frontend/lib/generated/**'
       - '.github/workflows/backend-build.yml'
   pull_request:
     paths:
       - 'workspace/backend/**'
+      - 'workspace/frontend/lib/generated/**'
       - '.github/workflows/backend-build.yml'
 
 jobs:

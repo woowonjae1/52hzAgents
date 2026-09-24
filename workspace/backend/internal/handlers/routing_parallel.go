@@ -273,7 +273,7 @@ type ParallelBatch struct {
 	// their own worktrees and scope conflicts do not block a start.
 	Isolated bool `json:"isolated"`
 	// Run is the latest batch actually started in the channel, with its lanes.
-	Run interface{} `json:"run,omitempty"`
+	Run *ParallelRunView `json:"run,omitempty"`
 }
 
 // buildParallelBatch groups a channel's tasks into per-worker lanes.

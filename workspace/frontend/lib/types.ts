@@ -1,3 +1,5 @@
+import type * as Wire from './generated/api-types';
+
 export interface Workspace {
   workspaceId: string;
   slug: string;
@@ -470,20 +472,8 @@ export interface AgentUsage {
   updated_at: string;
 }
 
-export interface AgentTokenStat {
-  agent_name: string;
-  current_model: string;
-  context_window_size: number;
-  total_prompt_tokens: number;
-  total_completion_tokens: number;
-  total_tokens: number;
-  last_prompt_tokens?: number;
-  session_used_percent: number;
-  week_used_percent: number;
-  session_resets_at?: string | null;
-  week_resets_at?: string | null;
-  status: string;
-}
+/** GET /v1/workspaces/:id/tokens/stats, per agent. Generated from the Go struct. */
+export type AgentTokenStat = Wire.AgentTokenStat;
 
 /**
  * How full ONE agent's own context is in ONE channel, as that agent's CLI
@@ -505,13 +495,8 @@ export interface AgentContext {
   updatedAt: string;
 }
 
-export interface WorkspaceTokenStats {
-  workspace_id: string;
-  total_tokens: number;
-  total_prompt_tokens: number;
-  total_completion_tokens: number;
-  agents: AgentTokenStat[];
-}
+/** GET /v1/workspaces/:id/tokens/stats. Generated from the Go struct. */
+export type WorkspaceTokenStats = Wire.WorkspaceTokenStatsResponse;
 
 export interface ApiResponse<T = unknown> {
   success: boolean;

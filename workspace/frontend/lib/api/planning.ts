@@ -6,6 +6,7 @@ import type {
   TimerItem,
   TodoItem,
 } from '../types';
+import type { TodoRecord } from '../generated/api-types';
 import { BaseWorkspaceApi } from './base';
 
 /** The viewer's IANA timezone, falling back to UTC where Intl is unavailable. */
@@ -91,26 +92,26 @@ export type TodoPatch = Partial<
  * away on the way back, so every priority read as "none"; the "Scheduled" badge
  * could never appear for the same reason.
  */
-export function normalizeTodo(t: Record<string, unknown>): TodoItem {
+export function normalizeTodo(t: TodoRecord): TodoItem {
   return {
-    id: (t.id || t.ID) as string,
-    content: (t.content || t.Content) as string,
-    status: (t.status || t.Status) as TodoItem['status'],
-    priority: (t.priority || t.Priority || 'none') as TodoItem['priority'],
-    assignee: (t.assignee || t.Assignee || '') as string,
-    createdBy: (t.created_by || t.createdBy || t.CreatedBy || '') as string,
-    channelName: (t.channel_name || t.channelName || t.ChannelName || '') as string,
-    threadId: (t.thread_id || t.threadId || t.ThreadID || null) as string | null,
-    position: (t.position ?? t.Position ?? 0) as number,
-    routineId: (t.routine_id ?? t.routineId ?? t.RoutineID ?? null) as string | null,
-    runId: (t.run_id ?? t.runId ?? t.RunID ?? null) as string | null,
-    timerId: (t.timer_id ?? t.timerId ?? t.TimerID ?? null) as string | null,
-    error: (t.error ?? t.Error ?? null) as string | null,
-    scope: (t.scope ?? t.Scope ?? null) as string | null,
-    dueDate: (t.due_date ?? t.dueDate ?? t.DueDate ?? null) as string | null,
-    completedAt: (t.completed_at ?? t.completedAt ?? t.CompletedAt ?? null) as string | null,
-    createdAt: (t.created_at || t.createdAt || t.CreatedAt || null) as string | null,
-    updatedAt: (t.updated_at || t.updatedAt || t.UpdatedAt || null) as string | null,
+    id: t.id,
+    content: t.content,
+    status: t.status as TodoItem['status'],
+    priority: (t.priority || 'none') as TodoItem['priority'],
+    assignee: t.assignee || '',
+    createdBy: t.created_by || '',
+    channelName: t.channel_name || '',
+    threadId: t.thread_id || null,
+    position: t.position ?? 0,
+    routineId: t.routine_id ?? null,
+    runId: t.run_id ?? null,
+    timerId: t.timer_id ?? null,
+    error: t.error ?? null,
+    scope: t.scope ?? null,
+    dueDate: t.due_date ?? null,
+    completedAt: t.completed_at ?? null,
+    createdAt: t.created_at || null,
+    updatedAt: t.updated_at || null,
   };
 }
 
@@ -129,7 +130,7 @@ function serializeTodo(todo: TodoWritePayload) {
 export class PlanningApi extends BaseWorkspaceApi {
   async listTodos(): Promise<{ todos: TodoItem[] }> {
     const params = new URLSearchParams({ network: this.workspaceId, all: 'true' });
-    const raw = await this.request<{ todos: Record<string, unknown>[] }>(`/v1/todos?${params}`);
+    const raw = await this.request<{ todos: TodoRecord[] | null }>(`/v1/todos?${params}`);
     return { todos: (raw.todos || []).map(normalizeTodo) };
   }
 
@@ -139,7 +140,7 @@ export class PlanningApi extends BaseWorkspaceApi {
     threadId?: string;
     todos: TodoWritePayload[];
   }): Promise<{ todos: TodoItem[] }> {
-    const raw = await this.request<{ todos: Record<string, unknown>[] }>('/v1/todos', {
+    const raw = await this.request<{ todos: TodoRecord[] | null }>('/v1/todos', {
       method: 'PUT',
       body: JSON.stringify({
         network: this.workspaceId,
@@ -159,7 +160,7 @@ export class PlanningApi extends BaseWorkspaceApi {
     threadId?: string;
     todo: TodoWritePayload;
   }): Promise<TodoItem> {
-    const raw = await this.request<Record<string, unknown>>('/v1/todos', {
+    const raw = await this.request<TodoRecord>('/v1/todos', {
       method: 'POST',
       body: JSON.stringify({
         network: this.workspaceId,
@@ -181,7 +182,7 @@ export class PlanningApi extends BaseWorkspaceApi {
    * edits from other agents and invalidates any id the UI was holding.
    */
   async updateTodo(todoId: string, patch: TodoPatch): Promise<TodoItem> {
-    const raw = await this.request<Record<string, unknown>>(`/v1/todos/${todoId}`, {
+    const raw = await this.request<TodoRecord>(`/v1/todos/${todoId}`, {
       method: 'PATCH',
       body: JSON.stringify({
         network: this.workspaceId,
@@ -208,7 +209,7 @@ export class PlanningApi extends BaseWorkspaceApi {
 
   async cancelChannelTodos(channel: string, source: string): Promise<void> {
     const params = new URLSearchParams({ network: this.workspaceId, channel, source });
-    const raw = await this.request<{ todos: Record<string, unknown>[] }>(`/v1/todos?${params}`);
+    const raw = await this.request<{ todos: TodoRecord[] | null }>(`/v1/todos?${params}`);
     const todos = (raw.todos || []).map(normalizeTodo);
     const active = todos.filter((t) => t.status === 'pending' || t.status === 'in_progress');
     if (active.length === 0) return;

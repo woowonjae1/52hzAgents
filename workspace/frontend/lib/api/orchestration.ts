@@ -1,85 +1,58 @@
+import type * as Wire from '../generated/api-types';
 import { BaseWorkspaceApi } from './base';
 
 /**
  * Orchestration: the parallel batch a thread is running, and the router model
  * that dynamic mode uses to choose the next speaker.
+ *
+ * The parallel-batch shapes are the Go structs' generated wire types
+ * (lib/generated/api-types.ts), with the free-form `string` status fields
+ * narrowed to the values the UI switches on.
  */
+
+/**
+ * `T` with some fields narrowed. Every key in `N` must already exist on `T`
+ * and its type must fit the wire type, so a field the backend renames or
+ * retypes is a compile error here instead of a silently re-added property.
+ */
+type Narrow<T, N extends { [K in keyof N]: K extends keyof T ? T[K] : never }> = Omit<T, keyof N> & N;
 
 export type ParallelBatchState = 'idle' | 'running' | 'blocked' | 'done';
 
-export interface ParallelTask {
-  id: string;
-  content: string;
-  status: string;
-  assignee: string;
-  scope?: string | null;
-}
+/** A task in a worker's lane: the whole todo row, as the server sends it. */
+export type ParallelTask = Wire.TodoRecord;
 
-export interface ParallelWorker {
-  assignee: string;
-  scope: string;
-  tasks: ParallelTask[];
-  done: number;
-  total: number;
-  running: boolean;
-}
+export type ParallelWorker = Wire.ParallelWorker;
 
-export interface ScopeConflict {
-  assignee_a: string;
-  assignee_b: string;
-  scope_a: string;
-  scope_b: string;
-  reason: string;
-}
-
-export interface ParallelBatch {
-  mode: string;
-  state: ParallelBatchState;
-  workers: ParallelWorker[];
-  conflicts: ScopeConflict[];
-  done: number;
-  total: number;
-  /** The channel folder is a git repository: lanes run in their own worktrees. */
-  isolated?: boolean;
-  /** The latest batch actually started in this channel. */
-  run?: ParallelRun;
-}
+export type ScopeConflict = Wire.ScopeConflict;
 
 export type ParallelLaneStatus = 'running' | 'done' | 'failed' | 'merged' | 'conflict' | 'kept';
 
-export interface ParallelLane {
-  id: string;
-  batch_id: string;
-  agent: string;
-  task: string;
-  scope: string;
-  worktree_path: string;
-  branch: string;
-  status: ParallelLaneStatus;
-  error: string;
-  commit: string;
-  reply: string;
-  attempts: number;
-  /** Dev-server port reserved for this lane (4101, 4102, ...); 0 or absent = none. */
-  port?: number;
-  started_at: string;
-  finished_at?: string | null;
-}
+/** One agent's share of a started batch. `port` 0 = no dev-server port reserved. */
+export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus }>;
 
-export interface ParallelRun {
-  batch: {
-    id: string;
-    channel_name: string;
-    isolation: 'worktree' | 'shared';
-    origin: 'board' | 'mention';
-    base_branch: string;
-    status: 'running' | 'done';
-    summary: string;
-    created_at: string;
-    finished_at?: string | null;
-  };
-  lanes: ParallelLane[];
-}
+/** A batch that was actually started, with its lanes. */
+export type ParallelRun = Narrow<
+  Wire.ParallelRunView,
+  {
+    batch: Narrow<
+      Wire.ParallelBatchRecord,
+      {
+        isolation: 'worktree' | 'shared';
+        origin: 'board' | 'mention';
+        status: 'running' | 'done';
+      }
+    >;
+    lanes: ParallelLane[];
+  }
+>;
+
+/**
+ * What a channel's parallel batch is doing. `isolated`: the channel folder is a
+ * git repository, so lanes run in their own worktrees. `run`: the latest batch
+ * actually started in this channel.
+ */
+export type ParallelBatch = Narrow<Wire.ParallelBatch, { state: ParallelBatchState; run?: ParallelRun | null }>;
 
 export type RouterProvider = 'openai' | 'anthropic';
 
