@@ -457,7 +457,7 @@ export function ThreadSidebar() {
         beside the list it creates into (the Projects header below).
       */}
       <nav className="flex flex-col gap-0.5">
-        <button type="button" className={cn(NAV_ROW_CLASS, 'glass-pill font-medium')} onClick={() => void createSession()}>
+        <button type="button" className={cn(NAV_ROW_CLASS, 'bg-muted/60 font-medium text-foreground')} onClick={() => void createSession()}>
           <SquarePen className="size-4 shrink-0" />
           New chat
         </button>
