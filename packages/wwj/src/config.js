@@ -167,7 +167,11 @@ class Config {
   }
 
   writeCommand(cmd) {
-    fs.writeFileSync(this.cmdFile, cmd + '\n', 'utf-8');
+    // Append, never overwrite: the daemon drains this file every 200ms, and
+    // two commands sent inside one tick (`wwj start a; wwj start b`, or
+    // connect's start+restart) used to keep only the last one.
+    fs.mkdirSync(this.configDir, { recursive: true });
+    fs.appendFileSync(this.cmdFile, cmd + '\n', 'utf-8');
   }
 
   getLogs(agentName, lines = 200) {

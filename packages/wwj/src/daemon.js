@@ -888,8 +888,13 @@ class Daemon {
     const cmdFile = this.config.cmdFile;
     try {
       if (!fs.existsSync(cmdFile)) return;
-      const raw = fs.readFileSync(cmdFile, 'utf-8').trim();
-      fs.unlinkSync(cmdFile);
+      // Claim the file by renaming it before reading: a command appended
+      // between a read and an unlink was deleted unseen. After the rename a
+      // late writer simply starts a fresh file for the next tick.
+      const claimed = `${cmdFile}.${process.pid}.processing`;
+      fs.renameSync(cmdFile, claimed);
+      const raw = fs.readFileSync(claimed, 'utf-8').trim();
+      fs.unlinkSync(claimed);
       if (!raw) return;
 
       for (const line of raw.split('\n')) {
