@@ -850,7 +850,7 @@ class ClaudeAdapter extends BaseAdapter {
               senderType: 'agent',
               senderName: this.agentName,
               messageType: 'status',
-              metadata: { agent_mode: this._mode },
+              metadata: { agent_mode: this._modeFor(channel) },
               sessionId: this._sessionId,
             });
         } catch (e) {
@@ -1098,7 +1098,7 @@ class ClaudeAdapter extends BaseAdapter {
       agentName: this.agentName,
       workspaceId: this.workspaceId,
       channelName,
-      mode: this._mode,
+      mode: this._modeFor(channelName),
       browserEnabled,
       toolMode: this.toolMode,
     });
@@ -1140,7 +1140,7 @@ class ClaudeAdapter extends BaseAdapter {
    * Skills mode: write a SKILL.md file and allow Bash + curl for workspace ops.
    */
   _buildSkillsCmd(cmd, channelName, workingDir) {
-    if (this._mode === 'plan') {
+    if (this._modeFor(channelName) === 'plan') {
       cmd.push('--permission-mode', 'plan');
       cmd.push('--allowedTools', 'Read', 'Glob', 'Grep', 'Bash');
     } else {
@@ -1211,7 +1211,7 @@ class ClaudeAdapter extends BaseAdapter {
     mcpTools.push(`${pfx}workspace_get_todos`, `${pfx}workspace_list_timers`, `${pfx}workspace_list_routines`);
     mcpWriteTools.push(`${pfx}workspace_put_todos`, `${pfx}workspace_create_timer`, `${pfx}workspace_cancel_timer`, `${pfx}workspace_create_routine`, `${pfx}workspace_cancel_routine`);
 
-    if (this._mode === 'plan') {
+    if (this._modeFor(channelName) === 'plan') {
       cmd.push('--permission-mode', 'plan');
       cmd.push('--allowedTools', ...mcpTools, 'Read', 'Glob', 'Grep');
     } else {
@@ -1411,8 +1411,11 @@ class ClaudeAdapter extends BaseAdapter {
       // lane's worktree) replaces it rather than reusing it.
       cwd: workingDir || null,
       // The plan/execute mode baked into this process's permission flags.
-      // Flags are fixed at spawn, so a set_mode must replace the process.
-      mode: this._mode,
+      // Flags are fixed at spawn, so a turn in another mode replaces it.
+      mode: this._modeFor(channel),
+      // The per-turn env it was spawned with (a parallel lane's PORT). Env is
+      // fixed at spawn too, so a turn needing different env replaces it.
+      turnEnvKey: this._turnEnvKey(channel),
       proc,
       lineBuffer: '',
       pendingLines: Promise.resolve(),
@@ -1862,17 +1865,11 @@ class ClaudeAdapter extends BaseAdapter {
     // If we have a living persistent process for this channel, send via stdin
     // instead of spawning a new CLI (saves ~2s startup time).
     let existingPP = this._persistentProcs[msgChannel];
-    if (existingPP && existingPP.alive && existingPP.cwd && resolvedWorkingDir && existingPP.cwd !== resolvedWorkingDir) {
-      this._log(`Working directory changed for ${msgChannel} (${existingPP.cwd} -> ${resolvedWorkingDir}); restarting the process`);
-      this._killPersistentProc(msgChannel);
-      existingPP = null;
-    }
-    // `--permission-mode plan` and the allowed-tool list are spawn flags. A
-    // process started in execute mode would keep its write tools after the
-    // workspace switched this agent to plan (and vice versa), so a mode change
-    // replaces it. The session itself is resumed, so no context is lost.
-    if (existingPP && existingPP.alive && existingPP.mode !== this._mode) {
-      this._log(`Mode changed for ${msgChannel} (${existingPP.mode} -> ${this._mode}); restarting the process`);
+    const restartReason = existingPP && existingPP.alive
+      ? this._persistentProcRestartReason(existingPP, msgChannel, resolvedWorkingDir)
+      : null;
+    if (restartReason) {
+      this._log(`${restartReason} for ${msgChannel}; restarting the process`);
       this._killPersistentProc(msgChannel);
       existingPP = null;
     }
@@ -1917,6 +1914,7 @@ class ClaudeAdapter extends BaseAdapter {
               this._channelQueues[msgChannel].push({
                 content: nudge, senderType: 'system', senderName: 'system:todos',
                 sessionId: msgChannel, messageType: 'chat', _todoNudge: true,
+                metadata: { agent_mode: this._modeFor(msgChannel) },
               });
             }
           } catch {}
@@ -1945,48 +1943,7 @@ class ClaudeAdapter extends BaseAdapter {
 
     let mcpConfigFile = null;
     let cmd;
-
-    // Clean env: strip CLAUDE_* / AI_AGENT variables that make the spawned
-    // `claude` think it's running under an SDK harness (org-scoped auth
-    // path → 403). But preserve config vars the child needs for cloud
-    // provider auth (Vertex, Bedrock) and model selection.
-    const CLAUDE_ENV_KEEP = new Set([
-      'CLAUDE_CODE_USE_VERTEX',
-      'CLAUDE_CODE_USE_BEDROCK',
-      'CLAUDE_MODEL',
-      'CLAUDE_API_KEY',
-      'CLAUDE_CODE_MAX_TURNS',
-    ]);
-    const cleanEnv = { ...(this.agentEnv || process.env) };
-    for (const k of Object.keys(cleanEnv)) {
-      if ((k.startsWith('CLAUDE_') && !CLAUDE_ENV_KEEP.has(k)) || k === 'CLAUDECODE' || k === 'AI_AGENT') {
-        delete cleanEnv[k];
-      }
-    }
-
-    // Third-party Anthropic-compatible relays (the common reason a custom
-    // ANTHROPIC_BASE_URL is set) authenticate via `Authorization: Bearer`, which
-    // the Claude CLI only sends when ANTHROPIC_AUTH_TOKEN is set. With just
-    // ANTHROPIC_API_KEY the CLI sends `x-api-key`, which most relays ignore — the
-    // relay then rejects every request as 401 "invalid token / 无效的令牌". When a
-    // non-official base URL is configured and no auth token was provided, mirror
-    // the API key into ANTHROPIC_AUTH_TOKEN (it outranks the API key in Claude
-    // Code's auth precedence) so the CLI uses Bearer auth. The launcher normally
-    // sets this when saving env; this is the runtime backstop for envs saved by
-    // an older launcher or coming from any other source. The official
-    // api.anthropic.com endpoint keeps x-api-key, so it is left untouched.
-    const anthropicBase = (cleanEnv.ANTHROPIC_BASE_URL || '').trim();
-    const anthropicKey = (cleanEnv.ANTHROPIC_API_KEY || '').trim();
-    if (anthropicKey && anthropicBase && !(cleanEnv.ANTHROPIC_AUTH_TOKEN || '').trim()) {
-      let officialAnthropic = false;
-      try {
-        const host = new URL(anthropicBase).hostname.toLowerCase();
-        officialAnthropic = host === 'anthropic.com' || host.endsWith('.anthropic.com');
-      } catch { officialAnthropic = false; }
-      if (!officialAnthropic) {
-        cleanEnv.ANTHROPIC_AUTH_TOKEN = anthropicKey;
-      }
-    }
+    const cleanEnv = this._buildSpawnEnv(msgChannel);
 
     // Spawn a persistent process and send the first message via stdin
     let effectiveContent = content;
@@ -2080,7 +2037,7 @@ class ClaudeAdapter extends BaseAdapter {
         // Success — post final response
         const fullResponse = pp.lastResponseText.join('\n').trim();
 
-        if (this._mode === 'plan') {
+        if (this._modeFor(msgChannel) === 'plan') {
           try {
             const planDir = path.join(resolvedWorkingDir || defaultAgentWorkdir(this.agentName), '.claude', 'plans');
             if (fs.existsSync(planDir)) {
@@ -2133,6 +2090,7 @@ class ClaudeAdapter extends BaseAdapter {
               this._channelQueues[msgChannel].push({
                 content: nudge, senderType: 'system', senderName: 'system:todos',
                 sessionId: msgChannel, messageType: 'chat', _todoNudge: true,
+                metadata: { agent_mode: this._modeFor(msgChannel) },
               });
             }
           } catch {}
@@ -2155,6 +2113,77 @@ class ClaudeAdapter extends BaseAdapter {
     if (mcpConfigFile) {
       try { fs.unlinkSync(mcpConfigFile); } catch {}
     }
+  }
+
+  /**
+   * Why a live per-channel process cannot serve this turn, or null when it
+   * can. Its directory, `--permission-mode plan` + allowed-tool list and env
+   * are all fixed at spawn:
+   *  - a parallel lane runs in its own worktree;
+   *  - a process started in execute mode would keep its write tools for a
+   *    turn that must only review (and vice versa) -- the turn's mode comes
+   *    from its message, else the set_mode default;
+   *  - a lane's PORT only reaches a freshly spawned CLI.
+   * The session is resumed on respawn, so no context is lost.
+   */
+  _persistentProcRestartReason(pp, channel, workingDir) {
+    if (pp.cwd && workingDir && pp.cwd !== workingDir) {
+      return `Working directory changed (${pp.cwd} -> ${workingDir})`;
+    }
+    const mode = this._modeFor(channel);
+    if (pp.mode !== mode) return `Mode changed (${pp.mode} -> ${mode})`;
+    if ((pp.turnEnvKey || '') !== this._turnEnvKey(channel)) return 'Turn env changed';
+    return null;
+  }
+
+  /**
+   * The env a spawned claude gets for `channel`'s current turn.
+   */
+  _buildSpawnEnv(channel) {
+    // Clean env: strip CLAUDE_* / AI_AGENT variables that make the spawned
+    // `claude` think it's running under an SDK harness (org-scoped auth
+    // path → 403). But preserve config vars the child needs for cloud
+    // provider auth (Vertex, Bedrock) and model selection.
+    const CLAUDE_ENV_KEEP = new Set([
+      'CLAUDE_CODE_USE_VERTEX',
+      'CLAUDE_CODE_USE_BEDROCK',
+      'CLAUDE_MODEL',
+      'CLAUDE_API_KEY',
+      'CLAUDE_CODE_MAX_TURNS',
+    ]);
+    const cleanEnv = { ...(this.agentEnv || process.env) };
+    for (const k of Object.keys(cleanEnv)) {
+      if ((k.startsWith('CLAUDE_') && !CLAUDE_ENV_KEEP.has(k)) || k === 'CLAUDECODE' || k === 'AI_AGENT') {
+        delete cleanEnv[k];
+      }
+    }
+    // This turn's own env (a parallel lane's PORT) on top.
+    Object.assign(cleanEnv, this._turnEnv(channel));
+
+    // Third-party Anthropic-compatible relays (the common reason a custom
+    // ANTHROPIC_BASE_URL is set) authenticate via `Authorization: Bearer`, which
+    // the Claude CLI only sends when ANTHROPIC_AUTH_TOKEN is set. With just
+    // ANTHROPIC_API_KEY the CLI sends `x-api-key`, which most relays ignore — the
+    // relay then rejects every request as 401 "invalid token / 无效的令牌". When a
+    // non-official base URL is configured and no auth token was provided, mirror
+    // the API key into ANTHROPIC_AUTH_TOKEN (it outranks the API key in Claude
+    // Code's auth precedence) so the CLI uses Bearer auth. The launcher normally
+    // sets this when saving env; this is the runtime backstop for envs saved by
+    // an older launcher or coming from any other source. The official
+    // api.anthropic.com endpoint keeps x-api-key, so it is left untouched.
+    const anthropicBase = (cleanEnv.ANTHROPIC_BASE_URL || '').trim();
+    const anthropicKey = (cleanEnv.ANTHROPIC_API_KEY || '').trim();
+    if (anthropicKey && anthropicBase && !(cleanEnv.ANTHROPIC_AUTH_TOKEN || '').trim()) {
+      let officialAnthropic = false;
+      try {
+        const host = new URL(anthropicBase).hostname.toLowerCase();
+        officialAnthropic = host === 'anthropic.com' || host.endsWith('.anthropic.com');
+      } catch { officialAnthropic = false; }
+      if (!officialAnthropic) {
+        cleanEnv.ANTHROPIC_AUTH_TOKEN = anthropicKey;
+      }
+    }
+    return cleanEnv;
   }
 
   async run() {

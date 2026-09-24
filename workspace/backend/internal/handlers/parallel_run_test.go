@@ -242,8 +242,8 @@ func TestParallelLanesGetDistinctFreePorts(t *testing.T) {
 	// The ports are in the lane view and are not handed out again while the
 	// batch runs, even though nothing listens on them yet.
 	view := latestBatchView(ws, batch.ChannelName)
-	if rows, _ := view["lanes"].([]models.ParallelLaneRecord); len(rows) != 3 || rows[0].Port == 0 {
-		t.Fatalf("lane view missing ports: %+v", view["lanes"])
+	if view == nil || len(view.Lanes) != 3 || view.Lanes[0].Port == 0 {
+		t.Fatalf("lane view missing ports: %+v", view)
 	}
 	for _, p := range allocateLanePorts(db.DB, 3) {
 		if _, taken := seen[p]; taken {

@@ -37,6 +37,8 @@ const PI_RESUME_MIN_CHARS = 400;      // work worth resuming rather than replayi
 // minutes between events.
 const PI_DEFAULT_INACTIVITY_SEC = 900;
 const PI_WATCHDOG_TICK_MS = 15000;
+// pi's documented read-only tool set (`pi --help`: 'Read-only mode').
+const PI_READ_ONLY_TOOLS = 'read,grep,find,ls';
 
 // Pi's own configuration directory. `models.json` declares the providers and
 // models this install can reach; `settings.json` names the active one. Both are
@@ -288,7 +290,7 @@ class PiAdapter extends BaseAdapter {
         channelName,
         endpoint: this.endpoint,
         token: this.token,
-        mode: this._mode,
+        mode: this._modeFor(channelName),
         disabledModules: this.disabledModules,
       }),
       '\n## 52hzAgents-specific Rules',
@@ -324,6 +326,12 @@ class PiAdapter extends BaseAdapter {
       '--session-dir', this._sessionDir,
     );
     if (this.piApprove) args.push('--approve');
+    // Plan (Review) mode is enforced by pi's own tool allowlist, not only asked
+    // for in the prompt: `pi --help` (0.85.1) documents
+    // `--tools read,grep,find,ls` as its read-only mode. It drops bash and
+    // edit/write -- and with bash the curl route to workspace tools, which a
+    // review turn does not need; its reply is still posted by the adapter.
+    if (this._modeFor(channelName) === 'plan') args.push('--tools', PI_READ_ONLY_TOOLS);
     const activeModel = this._resolveModel(channelName) || this.piModel;
     if (activeModel) args.push('--model', activeModel);
     // The workspace context goes in the system prompt, not in the conversation
@@ -357,7 +365,8 @@ class PiAdapter extends BaseAdapter {
     const args = this._buildPiCmd(prompt, channelName, contextFile);
     this._log(`Running pi (channel=${channelName}, session=${sessionPath})`);
 
-    const env = { ...getEnhancedEnv(), ...(this.agentEnv || process.env) };
+    // This turn's own env (a parallel lane's PORT) goes on top.
+    const env = { ...getEnhancedEnv(), ...(this.agentEnv || process.env), ...this._turnEnv(channelName) };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.ELECTRON_NO_ASAR;
     const cwd = await this._resolveWorkingDir(channelName, userMessage);

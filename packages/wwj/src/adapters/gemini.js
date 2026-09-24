@@ -169,6 +169,11 @@ class GeminiAdapter extends BaseAdapter {
     await super._onControlAction(action, payload);
   }
 
+  /** The one place gemini is spawned (a seam for tests, as in pi.js). */
+  _spawnProc(bin, args, opts) {
+    return spawn(bin, args, opts);
+  }
+
   async _stopProcess(proc) {
     if (!proc || proc.exitCode !== null) return;
     try {
@@ -325,17 +330,26 @@ class GeminiAdapter extends BaseAdapter {
       throw new Error('gemini CLI not found. Install with: npm install -g @google/gemini-cli');
     }
 
+    const mode = this._modeFor(channelName);
     const systemPrompt = '\n' + buildClaudeSystemPrompt({
       agentName: this.agentName,
       workspaceId: this.workspaceId,
       channelName,
-      mode: this._mode,
+      mode,
     });
-    
+
     // For gemini, we combine system prompt with the user message since it doesn't have an append-system-prompt flag
     const fullPrompt = `${systemPrompt}\n\n---\n\nUser message:\n${prompt}`;
 
-    const cmd = [geminiBin, '-p', fullPrompt, '-y', '-o', 'stream-json'];
+    // Plan (Review) mode is enforced by Gemini's approval policy, not only
+    // asked for in the prompt. Per the gemini-cli docs (cli-reference.md,
+    // reference/policy-engine.md): `--approval-mode default` makes write tools
+    // ask first, and in non-interactive mode an ask is treated as deny. Not
+    // `--approval-mode plan`: headless, its exit_plan_mode is auto-approved and
+    // switches to YOLO (cli/plan-mode.md). `-y` is the deprecated spelling of
+    // `--approval-mode yolo`, so the two are never passed together.
+    const approval = mode === 'plan' ? ['--approval-mode', 'default'] : ['-y'];
+    const cmd = [geminiBin, '-p', fullPrompt, ...approval, '-o', 'stream-json'];
 
     // Honor a user-configured model
     const env = this.agentEnv || process.env;
@@ -362,6 +376,9 @@ class GeminiAdapter extends BaseAdapter {
     if (!content) return;
 
     const msgChannel = msg.sessionId || this.channelName;
+    // Warm the per-channel folder so the spawn runs in the thread's folder (or
+    // a parallel lane's worktree), not the agent default.
+    try { await this._resolveWorkingDir(msgChannel); } catch {}
     const sender = msg.senderName || msg.senderType || 'user';
     this._log(`Processing message from ${sender} in ${msgChannel}: ${content.slice(0, 80)}...`);
 
@@ -391,7 +408,8 @@ class GeminiAdapter extends BaseAdapter {
     await this.sendStatus(msgChannel, 'thinking...');
 
     let cmd;
-    const cleanEnv = { ...(this.agentEnv || process.env) };
+    // This turn's own env (a parallel lane's PORT) on top.
+    const cleanEnv = { ...(this.agentEnv || process.env), ...this._turnEnv(msgChannel) };
 
     let _shouldRetry = false;
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -411,10 +429,10 @@ class GeminiAdapter extends BaseAdapter {
           cmd = ['cmd.exe', '/c', ...cmd];
         }
 
-        const proc = spawn(cmd[0], cmd.slice(1), {
+        const proc = this._spawnProc(cmd[0], cmd.slice(1), {
           stdio: ['ignore', 'pipe', 'pipe'],
           env: cleanEnv,
-          cwd: this.workingDir,
+          cwd: this._cwdFor(msgChannel),
           detached: !IS_WINDOWS,
           windowsHide: true,
         });

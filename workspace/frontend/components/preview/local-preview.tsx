@@ -88,8 +88,8 @@ function useLanePorts(): LanePort[] {
         const batch = await workspaceApi.getParallelBatch(channel);
         if (cancelled) return;
         const next = (batch.run?.lanes ?? [])
-          .filter((l) => typeof l.port === 'number' && l.port > 0)
-          .map((l) => ({ agent: l.agent, port: l.port as number }));
+          .filter((l) => l.port > 0)
+          .map((l) => ({ agent: l.agent, port: l.port }));
         // Keep the same array when nothing changed so the toolbar does not re-render every poll.
         setLanes((prev) =>
           prev.length === next.length && prev.every((p, i) => p.agent === next[i].agent && p.port === next[i].port)

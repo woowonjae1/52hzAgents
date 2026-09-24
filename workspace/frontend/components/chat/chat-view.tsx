@@ -60,6 +60,7 @@ import { AgentQuotaCapsule } from './agent-quota-capsule';
 
 import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
+import { threadAgentMode } from '@/lib/agent-profiles';
 import { PipelineStepper } from './pipeline-stepper';
 import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
@@ -817,6 +818,9 @@ export function ChatView() {
         if (segments && segments.length >= 2) {
           msgMetadata.mention_segments = segments;
         }
+        // The thread's Fix/Review profile rides on every message: the adapter
+        // runs this turn in that mode, whatever the agent does in other threads.
+        msgMetadata.agent_mode = threadAgentMode(sessionId);
 
         const confirmation = await workspaceApi.sendMessage(
           sessionId,

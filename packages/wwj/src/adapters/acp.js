@@ -545,12 +545,17 @@ class AcpAdapter extends BaseAdapter {
   }
 
   async _startConnection(channel, cwd) {
-    const entry = { channel, conn: null, sessionId: null, cwd: null, loadSession: false, authMethods: [], turn: null };
+    const turnEnv = this._turnEnv(channel);
+    const entry = {
+      channel, conn: null, sessionId: null, cwd: null, loadSession: false, authMethods: [], turn: null,
+      // The per-turn env (a parallel lane's PORT) this process was spawned with.
+      turnEnvKey: this._turnEnvKey(channel),
+    };
     const conn = new AcpConnection({
       command: this.acpCommand,
       args: this.acpArgs,
       cwd,
-      env: { ...(this.agentEnv || process.env) },
+      env: { ...(this.agentEnv || process.env), ...turnEnv },
       log: (m) => this._log(m),
       onNotification: (method, params) => this._onNotification(entry, method, params),
       onRequest: (method, params) => this._onAgentRequest(entry, method, params),
@@ -609,6 +614,15 @@ class AcpAdapter extends BaseAdapter {
     let entry = this._conns[channel];
     if (entry && entry.conn.closed) {
       delete this._conns[channel];
+      entry = null;
+    }
+    // Env is fixed at spawn: a turn whose env differs (a parallel lane's PORT,
+    // or the first turn back after one) needs a fresh process. The session is
+    // loaded again below when the agent supports it.
+    if (entry && (entry.turnEnvKey || '') !== this._turnEnvKey(channel)) {
+      this._log(`ACP: turn env changed for ${channel}; restarting the agent process`);
+      delete this._conns[channel];
+      try { entry.conn.kill(); } catch {}
       entry = null;
     }
     if (!entry) entry = await this._startConnection(channel, cwd);
@@ -693,7 +707,7 @@ class AcpAdapter extends BaseAdapter {
           agentName: this.agentName,
           workspaceId: this.workspaceId,
           channelName: channel,
-          mode: this._mode,
+          mode: this._modeFor(channel),
           browserEnabled: this._browserEnabledCache === true,
         }));
       } catch {}
@@ -987,7 +1001,7 @@ class AcpAdapter extends BaseAdapter {
 
     let decision;
     let why;
-    if (this._mode === 'plan' && WRITE_KINDS.has(kind)) {
+    if (this._modeFor(entry.channel) === 'plan' && WRITE_KINDS.has(kind)) {
       decision = 'denied';
       why = 'plan mode';
     } else if (this._permissionMode === 'auto') {
@@ -1109,7 +1123,7 @@ class AcpAdapter extends BaseAdapter {
   }
 
   _fsWrite(entry, params) {
-    if (this._mode === 'plan') throw rpcError(-32000, 'Writing files is disabled in plan mode');
+    if (this._modeFor(entry.channel) === 'plan') throw rpcError(-32000, 'Writing files is disabled in plan mode');
     const p = params && params.path;
     if (!p || !path.isAbsolute(p)) throw rpcError(-32602, 'path must be absolute');
     if (typeof params.content !== 'string') throw rpcError(-32602, 'content must be a string');

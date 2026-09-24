@@ -602,6 +602,9 @@ class CodexAdapter extends BaseAdapter {
 
     await this._autoTitleChannel(msgChannel, content);
     await this.sendStatus(msgChannel, 'thinking...');
+    // Warm the per-channel folder so the synchronous spawn below runs in the
+    // thread's folder (or a parallel lane's worktree), not the agent default.
+    try { await this._resolveWorkingDir(msgChannel); } catch {}
 
     if (this._useCliMode) {
       await this._handleViaSubprocess(content, msgChannel, msg);
@@ -615,6 +618,28 @@ class CodexAdapter extends BaseAdapter {
   // ------------------------------------------------------------------
   // CLI subprocess mode (primary)
   // ------------------------------------------------------------------
+
+  /**
+   * argv for one `codex exec` run. Plan (Review) mode is enforced by Codex's
+   * own sandbox, not only asked for in the prompt: `--sandbox read-only`
+   * instead of the full bypass (`codex exec --help`, codex-cli 0.146). The
+   * flag belongs to `exec` itself -- `exec resume` rejects it -- so it goes
+   * before the `resume` subcommand, where exec still parses it.
+   */
+  _buildCodexCmd({ threadId = null, model = '', effort = '', mode = 'execute' } = {}) {
+    const cmd = [this._codexBin, 'exec'];
+    if (mode === 'plan') cmd.push('--sandbox', 'read-only');
+    if (threadId) cmd.push('resume', threadId);
+    cmd.push('--json');
+    if (mode !== 'plan') cmd.push('--dangerously-bypass-approvals-and-sandbox');
+    cmd.push('--skip-git-repo-check');
+    if (model) cmd.push('-m', model);
+    if (effort) {
+      // Codex exposes no --effort flag; its documented route is the -c override.
+      cmd.push('-c', `model_reasoning_effort="${effort}"`);
+    }
+    return cmd;
+  }
 
   async _handleViaSubprocess(content, msgChannel, msg) {
     const env = { ...(this.agentEnv || process.env) };
@@ -630,29 +655,22 @@ class CodexAdapter extends BaseAdapter {
     const context = this._buildSystemContext(msgChannel);
     const fullPrompt = `${context}\n\n---\n\nUser message:\n${content}`;
 
+    // This turn's own env (a parallel lane's PORT) on top.
+    Object.assign(env, this._turnEnv(msgChannel));
+    const mode = this._modeFor(msgChannel);
+
     // Run up to 2 attempts: first with resume, then fresh if stale
     for (let attempt = 0; attempt < 2; attempt++) {
-      const cmd = [this._codexBin, 'exec'];
-
       // Resume existing thread for this channel
       const threadId = this._channelThreads[msgChannel];
-      if (threadId && attempt === 0) {
-        cmd.push('resume', threadId);
-      }
+      const cmd = this._buildCodexCmd({
+        threadId: threadId && attempt === 0 ? threadId : null,
+        model: activeModel,
+        effort: this._currentEffort(msgChannel),
+        mode,
+      });
 
-      cmd.push('--json', '--dangerously-bypass-approvals-and-sandbox', '--skip-git-repo-check');
-
-      // Model override
-      if (activeModel) {
-        cmd.push('-m', activeModel);
-      }
-      const activeEffort = this._currentEffort(msgChannel);
-      if (activeEffort) {
-        // Codex exposes no --effort flag; its documented route is the -c override.
-        cmd.push('-c', `model_reasoning_effort="${activeEffort}"`);
-      }
-
-      this._log(`Spawning: codex exec ${threadId && attempt === 0 ? `resume ${threadId} ` : ''}--json --full-auto -m ${activeModel || 'default'}`);
+      this._log(`Spawning: codex exec ${threadId && attempt === 0 ? `resume ${threadId} ` : ''}--json ${mode === 'plan' ? '--sandbox read-only' : '--full-auto'} -m ${activeModel || 'default'}`);
 
       try {
         const result = await this._spawnCodex(cmd, env, msgChannel, fullPrompt);
@@ -719,7 +737,7 @@ class CodexAdapter extends BaseAdapter {
       const proc = spawn(bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
         env,
-        cwd: this.workingDir,
+        cwd: this._cwdFor(msgChannel),
         detached: !IS_WINDOWS,
         windowsHide: true,
         shell: useShell,

@@ -20,6 +20,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { AsyncLocalStorage } = require('async_hooks');
 const { WorkspaceClient, SessionRevokedError } = require('../workspace-client');
 const { generateSessionTitle, SESSION_DEFAULT_RE, leadingMentions } = require('./utils');
 const { extractDecisionQuestions } = require('./decision-parser');
@@ -30,6 +31,14 @@ const {
   classifyJoinError,
   classifyHeartbeatError,
 } = require('./health-status');
+
+// Which adapter+channel the running code belongs to, so a bare `this._mode`
+// read inside a turn resolves to THAT turn's mode (see the `_mode` getter).
+// Turns of different channels run concurrently, so an instance field alone
+// cannot say which one is asking.
+const turnScope = new AsyncLocalStorage();
+
+const TURN_MODES = new Set(['execute', 'plan']);
 
 const DEFAULT_ENDPOINT = process.env.WWJ_WORKSPACE_ENDPOINT || process.env.WWJ_ENDPOINT || 'http://localhost:8000';
 
@@ -161,7 +170,13 @@ class BaseAdapter {
     this._turnErrors = {};
     this._turnReportChain = {};
     this._titledSessions = new Set();
-    this._mode = 'execute';
+    // The fallback mode, set by the `set_mode` control. A message that carries
+    // `metadata.agent_mode` overrides it for that one turn (_turnModeOverride);
+    // read the effective value through `_modeFor(channel)` / `this._mode`.
+    this._defaultMode = 'execute';
+    this._turnModeOverride = {};
+    // Extra env for one turn's spawned CLI (a parallel lane's PORT). See _turnEnv.
+    this._turnEnvOverride = {};
     this._lastControlId = null;
     this._controlWake = null;
     // Per-channel task tracking for parallel execution
@@ -703,6 +718,80 @@ class BaseAdapter {
     } catch {}
   }
 
+  // ------------------------------------------------------------------
+  // Plan / execute mode
+  // ------------------------------------------------------------------
+
+  /**
+   * The mode (execute | plan) in effect for `channel` right now: the running
+   * turn's own mode when its message carried one, else the adapter default
+   * from `set_mode`. Adapters should prefer this over `this._mode` wherever
+   * they know the channel -- callbacks of a long-lived per-channel process
+   * included.
+   */
+  _modeFor(channel) {
+    const m = channel && this._turnModeOverride ? this._turnModeOverride[channel] : null;
+    return m || this._defaultMode || 'execute';
+  }
+
+  /**
+   * `this._mode` as a bare read: inside a turn it is that turn's mode (the
+   * turn's async context carries its channel); outside any turn -- control
+   * polling, status reports -- it is the adapter default. Assigning it sets
+   * the default, as `set_mode` does.
+   */
+  get _mode() {
+    const scope = turnScope.getStore();
+    if (scope && scope.adapter === this) return this._modeFor(scope.channel);
+    return this._defaultMode || 'execute';
+  }
+
+  set _mode(value) {
+    this._defaultMode = value;
+  }
+
+  /**
+   * Take the turn's mode from the message: the workspace attaches the
+   * thread's Fix/Review choice as `metadata.agent_mode` to every message it
+   * sends, so one agent can review in one thread and fix in another, and the
+   * choice survives an adapter restart. Agents stamp their own messages with
+   * their effective mode too, so a handoff inside a Review thread stays in
+   * review. Anything else leaves the default in charge.
+   */
+  _enterTurnMode(channel, msg) {
+    if (!this._turnModeOverride) this._turnModeOverride = {};
+    const m = msg && msg.metadata && msg.metadata.agent_mode;
+    if (typeof m === 'string' && TURN_MODES.has(m)) this._turnModeOverride[channel] = m;
+    else delete this._turnModeOverride[channel];
+  }
+
+  _exitTurnMode(channel) {
+    if (this._turnModeOverride) delete this._turnModeOverride[channel];
+  }
+
+  /** Run one turn's handler with its channel attached to the async context. */
+  _runInTurnScope(channel, fn) {
+    return turnScope.run({ adapter: this, channel }, fn);
+  }
+
+  /**
+   * Env vars the CLI spawned for this channel's current turn must get on top
+   * of agentEnv -- a parallel lane's own PORT. Adapters merge it into the env
+   * they spawn with; one that keeps a long-lived process per channel must
+   * restart it when this differs from what the process was spawned with.
+   */
+  _turnEnv(channel) {
+    const extra = channel && this._turnEnvOverride ? this._turnEnvOverride[channel] : null;
+    return extra ? { ...extra } : {};
+  }
+
+  /** A stable comparison key for `_turnEnv(channel)` ('' when there is none). */
+  _turnEnvKey(channel) {
+    const env = this._turnEnv(channel);
+    const keys = Object.keys(env).sort();
+    return keys.length ? JSON.stringify(keys.map((k) => [k, env[k]])) : '';
+  }
+
   async _pollControl() {
     try {
       const events = await this.client.pollControl(
@@ -714,11 +803,13 @@ class BaseAdapter {
         const payload = ev.payload || {};
         const action = payload.action;
         if (action === 'set_mode') {
+          // Only the fallback: a message carrying metadata.agent_mode still
+          // decides its own turn (see _enterTurnMode).
           const newMode = payload.mode || 'execute';
-          if ((newMode === 'execute' || newMode === 'plan') && newMode !== this._mode) {
-            const oldMode = this._mode;
-            this._mode = newMode;
-            this._log(`Mode changed: ${oldMode} -> ${newMode}`);
+          if (TURN_MODES.has(newMode) && newMode !== this._defaultMode) {
+            const oldMode = this._defaultMode;
+            this._defaultMode = newMode;
+            this._log(`Default mode changed: ${oldMode} -> ${newMode}`);
           }
         } else {
           await this._onControlAction(action, payload);
@@ -1525,12 +1616,13 @@ class BaseAdapter {
     this._beginTurn(channel);
     this._turnStarted(channel);
     const turnStartedAt = Date.now();
+    this._enterTurnMode(channel, msg);
     const lane = this._enterParallelLane(channel, msg);
     try {
       if (msg && typeof msg.content === 'string') {
         msg.content = await this._resolveKnowledgeMentions(msg.content);
       }
-      await this._handleMessage(msg);
+      await this._runInTurnScope(channel, () => this._handleMessage(msg));
     } catch (e) {
       this._log(`Error in channel worker for ${channel}: ${e.message}`);
       this._noteTurnError(channel, e.message);
@@ -1541,6 +1633,7 @@ class BaseAdapter {
       await this._releaseStaleTodos(channel, 'turn ended');
       this._registerFilesTouchedSince(channel, turnStartedAt).catch(() => {});
       if (lane) await this._exitParallelLane(channel, lane);
+      this._exitTurnMode(channel);
     }
 
     // Drain queue
@@ -1554,12 +1647,13 @@ class BaseAdapter {
       this._beginTurn(channel);
       this._turnStarted(channel);
       const queuedStartedAt = Date.now();
+      this._enterTurnMode(channel, nextMsg);
       const queuedLane = this._enterParallelLane(channel, nextMsg);
       try {
         if (nextMsg && typeof nextMsg.content === 'string') {
           nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content);
         }
-        await this._handleMessage(nextMsg);
+        await this._runInTurnScope(channel, () => this._handleMessage(nextMsg));
       } catch (e) {
         this._log(`Error processing queued message in ${channel}: ${e.message}`);
         this._noteTurnError(channel, e.message);
@@ -1570,6 +1664,7 @@ class BaseAdapter {
         await this._releaseStaleTodos(channel, 'queued turn ended');
         this._registerFilesTouchedSince(channel, queuedStartedAt).catch(() => {});
         if (queuedLane) await this._exitParallelLane(channel, queuedLane);
+        this._exitTurnMode(channel);
       }
     }
     this._channelBusy.delete(channel);
@@ -1618,11 +1713,14 @@ class BaseAdapter {
       lines.push('The other agents share this folder. Change only what your part needs.');
     }
     // A per-lane port keeps two lanes' dev servers off each other's 3000/5173.
-    // Only the brief carries it: agentEnv is shared by every channel and some
-    // adapters keep one long-lived CLI per channel, so a per-turn env var
-    // would neither be isolated nor reliably reach the process.
+    // The brief tells the agent, and PORT in the spawned CLI's env makes the
+    // usual dev servers pick it up on their own: a per-turn, per-channel
+    // override (never agentEnv, which every channel shares) that CLI adapters
+    // merge in via _turnEnv, restarting a long-lived process when it differs.
     const port = Number(lane.port);
     if (Number.isInteger(port) && port > 0) {
+      this._turnEnvOverride = this._turnEnvOverride || {};
+      this._turnEnvOverride[channel] = { PORT: String(port) };
       lines.push(`If you start a dev server or any listening process, use port ${port} -- other agents are using other ports.`);
     }
     lines.push('Finish with a short summary of what you changed.', '', '---', '');
@@ -1634,6 +1732,7 @@ class BaseAdapter {
   /** Report the lane's end to the backend, which commits and, last, merges. */
   async _exitParallelLane(channel, lane) {
     if (this._turnDirOverride) delete this._turnDirOverride[channel];
+    if (this._turnEnvOverride) delete this._turnEnvOverride[channel];
     const failed = Boolean(this._turnFailed && this._turnFailed.has(channel));
     const reply = (this._lastReply && this._lastReply[channel]) || '';
     try {
@@ -1682,6 +1781,19 @@ class BaseAdapter {
    * pay a network round trip — call after computing `channel` for a message,
    * not once at adapter startup, since the binding is per-thread not per-agent.
    */
+  /**
+   * The directory to spawn a CLI in, synchronously, for adapters whose spawn
+   * site cannot await: a parallel lane's worktree for this turn, else the
+   * channel folder _resolveWorkingDir last resolved (call it earlier in the
+   * turn to warm the cache), else the agent's own folder.
+   */
+  _cwdFor(channel) {
+    if (this._turnDirOverride && this._turnDirOverride[channel]) return this._turnDirOverride[channel];
+    const cached = this._workingDirCache && this._workingDirCache.get(channel);
+    if (cached && cached.value) return cached.value;
+    return this.workingDir || defaultAgentWorkdir(this.agentName);
+  }
+
   async _resolveWorkingDir(channel, messageText = '') {
     // A parallel lane runs this one turn in its own worktree. Checked before
     // the cache, and never written to it, so the next turn is back home.

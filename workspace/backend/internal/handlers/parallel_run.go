@@ -594,16 +594,23 @@ func ExpireStaleParallelLanes() {
 	}
 }
 
+// ParallelRunView is a batch that was actually started, with its lanes: the
+// `run` of GET /v1/parallel-batch.
+type ParallelRunView struct {
+	Batch models.ParallelBatchRecord  `json:"batch"`
+	Lanes []models.ParallelLaneRecord `json:"lanes"`
+}
+
 // latestBatchView is the channel's most recent batch with its lanes, for the UI.
-func latestBatchView(workspaceID, channelName string) gin.H {
+func latestBatchView(workspaceID, channelName string) *ParallelRunView {
 	var batch models.ParallelBatchRecord
 	if db.DB.Where("workspace_id = ? AND channel_name = ?", workspaceID, channelName).
 		Order("created_at DESC").Limit(1).Find(&batch).RowsAffected == 0 {
 		return nil
 	}
-	var lanes []models.ParallelLaneRecord
+	lanes := []models.ParallelLaneRecord{}
 	db.DB.Where("batch_id = ?", batch.ID).Order("agent").Find(&lanes)
-	return gin.H{"batch": batch, "lanes": lanes}
+	return &ParallelRunView{Batch: batch, Lanes: lanes}
 }
 
 func truncateRunes(s string, n int) string {
