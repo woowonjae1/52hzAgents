@@ -173,6 +173,8 @@ func main() { // 服务程序运行主入口函数。
 		v1.GET("/workspaces/:workspace_id/agents/:agent_name/usage", handlers.GetAgentUsage)
 		v1.POST("/workspaces/:workspace_id/agents/:agent_name/context", handlers.ReportAgentContext) // 每个 agent 在每个频道里自己的上下文用量
 		v1.GET("/workspaces/:workspace_id/agent-contexts", handlers.ListAgentContexts)
+		v1.POST("/workspaces/:workspace_id/agents/:agent_name/turn", handlers.ReportAgentTurn) // agent 自己报告的回合状态 idle|running|error
+		v1.GET("/workspaces/:workspace_id/agent-turns", handlers.ListAgentTurns)
 		v1.POST("/workspaces/:workspace_id/agents/:agent_name/logs", handlers.CreateAgentLog)
 		v1.GET("/workspaces/:workspace_id/agents/:agent_name/logs", handlers.ListAgentLogs)
 		v1.POST("/approvals", handlers.CreateAgentApproval)

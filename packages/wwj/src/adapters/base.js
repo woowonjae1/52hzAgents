@@ -95,6 +95,21 @@ function toolCallDetail(args) {
 /** Lines kept in a channel recap (see _buildChannelContext). */
 const RECAP_TAIL_LINES = 20;
 
+/*
+  Persisted message cursor (see _initEventCursor). A stored cursor older than
+  CURSOR_MAX_AGE_MS is ignored; resuming replays at most CURSOR_REPLAY_CAP
+  messages. The file is rewritten when the cursor moves (at most every
+  CURSOR_SAVE_INTERVAL_MS unless a message was just dispatched) and touched
+  every CURSOR_TOUCH_INTERVAL_MS while idle, so a long-idle adapter that
+  restarts still counts as recent. CURSOR_REPLAY_MARGIN_MS absorbs the throttle
+  and clock skew when discarding events that predate the saved cursor.
+*/
+const CURSOR_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CURSOR_REPLAY_CAP = 50;
+const CURSOR_SAVE_INTERVAL_MS = 5000;
+const CURSOR_TOUCH_INTERVAL_MS = 10 * 60 * 1000;
+const CURSOR_REPLAY_MARGIN_MS = 2 * 60 * 1000;
+
 class BaseAdapter {
   /**
    * @param {object} opts
@@ -133,6 +148,18 @@ class BaseAdapter {
     this._running = false;
     this._sessionId = null;  // issued by server on /v1/join; used to prove liveness
     this._processedIds = new Set();
+    // Where the message cursor survives a restart (see _initEventCursor). Off
+    // under `node --test` unless a test points it at a temp dir, for the same
+    // reason _logFile is.
+    this._cursorDir = process.env.NODE_TEST_CONTEXT ? null : path.join(os.homedir(), '.wwj', 'cursors');
+    this._cursorSavedId = null;
+    this._cursorSavedAt = 0;
+    this._replayFloorMs = null;
+    // Channels with a turn in flight, and the failure text of the current one,
+    // for turn-state reporting (see _turnStarted / _turnEnded).
+    this._runningTurns = new Set();
+    this._turnErrors = {};
+    this._turnReportChain = {};
     this._titledSessions = new Set();
     this._mode = 'execute';
     this._lastControlId = null;
@@ -368,6 +395,9 @@ class BaseAdapter {
       this._sessionId = (joinResult && joinResult.session_id) || null;
       this._log(`Joined workspace ${this.workspaceId}${this._sessionId ? ` (session ${this._sessionId.slice(0, 8)})` : ''}`);
       this._reportStatus(null); // joined OK → clear any prior error
+      // A rejoin mid-turn: say the turns are still ours, or the backend reads
+      // the new session as a restart and marks them failed.
+      for (const channel of this._runningTurns || []) this._reportTurnState(channel, 'running');
       return true;
     } catch (e) {
       const { reason, message } = classifyJoinError(e);
@@ -414,7 +444,7 @@ class BaseAdapter {
         this._log(`Heartbeat failed (non-fatal): ${e.message}`);
       }
       // Slow path: only the message-poll loop waits for this.
-      await this._skipExistingEvents();
+      await this._initEventCursor();
       this._log('Starting poll loop...');
       await this._pollLoop();
 
@@ -447,6 +477,16 @@ class BaseAdapter {
       this._wakeControlPoller();
       clearInterval(heartbeatInterval);
       try { await controlPoller; } catch {}
+      // Not before the first successful poll: rewriting a resumed cursor then
+      // would move its savedAt past a replay that never ran.
+      if (this._cursorPolled) this._persistCursor(true);
+      // Before disconnect: a clean stop ends its turns idle; anything else
+      // ends them in error rather than leaving them looking busy.
+      try {
+        await this._endRunningTurns(
+          this._stopRequested ? null : ((this._exitInfo && this._exitInfo.message) || 'adapter stopped mid-turn')
+        );
+      } catch {}
       try {
         await this.client.disconnect(this.workspaceId, this.agentName, this.token);
       } catch {}
@@ -472,6 +512,110 @@ class BaseAdapter {
     if (head) {
       this._lastEventId = head;
       this._log(`Skipped existing events, cursor at ${head}`);
+    }
+  }
+
+  /*
+    WHERE THE POLL LOOP STARTS.
+
+    Skipping to the head on every start meant anything posted while the adapter
+    was down or restarting was never seen -- and the daemon now restarts
+    adapters on its own, so that window opens on every crash. The cursor is
+    persisted as the loop advances; a recent one is resumed from, with the
+    replay capped so a stale cursor cannot flood the agent with old work.
+  */
+  async _initEventCursor() {
+    let resumed = false;
+    try {
+      resumed = await this._resumeFromStoredCursor();
+    } catch (e) {
+      this._log(`Could not resume from the stored cursor (${e && e.message ? e.message : e}); skipping to head`);
+      this._replayFloorMs = null;
+    }
+    // A resumed cursor is not rewritten until the replay has been polled: a
+    // crash in between must find the original savedAt, not a fresh one.
+    if (!resumed) {
+      await this._skipExistingEvents();
+      this._persistCursor(true);
+    }
+  }
+
+  async _resumeFromStoredCursor() {
+    const stored = this._readStoredCursor();
+    if (!stored) return false;
+    const age = Date.now() - stored.savedAt;
+    if (age > CURSOR_MAX_AGE_MS) {
+      this._log(`Stored cursor is ${Math.round(age / 3600000)}h old; skipping to head`);
+      return false;
+    }
+    if (!this.client || typeof this.client.listAgentEvents !== 'function') return false;
+
+    const probe = await this.client.listAgentEvents(this.workspaceId, this.agentName, this.token, {
+      after: stored.eventId, limit: CURSOR_REPLAY_CAP,
+    });
+    if (!probe.hasMore) {
+      this._lastEventId = stored.eventId;
+      this._replayFloorMs = stored.savedAt - CURSOR_REPLAY_MARGIN_MS;
+      this._log(`Resuming from stored cursor ${stored.eventId} (${probe.events.length} event(s) since, saved ${Math.round(age / 1000)}s ago)`);
+      return true;
+    }
+
+    // Over the cap: start just before the newest CURSOR_REPLAY_CAP instead.
+    const tail = await this.client.listAgentEvents(this.workspaceId, this.agentName, this.token, {
+      sort: 'desc', limit: CURSOR_REPLAY_CAP + 1,
+    });
+    const boundary = tail.events.length > CURSOR_REPLAY_CAP ? tail.events[CURSOR_REPLAY_CAP] : null;
+    if (!boundary || !boundary.id) return false;
+    this._lastEventId = boundary.id;
+    this._replayFloorMs = stored.savedAt - CURSOR_REPLAY_MARGIN_MS;
+    this._log(`Stored cursor ${stored.eventId} is more than ${CURSOR_REPLAY_CAP} events behind; replaying only the newest ${CURSOR_REPLAY_CAP}, older ones skipped`);
+    return true;
+  }
+
+  _cursorFile() {
+    if (!this._cursorDir || !this.workspaceId || !this.agentName) return null;
+    const safe = (s) => String(s).replace(/[^A-Za-z0-9._-]/g, '_');
+    return path.join(this._cursorDir, `${safe(this.workspaceId)}_${safe(this.agentName)}.json`);
+  }
+
+  _readStoredCursor() {
+    const file = this._cursorFile();
+    if (!file) return null;
+    try {
+      const data = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      if (data && typeof data.eventId === 'string' && data.eventId && Number.isFinite(data.savedAt)) return data;
+    } catch {}
+    return null;
+  }
+
+  /**
+   * Write the cursor to disk. Throttled: a moved cursor at most every
+   * CURSOR_SAVE_INTERVAL_MS, an unmoved one touched every
+   * CURSOR_TOUCH_INTERVAL_MS; `force` writes now (after a dispatch, on start
+   * and on stop). Never throws.
+   */
+  _persistCursor(force = false) {
+    const file = this._cursorFile();
+    const id = this._lastEventId;
+    if (!file || !id) return;
+    const now = Date.now();
+    const elapsed = now - this._cursorSavedAt;
+    if (!force) {
+      const moved = id !== this._cursorSavedId;
+      if (moved ? elapsed < CURSOR_SAVE_INTERVAL_MS : elapsed < CURSOR_TOUCH_INTERVAL_MS) return;
+    }
+    try {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const tmp = `${file}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify({ eventId: id, savedAt: now }));
+      fs.renameSync(tmp, file);
+      this._cursorSavedId = id;
+      this._cursorSavedAt = now;
+    } catch (e) {
+      if (!this._cursorWriteWarned) {
+        this._cursorWriteWarned = true;
+        this._log(`Could not persist the message cursor (${e && e.message ? e.message : e}); a restart will skip to head`);
+      }
     }
   }
 
@@ -939,14 +1083,28 @@ class BaseAdapter {
         continue;
       }
       this._pollFailures = 0;
+      this._cursorPolled = true;
 
       if (rawCursor) this._lastEventId = rawCursor;
+
+      // Only the first poll after resuming a stored cursor carries the replay;
+      // events older than the saved cursor were handled before the restart
+      // (they come back when the stored id no longer exists server-side).
+      const replayFloor = this._replayFloorMs;
+      this._replayFloorMs = null;
 
       // Deduplicate
       const incoming = [];
       for (const msg of messages) {
         const msgId = msg.id || msg.messageId;
         if (msgId && this._processedIds.has(msgId)) continue;
+        if (replayFloor !== null && replayFloor !== undefined) {
+          const at = Date.parse(msg.createdAt || '');
+          if (Number.isFinite(at) && at < replayFloor) {
+            if (msgId) this._processedIds.add(msgId);
+            continue;
+          }
+        }
         if (msg.metadata?.tool_approval_response) {
           let handled = false;
           try { handled = await this._handleApprovalResponse(msg); } catch (e) {
@@ -1138,6 +1296,10 @@ class BaseAdapter {
         idleCount++;
       }
 
+      // Right away once something was dispatched -- that is the moment a
+      // restart must not replay -- otherwise throttled.
+      this._persistCursor(incoming.length > 0);
+
       // Reasonable production polling with adaptive backoff:
       //   Active (incoming msgs processing): 200ms
       //   Warm (conversation active within last 15s): 1000ms (1s)
@@ -1292,9 +1454,76 @@ class BaseAdapter {
     if (this._turnFailed) this._turnFailed.delete(channel);
   }
 
+  /*
+    TURN STATE, IN THE AGENT'S OWN WORDS.
+
+    The workspace used to guess whether an agent was working from which
+    message came last, so a turn cut off by a crash left a thinking event
+    behind and looked busy forever. The agent now says so: running when a turn
+    starts, idle or error when it ends. Fire-and-forget -- a report never
+    delays or fails the turn -- but chained per channel, so a fast turn's idle
+    can never overtake its own running on the way to the server.
+  */
+  _reportTurnState(channel, state, error) {
+    if (!this.client || typeof this.client.reportAgentTurn !== 'function') return Promise.resolve(null);
+    const turn = { channel, state };
+    if (error) turn.error = String(error).slice(0, 1000);
+    if (!this._turnReportChain) this._turnReportChain = {};
+    const prev = this._turnReportChain[channel] || Promise.resolve();
+    const next = prev
+      .then(() => this.client.reportAgentTurn(this.workspaceId, this.agentName, turn, this.token))
+      .catch(() => null);
+    this._turnReportChain[channel] = next;
+    next.then(() => {
+      if (this._turnReportChain[channel] === next) delete this._turnReportChain[channel];
+    });
+    return next;
+  }
+
+  _noteTurnError(channel, text) {
+    if (!this._turnErrors) this._turnErrors = {};
+    const t = String(text || '').trim();
+    if (t) this._turnErrors[channel] = t.slice(0, 1000);
+  }
+
+  _turnStarted(channel) {
+    if (!this._runningTurns) this._runningTurns = new Set();
+    this._runningTurns.add(channel);
+    if (this._turnErrors) delete this._turnErrors[channel];
+    this._reportTurnState(channel, 'running');
+  }
+
+  _turnEnded(channel) {
+    if (this._runningTurns) this._runningTurns.delete(channel);
+    const failed = Boolean(this._turnFailed && this._turnFailed.has(channel));
+    if (failed) {
+      this._reportTurnState(channel, 'error', (this._turnErrors && this._turnErrors[channel]) || 'turn failed');
+    } else {
+      this._reportTurnState(channel, 'idle');
+    }
+  }
+
+  /**
+   * End every turn still in flight when the adapter stops: idle for a clean
+   * stop (errorText null), error otherwise. Waits at most 2s for the reports.
+   */
+  async _endRunningTurns(errorText) {
+    if (!this._runningTurns || this._runningTurns.size === 0) return;
+    const channels = [...this._runningTurns];
+    this._runningTurns.clear();
+    const reports = channels.map((ch) => this._reportTurnState(ch, errorText ? 'error' : 'idle', errorText || undefined));
+    let timer;
+    await Promise.race([
+      Promise.allSettled(reports),
+      new Promise((resolve) => { timer = setTimeout(resolve, 2000); }),
+    ]);
+    clearTimeout(timer);
+  }
+
   async _channelWorker(channel, msg) {
     this._channelBusy.add(channel);
     this._beginTurn(channel);
+    this._turnStarted(channel);
     const turnStartedAt = Date.now();
     const lane = this._enterParallelLane(channel, msg);
     try {
@@ -1304,9 +1533,11 @@ class BaseAdapter {
       await this._handleMessage(msg);
     } catch (e) {
       this._log(`Error in channel worker for ${channel}: ${e.message}`);
+      this._noteTurnError(channel, e.message);
       this._markTurnFailed(channel);
       try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
     } finally {
+      this._turnEnded(channel);
       await this._releaseStaleTodos(channel, 'turn ended');
       this._registerFilesTouchedSince(channel, turnStartedAt).catch(() => {});
       if (lane) await this._exitParallelLane(channel, lane);
@@ -1321,6 +1552,7 @@ class BaseAdapter {
         try { await this.sendStatus(channel, 'processing queued message', { queue_id: nextMsg._queueId, queue_status: 'processed' }); } catch {}
       }
       this._beginTurn(channel);
+      this._turnStarted(channel);
       const queuedStartedAt = Date.now();
       const queuedLane = this._enterParallelLane(channel, nextMsg);
       try {
@@ -1330,9 +1562,11 @@ class BaseAdapter {
         await this._handleMessage(nextMsg);
       } catch (e) {
         this._log(`Error processing queued message in ${channel}: ${e.message}`);
+        this._noteTurnError(channel, e.message);
         this._markTurnFailed(channel);
         try { await this.sendError(channel, `Agent error: ${e.message}`); } catch {}
       } finally {
+        this._turnEnded(channel);
         await this._releaseStaleTodos(channel, 'queued turn ended');
         this._registerFilesTouchedSince(channel, queuedStartedAt).catch(() => {});
         if (queuedLane) await this._exitParallelLane(channel, queuedLane);
@@ -1382,6 +1616,14 @@ class BaseAdapter {
       lines.push(`The other agents share this folder. Change files only under ${lane.scope}.`);
     } else {
       lines.push('The other agents share this folder. Change only what your part needs.');
+    }
+    // A per-lane port keeps two lanes' dev servers off each other's 3000/5173.
+    // Only the brief carries it: agentEnv is shared by every channel and some
+    // adapters keep one long-lived CLI per channel, so a per-turn env var
+    // would neither be isolated nor reliably reach the process.
+    const port = Number(lane.port);
+    if (Number.isInteger(port) && port > 0) {
+      lines.push(`If you start a dev server or any listening process, use port ${port} -- other agents are using other ports.`);
     }
     lines.push('Finish with a short summary of what you changed.', '', '---', '');
     if (msg && typeof msg.content === 'string') msg.content = lines.join('\n') + msg.content;
@@ -1977,6 +2219,7 @@ class BaseAdapter {
   }
 
   async sendError(channel, error) {
+    this._noteTurnError(channel, error);
     this._markTurnFailed(channel);
     try {
       await this.client.sendMessage(this.workspaceId, channel, this.token, error, {

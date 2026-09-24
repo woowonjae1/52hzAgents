@@ -11,6 +11,7 @@ import {
 import { AgentAvatar, AgentAvatarStack } from '@/components/agents/agent-avatar';
 import { useWorkspace, isUnusedSession } from '@/lib/workspace-context';
 import { useThreadSeen } from '@/lib/thread-seen';
+import { useAgentTurns } from '@/lib/use-agent-turns';
 import { useLayout } from '@/components/layout/layout-context';
 import { basename, browseForFolder } from '@/components/chat/project-folder-picker';
 import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
@@ -63,6 +64,27 @@ export function ThreadSidebar() {
     moveSessionToFolder,
   } = useWorkspace();
   const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab } = useLayout();
+
+  /*
+    Per channel, what the agents themselves reported: a channel with any
+    reported turn is answered from those rows; only a channel no agent has
+    ever reported in falls back to the message-stream guess.
+  */
+  const { rows: turnRows } = useAgentTurns();
+  const turnsByChannel = React.useMemo(() => {
+    const map = new Map<string, { running: boolean; error: string | null }>();
+    const recentMs = 60 * 60 * 1000;
+    for (const t of turnRows) {
+      const cur = map.get(t.channelName) || { running: false, error: null };
+      if (t.state === 'running') cur.running = true;
+      else if (t.state === 'error' && !cur.error) {
+        const ended = t.endedAt ? new Date(t.endedAt).getTime() : 0;
+        if (ended && Date.now() - ended < recentMs) cur.error = t.error || 'Turn failed';
+      }
+      map.set(t.channelName, cur);
+    }
+    return map;
+  }, [turnRows]);
 
   const [showSearch, setShowSearch] = React.useState(false);
   const [query, setQuery] = React.useState('');
@@ -293,7 +315,9 @@ export function ThreadSidebar() {
       if (item.kind !== 'file') return null;
       const session = byId.get(item.id);
       if (!session) return null;
-      const isRunning = activeSessionIds.has(item.id);
+      const reported = turnsByChannel.get(item.id);
+      const isRunning = reported ? reported.running : activeSessionIds.has(item.id);
+      const turnError = reported && !reported.running ? reported.error : null;
       const isUnread = unreadIds.has(item.id);
       const at = session.lastEventAt || (session.createdAt ? new Date(session.createdAt).getTime() : 0);
 
@@ -308,6 +332,12 @@ export function ThreadSidebar() {
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
               <span className="relative inline-flex size-1.5 rounded-full bg-primary" />
             </span>
+          ) : turnError ? (
+            <span
+              aria-label="Agent stopped mid-turn"
+              title={`Agent stopped mid-turn: ${turnError}`}
+              className="size-1.5 rounded-full bg-status-danger"
+            />
           ) : isUnread ? (
             <span aria-label="Unread" className="size-1.5 rounded-full bg-primary" />
           ) : null}
@@ -322,7 +352,7 @@ export function ThreadSidebar() {
         </span>
       );
     },
-    [byId, activeSessionIds, unreadIds]
+    [byId, activeSessionIds, unreadIds, turnsByChannel]
   );
 
   const renderMenu = React.useCallback(

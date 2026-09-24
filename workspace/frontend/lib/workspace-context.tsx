@@ -11,6 +11,7 @@ import { networkAgentToWorkspaceAgent, networkChannelToSession } from './types';
 import type { TodoPatch, TodoWritePayload } from './api/planning';
 import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TimerItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
 import { stripAddressPrefix, isAgentAddress } from '@/lib/types';
+import { moveThreadProfile } from './agent-profiles';
 
 // ---------------------------------------------------------------------------
 // Reference stability for polled collections
@@ -1741,6 +1742,13 @@ export function WorkspaceProvider({
                 break;
               }
 
+              case 'workspace.agent.turn.updated': {
+                // Relayed, not stored here: lib/use-agent-turns owns the rows
+                // (and imports this module, so it cannot be imported back).
+                window.dispatchEvent(new CustomEvent('wwj:agent-turn-updated', { detail: event.payload }));
+                break;
+              }
+
               case 'workspace.member.removed': {
                 const payload = event.payload as { agent_name?: string };
                 if (payload?.agent_name) {
@@ -1916,6 +1924,8 @@ export function WorkspaceProvider({
           localStorage.removeItem(key);
         }
       } catch {}
+      // So was the Fix/Review profile (lib/agent-profiles).
+      moveThreadProfile(draftId, session.sessionId);
 
       capture('thread_created', { participant_count: draft.participants.length, has_resume: !!draftCreateOptsRef.current.resumeFrom, has_working_dir: !!draft.workingDir });
       setSessions((prev) => [session, ...prev]);

@@ -552,6 +552,32 @@ func (AgentContextRecord) TableName() string {
 	return "agent_contexts"
 }
 
+// Agent turn states. A turn is one agent answering one message in one channel.
+const (
+	AgentTurnIdle    = "idle"
+	AgentTurnRunning = "running"
+	AgentTurnError   = "error"
+)
+
+// AgentTurnState is whether ONE agent is mid-turn in ONE channel, as the
+// agent itself reported it -- not inferred from which messages happen to be
+// the latest. The scheduler moves a `running` row to `error` when the agent
+// behind it goes away, so a runtime that dies never keeps looking busy.
+type AgentTurnState struct {
+	WorkspaceID string     `gorm:"type:uuid;not null;uniqueIndex:idx_agent_turn_key" json:"workspace_id"`
+	AgentName   string     `gorm:"type:text;not null;uniqueIndex:idx_agent_turn_key" json:"agent_name"`
+	ChannelName string     `gorm:"type:text;not null;uniqueIndex:idx_agent_turn_key" json:"channel_name"`
+	State       string     `gorm:"type:text;not null;default:idle;index" json:"state"`
+	Error       string     `gorm:"type:text;not null;default:''" json:"error"`
+	StartedAt   *time.Time `json:"started_at,omitempty"`
+	EndedAt     *time.Time `json:"ended_at,omitempty"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+func (AgentTurnState) TableName() string {
+	return "agent_turns"
+}
+
 type AgentApprovalRecord struct {
 	ID          string     `gorm:"primaryKey;type:text" json:"id"`
 	WorkspaceID string     `gorm:"type:uuid;not null;index:idx_agent_approvals_workspace_status" json:"workspace_id"`
@@ -794,6 +820,7 @@ type ParallelLaneRecord struct {
 	Commit       string     `gorm:"type:text;not null;default:''" json:"commit"`
 	Reply        string     `gorm:"type:text;not null;default:''" json:"reply"`
 	Attempts     int        `gorm:"not null;default:1" json:"attempts"`
+	Port         int        `gorm:"not null;default:0" json:"port"` // dev-server port reserved for this lane; 0 = none
 	StartedAt    time.Time  `json:"started_at"`
 	FinishedAt   *time.Time `json:"finished_at,omitempty"`
 }

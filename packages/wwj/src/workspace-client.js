@@ -1177,6 +1177,48 @@ class WorkspaceClient {
       return null;
     }
   }
+
+  /**
+   * Report this agent's turn state in one channel: 'running' when a turn
+   * starts, 'idle' when it ends, 'error' (with text) when it failed. Never
+   * throws -- a missed report must not break the turn it describes.
+   * @param {{channel: string, state: 'running'|'idle'|'error', error?: string}} turn
+   */
+  async reportAgentTurn(workspaceId, agentName, turn, token) {
+    try {
+      const data = await this._post(
+        `/v1/workspaces/${encodeURIComponent(workspaceId)}/agents/${encodeURIComponent(agentName)}/turn`,
+        turn,
+        this._wsHeaders(token)
+      );
+      return data.data || data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Raw page of workspace.message.posted events routed to this agent, for
+   * sizing a backlog before resuming from a stored cursor. Unlike pollPending
+   * it keeps `has_more` and does no client-side filtering.
+   * @returns {{events: Array, hasMore: boolean}}
+   */
+  async listAgentEvents(workspaceId, agentName, token, { after, sort, limit = 50 } = {}) {
+    const params = new URLSearchParams({
+      network: workspaceId,
+      type: 'workspace.message.posted',
+      target_agents: agentName,
+      limit: String(limit),
+    });
+    if (after) params.set('after', after);
+    if (sort) params.set('sort', sort);
+    const data = await this._get(`/v1/events?${params}`, this._wsHeaders(token));
+    const result = data.data || data;
+    return {
+      events: (result && result.events) || [],
+      hasMore: !!(result && result.has_more),
+    };
+  }
 }
 
 module.exports = { WorkspaceClient, SessionRevokedError };

@@ -34,6 +34,7 @@ func StartScheduler() {
 					}
 				}()
 				expireStaleAgents()
+				expireOrphanedAgentTurns() // after expireStaleAgents: it reads the offline it just set
 				expirePendingApprovals()
 				expireStalePipelineSteps()
 				expireStaleCouncilSessions()
@@ -87,6 +88,16 @@ func expireStaleAgents() {
 		})
 		log.Printf("scheduler: agent @%s timed out after %ds without heartbeat, marked offline", m.AgentName, timeoutSec)
 	}
+}
+
+// expireOrphanedAgentTurns lands a turn left `running` by an agent that has
+// gone away in `error`, using the same heartbeat timeout as expireStaleAgents.
+func expireOrphanedAgentTurns() {
+	timeoutSec := 60
+	if config.GlobalConfig != nil && config.GlobalConfig.AgentTimeoutSeconds > 0 {
+		timeoutSec = config.GlobalConfig.AgentTimeoutSeconds
+	}
+	handlers.ExpireOrphanedAgentTurns(time.Duration(timeoutSec) * time.Second)
 }
 
 func fireDueTimers() {

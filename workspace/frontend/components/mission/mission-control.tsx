@@ -28,6 +28,7 @@ import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { toast } from '@/lib/toast';
 import { extractSessionAgents } from '@/components/threads/thread-list';
 import { useAgentContexts } from '@/lib/use-agent-contexts';
+import { useAgentTurns, summarizeAgentTurns } from '@/lib/use-agent-turns';
 
 /*
   The filter affordance that replaced the metric cards. Deliberately flat: no
@@ -85,6 +86,7 @@ export function MissionControl() {
     lastMessageBySession: workspaceLastMessages,
   } = useWorkspace();
   const { rows: contextRows } = useAgentContexts();
+  const { rows: turnRows } = useAgentTurns();
   // A dashboard you leave and come back to; it should not rewind.
   const scrollRef = useScrollRestore<HTMLDivElement>('mission');
   const { setViewMode, isSidebarOpen, setActiveRightTab } = useLayout();
@@ -308,8 +310,24 @@ export function MissionControl() {
         .filter((s) => mine?.has(s.sessionId))
         .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
 
-      const isWorking = workingAgentNames.has(agent.agentName);
-      const workingThread = isWorking ? threads.find((t) => activeSessionIds.has(t.sessionId)) || null : null;
+      /*
+        The agent's own turn reports win whenever it has ever sent one; the
+        message-stream guess (and its "stalled after 35s of silence") is only
+        for adapters that do not report. A reported running turn is not
+        second-guessed by silence: the backend moves it to error itself if
+        the agent dies.
+      */
+      const turns = summarizeAgentTurns(turnRows, agent.agentName);
+      const isWorking = turns.reported ? turns.running.length > 0 : workingAgentNames.has(agent.agentName);
+      const workingThread = !isWorking
+        ? null
+        : turns.reported
+          ? threads.find((t) => t.sessionId === turns.running[0].channelName) || null
+          : threads.find((t) => activeSessionIds.has(t.sessionId)) || null;
+      const failedTurn = turns.reported && !isWorking && turns.latest?.state === 'error' ? turns.latest : null;
+      const failedAtMs = failedTurn?.endedAt ? new Date(failedTurn.endedAt).getTime() || 0 : 0;
+      // Offline agents keep "stopped mid-turn" only while it is news.
+      const showFailed = !!failedTurn && (agent.status === 'online' || now - failedAtMs < 10 * 60 * 1000);
       const focusThread = workingThread || threads[0] || null;
       const activity = focusThread ? lastMessageBySession[focusThread.sessionId] || null : null;
 
@@ -318,10 +336,14 @@ export function MissionControl() {
       let stationStatus: StationStatus;
       let stalledMs: number | undefined;
 
-      if (agent.status !== 'online') {
+      if (showFailed) {
+        stationStatus = 'error';
+      } else if (agent.status !== 'online') {
         stationStatus = 'offline';
       } else if (pendingApp) {
         stationStatus = 'blocked';
+      } else if (isWorking && turns.reported) {
+        stationStatus = 'working';
       } else if (isWorking) {
         const lastActivityTime = activity?.timestamp || (focusThread?.lastEventAt ? focusThread.lastEventAt : now);
         const elapsed = now - lastActivityTime;
@@ -347,6 +369,7 @@ export function MissionControl() {
         tokenCount: agentTokens[agent.agentName] || 0,
         isCatalogPlaceholder: false,
         stalledMs,
+        turnError: showFailed ? failedTurn?.error || 'Turn failed' : undefined,
         pendingApproval: pendingApp
           ? {
               approvalId: pendingApp.approvalId || '',
@@ -358,11 +381,11 @@ export function MissionControl() {
         lastHeartbeatAt: agent.lastHeartbeatAt,
       };
     }).sort((a, b) => {
-      const rank = { blocked: 0, stalled: 1, working: 2, ready: 3, offline: 4 } as const;
+      const rank = { blocked: 0, error: 1, stalled: 1, working: 2, ready: 3, offline: 4 } as const;
       if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
       return a.agent.agentName.localeCompare(b.agent.agentName);
     });
-  }, [agents, sessions, lastMessageBySession, workspaceLastMessages, contextRows, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
+  }, [agents, sessions, lastMessageBySession, workspaceLastMessages, contextRows, turnRows, activeSessionIds, workingAgentNames, agentTokens, pendingApprovals]);
 
   // Section 2: Available Catalog Presets
   const integrationStations: StationData[] = useMemo(() => {

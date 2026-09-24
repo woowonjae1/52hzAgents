@@ -21,7 +21,7 @@ import { workspaceApi } from '@/lib/api';
 import { ContextRing } from '@/components/chat/context-ring';
 import { useAgentContexts, contextPercent, contextLevel, fmtTokens as fmtCtx } from '@/lib/use-agent-contexts';
 
-export type StationStatus = 'working' | 'ready' | 'offline' | 'blocked' | 'stalled';
+export type StationStatus = 'working' | 'ready' | 'offline' | 'blocked' | 'stalled' | 'error';
 
 export interface StationData {
   agent: WorkspaceAgent;
@@ -33,6 +33,8 @@ export interface StationData {
   tokenCount?: number;
   isCatalogPlaceholder?: boolean;
   stalledMs?: number;
+  /** Set with status 'error': why the agent's last turn ended mid-way, as reported. */
+  turnError?: string;
   pendingApproval?: {
     approvalId: string;
     tool: string;
@@ -82,6 +84,7 @@ export function AgentStation({
     tokenCount = 0,
     isCatalogPlaceholder = false,
     stalledMs,
+    turnError,
     pendingApproval,
     lastHeartbeatAt,
   } = data;
@@ -89,6 +92,7 @@ export function AgentStation({
   const isWorking = status === 'working';
   const isBlocked = status === 'blocked';
   const isStalled = status === 'stalled';
+  const isTurnError = status === 'error';
   const isCustomPlaceholder = isCatalogPlaceholder === true && agent.agentName.toLowerCase() === 'custom';
   const activeThread = threads[0];
   const [busy, setBusy] = React.useState(false);
@@ -137,6 +141,15 @@ export function AgentStation({
         dot: 'bg-status-warning',
         ring: 'ring-status-warning/25',
         badge: 'bg-status-warning/15 text-status-warning font-medium',
+      };
+    }
+    if (isTurnError) {
+      return {
+        label: 'Stopped mid-turn',
+        title: turnError,
+        dot: 'bg-status-danger',
+        ring: 'ring-status-danger/25',
+        badge: 'bg-status-danger/10 text-status-danger font-medium',
       };
     }
     if (isStalled) {
@@ -194,7 +207,7 @@ export function AgentStation({
       ring: 'ring-muted-foreground/10',
       badge: 'bg-surface2/80 text-muted-foreground font-medium',
     };
-  }, [isBlocked, isStalled, isHeartbeatTimeout, isRecentHeartbeatLoss, isWorking, status, isCatalogPlaceholder, stalledMs, lastHeartbeatAt]);
+  }, [isBlocked, isTurnError, turnError, isStalled, isHeartbeatTimeout, isRecentHeartbeatLoss, isWorking, status, isCatalogPlaceholder, stalledMs, lastHeartbeatAt]);
 
   const handleApprove = async () => {
     if (!pendingApproval || !activeThread) return;
@@ -272,7 +285,7 @@ export function AgentStation({
         'bg-surface1 transition-colors duration-150',
         'border border-border/60 hover:border-border/60 hover:shadow-xs',
         isBlocked && 'ring-2 ring-status-warning/20 bg-status-warning/[0.02]',
-        isStalled && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
+        (isStalled || isTurnError) && 'ring-2 ring-status-danger/20 bg-status-danger/[0.02]',
         isRecentHeartbeatLoss && 'border-status-warning/30',
         status === 'offline' && !isCatalogPlaceholder && 'opacity-85',
         isCatalogPlaceholder && 'bg-surface1/30',
@@ -333,7 +346,7 @@ export function AgentStation({
               statusBadge.ring,
             )}
           />
-          <Hint label={statusBadge.label}>
+          <Hint label={('title' in statusBadge && statusBadge.title) || statusBadge.label}>
             <span className={cn('truncate', isWorking && 'event-running')} >
               {statusBadge.label}
             </span>
