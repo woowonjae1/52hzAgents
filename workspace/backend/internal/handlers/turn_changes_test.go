@@ -807,3 +807,43 @@ func TestDrainDirQueueEnrichesPromptWithTriggerContext(t *testing.T) {
 	}
 }
 
+
+func TestWorktreeBatchLanesAreNotQueuedOnTheProjectFolder(t *testing.T) {
+	// Every lane of a worktree batch has its own checkout. Queueing the second
+	// lane behind the first on the shared project folder used to re-wake it
+	// afterwards with the whole message, in the shared folder.
+	ws, _, _ := setupTurnDB(t)
+	newReq := func(batch map[string]interface{}) *SendEventRequest {
+		meta := map[string]interface{}{"target_agents": []string{"agent1", "agent2"}}
+		if batch != nil {
+			meta["parallel_batch"] = batch
+		}
+		return &SendEventRequest{
+			Type: "workspace.message.posted", Source: "human:user", Target: "channel/general",
+			Payload:  map[string]interface{}{"content": "@agent1 do x @agent2 do y", "message_type": "chat"},
+			Metadata: meta,
+		}
+	}
+
+	req := newReq(map[string]interface{}{"batch_id": "b1", "isolation": "worktree"})
+	recordTurnChanges(ws.ID, req, "event-batch")
+	if got := metadataStrings(req.Metadata, "target_agents"); len(got) != 2 {
+		t.Fatalf("both lanes must be dispatched, target_agents = %v", got)
+	}
+	if req.Metadata["queued_agents"] != nil {
+		t.Fatalf("no lane may be queued, queued_agents = %v", req.Metadata["queued_agents"])
+	}
+	var queued int64
+	db.DB.Model(&models.AgentTurnChange{}).Where("workspace_id = ? AND status = ?", ws.ID, "queued").Count(&queued)
+	if queued != 0 {
+		t.Fatalf("found %d queued turns for a worktree batch", queued)
+	}
+
+	// A shared-folder batch still contends: its lanes really share the folder.
+	ws2, _, _ := setupTurnDB(t)
+	shared := newReq(map[string]interface{}{"batch_id": "b2", "isolation": "shared"})
+	recordTurnChanges(ws2.ID, shared, "event-shared")
+	if shared.Metadata["queued_agents"] == nil {
+		t.Fatal("a shared-folder batch must keep the directory queue")
+	}
+}

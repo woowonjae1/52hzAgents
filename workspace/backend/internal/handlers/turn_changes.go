@@ -904,9 +904,14 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 	var activeTargets []string
 	var queuedTargets []string
 	isDecisionResponse := req.Metadata != nil && (req.Metadata["is_decision_response"] == true || req.Metadata["decision_response"] != nil)
+	// The lanes of a worktree batch each run in their own checkout, so they do
+	// not contend for the project folder. Queueing them held back every lane
+	// but the first and, once it finished, re-woke the others with the whole
+	// message in the SHARED folder -- a second, unisolated run.
+	bypassQueue := isDecisionResponse || isolatedParallelBatch(req.Metadata)
 
 	for _, target := range metadataStrings(req.Metadata, "target_agents") {
-		if openAgentTurnWithBypass(workspaceID, &channel, target, taskID, eventID, isDecisionResponse) {
+		if openAgentTurnWithBypass(workspaceID, &channel, target, taskID, eventID, bypassQueue) {
 			activeTargets = append(activeTargets, target)
 		} else {
 			queuedTargets = append(queuedTargets, target)
@@ -924,6 +929,17 @@ func recordTurnChanges(workspaceID string, req *SendEventRequest, eventID string
 		req.Metadata["target_agents"] = activeTargets
 		req.Metadata["queued_agents"] = queuedTargets
 	}
+}
+
+// isolatedParallelBatch reports whether the message starts a parallel batch
+// whose lanes got their own git worktrees (see startParallelBatch).
+func isolatedParallelBatch(metadata map[string]interface{}) bool {
+	batch, ok := metadata["parallel_batch"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	isolation, _ := batch["isolation"].(string)
+	return isolation == "worktree"
 }
 
 // recordRelayTurn is the hook for the relay paths, which write their event rows
