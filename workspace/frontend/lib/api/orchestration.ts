@@ -60,6 +60,8 @@ export interface ParallelLane {
   commit: string;
   reply: string;
   attempts: number;
+  /** Dev-server port reserved for this lane (4101, 4102, ...); 0 or absent = none. */
+  port?: number;
   started_at: string;
   finished_at?: string | null;
 }

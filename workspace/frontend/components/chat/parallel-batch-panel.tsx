@@ -210,7 +210,14 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
               <Icon className={cn('mt-0.5 size-3.5 shrink-0', st.className, lane.status === 'running' && 'animate-spin')} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-2xs font-medium text-foreground truncate">{lane.agent}</span>
+                  <span className="flex items-baseline gap-1.5 min-w-0">
+                    <span className="text-2xs font-medium text-foreground truncate">{lane.agent}</span>
+                    {lane.port ? (
+                      <code className="text-2xs text-muted-foreground shrink-0" title="Dev-server port for this lane">
+                        :{lane.port}
+                      </code>
+                    ) : null}
+                  </span>
                   <span className={cn('text-2xs shrink-0', st.className)}>
                     {st.label}
                     {lane.attempts > 1 ? ` · attempt ${lane.attempts}` : ''}

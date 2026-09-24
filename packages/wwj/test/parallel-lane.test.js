@@ -53,8 +53,8 @@ function laneMsg(worktree) {
         batch_id: 'b-123',
         isolation: 'worktree',
         lanes: {
-          PI: { task: 'rebuild the list', working_dir: worktree, branch: 'parallel/b-123/pi' },
-          claude: { task: 'write the endpoint', working_dir: '/elsewhere', branch: 'parallel/b-123/claude' },
+          PI: { task: 'rebuild the list', working_dir: worktree, branch: 'parallel/b-123/pi', port: 4101 },
+          claude: { task: 'write the endpoint', working_dir: '/elsewhere', branch: 'parallel/b-123/claude', port: 4102 },
         },
       },
     },
@@ -72,12 +72,23 @@ test('the lane turn runs in its worktree with its brief, then the directory goes
   assert.equal(a.seen[0].dir, worktree, 'turn ran in the lane worktree (agent name matched case-insensitively)');
   assert.match(a.seen[0].content, /Your part:\nrebuild the list/);
   assert.match(a.seen[0].content, /Do not commit, merge/);
+  assert.match(a.seen[0].content, /dev server or any listening process, use port 4101 /, 'the brief names this lane\'s own port');
+  assert.doesNotMatch(a.seen[0].content, /4102/, 'not another lane\'s port');
   assert.match(a.seen[0].content, /split the work$/);
   assert.deepEqual(reports, [{ batchId: 'b-123', agent: 'pi', status: 'done', error: '', reply: 'changed the list component' }]);
 
   await a._channelWorker('ch-1', { sessionId: 'ch-1', content: 'normal turn', metadata: {} });
   assert.equal(a.seen[1].dir, home, 'the next turn is back in the channel folder');
   assert.equal(reports.length, 1, 'a normal turn reports nothing');
+});
+
+test('a lane without a port gets no port line', async () => {
+  const worktree = fs.mkdtempSync(path.join(os.tmpdir(), 'wwj-wt-'));
+  const { a } = make();
+  const msg = laneMsg(worktree);
+  delete msg.metadata.parallel_batch.lanes.PI.port;
+  await a._channelWorker('ch-1', msg);
+  assert.doesNotMatch(a.seen[0].content, /use port/);
 });
 
 test('a failed lane turn is reported as failed', async () => {

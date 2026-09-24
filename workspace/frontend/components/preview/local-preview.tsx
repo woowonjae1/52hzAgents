@@ -20,6 +20,8 @@ import {
 import { cn } from '@/lib/utils';
 import { useLayout } from '@/components/layout/layout-context';
 import { useIsDesktop } from '@/lib/desktop';
+import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
+import { workspaceApi } from '@/lib/api';
 
 interface WebviewProps extends React.HTMLAttributes<HTMLElement> {
   src?: string;
@@ -57,8 +59,61 @@ function normalizeInput(raw: string): string | null {
   return `http://${t}`;
 }
 
+interface LanePort {
+  agent: string;
+  port: number;
+}
+
+const LANE_POLL_MS = 5000;
+
+/**
+ * In a parallel thread every lane is told to run its dev server on a port of
+ * its own (4101, 4102, ...), so two agents' servers can be up at once. This
+ * returns those ports for the open thread's latest batch, or [] otherwise.
+ */
+function useLanePorts(): LanePort[] {
+  const { currentSessionId, sessions } = useWorkspace();
+  const channel = isDraftSessionId(currentSessionId) ? null : currentSessionId;
+  const parallel = !!channel && sessions.find((s) => s.sessionId === channel)?.orchestrationMode === 'parallel';
+  const [lanes, setLanes] = React.useState<LanePort[]>([]);
+
+  React.useEffect(() => {
+    if (!channel || !parallel) {
+      setLanes([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const batch = await workspaceApi.getParallelBatch(channel);
+        if (cancelled) return;
+        const next = (batch.run?.lanes ?? [])
+          .filter((l) => typeof l.port === 'number' && l.port > 0)
+          .map((l) => ({ agent: l.agent, port: l.port as number }));
+        // Keep the same array when nothing changed so the toolbar does not re-render every poll.
+        setLanes((prev) =>
+          prev.length === next.length && prev.every((p, i) => p.agent === next[i].agent && p.port === next[i].port)
+            ? prev
+            : next
+        );
+      } catch {
+        // A dropped poll keeps the chips that are on screen.
+      }
+    };
+    load();
+    const timer = setInterval(load, LANE_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [channel, parallel]);
+
+  return lanes;
+}
+
 export function LocalPreview() {
   const isDesktop = useIsDesktop();
+  const lanePorts = useLanePorts();
 
   const { previewUrl } = useLayout();
 
@@ -208,31 +263,39 @@ export function LocalPreview() {
           />
         </form>
 
-        {/* Quick Port Badges */}
+        {/* Quick Port Badges — plus, in a parallel thread, one per lane's own port */}
         <div className="hidden sm:flex items-center gap-1 shrink-0">
-          {QUICK_PORTS.map((port) => {
+          {[
+            ...lanePorts.map((l) => ({ key: `lane-${l.agent}`, port: l.port, text: `${l.agent} :${l.port}`, hint: `Preview ${l.agent}'s lane on :${l.port}` })),
+            ...QUICK_PORTS.map((port) => ({ key: `port-${port}`, port, text: `:${port}`, hint: `Switch to :${port}` })),
+          ].map(({ key, port, text, hint }, i) => {
             const isCurrent = url.includes(`:${port}`);
             return (
-              <Hint key={port} label={`Switch to :${port}`}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const targetUrl = `http://localhost:${port}`;
-                    setDraft(targetUrl);
-                    setUrl(targetUrl);
-                    setLoadError(null);
-                    if (!isDesktop) setIframeNonce((n) => n + 1);
-                  }}
-                  className={cn(
-                    "px-1.5 py-0.5 rounded text-3xs font-mono transition-colors",
-                    isCurrent
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "bg-surface2 text-muted-foreground hover:text-foreground hover:bg-surface3"
-                  )}
-                >
-                  :{port}
-                </button>
-              </Hint>
+              <React.Fragment key={key}>
+                {lanePorts.length > 0 && i === lanePorts.length && (
+                  <span aria-hidden className="mx-0.5 h-3 w-px bg-border" />
+                )}
+                <Hint label={hint}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetUrl = `http://localhost:${port}`;
+                      setDraft(targetUrl);
+                      setUrl(targetUrl);
+                      setLoadError(null);
+                      if (!isDesktop) setIframeNonce((n) => n + 1);
+                    }}
+                    className={cn(
+                      "px-1.5 py-0.5 rounded text-3xs font-mono transition-colors max-w-32 truncate",
+                      isCurrent
+                        ? "bg-primary text-primary-foreground font-semibold"
+                        : "bg-surface2 text-muted-foreground hover:text-foreground hover:bg-surface3"
+                    )}
+                  >
+                    {text}
+                  </button>
+                </Hint>
+              </React.Fragment>
             );
           })}
         </div>

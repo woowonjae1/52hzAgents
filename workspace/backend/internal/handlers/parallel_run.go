@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -32,7 +33,8 @@ by hand. A batch is now a record with one lane per agent:
     each other and scopes stop mattering. Otherwise the lanes share the folder
     and the board's scope check still guards the start.
  2. dispatch: the routed message carries `parallel_batch` metadata -- for each
-    agent its task, its working directory and its branch. The adapter runs that
+    agent its task, its working directory, its branch and a dev-server port of
+    its own (so two lanes never fight over 3000/5173). The adapter runs that
     turn in the lane's directory and reports back when the turn ends.
  3. finish: a lane that reports done has its worktree committed. When every
     lane is terminal the batch merges each committed branch into the base
@@ -156,6 +158,50 @@ type laneDispatch struct {
 	WorkingDir string `json:"working_dir,omitempty"`
 	Branch     string `json:"branch,omitempty"`
 	Scope      string `json:"scope,omitempty"`
+	Port       int    `json:"port,omitempty"`
+}
+
+func dispatchFor(lane *models.ParallelLaneRecord) laneDispatch {
+	return laneDispatch{Task: lane.Task, WorkingDir: lane.WorktreePath, Branch: lane.Branch, Scope: lane.Scope, Port: lane.Port}
+}
+
+// laneBasePort is where lane dev-server ports start: lane ports are
+// laneBasePort+1, +2, ... Two lanes that each start a dev server would
+// otherwise both grab 3000/5173 and the Preview could only show one.
+const laneBasePort = 4100
+
+// portFree reports whether nothing is listening on 127.0.0.1:port.
+func portFree(port int) bool {
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return false
+	}
+	_ = l.Close()
+	return true
+}
+
+// allocateLanePorts picks n distinct ports counting up from laneBasePort+1,
+// skipping ports that are listening now or reserved by a lane of another
+// running batch (whose server may simply not be up yet). Deterministic: the
+// same machine state gives the same ports. Returns fewer than n only if the
+// search window is exhausted; missing lanes get port 0.
+func allocateLanePorts(tx *gorm.DB, n int) []int {
+	reserved := map[int]bool{}
+	var taken []int
+	tx.Model(&models.ParallelLaneRecord{}).
+		Joins("JOIN parallel_batches ON parallel_batches.id = parallel_lanes.batch_id").
+		Where("parallel_batches.status = ? AND parallel_lanes.port > 0", batchRunning).
+		Pluck("parallel_lanes.port", &taken)
+	for _, p := range taken {
+		reserved[p] = true
+	}
+	ports := make([]int, 0, n)
+	for p := laneBasePort + 1; len(ports) < n && p <= laneBasePort+500; p++ {
+		if !reserved[p] && portFree(p) {
+			ports = append(ports, p)
+		}
+	}
+	return ports
 }
 
 // startParallelBatch records a batch for agents woken together and returns the
@@ -180,10 +226,15 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 	}
 	lanes := make([]models.ParallelLaneRecord, 0, len(agents))
 	now := time.Now().UTC()
-	for _, agent := range agents {
+	ports := allocateLanePorts(tx, len(agents))
+	for i, agent := range agents {
+		port := 0
+		if i < len(ports) {
+			port = ports[i]
+		}
 		lanes = append(lanes, models.ParallelLaneRecord{
 			ID: uuid.NewString(), BatchID: batch.ID, Agent: agent,
-			Task: tasks[agent], Scope: scopes[agent], Status: laneRunning, StartedAt: now,
+			Task: tasks[agent], Scope: scopes[agent], Status: laneRunning, StartedAt: now, Port: port,
 		})
 	}
 
@@ -228,9 +279,7 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 		if err := tx.Create(&lanes[i]).Error; err != nil {
 			return nil
 		}
-		dispatch[lanes[i].Agent] = laneDispatch{
-			Task: lanes[i].Task, WorkingDir: lanes[i].WorktreePath, Branch: lanes[i].Branch, Scope: lanes[i].Scope,
-		}
+		dispatch[lanes[i].Agent] = dispatchFor(&lanes[i])
 	}
 	_ = PublishWorkspaceStateEvent(workspaceID, "workspace.parallel.batch", "system:parallel", channel.Name, gin.H{"batch_id": batch.ID, "status": batch.Status})
 	return map[string]interface{}{
@@ -521,9 +570,7 @@ func RetryParallelLane(c *gin.Context) {
 		map[string]interface{}{"parallel_batch": map[string]interface{}{
 			"batch_id":  batch.ID,
 			"isolation": batch.Isolation,
-			"lanes": map[string]laneDispatch{lane.Agent: {
-				Task: lane.Task, WorkingDir: lane.WorktreePath, Branch: lane.Branch, Scope: lane.Scope,
-			}},
+			"lanes":     map[string]laneDispatch{lane.Agent: dispatchFor(&lane)},
 		}})
 	c.JSON(200, gin.H{"lane": lane})
 }

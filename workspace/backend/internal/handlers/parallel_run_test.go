@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -207,6 +208,47 @@ func TestParallelNonGitFolderSharesTheDirectory(t *testing.T) {
 	db.DB.Where("name = ?", batch.ChannelName).First(&ch)
 	if startParallelBatch(db.DB, ws, &ch, "mention", []string{"alpha", "beta"}, nil, nil) != nil {
 		t.Fatal("started a second batch while one is running")
+	}
+}
+
+func TestParallelLanesGetDistinctFreePorts(t *testing.T) {
+	ws := parallelTestDB(t)
+	// Occupy the port the first lane would get, as if a dev server were up.
+	wouldBe := allocateLanePorts(db.DB, 1)
+	if len(wouldBe) != 1 || wouldBe[0] <= laneBasePort {
+		t.Fatalf("allocateLanePorts gave %v", wouldBe)
+	}
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", wouldBe[0]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+
+	batch, lanes := startTestBatch(t, ws, t.TempDir(), "alpha", "beta", "gamma")
+	seen := map[int]string{}
+	for a, lane := range lanes {
+		if lane.Port <= laneBasePort {
+			t.Fatalf("lane %s has no port: %d", a, lane.Port)
+		}
+		if lane.Port == wouldBe[0] {
+			t.Fatalf("lane %s got port %d, which is already listening", a, lane.Port)
+		}
+		if other, dup := seen[lane.Port]; dup {
+			t.Fatalf("lanes %s and %s share port %d", a, other, lane.Port)
+		}
+		seen[lane.Port] = a
+	}
+
+	// The ports are in the lane view and are not handed out again while the
+	// batch runs, even though nothing listens on them yet.
+	view := latestBatchView(ws, batch.ChannelName)
+	if rows, _ := view["lanes"].([]models.ParallelLaneRecord); len(rows) != 3 || rows[0].Port == 0 {
+		t.Fatalf("lane view missing ports: %+v", view["lanes"])
+	}
+	for _, p := range allocateLanePorts(db.DB, 3) {
+		if _, taken := seen[p]; taken {
+			t.Fatalf("port %d reserved by a running batch was handed out again", p)
+		}
 	}
 }
 
