@@ -821,7 +821,12 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 			segments = parseAgentPipeline(content, availableCandidates)
 		}
 
-		if len(segments) >= 2 {
+		// In parallel mode "@a do x @b do y" is the batch itself -- each lane
+		// takes its own instruction (laneTasksFromMessage). Starting a
+		// sequential pipeline here ran b after a, in the shared folder, with
+		// no worktrees: the parallel branch below was never reached.
+		parallelMode := strings.EqualFold(strings.TrimSpace(channel.OrchestrationMode), "parallel")
+		if len(segments) >= 2 && !parallelMode {
 			if pipelineID := startPipeline(database, workspaceID, channel.ID, req.Source, segments); pipelineID != "" && req.Metadata != nil {
 				// Turn attribution groups every retry of a step under that
 				// step's key. Step 0 is dispatched through the event handler
