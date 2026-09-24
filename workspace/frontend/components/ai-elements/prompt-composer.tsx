@@ -28,6 +28,7 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
 import { composerPillClass } from './composer-pill';
 import { OrchestrationControl } from '@/components/chat/orchestration-control';
+import { AgentProfileControl } from '@/components/chat/agent-profile-control';
 import { ContextHealthIndicator } from '@/components/chat/context-health-indicator';
 
 export type OrchestrationMode = 'dynamic' | 'master' | 'parallel';
@@ -924,6 +925,10 @@ export function PromptComposer({
                 onChange={onOrchestrationChange}
               />
             )}
+
+            {/* Fix / Review: the other "what happens when I send" setting —
+                whether the agents may edit. Profiles live in lib/agent-profiles. */}
+            {session && <AgentProfileControl session={session} />}
 
             {/*
               THE SAME TWO KINDS OF THING AS THE HEADER ROW, NOW SAID THE SAME WAY.

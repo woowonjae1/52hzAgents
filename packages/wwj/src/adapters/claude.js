@@ -1410,6 +1410,9 @@ class ClaudeAdapter extends BaseAdapter {
       // cannot change directory, so a turn that must run elsewhere (a parallel
       // lane's worktree) replaces it rather than reusing it.
       cwd: workingDir || null,
+      // The plan/execute mode baked into this process's permission flags.
+      // Flags are fixed at spawn, so a set_mode must replace the process.
+      mode: this._mode,
       proc,
       lineBuffer: '',
       pendingLines: Promise.resolve(),
@@ -1861,6 +1864,15 @@ class ClaudeAdapter extends BaseAdapter {
     let existingPP = this._persistentProcs[msgChannel];
     if (existingPP && existingPP.alive && existingPP.cwd && resolvedWorkingDir && existingPP.cwd !== resolvedWorkingDir) {
       this._log(`Working directory changed for ${msgChannel} (${existingPP.cwd} -> ${resolvedWorkingDir}); restarting the process`);
+      this._killPersistentProc(msgChannel);
+      existingPP = null;
+    }
+    // `--permission-mode plan` and the allowed-tool list are spawn flags. A
+    // process started in execute mode would keep its write tools after the
+    // workspace switched this agent to plan (and vice versa), so a mode change
+    // replaces it. The session itself is resumed, so no context is lost.
+    if (existingPP && existingPP.alive && existingPP.mode !== this._mode) {
+      this._log(`Mode changed for ${msgChannel} (${existingPP.mode} -> ${this._mode}); restarting the process`);
       this._killPersistentProc(msgChannel);
       existingPP = null;
     }
