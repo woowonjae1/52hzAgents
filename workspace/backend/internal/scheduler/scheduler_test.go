@@ -19,6 +19,12 @@ func setupTestDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite in-memory db: %v", err)
 	}
+	// ":memory:" is per CONNECTION: a second pooled connection opens a new,
+	// empty database, so any concurrent query (a background publish, the
+	// sweeps) intermittently failed with "no such table". One connection.
+	if sqlDB, err := database.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
 	db.DB = database
 	err = db.DB.AutoMigrate(
 		&models.ChannelPipeline{},

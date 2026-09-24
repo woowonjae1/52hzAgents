@@ -17,6 +17,12 @@ func setupTimerDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
+	// ":memory:" is per CONNECTION: a second pooled connection opens a new,
+	// empty database, so any concurrent query (a background publish, the
+	// sweeps) intermittently failed with "no such table". One connection.
+	if sqlDB, err := database.DB(); err == nil {
+		sqlDB.SetMaxOpenConns(1)
+	}
 	db.DB = database
 	if err := db.DB.AutoMigrate(&models.TimerRecord{}, &models.TodoRecord{}, &models.EventRecord{}); err != nil {
 		t.Fatalf("migrate: %v", err)
