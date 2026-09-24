@@ -14,6 +14,7 @@ import type {
   WorkspaceTokenStats,
 } from '../types';
 import { networkAgentToWorkspaceAgent } from '../types';
+import type { AgentContextRecord } from '../generated/api-types';
 import { BaseWorkspaceApi } from './base';
 
 export class AgentsApi extends BaseWorkspaceApi {
@@ -21,12 +22,23 @@ export class AgentsApi extends BaseWorkspaceApi {
     return this.request<NetworkDiscovery>(`/v1/discover?network=${this.workspaceId}`);
   }
 
-  async launchAgent(agentName: string, workingDir?: string): Promise<{ message: string; agent_name: string; status: string }> {
+  /**
+   * `setup` carries per-agent settings for runtimes that need them to run (an
+   * ACP agent's ACP_COMMAND / ACP_PERMISSION_MODE); the backend hands them to
+   * `wwj connect --type … --env KEY=VALUE`.
+   */
+  async launchAgent(
+    agentName: string,
+    workingDir?: string,
+    setup?: { agentType?: string; env?: Record<string, string> },
+  ): Promise<{ message: string; agent_name: string; status: string }> {
     const params = new URLSearchParams({ network: this.workspaceId });
     if (workingDir) params.set('working_dir', workingDir);
     return this.request<{ message: string; agent_name: string; status: string }>(
       `/v1/agents/${encodeURIComponent(agentName)}/launch?${params}`,
-      { method: 'POST' }
+      setup
+        ? { method: 'POST', body: JSON.stringify({ agent_type: setup.agentType || '', env: setup.env || {} }) }
+        : { method: 'POST' }
     );
   }
 
@@ -257,18 +269,18 @@ export class AgentsApi extends BaseWorkspaceApi {
   /** Every (agent, channel) context row, newest first; `channel` narrows it. */
   async getAgentContexts(channel?: string): Promise<AgentContext[]> {
     const q = channel ? `?channel=${encodeURIComponent(channel.replace(/^channel\//, ''))}` : '';
-    const res = await this.request<{ contexts?: Array<Record<string, unknown>> }>(
+    const res = await this.request<{ contexts?: AgentContextRecord[] | null }>(
       `/v1/workspaces/${this.workspaceId}/agent-contexts${q}`
     );
     return (res?.contexts || []).map((r) => ({
-      agentName: String(r.agent_name || ''),
-      channelName: String(r.channel_name || ''),
-      promptTokens: Number(r.prompt_tokens) || 0,
-      contextWindow: Number(r.context_window) || 0,
-      windowSource: (r.window_source === 'reported' || r.window_source === 'model' ? r.window_source : '') as AgentContext['windowSource'],
-      model: String(r.model || ''),
-      compactedAt: (r.compacted_at as string | null) ?? null,
-      updatedAt: String(r.updated_at || ''),
+      agentName: r.agent_name || '',
+      channelName: r.channel_name || '',
+      promptTokens: r.prompt_tokens || 0,
+      contextWindow: r.context_window || 0,
+      windowSource: r.window_source === 'reported' || r.window_source === 'model' ? r.window_source : '',
+      model: r.model || '',
+      compactedAt: r.compacted_at ?? null,
+      updatedAt: r.updated_at || '',
     }));
   }
 

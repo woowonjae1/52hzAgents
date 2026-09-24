@@ -18,6 +18,14 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { AgentCatalogEntry, CloudAgentConfig, CloudAgentProvider } from '@/lib/types';
 import { AgentIcon, ProviderIcon } from '@/components/icons/agent-icons';
 import { getApiBaseUrl } from '@/lib/config';
+import {
+  DEFAULT_AGENT_CATALOG,
+  acpAgentName,
+  acpConnectCommand,
+  withAcpRuntime,
+  type AcpPermissionMode,
+} from '@/lib/agent-catalog';
+import { AcpSetupFields } from './acp-setup-fields';
 
 /**
  * Surface a failed panel load. Silently swallowing these is what let a wrong
@@ -138,8 +146,14 @@ export function ConnectAgentView() {
     ])
       .then(([catalogResult, providersResult, agentsResult]) => {
         if (cancelled) return;
-        if (catalogResult.status === 'fulfilled') setCatalog(catalogResult.value);
-        else reportLoadFailure('the agent catalog', catalogResult.reason);
+        // The ACP runtime is not on the backend roster (it needs a command, so
+        // it is not one-click); it is appended here. On failure fall back to
+        // the bundled roster, as useAgentCatalog does, so the tab is not blank.
+        if (catalogResult.status === 'fulfilled') setCatalog(withAcpRuntime(catalogResult.value));
+        else {
+          reportLoadFailure('the agent catalog', catalogResult.reason);
+          setCatalog(withAcpRuntime(DEFAULT_AGENT_CATALOG));
+        }
         if (providersResult.status === 'fulfilled') setCloudProviders(providersResult.value);
         else reportLoadFailure('cloud providers', providersResult.reason);
         if (agentsResult.status === 'fulfilled') setCloudAgents(agentsResult.value);
@@ -368,6 +382,21 @@ function LocalAgentsTab({
   copyToClipboard: (text: string) => void;
 }) {
   const displayToken = token || '<token>';
+
+  // ACP agents need a command and a permission policy before they can run;
+  // both travel in the connect command as `--env` flags.
+  const [acpCommand, setAcpCommand] = useState('');
+  const [acpPermission, setAcpPermission] = useState<AcpPermissionMode>('ask');
+  const isAcp = selectedEntry?.name === 'acp';
+  const acpReady = acpCommand.trim().length > 0;
+  const connectCommand = selectedEntry
+    ? isAcp
+      ? acpReady
+        ? acpConnectCommand(acpAgentName(acpCommand), displayToken, acpCommand, acpPermission)
+        : ''
+      : `wwj connect my-${selectedEntry.name} ${displayToken}`
+    : '';
+
   return (
     <div className="p-4 space-y-4">
       {/* Agent grid */}
@@ -391,7 +420,7 @@ function LocalAgentsTab({
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium leading-tight truncate">{entry.label}</div>
                 <div className="text-3xs text-muted-foreground mt-0.5 truncate">
-                  {entry.builtin ? 'Built-in' : entry.tags?.[0] || 'Open Source'}
+                  {entry.name === 'acp' ? 'Any ACP CLI' : entry.builtin ? 'Built-in' : entry.tags?.[0] || 'Open Source'}
                 </div>
               </div>
               {isSelected && <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />}
@@ -435,20 +464,37 @@ function LocalAgentsTab({
               <AgentIcon name={selectedEntry.name} size={52} />
             </div>
 
-            <div className="w-full bg-primary dark:bg-black border border-border rounded-xl p-4 relative group text-left">
-              <div className="text-2xs text-foreground-muted font-mono mb-2">
-                Run command to connect:
+            {isAcp && (
+              <AcpSetupFields
+                idPrefix="connect-view"
+                className="w-full"
+                command={acpCommand}
+                onCommandChange={setAcpCommand}
+                permissionMode={acpPermission}
+                onPermissionModeChange={setAcpPermission}
+              />
+            )}
+
+            {connectCommand ? (
+              <div className="w-full bg-primary dark:bg-black border border-border rounded-xl p-4 relative group text-left">
+                <div className="text-2xs text-foreground-muted font-mono mb-2">
+                  Run command to connect:
+                </div>
+                <pre className="text-primary-foreground text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
+                  {connectCommand}
+                </pre>
+                <button
+                  className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-surface2 hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors"
+                  onClick={() => copyToClipboard(connectCommand)}
+                >
+                  {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                </button>
               </div>
-              <pre className="text-primary-foreground text-xs font-mono select-all whitespace-pre-wrap break-all pr-8 leading-relaxed">
-                {`wwj connect my-${selectedEntry.name} ${displayToken}`}
-              </pre>
-              <button
-                className="absolute top-3.5 right-3.5 size-6 flex items-center justify-center rounded bg-surface2 hover:bg-surface3 text-foreground-extra-muted hover:text-foreground transition-colors"
-                onClick={() => copyToClipboard(`wwj connect my-${selectedEntry.name} ${displayToken}`)}
-              >
-                {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
-              </button>
-            </div>
+            ) : (
+              <div className="w-full rounded-xl border border-dashed border-border px-4 py-3 text-left text-2xs text-muted-foreground">
+                Pick a preset or enter the command that starts the agent in ACP mode to get its connect command.
+              </div>
+            )}
 
             {/* Token */}
             <div className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg border border-border bg-card text-xs font-medium text-muted-foreground">

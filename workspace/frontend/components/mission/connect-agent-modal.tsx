@@ -9,7 +9,14 @@ import { Terminal, Copy, Check, Play, Zap, Loader2, Globe, ShieldCheck, Settings
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
-import { useAgentCatalog } from '@/lib/agent-catalog';
+import {
+  useAgentCatalog,
+  withAcpRuntime,
+  acpAgentEnv,
+  acpAgentName,
+  type AcpPermissionMode,
+} from '@/lib/agent-catalog';
+import { AcpSetupFields } from '@/components/connect/acp-setup-fields';
 
 import { getApiBaseUrl } from '@/lib/config';
 
@@ -21,9 +28,15 @@ interface ConnectAgentModalProps {
 export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps) {
   const { workspaceId, agents } = useWorkspace();
   // Only fetched while the dialog is open — this is a modal, not a mounted view.
-  const { catalog } = useAgentCatalog(open);
+  const { catalog: roster } = useAgentCatalog(open);
+  const catalog = withAcpRuntime(roster);
   const [copiedCmd, setCopiedCmd] = useState(false);
   const [startingAgent, setStartingAgent] = useState<string | null>(null);
+  // ACP is not one-click: its card opens a small form for the command and
+  // permission policy, which are passed to the launcher as agent env.
+  const [acpOpen, setAcpOpen] = useState(false);
+  const [acpCommand, setAcpCommand] = useState('');
+  const [acpPermission, setAcpPermission] = useState<AcpPermissionMode>('ask');
 
   const pairingCommand = `node bin/agent-connector.js up --workspace=${workspaceId || 'current'} --server=${getApiBaseUrl()}`;
 
@@ -37,16 +50,30 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
   // launchAgent, not sendAgentControl: a control event is delivered by the
   // agent's own poller, so it only ever reached agents that were already
   // running — exactly not the case for a card the user is clicking Connect on.
-  const handleLaunchAgent = async (agentName: string) => {
-    setStartingAgent(agentName);
+  const handleLaunchAgent = async (
+    agentName: string,
+    setup?: { agentType: string; env: Record<string, string> },
+    cardKey: string = agentName,
+  ) => {
+    setStartingAgent(cardKey);
     try {
-      await workspaceApi.launchAgent(agentName);
+      await workspaceApi.launchAgent(agentName, undefined, setup);
       toast.success(`Launching ${agentName}. Agent terminal window opened.`);
     } catch (e) {
       toast.error(`Could not launch ${agentName}: ${e instanceof Error ? e.message : 'unknown error'}`);
     } finally {
       setTimeout(() => setStartingAgent(null), 1500);
     }
+  };
+
+  const handleLaunchAcp = () => {
+    const command = acpCommand.trim();
+    if (!command) return;
+    void handleLaunchAgent(
+      acpAgentName(command),
+      { agentType: 'acp', env: acpAgentEnv(command, acpPermission) },
+      'acp',
+    );
   };
 
   return (
@@ -93,6 +120,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                   );
                   const isOnline = matchedAgent?.status === 'online';
                   const isStarting = startingAgent === cat.name;
+                  const isAcp = cat.name === 'acp';
 
                   return (
                     <div
@@ -112,6 +140,18 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                         </div>
                       </div>
 
+                      {isAcp ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-expanded={acpOpen}
+                          onClick={() => setAcpOpen((v) => !v)}
+                          className="h-8 px-3 text-2xs font-medium gap-1.5 shrink-0"
+                        >
+                          <Settings2 className="size-3" />
+                          <span>{acpOpen ? 'Close' : 'Set up'}</span>
+                        </Button>
+                      ) : (
                       <Button
                         size="sm"
                         variant={isOnline ? 'outline' : 'primary'}
@@ -136,11 +176,52 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
                           </>
                         )}
                       </Button>
+                      )}
                     </div>
                   );
                 });
               })()}
             </div>
+
+            {acpOpen && (
+              <div className="rounded-xl border border-border bg-card p-4 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div>
+                  <p className="text-xs font-semibold text-foreground">ACP Agent</p>
+                  <p className="text-3xs text-foreground-extra-muted mt-0.5">
+                    Runs any CLI that speaks the Agent Client Protocol. Connecting creates{' '}
+                    <span className="font-mono">
+                      @{acpCommand.trim() ? acpAgentName(acpCommand) : 'acp-…'}
+                    </span>
+                    .
+                  </p>
+                </div>
+                <AcpSetupFields
+                  idPrefix="connect-modal"
+                  command={acpCommand}
+                  onCommandChange={setAcpCommand}
+                  permissionMode={acpPermission}
+                  onPermissionModeChange={setAcpPermission}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    disabled={!acpCommand.trim() || startingAgent === 'acp'}
+                    onClick={handleLaunchAcp}
+                    className="h-8 px-3 text-2xs font-medium gap-1.5"
+                  >
+                    {startingAgent === 'acp' ? (
+                      <span className="event-running">Starting</span>
+                    ) : (
+                      <>
+                        <Zap className="size-3" />
+                        <span>Connect</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 2: Remote Pairing Command */}

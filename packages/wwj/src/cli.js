@@ -4,27 +4,36 @@ const { AgentConnector, Daemon } = require('./index');
 const { hasCredentialMetadata, formatAuthGuidance } = require('./auth-guidance');
 const { knownAgentTypes } = require('./adapters');
 const { resolveAgentType } = require('./agent-types');
+const { envFlagValues, parseEnvAssignments, missingRequired } = require('./agent-env-flags');
 
 // ---------------------------------------------------------------------------
 // Arg parsing
 // ---------------------------------------------------------------------------
+
+// Flags that may be given more than once; they always parse to an array.
+const REPEATABLE_FLAGS = new Set(['env']);
 
 function parseArgs(argv) {
   const args = argv.slice(2);
   const flags = {};
   const allPositional = [];
 
+  const setFlag = (key, value) => {
+    if (REPEATABLE_FLAGS.has(key)) (flags[key] = flags[key] || []).push(value);
+    else flags[key] = value;
+  };
+
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a.startsWith('--')) {
       const eq = a.indexOf('=');
       if (eq > 0) {
-        flags[a.slice(2, eq)] = a.slice(eq + 1);
+        setFlag(a.slice(2, eq), a.slice(eq + 1));
       } else if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-        flags[a.slice(2)] = args[i + 1];
+        setFlag(a.slice(2), args[i + 1]);
         i++;
       } else {
-        flags[a.slice(2)] = true;
+        setFlag(a.slice(2), true);
       }
     } else {
       allPositional.push(a);
@@ -51,6 +60,33 @@ function getConnector(flags) {
 }
 
 function print(msg) { process.stdout.write(msg + '\n'); }
+
+/**
+ * Validate `--env KEY=VALUE` flags against the type's env_config. Prints the
+ * problems and returns null when any are invalid, so the caller stops before
+ * touching config.
+ */
+function envFromFlags(connector, flags, type) {
+  const assignments = envFlagValues(flags.env);
+  if (assignments.length === 0) return {};
+  const { env, errors } = parseEnvAssignments(assignments, connector.getEnvFields(type), type);
+  if (errors.length > 0) {
+    for (const err of errors) print(`Error: ${err}`);
+    process.exitCode = 1;
+    return null;
+  }
+  return env;
+}
+
+/** Warn (not fail) when a required setting is still unset for this agent. */
+function warnMissingEnv(connector, type, agentEnv) {
+  let typeEnv = {};
+  try { typeEnv = connector.getAgentEnv(type) || {}; } catch {}
+  const missing = missingRequired(connector.getEnvFields(type), { ...typeEnv, ...(agentEnv || {}) });
+  for (const key of missing) {
+    print(`Warning: '${type}' needs ${key} — pass --env ${key}=<value>`);
+  }
+}
 
 function table(rows, headers) {
   if (rows.length === 0) return;
@@ -161,7 +197,7 @@ async function cmdStatus(connector) {
 async function cmdCreate(connector, flags, positional) {
   const name = positional[0];
   if (!name) {
-    print('Usage: wwj create <name> [--type <type>] [--command <exe>] [--args "<a> <b>"] [--install]');
+    print('Usage: wwj create <name> [--type <type>] [--command <exe>] [--args "<a> <b>"] [--env KEY=VALUE]... [--install]');
     return;
   }
   const type = resolveAgentType(flags.type) || 'openclaw';
@@ -191,8 +227,12 @@ async function cmdCreate(connector, flags, positional) {
     return;
   }
 
+  const env = envFromFlags(connector, flags, type);
+  if (!env) return;
+
   try {
-    connector.addAgent({ name, type, role, path: flags.path || process.cwd(), command, args });
+    connector.addAgent({ name, type, role, path: flags.path || process.cwd(), command, args, env });
+    warnMissingEnv(connector, type, env);
 
     // Signal daemon to pick up the new agent
     try { connector.sendDaemonCommand('reload'); } catch {}
@@ -380,10 +420,31 @@ async function cmdConnect(connector, flags, positional) {
   }
 
   if (!name) {
-    print('Usage: wwj connect <agent-name> <token>');
+    print('Usage: wwj connect <agent-name> <token> [--type <type>] [--env KEY=VALUE]...');
     process.exitCode = 1;
     return;
   }
+
+  // The agent's type decides which --env keys are valid, so settle it before
+  // anything is written. An existing agent keeps its type; a new one takes an
+  // explicit --type first, then a runtime name found in the agent name.
+  const existingAgent = connector.config.getAgent(name);
+  let agentType = existingAgent ? existingAgent.type || 'openclaw' : null;
+  if (!agentType) {
+    // Derived from the adapter registry rather than hand-listed: a hard-coded
+    // list silently dropped 'pi' and 'chatgpt', so those agents fell through
+    // to 'custom' (= OpenClaw) instead of their own runtime.
+    // Longest name first so 'opencode' wins over a substring match.
+    const knownTypes = knownAgentTypes()
+      .filter((t) => t !== 'custom')
+      .sort((a, b) => b.length - a.length);
+    const lowerName = name.toLowerCase();
+    const explicit = typeof flags.type === 'string' ? flags.type : '';
+    agentType =
+      resolveAgentType(explicit) || resolveAgentType(knownTypes.find((t) => lowerName.includes(t))) || 'custom';
+  }
+  const envUpdates = envFromFlags(connector, flags, agentType);
+  if (!envUpdates) return;
 
   if (!token) {
     // No token supplied and none in the environment. Never prompt — keep
@@ -415,19 +476,17 @@ async function cmdConnect(connector, flags, positional) {
     // Auto-create agent if it doesn't exist yet
     let agent = connector.config.getAgent(name);
     if (!agent) {
-      // Derived from the adapter registry rather than hand-listed: a hard-coded
-      // list silently dropped 'pi' and 'chatgpt', so those agents fell through
-      // to 'custom' (= OpenClaw) instead of their own runtime.
-      // Longest name first so 'opencode' wins over a substring match.
-      const knownTypes = knownAgentTypes()
-        .filter((t) => t !== 'custom')
-        .sort((a, b) => b.length - a.length);
-      const lowerName = name.toLowerCase();
-      const inferred =
-        resolveAgentType(knownTypes.find((t) => lowerName.includes(t)) || flags.type) || 'custom';
-      print(`Agent '${name}' not created yet. Auto-creating agent '${name}' of type '${inferred}'...`);
-      connector.config.addAgent({ name, type: inferred });
+      print(`Agent '${name}' not created yet. Auto-creating agent '${name}' of type '${agentType}'...`);
+      agent = connector.config.addAgent({ name, type: agentType, env: envUpdates });
+    } else if (Object.keys(envUpdates).length > 0) {
+      // Re-connecting with new settings (e.g. a different ACP command) updates
+      // them in place; the restart below launches with the new values.
+      agent.env = connector.config.updateAgentEnv(name, envUpdates);
     }
+    if (Object.keys(envUpdates).length > 0) {
+      print(`Saved ${Object.keys(envUpdates).join(', ')} for '${name}'`);
+    }
+    warnMissingEnv(connector, agentType, agent.env);
 
     // Connect agent
     connector.connectWorkspace(name, slug);
@@ -843,6 +902,8 @@ Commands:
 Options:
   --config <dir>              Config directory (default: ~/.wwj)
   --install                   Install runtime during create
+  --env KEY=VALUE             Per-agent setting for create/connect (repeatable;
+                              only keys the type declares, e.g. ACP_COMMAND)
 `);
 }
 

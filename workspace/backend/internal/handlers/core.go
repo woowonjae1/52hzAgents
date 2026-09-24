@@ -673,11 +673,20 @@ func LaunchAgent(c *gin.Context) {
 		endpoint = envEndpoint
 	}
 
+	// Optional per-agent settings (e.g. an ACP agent's command). Each value is
+	// its own argv entry — nothing here is joined into a shell string.
+	extraArgs, extraErr := launchConnectExtraArgs(c.Request.Body, cliPath)
+	if extraErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": extraErr.Error()})
+		return
+	}
+	connectArgs := append([]string{"connect", agentName, reqToken, "--endpoint", endpoint}, extraArgs...)
+
 	var runCmd *exec.Cmd
 	if cliPath == "wwj" {
-		runCmd = exec.Command("wwj", "connect", agentName, reqToken, "--endpoint", endpoint)
+		runCmd = exec.Command("wwj", connectArgs...)
 	} else {
-		runCmd = exec.Command("node", cliPath, "connect", agentName, reqToken, "--endpoint", endpoint)
+		runCmd = exec.Command("node", append([]string{cliPath}, connectArgs...)...)
 	}
 	runCmd.Env = append(os.Environ(),
 		"WWJ_WORKSPACE_TOKEN="+reqToken,
