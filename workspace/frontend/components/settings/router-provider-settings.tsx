@@ -177,7 +177,7 @@ export function RouterProviderSettings() {
             id="router-model"
             value={config.model}
             onChange={(e) => update({ model: e.target.value })}
-            placeholder={config.provider === 'openai' ? 'gpt-4o-mini' : 'claude-haiku-4-5-20251001'}
+            placeholder={config.provider === 'openai' ? 'gpt-5-mini' : 'claude-haiku-4-5'}
             className="h-8 text-xs"
           />
         </div>

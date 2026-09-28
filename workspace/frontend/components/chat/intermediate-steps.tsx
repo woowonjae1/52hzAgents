@@ -392,7 +392,7 @@ function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
 
 // ── Step Item ──
 
-const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMessage }) {
+const SingleStep = memo(function SingleStep({ message, live }: { message: WorkspaceMessage; live?: boolean }) {
   // No `expanded` state: the disclosure is a native `<details>` inside
   // `EventLine` now, so nothing here owns open/closed.
   const [copied, setCopied] = useState(false);
@@ -520,8 +520,16 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
         state={(() => {
           const status = String(message.metadata?.tool_status || '').toLowerCase();
           if (status === 'failed' || status === 'error') return 'failed' as const;
-          if (status === 'running' || status === 'pending' || status === 'in_progress') return 'running' as const;
           if (status === 'blocked') return 'blocked' as const;
+          if (status === 'running' || status === 'pending' || status === 'in_progress') {
+            // A tool call is only in an active 'running' state if the containing trace is live
+            // and the step is not stale (> 5 minutes old). Once settled or aged out,
+            // historical running states render resolved as 'ok' rather than ticking live forever.
+            const isStale = message.createdAt
+              ? Date.now() - new Date(message.createdAt).getTime() > 5 * 60_000
+              : false;
+            return live && !isStale ? ('running' as const) : ('ok' as const);
+          }
           return 'ok' as const;
         })()}
         startTime={message.createdAt ? Date.parse(message.createdAt) : null}
@@ -717,7 +725,7 @@ function joinThoughts(messages: WorkspaceMessage[]): string {
  * reads of four different files is four reads, and collapsing that to "Read"
  * would hide the scale of what happened.
  */
-const ParallelTools = memo(function ParallelTools({ messages }: { messages: WorkspaceMessage[] }) {
+const ParallelTools = memo(function ParallelTools({ messages, live }: { messages: WorkspaceMessage[]; live?: boolean }) {
   const names = messages.map((m) => parseMessageStep(m).toolDisplay || 'Tool');
   // The batch's own icon is whichever tool it led with; a wrench for a batch of
   // four reads would be less informative than the read glyph.
@@ -738,7 +746,7 @@ const ParallelTools = memo(function ParallelTools({ messages }: { messages: Work
       */}
       <div className="py-0.5">
         {messages.map((m, i) => (
-          <SingleStep key={`${m.messageId || 'batch'}-${i}`} message={m} />
+          <SingleStep key={`${m.messageId || 'batch'}-${i}`} message={m} live={live} />
         ))}
       </div>
     </EventLine>
@@ -786,11 +794,13 @@ function StepRuns({ steps, live }: { steps: WorkspaceMessage[]; live?: boolean }
           <ParallelTools
             key={`tools-${run.messages[0]?.messageId || runIdx}`}
             messages={run.messages}
+            live={Boolean(live) && runIdx === runs.length - 1}
           />
         ) : (
           <SingleStep
             key={`${run.message.messageId || 'step'}-${runIdx}`}
             message={run.message}
+            live={Boolean(live) && runIdx === runs.length - 1}
           />
         )
       )}

@@ -933,7 +933,23 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 		// No open batch. Fall through, so a channel parked in parallel mode
 		// still answers an ordinary question between batches.
 	}
-	if mode == "master" && channel.MasterAgent != nil && *channel.MasterAgent != "" {
+	if len(mentions) > 0 {
+		// Fast path: Explicit @mention directly routes to the targeted agent(s)
+		// without invoking routeWithLLM. Explicit mention is authoritative and saves 1-3s latency.
+		targets = mentions
+		if mode != "parallel" && len(targets) > 1 {
+			targets = targets[:1]
+		}
+		for _, target := range targets {
+			var cm models.ChannelMember
+			if err := database.Where("channel_id = ? AND agent_name = ?", channel.ID, target).First(&cm).Error; err != nil {
+				_ = database.Create(&models.ChannelMember{
+					ChannelID: channel.ID,
+					AgentName: target,
+				}).Error
+			}
+		}
+	} else if mode == "master" && channel.MasterAgent != nil && *channel.MasterAgent != "" {
 		targets = masterTargets(req.Source, *channel.MasterAgent, participants, mentions)
 	} else if len(participants) >= 2 {
 		// Dynamic keeps its own rule: the router picks one next speaker. Waking

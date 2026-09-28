@@ -500,11 +500,18 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 		return false
 	}
 
+	var failedAgents []string
+	for _, l := range lanes {
+		if l.Status == laneFailed {
+			failedAgents = append(failedAgents, l.Agent)
+		}
+	}
+
 	batch.Status = batchReview
 	batch.Summary = reviewSummary(batch, lanes)
 	db.DB.Save(batch)
 	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
-	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, failedAgents, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID, "review": true},
 	})
 	return true
@@ -513,9 +520,11 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 func reviewSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLaneRecord) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("**Parallel batch ready for review** — nothing has been merged into `%s` yet. Review each lane, then Merge or Discard in the panel above.\n\n", baseRef(batch)))
+	var failedLanes []models.ParallelLaneRecord
 	for _, l := range lanes {
 		switch {
 		case l.Status == laneFailed:
+			failedLanes = append(failedLanes, l)
 			b.WriteString(fmt.Sprintf("❌ **@%s** — failed", l.Agent))
 			if l.Error != "" {
 				b.WriteString(" · " + l.Error)
@@ -528,6 +537,16 @@ func reviewSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLan
 		b.WriteString("\n")
 		if l.Reply != "" {
 			b.WriteString("  > " + strings.ReplaceAll(truncateRunes(l.Reply, 280), "\n", " ") + "\n")
+		}
+	}
+	if len(failedLanes) > 0 {
+		b.WriteString("\n")
+		for _, fl := range failedLanes {
+			diag := fl.Error
+			if diag == "" {
+				diag = "unknown execution failure"
+			}
+			b.WriteString(fmt.Sprintf("⚠️ @%s [Task Issue Bounced Back] Your parallel lane failed: %s. Please inspect branch `%s` and worktree `%s` to fix the problem.\n", fl.Agent, diag, fl.Branch, fl.WorktreePath))
 		}
 	}
 	return strings.TrimSpace(b.String())
@@ -685,12 +704,12 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 	db.DB.Save(batch)
 	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
 
-	// Wake the master to review, unless the master was itself one of the lanes
-	// (then it has already seen its own part and the summary is for the human).
+	// Wake the master to review, or bounce issues back to responsible lane agents
 	var targets []string
 	var channel models.Channel
-	if db.DB.Where("workspace_id = ? AND name = ?", batch.WorkspaceID, batch.ChannelName).Limit(1).Find(&channel).RowsAffected > 0 &&
-		channel.MasterAgent != nil && *channel.MasterAgent != "" {
+	hasMaster := db.DB.Where("workspace_id = ? AND name = ?", batch.WorkspaceID, batch.ChannelName).Limit(1).Find(&channel).RowsAffected > 0 &&
+		channel.MasterAgent != nil && *channel.MasterAgent != ""
+	if hasMaster {
 		isLane := false
 		for _, l := range lanes {
 			if strings.EqualFold(l.Agent, *channel.MasterAgent) {
@@ -698,12 +717,32 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 			}
 		}
 		if !isLane {
-			targets = []string{*channel.MasterAgent}
+			targets = append(targets, *channel.MasterAgent)
 		}
 	}
+
+	var issueAgents []string
+	for _, l := range lanes {
+		if l.Status == laneFailed || l.Status == laneConflict {
+			issueAgents = append(issueAgents, l.Agent)
+			targets = append(targets, l.Agent)
+		}
+	}
+
 	content := batch.Summary
-	if len(targets) > 0 {
-		content += "\n\n@" + targets[0] + " please review the combined result above: check the merged changes fit together, and resolve or report anything listed as a conflict or failure."
+	if hasMaster && len(targets) > 0 {
+		content += "\n\n@" + *channel.MasterAgent + " please review the combined result above: check the merged changes fit together, and resolve or report anything listed as a conflict or failure."
+	}
+	if len(issueAgents) > 0 {
+		for _, l := range lanes {
+			if l.Status == laneFailed || l.Status == laneConflict {
+				diag := l.Error
+				if diag == "" {
+					diag = l.Status
+				}
+				content += fmt.Sprintf("\n\n⚠️ @%s [Task Issue Bounced Back] Your parallel lane encountered an issue (%s): %s. Please review your branch `%s` and worktree `%s` to resolve it.", l.Agent, l.Status, diag, l.Branch, l.WorktreePath)
+			}
+		}
 	}
 	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", content, targets, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID},

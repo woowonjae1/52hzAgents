@@ -517,6 +517,19 @@ class PiAdapter extends BaseAdapter {
         } catch {}
       }
 
+      if (eventType === 'tool_execution_end' && (event.isError || event.error)) {
+        const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
+        const errMsg = event.result || event.error || '';
+        try {
+          await this.sendToolCall(channelName, {
+            name: toolName,
+            status: 'failed',
+            id: event.toolCallId || event.id || event.tool_call_id,
+            summary: typeof errMsg === 'string' ? errMsg.slice(0, 100) : undefined,
+          });
+        } catch {}
+      }
+
       // 4. Final response extraction & error detection from message_end / turn_end
       if (eventType === 'message_end' || eventType === 'turn_end') {
         await flushThinking();

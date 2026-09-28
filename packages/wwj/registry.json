@@ -38,9 +38,9 @@
       },
       {
         "name": "AIDER_MODEL",
-        "description": "Model to use, e.g. sonnet, gpt-4o, claude-3-5-sonnet-20241022, openrouter/anthropic/claude-3.5-sonnet, gemini/gemini-1.5-pro, deepseek/deepseek-chat. May be left blank to let Aider auto-select —but if you set LLM_API_KEY, the provider must be determinable (via AIDER_PROVIDER or the model name).",
+        "description": "Model to use, e.g. o3, claude-sonnet-4, gemini-2.5-pro, deepseek/deepseek-r1. May be left blank to let Aider auto-select —but if you set LLM_API_KEY, the provider must be determinable (via AIDER_PROVIDER or the model name).",
         "required": false,
-        "placeholder": "gpt-4o"
+        "placeholder": "o3"
       },
       {
         "name": "LLM_API_KEY",
@@ -448,7 +448,7 @@
       },
       {
         "name": "CURSOR_MODEL",
-        "description": "Model to use (e.g. claude-sonnet-4-6, gpt-4o)",
+        "description": "Model to use (e.g. claude-sonnet-4, o3, deepseek-r1)",
         "required": false
       }
     ],
@@ -568,7 +568,7 @@
       },
       {
         "name": "GOOSE_MODEL",
-        "description": "Model name for the selected provider (e.g. gpt-4o, claude-sonnet-4-6). Leave blank to reuse your existing Goose config.",
+        "description": "Model name for the selected provider (e.g. o3, claude-sonnet-4, deepseek-r1). Leave blank to reuse your existing Goose config.",
         "required": false
       },
       {
@@ -704,7 +704,7 @@
         "name": "LLM_MODEL",
         "description": "Model name",
         "required": false,
-        "placeholder": "gpt-4o, claude-sonnet-4-20250514, deepseek-chat, etc."
+        "placeholder": "o3, claude-sonnet-4, deepseek-r1, etc."
       }
     ],
     "resolve_env": {

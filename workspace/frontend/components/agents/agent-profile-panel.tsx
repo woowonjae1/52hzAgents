@@ -510,7 +510,7 @@ export function AgentProfilePanel() {
                               setCustomModelInput('');
                             }
                           }}
-                          placeholder="Model ID, e.g. gpt-4o"
+                          placeholder="Model ID, e.g. o3, claude-sonnet-4, deepseek-r1"
                           className="w-full px-2 py-1 text-2xs font-mono rounded border bg-surface2 focus:ring-1 focus:ring-primary/40 text-foreground"
                           autoFocus
                         />

@@ -637,7 +637,7 @@ function CloudAgentsTab({
                   id="cloud-model"
                   value={cfgModel}
                   onChange={(e) => setCfgModel(e.target.value)}
-                  placeholder="e.g. gpt-4o, deepseek-chat, qwen-turbo"
+                  placeholder="e.g. o3, claude-sonnet-4, deepseek-r1, qwen-max"
                   className="text-xs h-9 border-border focus:border-border-accent dark:border-border dark:focus:border-border-accent focus:ring-0 focus-visible:ring-0"
                 />
               </div>

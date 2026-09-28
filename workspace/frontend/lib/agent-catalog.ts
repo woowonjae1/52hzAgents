@@ -20,7 +20,7 @@ export const DEFAULT_AGENT_CATALOG: AgentCatalogEntry[] = [
   {
     name: 'chatgpt',
     label: 'ChatGPT / Codex',
-    description: 'OpenAI GPT-4o & Codex terminal assistant for intelligent software development.',
+    description: 'OpenAI o-series & GPT flagship models terminal assistant for intelligent software development.',
     install_command: 'wwj install chatgpt',
     homepage: 'https://chatgpt.com',
     tags: ['coding', 'cli'],

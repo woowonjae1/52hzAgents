@@ -253,7 +253,7 @@ export default function AgentsDemoPage() {
                 onModelChange={setSelectedModel}
                 models={[
                   { value: 'qwen-max', label: 'Qwen 3.6 Max' },
-                  { value: 'claude-3-7-sonnet', label: 'Claude 3.7 Sonnet' },
+                  { value: 'claude-sonnet-4', label: 'Claude 4 Sonnet' },
                   { value: 'pi-agent', label: 'Pi Local Agent' },
                 ]}
                 onSubmit={(val) => {

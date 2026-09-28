@@ -6,6 +6,7 @@ import (
 	"encoding/json" // 编码事件负载。
 	"fmt"
 	"log"  // 打印到期任务触发日志。
+	"sync"
 	"time" // 控制轮询间隔与到期比对。
 
 	"github.com/google/uuid" // 生成事件唯一 UUID 主键。
@@ -16,32 +17,47 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"   // 表模型结构体。
 )
 
-// StartScheduler 启动定时任务常驻协程，每 5 秒进行一次库扫描。
-func StartScheduler() {
-	// 开启异步协程。
-	go func() {
-		log.Println("Starting background scheduler loop...")
-		// 设定 5 秒的心跳计时器。
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop() // 方法结束时释放计时器。
+var (
+	nextTimerWakeMu   sync.RWMutex
+	nextTimerWake     time.Time
+	nextRoutineWakeMu sync.RWMutex
+	nextRoutineWake   time.Time
+)
 
-		// 无限循环监听计时器 Tick 信号，并带有 panic 容错恢复保护。
+// StartScheduler 启动定时任务常驻协程，采用分级频率与内存时间轮感知，降低空转扫表消耗。
+func StartScheduler() {
+	go func() {
+		log.Println("Starting background scheduler loop with tiered interval checks...")
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		var tickCount uint64
 		for range ticker.C {
+			tickCount++
 			func() {
 				defer func() {
 					if r := recover(); r != nil {
 						log.Printf("Recovered from panic in background scheduler loop: %v", r)
 					}
 				}()
+				// Tier 1: 高频心跳与即时计时器扫描 (每 5 秒，带内存唤醒缓存)
 				expireStaleAgents()
-				expireOrphanedAgentTurns() // after expireStaleAgents: it reads the offline it just set
-				expirePendingApprovals()
-				expireStalePipelineSteps()
-				expireStaleCouncilSessions()
-				expireStaleRoutineRuns()
-				handlers.ExpireStaleParallelLanes()
-				fireDueTimers()   // 执行到期 Timers 触发扫描。
-				fireDueRoutines() // 执行到期 Routines 触发扫描。
+				expireOrphanedAgentTurns()
+				fireDueTimers()
+				fireDueRoutines()
+
+				// Tier 2: 中频过期扫描 (每 15 秒)
+				if tickCount%3 == 0 {
+					expirePendingApprovals()
+					handlers.ExpireStaleParallelLanes()
+				}
+
+				// Tier 3: 低频超时清理 (每 30 秒)
+				if tickCount%6 == 0 {
+					expireStalePipelineSteps()
+					expireStaleCouncilSessions()
+					expireStaleRoutineRuns()
+				}
 			}()
 		}
 	}()
@@ -104,7 +120,15 @@ func fireDueTimers() {
 	if db.DB == nil {
 		return
 	}
-	now := time.Now().UTC()            // 获取当前的 UTC 时刻。
+	now := time.Now().UTC() // 获取当前的 UTC 时刻。
+
+	nextTimerWakeMu.RLock()
+	wake := nextTimerWake
+	nextTimerWakeMu.RUnlock()
+	if !wake.IsZero() && now.Before(wake) {
+		return
+	}
+
 	var dueTimers []models.TimerRecord // 声明列表存放被捕获的到期定时器。
 
 	// 检索状态为 active 且 fires_at 小于等于当前时间的前 50 条记录。
@@ -237,6 +261,18 @@ func fireDueTimers() {
 
 		log.Printf("Timer %s successfully fired in channel: %s", timer.ID, timer.ChannelName)
 	}
+
+	// 动态计算下一次最早触发时刻，避免空转反复扫表
+	var earliestTimer models.TimerRecord
+	if err := db.DB.Where("status = ?", "active").Order("fires_at ASC").Limit(1).Find(&earliestTimer).Error; err == nil && earliestTimer.ID != "" {
+		nextTimerWakeMu.Lock()
+		nextTimerWake = earliestTimer.FiresAt
+		nextTimerWakeMu.Unlock()
+	} else {
+		nextTimerWakeMu.Lock()
+		nextTimerWake = now.Add(25 * time.Second)
+		nextTimerWakeMu.Unlock()
+	}
 }
 
 // fireDueRoutines 扫描并触发周期性循环定时任务。
@@ -244,7 +280,15 @@ func fireDueRoutines() {
 	if db.DB == nil {
 		return
 	}
-	now := time.Now().UTC()                // 当前 UTC 时间。
+	now := time.Now().UTC() // 当前 UTC 时间。
+
+	nextRoutineWakeMu.RLock()
+	wake := nextRoutineWake
+	nextRoutineWakeMu.RUnlock()
+	if !wake.IsZero() && now.Before(wake) {
+		return
+	}
+
 	var dueRoutines []models.RoutineRecord // 存储临时结果。
 
 	// 检索状态为 active 且下一次触发时间小于当前时间的前 50 条周期任务。
@@ -284,6 +328,18 @@ func fireDueRoutines() {
 		} else {
 			log.Printf("Routine %s (%s, Name: %s) successfully triggered in channel: %s", r.ID, r.ShortID, r.Name, r.ChannelName)
 		}
+	}
+
+	// 动态计算周期任务下一次最早触发时刻
+	var earliestRoutine models.RoutineRecord
+	if err := db.DB.Where("status = ?", "active").Order("next_fires_at ASC").Limit(1).Find(&earliestRoutine).Error; err == nil && earliestRoutine.ID != "" {
+		nextRoutineWakeMu.Lock()
+		nextRoutineWake = earliestRoutine.NextFiresAt
+		nextRoutineWakeMu.Unlock()
+	} else {
+		nextRoutineWakeMu.Lock()
+		nextRoutineWake = now.Add(25 * time.Second)
+		nextRoutineWakeMu.Unlock()
 	}
 }
 
