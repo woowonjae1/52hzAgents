@@ -461,6 +461,10 @@ export function PromptComposer({
   const activePipelineSegments = React.useMemo(() => {
     return extractMentionSegments(message, agents);
   }, [message, agents]);
+  // In a parallel thread the backend turns a multi-@mention message into a
+  // batch — every agent starts at once in its own lane — not a hand-off chain.
+  // The preview must not draw numbered steps and arrows for that.
+  const previewIsParallel = session?.orchestrationMode === 'parallel';
 
   const handleSend = () => {
     const trimmed = message.trim();
@@ -824,15 +828,25 @@ export function PromptComposer({
               exit={{ height: 0, opacity: 0 }}
               className="px-3.5 pt-2 pb-1 overflow-hidden"
             >
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-primary/8 border border-primary/25 text-2xs text-foreground backdrop-blur-xs">
+              <div
+                className={cn(
+                  'flex gap-2 p-2 rounded-xl bg-primary/8 border border-primary/25 text-2xs text-foreground backdrop-blur-xs',
+                  previewIsParallel ? 'flex-col items-start' : 'items-center',
+                )}
+              >
                 <div className="flex items-center gap-1 text-primary font-semibold shrink-0">
                   <Waypoints className="size-3.5" />
-                  <span>Pipeline Preview:</span>
+                  <span>{previewIsParallel ? 'Runs in parallel:' : 'Pipeline Preview:'}</span>
                 </div>
-                <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto py-0.5 flex-1">
+                <div
+                  className={cn(
+                    'flex gap-1.5 min-w-0 py-0.5 flex-1',
+                    previewIsParallel ? 'flex-col items-start w-full' : 'items-center overflow-x-auto',
+                  )}
+                >
                   {activePipelineSegments.map((seg, idx) => (
                     <React.Fragment key={idx}>
-                      {idx > 0 && (
+                      {idx > 0 && !previewIsParallel && (
                         <ChevronRight
                           className="size-3 shrink-0 text-foreground-extra-muted"
                           aria-hidden
@@ -840,15 +854,26 @@ export function PromptComposer({
                       )}
                       <Hint label={seg.instruction ? `@${seg.agent}: ${seg.instruction}` : `@${seg.agent}`}>
                       <div
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground max-w-[220px]"
+                        className={cn(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground',
+                          previewIsParallel ? 'max-w-full' : 'max-w-[220px]',
+                        )}
                       >
-                        <span className="size-3.5 rounded-full bg-primary text-primary-foreground text-3xs font-bold flex items-center justify-center shrink-0">
-                          {idx + 1}
-                        </span>
+                        {/* A step number implies an order; parallel lanes have none. */}
+                        {!previewIsParallel && (
+                          <span className="size-3.5 rounded-full bg-primary text-primary-foreground text-3xs font-bold flex items-center justify-center shrink-0">
+                            {idx + 1}
+                          </span>
+                        )}
                         <AgentAvatar name={seg.agent} size={13} />
                         <span className="font-semibold truncate">@{seg.agent}</span>
                         {seg.instruction && (
-                          <span className="text-3xs text-muted-foreground truncate max-w-[100px]">
+                          <span
+                            className={cn(
+                              'text-3xs text-muted-foreground truncate',
+                              previewIsParallel ? 'min-w-0' : 'max-w-[100px]',
+                            )}
+                          >
                             {seg.instruction}
                           </span>
                         )}
