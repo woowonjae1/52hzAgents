@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, History, Folder, FolderPlus, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, House, CalendarClock, Inbox, Users, BookOpen, CircleCheck } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -42,9 +42,24 @@ function folderId(dir: string | null | undefined) {
   return dir ? `dir:${dir}` : DIRECT_CHATS;
 }
 
-/** Top nav rows: same height, type and radius as the thread rows below. */
+/** Nav rows: the same height and radius as the thread rows below. */
 const NAV_ROW_CLASS =
-  'flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring';
+  'flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring';
+const NAV_ROW_ACTIVE = 'bg-muted font-medium text-foreground';
+
+/** Small uppercase group label, as in the reference shells' grouped nav. */
+const SECTION_LABEL_CLASS = 'text-[10.5px] font-medium uppercase tracking-[0.06em] text-muted-foreground/75';
+
+function NavSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="flex flex-col gap-0.5">
+      <div className="mt-3 mb-0.5 flex h-6 items-center pl-2.5">
+        <span className={SECTION_LABEL_CLASS}>{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 const ROW_CLASS =
   'flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring';
@@ -62,8 +77,22 @@ export function ThreadSidebar() {
     renameSession,
     updateSession,
     moveSessionToFolder,
+    unreadNotificationCount,
   } = useWorkspace();
-  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab } = useLayout();
+  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings } = useLayout();
+  // Same rule as the wrapper: Home, or Threads with nothing open.
+  const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
+
+  /*
+    "New session" opens Home's setup rather than an empty draft: picking the
+    agents, folder and mode IS starting a session, and the draft Home creates
+    carries all of it. The quick path (an immediate draft with everyone) is
+    still C / the palette's "New chat", and "New chat here" on a project row.
+  */
+  const startNewSession = React.useCallback(() => {
+    setCurrentSessionId(null);
+    setViewMode('home');
+  }, [setCurrentSessionId, setViewMode]);
 
   /*
     Per channel, what the agents themselves reported: a channel with any
@@ -486,14 +515,19 @@ export function ThreadSidebar() {
         "New project" left this list: it CREATES something, and creation sits
         beside the list it creates into (the Projects header below).
       */}
-      <nav className="flex flex-col gap-0.5">
-        <button type="button" className={cn(NAV_ROW_CLASS, 'bg-muted/60 font-medium text-foreground')} onClick={() => void createSession()}>
-          <SquarePen className="size-4 shrink-0" />
-          New chat
+      <nav className="flex flex-col gap-0.5" aria-label="Workspace navigation">
+        {/* The one solid control in the sidebar: where a session starts. */}
+        <button
+          type="button"
+          onClick={startNewSession}
+          className="mb-1 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          <Plus className="size-4 shrink-0" />
+          New session
         </button>
         <button
           type="button"
-          className={cn(NAV_ROW_CLASS, showSearch && 'bg-muted text-foreground')}
+          className={cn(NAV_ROW_CLASS, showSearch && NAV_ROW_ACTIVE)}
           onClick={() => {
             setShowSearch((open) => !open);
             requestAnimationFrame(() => searchRef.current?.focus());
@@ -502,39 +536,85 @@ export function ThreadSidebar() {
           <Search className="size-4 shrink-0" />
           Search
         </button>
-        {/*
-          The workspace's shared files: what you uploaded and what agents
-          produced (adapters register files they write each turn). The tree
-          below swaps to the file list while this is on.
-        */}
-        <button
-          type="button"
-          className={cn(NAV_ROW_CLASS, viewMode === 'files' && 'bg-muted text-foreground')}
-          onClick={() => setViewMode(viewMode === 'files' ? 'threads' : 'files')}
-        >
-          <FileText className="size-4 shrink-0" />
-          Files
-        </button>
-        {/*
-          "Runs" opened routines. The label said run history; the target was
-          Settings › Scheduled Tasks (what 'routines' resolved to). Tasks has a
-          Runs page of its own, so the button now goes where it says.
-        */}
-        <button
-          type="button"
-          className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && tasksTab === 'runs' && 'bg-muted text-foreground')}
-          onClick={() => {
-            if (viewMode === 'tasks' && tasksTab === 'runs') {
-              setViewMode('threads');
-            } else {
+
+        <NavSection label="Main">
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, isHome && NAV_ROW_ACTIVE)}
+            aria-current={isHome ? 'page' : undefined}
+            onClick={() => setViewMode('home')}
+          >
+            <House className="size-4 shrink-0" />
+            Home
+          </button>
+          {/*
+            Was "Runs": Tasks' Runs page is where scheduled work and its
+            history live, so the row is named for what it holds.
+          */}
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && tasksTab !== 'tasks' && NAV_ROW_ACTIVE)}
+            onClick={() => {
               setTasksTab('runs');
               setViewMode('tasks');
-            }
-          }}
-        >
-          <History className="size-4 shrink-0" />
-          Runs
-        </button>
+            }}
+          >
+            <CalendarClock className="size-4 shrink-0" />
+            Automations
+          </button>
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, viewMode === 'inbox' && NAV_ROW_ACTIVE)}
+            onClick={() => setViewMode('inbox')}
+          >
+            <Inbox className="size-4 shrink-0" />
+            Inbox
+            {unreadNotificationCount > 0 && (
+              <span className="ms-auto text-2xs tabular-nums text-muted-foreground" aria-label={`${unreadNotificationCount} unread`}>
+                {unreadNotificationCount}
+              </span>
+            )}
+          </button>
+        </NavSection>
+
+        <NavSection label="Workspace">
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, viewMode === 'mission' && NAV_ROW_ACTIVE)}
+            onClick={() => setViewMode('mission')}
+          >
+            <Users className="size-4 shrink-0" />
+            Agents
+          </button>
+          {/*
+            The workspace's shared files: what you uploaded and what agents
+            produced (adapters register files they write each turn). The tree
+            below swaps to the file list while this is on.
+          */}
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, viewMode === 'files' && NAV_ROW_ACTIVE)}
+            onClick={() => setViewMode(viewMode === 'files' ? 'threads' : 'files')}
+          >
+            <FileText className="size-4 shrink-0" />
+            Files
+          </button>
+          <button type="button" className={NAV_ROW_CLASS} onClick={() => openSettings('knowledge')}>
+            <BookOpen className="size-4 shrink-0" />
+            Knowledge
+          </button>
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && tasksTab === 'tasks' && NAV_ROW_ACTIVE)}
+            onClick={() => {
+              setTasksTab('tasks');
+              setViewMode('tasks');
+            }}
+          >
+            <CircleCheck className="size-4 shrink-0" />
+            Tasks
+          </button>
+        </NavSection>
       </nav>
 
       {showSearch && (
@@ -560,8 +640,8 @@ export function ThreadSidebar() {
         workspace has not seen before.
       */}
       {viewMode !== 'files' && (
-      <div className="mt-3 mb-0.5 flex h-7 items-center justify-between pl-2.5 pr-1">
-        <span className="text-[11px] font-medium text-muted-foreground/80">Projects</span>
+      <div className="mt-3 mb-0.5 flex h-6 items-center justify-between pl-2.5 pr-1">
+        <span className={SECTION_LABEL_CLASS}>Projects</span>
         <Hint label={browsingFolder ? 'Opening folder…' : 'New project'}>
           <button
             type="button"
@@ -583,7 +663,7 @@ export function ThreadSidebar() {
         <AISidebar
           ariaLabel="Conversations"
           items={items}
-          activeId={currentSessionId}
+          activeId={isHome ? null : currentSessionId}
           onActiveChange={handleActiveChange}
           defaultExpandedIds={defaultExpandedIds}
           onMove={handleMove}

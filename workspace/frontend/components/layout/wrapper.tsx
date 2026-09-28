@@ -18,7 +18,7 @@ import { InboxView } from '@/components/inbox/inbox-view';
 import { MissionControl } from '@/components/mission/mission-control';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
-import { EmptyState } from '@/components/chat/empty-state';
+import { HomeDashboard } from '@/components/home/home-dashboard';
 
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
@@ -119,9 +119,18 @@ function WrapperInner() {
   }, []);
 
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, setSidebarOpen, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
-  const { monitorMode, agents, loading, workspace } = useWorkspace();
+  const { monitorMode, loading, workspace, currentSessionId } = useWorkspace();
   const { activeArtifact, isCanvasOpen, closeCanvas } = useArtifacts();
-  const hasAgents = agents.length > 0;
+  /*
+    HOME IS WHERE A WINDOW WITH NO OPEN SESSION LANDS.
+
+    Either asked for ('home': the sidebar's Home / New session, G H) or
+    implied: the Threads view with nothing selected -- first launch, a
+    restored layout whose thread is gone, closing or deleting the open
+    thread. The implied case is what replaced the "No channel selected" pane,
+    so there is no longer a state where the main area is empty.
+  */
+  const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
   const desktopContainerRef = React.useRef<HTMLDivElement>(null);
   const narrowStateRef = React.useRef<boolean | null>(null);
 
@@ -146,6 +155,7 @@ function WrapperInner() {
   const isStudioOpen =
     !isDetailExpanded &&
     (activeRightTab !== null || isCanvasOpen) &&
+    !isHome &&
     viewMode !== 'mission' &&
     viewMode !== 'connect' &&
     viewMode !== 'files';
@@ -230,9 +240,9 @@ function WrapperInner() {
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <MissionControl />
             </div>
-          ) : !hasAgents && viewMode === 'threads' ? (
+          ) : viewMode === 'home' || (isHome && mobilePane === 'detail') ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <EmptyState />
+              <HomeDashboard />
             </div>
           ) : viewMode === 'connect' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
@@ -320,7 +330,7 @@ function WrapperInner() {
             <>
               {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
               <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", undefined)}>
-                {!isSidebarOpen && !isSettings && viewMode !== 'threads' && (
+                {!isSidebarOpen && !isSettings && (viewMode !== 'threads' || isHome) && (
                   <Hint label="Expand sidebar" side="right">
                     <button
                       onClick={sidebarToggle}
@@ -350,11 +360,12 @@ function WrapperInner() {
                   </Hint>
                 )}
                 {/* Keep ChatView alive in DOM to prevent SSE disconnection, dropped messages, and re-fetch flicker */}
-                <div className={cn("h-full w-full", viewMode !== 'threads' && "hidden")}>
+                <div className={cn("h-full w-full", (viewMode !== 'threads' || isHome) && "hidden")}>
                   <main className="h-full">
                     <ChatView />
                   </main>
                 </div>
+                {isHome && <HomeDashboard />}
                 {viewMode === 'mission' && <MissionControl />}
                 {viewMode === 'connect' && <ConnectAgentView />}
                 {viewMode === 'files' && <FilePreview />}

@@ -3,14 +3,11 @@
 import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import {
-  Users,
   Settings,
   KeyRound,
   Check,
   LogOut,
   LogIn,
-  CheckCircle2,
-  Inbox,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { ThemeToggle } from '@/components/motion/theme-toggle';
@@ -21,15 +18,13 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { ThreadSidebar } from '@/components/threads/thread-sidebar';
-import { FileList } from '@/components/files/file-list';
-import { TasksView } from '@/components/tasks/tasks-view';
 
 export function SidebarContent() {
-  const { viewMode, setViewMode, openSettings } = useLayout();
+  const { viewMode, openSettings } = useLayout();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
-  const { token, agents, todos, unreadNotificationCount } = useWorkspace();
+  const { token } = useWorkspace();
   const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -105,76 +100,13 @@ export function SidebarContent() {
           <span>Settings</span>
         </button>
 
-        {/* Right group: Inbox, Tasks, Agents, Token, Theme */}
+        {/* Right group: token, theme */}
         <div className="flex items-center gap-0.5">
-          {/* Inbox & Notifications */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === 'inbox' ? 'threads' : 'inbox')}
-                aria-label="Inbox & Notifications"
-                className={cn(
-                  'size-7 rounded-lg flex items-center justify-center transition-colors relative',
-                  viewMode === 'inbox'
-                    ? 'bg-surface2 text-foreground'
-                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
-                )}
-              >
-                <Inbox className="size-3.5" />
-                {unreadNotificationCount > 0 && (
-                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-status-danger" />
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {unreadNotificationCount > 0 ? `Inbox (${unreadNotificationCount} unread)` : 'Inbox'}
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Tasks & Issues */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === 'tasks' ? 'threads' : 'tasks')}
-                aria-label="Tasks & Issues"
-                className={cn(
-                  'size-7 rounded-lg flex items-center justify-center transition-colors relative',
-                  viewMode === 'tasks'
-                    ? 'bg-surface2 text-foreground'
-                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
-                )}
-              >
-                <CheckCircle2 className="size-3.5" />
-                {todos && todos.filter((t) => t.status !== 'completed' && t.status !== 'cancelled').length > 0 && (
-                  <span className="absolute 1 top-1 right-1 size-1.5 rounded-full bg-status-success" />
-                )}
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Tasks & Issues</TooltipContent>
-          </Tooltip>
-
-          {/* Agents Dashboard */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === 'mission' ? 'threads' : 'mission')}
-                aria-label="Agents Dashboard"
-                className={cn(
-                  'size-7 rounded-lg flex items-center justify-center transition-colors',
-                  viewMode === 'mission'
-                    ? 'bg-surface2 text-foreground'
-                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60'
-                )}
-              >
-                <Users className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Agents Dashboard</TooltipContent>
-          </Tooltip>
-
+          {/*
+            Inbox, Tasks and Agents used to sit here as three unlabeled
+            icons. They are named rows in the grouped nav above now, so this
+            bar keeps only what is about the app itself.
+          */}
           {token && (
             <Tooltip>
               <TooltipTrigger asChild>

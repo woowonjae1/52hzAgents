@@ -12,6 +12,7 @@ import {
   isReadOnlyEnforced,
   loadThreadProfile,
   saveThreadProfile,
+  THREAD_PROFILE_EVENT,
   type AgentProfileId,
 } from '@/lib/agent-profiles';
 
@@ -40,6 +41,12 @@ export function AgentProfileControl({ session }: Props) {
   );
   React.useEffect(() => {
     setProfileId(loadThreadProfile(sessionId) ?? DEFAULT_PROFILE_ID);
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ sessionId: string; id: AgentProfileId }>).detail;
+      if (detail?.sessionId === sessionId) setProfileId(detail.id);
+    };
+    window.addEventListener(THREAD_PROFILE_EVENT, onChange);
+    return () => window.removeEventListener(THREAD_PROFILE_EVENT, onChange);
   }, [sessionId]);
 
   // Whose read-only is a guard and whose only a request: the thread's online

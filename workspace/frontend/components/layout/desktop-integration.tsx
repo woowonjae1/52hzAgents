@@ -67,6 +67,7 @@ function drawBadge(count: number): string | null {
 
 /** Menu command id → what the app does. Mirrors global-shortcuts.tsx. */
 const GO_TARGETS: Record<string, ViewMode> = {
+  home: 'home',
   threads: 'threads',
   tasks: 'tasks',
   mission: 'mission',

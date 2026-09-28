@@ -131,6 +131,8 @@ export interface WorkspaceMessageMetadata extends Record<string, unknown> {
   reply_preview?: boolean;
   attachments?: Record<string, unknown>[];
   turn_changes?: TurnChangesMetadata;
+  /** On a system:routine message announcing an agent's proposed routine. */
+  routine_proposal?: RoutineProposalMetadata;
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
@@ -352,6 +354,27 @@ export interface RoutineRunItem {
   startedAt: string;
   completedAt: string | null;
   error: string | null;
+  /** The agent's last reply in the run's channel during the run (truncated). */
+  result: string | null;
+  /** Event id of that reply, for jumping to it in the thread. */
+  resultMessageId: string | null;
+  /** Names of files the agent registered during the run. */
+  filesChanged: string[];
+}
+
+/**
+ * active fires on schedule; paused does not (pausedReason set when the system
+ * paused it); pending_approval is an agent's proposal awaiting the user.
+ */
+export type RoutineStatus = 'active' | 'paused' | 'pending_approval' | 'cancelled';
+
+/** `metadata.routine_proposal` on the channel message announcing a proposal. */
+export interface RoutineProposalMetadata {
+  routine_id: string;
+  short_id: string;
+  name: string;
+  schedule_text: string;
+  created_by: string;
 }
 
 export interface RoutineItem {
@@ -375,6 +398,9 @@ export interface RoutineItem {
   channelName: string;
   createdAt: string | null;
   context?: string | null;
+  /** Why the system paused it (e.g. repeated failures); null for a user pause. */
+  pausedReason: string | null;
+  consecutiveFailures: number;
 }
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';

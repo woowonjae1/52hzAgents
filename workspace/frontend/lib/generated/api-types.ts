@@ -811,8 +811,23 @@ export interface RoutineRecord {
   last_run_id: string | null;
   last_run_status: string;
   last_run_error: string | null;
+  /**
+   * Status is active | paused | pending_approval | cancelled. Only active
+   * fires. pending_approval is how a routine an AGENT created starts out: it
+   * does nothing until a person approves it (POST /v1/routines/:id/approve).
+   */
   status: string;
   created_at: string;
+  /**
+   * PausedReason says why the SYSTEM paused it (e.g. after repeated failed
+   * runs). Nil for a pause the user chose; cleared when it is resumed.
+   */
+  paused_reason: string | null;
+  /**
+   * ConsecutiveFailures counts failed runs since the last successful one;
+   * reaching the auto-pause threshold pauses the routine.
+   */
+  consecutive_failures: number;
 }
 
 /**
@@ -833,6 +848,20 @@ export interface RoutineRunRecord {
   started_at: string;
   completed_at: string | null;
   error?: string | null;
+  /**
+   * Result is the agent's last chat message in the run's channel during the
+   * run (truncated), captured when the run completes.
+   */
+  result?: string | null;
+  /**
+   * ResultMessageID is the event id of that message, for jumping to it.
+   */
+  result_message_id?: string | null;
+  /**
+   * FilesChanged is the newline-joined names of files the agent registered in
+   * the run's channel during the run.
+   */
+  files_changed?: string | null;
 }
 
 /**

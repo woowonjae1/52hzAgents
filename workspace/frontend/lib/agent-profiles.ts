@@ -107,12 +107,22 @@ export function threadAgentMode(sessionId: string | null | undefined): AgentMode
   return getProfile(loadThreadProfile(sessionId) ?? DEFAULT_PROFILE_ID).settings.agentMode;
 }
 
+/**
+ * Fired after a thread's profile is written, so a switch that is already on
+ * screen for that thread (the composer's) follows a write made elsewhere --
+ * Home's setup saves the profile a tick after the draft opens.
+ */
+export const THREAD_PROFILE_EVENT = 'wwj:thread-profile-changed';
+
 export function saveThreadProfile(sessionId: string, id: AgentProfileId): void {
   memoryProfiles.set(sessionId, id);
   try {
     localStorage.setItem(storageKey(sessionId), id);
   } catch {
     // Private windows throw; memoryProfiles keeps the pick for this tab.
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(THREAD_PROFILE_EVENT, { detail: { sessionId, id } }));
   }
 }
 

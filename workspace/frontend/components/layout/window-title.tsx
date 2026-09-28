@@ -5,7 +5,8 @@ import { useLayout } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 
 const VIEW_LABEL: Record<string, string> = {
-  mission: 'Mission Control',
+  home: 'Home',
+  mission: 'Agents',
   files: 'Files',
   browser: 'Browser',
   tasks: 'Tasks',
@@ -45,7 +46,7 @@ export function WindowTitle() {
     let subject: string | null = null;
     if (viewMode === 'threads') {
       const s = sessions.find((x) => x.sessionId === currentSessionId);
-      subject = s?.title || (currentSessionId ? `#${currentSessionId.replace(/^channel\//, '')}` : null);
+      subject = s?.title || (currentSessionId ? `#${currentSessionId.replace(/^channel\//, '')}` : 'Home');
     } else if (viewMode === 'settings') {
       const tab = settingsTab === 'general' ? 'Settings' : VIEW_LABEL[settingsTab] || 'Settings';
       subject = tab;

@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentStation, type StationData, type StationStatus } from './agent-station';
-import { ActionRequiredBanner, type PendingActionItem } from './action-required-banner';
+import { ActionRequiredBanner, pendingApprovalsFromMessages, type PendingActionItem } from './action-required-banner';
 import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
 import { ConnectAgentModal } from './connect-agent-modal';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
@@ -145,27 +145,7 @@ export function MissionControl() {
             const msgs = (res.events || []).map(eventToMessage);
             if (!msgs.length) return;
 
-            const respondedApprovalIds = new Set(
-              msgs.map((m) => m.metadata?.tool_approval_response?.approval_id).filter(Boolean)
-            );
-
-            for (const m of msgs) {
-              const appReq = m.metadata?.tool_approval_request;
-              if (appReq && !respondedApprovalIds.has(appReq.approval_id)) {
-                approvals.push({
-                  id: `app-${m.messageId || appReq.approval_id}`,
-                  type: 'approval',
-                  agentName: m.senderName,
-                  channelId: s.sessionId,
-                  channelTitle: s.title,
-                  toolName: appReq.tool,
-                  command: appReq.args?.command,
-                  path: appReq.args?.path,
-                  approvalId: appReq.approval_id,
-                  timestamp: m.createdAt ? new Date(m.createdAt) : new Date(),
-                });
-              }
-            }
+            approvals.push(...pendingApprovalsFromMessages(s, msgs));
 
             const meaningful = [...msgs]
               .reverse()
@@ -504,7 +484,7 @@ export function MissionControl() {
         <div className="flex flex-1 items-center justify-between gap-4 min-w-0">
           <div className="flex items-baseline gap-2.5 min-w-0">
             <h1 className="text-sm font-semibold tracking-tight text-foreground shrink-0">
-              Agent Dashboard
+              Agents
             </h1>
             <p className="truncate text-xs text-muted-foreground tabular-nums">
               {agents.length} {agents.length === 1 ? 'agent' : 'agents'}

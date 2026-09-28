@@ -11,7 +11,6 @@ import {
   CalendarClock,
   Globe,
   Hash,
-  History,
   LayoutGrid,
   LayoutList,
   ListTodo,
@@ -42,8 +41,7 @@ import { toast } from '@/lib/toast';
 import { StatusSelector, StatusGlyph } from './status-selector';
 import { TasksDisplayOptions, type TasksDisplaySettings } from './tasks-display-options';
 import { TasksBoard } from './tasks-board';
-import { SchedulesView } from './schedules-view';
-import { RunsView } from './runs-view';
+import { AutomationsView } from './automations-view';
 
 const STATUS_LABEL: Record<TodoStatus, string> = {
   pending: 'Todo',
@@ -490,34 +488,26 @@ export function TasksView() {
                 {filteredTodos.length}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveSubTab('schedules')}
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
-                activeSubTab === 'schedules'
-                  ? 'bg-background text-foreground shadow-xs font-semibold'
-                  : 'text-foreground-muted hover:text-foreground'
-              )}
-            >
-              <CalendarClock className="size-3.5" />
-              <span>Schedules</span>
-              <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/60">
-                {routines.length}
-              </span>
-            </button>
+            {/*
+              One tab for what used to be two ("Schedules" and "Runs"): a
+              routine and its runs are one thing. The 'runs' key is kept so
+              existing links (sidebar, command palette's 'schedules') land here.
+            */}
             <button
               type="button"
               onClick={() => setActiveSubTab('runs')}
               className={cn(
                 'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium ui-transition',
-                activeSubTab === 'runs'
+                activeSubTab === 'runs' || activeSubTab === 'schedules'
                   ? 'bg-background text-foreground shadow-xs font-semibold'
                   : 'text-foreground-muted hover:text-foreground'
               )}
             >
-              <History className="size-3.5" />
-              <span>Runs</span>
+              <CalendarClock className="size-3.5" />
+              <span>Automations</span>
+              <span className="text-2xs font-mono font-medium text-foreground-extra-muted bg-surface2 px-1.5 py-0.2 rounded-full border border-border/60">
+                {routines.length}
+              </span>
             </button>
           </div>
         </div>
@@ -651,10 +641,8 @@ export function TasksView() {
       </div>
 
       {/* ── Main View Container ── */}
-      {activeSubTab === 'schedules' ? (
-        <SchedulesView />
-      ) : activeSubTab === 'runs' ? (
-        <RunsView />
+      {activeSubTab === 'schedules' || activeSubTab === 'runs' ? (
+        <AutomationsView />
       ) : (
         <div
           {...listNavProps}

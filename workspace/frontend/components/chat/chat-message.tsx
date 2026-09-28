@@ -19,6 +19,7 @@ import { ToolConfirmation } from '@/components/ai-elements/tool-confirmation';
 import { TodoList, type TodoItem } from '@/components/agents/todo-list';
 import { FileDiff, type DiffLine } from '@/components/ai-elements/file-diff';
 import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
+import { RoutineProposalCard } from '@/components/chat/routine-proposal-card';
 import { MessageActions } from '@/components/ai-elements/message-actions';
 import { StreamingResponse, type StreamingResponseStatus } from '@/components/agents/streaming-response';
 import { Citations, Citation, type CitationItem } from '@/components/agents/citations';
@@ -588,6 +589,17 @@ export const ChatMessage = memo(function ChatMessage({
     : isStreaming
       ? 'streaming'
       : 'complete';
+
+  // An agent's proposed routine: decided in place (Approve / Reject). Same
+  // early-return position as a status line, so hook order matches that path.
+  const routineProposal = message.metadata?.routine_proposal;
+  if (routineProposal && typeof routineProposal === 'object' && routineProposal.routine_id) {
+    return (
+      <div className="py-1">
+        <RoutineProposalCard proposal={routineProposal} />
+      </div>
+    );
+  }
 
   if (isSystem) {
     const isQueued = message.content.includes('queued');

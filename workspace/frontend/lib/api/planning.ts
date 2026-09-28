@@ -71,6 +71,8 @@ export function normalizeRoutine(r: Record<string, unknown>): RoutineItem {
     createdBy: (r.created_by || r.createdBy || r.CreatedBy || '') as string,
     channelName: (r.channel_name || r.channelName || r.ChannelName || '') as string,
     createdAt: (r.created_at || r.createdAt || r.CreatedAt || null) as string | null,
+    pausedReason: (r.paused_reason ?? r.pausedReason ?? null) as string | null,
+    consecutiveFailures: (r.consecutive_failures ?? r.consecutiveFailures ?? 0) as number,
   };
 }
 
@@ -305,9 +307,10 @@ export class PlanningApi extends BaseWorkspaceApi {
     });
   }
 
-  async listRoutineRuns(routineId?: string): Promise<{ runs: RoutineRunItem[] }> {
+  async listRoutineRuns(routineId?: string, limit?: number): Promise<{ runs: RoutineRunItem[] }> {
     const params = new URLSearchParams({ network: this.workspaceId });
     if (routineId) params.set('routine_id', routineId);
+    if (limit) params.set('limit', String(limit));
     const raw = await this.request<{ runs: Record<string, unknown>[] }>(`/v1/routine-runs?${params}`);
     return {
       runs: (raw.runs || []).map((r) => ({
@@ -323,8 +326,25 @@ export class PlanningApi extends BaseWorkspaceApi {
         startedAt: (r.started_at || r.startedAt || r.StartedAt || '') as string,
         completedAt: (r.completed_at || r.completedAt || r.CompletedAt || null) as string | null,
         error: (r.error || r.Error || null) as string | null,
+        result: (r.result ?? null) as string | null,
+        resultMessageId: (r.result_message_id ?? null) as string | null,
+        filesChanged: typeof r.files_changed === 'string'
+          ? r.files_changed.split('\n').map((f) => f.trim()).filter(Boolean)
+          : [],
       })),
     };
+  }
+
+  /** Approves an agent's proposed routine (pending_approval -> active). 409 if it is no longer pending. */
+  async approveRoutine(routineId: string): Promise<RoutineItem> {
+    const raw = await this.request<Record<string, unknown>>(`/v1/routines/${routineId}/approve`, { method: 'POST' });
+    return normalizeRoutine(raw);
+  }
+
+  /** Rejects an agent's proposed routine (pending_approval -> cancelled). 409 if it is no longer pending. */
+  async rejectRoutine(routineId: string): Promise<RoutineItem> {
+    const raw = await this.request<Record<string, unknown>>(`/v1/routines/${routineId}/reject`, { method: 'POST' });
+    return normalizeRoutine(raw);
   }
 
   async createRoutine(params: {
@@ -348,6 +368,9 @@ export class PlanningApi extends BaseWorkspaceApi {
         // UTC is locally.
         timezone: params.timezone || localTimezone(),
         network: this.workspaceId,
+        // A person is creating this. Without it the server treats the caller
+        // as an agent and stores the routine as a proposal awaiting approval.
+        requested_by: 'human:user',
       }),
     });
     return normalizeRoutine(raw);
@@ -376,6 +399,8 @@ export class PlanningApi extends BaseWorkspaceApi {
     const raw = await this.request<Record<string, unknown>>(`/v1/routines/${routineId}`, {
       method: 'PATCH',
       body: JSON.stringify({
+        // A person is editing: the agent interval floor does not apply.
+        requested_by: 'human:user',
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.message !== undefined ? { message: patch.message } : {}),
         ...(patch.context !== undefined ? { context: patch.context } : {}),

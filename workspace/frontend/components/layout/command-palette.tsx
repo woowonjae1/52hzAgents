@@ -31,6 +31,7 @@ import {
   AlertCircle,
   PanelLeft,
   Users,
+  House,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -137,6 +138,18 @@ export function CommandPalette() {
      */
     const nav: CommandItem[] = [
       {
+        id: 'nav-home',
+        category: 'Navigation',
+        title: 'Home',
+        subtitle: 'Set up a new session, and see what needs you',
+        icon: <House className="size-4 text-foreground-muted" />,
+        shortcut: ['G', 'H'],
+        action: () => {
+          setCurrentSessionId(null);
+          setViewMode('home');
+        },
+      },
+      {
         id: 'nav-threads',
         category: 'Navigation',
         title: 'Threads & Conversations',
@@ -196,7 +209,7 @@ export function CommandPalette() {
         id: 'nav-schedules',
         shortcut: ['G', 'R'],
         category: 'Navigation',
-        title: 'Schedules',
+        title: 'Automations',
         subtitle: 'Recurring routines and one-shot timers',
         icon: <Repeat className="size-4 text-foreground-muted" />,
         action: () => setViewMode('routines'),

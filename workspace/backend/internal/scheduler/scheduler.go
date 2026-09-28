@@ -488,6 +488,15 @@ func expireStaleCouncilSessions() {
 	}
 }
 
+const (
+	// routineRunTimeout: a run with no turn in progress and no reply this long
+	// after it fired has failed.
+	routineRunTimeout = 15 * time.Minute
+	// routineRunHardLimit: even a turn still reported running does not keep a
+	// run open longer than this.
+	routineRunHardLimit = 2 * time.Hour
+)
+
 // expireStaleRoutineRuns 扫描并回收超时的 Routine 运行实例与僵尸 Timer 任务。
 func expireStaleRoutineRuns() {
 	if db.DB == nil {
@@ -496,10 +505,16 @@ func expireStaleRoutineRuns() {
 	now := time.Now().UTC()
 
 	// 1. 回收运行中的 Routine 运行记录 (RoutineRunRecord)
+	//
+	// Every way a run fails goes through handlers.FailRoutineRun, which also
+	// counts the failure toward the routine's auto-pause streak. A run whose
+	// agent is visibly still in its turn is left alone past the 15-minute mark
+	// (up to routineRunHardLimit): completion is the end of the turn now, and a
+	// real task can take longer than a quarter of an hour.
 	var runningRuns []models.RoutineRunRecord
 	if err := db.DB.Where("status = ?", "running").Find(&runningRuns).Error; err == nil && len(runningRuns) > 0 {
 		for _, run := range runningRuns {
-			isTimeout := run.StartedAt.Before(now.Add(-15 * time.Minute))
+			age := now.Sub(run.StartedAt)
 
 			// 检测对应智能体是否离线或崩溃
 			agentCrashed := false
@@ -508,57 +523,41 @@ func expireStaleRoutineRuns() {
 			if err := db.DB.Where("workspace_id = ? AND agent_name = ?", run.WorkspaceID, run.AgentName).First(&member).Error; err == nil {
 				if member.Status == "crashed" {
 					agentCrashed = true
-				} else if member.Status == "offline" && run.StartedAt.Before(now.Add(-2*time.Minute)) {
+				} else if member.Status == "offline" && age > 2*time.Minute {
 					agentOffline = true
 				}
-			} else if run.StartedAt.Before(now.Add(-2 * time.Minute)) {
+			} else if age > 2*time.Minute {
 				agentOffline = true
 			}
 
-			if isTimeout || agentCrashed || agentOffline {
-				failReason := "执行超时 (15分钟无响应)"
-				if agentCrashed {
-					failReason = fmt.Sprintf("智能体 @%s 异常崩溃退出", run.AgentName)
-				} else if agentOffline {
-					failReason = fmt.Sprintf("智能体 @%s 处于离线状态或异常退出", run.AgentName)
+			failReason := ""
+			switch {
+			case agentCrashed:
+				failReason = fmt.Sprintf("Agent %s crashed", run.AgentName)
+			case agentOffline:
+				failReason = fmt.Sprintf("Agent %s was offline or exited", run.AgentName)
+			case age > routineRunTimeout:
+				if age < routineRunHardLimit && handlers.AgentTurnRunningSince(run.WorkspaceID, run.AgentName, run.ChannelName, run.StartedAt) {
+					continue // still working on it
 				}
+				// The turn-end report may simply have been lost; a reply in
+				// the window is evidence enough that the run was answered.
+				if handlers.AgentRepliedDuringRun(&run) {
+					if handlers.CompleteRoutineRun(run, "system:routine", "sweep_reply") {
+						log.Printf("Routine run %s completed by sweep: reply found, no turn-end report", run.ID)
+					}
+					continue
+				}
+				if age >= routineRunHardLimit {
+					failReason = fmt.Sprintf("Still running after %s", routineRunHardLimit)
+				} else {
+					failReason = fmt.Sprintf("No response within %d minutes", int(routineRunTimeout.Minutes()))
+				}
+			default:
+				continue
+			}
 
-				// 将运行记录标记为 failed 并记录错误
-				db.DB.Model(&models.RoutineRunRecord{}).Where("id = ? AND status = ?", run.ID, "running").Updates(map[string]interface{}{
-					"status":       "failed",
-					"error":        &failReason,
-					"completed_at": &now,
-				})
-
-				// 将 Routine 本身的最后运行状态同步为 failed
-				db.DB.Model(&models.RoutineRecord{}).Where("id = ?", run.RoutineID).Updates(map[string]interface{}{
-					"last_run_status": "failed",
-					"last_run_error":  &failReason,
-				})
-
-				// 将关联的看板待办 (TodoRecord) 置为 cancelled 并持久化错误原因
-				db.DB.Model(&models.TodoRecord{}).Where("run_id = ? AND status = ?", run.ID, "in_progress").Updates(map[string]interface{}{
-					"status":       "cancelled",
-					"error":        &failReason,
-					"completed_at": &now,
-					"updated_at":   now,
-				})
-
-				// 广播 Routine 失败事件与看板更新事件
-				_ = handlers.PublishWorkspaceStateEvent(run.WorkspaceID, "workspace.routine.failed", "system:routine", run.ChannelName, map[string]interface{}{
-					"run_id":       run.ID,
-					"routine_id":   run.RoutineID,
-					"routine_name": run.RoutineName,
-					"channel_name": run.ChannelName,
-					"status":       "failed",
-					"error":        failReason,
-				})
-				_ = handlers.PublishWorkspaceStateEvent(run.WorkspaceID, "workspace.todos.updated", "system:routine", run.ChannelName, map[string]interface{}{
-					"run_id": run.ID,
-					"status": "cancelled",
-					"error":  failReason,
-				})
-
+			if handlers.FailRoutineRun(run, failReason, "system:routine", true) {
 				log.Printf("Routine run %s marked failed: %s", run.ID, failReason)
 			}
 		}

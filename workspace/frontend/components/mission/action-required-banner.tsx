@@ -5,6 +5,7 @@ import { Check, X, Square, Clock, Terminal, ShieldAlert, ArrowRight } from 'luci
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
+import type { WorkspaceMessage } from '@/lib/types';
 
 export interface PendingActionItem {
   id: string;
@@ -19,6 +20,68 @@ export interface PendingActionItem {
   stalledMs?: number;
   errorMessage?: string;
   timestamp: Date;
+}
+
+/**
+ * Answer an agent's in-thread tool approval request. The reply rides the
+ * channel as a human message carrying `tool_approval_response`, which is what
+ * the adapter waiting on that `approval_id` listens for. Shared by this banner
+ * and the Home dashboard's "Needs your attention" list, so the two cannot
+ * drift into answering in different shapes.
+ */
+export async function respondToToolApproval(item: PendingActionItem, granted: boolean): Promise<void> {
+  if (!item.approvalId) return;
+  await workspaceApi.sendEvent({
+    type: 'workspace.message.posted',
+    source: 'human:user',
+    target: `channel/${item.channelId}`,
+    payload: {
+      content: granted
+        ? 'Approved command execution via Agent Dashboard.'
+        : 'Rejected command execution via Agent Dashboard.',
+      sender_type: 'human',
+      sender_name: 'user',
+    },
+    metadata: {
+      target_agents: [item.agentName],
+      tool_approval_response: {
+        approval_id: item.approvalId,
+        granted,
+      },
+    },
+    visibility: 'channel',
+  });
+}
+
+/**
+ * Tool approval requests in a slice of one thread's history that nothing in
+ * the same slice has answered yet.
+ */
+export function pendingApprovalsFromMessages(
+  session: { sessionId: string; title?: string | null },
+  msgs: WorkspaceMessage[],
+): PendingActionItem[] {
+  const responded = new Set(
+    msgs.map((m) => m.metadata?.tool_approval_response?.approval_id).filter(Boolean)
+  );
+  const out: PendingActionItem[] = [];
+  for (const m of msgs) {
+    const appReq = m.metadata?.tool_approval_request;
+    if (!appReq || responded.has(appReq.approval_id)) continue;
+    out.push({
+      id: `app-${m.messageId || appReq.approval_id}`,
+      type: 'approval',
+      agentName: m.senderName,
+      channelId: session.sessionId,
+      channelTitle: session.title || undefined,
+      toolName: appReq.tool,
+      command: appReq.args?.command,
+      path: appReq.args?.path,
+      approvalId: appReq.approval_id,
+      timestamp: m.createdAt ? new Date(m.createdAt) : new Date(),
+    });
+  }
+  return out;
 }
 
 interface ActionRequiredBannerProps {
@@ -38,67 +101,22 @@ export function ActionRequiredBanner({
 
   if (!items || items.length === 0) return null;
 
-  const handleApprove = async (item: PendingActionItem) => {
+  const respond = async (item: PendingActionItem, granted: boolean) => {
     if (!item.approvalId) return;
     setProcessingId(item.id);
     try {
-      await workspaceApi.sendEvent({
-        type: 'workspace.message.posted',
-        source: 'human:user',
-        target: `channel/${item.channelId}`,
-        payload: {
-          content: 'Approved command execution via Agent Dashboard.',
-          sender_type: 'human',
-          sender_name: 'user',
-        },
-        metadata: {
-          target_agents: [item.agentName],
-          tool_approval_response: {
-            approval_id: item.approvalId,
-            granted: true,
-          },
-        },
-        visibility: 'channel',
-      });
-      toast.success(`Approved @${item.agentName}`);
+      await respondToToolApproval(item, granted);
+      if (granted) toast.success(`Approved @${item.agentName}`);
+      else toast.info(`Denied @${item.agentName}`);
       onResolved?.(item.id);
     } catch {
-      toast.error('Approval failed');
+      toast.error(granted ? 'Approval failed' : 'Could not submit the denial');
     } finally {
       setProcessingId(null);
     }
   };
-
-  const handleDeny = async (item: PendingActionItem) => {
-    if (!item.approvalId) return;
-    setProcessingId(item.id);
-    try {
-      await workspaceApi.sendEvent({
-        type: 'workspace.message.posted',
-        source: 'human:user',
-        target: `channel/${item.channelId}`,
-        payload: {
-          content: 'Rejected command execution via Agent Dashboard.',
-          sender_type: 'human',
-          sender_name: 'user',
-        },
-        metadata: {
-          target_agents: [item.agentName],
-          tool_approval_response: {
-            approval_id: item.approvalId,
-            granted: false,
-          },
-        },
-        visibility: 'channel',
-      });
-      toast.info(`Denied @${item.agentName}`);
-      onResolved?.(item.id);
-    } catch {
-      toast.error('Could not submit the denial');
-    } finally {
-      setProcessingId(null);
-    }
-  };
+  const handleApprove = (item: PendingActionItem) => respond(item, true);
+  const handleDeny = (item: PendingActionItem) => respond(item, false);
 
   const handleForceStop = async (item: PendingActionItem) => {
     setProcessingId(item.id);

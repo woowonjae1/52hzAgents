@@ -399,8 +399,17 @@ type RoutineRecord struct {
 	LastRunID               *string    `gorm:"type:text" json:"last_run_id"`
 	LastRunStatus           string     `gorm:"type:text;default:scheduled" json:"last_run_status"`
 	LastRunError            *string    `gorm:"type:text" json:"last_run_error"`
-	Status                  string     `gorm:"type:text;not null;default:active;index:idx_routines_next_fires_status" json:"status"`
-	CreatedAt               time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	// Status is active | paused | pending_approval | cancelled. Only active
+	// fires. pending_approval is how a routine an AGENT created starts out: it
+	// does nothing until a person approves it (POST /v1/routines/:id/approve).
+	Status    string    `gorm:"type:text;not null;default:active;index:idx_routines_next_fires_status" json:"status"`
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	// PausedReason says why the SYSTEM paused it (e.g. after repeated failed
+	// runs). Nil for a pause the user chose; cleared when it is resumed.
+	PausedReason *string `gorm:"type:text" json:"paused_reason"`
+	// ConsecutiveFailures counts failed runs since the last successful one;
+	// reaching the auto-pause threshold pauses the routine.
+	ConsecutiveFailures int `gorm:"type:integer;not null;default:0" json:"consecutive_failures"`
 }
 
 func (RoutineRecord) TableName() string {
@@ -422,6 +431,14 @@ type RoutineRunRecord struct {
 	StartedAt      time.Time  `gorm:"autoCreateTime" json:"started_at"`
 	CompletedAt    *time.Time `gorm:"" json:"completed_at"`
 	Error          *string    `gorm:"type:text" json:"error,omitempty"`
+	// Result is the agent's last chat message in the run's channel during the
+	// run (truncated), captured when the run completes.
+	Result *string `gorm:"type:text" json:"result,omitempty"`
+	// ResultMessageID is the event id of that message, for jumping to it.
+	ResultMessageID *string `gorm:"type:text" json:"result_message_id,omitempty"`
+	// FilesChanged is the newline-joined names of files the agent registered in
+	// the run's channel during the run.
+	FilesChanged *string `gorm:"type:text" json:"files_changed,omitempty"`
 }
 
 func (RoutineRunRecord) TableName() string {

@@ -154,13 +154,15 @@ func main() { // 服务程序运行主入口函数。
 		v1.GET("/timers", handlers.ListTimers)               // 列出活跃状态的计时器。
 		v1.DELETE("/timers/:timer_id", handlers.DeleteTimer) // 取消定时提醒。
 
-		v1.POST("/routines", handlers.CreateRoutine)                     // 创建周期性循环执行任务。
-		v1.GET("/routines", handlers.ListRoutines)                       // 列出活跃中的循环任务。
-		v1.PATCH("/routines/:routine_id", handlers.UpdateRoutine)        // 就地编辑日程（保留短号与运行历史）。
-		v1.PATCH("/routines/:routine_id/toggle", handlers.ToggleRoutine) // 暂停或恢复周期任务。
-		v1.POST("/routines/:routine_id/run", handlers.TriggerRoutineNow) // 立即执行一次周期任务。
-		v1.DELETE("/routines/:routine_id", handlers.DeleteRoutine)       // 撤销或取消周期任务。
-		v1.GET("/routine-runs", handlers.ListRoutineRuns)                // 查询任务执行记录。
+		v1.POST("/routines", handlers.CreateRoutine)                      // 创建周期性循环执行任务。
+		v1.GET("/routines", handlers.ListRoutines)                        // 列出活跃中的循环任务。
+		v1.PATCH("/routines/:routine_id", handlers.UpdateRoutine)         // 就地编辑日程（保留短号与运行历史）。
+		v1.PATCH("/routines/:routine_id/toggle", handlers.ToggleRoutine)  // 暂停或恢复周期任务。
+		v1.POST("/routines/:routine_id/run", handlers.TriggerRoutineNow)  // 立即执行一次周期任务。
+		v1.POST("/routines/:routine_id/approve", handlers.ApproveRoutine) // pending_approval -> active（agent 创建的日程需人工批准）
+		v1.POST("/routines/:routine_id/reject", handlers.RejectRoutine)   // pending_approval -> cancelled
+		v1.DELETE("/routines/:routine_id", handlers.DeleteRoutine)        // 撤销或取消周期任务。
+		v1.GET("/routine-runs", handlers.ListRoutineRuns)                 // 查询任务执行记录。
 		v1.POST("/notifications", handlers.CreateNotification)
 		v1.GET("/notifications", handlers.ListNotifications)
 		v1.PATCH("/notifications/read-all", handlers.MarkAllNotificationsRead)

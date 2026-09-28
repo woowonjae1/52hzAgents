@@ -239,6 +239,42 @@ function parseCronSchedule(params) {
   return null;
 }
 
+/*
+  The reply after mirroring a CLI cron schedule into the workspace.
+
+  A routine an agent creates is a PROPOSAL: the workspace stores it as
+  pending_approval and nothing fires until the user approves it. This used to
+  announce "已自动登记 ... 到期将自动执行" regardless -- which is how a
+  schedule nobody approved ran every 30 minutes, 139 times.
+*/
+function routineMirrorReply(routine, when, text) {
+  const shortId = (routine && (routine.short_id || routine.shortId || routine.id)) || 'RTN';
+  const status = routine && routine.status;
+  if (status === 'pending_approval') {
+    return (
+      `已提议一个周期任务（${when}），等待你批准后才会开始执行：\n\n` +
+      `> ${text}\n\n` +
+      `任务编号：\`${shortId}\`\n\n` +
+      `请在聊天中的提议卡片或 **Automations** 里批准或拒绝。批准前它不会运行。`
+    );
+  }
+  return (
+    `已创建周期任务（${when}）：\n\n` +
+    `> ${text}\n\n` +
+    `任务编号：\`${shortId}\`\n\n` +
+    `可在 **Automations** 中查看运行记录、暂停或删除。`
+  );
+}
+
+function routineMirrorFailureReply(err, when, text) {
+  const reason = (err && err.message) ? String(err.message) : 'unknown error';
+  return (
+    `未能登记周期任务（${when}）：\n\n` +
+    `> ${text}\n\n` +
+    `原因：${reason}\n\n它不会自动运行。`
+  );
+}
+
 function deriveRoutineName(prompt, scheduleText) {
   if (!prompt) return `定时任务 (${scheduleText})`;
   let clean = prompt.replace(/^(?:每天(?:上午|下午|晚上)?\d+点)?(?:定时任务(?:触发)?[:：]?\s*)/i, '').trim();
@@ -782,23 +818,14 @@ class AntigravityAdapter extends BaseAdapter {
                       source: `52hz:${this.agentName}`,
                     })
                     .then(async (routine) => {
-                      const shortId = routine && (routine.short_id || routine.shortId || routine.id);
-                      await this.sendResponse(
-                        channel,
-                        `已为您创建周期计划任务（${when}）：\n\n` +
-                        `> ${text}\n\n` +
-                        `📌 任务编号：\`${shortId || 'RTN'}\`\n` +
-                        `🕒 触发规则：${when}\n\n` +
-                        `已自动登记到 **Tasks & Issues -> Schedules**，到期将自动执行并向频道汇报结果。`
-                      );
+                      await this.sendResponse(channel, routineMirrorReply(routine, when, text));
                       await finishHandoff();
                     })
                     .catch(async (err) => {
                       console.error('Failed to create routine mirror:', err);
-                      await this.sendResponse(
-                        channel,
-                        `已为您安排定时任务（${when}）：\n\n> ${text}\n\n后台调度器已开始监听。`
-                      );
+                      // It used to claim "后台调度器已开始监听" here -- i.e. report
+                      // a schedule that had just FAILED to register as running.
+                      await this.sendResponse(channel, routineMirrorFailureReply(err, when, text));
                       await finishHandoff();
                     });
                 } else if (seconds && this.client && this.workspaceId) {
@@ -1040,3 +1067,5 @@ module.exports = AntigravityAdapter;
 module.exports.stripSubagentFraming = stripSubagentFraming;
 module.exports.stripLeadingPlan = stripLeadingPlan;
 module.exports.stripPreamble = stripPreamble;
+module.exports.routineMirrorReply = routineMirrorReply;
+module.exports.routineMirrorFailureReply = routineMirrorFailureReply;

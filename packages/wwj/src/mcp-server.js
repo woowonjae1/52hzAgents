@@ -344,7 +344,7 @@ function buildToolDefs(disabledModules) {
     tools.push(
       {
         name: 'workspace_create_routine',
-        description: 'Create a recurring scheduled routine. Each routine gets its own dedicated thread with full context. Two schedule modes: daily (hour+minute, optional days) or interval (every N minutes).',
+        description: 'Propose a recurring scheduled routine. Use ONLY when the user asked for recurring work - never to check on your own background tasks (use workspace_create_timer for a one-off follow-up). The routine is created as a proposal (pending_approval) and does not run until the user approves it; tell the user it is waiting for their approval. Each routine gets its own dedicated thread with full context. Two schedule modes: daily (hour+minute, optional days) or interval (every N minutes, minimum 15).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -360,7 +360,7 @@ function buildToolDefs(disabledModules) {
             },
             interval_minutes: {
               type: 'integer',
-              description: 'Interval mode: fire every N minutes (1-1440). Mutually exclusive with hour/minute.',
+              description: 'Interval mode: fire every N minutes (15-1440). Mutually exclusive with hour/minute.',
             },
           },
           required: ['name', 'message', 'context'],
@@ -970,6 +970,13 @@ class McpServer {
           scheduleStr = `at ${String(args.hour).padStart(2,'0')}:${String(args.minute).padStart(2,'0')} UTC, ${daysStr}`;
         }
         const channel = (result && result.channel_name) || `routine:${result.id}`;
+        if (result && result.status === 'pending_approval') {
+          return text(
+            `Routine proposed: "${args.name}" ${scheduleStr} (id: ${result.id}). It is waiting for the user's approval ` +
+            `and will not run until they approve it in the chat or in Automations. Tell the user it needs their approval; ` +
+            `do not say it is scheduled.`,
+          );
+        }
         return text(
           `Routine created: "${args.name}" ${scheduleStr} in dedicated thread \`${channel}\` (id: ${result.id})`,
         );

@@ -179,6 +179,7 @@ func TestRoutineLifecycleValidationAndWorkspaceScopedCancellation(t *testing.T) 
 	router, workspace, token := planningTestRouter(t)
 	base := gin.H{
 		"network": workspace.ID, "source": "openagents:planner", "name": "Daily briefing", "message": "Summarise progress",
+		"requested_by": "human:user",
 	}
 	if response := planningRequest(t, router, http.MethodPost, "/v1/routines", token, base); response.Code != http.StatusBadRequest {
 		t.Fatalf("routine without schedule = %d, want %d", response.Code, http.StatusBadRequest)

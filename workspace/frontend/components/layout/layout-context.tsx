@@ -19,7 +19,7 @@ import {
   storeSidebarWidth,
 } from '@/lib/panel-store';
 
-export type ViewMode = 'mission' | 'threads' | 'files' | 'knowledge' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
+export type ViewMode = 'home' | 'mission' | 'threads' | 'files' | 'knowledge' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
 
 export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' | 'knowledge';
 
@@ -207,7 +207,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   // Restored through resolveView too: a layout saved on 'timers' or 'routines'
   // would otherwise reopen a view that no longer renders.
   const [viewMode, setViewModeState] = useState<ViewMode>(
-    () => resolveView(readLayout().viewMode ?? 'threads').view,
+    () => resolveView(readLayout().viewMode ?? 'home').view,
   );
   const [settingsTab, setSettingsTabState] = useState<SettingsTab>(() => {
     const saved = readLayout().settingsTab as string | undefined;
@@ -215,7 +215,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     return saved && saved !== 'routines' ? (saved as SettingsTab) : 'general';
   });
   const [tasksTab, setTasksTab] = useState<TasksTab>(
-    () => resolveView(readLayout().viewMode ?? 'threads').tasksTab ?? 'tasks',
+    () => resolveView(readLayout().viewMode ?? 'home').tasksTab ?? 'tasks',
   );
 
   const setSettingsTab = useCallback((tab: SettingsTab) => {
@@ -254,7 +254,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const [nav, setNav] = useState<{ stack: ViewMode[]; index: number }>(() => ({
-    stack: [readLayout().viewMode ?? 'threads'],
+    stack: [readLayout().viewMode ?? 'home'],
     index: 0,
   }));
 

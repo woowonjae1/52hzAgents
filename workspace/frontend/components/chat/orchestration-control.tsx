@@ -6,9 +6,11 @@ import { Waypoints, Crown, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WorkspaceSession, WorkspaceAgent } from '@/lib/types';
 
-type Mode = 'dynamic' | 'master' | 'parallel';
+export type OrchestrationMode = 'dynamic' | 'master' | 'parallel';
+type Mode = OrchestrationMode;
 
-const MODES: { value: Mode; label: string; icon: React.ElementType; description: string }[] = [
+/** Shared with the Home dashboard's Collaboration card, so the words match. */
+export const ORCHESTRATION_MODES: { value: Mode; label: string; icon: React.ElementType; description: string }[] = [
   {
     value: 'dynamic',
     label: 'Dynamic',
@@ -75,8 +77,8 @@ export function OrchestrationControl({ session, onChange }: Props) {
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
-    const i = MODES.findIndex((m) => m.value === mode);
-    const next = MODES[(i + (e.key === 'ArrowRight' ? 1 : MODES.length - 1)) % MODES.length];
+    const i = ORCHESTRATION_MODES.findIndex((m) => m.value === mode);
+    const next = ORCHESTRATION_MODES[(i + (e.key === 'ArrowRight' ? 1 : ORCHESTRATION_MODES.length - 1)) % ORCHESTRATION_MODES.length];
     select(next.value);
     // All three segments are always rendered, so focus can move now.
     e.currentTarget.querySelector<HTMLButtonElement>(`[data-mode="${next.value}"]`)?.focus();
@@ -89,7 +91,7 @@ export function OrchestrationControl({ session, onChange }: Props) {
       onKeyDown={onKeyDown}
       className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-surface1 p-0.5"
     >
-      {MODES.map((m) => {
+      {ORCHESTRATION_MODES.map((m) => {
         const Icon = m.icon;
         const isActive = m.value === mode;
         return (

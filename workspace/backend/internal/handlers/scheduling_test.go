@@ -402,7 +402,7 @@ func TestRoutineRunCompletesOnlyForItsOwnAgent(t *testing.T) {
 
 	create := gin.H{
 		"network": workspace.ID, "source": "52hz:planner", "name": "Nightly",
-		"message": "run checks", "interval_minutes": 60,
+		"message": "run checks", "interval_minutes": 60, "requested_by": "human:user",
 	}
 	response := planningRequest(t, router, http.MethodPost, "/v1/routines", token, create)
 	if response.Code != http.StatusOK {
@@ -445,17 +445,11 @@ func TestRoutineRunCompletesOnlyForItsOwnAgent(t *testing.T) {
 		t.Fatalf("agent reply did not complete the run: %+v", run)
 	}
 
-	// The tracking task must close with it — this is the write that silently
-	// failed while todos had no completed_at column.
-	var tracker models.TodoRecord
-	if err := db.DB.Where("run_id = ?", run.ID).First(&tracker).Error; err != nil {
-		t.Fatalf("tracking task missing: %v", err)
-	}
-	if tracker.Status != "completed" {
-		t.Fatalf("tracking task stayed %q; scheduled tasks would pile up forever", tracker.Status)
-	}
-	if tracker.CompletedAt == nil {
-		t.Fatal("tracking task has no completed_at")
+	// Runs no longer open a board task per fire.
+	var trackers int64
+	db.DB.Model(&models.TodoRecord{}).Where("run_id = ?", run.ID).Count(&trackers)
+	if trackers != 0 {
+		t.Fatalf("a fire opened %d board tasks, want 0", trackers)
 	}
 }
 
@@ -494,7 +488,7 @@ func TestRunsAreRecordedInEveryWorkspace(t *testing.T) {
 	}{{first.ID, token}, {second.ID, "second-token"}} {
 		body := gin.H{
 			"network": ws.id, "source": "52hz:planner", "name": "Nightly",
-			"message": "run checks", "interval_minutes": 60,
+			"message": "run checks", "interval_minutes": 60, "requested_by": "human:user",
 		}
 		response := planningRequest(t, router, http.MethodPost, "/v1/routines", ws.token, body)
 		if response.Code != http.StatusOK {
@@ -529,15 +523,8 @@ func TestRunsAreRecordedInEveryWorkspace(t *testing.T) {
 			t.Fatalf("%s workspace run lost its readable identity: %+v", label, runs[0])
 		}
 
-		var trackers []models.TodoRecord
-		if err := db.DB.Where("routine_id = ?", made[ws].id).Find(&trackers).Error; err != nil {
-			t.Fatalf("list tracking tasks for %s workspace: %v", label, err)
-		}
-		if len(trackers) != 1 {
-			t.Fatalf("%s workspace opened %d tracking tasks, want 1", label, len(trackers))
-		}
-		if trackers[0].WorkspaceID != ws {
-			t.Fatalf("%s workspace tracking task belongs to %s", label, trackers[0].WorkspaceID)
+		if runs[0].WorkspaceID != ws {
+			t.Fatalf("%s workspace run belongs to %s", label, runs[0].WorkspaceID)
 		}
 	}
 }
@@ -548,7 +535,7 @@ func TestTriggerCancelledRoutineIsRejected(t *testing.T) {
 	router, workspace, token := schedulingTestRouter(t)
 	create := gin.H{
 		"network": workspace.ID, "source": "52hz:planner", "name": "Gone",
-		"message": "x", "interval_minutes": 30,
+		"message": "x", "interval_minutes": 30, "requested_by": "human:user",
 	}
 	response := planningRequest(t, router, http.MethodPost, "/v1/routines", token, create)
 	if response.Code != http.StatusOK {
@@ -573,7 +560,7 @@ func TestRoutineRunNumbersDoNotCollide(t *testing.T) {
 	router, workspace, token := schedulingTestRouter(t)
 	create := gin.H{
 		"network": workspace.ID, "source": "52hz:planner", "name": "Repeat",
-		"message": "x", "interval_minutes": 30,
+		"message": "x", "interval_minutes": 30, "requested_by": "human:user",
 	}
 	response := planningRequest(t, router, http.MethodPost, "/v1/routines", token, create)
 	if response.Code != http.StatusOK {

@@ -168,6 +168,9 @@ func UploadFileMultipart(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file meta to database"})
 		return
 	}
+	// Files an agent registers right after its turn ends belong to the
+	// routine run that turn completed.
+	NoteRoutineRunFile(workspace.ID, record.UploadedBy, record.ChannelName)
 
 	// 构建上传成功通知事件。
 	payloadData := map[string]interface{}{
@@ -294,6 +297,9 @@ func UploadFileBase64(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file meta to database"})
 		return
 	}
+	// Files an agent registers right after its turn ends belong to the
+	// routine run that turn completed.
+	NoteRoutineRunFile(workspace.ID, record.UploadedBy, record.ChannelName)
 
 	// 组装并广播事件。
 	payloadData := map[string]interface{}{

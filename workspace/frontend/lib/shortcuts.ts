@@ -46,9 +46,10 @@ export interface ShortcutSpec {
 
 /** `g`-prefixed navigation sequences, keyed by the second key pressed. */
 export const GOTO_SEQUENCE: Record<string, { view: string; label: string }> = {
+  h: { view: 'home', label: 'Home' },
   t: { view: 'threads', label: 'Threads' },
   a: { view: 'tasks', label: 'Tasks' },
-  m: { view: 'mission', label: 'Agent Dashboard' },
+  m: { view: 'mission', label: 'Agents' },
   f: { view: 'files', label: 'Files' },
   k: { view: 'knowledge', label: 'Knowledge' },
   e: { view: 'skills', label: 'Skills' },

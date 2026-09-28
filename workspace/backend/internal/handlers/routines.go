@@ -32,6 +32,13 @@ type CreateRoutineRequest struct {
 	IntervalMinutes *int    `json:"interval_minutes"`           // 间隔分钟数（与每日定时互斥）
 	Timezone        string  `json:"timezone"`                   // IANA 时区名（如 Asia/Shanghai），缺省 UTC
 	ThreadID        *string `json:"thread_id"`                  // 可选的指定会话线程 ID
+	// Channel is where the caller was talking when it asked for the routine.
+	// An agent's proposal is announced there so the person sees it in context.
+	Channel string `json:"channel"`
+	// RequestedBy identifies a PERSON creating the routine ("human:<id>"),
+	// sent by the UI. Absent means an agent asked, and the routine is created
+	// as a proposal (pending_approval) that fires only once approved.
+	RequestedBy string `json:"requested_by"`
 }
 
 // UpdateRoutineRequest 代表编辑既有周期任务的请求数据载荷。
@@ -48,6 +55,10 @@ type UpdateRoutineRequest struct {
 	// ScheduleMode 明确声明本次编辑要切换到哪种模式（daily | interval）。
 	// 单靠上面的指针无法区分「不改」与「清空另一模式」，日程编辑必须能做后者。
 	ScheduleMode *string `json:"schedule_mode"`
+	// RequestedBy: see CreateRoutineRequest. Without it the edit is treated as
+	// an agent's, and the agent interval floor applies -- otherwise an agent
+	// could create at 15 minutes and PATCH itself down to 1.
+	RequestedBy string `json:"requested_by"`
 }
 
 // resolveLocation 将存储的时区名解析为 *time.Location。
@@ -258,6 +269,13 @@ func CreateRoutine(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "interval_minutes must be between 1 and 44640"})
 		return
 	}
+	byHuman := isHumanRequester(req.RequestedBy)
+	if !byHuman && isInterval && *req.IntervalMinutes < agentRoutineMinIntervalMinutes {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf(
+			"interval_minutes must be at least %d for a routine an agent creates (got %d). For a one-off follow-up, set a timer instead.",
+			agentRoutineMinIntervalMinutes, *req.IntervalMinutes)})
+		return
+	}
 	if isDaily {
 		if req.Hour == nil || req.Minute == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "hour and minute are both required in daily mode"})
@@ -336,8 +354,12 @@ func CreateRoutine(c *gin.Context) {
 		NextFiresAt:             nextFire,
 		RunCount:                0,
 		LastRunStatus:           "scheduled",
-		Status:                  "active", // 设置为活跃。
+		Status:                  RoutineStatusActive,
 		CreatedAt:               time.Now(),
+	}
+	// A routine an agent asked for waits for a person to approve it.
+	if !byHuman {
+		record.Status = RoutineStatusPendingApproval
 	}
 
 	// 持久化记录。
@@ -348,6 +370,9 @@ func CreateRoutine(c *gin.Context) {
 	if err := PublishWorkspaceStateEvent(workspace.ID, "workspace.routine.created", req.Source, chName, gin.H{"routine": record}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to publish routine update"})
 		return
+	}
+	if record.Status == RoutineStatusPendingApproval {
+		postRoutineProposal(&record, strings.TrimPrefix(strings.TrimSpace(req.Channel), "channel/"))
 	}
 
 	// 返回成功。
@@ -409,18 +434,30 @@ func ToggleRoutine(c *gin.Context) {
 		return
 	}
 
-	nextStatus := "paused"
-	if record.Status == "paused" {
-		nextStatus = "active"
+	// Pause/resume only moves between active and paused. A proposal is
+	// decided with approve/reject, and a cancelled routine stays cancelled.
+	if record.Status != RoutineStatusActive && record.Status != RoutineStatusPaused {
+		c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("Routine is %s and cannot be paused or resumed", record.Status), "status": record.Status})
+		return
+	}
+	updates := map[string]interface{}{}
+	if record.Status == RoutineStatusPaused {
+		record.Status = RoutineStatusActive
 		// 重新计算下次触发时间
 		record.NextFiresAt = nextRoutineFire(&record)
+		// Resuming is the person saying the cause is dealt with: forget why
+		// it was paused and give it a fresh failure budget.
+		record.PausedReason = nil
+		record.ConsecutiveFailures = 0
+		updates["paused_reason"] = nil
+		updates["consecutive_failures"] = 0
+	} else {
+		record.Status = RoutineStatusPaused
 	}
-	record.Status = nextStatus
+	updates["status"] = record.Status
+	updates["next_fires_at"] = record.NextFiresAt
 
-	if err := db.DB.Model(&models.RoutineRecord{}).Where("id = ?", record.ID).Updates(map[string]interface{}{
-		"status":        record.Status,
-		"next_fires_at": record.NextFiresAt,
-	}).Error; err != nil {
+	if err := db.DB.Model(&models.RoutineRecord{}).Where("id = ?", record.ID).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update routine status"})
 		return
 	}
@@ -514,6 +551,12 @@ func UpdateRoutine(c *gin.Context) {
 		}
 		if *req.IntervalMinutes < 1 || *req.IntervalMinutes > 44640 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "interval_minutes must be between 1 and 44640"})
+			return
+		}
+		if !isHumanRequester(req.RequestedBy) && *req.IntervalMinutes < agentRoutineMinIntervalMinutes {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf(
+				"interval_minutes must be at least %d for a routine an agent edits (got %d)",
+				agentRoutineMinIntervalMinutes, *req.IntervalMinutes)})
 			return
 		}
 		interval := *req.IntervalMinutes
@@ -614,10 +657,14 @@ func TriggerRoutineNow(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "This routine has been cancelled and can no longer be run"})
 		return
 	}
+	if record.Status == RoutineStatusPendingApproval {
+		c.JSON(http.StatusConflict, gin.H{"error": "This routine is waiting for approval; approve it before running it"})
+		return
+	}
 
 	var member models.WorkspaceMember
 	if err := db.DB.Where("workspace_id = ? AND agent_name = ?", workspace.ID, record.CreatedBy).First(&member).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("智能体 @%s 不是该工作区成员", record.CreatedBy)})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Agent %s is not a member of this workspace", record.CreatedBy)})
 		return
 	}
 
@@ -652,8 +699,20 @@ func ListRoutineRuns(c *gin.Context) {
 		query = query.Where("routine_id = ?", routineID)
 	}
 
+	// ?limit= (1-500, default 100). Automations reads the last runs of EVERY
+	// routine in one request, and one noisy routine's 100 newest runs used to
+	// crowd every other routine out of that window.
+	limit := 100
+	if raw := c.Query("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > 500 {
+		limit = 500
+	}
 	var runs []models.RoutineRunRecord
-	query.Order("started_at DESC").Limit(100).Find(&runs)
+	query.Order("started_at DESC").Limit(limit).Find(&runs)
 	c.JSON(http.StatusOK, gin.H{"runs": runs})
 }
 
@@ -734,26 +793,10 @@ func ExecuteRoutineTriggerWithNext(r *models.RoutineRecord, isManual bool, nextF
 		log.Printf("routine %s run %s could not be recorded: %v", r.ID, runLabel, err)
 	}
 
-	// 联动生成一条活跃 Task 进 todos 表，在 Tasks & Issues 中实时显示。
-	todoRec := models.TodoRecord{
-		ID:          uuid.New().String(),
-		WorkspaceID: r.WorkspaceID,
-		ChannelName: r.ChannelName,
-		ThreadID:    r.ThreadID,
-		CreatedBy:   "system:routine",
-		Assignee:    r.CreatedBy,
-		Content:     fmt.Sprintf("⏰ [%s] %s (Run #%d)", r.Name, r.Message, runNumber),
-		Status:      "in_progress",
-		Priority:    "high",
-		RoutineID:   &r.ID,
-		RunID:       &runID,
-		Position:    0,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-	}
-	if err := db.DB.Create(&todoRec).Error; err != nil {
-		log.Printf("routine %s run %s could not open its tracking task: %v", r.ID, runLabel, err)
-	}
+	// A fire used to insert a high-priority board task as well. A routine on
+	// a 30-minute interval therefore filled the board with one task per fire,
+	// all of them duplicates of the run record; the run IS the tracking record,
+	// and Automations is where it is shown.
 
 	// 拼接周期背景上下文和触发消息
 	content := fmt.Sprintf("Routine \"%s\" (%s) fired: %s", r.Name, shortID, r.Message)
@@ -824,10 +867,6 @@ func ExecuteRoutineTriggerWithNext(r *models.RoutineRecord, isManual bool, nextF
 	_ = PublishWorkspaceStateEvent(r.WorkspaceID, "workspace.routine.triggered", "system:routine", r.ChannelName, gin.H{
 		"routine": r,
 		"run":     runRec,
-		"todo":    todoRec,
-	})
-	_ = PublishWorkspaceStateEvent(r.WorkspaceID, "workspace.todos.updated", "system:routine", r.ChannelName, gin.H{
-		"todo": todoRec,
 	})
 
 	return nil
@@ -861,14 +900,12 @@ func DeleteRoutine(c *gin.Context) {
 
 	// 同步清理取消当前 Routine 下仍处于 running / in_progress 的在途运行与待办
 	cancelledAt := time.Now().UTC()
-	cancelReason := "周期任务已被用户删除取消"
-	db.DB.Model(&models.RoutineRunRecord{}).
-		Where("routine_id = ? AND status = ?", record.ID, "running").
-		Updates(map[string]interface{}{
-			"status":       "failed",
-			"error":        &cancelReason,
-			"completed_at": &cancelledAt,
-		})
+	cancelReason := "Routine was deleted"
+	var openRuns []models.RoutineRunRecord
+	db.DB.Where("routine_id = ? AND status = ?", record.ID, "running").Find(&openRuns)
+	for _, run := range openRuns {
+		FailRoutineRun(run, cancelReason, "system:routine", false)
+	}
 	db.DB.Model(&models.TodoRecord{}).
 		Where("routine_id = ? AND status = ?", record.ID, "in_progress").
 		Updates(map[string]interface{}{
@@ -949,40 +986,31 @@ func CompleteRoutineRunIfApplicable(workspaceID string, target string, source st
 	// 却永远显示"进行中"。
 	closeFiredTimerTasks(workspaceID, chName, replier, now)
 
+	// A reply that lands just after its run was settled (by the turn-end
+	// report) still becomes that run's result.
+	refreshRecentRunOutcome(workspaceID, replier, chName)
+
 	var runningRuns []models.RoutineRunRecord
 	if err := db.DB.Where("status = ? AND workspace_id = ? AND channel_name = ? AND agent_name = ?",
 		"running", workspaceID, chName, replier).Find(&runningRuns).Error; err != nil || len(runningRuns) == 0 {
 		return
 	}
-	for _, run := range runningRuns {
-		db.DB.Model(&models.RoutineRunRecord{}).Where("id = ?", run.ID).Updates(map[string]interface{}{
-			"status":       "completed",
-			"completed_at": &now,
-		})
-		db.DB.Model(&models.RoutineRecord{}).Where("id = ?", run.RoutineID).Updates(map[string]interface{}{
-			"last_run_status": "completed",
-		})
-		if err := db.DB.Model(&models.TodoRecord{}).Where("run_id = ?", run.ID).Updates(map[string]interface{}{
-			"status":       "completed",
-			"completed_at": &now,
-		}).Error; err != nil {
-			log.Printf("routine run %s completed but its tracking task could not be closed: %v", run.ID, err)
-		}
 
-		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.routine.completed", source, run.ChannelName, gin.H{
-			"run_id":       run.ID,
-			"routine_id":   run.RoutineID,
-			"routine_name": run.RoutineName,
-			"routine": gin.H{
-				"id":   run.RoutineID,
-				"name": run.RoutineName,
-			},
-			"status": "completed",
-		})
-		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.todos.updated", source, run.ChannelName, gin.H{
-			"run_id": run.ID,
-			"status": "completed",
-		})
+	/*
+		COMPLETION IS THE END OF THE TURN, NOT THE FIRST WORD.
+
+		An agent's first chat message is often "on it" -- a run closed there
+		recorded success before any work was done. Adapters that report turn
+		state (POST .../agents/:name/turn) complete the run when the turn goes
+		idle: see settleRoutineRunsForTurn. The first-reply rule survives only as
+		the fallback for an adapter that has never reported a turn; the sweep in
+		the scheduler covers a turn report that got lost.
+	*/
+	if agentReportsTurns(workspaceID, replier) {
+		return
+	}
+	for _, run := range runningRuns {
+		CompleteRoutineRun(run, source, "first_reply")
 	}
 }
 
@@ -992,7 +1020,7 @@ func StopActiveRoutineRunsAndTasks(workspaceID, agentName, channelName string) {
 		return
 	}
 	now := time.Now().UTC()
-	stopReason := "用户手动停止了执行"
+	stopReason := "Stopped by the user"
 
 	// 1. 查找并取消处于 running 状态的 RoutineRunRecord
 	runQuery := db.DB.Model(&models.RoutineRunRecord{}).Where("workspace_id = ? AND status = ?", workspaceID, "running")
@@ -1005,24 +1033,10 @@ func StopActiveRoutineRunsAndTasks(workspaceID, agentName, channelName string) {
 	var affectedRuns []models.RoutineRunRecord
 	runQuery.Find(&affectedRuns)
 
+	// A person stopping the agent is not the routine failing: it does not
+	// count toward the auto-pause streak.
 	for _, run := range affectedRuns {
-		db.DB.Model(&models.RoutineRunRecord{}).Where("id = ?", run.ID).Updates(map[string]interface{}{
-			"status":       "failed",
-			"error":        &stopReason,
-			"completed_at": &now,
-		})
-		db.DB.Model(&models.RoutineRecord{}).Where("id = ?", run.RoutineID).Updates(map[string]interface{}{
-			"last_run_status": "failed",
-			"last_run_error":  &stopReason,
-		})
-		_ = PublishWorkspaceStateEvent(workspaceID, "workspace.routine.failed", "system:user_stop", run.ChannelName, gin.H{
-			"run_id":       run.ID,
-			"routine_id":   run.RoutineID,
-			"routine_name": run.RoutineName,
-			"channel_name": run.ChannelName,
-			"status":       "failed",
-			"error":        stopReason,
-		})
+		FailRoutineRun(run, stopReason, "system:user_stop", false)
 	}
 
 	// 2. 查找并取消处于 in_progress 状态的 TodoRecord

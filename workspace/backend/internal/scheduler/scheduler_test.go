@@ -458,7 +458,7 @@ func TestExpireStaleRoutineRuns_ImmediateCrash(t *testing.T) {
 	if freshRun.Status != "failed" {
 		t.Fatalf("expected run status to be failed immediately on crash, got %s", freshRun.Status)
 	}
-	if freshRun.Error == nil || !containsStr(*freshRun.Error, "崩溃") {
+	if freshRun.Error == nil || !containsStr(*freshRun.Error, "crashed") {
 		t.Fatalf("expected crash error message, got: %v", freshRun.Error)
 	}
 

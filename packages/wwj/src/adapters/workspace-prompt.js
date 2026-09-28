@@ -1054,6 +1054,20 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
 
       'interfere, and the full context is preserved.\n\n' +
 
+      '**Only when the USER asks for recurring work.** A routine you create is a ' +
+
+      '**proposal**: it is saved as `pending_approval` and does not run until the ' +
+
+      'user approves it in the chat or in Automations. Tell the user it is waiting ' +
+
+      'for their approval - never say it is already scheduled. Do NOT create a routine ' +
+
+      'to check on your own background work or to poll something you started; use a ' +
+
+      'one-off timer for that. The shortest interval you may request is 15 minutes, ' +
+
+      'and the name must match the schedule (do not call an every-30-minutes routine "Daily").\n\n' +
+
       '**`context` is required**  - provide a thorough description of what the ' +
 
       'routine should do, any background info, and relevant details from the ' +
@@ -1068,7 +1082,7 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
 
       'array (0=Mon, 6=Sun). Omit `days` for every day.\n' +
 
-      '- **Interval**: `interval_minutes` (1-1440). Fires every N minutes. ' +
+      '- **Interval**: `interval_minutes` (15-1440). Fires every N minutes. ' +
 
       'Mutually exclusive with `hour`/`minute`.\n\n' +
 
@@ -1320,6 +1334,8 @@ function buildGuardrails() {
 
     '     - For one-shot delay/reminders ("10分钟后", "今天15:16提醒我", 半小时后): use DurationSeconds or `workspace_create_timer`.\n' +
 
+    '     - A recurring routine is created as a PROPOSAL that waits for the user\'s approval. Only create one when the user asked for recurring work - never to check on your own background tasks (use a one-off timer for that). After creating it, say it is waiting for the user\'s approval, not that it is scheduled. Minimum interval is 15 minutes.\n' +
+
     '  3. Do NOT just create a static TodoList checkbox for scheduled work - static to-dos need manual user action and will never fire automatically.\n' +
 
     '  4. NEVER say a reminder is set unless the tool call actually succeeded.\n'
@@ -1350,7 +1366,7 @@ function buildClaudeMcpToolBlock() {
 
     'Use workspace_create_timer to set a reminder that wakes you up later.\n' +
 
-    'Use workspace_create_routine to set up recurring scheduled tasks (e.g. daily reviews).\n' +
+    'Use workspace_create_routine only when the user asks for recurring work (e.g. daily reviews); it is created as a proposal the user must approve.\n' +
 
     'Use workspace_send_notification to send a notification to the workspace inbox when you complete a task or have important results.\n' +
 
