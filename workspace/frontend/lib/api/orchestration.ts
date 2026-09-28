@@ -26,7 +26,7 @@ export type ParallelWorker = Wire.ParallelWorker;
 
 export type ScopeConflict = Wire.ScopeConflict;
 
-export type ParallelLaneStatus = 'running' | 'done' | 'failed' | 'merged' | 'conflict' | 'kept';
+export type ParallelLaneStatus = 'running' | 'done' | 'failed' | 'merged' | 'conflict' | 'kept' | 'discarded';
 
 /** One agent's share of a started batch. `port` 0 = no dev-server port reserved. */
 export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus }>;
@@ -40,7 +40,8 @@ export type ParallelRun = Narrow<
       {
         isolation: 'worktree' | 'shared';
         origin: 'board' | 'mention';
-        status: 'running' | 'done';
+        /** `review`: every lane ended and there is something to merge; waiting for the user. */
+        status: 'running' | 'review' | 'done';
       }
     >;
     lanes: ParallelLane[];
@@ -91,6 +92,22 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   async retryParallelLane(batchId: string, agent: string): Promise<void> {
     await this.request(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/retry`,
+      { method: 'POST' }
+    );
+  }
+
+  /** The user approved a batch under review: merge its lanes into the base branch. */
+  async mergeParallelBatch(batchId: string): Promise<void> {
+    await this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/merge`,
+      { method: 'POST' }
+    );
+  }
+
+  /** Throw a batch under review away: every lane's worktree and branch is removed. */
+  async discardParallelBatch(batchId: string): Promise<void> {
+    await this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/discard`,
       { method: 'POST' }
     );
   }

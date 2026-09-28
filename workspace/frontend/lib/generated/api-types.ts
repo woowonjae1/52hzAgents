@@ -588,7 +588,7 @@ export interface ParallelBatchRecord {
   repo_dir: string;
   base_branch: string;
   /**
-   * running | done
+   * running | review | done
    */
   status: string;
   summary: string;
@@ -599,10 +599,11 @@ export interface ParallelBatchRecord {
 /**
  * ParallelLaneRecord is one agent's share of a batch.
  *
- * Status: running -> done | failed, then after the batch finishes a done lane
- * becomes merged (its branch is in the base branch), conflict (the merge was
- * refused; branch kept) or kept (the base tree had uncommitted work, so
- * nothing was merged automatically; branch kept).
+ * Status: running -> done | failed. Once every lane is terminal the batch waits
+ * in "review" for the user; on merge a done lane becomes merged (its branch is
+ * in the base branch), conflict (the merge was refused; branch kept) or kept
+ * (the base tree had uncommitted work; branch kept). On discard it becomes
+ * discarded (worktree and branch removed).
  *
  * Go: models.ParallelLaneRecord
  */
@@ -618,6 +619,12 @@ export interface ParallelLaneRecord {
   error: string;
   commit: string;
   reply: string;
+  /**
+   * Diffstat and ChangedFiles describe the lane's branch against the base when
+   * the batch entered review -- what the user is asked to approve.
+   */
+  diffstat: string;
+  changed_files: string;
   attempts: number;
   /**
    * dev-server port reserved for this lane; 0 = none
@@ -896,6 +903,11 @@ export interface TimerRecord {
   delay_seconds: number;
   fires_at: string;
   status: string;
+  /**
+   * ParallelBatchID is set when an agent scheduled this from inside a parallel
+   * lane to pause its own work: the firing wakes it back into that lane.
+   */
+  parallel_batch_id?: string;
   created_at: string;
 }
 

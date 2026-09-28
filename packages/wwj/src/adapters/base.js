@@ -92,13 +92,31 @@ function toolCallDetail(args) {
   if (args === undefined || args === null) return '';
   if (typeof args === 'string') return args.length > 120 ? args.slice(0, 117) + '...' : args;
   if (typeof args !== 'object') return String(args);
-  for (const key of ['command', 'cmd', 'path', 'file_path', 'filePath', 'file', 'url', 'query', 'pattern']) {
+  // Lower-case keys are the common CLI shape; the PascalCase ones are
+  // Antigravity's (`run_command` → CommandLine, `view_file` → AbsolutePath, ...).
+  // Without them every agy call reached the transcript as a bare tool name.
+  for (const key of [
+    'command', 'cmd', 'path', 'file_path', 'filePath', 'file', 'url', 'query', 'pattern',
+    'CommandLine', 'TargetFile', 'AbsolutePath', 'DirectoryPath', 'SearchPath', 'Query', 'Pattern', 'Url',
+  ]) {
     const value = args[key];
     if (typeof value === 'string' && value.trim()) {
       return value.length > 120 ? value.slice(0, 117) + '...' : value;
     }
   }
   return '';
+}
+
+/**
+ * A message the workspace itself posted (a timer firing, a parallel-batch
+ * summary or retry) rather than a person or another agent. Implicit
+ * knowledge-base retrieval is skipped for these: their text is machine-written,
+ * and matching it against the knowledge base only drags in whatever shares a
+ * word with it -- "Check the tsc task status and view the log output" pulled
+ * in two unrelated MQTT API sections about `status` and `systemLogs`.
+ */
+function isSystemMessage(msg) {
+  return String((msg && msg.senderName) || '').startsWith('system:');
 }
 
 /** Lines kept in a channel recap (see _buildChannelContext). */
@@ -1460,7 +1478,7 @@ class BaseAdapter {
    * 2. Implicit / Auto RAG: if no explicit @knowledge mention exists and message has substantive
    *    inquiry content, queries the workspace semantic search API and injects top matching snippets.
    */
-  async _resolveKnowledgeMentions(content) {
+  async _resolveKnowledgeMentions(content, { autoRag = true } = {}) {
     if (!content || typeof content !== 'string') return content;
     const matches = content.match(/@knowledge:([a-zA-Z0-9_-]+)/g);
 
@@ -1500,7 +1518,7 @@ class BaseAdapter {
     }
 
     // 2. Implicit Auto-RAG for substantive questions (length >= 6 and not pure command/code)
-    if (this.client && this.workspaceId && this.token && typeof this.client.searchKnowledge === 'function') {
+    if (autoRag && this.client && this.workspaceId && this.token && typeof this.client.searchKnowledge === 'function') {
       const cleanText = content.replace(/@[a-zA-Z0-9_-]+/g, '').trim();
       // Only search if user prompt is between 6 and 300 chars, not starting with markdown code fences or commands
       if (cleanText.length >= 6 && cleanText.length <= 300 && !cleanText.startsWith('```') && !cleanText.startsWith('/')) {
@@ -1620,7 +1638,7 @@ class BaseAdapter {
     const lane = this._enterParallelLane(channel, msg);
     try {
       if (msg && typeof msg.content === 'string') {
-        msg.content = await this._resolveKnowledgeMentions(msg.content);
+        msg.content = await this._resolveKnowledgeMentions(msg.content, { autoRag: !isSystemMessage(msg) });
       }
       await this._runInTurnScope(channel, () => this._handleMessage(msg));
     } catch (e) {
@@ -1651,7 +1669,7 @@ class BaseAdapter {
       const queuedLane = this._enterParallelLane(channel, nextMsg);
       try {
         if (nextMsg && typeof nextMsg.content === 'string') {
-          nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content);
+          nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content, { autoRag: !isSystemMessage(nextMsg) });
         }
         await this._runInTurnScope(channel, () => this._handleMessage(nextMsg));
       } catch (e) {
@@ -1686,6 +1704,8 @@ class BaseAdapter {
     const key = Object.keys(pb.lanes).find((k) => k.toLowerCase() === String(this.agentName).toLowerCase());
     if (!key) return null;
     const lane = { ...pb.lanes[key], batchId: pb.batch_id, isolation: pb.isolation, others: Object.keys(pb.lanes).length - 1 };
+    this._activeLanes = this._activeLanes || {};
+    this._activeLanes[channel] = lane;
 
     if (lane.working_dir) {
       if (fs.existsSync(lane.working_dir)) {
@@ -1698,8 +1718,13 @@ class BaseAdapter {
     this._lastReply = this._lastReply || {};
     delete this._lastReply[channel];
 
+    // A resume is the agent's own timer waking it back into a lane it paused
+    // (see _deferParallelLane). Same folder and rules; the headline says so,
+    // because the conversation already holds the original brief.
     const lines = [
-      `[Parallel batch] You are one of ${lane.others + 1} agents working at the same time on separate parts.`,
+      pb.resume
+        ? '[Parallel batch] Resuming your part after the wait you scheduled. Pick up where you left off.'
+        : `[Parallel batch] You are one of ${lane.others + 1} agents working at the same time on separate parts.`,
       '',
       'Your part:',
       lane.task || '(see the message below)',
@@ -1736,10 +1761,37 @@ class BaseAdapter {
    */
   async _releaseLaneProcess(_channel) {}
 
+  /** The lane this channel's current turn is running, or null. */
+  activeParallelLane(channel) {
+    return (this._activeLanes && this._activeLanes[channel]) || null;
+  }
+
+  /**
+   * Keep the current lane open past the end of this turn.
+   *
+   * For an agent that pauses itself -- Antigravity's `schedule` tool ("come
+   * back when tsc finishes") ends the CLI run -- the turn ending is not the
+   * lane ending. Reporting it done would commit half the work, count the lane
+   * as finished, and let the wake-up run outside the worktree with no brief.
+   * The caller must have arranged the wake-up to carry the lane (a timer with
+   * `parallel_batch_id`); if that never fires, the backend's lane timeout
+   * still fails the lane.
+   */
+  _deferParallelLane(channel) {
+    this._deferredLanes = this._deferredLanes || new Set();
+    this._deferredLanes.add(channel);
+  }
+
   /** Report the lane's end to the backend, which commits and, last, merges. */
   async _exitParallelLane(channel, lane) {
     if (this._turnDirOverride) delete this._turnDirOverride[channel];
     if (this._turnEnvOverride) delete this._turnEnvOverride[channel];
+    if (this._activeLanes) delete this._activeLanes[channel];
+    if (this._deferredLanes && this._deferredLanes.delete(channel)) {
+      try { await this._releaseLaneProcess(channel); } catch {}
+      this._log(`Parallel: lane of batch ${String(lane.batchId).slice(0, 8)} paused; it resumes when its wake-up fires`);
+      return;
+    }
     const failed = Boolean(this._turnFailed && this._turnFailed.has(channel));
     const reply = (this._lastReply && this._lastReply[channel]) || '';
     // Before reporting: the last lane's report triggers the merge, which

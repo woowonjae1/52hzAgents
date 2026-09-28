@@ -122,6 +122,14 @@ func fireDueTimers() {
 
 	// 遍历每个到期的定时器进行触发处理。
 	for _, timer := range dueTimers {
+		// 分道内的暂停：把 agent 唤醒回原来的分道（worktree + 简报）。分道已经
+		// 结束（完成/失败/超时）时为 nil，按普通提醒发。必须在开事务之前查：
+		// 它走 db.DB，事务里再占一个连接在单连接的 SQLite 上会互相等死。
+		var resume map[string]interface{}
+		if timer.ParallelBatchID != "" {
+			resume = handlers.ParallelResumeMetadata(timer.ParallelBatchID, handlers.AgentNameFromSource(timer.CreatedBy))
+		}
+
 		// 开启事务保护。
 		tx := db.DB.Begin()
 
@@ -157,6 +165,9 @@ func fireDueTimers() {
 
 		metadataData := map[string]interface{}{
 			"target_agents": []string{agentName},
+		}
+		if resume != nil {
+			metadataData["parallel_batch"] = resume
 		}
 		metadataBytes, _ := json.Marshal(metadataData)
 

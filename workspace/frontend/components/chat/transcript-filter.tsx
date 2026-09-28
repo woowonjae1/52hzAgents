@@ -55,7 +55,7 @@ function isToolStep(m: WorkspaceMessage): boolean {
 
 function isReasoning(m: WorkspaceMessage): boolean {
   // `reply_preview` thinking is the answer arriving early, not reasoning.
-  return m.messageType === 'thinking' && !m.metadata?.reply_preview;
+  return m.messageType === 'thinking' && !m.metadata?.reply_preview && !isToolStep(m);
 }
 
 export function applyTranscriptFilter(

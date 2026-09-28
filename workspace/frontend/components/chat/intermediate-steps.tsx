@@ -36,6 +36,7 @@ import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elemen
 import { SubagentList } from '@/components/ai-elements/subagent-list';
 import { MarkdownContent } from './markdown-content';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
+import { isToolCallMessage, isThinkingText } from './message-kinds';
 
 // ── Content Parsing ──
 
@@ -260,7 +261,7 @@ function getStepIcon(parsed: ParsedStep) {
 }
 
 function isPlaceholderThinking(message: WorkspaceMessage): boolean {
-  if (message.messageType === 'todos') return false;
+  if (message.messageType === 'todos' || isToolCallMessage(message)) return false;
   const parsed = message.messageType === 'thinking'
     ? { type: 'thinking' as const, text: message.content }
     : parseMessageStep(message);
@@ -437,7 +438,9 @@ const SingleStep = memo(function SingleStep({ message }: { message: WorkspaceMes
 
   if (isPlaceholderThinking(message)) return null;
 
-  const parsed = message.messageType === 'thinking'
+  const parsed = isToolCallMessage(message)
+    ? parseMessageStep(message)
+    : message.messageType === 'thinking'
     ? { type: 'thinking' as const, text: message.content }
     : parseStepContent(message.content);
   const Icon = getStepIcon(parsed);
@@ -650,6 +653,7 @@ function stepTime(msg: WorkspaceMessage): number | null {
 }
 
 function isToolCallStep(msg: WorkspaceMessage): boolean {
+  if (isToolCallMessage(msg)) return true;
   if (msg.messageType === 'thinking' || msg.messageType === 'todos') return false;
   return parseMessageStep(msg).type === 'tool_call';
 }
@@ -837,7 +841,7 @@ function coalesceThinking(steps: WorkspaceMessage[]): StepRun[] {
   for (const step of steps) {
     if (isPlaceholderThinking(step)) continue;
 
-    const isThinkingMsg = step.messageType === 'thinking';
+    const isThinkingMsg = isThinkingText(step);
     if (!isThinkingMsg) {
       // Tool call or status message ends current thinking/reply phase
       currentPhase.tools.push(step);
@@ -971,6 +975,7 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
 
   const runs = coalesceThinking(renderable);
   const toolCount = renderable.filter((s) => {
+    if (isToolCallMessage(s)) return true;
     if (s.messageType === 'todos' || s.messageType === 'thinking') return false;
     return parseMessageStep(s).type === 'tool_call';
   }).length;

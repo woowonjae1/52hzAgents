@@ -802,15 +802,29 @@ class AntigravityAdapter extends BaseAdapter {
                       await finishHandoff();
                     });
                 } else if (seconds && this.client && this.workspaceId) {
+                  // Inside a parallel lane this is the agent pausing its OWN work
+                  // ("check tsc again in a minute"), not a reminder anyone asked
+                  // for. Posting "已为您设置提醒" as the reply ended the lane with
+                  // that line as its result, and the wake-up then ran in the
+                  // channel folder with no brief. So: the timer carries the lane,
+                  // the lane stays open, and the transcript gets a status.
+                  const lane = this.activeParallelLane(channel);
                   this.client
                     .createTimer(this.workspaceId, channel, this.token, seconds, text, {
                       source: `52hz:${this.agentName}`,
+                      parallelBatchId: lane ? lane.batchId : undefined,
                     })
                     .then(async (timer) => {
                       const at = timer && (timer.fires_at || timer.firesAt);
                       const when = at
                         ? new Date(at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
                         : `${Math.round(seconds / 60)} 分钟后`;
+                      if (lane) {
+                        this._deferParallelLane(channel);
+                        try { await this.sendStatus(channel, `Waiting until ${when} to continue: ${text}`); } catch {}
+                        await finishHandoff();
+                        return;
+                      }
                       // A reply, not a status line. The model goes straight to
                       // sleep after calling its own scheduling tool, so without
                       // this the user is left looking at one grey English line

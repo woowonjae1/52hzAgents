@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -126,5 +127,45 @@ func TestFireDueTimersAdvancesItsTask(t *testing.T) {
 	}
 	if got := read(pending.ID); got != "pending" {
 		t.Fatalf("an unrelated timer's task was advanced: %q", got)
+	}
+}
+
+// A timer an agent set from inside a parallel lane wakes it back INTO that
+// lane: the fired message carries the lane's parallel_batch metadata. The
+// lookup runs before the firing transaction opens -- on this one-connection
+// database, doing it inside would wait on its own lock forever.
+func TestFireDueTimersResumesAParallelLane(t *testing.T) {
+	setupTimerDB(t)
+	if err := db.DB.AutoMigrate(&models.ParallelBatchRecord{}, &models.ParallelLaneRecord{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	batchID := uuid.NewString()
+	db.DB.Create(&models.ParallelBatchRecord{ID: batchID, WorkspaceID: uuid.NewString(), ChannelName: "general", Isolation: "worktree", Status: "running"})
+	db.DB.Create(&models.ParallelLaneRecord{ID: uuid.NewString(), BatchID: batchID, Agent: "antigravity", WorktreePath: "/tmp/wt", Branch: "parallel/x/antigravity", Status: "running", StartedAt: time.Now().UTC()})
+
+	rec := newTimer(t, time.Now().UTC().Add(-time.Second))
+	db.DB.Model(&models.TimerRecord{}).Where("id = ?", rec.ID).Update("parallel_batch_id", batchID)
+
+	done := make(chan struct{})
+	go func() { fireDueTimers(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("fireDueTimers deadlocked resolving the lane")
+	}
+
+	var ev models.EventRecord
+	if err := db.DB.Where("source = ? AND type = ?", "system:timer", "workspace.message.posted").First(&ev).Error; err != nil {
+		t.Fatalf("no fired message: %v", err)
+	}
+	var meta map[string]interface{}
+	_ = json.Unmarshal(ev.Metadata, &meta)
+	pb, _ := meta["parallel_batch"].(map[string]interface{})
+	if pb == nil || pb["batch_id"] != batchID || pb["resume"] != true {
+		t.Fatalf("fired message does not resume the lane: %s", ev.Metadata)
+	}
+	lanes, _ := pb["lanes"].(map[string]interface{})
+	if lane, _ := lanes["antigravity"].(map[string]interface{}); lane == nil || lane["working_dir"] != "/tmp/wt" {
+		t.Fatalf("resume does not carry the worktree: %s", ev.Metadata)
 	}
 }

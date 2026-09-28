@@ -368,7 +368,10 @@ type TimerRecord struct {
 	DelaySeconds int       `gorm:"type:integer;not null" json:"delay_seconds"`
 	FiresAt      time.Time `gorm:"not null;index:idx_timers_fires_at_status" json:"fires_at"`
 	Status       string    `gorm:"type:text;not null;default:active;index:idx_timers_fires_at_status" json:"status"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	// ParallelBatchID is set when an agent scheduled this from inside a parallel
+	// lane to pause its own work: the firing wakes it back into that lane.
+	ParallelBatchID string    `gorm:"type:text;not null;default:''" json:"parallel_batch_id,omitempty"`
+	CreatedAt       time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (TimerRecord) TableName() string {
@@ -793,7 +796,7 @@ type ParallelBatchRecord struct {
 	Origin     string     `gorm:"type:text;not null;default:'mention'" json:"origin"`
 	RepoDir    string     `gorm:"type:text;not null;default:''" json:"repo_dir"`
 	BaseBranch string     `gorm:"type:text;not null;default:''" json:"base_branch"`
-	Status     string     `gorm:"type:text;not null;default:'running'" json:"status"` // running | done
+	Status     string     `gorm:"type:text;not null;default:'running'" json:"status"` // running | review | done
 	Summary    string     `gorm:"type:text;not null;default:''" json:"summary"`
 	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
@@ -803,22 +806,27 @@ func (ParallelBatchRecord) TableName() string { return "parallel_batches" }
 
 // ParallelLaneRecord is one agent's share of a batch.
 //
-// Status: running -> done | failed, then after the batch finishes a done lane
-// becomes merged (its branch is in the base branch), conflict (the merge was
-// refused; branch kept) or kept (the base tree had uncommitted work, so
-// nothing was merged automatically; branch kept).
+// Status: running -> done | failed. Once every lane is terminal the batch waits
+// in "review" for the user; on merge a done lane becomes merged (its branch is
+// in the base branch), conflict (the merge was refused; branch kept) or kept
+// (the base tree had uncommitted work; branch kept). On discard it becomes
+// discarded (worktree and branch removed).
 type ParallelLaneRecord struct {
-	ID           string     `gorm:"primaryKey;type:text" json:"id"`
-	BatchID      string     `gorm:"type:text;not null;index" json:"batch_id"`
-	Agent        string     `gorm:"type:text;not null" json:"agent"`
-	Task         string     `gorm:"type:text;not null;default:''" json:"task"`
-	Scope        string     `gorm:"type:text;not null;default:''" json:"scope"`
-	WorktreePath string     `gorm:"type:text;not null;default:''" json:"worktree_path"`
-	Branch       string     `gorm:"type:text;not null;default:''" json:"branch"`
-	Status       string     `gorm:"type:text;not null;default:'running'" json:"status"`
-	Error        string     `gorm:"type:text;not null;default:''" json:"error"`
-	Commit       string     `gorm:"type:text;not null;default:''" json:"commit"`
-	Reply        string     `gorm:"type:text;not null;default:''" json:"reply"`
+	ID           string `gorm:"primaryKey;type:text" json:"id"`
+	BatchID      string `gorm:"type:text;not null;index" json:"batch_id"`
+	Agent        string `gorm:"type:text;not null" json:"agent"`
+	Task         string `gorm:"type:text;not null;default:''" json:"task"`
+	Scope        string `gorm:"type:text;not null;default:''" json:"scope"`
+	WorktreePath string `gorm:"type:text;not null;default:''" json:"worktree_path"`
+	Branch       string `gorm:"type:text;not null;default:''" json:"branch"`
+	Status       string `gorm:"type:text;not null;default:'running'" json:"status"`
+	Error        string `gorm:"type:text;not null;default:''" json:"error"`
+	Commit       string `gorm:"type:text;not null;default:''" json:"commit"`
+	Reply        string `gorm:"type:text;not null;default:''" json:"reply"`
+	// Diffstat and ChangedFiles describe the lane's branch against the base when
+	// the batch entered review -- what the user is asked to approve.
+	Diffstat     string     `gorm:"type:text;not null;default:''" json:"diffstat"`
+	ChangedFiles string     `gorm:"type:text;not null;default:''" json:"changed_files"`
 	Attempts     int        `gorm:"not null;default:1" json:"attempts"`
 	Port         int        `gorm:"not null;default:0" json:"port"` // dev-server port reserved for this lane; 0 = none
 	StartedAt    time.Time  `json:"started_at"`

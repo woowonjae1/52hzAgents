@@ -37,11 +37,16 @@ by hand. A batch is now a record with one lane per agent:
     its own (so two lanes never fight over 3000/5173). The adapter runs that
     turn in the lane's directory and reports back when the turn ends.
  3. finish: a lane that reports done has its worktree committed. When every
-    lane is terminal the batch merges each committed branch into the base
-    branch, keeps the branches that conflict (and everything, if the base tree
-    has uncommitted work), removes merged worktrees, and posts one summary to
-    the channel -- waking the master, when the channel has one, to review it.
- 4. recovery: a lane can be retried on its own worktree; a lane silent past the
+    lane is terminal and any lane has changes, the batch waits in "review":
+    each lane's diff against the base is recorded and the user is asked to
+    merge or discard. Nothing lands on the base branch without that click --
+    agents asked to "check" something routinely edit code as well.
+ 4. merge (on the user's say-so): each committed branch is merged into the base
+    branch, conflicting branches are kept (and everything, if the base tree has
+    uncommitted work), merged worktrees are removed, and one summary is posted
+    -- waking the master, when the channel has one, to review it. Discard
+    removes every lane's worktree and branch instead.
+ 5. recovery: a lane can be retried on its own worktree; a lane silent past the
     timeout is failed by the scheduler so the batch can still finish.
 */
 
@@ -52,9 +57,14 @@ const (
 	laneMerged   = "merged"
 	laneConflict = "conflict"
 	laneKept     = "kept"
+	// laneDiscarded: the user discarded the batch; worktree and branch removed.
+	laneDiscarded = "discarded"
 
 	batchRunning = "running"
-	batchDone    = "done"
+	// batchReview: every lane is terminal and there is something to merge; the
+	// batch waits for the user to merge or discard it.
+	batchReview = "review"
+	batchDone   = "done"
 )
 
 // ParallelLaneTimeout is how long a lane may stay running before the scheduler
@@ -90,12 +100,12 @@ func gitRepoRoot(dir string) string {
 	return filepath.Clean(strings.TrimSpace(out))
 }
 
-// runningBatch is the channel's unfinished batch, if any. A second batch is
-// never started on top of one: its lanes would be branched from a base the
-// first batch is about to merge into.
+// runningBatch is the channel's unfinished batch, if any -- running or waiting
+// for review. A second batch is never started on top of one: its lanes would be
+// branched from a base the first batch is about to merge into.
 func runningBatch(tx *gorm.DB, workspaceID, channelName string) *models.ParallelBatchRecord {
 	var b models.ParallelBatchRecord
-	if tx.Where("workspace_id = ? AND channel_name = ? AND status = ?", workspaceID, channelName, batchRunning).
+	if tx.Where("workspace_id = ? AND channel_name = ? AND status IN ?", workspaceID, channelName, []string{batchRunning, batchReview}).
 		Order("created_at DESC").Limit(1).Find(&b).RowsAffected == 0 {
 		return nil
 	}
@@ -425,7 +435,194 @@ func finishLane(batch *models.ParallelBatchRecord, lane *models.ParallelLaneReco
 	var running int64
 	db.DB.Model(&models.ParallelLaneRecord{}).Where("batch_id = ? AND status = ?", batch.ID, laneRunning).Count(&running)
 	if running == 0 {
-		finalizeBatch(batch)
+		if !enterReview(batch) {
+			finalizeBatch(batch)
+		}
+	}
+}
+
+// baseRef is what lane branches are compared against and merged into.
+func baseRef(batch *models.ParallelBatchRecord) string {
+	if b := strings.TrimSpace(batch.BaseBranch); b != "" && b != "HEAD" {
+		return b
+	}
+	return "HEAD"
+}
+
+// laneAhead counts the commits on the lane's branch that the base lacks. This,
+// not lane.Commit, is what decides whether there is anything to merge: an agent
+// that committed on its own branch leaves the worktree clean, so commitLane
+// returns "" although the branch carries work.
+func laneAhead(batch *models.ParallelBatchRecord, lane *models.ParallelLaneRecord) int {
+	if batch.Isolation != "worktree" || lane.Branch == "" {
+		return 0
+	}
+	out, err := runGit(batch.RepoDir, "rev-list", "--count", baseRef(batch)+".."+lane.Branch)
+	if err != nil {
+		return 0
+	}
+	var n int
+	_, _ = fmt.Sscanf(strings.TrimSpace(out), "%d", &n)
+	return n
+}
+
+// enterReview parks a batch whose lanes have all ended and that has something
+// to merge, recording each lane's diff and asking the user to merge or
+// discard. Returns false when there is nothing to review (shared folder, or no
+// lane changed anything), in which case the caller finalizes directly.
+func enterReview(batch *models.ParallelBatchRecord) bool {
+	if batch.Isolation != "worktree" {
+		return false
+	}
+	var lanes []models.ParallelLaneRecord
+	db.DB.Where("batch_id = ?", batch.ID).Order("agent").Find(&lanes)
+	pending := 0
+	for i := range lanes {
+		lane := &lanes[i]
+		if lane.Status != laneDone || laneAhead(batch, lane) == 0 {
+			continue
+		}
+		pending++
+		diffRange := baseRef(batch) + "..." + lane.Branch
+		if st, err := runGit(batch.RepoDir, "diff", "--shortstat", diffRange); err == nil {
+			lane.Diffstat = strings.TrimSpace(st)
+		}
+		if names, err := runGit(batch.RepoDir, "diff", "--name-only", diffRange); err == nil {
+			files := strings.Split(strings.TrimSpace(names), "\n")
+			if len(files) > 50 {
+				files = append(files[:50], fmt.Sprintf("… and %d more", len(files)-50))
+			}
+			lane.ChangedFiles = strings.Join(files, "\n")
+		}
+		db.DB.Save(lane)
+	}
+	if pending == 0 {
+		return false
+	}
+
+	batch.Status = batchReview
+	batch.Summary = reviewSummary(batch, lanes)
+	db.DB.Save(batch)
+	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
+		"parallel_summary": gin.H{"batch_id": batch.ID, "review": true},
+	})
+	return true
+}
+
+func reviewSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLaneRecord) string {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("**Parallel batch ready for review** — nothing has been merged into `%s` yet. Review each lane, then Merge or Discard in the panel above.\n\n", baseRef(batch)))
+	for _, l := range lanes {
+		switch {
+		case l.Status == laneFailed:
+			b.WriteString(fmt.Sprintf("❌ **@%s** — failed", l.Agent))
+			if l.Error != "" {
+				b.WriteString(" · " + l.Error)
+			}
+		case l.Diffstat != "":
+			b.WriteString(fmt.Sprintf("📝 **@%s** — %s · branch `%s`", l.Agent, l.Diffstat, l.Branch))
+		default:
+			b.WriteString(fmt.Sprintf("✅ **@%s** — no file changes", l.Agent))
+		}
+		b.WriteString("\n")
+		if l.Reply != "" {
+			b.WriteString("  > " + strings.ReplaceAll(truncateRunes(l.Reply, 280), "\n", " ") + "\n")
+		}
+	}
+	return strings.TrimSpace(b.String())
+}
+
+// batchForReview loads the batch named in the URL and checks it is waiting for
+// review. Writes the error response and returns nil otherwise.
+func batchForReview(c *gin.Context) *models.ParallelBatchRecord {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return nil
+	}
+	var batch models.ParallelBatchRecord
+	if db.DB.Where("id = ? AND workspace_id = ?", c.Param("batch_id"), workspace.ID).Limit(1).Find(&batch).RowsAffected == 0 {
+		c.JSON(404, gin.H{"error": "batch not found"})
+		return nil
+	}
+	if batch.Status != batchReview {
+		c.JSON(409, gin.H{"error": "the batch is not waiting for review", "status": batch.Status})
+		return nil
+	}
+	return &batch
+}
+
+// MergeParallelBatch handles POST /v1/workspaces/:ws/parallel-batches/:batch_id/merge:
+// the user approved the batch, so its lanes are merged into the base branch.
+func MergeParallelBatch(c *gin.Context) {
+	batch := batchForReview(c)
+	if batch == nil {
+		return
+	}
+	finalizeBatch(batch)
+	c.JSON(200, gin.H{"batch": batch})
+}
+
+// DiscardParallelBatch handles POST /v1/workspaces/:ws/parallel-batches/:batch_id/discard:
+// every lane's worktree and branch is removed and nothing is merged.
+func DiscardParallelBatch(c *gin.Context) {
+	batch := batchForReview(c)
+	if batch == nil {
+		return
+	}
+	discardBatch(batch)
+	c.JSON(200, gin.H{"batch": batch})
+}
+
+func discardBatch(batch *models.ParallelBatchRecord) {
+	var lanes []models.ParallelLaneRecord
+	db.DB.Where("batch_id = ?", batch.ID).Order("agent").Find(&lanes)
+	for i := range lanes {
+		lane := &lanes[i]
+		if lane.WorktreePath != "" {
+			_ = RemoveGitWorktree(batch.RepoDir, lane.WorktreePath, true)
+		}
+		if lane.Branch != "" {
+			_, _ = runGit(batch.RepoDir, "branch", "-D", lane.Branch)
+		}
+		if lane.Status == laneDone || lane.Status == laneFailed {
+			lane.Status = laneDiscarded
+		}
+		db.DB.Save(lane)
+	}
+	now := time.Now().UTC()
+	batch.Status = batchDone
+	batch.FinishedAt = &now
+	batch.Summary = fmt.Sprintf("**Parallel batch discarded** — nothing was merged into `%s`; every lane's worktree and branch was removed.", baseRef(batch))
+	db.DB.Save(batch)
+	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
+		"parallel_summary": gin.H{"batch_id": batch.ID},
+	})
+}
+
+// ParallelResumeMetadata is the `parallel_batch` metadata that wakes agent back
+// into its lane of batchID -- for a timer the agent set from inside the lane to
+// pause its own work. nil when that lane is no longer running (finished,
+// failed or timed out), so the timer then fires as an ordinary reminder.
+func ParallelResumeMetadata(batchID, agent string) map[string]interface{} {
+	if db.DB == nil || strings.TrimSpace(batchID) == "" {
+		return nil
+	}
+	var batch models.ParallelBatchRecord
+	if db.DB.Where("id = ?", batchID).Limit(1).Find(&batch).RowsAffected == 0 {
+		return nil
+	}
+	var lane models.ParallelLaneRecord
+	if db.DB.Where("batch_id = ? AND LOWER(agent) = LOWER(?) AND status = ?", batchID, agent, laneRunning).
+		Limit(1).Find(&lane).RowsAffected == 0 {
+		return nil
+	}
+	return map[string]interface{}{
+		"batch_id":  batch.ID,
+		"isolation": batch.Isolation,
+		"resume":    true,
+		"lanes":     map[string]laneDispatch{lane.Agent: dispatchFor(&lane)},
 	}
 }
 
@@ -459,8 +656,8 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 			continue
 		}
 		switch {
-		case lane.Commit == "":
-			// Nothing to merge: the lane changed no files.
+		case laneAhead(batch, lane) == 0:
+			// Nothing to merge: the lane's branch carries no commits.
 			lane.Status = laneMerged
 		case baseDirty != "":
 			lane.Status = laneKept

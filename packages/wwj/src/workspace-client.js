@@ -683,13 +683,16 @@ class WorkspaceClient {
    * ignored, leaving `delay_seconds` at its zero value and failing the required
    * check - so every timer created through this client returned 400.
    */
-  async createTimer(workspaceId, channelName, token, delay, message, { source, firesAt } = {}) {
+  async createTimer(workspaceId, channelName, token, delay, message, { source, firesAt, parallelBatchId } = {}) {
     const body = {
       message,
       network: workspaceId,
       channel: channelName,
       source: source || '52hz:unknown',
     };
+    // Set from inside a parallel lane: the firing wakes the agent back into
+    // that lane (its worktree and brief) instead of the channel folder.
+    if (parallelBatchId) body.parallel_batch_id = parallelBatchId;
     if (firesAt) {
       body.fires_at = firesAt instanceof Date ? firesAt.toISOString() : firesAt;
     } else {

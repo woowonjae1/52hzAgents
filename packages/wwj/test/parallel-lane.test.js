@@ -107,3 +107,35 @@ test('a message whose batch has no lane for this agent is an ordinary turn', asy
   assert.equal(a.seen[0].content, 'split the work');
   assert.equal(reports.length, 0);
 });
+
+test('a lane that pauses itself stays open, and its wake-up resumes it in the worktree', async () => {
+  // Antigravity's `schedule` tool ends the CLI run mid-task ("check tsc again
+  // at 10:00"). That turn ending is not the lane ending.
+  const worktree = fs.mkdtempSync(path.join(os.tmpdir(), 'wwj-wt-'));
+  const { a, reports, home } = make();
+  let seenLane = null;
+  a.behaviour = async () => {
+    seenLane = a.activeParallelLane('ch-1');
+    a._deferParallelLane('ch-1');
+  };
+  await a._channelWorker('ch-1', laneMsg(worktree));
+
+  assert.equal(seenLane && seenLane.batchId, 'b-123', 'the turn can see which lane it is running');
+  assert.equal(reports.length, 0, 'a paused lane is not reported done');
+  assert.equal(a.activeParallelLane('ch-1'), null, 'nothing lingers after the turn');
+
+  // The timer fires with the lane (the backend's ParallelResumeMetadata).
+  a.behaviour = async () => { await a.sendResponse('ch-1', 'tsc is clean; notes page optimised'); };
+  const wake = laneMsg(worktree);
+  wake.content = '⏰ Timer fired (set by @pi): check the tsc task';
+  wake.metadata.parallel_batch.resume = true;
+  await a._channelWorker('ch-1', wake);
+
+  assert.equal(a.seen[1].dir, worktree, 'the wake-up runs in the lane worktree, not the channel folder');
+  assert.match(a.seen[1].content, /^\[Parallel batch\] Resuming your part/);
+  assert.match(a.seen[1].content, /Do not commit, merge/, 'the rules come back with it');
+  assert.deepEqual(reports, [{ batchId: 'b-123', agent: 'pi', status: 'done', error: '', reply: 'tsc is clean; notes page optimised' }]);
+
+  await a._channelWorker('ch-1', { sessionId: 'ch-1', content: 'normal turn', metadata: {} });
+  assert.equal(a.seen[2].dir, home);
+});

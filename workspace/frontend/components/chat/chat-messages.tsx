@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { ChatMessage } from './chat-message';
 import { IntermediateSteps } from './intermediate-steps';
 import { ThinkingMessage } from './thinking-message';
+import { isThinkingText } from './message-kinds';
 import { SpeechActEvent } from './speech-act-event';
 import { WorkingIndicator } from './working-indicator';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
@@ -102,7 +103,7 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
   const flushOrphanSteps = (forceSettled?: boolean) => {
     for (const [sender, own] of pendingSteps) {
       if (own.length === 0) continue;
-      const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+      const thinkingOnly = own.every(isThinkingText);
       const lastStep = own[own.length - 1];
       const isRecent = lastStep?.createdAt ? Date.now() - new Date(lastStep.createdAt).getTime() < 60_000 : false;
       const isSettled = forceSettled || !isChannelActive || !isRecent;
@@ -156,7 +157,7 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
         // If there's a gap exceeding the burst window (5 minutes) between consecutive steps,
         // the older steps belonged to an abandoned/prior execution. Flush them as settled.
         if (gap > BURST_WINDOW_MS) {
-          const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+          const thinkingOnly = own.every(isThinkingText);
           groups.push(
             thinkingOnly
               ? { type: 'thinking', sender: msg.senderName, messages: [...own], settled: true }
@@ -172,7 +173,7 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
     } else {
       const own = takeSteps(msg.senderName);
       if (own) {
-        const thinkingOnly = own.every((m) => m.messageType === 'thinking');
+        const thinkingOnly = own.every(isThinkingText);
         groups.push(
           thinkingOnly
             ? { type: 'thinking', sender: msg.senderName, messages: own, settled: true }
@@ -512,7 +513,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
      * distinguish the two. Only the content does.
      */
     const deduped = realMessages.filter((msg, i) => {
-      if (msg.messageType !== 'thinking') return true;
+      if (!isThinkingText(msg)) return true;
       const flagged = msg.metadata?.reply_preview === true;
       // Look ahead for a chat message from the same agent
       for (let j = i + 1; j < realMessages.length; j++) {

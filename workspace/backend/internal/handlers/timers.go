@@ -39,6 +39,9 @@ type CreateTimerRequest struct {
 	// 秒数，而 routine 的每日模式是天天重复、不是就这一次。于是 agent 只能用
 	// 文字假装设了提醒。给定一个时刻比让模型自己做时间减法更可靠。
 	FiresAt *time.Time `json:"fires_at"`
+	// ParallelBatchID marks an agent pausing its own parallel lane; see
+	// models.TimerRecord.ParallelBatchID.
+	ParallelBatchID string `json:"parallel_batch_id"`
 }
 
 // timerTaskContent 生成看板上那条任务的标题。
@@ -127,6 +130,8 @@ func CreateTimer(c *gin.Context) {
 		FiresAt:      firesAt,
 		Status:       "active", // 设定初始状态为活跃。
 		CreatedAt:    now,
+
+		ParallelBatchID: strings.TrimSpace(req.ParallelBatchID),
 	}
 
 	// 写入数据库。
@@ -140,6 +145,7 @@ func CreateTimer(c *gin.Context) {
 	// 周期任务每次触发都会建一条跟踪任务，一次性 timer 却什么都不建 —— 于是
 	// 「16:11 提醒我开会」在 Tasks & Issues 的三个页面里都查不到，用户只能在
 	// 会话底部那条状态栏里瞥见它。
+	// 并行分道里 agent 给自己设的「过会儿回来看」不是用户的待办，不上看板。
 	todo := models.TodoRecord{
 		ID:          uuid.New().String(),
 		WorkspaceID: workspace.ID,
@@ -156,7 +162,9 @@ func CreateTimer(c *gin.Context) {
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	if err := db.DB.Create(&todo).Error; err != nil {
+	if record.ParallelBatchID != "" {
+		// skip: an internal pause, see above
+	} else if err := db.DB.Create(&todo).Error; err != nil {
 		// 待办只是可见性，建不出来不该让定时本身失败。
 		log.Printf("timer %s scheduled but its task could not be opened: %v", record.ID, err)
 	} else {

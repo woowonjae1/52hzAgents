@@ -91,6 +91,18 @@ func finish(t *testing.T, batchID, agent string, failed bool) {
 	finishLane(&batch, &lane, failed, "boom", agent+" finished")
 }
 
+// approve is the user pressing Merge: the batch must be waiting for review,
+// and nothing may have reached the base branch before this.
+func approve(t *testing.T, batchID string) {
+	t.Helper()
+	var batch models.ParallelBatchRecord
+	db.DB.Where("id = ?", batchID).First(&batch)
+	if batch.Status != batchReview {
+		t.Fatalf("batch should wait for review before merging, got %s", batch.Status)
+	}
+	finalizeBatch(&batch)
+}
+
 func lanesOf(batchID string) map[string]models.ParallelLaneRecord {
 	var rows []models.ParallelLaneRecord
 	db.DB.Where("batch_id = ?", batchID).Find(&rows)
@@ -127,6 +139,14 @@ func TestParallelBatchIsolatesLanesAndMergesDisjointWork(t *testing.T) {
 	}
 	finish(t, batch.ID, "beta", false)
 
+	// Every lane ended, but nothing lands on main until the user says so.
+	for _, f := range []string{"alpha.txt", "beta.txt"} {
+		if _, err := os.Stat(filepath.Join(repo, f)); err == nil {
+			t.Fatalf("%s reached the base tree before the user approved", f)
+		}
+	}
+	approve(t, batch.ID)
+
 	db.DB.Where("id = ?", batch.ID).First(&batch)
 	if batch.Status != batchDone {
 		t.Fatalf("batch not done: %s", batch.Status)
@@ -161,6 +181,7 @@ func TestParallelConflictingLaneKeepsItsBranch(t *testing.T) {
 	os.WriteFile(filepath.Join(lanes["beta"].WorktreePath, "shared.txt"), []byte("beta wins\n"), 0644)
 	finish(t, batch.ID, "alpha", false)
 	finish(t, batch.ID, "beta", false)
+	approve(t, batch.ID)
 
 	got := lanesOf(batch.ID)
 	if got["alpha"].Status != laneMerged || got["beta"].Status != laneConflict {
@@ -183,6 +204,7 @@ func TestParallelDirtyBaseKeepsEverythingAndFailedLaneIsNotMerged(t *testing.T) 
 	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("user is editing\n"), 0644) // uncommitted work in the base
 	finish(t, batch.ID, "alpha", false)
 	finish(t, batch.ID, "beta", true)
+	approve(t, batch.ID)
 
 	got := lanesOf(batch.ID)
 	if got["alpha"].Status != laneKept || got["beta"].Status != laneFailed {
@@ -294,6 +316,7 @@ func TestParallelMergesWithoutAHostGitIdentity(t *testing.T) {
 	}
 	finish(t, batch.ID, "alpha", false)
 	finish(t, batch.ID, "beta", false)
+	approve(t, batch.ID)
 
 	for a, l := range lanesOf(batch.ID) {
 		if l.Status != laneMerged {
@@ -363,6 +386,7 @@ func TestParallelSummaryOfAnUnmergedBatchSaysNothingMerged(t *testing.T) {
 	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("user is editing\n"), 0644)
 	finish(t, batch.ID, "alpha", false)
 	finish(t, batch.ID, "beta", true)
+	approve(t, batch.ID)
 
 	s := postedSummary(t, batch.ChannelName)
 	if strings.Contains(s, "— merged into") || strings.Contains(s, "lanes merged into") {
@@ -370,5 +394,109 @@ func TestParallelSummaryOfAnUnmergedBatchSaysNothingMerged(t *testing.T) {
 	}
 	if !strings.Contains(s, "nothing was merged into `main`") {
 		t.Fatalf("summary does not say nothing was merged: %s", s)
+	}
+}
+
+func TestParallelBatchWaitsForReviewAndCanBeDiscarded(t *testing.T) {
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	batch, lanes := startTestBatch(t, ws, repo, "alpha", "beta")
+	os.WriteFile(filepath.Join(lanes["alpha"].WorktreePath, "alpha.txt"), []byte("a\n"), 0644)
+	finish(t, batch.ID, "alpha", false)
+	finish(t, batch.ID, "beta", false)
+
+	db.DB.Where("id = ?", batch.ID).First(&batch)
+	if batch.Status != batchReview {
+		t.Fatalf("want review, got %s", batch.Status)
+	}
+	got := lanesOf(batch.ID)
+	if !strings.Contains(got["alpha"].Diffstat, "1 file changed") || got["alpha"].ChangedFiles != "alpha.txt" {
+		t.Fatalf("alpha's diff was not recorded: %q / %q", got["alpha"].Diffstat, got["alpha"].ChangedFiles)
+	}
+	if got["beta"].Diffstat != "" {
+		t.Fatalf("beta changed nothing but has a diffstat %q", got["beta"].Diffstat)
+	}
+	// A batch under review still holds the channel: a new one would branch
+	// from a base this one may be about to merge into.
+	var ch models.Channel
+	db.DB.Where("name = ?", batch.ChannelName).First(&ch)
+	if startParallelBatch(db.DB, ws, &ch, "mention", []string{"alpha", "beta"}, nil, nil) != nil {
+		t.Fatal("started a second batch while one waits for review")
+	}
+	var rows []models.EventRecord
+	db.DB.Where("source = ? AND target = ? AND type = ?", "system:parallel", "channel/"+batch.ChannelName, "workspace.message.posted").Find(&rows)
+	if len(rows) != 1 || !strings.Contains(string(rows[0].Payload), "ready for review") {
+		t.Fatalf("want one review message, got %d", len(rows))
+	}
+
+	discardBatch(&batch)
+	db.DB.Where("id = ?", batch.ID).First(&batch)
+	if batch.Status != batchDone {
+		t.Fatalf("discarded batch = %s", batch.Status)
+	}
+	for a, l := range lanesOf(batch.ID) {
+		if l.Status != laneDiscarded {
+			t.Fatalf("lane %s = %s", a, l.Status)
+		}
+		if _, err := os.Stat(l.WorktreePath); err == nil {
+			t.Fatalf("discarded worktree %s still exists", l.WorktreePath)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(repo, "alpha.txt")); err == nil {
+		t.Fatal("discard merged alpha's work")
+	}
+	if strings.Contains(git(t, repo, "branch", "--list", "parallel/*"), "parallel/") {
+		t.Fatal("discarded lane branches were not deleted")
+	}
+}
+
+func TestParallelBatchWithNoChangesFinishesWithoutReview(t *testing.T) {
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	batch, _ := startTestBatch(t, ws, repo, "alpha", "beta")
+	finish(t, batch.ID, "alpha", false)
+	finish(t, batch.ID, "beta", false)
+	db.DB.Where("id = ?", batch.ID).First(&batch)
+	if batch.Status != batchDone {
+		t.Fatalf("a batch with nothing to merge should not wait for review, got %s", batch.Status)
+	}
+}
+
+func TestParallelMergesALaneThatCommittedOnItsOwn(t *testing.T) {
+	// An agent that commits in its worktree leaves it clean, so commitLane has
+	// nothing to do and lane.Commit stays empty -- the branch still carries work.
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	batch, lanes := startTestBatch(t, ws, repo, "alpha", "beta")
+	wt := lanes["alpha"].WorktreePath
+	os.WriteFile(filepath.Join(wt, "alpha.txt"), []byte("a\n"), 0644)
+	git(t, wt, "add", "-A")
+	git(t, wt, "-c", "user.name=agent", "-c", "user.email=a@b.c", "commit", "-m", "self")
+	finish(t, batch.ID, "alpha", false)
+	finish(t, batch.ID, "beta", false)
+	approve(t, batch.ID)
+	if _, err := os.Stat(filepath.Join(repo, "alpha.txt")); err != nil {
+		t.Fatal("the lane's own commit was not merged")
+	}
+}
+
+func TestParallelResumeMetadataOnlyForARunningLane(t *testing.T) {
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	batch, lanes := startTestBatch(t, ws, repo, "alpha", "beta")
+	meta := ParallelResumeMetadata(batch.ID, "ALPHA")
+	if meta == nil || meta["resume"] != true || meta["batch_id"] != batch.ID {
+		t.Fatalf("running lane: %+v", meta)
+	}
+	d, ok := meta["lanes"].(map[string]laneDispatch)["alpha"]
+	if !ok || d.WorkingDir != lanes["alpha"].WorktreePath {
+		t.Fatalf("resume must carry the lane's worktree: %+v", meta["lanes"])
+	}
+	finish(t, batch.ID, "alpha", false)
+	if ParallelResumeMetadata(batch.ID, "alpha") != nil {
+		t.Fatal("a finished lane must not be resumed")
+	}
+	if ParallelResumeMetadata("", "alpha") != nil || ParallelResumeMetadata(batch.ID, "nobody") != nil {
+		t.Fatal("unknown batch or agent must give nil")
 	}
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
 import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane } from '@/lib/api/orchestration';
@@ -66,7 +66,9 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
   if (!active || !batch) return null;
 
   const run = batch.run;
-  const runLive = run?.batch.status === 'running';
+  // A batch under review still owns the channel -- no new batch can start
+  // until it is merged or discarded -- so the next-batch preview stays hidden.
+  const runLive = run?.batch.status === 'running' || run?.batch.status === 'review';
   const reload = async () => {
     try {
       setBatch(await workspaceApi.getParallelBatch(channelName));
@@ -159,6 +161,7 @@ const LANE_STATUS: Record<ParallelLane['status'], { label: string; icon: React.E
   kept: { label: 'Branch kept', icon: PauseCircle, className: 'text-status-warning' },
   conflict: { label: 'Conflict', icon: AlertTriangle, className: 'text-status-warning' },
   failed: { label: 'Failed', icon: XCircle, className: 'text-status-danger' },
+  discarded: { label: 'Discarded', icon: Trash2, className: 'text-muted-foreground' },
 };
 
 /**
@@ -167,8 +170,39 @@ const LANE_STATUS: Record<ParallelLane['status'], { label: string; icon: React.E
  */
 function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }) {
   const [retrying, setRetrying] = React.useState<string | null>(null);
+  const [deciding, setDeciding] = React.useState<'merge' | 'discard' | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = React.useState(false);
   const live = run.batch.status === 'running';
+  const reviewing = run.batch.status === 'review';
   const finished = run.lanes.filter((l) => l.status !== 'running').length;
+  const base = run.batch.base_branch || 'the base branch';
+
+  // Discard is a two-step click: it deletes every lane's worktree and branch,
+  // and the second click has to be deliberate.
+  React.useEffect(() => {
+    if (!confirmDiscard) return;
+    const t = setTimeout(() => setConfirmDiscard(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirmDiscard]);
+
+  const decide = async (action: 'merge' | 'discard') => {
+    setDeciding(action);
+    try {
+      if (action === 'merge') {
+        await workspaceApi.mergeParallelBatch(run.batch.id);
+        toast.success(`Merging into ${base}`);
+      } else {
+        await workspaceApi.discardParallelBatch(run.batch.id);
+        toast.success('Batch discarded');
+      }
+      onRetried();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : `Could not ${action}`);
+    } finally {
+      setDeciding(null);
+      setConfirmDiscard(false);
+    }
+  };
 
   const retry = async (agent: string) => {
     setRetrying(agent);
@@ -188,11 +222,13 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
       <header className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-medium text-foreground">
-            {live ? 'Working in parallel' : 'Last parallel batch'}
+            {live ? 'Working in parallel' : reviewing ? 'Ready for review' : 'Last parallel batch'}
           </span>
           <span className="text-2xs text-muted-foreground truncate">
-            {run.batch.isolation === 'worktree'
-              ? `own worktrees${run.batch.base_branch ? ` · merges into ${run.batch.base_branch}` : ''}`
+            {reviewing
+              ? `nothing merged into ${base} yet`
+              : run.batch.isolation === 'worktree'
+              ? `own worktrees${run.batch.base_branch ? ` · merges into ${run.batch.base_branch} after your review` : ''}`
               : 'shared folder'}
           </span>
         </div>
@@ -202,7 +238,10 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
       </header>
       <ul className="space-y-2">
         {run.lanes.map((lane) => {
-          const st = LANE_STATUS[lane.status] ?? LANE_STATUS.running;
+          const st =
+            reviewing && lane.status === 'done' && lane.diffstat
+              ? { label: 'Ready to merge', icon: FileDiff, className: 'text-status-info' }
+              : LANE_STATUS[lane.status] ?? LANE_STATUS.running;
           const Icon = st.icon;
           const firstLine = lane.task.replace(/^- /, '').split(/\r?\n/)[0];
           return (
@@ -232,6 +271,22 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
                     {lane.branch}
                   </code>
                 )}
+                {reviewing && lane.diffstat && (
+                  <details className="mt-0.5 group">
+                    <summary className="cursor-pointer list-none text-2xs text-muted-foreground hover:text-foreground">
+                      {lane.diffstat}
+                    </summary>
+                    {lane.changed_files && (
+                      <ul className="mt-0.5 space-y-px pl-3">
+                        {lane.changed_files.split('\n').map((f) => (
+                          <li key={f}>
+                            <code className="text-2xs text-muted-foreground break-all">{f}</code>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </details>
+                )}
                 {lane.error && <p className="mt-0.5 text-2xs text-status-danger/90 leading-snug">{lane.error}</p>}
                 {lane.status === 'failed' && (
                   <button
@@ -249,6 +304,33 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
           );
         })}
       </ul>
+      {reviewing && (
+        <footer className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-2.5">
+          <button
+            type="button"
+            disabled={deciding !== null}
+            onClick={() => (confirmDiscard ? void decide('discard') : setConfirmDiscard(true))}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-2xs disabled:opacity-60',
+              confirmDiscard
+                ? 'border-status-danger/60 text-status-danger hover:bg-status-danger/10'
+                : 'border-border text-foreground hover:bg-muted'
+            )}
+          >
+            <Trash2 className="size-3" />
+            {confirmDiscard ? 'Click again to discard all' : 'Discard'}
+          </button>
+          <button
+            type="button"
+            disabled={deciding !== null}
+            onClick={() => void decide('merge')}
+            className="inline-flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-2xs font-medium text-background hover:opacity-90 disabled:opacity-60"
+          >
+            {deciding === 'merge' ? <Loader2 className="size-3 animate-spin" /> : <GitMerge className="size-3" />}
+            Merge into {base}
+          </button>
+        </footer>
+      )}
     </div>
   );
 }
