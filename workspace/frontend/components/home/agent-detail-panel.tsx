@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   Check,
   Copy,
+  ExternalLink,
   MessageSquare,
   Plug,
   RefreshCw,
@@ -41,7 +42,7 @@ import {
 } from '@/lib/agent-model-store';
 import { useAgentContexts, contextPercent, fmtTokens } from '@/lib/use-agent-contexts';
 import { useAgentTurns, summarizeAgentTurns } from '@/lib/use-agent-turns';
-import type { AgentApproval, AgentLogEntry, AgentRuntime, AgentUsage, WorkspaceAgent } from '@/lib/types';
+import type { AgentApproval, AgentCatalogEntry, AgentLogEntry, AgentRuntime, AgentUsage, WorkspaceAgent } from '@/lib/types';
 import { FieldLabel, FieldValue, StatusDot } from './home-panel';
 
 /*
@@ -69,6 +70,8 @@ export type AgentState = 'online' | 'working' | 'offline';
 interface Props {
   agent: WorkspaceAgent;
   state: AgentState;
+  isCatalogPreset?: boolean;
+  catalogEntry?: AgentCatalogEntry;
   selected: boolean;
   onToggleSelected: (on: boolean) => void;
   mode: OrchestrationMode;
@@ -110,6 +113,8 @@ function Help({ children }: { children: React.ReactNode }) {
 export function AgentDetailPanel({
   agent,
   state,
+  isCatalogPreset = false,
+  catalogEntry,
   selected,
   onToggleSelected,
   mode,
@@ -124,6 +129,7 @@ export function AgentDetailPanel({
   onClose,
 }: Props) {
   const name = agent.agentName;
+  const displayName = catalogEntry?.label ? `${catalogEntry.label} (${name})` : name;
   const online = state !== 'offline';
   const isCloud = agent.agentType?.startsWith('cloud:') ?? false;
   const { sessions, agents, lastMessageBySession, createSession, refreshAgents, token } = useWorkspace();
@@ -141,6 +147,7 @@ export function AgentDetailPanel({
   const [loading, setLoading] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
+    if (isCatalogPreset) return;
     setLoading(true);
     const [u, r, l, a] = await Promise.all([
       workspaceApi.getAgentUsage(name).catch(() => null),
@@ -154,15 +161,17 @@ export function AgentDetailPanel({
     setApprovals(a.filter((x) => x.agentName === name));
     if (u) hydrateAgentModels(name, { options: parseReportedModels(u.available_models), current: u.current_model });
     setLoading(false);
-  }, [name]);
+  }, [name, isCatalogPreset]);
 
   React.useEffect(() => {
     setUsage(null);
     setRuntime(null);
     setLogs([]);
     setApprovals([]);
-    void refresh();
-  }, [refresh]);
+    if (!isCatalogPreset) {
+      void refresh();
+    }
+  }, [refresh, isCatalogPreset]);
 
   const models = modelsFor(modelState, name);
   const reportedModel = currentModelFor(modelState, name) ?? usage?.current_model ?? undefined;
@@ -217,12 +226,12 @@ export function AgentDetailPanel({
     setBusy('connect');
     try {
       await workspaceApi.launchAgent(name);
-      toast.success(`${name} is starting`);
+      toast.success(`${displayName} is starting`);
       await refreshAgents();
     } catch (e) {
       // Never swallow this one: a missing runtime, a bad token and a stopped
       // daemon all need different fixes.
-      toast.error(`Could not connect ${name}: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(`Could not connect ${displayName}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
     }
@@ -312,8 +321,9 @@ export function AgentDetailPanel({
     await refreshAgents();
   };
 
-  const statusLine =
-    state === 'working'
+  const statusLine = isCatalogPreset
+    ? 'Available integration · Not connected'
+    : state === 'working'
       ? runningChannel && threadTitle(runningChannel)
         ? `Working in ${threadTitle(runningChannel)}`
         : 'Working'
@@ -325,7 +335,11 @@ export function AgentDetailPanel({
           ? `Offline, last seen ${timeAgo(lastSeen)}`
           : 'Offline, never connected';
 
-  const typeLabel = agent.agentType ? agent.agentType.replace(/^cloud:/, 'Cloud: ') : 'Agent';
+  const typeLabel = isCatalogPreset
+    ? 'Catalog preset'
+    : agent.agentType
+      ? agent.agentType.replace(/^cloud:/, 'Cloud: ')
+      : 'Agent';
 
   return (
     <div className="@container">
@@ -334,11 +348,11 @@ export function AgentDetailPanel({
         <AgentAvatar name={name} agentType={agent.agentType} size={32} status={agent.status} />
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            <h3 className="truncate text-sm font-semibold text-foreground">{name}</h3>
+            <h3 className="truncate text-sm font-semibold text-foreground">{displayName}</h3>
             <span className="truncate text-2xs capitalize text-foreground-extra-muted">{typeLabel}</span>
           </div>
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <StatusDot state={state} />
+            <StatusDot state={isCatalogPreset ? 'offline' : state} />
             <span className={cn('truncate', state === 'working' && 'event-running')}>{statusLine}</span>
           </p>
         </div>
@@ -386,79 +400,209 @@ export function AgentDetailPanel({
       </div>
 
       {/* ── Sections, label above value ── */}
-      <div className="mt-3 grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
-        <SubCard title="This session">
-          <div>
-            <FieldLabel>Model</FieldLabel>
-            {online && models.length > 0 ? (
-              <Select value={modelPick ?? DEFAULT_PICK} onValueChange={(v) => onModelPick(v === DEFAULT_PICK ? null : v)}>
-                <SelectTrigger size="sm" className="w-full text-xs" aria-label={`Model for ${name}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DEFAULT_PICK}>Agent default{reportedModel ? ` (${short(reportedModel)})` : ''}</SelectItem>
-                  {models.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.shortName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
+      {isCatalogPreset ? (
+        <div className="mt-3 grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
+          <SubCard title="This session">
+            <div>
+              <FieldLabel>Model</FieldLabel>
               <FieldValue className="text-muted-foreground">
-                <span className="truncate">{reportedModel ? short(reportedModel) : 'Agent default'}</span>
+                <span className="truncate">Agent default</span>
               </FieldValue>
-            )}
-            <Help>
-              {!online
-                ? 'Pick a model once the agent is online.'
-                : models.length > 0
-                  ? 'For the session you start here.'
-                  : 'This agent has not reported a model list.'}
-            </Help>
-          </div>
-          {online && efforts.length > 0 && (
-            <div>
-              <FieldLabel>Reasoning effort</FieldLabel>
-              <Select value={effortPick ?? DEFAULT_PICK} onValueChange={(v) => onEffortPick(v === DEFAULT_PICK ? null : v)}>
-                <SelectTrigger size="sm" className="w-full text-xs" aria-label={`Reasoning effort for ${name}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={DEFAULT_PICK}>Current{usage?.current_effort ? ` (${usage.current_effort})` : ''}</SelectItem>
-                  {efforts.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Help>Changes this agent&apos;s default, for sessions without their own level.</Help>
+              <Help>Connect this agent to configure its runtime model.</Help>
             </div>
-          )}
-          {mode === 'master' && online && (
+            {mode === 'master' && (
+              <div>
+                <FieldLabel>Lead agent</FieldLabel>
+                <label className="flex h-8 items-center gap-2.5 text-xs text-muted-foreground">
+                  <Switch size="sm" checked={false} disabled aria-label={`Make @${name} the lead`} />
+                  Not the lead
+                </label>
+                <Help>Connect and add this agent to the session to make it the lead.</Help>
+              </div>
+            )}
+          </SubCard>
+
+          <SubCard title="Integration info">
             <div>
-              <FieldLabel>Lead agent</FieldLabel>
-              <label className="flex h-8 items-center gap-2.5 text-xs text-foreground">
-                <Switch
-                  size="sm"
-                  checked={isLead}
-                  disabled={!selected || (isLead && !canUnsetLead)}
-                  onCheckedChange={onLeadChange}
-                  aria-label={`Make @${name} the lead`}
-                />
-                {isLead ? `@${name} leads` : 'Not the lead'}
-              </label>
+              <FieldLabel>Description</FieldLabel>
+              <p className="text-xs leading-relaxed text-foreground">
+                {catalogEntry?.description || agent.description || 'Pre-configured catalog agent.'}
+              </p>
+            </div>
+            {catalogEntry?.tags && catalogEntry.tags.length > 0 && (
+              <div>
+                <FieldLabel>Capabilities</FieldLabel>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {catalogEntry.tags.map((t) => (
+                    <span key={t} className="rounded bg-surface2 px-1.5 py-0.5 font-mono text-3xs text-muted-foreground">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {catalogEntry?.homepage && (
+              <div className="pt-1">
+                <a
+                  href={catalogEntry.homepage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  Official website <ExternalLink className="size-3" />
+                </a>
+              </div>
+            )}
+          </SubCard>
+
+          <SubCard title="Installation & Command">
+            {catalogEntry?.install_command ? (
+              <div>
+                <FieldLabel>Install CLI command</FieldLabel>
+                <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-border bg-surface2/60 px-2.5">
+                  <Terminal className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                  <code className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
+                    {catalogEntry.install_command}
+                  </code>
+                  <Hint label={isCopied ? 'Copied' : 'Copy command'}>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(catalogEntry.install_command)}
+                      aria-label="Copy install command"
+                      className="grid size-5 place-items-center rounded text-foreground-extra-muted hover:text-foreground"
+                    >
+                      {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                    </button>
+                  </Hint>
+                </div>
+                <Help>Run this command in your terminal to install the agent CLI, or click Connect to launch.</Help>
+              </div>
+            ) : null}
+            <div>
+              <FieldLabel>Alternative start command</FieldLabel>
+              <div className="flex h-8 min-w-0 items-center gap-2 rounded-md border border-border bg-surface2/60 px-2.5">
+                <Terminal className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                <code className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
+                  wwj up
+                </code>
+                <Hint label={isCopied ? 'Copied' : 'Copy command'}>
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard('wwj up')}
+                    aria-label="Copy command"
+                    className="grid size-5 place-items-center rounded text-foreground-extra-muted hover:text-foreground"
+                  >
+                    {isCopied ? <Check className="size-3" /> : <Copy className="size-3" />}
+                  </button>
+                </Hint>
+              </div>
+              <Help>The local connector brings configured agents online.</Help>
+            </div>
+          </SubCard>
+
+          <SubCard title="Connection">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0">
+                <FieldLabel>Server</FieldLabel>
+                <FieldValue>
+                  <span className="truncate font-mono">This machine</span>
+                </FieldValue>
+              </div>
+              <div className="min-w-0">
+                <FieldLabel>Agent ID</FieldLabel>
+                <FieldValue>
+                  <span className="truncate font-mono">52hz:{name}</span>
+                </FieldValue>
+              </div>
+            </div>
+          </SubCard>
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-1 gap-3 @2xl:grid-cols-2 @5xl:grid-cols-3">
+          <SubCard title="This session">
+            <div>
+              <FieldLabel>Model</FieldLabel>
+              {online && models.length > 0 ? (
+                <Select value={modelPick ?? DEFAULT_PICK} onValueChange={(v) => onModelPick(v === DEFAULT_PICK ? null : v)}>
+                  <SelectTrigger size="sm" className="w-full text-xs" aria-label={`Model for ${name}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DEFAULT_PICK}>Agent default{reportedModel ? ` (${short(reportedModel)})` : ''}</SelectItem>
+                    {models.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.shortName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <FieldValue className="text-muted-foreground">
+                  <span className="truncate">{reportedModel ? short(reportedModel) : 'Agent default'}</span>
+                </FieldValue>
+              )}
               <Help>
-                {!selected
-                  ? 'Add the agent to the session to make it the lead.'
-                  : isLead && !canUnsetLead
-                    ? 'Master mode needs a lead. Add another agent to hand it over.'
-                    : 'The lead receives every message and delegates.'}
+                {!online
+                  ? 'Pick a model once the agent is online.'
+                  : models.length > 0
+                    ? 'For the session you start here.'
+                    : 'This agent has not reported a model list.'}
               </Help>
             </div>
-          )}
-        </SubCard>
+            {online && efforts.length > 0 && (
+              <div>
+                <FieldLabel>Reasoning effort</FieldLabel>
+                <Select value={effortPick ?? DEFAULT_PICK} onValueChange={(v) => onEffortPick(v === DEFAULT_PICK ? null : v)}>
+                  <SelectTrigger size="sm" className="w-full text-xs" aria-label={`Reasoning effort for ${name}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={DEFAULT_PICK}>Current{usage?.current_effort ? ` (${usage.current_effort})` : ''}</SelectItem>
+                    {efforts.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Help>Changes this agent&apos;s default, for sessions without their own level.</Help>
+              </div>
+            )}
+            {mode === 'master' && (
+              <div>
+                <FieldLabel>Lead agent</FieldLabel>
+                {online ? (
+                  <>
+                    <label className="flex h-8 items-center gap-2.5 text-xs text-foreground">
+                      <Switch
+                        size="sm"
+                        checked={isLead}
+                        disabled={!selected || (isLead && !canUnsetLead)}
+                        onCheckedChange={onLeadChange}
+                        aria-label={`Make @${name} the lead`}
+                      />
+                      {isLead ? `@${name} leads` : 'Not the lead'}
+                    </label>
+                    <Help>
+                      {!selected
+                        ? 'Add the agent to the session to make it the lead.'
+                        : isLead && !canUnsetLead
+                          ? 'Master mode needs a lead. Add another agent to hand it over.'
+                          : 'The lead receives every message and delegates.'}
+                    </Help>
+                  </>
+                ) : (
+                  <>
+                    <label className="flex h-8 items-center gap-2.5 text-xs text-muted-foreground">
+                      <Switch size="sm" checked={false} disabled aria-label={`Make @${name} the lead`} />
+                      Not the lead
+                    </label>
+                    <Help>Agent must be online to lead a session.</Help>
+                  </>
+                )}
+              </div>
+            )}
+          </SubCard>
 
         <SubCard
           title="Status"
@@ -723,17 +867,24 @@ export function AgentDetailPanel({
           </SubCard>
         )}
       </div>
+      )}
 
       {/* ── Rare and destructive: out of the way ── */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" size="sm" onClick={() => setSelectedAgentName(name)}>
-          Full profile{isCloud ? ' and API key' : ''}
-        </Button>
-        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setConfirmRemove(true)}>
-          <Trash2 className="size-3.5" />
-          Remove from workspace
-        </Button>
-      </div>
+      {isCatalogPreset ? (
+        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Official catalog preset. Click Connect above to launch and pair it with this workspace.</span>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedAgentName(name)}>
+            Full profile{isCloud ? ' and API key' : ''}
+          </Button>
+          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setConfirmRemove(true)}>
+            <Trash2 className="size-3.5" />
+            Remove from workspace
+          </Button>
+        </div>
+      )}
 
       <ConfirmDialog
         open={confirmRemove}

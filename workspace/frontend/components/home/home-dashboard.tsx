@@ -29,7 +29,8 @@ import { useAgentTurns, summarizeAgentTurns } from '@/lib/use-agent-turns';
 import { sendFirstMessage } from '@/lib/first-message';
 import { isComposing } from '@/lib/ime';
 import type { GitStatus } from '@/lib/use-git-status';
-import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
+import type { AgentCatalogEntry, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
+import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { FieldLabel, FieldValue, HomePanel } from './home-panel';
 import { NeedsAttentionPanel, RecentSessionsPanel, UpcomingPanel } from './home-sections';
 import { AgentGrid } from './agent-grid';
@@ -75,6 +76,39 @@ export function HomeDashboard() {
   const { rows: turnRows } = useAgentTurns();
   const feed = useActivityFeed(sessions, 10_000);
 
+  // ── Dynamic catalog from backend / fallback ──
+  const { catalog } = useAgentCatalog();
+  const allCatalogAgents = React.useMemo(() => catalogAsOfflineAgents(catalog), [catalog]);
+
+  const configuredMap = React.useMemo(() => {
+    const map = new Map<string, WorkspaceAgent>();
+    for (const a of agents) {
+      map.set(a.agentName.toLowerCase(), a);
+    }
+    return map;
+  }, [agents]);
+
+  const unconfiguredCatalogAgents = React.useMemo(() => {
+    return allCatalogAgents.filter((c) => !configuredMap.has(c.agentName.toLowerCase()));
+  }, [allCatalogAgents, configuredMap]);
+
+  const allAvailableAgents = React.useMemo(() => {
+    return [...agents, ...unconfiguredCatalogAgents];
+  }, [agents, unconfiguredCatalogAgents]);
+
+  const catalogEntryMap = React.useMemo(() => {
+    const map = new Map<string, AgentCatalogEntry>();
+    for (const entry of catalog) {
+      map.set(entry.name.toLowerCase(), entry);
+    }
+    return map;
+  }, [catalog]);
+
+  const isCatalogPreset = React.useCallback(
+    (a: WorkspaceAgent) => !configuredMap.has(a.agentName.toLowerCase()),
+    [configuredMap],
+  );
+
   // ── Roster, with the status the rest of the app already agrees on ──
   const stateOf = React.useCallback(
     (a: WorkspaceAgent): AgentState => {
@@ -85,15 +119,22 @@ export function HomeDashboard() {
     },
     [turnRows, workingAgentNames],
   );
+
   const onlineAgents = React.useMemo(() => agents.filter((a) => a.status === 'online'), [agents]);
   const counts = React.useMemo(() => {
     let working = 0;
     for (const a of onlineAgents) if (stateOf(a) === 'working') working++;
-    return { online: onlineAgents.length, working, offline: agents.length - onlineAgents.length };
-  }, [agents.length, onlineAgents, stateOf]);
+    return {
+      total: allAvailableAgents.length,
+      online: onlineAgents.length,
+      working,
+      offline: allAvailableAgents.length - onlineAgents.length,
+      workspace: agents.length,
+    };
+  }, [allAvailableAgents.length, onlineAgents, stateOf, agents.length]);
 
   // ── Setup state ──
-  const [tab, setTab] = React.useState<'online' | 'all'>(() => (onlineAgents.length > 0 ? 'online' : 'all'));
+  const [tab, setTab] = React.useState<'all' | 'online' | 'workspace'>('all');
   const [selected, setSelected] = React.useState<string[]>([]);
   const [openName, setOpenName] = React.useState<string | null>(null);
   const [workingDir, setWorkingDir] = React.useState('');
@@ -107,7 +148,7 @@ export function HomeDashboard() {
   const [connectOpen, setConnectOpen] = React.useState(false);
   const taskRef = React.useRef<HTMLTextAreaElement>(null);
 
-  // One agent online: it is the only possible choice, so it starts selected.
+  // One agent online: it starts selected if none is selected yet.
   const soleOnline = onlineAgents.length === 1 ? onlineAgents[0].agentName : null;
   React.useEffect(() => {
     if (soleOnline) setSelected((prev) => (prev.length === 0 ? [soleOnline] : prev));
@@ -122,7 +163,12 @@ export function HomeDashboard() {
   const setAgentSelected = (name: string, on: boolean) =>
     setSelected((prev) => (on ? (prev.includes(name) ? prev : [...prev, name]) : prev.filter((n) => n !== name)));
 
-  const effectiveLead = mode === 'master' ? (lead && selected.includes(lead) ? lead : selected[0] ?? null) : null;
+  const activeOnlineSelected = React.useMemo(
+    () => selected.filter((n) => onlineAgents.some((a) => a.agentName === n)),
+    [selected, onlineAgents],
+  );
+
+  const effectiveLead = mode === 'master' ? (lead && activeOnlineSelected.includes(lead) ? lead : activeOnlineSelected[0] ?? null) : null;
 
   // ── Project: branch, from a thread already bound to the same folder ──
   const dir = workingDir.trim();
@@ -168,15 +214,13 @@ export function HomeDashboard() {
   }, [setTasksTab, setViewMode]);
 
   // ── Start ──
-  const canStart = selected.length > 0 && !starting;
+  const canStart = activeOnlineSelected.length > 0 && !starting;
   const startHint =
-    onlineAgents.length === 0
-      ? agents.length === 0
-        ? 'Add an agent below to start a session.'
-        : 'No agent is online. Open one below and connect it.'
-      : selected.length === 0
-        ? 'Tick at least one agent below to start.'
-        : `Starts with ${selected.map((n) => `@${n}`).join(', ')}. Enter to start, Shift+Enter for a new line.`;
+    counts.online === 0
+      ? 'No agent is online. Connect an agent below to start a session.'
+      : activeOnlineSelected.length === 0
+        ? 'Tick at least one online agent below to start.'
+        : `Starts with ${activeOnlineSelected.map((n) => `@${n}`).join(', ')}. Enter to start, Shift+Enter for a new line.`;
 
   const handleStart = async () => {
     if (!canStart) return;
@@ -189,7 +233,7 @@ export function HomeDashboard() {
     if (isMobile) openMobileDetail();
     try {
       const session = await createSession({
-        participants: selected,
+        participants: activeOnlineSelected,
         workingDir: dir || undefined,
         master: effectiveLead ?? undefined,
         orchestrationMode: mode,
@@ -197,12 +241,12 @@ export function HomeDashboard() {
       const id = session.sessionId;
       saveThreadProfile(id, profile);
       for (const [agentName, modelId] of Object.entries(modelPicks)) {
-        if (!selected.includes(agentName)) continue;
+        if (!activeOnlineSelected.includes(agentName)) continue;
         rememberForSession(id, agentName, modelId);
         setCurrentModel(agentName, modelId);
       }
       for (const [agentName, effort] of Object.entries(effortPicks)) {
-        if (!selected.includes(agentName)) continue;
+        if (!activeOnlineSelected.includes(agentName)) continue;
         workspaceApi
           .sendAgentControl(agentName, 'set_effort', { effort })
           .catch((e) =>
@@ -221,7 +265,7 @@ export function HomeDashboard() {
   };
 
   // ── Derived display ──
-  const shownAgents = tab === 'online' ? onlineAgents : agents;
+  const shownAgents = tab === 'online' ? onlineAgents : tab === 'workspace' ? agents : allAvailableAgents;
   const modeInfo = ORCHESTRATION_MODES.find((m) => m.value === mode)!;
   const profileInfo = getProfile(profile);
   const isolation =
@@ -238,54 +282,60 @@ export function HomeDashboard() {
             : 'Own worktree if the folder is a git repo';
 
   const headerCounts = [
-    `${counts.online} of ${agents.length} ${agents.length === 1 ? 'agent' : 'agents'} online`,
+    `${counts.online} of ${counts.total} ${counts.total === 1 ? 'agent' : 'agents'} online`,
     counts.working > 0 ? `${counts.working} working` : null,
   ]
     .filter(Boolean)
     .join(' · ');
 
-  const renderPanel = (a: WorkspaceAgent) => (
-    <AgentDetailPanel
-      agent={a}
-      state={stateOf(a)}
-      selected={selected.includes(a.agentName)}
-      onToggleSelected={(on) => setAgentSelected(a.agentName, on)}
-      mode={mode}
-      isLead={effectiveLead === a.agentName}
-      canUnsetLead={selected.length > 1}
-      onLeadChange={(on) => {
-        if (on) setLead(a.agentName);
-        else setLead(selected.find((n) => n !== a.agentName) ?? a.agentName);
-      }}
-      modelPick={modelPicks[a.agentName]}
-      onModelPick={(m) =>
-        setModelPicks((prev) => {
-          const next = { ...prev };
-          if (m) next[a.agentName] = m;
-          else delete next[a.agentName];
-          return next;
-        })
-      }
-      effortPick={effortPicks[a.agentName]}
-      onEffortPick={(e) =>
-        setEffortPicks((prev) => {
-          const next = { ...prev };
-          if (e) next[a.agentName] = e;
-          else delete next[a.agentName];
-          return next;
-        })
-      }
-      onOpenThread={openThread}
-      onClose={() => setOpenName(null)}
-    />
-  );
+  const renderPanel = (a: WorkspaceAgent) => {
+    const isPreset = isCatalogPreset(a);
+    const catEntry = catalogEntryMap.get(a.agentName.toLowerCase());
+    return (
+      <AgentDetailPanel
+        agent={a}
+        state={stateOf(a)}
+        isCatalogPreset={isPreset}
+        catalogEntry={catEntry}
+        selected={selected.includes(a.agentName)}
+        onToggleSelected={(on) => setAgentSelected(a.agentName, on)}
+        mode={mode}
+        isLead={effectiveLead === a.agentName}
+        canUnsetLead={activeOnlineSelected.length > 1}
+        onLeadChange={(on) => {
+          if (on) setLead(a.agentName);
+          else setLead(activeOnlineSelected.find((n) => n !== a.agentName) ?? a.agentName);
+        }}
+        modelPick={modelPicks[a.agentName]}
+        onModelPick={(m) =>
+          setModelPicks((prev) => {
+            const next = { ...prev };
+            if (m) next[a.agentName] = m;
+            else delete next[a.agentName];
+            return next;
+          })
+        }
+        effortPick={effortPicks[a.agentName]}
+        onEffortPick={(e) =>
+          setEffortPicks((prev) => {
+            const next = { ...prev };
+            if (e) next[a.agentName] = e;
+            else delete next[a.agentName];
+            return next;
+          })
+        }
+        onOpenThread={openThread}
+        onClose={() => setOpenName(null)}
+      />
+    );
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface0">
       <div className={cn('app-header ps-6', !isSidebarOpen && !isMobile && 'ps-14')}>
         <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
           <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Agents</h1>
-          {agents.length > 0 && <p className="truncate text-xs tabular-nums text-muted-foreground">{headerCounts}</p>}
+          {allAvailableAgents.length > 0 && <p className="truncate text-xs tabular-nums text-muted-foreground">{headerCounts}</p>}
         </div>
       </div>
 
@@ -326,25 +376,26 @@ export function HomeDashboard() {
               id="home-agents"
               title="Agents"
               subtitle={
-                agents.length === 0
-                  ? 'No agents connected yet.'
+                allAvailableAgents.length === 0
+                  ? 'No agents available.'
                   : `Open an agent to configure it; tick it to add it to the session. ${counts.online} online${counts.working ? `, ${counts.working} working` : ''}${counts.offline ? `, ${counts.offline} offline` : ''}.`
               }
               action={
-                agents.length > 0 ? (
+                allAvailableAgents.length > 0 ? (
                   <SegmentedControl
                     size="xs"
                     value={tab}
                     onValueChange={setTab}
                     options={[
+                      { value: 'all', label: `All ${counts.total}` },
                       { value: 'online', label: `Online ${counts.online}` },
-                      { value: 'all', label: `All ${agents.length}` },
+                      { value: 'workspace', label: `Configured ${counts.workspace}` },
                     ]}
                   />
                 ) : undefined
               }
             >
-              {tab === 'online' && shownAgents.length === 0 && agents.length > 0 && (
+              {tab === 'online' && shownAgents.length === 0 && allAvailableAgents.length > 0 && (
                 <p className="mb-3 text-xs text-muted-foreground">
                   No agent is online.{' '}
                   <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => setTab('all')}>
@@ -359,6 +410,8 @@ export function HomeDashboard() {
                 selected={selected}
                 openName={openName}
                 leadName={effectiveLead}
+                isCatalogPreset={isCatalogPreset}
+                catalogEntryMap={catalogEntryMap}
                 onOpen={setOpenName}
                 onToggleSelected={(n) => setAgentSelected(n, !selected.includes(n))}
                 onAddAgent={() => setConnectOpen(true)}
@@ -375,7 +428,7 @@ export function HomeDashboard() {
                 onChange={setWorkingDir}
                 helperText="Leave empty for a plain chat with no file access."
               />
-              {dir && (
+              {dir ? (
                 <div className="mt-3 space-y-1.5">
                   {git?.available ? (
                     <>
@@ -389,14 +442,28 @@ export function HomeDashboard() {
                           </span>
                         )}
                       </FieldValue>
-                      <p className="text-2xs text-muted-foreground">Each agent works in its own worktree in Parallel mode.</p>
+                      <p className="text-2xs text-muted-foreground">
+                        {mode === 'parallel'
+                          ? 'Each agent works in its own isolated worktree branch in Parallel mode.'
+                          : 'Agents will read and edit files in this git repository.'}
+                      </p>
                     </>
                   ) : git && !git.available ? (
-                    <p className="text-2xs text-muted-foreground">Not a git repository. In Parallel mode, agents share this folder.</p>
+                    <p className="text-2xs text-muted-foreground">
+                      Not a git repository. {mode === 'parallel' ? 'In Parallel mode, agents share this folder (worktree isolation requires git).' : 'Agents can read and edit files in this folder.'}
+                    </p>
                   ) : !sibling ? (
-                    <p className="text-2xs text-foreground-extra-muted">Branch details appear once a session has used this folder.</p>
+                    <p className="text-2xs text-foreground-extra-muted">
+                      {mode === 'parallel'
+                        ? 'In Parallel mode, git repositories automatically get isolated per-agent worktrees.'
+                        : 'Agents will be given access to this directory.'}
+                    </p>
                   ) : null}
                 </div>
+              ) : (
+                <p className="mt-2 text-2xs text-muted-foreground">
+                  Plain chat mode. Agents converse without access to local files.
+                </p>
               )}
             </HomePanel>
 
@@ -415,7 +482,15 @@ export function HomeDashboard() {
               <p className="mt-2 text-2xs text-muted-foreground">
                 {modeInfo.description}
                 {mode === 'master' &&
-                  (effectiveLead ? ` Lead: @${effectiveLead}. Change it in the agent's panel.` : ' Tick an agent to lead.')}
+                  (effectiveLead
+                    ? ` Lead: @${effectiveLead}. Switch lead in any agent's panel.`
+                    : ' Tick an online agent below to act as lead.')}
+                {mode === 'parallel' &&
+                  (dir && git?.available
+                    ? ' Agents work concurrently in isolated git worktrees.'
+                    : dir
+                      ? ' Agents work concurrently in this shared folder.'
+                      : ' Agents work concurrently in plain chat.')}
               </p>
             </HomePanel>
 

@@ -6,7 +6,7 @@ import { Check, Plus } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { cn } from '@/lib/utils';
-import type { WorkspaceAgent } from '@/lib/types';
+import type { AgentCatalogEntry, WorkspaceAgent } from '@/lib/types';
 import { StatusDot } from './home-panel';
 import type { AgentState } from './agent-detail-panel';
 
@@ -36,6 +36,8 @@ export function AgentGrid({
   selected,
   openName,
   leadName,
+  isCatalogPreset,
+  catalogEntryMap,
   onOpen,
   onToggleSelected,
   onAddAgent,
@@ -46,6 +48,8 @@ export function AgentGrid({
   selected: string[];
   openName: string | null;
   leadName: string | null;
+  isCatalogPreset?: (a: WorkspaceAgent) => boolean;
+  catalogEntryMap?: Map<string, AgentCatalogEntry>;
   onOpen: (name: string | null) => void;
   onToggleSelected: (name: string) => void;
   onAddAgent: () => void;
@@ -117,6 +121,8 @@ export function AgentGrid({
                 selected={selected.includes(cell.agent.agentName)}
                 open={openName === cell.agent.agentName}
                 isLead={leadName === cell.agent.agentName}
+                isCatalogPreset={isCatalogPreset ? isCatalogPreset(cell.agent) : false}
+                catalogEntry={catalogEntryMap?.get(cell.agent.agentName.toLowerCase())}
                 onOpen={() => onOpen(openName === cell.agent.agentName ? null : cell.agent.agentName)}
                 onToggleSelected={() => onToggleSelected(cell.agent.agentName)}
               />
@@ -160,6 +166,8 @@ function AgentTile({
   selected,
   open,
   isLead,
+  isCatalogPreset = false,
+  catalogEntry,
   onOpen,
   onToggleSelected,
 }: {
@@ -168,11 +176,22 @@ function AgentTile({
   selected: boolean;
   open: boolean;
   isLead: boolean;
+  isCatalogPreset?: boolean;
+  catalogEntry?: AgentCatalogEntry;
   onOpen: () => void;
   onToggleSelected: () => void;
 }) {
   const offline = state === 'offline';
-  const stateWord = isLead ? 'Lead' : state === 'working' ? 'Working' : state === 'online' ? 'Online' : 'Offline';
+  const displayName = catalogEntry?.label || agent.agentName;
+  const stateWord = isLead
+    ? 'Lead'
+    : state === 'working'
+      ? 'Working'
+      : state === 'online'
+        ? 'Online'
+        : isCatalogPreset
+          ? 'Preset'
+          : 'Offline';
   return (
     <div className="relative min-w-0">
       <button
@@ -190,12 +209,14 @@ function AgentTile({
               : 'border-border bg-background hover:border-border-accent hover:bg-surface2/60',
         )}
       >
-        <span className={cn('flex flex-col items-center gap-1.5', offline && 'opacity-55')}>
+        <span className={cn('flex flex-col items-center gap-1.5', (offline || isCatalogPreset) && 'opacity-65')}>
           <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={28} status={agent.status} />
-          <span className="w-full max-w-[9rem] truncate text-xs font-medium text-foreground">{agent.agentName}</span>
+          <span className="w-full max-w-[9rem] truncate text-xs font-medium text-foreground" title={displayName}>
+            {displayName}
+          </span>
         </span>
         <span className="inline-flex items-center gap-1 text-3xs text-muted-foreground">
-          <StatusDot state={state} />
+          <StatusDot state={isCatalogPreset ? 'offline' : state} />
           {stateWord}
         </span>
       </button>
@@ -205,21 +226,29 @@ function AgentTile({
         aria-disabled rather than disabled, so the Hint explaining why can open.
       */}
       <Hint
-        label={offline ? `@${agent.agentName} is offline. Connect it to add it.` : selected ? 'Remove from session' : 'Add to session'}
+        label={
+          isCatalogPreset
+            ? `@${displayName} is an available integration. Connect it to add it.`
+            : offline
+              ? `@${agent.agentName} is offline. Connect it to add it.`
+              : selected
+                ? 'Remove from session'
+                : 'Add to session'
+        }
       >
         <button
           type="button"
           role="checkbox"
           aria-checked={selected}
-          aria-disabled={offline || undefined}
+          aria-disabled={offline || isCatalogPreset || undefined}
           aria-label={`Add @${agent.agentName} to the session`}
-          onClick={offline ? undefined : onToggleSelected}
+          onClick={offline || isCatalogPreset ? undefined : onToggleSelected}
           className={cn(
             'absolute left-1.5 top-1.5 grid size-4 place-items-center rounded border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
             selected
               ? 'border-foreground bg-foreground text-background'
               : 'border-border-accent bg-background hover:border-foreground/60',
-            offline && 'cursor-not-allowed opacity-40 hover:border-border-accent',
+            (offline || isCatalogPreset) && 'cursor-not-allowed opacity-40 hover:border-border-accent',
           )}
         >
           {selected && <Check className="size-2.5" strokeWidth={3} />}

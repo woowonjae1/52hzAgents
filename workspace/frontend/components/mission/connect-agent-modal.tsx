@@ -26,7 +26,7 @@ interface ConnectAgentModalProps {
 }
 
 export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps) {
-  const { workspaceId, agents } = useWorkspace();
+  const { workspaceId, agents, refreshAgents } = useWorkspace();
   // Only fetched while the dialog is open — this is a modal, not a mounted view.
   const { catalog: roster } = useAgentCatalog(open);
   const catalog = withAcpRuntime(roster);
@@ -59,6 +59,7 @@ export function ConnectAgentModal({ open, onOpenChange }: ConnectAgentModalProps
     try {
       await workspaceApi.launchAgent(agentName, undefined, setup);
       toast.success(`Launching ${agentName}. Agent terminal window opened.`);
+      await refreshAgents();
     } catch (e) {
       toast.error(`Could not launch ${agentName}: ${e instanceof Error ? e.message : 'unknown error'}`);
     } finally {
