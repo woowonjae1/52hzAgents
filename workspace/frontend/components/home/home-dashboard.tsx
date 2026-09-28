@@ -1,22 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import {
-  ArrowRight,
-  Check,
-  Folder,
-  GitBranch,
-  Play,
-  Plug,
-  Users,
-} from 'lucide-react';
+import { ArrowUp, Cpu, Folder, GitBranch, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Hint } from '@/components/ui/hint';
-import { Switch } from '@/components/ui/switch';
 import { SegmentedControl } from '@/components/ui/segmented-control';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { ContextRing } from '@/components/chat/context-ring';
 import {
   ProjectFolderPicker,
   basename,
@@ -24,19 +11,13 @@ import {
 } from '@/components/chat/project-folder-picker';
 import { ORCHESTRATION_MODES, type OrchestrationMode } from '@/components/chat/orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
+import { ActivityTimeline } from '@/components/mission/activity-timeline';
+import { useActivityFeed } from '@/components/mission/use-activity-feed';
 import { useWorkspace } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import {
-  currentModelFor,
-  hydrateAgentModels,
-  modelsFor,
-  parseReportedModels,
-  rememberForSession,
-  setCurrentModel,
-  useAgentModels,
-} from '@/lib/agent-model-store';
+import { rememberForSession, setCurrentModel } from '@/lib/agent-model-store';
 import {
   AGENT_PROFILES,
   DEFAULT_PROFILE_ID,
@@ -44,40 +25,38 @@ import {
   saveThreadProfile,
   type AgentProfileId,
 } from '@/lib/agent-profiles';
-import { useAgentContexts, contextPercent, fmtTokens } from '@/lib/use-agent-contexts';
 import { useAgentTurns, summarizeAgentTurns } from '@/lib/use-agent-turns';
+import { sendFirstMessage } from '@/lib/first-message';
+import { isComposing } from '@/lib/ime';
 import type { GitStatus } from '@/lib/use-git-status';
-import type { AgentUsage, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
-import { getSmartSessionTitle } from '@/components/threads/thread-list';
-import { FieldLabel, FieldValue, HomePanel, StatusDot } from './home-panel';
+import type { WorkspaceAgent, WorkspaceSession } from '@/lib/types';
+import { FieldLabel, FieldValue, HomePanel } from './home-panel';
 import { NeedsAttentionPanel, RecentSessionsPanel, UpcomingPanel } from './home-sections';
+import { AgentGrid } from './agent-grid';
+import { AgentDetailPanel, type AgentState } from './agent-detail-panel';
 
 /*
   HOME: CONFIGURE, THEN ENTER THE CHAT.
 
-  The landing view when no session is open. Its structure is taken from a
-  deploy tool's "new project" page -- a grid of small tiles, the selected tile
-  opening its configuration below, a rail of choices on the right ending in
-  ONE primary action and a summary of what that action will do. The colours
-  are not: tokens only, the status accents only for status.
+  The landing view when no session is open, and the one place per-agent work
+  happens (the agent panel under each tile -- see agent-detail-panel).
 
-  Every control here writes through a mechanism the thread already has, so a
-  session started from Home is indistinguishable from one configured in the
-  composer afterwards:
-  - agents + folder -> createSession() (a local draft; nothing reaches the
-    server until the first message -- see workspace-context)
-  - lead agent      -> createSession({ master }) -> createChannel on first send
-  - mode            -> setSessionOrchestration(draftId) -> PATCH on first send
+  LAYOUT FOLLOWS THE PANE, NOT THE WINDOW. The sizes are container queries on
+  the scroll area (`@container`), because the pane is the window minus a
+  resizable sidebar: at a 1650px window the pane is ~1330px, at 1280 it is
+  ~960. Main column + rail from 960px; the rail widens and the lower cards go
+  three-up from 1200px. Cards in a row stretch to one height, and the rail
+  ends in the activity feed, which takes whatever height is left -- so no
+  column stops halfway down the page.
+
+  Every control writes through a mechanism the thread already has:
+  - agents + folder + lead + mode -> createSession() (a local draft; nothing
+    reaches the server until the first message -- see workspace-context)
   - Fix / Review    -> saveThreadProfile(draftId), moved to the real id on send
-  - model           -> rememberForSession(draftId) (the composer chip's keys),
-                       migrated on send and carried as `agent_models` metadata
-  - effort          -> `set_effort` control, agent-wide (a draft has no
-                       channel yet to scope it to; the card says so)
+  - model           -> rememberForSession(draftId) (the composer chip's keys)
+  - effort          -> `set_effort` control, agent-wide (a draft has no channel)
+  - the task text   -> ChatView's own send path (lib/first-message)
 */
-
-const DEFAULT_MODEL = '__agent_default__';
-
-type AgentState = 'online' | 'working' | 'offline';
 
 function samePath(a: string | null | undefined, b: string): boolean {
   if (!a) return false;
@@ -90,19 +69,10 @@ function sessionTime(s: WorkspaceSession): number {
 }
 
 export function HomeDashboard() {
-  const {
-    agents,
-    sessions,
-    lastMessageBySession,
-    workingAgentNames,
-    createSession,
-    setSessionOrchestration,
-    setCurrentSessionId,
-  } = useWorkspace();
-  const { setViewMode, setTasksTab, isSidebarOpen, isMobile, openMobileDetail, setSelectedAgentName } = useLayout();
+  const { agents, sessions, workingAgentNames, createSession, setCurrentSessionId } = useWorkspace();
+  const { setViewMode, setTasksTab, isSidebarOpen, isMobile, openMobileDetail } = useLayout();
   const { rows: turnRows } = useAgentTurns();
-  const { rows: contextRows } = useAgentContexts();
-  const modelState = useAgentModels();
+  const feed = useActivityFeed(sessions, 10_000);
 
   // ── Roster, with the status the rest of the app already agrees on ──
   const stateOf = React.useCallback(
@@ -124,21 +94,21 @@ export function HomeDashboard() {
   // ── Setup state ──
   const [tab, setTab] = React.useState<'online' | 'all'>(() => (onlineAgents.length > 0 ? 'online' : 'all'));
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [focused, setFocused] = React.useState<string | null>(null);
+  const [openName, setOpenName] = React.useState<string | null>(null);
   const [workingDir, setWorkingDir] = React.useState('');
   const [mode, setMode] = React.useState<OrchestrationMode>('dynamic');
   const [lead, setLead] = React.useState<string | null>(null);
   const [profile, setProfile] = React.useState<AgentProfileId>(DEFAULT_PROFILE_ID);
   const [modelPicks, setModelPicks] = React.useState<Record<string, string>>({});
   const [effortPicks, setEffortPicks] = React.useState<Record<string, string>>({});
+  const [task, setTask] = React.useState('');
   const [starting, setStarting] = React.useState(false);
+  const taskRef = React.useRef<HTMLTextAreaElement>(null);
 
   // One agent online: it is the only possible choice, so it starts selected.
   const soleOnline = onlineAgents.length === 1 ? onlineAgents[0].agentName : null;
   React.useEffect(() => {
-    if (!soleOnline) return;
-    setSelected((prev) => (prev.length === 0 ? [soleOnline] : prev));
-    setFocused((prev) => prev ?? soleOnline);
+    if (soleOnline) setSelected((prev) => (prev.length === 0 ? [soleOnline] : prev));
   }, [soleOnline]);
 
   // An agent that goes offline while selected leaves the selection.
@@ -146,40 +116,11 @@ export function HomeDashboard() {
     const online = new Set(onlineAgents.map((a) => a.agentName));
     setSelected((prev) => (prev.every((n) => online.has(n)) ? prev : prev.filter((n) => online.has(n))));
   }, [onlineAgents]);
-  React.useEffect(() => {
-    if (focused && !selected.includes(focused)) setFocused(selected[selected.length - 1] ?? null);
-  }, [selected, focused]);
 
-  const toggleAgent = (name: string) => {
-    if (selected.includes(name)) {
-      setSelected((prev) => prev.filter((n) => n !== name));
-    } else {
-      setSelected((prev) => [...prev, name]);
-      setFocused(name);
-    }
-  };
+  const setAgentSelected = (name: string, on: boolean) =>
+    setSelected((prev) => (on ? (prev.includes(name) ? prev : [...prev, name]) : prev.filter((n) => n !== name)));
 
   const effectiveLead = mode === 'master' ? (lead && selected.includes(lead) ? lead : selected[0] ?? null) : null;
-
-  // ── What each agent reports: models, effort ──
-  const [usage, setUsage] = React.useState<Record<string, AgentUsage | null>>({});
-  React.useEffect(() => {
-    if (!focused) return;
-    let cancelled = false;
-    void workspaceApi.getAgentUsage(focused).then((u) => {
-      if (cancelled) return;
-      setUsage((prev) => ({ ...prev, [focused]: u }));
-      if (u) {
-        hydrateAgentModels(focused, {
-          options: parseReportedModels(u.available_models),
-          current: u.current_model,
-        });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [focused]);
 
   // ── Project: branch, from a thread already bound to the same folder ──
   const dir = workingDir.trim();
@@ -226,16 +167,19 @@ export function HomeDashboard() {
 
   // ── Start ──
   const canStart = selected.length > 0 && !starting;
-  const startBlockedReason =
+  const startHint =
     onlineAgents.length === 0
-      ? 'No agent is online. Connect one in Agents to start a session.'
+      ? agents.length === 0
+        ? 'Add an agent below to start a session.'
+        : 'No agent is online. Open one below and connect it.'
       : selected.length === 0
-        ? 'Select at least one agent to start.'
-        : null;
+        ? 'Tick at least one agent below to start.'
+        : `Starts with ${selected.map((n) => `@${n}`).join(', ')}. Enter to start, Shift+Enter for a new line.`;
 
   const handleStart = async () => {
     if (!canStart) return;
     setStarting(true);
+    const text = task.trim();
     // The view switches in the same flush that opens the draft, so the chat is
     // visible when ChatView's "new session -> focus the composer" effect runs.
     // Home unmounts on that render; everything below is writes, not state.
@@ -246,9 +190,9 @@ export function HomeDashboard() {
         participants: selected,
         workingDir: dir || undefined,
         master: effectiveLead ?? undefined,
+        orchestrationMode: mode,
       });
       const id = session.sessionId;
-      if (mode !== 'dynamic') await setSessionOrchestration(id, { mode });
       saveThreadProfile(id, profile);
       for (const [agentName, modelId] of Object.entries(modelPicks)) {
         if (!selected.includes(agentName)) continue;
@@ -260,12 +204,13 @@ export function HomeDashboard() {
         workspaceApi
           .sendAgentControl(agentName, 'set_effort', { effort })
           .catch((e) =>
-            toast.error(
-              `@${agentName} could not switch effort${e instanceof Error && e.message ? `: ${e.message}` : ''}`,
-            ),
+            toast.error(`@${agentName} could not switch effort${e instanceof Error && e.message ? `: ${e.message}` : ''}`),
           );
       }
       rememberWorkingDir(dir);
+      // Last, after the profile and models are stored under the draft id, so
+      // the first message carries them.
+      if (text) sendFirstMessage(id, text);
     } catch (e) {
       setViewMode('home');
       toast.error(e instanceof Error ? e.message : 'Could not start the session');
@@ -275,7 +220,6 @@ export function HomeDashboard() {
 
   // ── Derived display ──
   const shownAgents = tab === 'online' ? onlineAgents : agents;
-  const focusedAgent = focused ? agents.find((a) => a.agentName === focused) ?? null : null;
   const modeInfo = ORCHESTRATION_MODES.find((m) => m.value === mode)!;
   const profileInfo = getProfile(profile);
   const isolation =
@@ -298,6 +242,42 @@ export function HomeDashboard() {
     .filter(Boolean)
     .join(' · ');
 
+  const renderPanel = (a: WorkspaceAgent) => (
+    <AgentDetailPanel
+      agent={a}
+      state={stateOf(a)}
+      selected={selected.includes(a.agentName)}
+      onToggleSelected={(on) => setAgentSelected(a.agentName, on)}
+      mode={mode}
+      isLead={effectiveLead === a.agentName}
+      canUnsetLead={selected.length > 1}
+      onLeadChange={(on) => {
+        if (on) setLead(a.agentName);
+        else setLead(selected.find((n) => n !== a.agentName) ?? a.agentName);
+      }}
+      modelPick={modelPicks[a.agentName]}
+      onModelPick={(m) =>
+        setModelPicks((prev) => {
+          const next = { ...prev };
+          if (m) next[a.agentName] = m;
+          else delete next[a.agentName];
+          return next;
+        })
+      }
+      effortPick={effortPicks[a.agentName]}
+      onEffortPick={(e) =>
+        setEffortPicks((prev) => {
+          const next = { ...prev };
+          if (e) next[a.agentName] = e;
+          else delete next[a.agentName];
+          return next;
+        })
+      }
+      onOpenThread={openThread}
+      onClose={() => setOpenName(null)}
+    />
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface0">
       <div className={cn('app-header ps-6', !isSidebarOpen && !isMobile && 'ps-14')}>
@@ -307,37 +287,49 @@ export function HomeDashboard() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-start gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-          {/* ── Setup: agents, then the selected agent's configuration ── */}
+      <div className="@container min-h-0 flex-1 overflow-y-auto">
+        <div className="grid w-full grid-cols-1 gap-4 p-4 sm:p-5 @5xl:grid-cols-[minmax(0,1fr)_320px] @7xl:grid-cols-[minmax(0,1fr)_360px]">
+          {/* ── Main: what to do, and who does it ── */}
           <div className="flex min-w-0 flex-col gap-4">
+            <section
+              aria-label="New session"
+              className="rounded-xl border border-border bg-card p-3 focus-within:border-border-accent"
+            >
+              <textarea
+                ref={taskRef}
+                autoFocus={!isMobile}
+                value={task}
+                onChange={(e) => setTask(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !isComposing(e)) {
+                    e.preventDefault();
+                    void handleStart();
+                  }
+                }}
+                rows={2}
+                aria-label="What should the agents do?"
+                placeholder="What should the agents do?"
+                className="block max-h-48 min-h-[3rem] w-full resize-none bg-transparent px-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <p className="min-w-0 flex-1 truncate px-1 text-2xs text-muted-foreground">{startHint}</p>
+                <Button variant="primary" size="sm" disabled={!canStart} onClick={handleStart}>
+                  {starting ? 'Starting…' : task.trim() ? 'Start and send' : 'Start session'}
+                  <ArrowUp className="size-3.5" />
+                </Button>
+              </div>
+            </section>
+
             <HomePanel
               id="home-agents"
               title="Agents"
               subtitle={
                 agents.length === 0
                   ? 'No agents connected yet.'
-                  : `Pick who joins the session. ${counts.online} online${counts.working ? `, ${counts.working} working` : ''}${counts.offline ? `, ${counts.offline} offline` : ''}.`
+                  : `Open an agent to configure it; tick it to add it to the session. ${counts.online} online${counts.working ? `, ${counts.working} working` : ''}${counts.offline ? `, ${counts.offline} offline` : ''}.`
               }
               action={
-                <Button variant="ghost" size="sm" onClick={() => setViewMode('mission')}>
-                  Manage
-                  <ArrowRight className="size-3" />
-                </Button>
-              }
-            >
-              {agents.length === 0 ? (
-                <div className="flex flex-col items-start gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    A session needs at least one agent. Connect a CLI agent (Claude Code, Codex, Gemini, …) from the Agents page.
-                  </p>
-                  <Button variant="outline" size="sm" onClick={() => setViewMode('mission')}>
-                    <Plug className="size-3.5" />
-                    Connect an agent
-                  </Button>
-                </div>
-              ) : (
-                <>
+                agents.length > 0 ? (
                   <SegmentedControl
                     size="xs"
                     value={tab}
@@ -347,87 +339,34 @@ export function HomeDashboard() {
                       { value: 'all', label: `All ${agents.length}` },
                     ]}
                   />
-                  {shownAgents.length === 0 ? (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      No agent is online.{' '}
-                      <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => setTab('all')}>
-                        Show all agents
-                      </button>
-                    </p>
-                  ) : (
-                    <div
-                      role="group"
-                      aria-label="Agents to include"
-                      className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2"
-                    >
-                      {shownAgents.map((a) => (
-                        <AgentTile
-                          key={a.agentName}
-                          agent={a}
-                          state={stateOf(a)}
-                          selected={selected.includes(a.agentName)}
-                          focused={focused === a.agentName}
-                          isLead={effectiveLead === a.agentName}
-                          onToggle={() => toggleAgent(a.agentName)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {tab === 'all' && counts.offline > 0 && (
-                    <p className="mt-2.5 text-2xs text-foreground-extra-muted">
-                      Offline agents can join once they are connected.
-                    </p>
-                  )}
-                </>
+                ) : undefined
+              }
+            >
+              {tab === 'online' && shownAgents.length === 0 && agents.length > 0 && (
+                <p className="mb-3 text-xs text-muted-foreground">
+                  No agent is online.{' '}
+                  <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={() => setTab('all')}>
+                    Show all agents
+                  </button>{' '}
+                  to connect one.
+                </p>
               )}
-            </HomePanel>
-
-            {focusedAgent && (
-              <AgentConfigCard
-                agent={focusedAgent}
-                usage={usage[focusedAgent.agentName]}
-                models={modelsFor(modelState, focusedAgent.agentName)}
-                reportedModel={currentModelFor(modelState, focusedAgent.agentName) ?? usage[focusedAgent.agentName]?.current_model ?? undefined}
-                modelPick={modelPicks[focusedAgent.agentName]}
-                onModelPick={(m) =>
-                  setModelPicks((prev) => {
-                    const next = { ...prev };
-                    if (m) next[focusedAgent.agentName] = m;
-                    else delete next[focusedAgent.agentName];
-                    return next;
-                  })
-                }
-                effortPick={effortPicks[focusedAgent.agentName]}
-                onEffortPick={(e) =>
-                  setEffortPicks((prev) => {
-                    const next = { ...prev };
-                    if (e) next[focusedAgent.agentName] = e;
-                    else delete next[focusedAgent.agentName];
-                    return next;
-                  })
-                }
-                contextRows={contextRows}
-                threadTitle={(id) => {
-                  const s = sessions.find((x) => x.sessionId === id);
-                  return s ? getSmartSessionTitle(s, lastMessageBySession[id]) : null;
-                }}
-                mode={mode}
-                isLead={effectiveLead === focusedAgent.agentName}
-                canUnsetLead={selected.length > 1}
-                onLeadChange={(on) => {
-                  if (on) setLead(focusedAgent.agentName);
-                  else setLead(selected.find((n) => n !== focusedAgent.agentName) ?? focusedAgent.agentName);
-                }}
-                onOpenProfile={() => setSelectedAgentName(focusedAgent.agentName)}
+              <AgentGrid
+                agents={shownAgents}
+                stateOf={stateOf}
+                selected={selected}
+                openName={openName}
+                leadName={effectiveLead}
+                onOpen={setOpenName}
+                onToggleSelected={(n) => setAgentSelected(n, !selected.includes(n))}
+                onAddAgent={() => setViewMode('mission')}
+                renderPanel={renderPanel}
               />
-            )}
+            </HomePanel>
           </div>
 
-          {/* ── Rail: where, how, go, and what "go" will do ── */}
-          <aside
-            aria-label="Session settings"
-            className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:col-start-2 lg:row-span-2 lg:row-start-1"
-          >
+          {/* ── Rail: where, how, and what Start will do ── */}
+          <aside aria-label="Session settings" className="flex min-w-0 flex-col gap-4">
             <HomePanel id="home-project" title="Project" subtitle="The folder agents read and write. Optional.">
               <ProjectFolderPicker
                 value={workingDir}
@@ -451,13 +390,9 @@ export function HomeDashboard() {
                       <p className="text-2xs text-muted-foreground">Each agent works in its own worktree in Parallel mode.</p>
                     </>
                   ) : git && !git.available ? (
-                    <p className="text-2xs text-muted-foreground">
-                      Not a git repository. In Parallel mode, agents share this folder.
-                    </p>
+                    <p className="text-2xs text-muted-foreground">Not a git repository. In Parallel mode, agents share this folder.</p>
                   ) : !sibling ? (
-                    <p className="text-2xs text-foreground-extra-muted">
-                      Branch details appear once a session has used this folder.
-                    </p>
+                    <p className="text-2xs text-foreground-extra-muted">Branch details appear once a session has used this folder.</p>
                   ) : null}
                 </div>
               )}
@@ -478,9 +413,7 @@ export function HomeDashboard() {
               <p className="mt-2 text-2xs text-muted-foreground">
                 {modeInfo.description}
                 {mode === 'master' &&
-                  (effectiveLead
-                    ? ` Lead: @${effectiveLead}. Change it in the agent's configuration.`
-                    : ' Select an agent to lead.')}
+                  (effectiveLead ? ` Lead: @${effectiveLead}. Change it in the agent's panel.` : ' Tick an agent to lead.')}
               </p>
             </HomePanel>
 
@@ -495,33 +428,13 @@ export function HomeDashboard() {
               <p className="mt-2 text-2xs text-muted-foreground">{profileInfo.whenToUse}</p>
             </HomePanel>
 
-            <div>
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                disabled={!canStart}
-                onClick={handleStart}
-              >
-                <Play className="size-3.5" />
-                {starting ? 'Starting…' : 'Start session'}
-              </Button>
-              {startBlockedReason && (
-                <p className="mt-1.5 text-center text-2xs text-muted-foreground">{startBlockedReason}</p>
-              )}
-            </div>
-
-            <HomePanel id="home-summary" title="Summary" subtitle="What Start session will open.">
+            <HomePanel id="home-summary" title="Summary" subtitle="What Start will open.">
               <dl className="space-y-2 text-xs">
                 <SummaryRow icon={<Folder className="size-3.5" />} label="Folder">
                   {dir ? <span title={dir}>{basename(dir)}</span> : <span className="text-foreground-extra-muted">None, plain chat</span>}
                 </SummaryRow>
                 <SummaryRow icon={<Users className="size-3.5" />} label="Agents">
-                  {selected.length > 0 ? (
-                    selected.map((n) => `@${n}`).join(', ')
-                  ) : (
-                    <span className="text-foreground-extra-muted">None selected</span>
-                  )}
+                  {selected.length > 0 ? selected.map((n) => `@${n}`).join(', ') : <span className="text-foreground-extra-muted">None ticked</span>}
                 </SummaryRow>
                 <SummaryRow icon={<modeInfo.icon className="size-3.5" />} label="Mode">
                   {modeInfo.label}
@@ -535,7 +448,7 @@ export function HomeDashboard() {
                   {isolation}
                 </SummaryRow>
                 {Object.keys(modelPicks).some((n) => selected.includes(n)) && (
-                  <SummaryRow icon={<Check className="size-3.5" />} label="Models">
+                  <SummaryRow icon={<Cpu className="size-3.5" />} label="Models">
                     {Object.entries(modelPicks)
                       .filter(([n]) => selected.includes(n))
                       .map(([n, m]) => `@${n}: ${m.includes('/') ? m.slice(m.indexOf('/') + 1) : m}`)
@@ -544,15 +457,38 @@ export function HomeDashboard() {
                 )}
               </dl>
             </HomePanel>
+
+            {/* Takes whatever height the main column leaves, and scrolls. */}
+            <section
+              aria-labelledby="home-activity-title"
+              className="flex min-h-[18rem] flex-1 basis-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
+            >
+              <div className="px-4 pt-4">
+                <h2 id="home-activity-title" className="text-sm font-semibold tracking-tight text-foreground">
+                  Activity
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">What agents said and did, across threads.</p>
+              </div>
+              <ActivityTimeline
+                hideHeader
+                events={feed.events}
+                agents={agents.map((a) => a.agentName)}
+                onOpenThread={openThread}
+                loading={feed.loading}
+                className="min-h-0 flex-1 border-l-0 bg-transparent"
+              />
+            </section>
           </aside>
 
           {/* ── What is going on, from data the app already tracks ── */}
-          <div className="flex min-w-0 flex-col gap-4 lg:col-start-1">
-            <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} />
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-              <RecentSessionsPanel onOpenThread={openThread} />
-              <UpcomingPanel onOpenAutomations={openAutomations} onOpenThread={openThread} />
-            </div>
+          <div className="grid min-w-0 grid-cols-1 gap-4 @3xl:grid-cols-2 @5xl:col-span-2 @7xl:grid-cols-3">
+            <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} onOpenInbox={() => setViewMode('inbox')} />
+            <RecentSessionsPanel onOpenThread={openThread} onNewSession={() => taskRef.current?.focus()} />
+            <UpcomingPanel
+              className="@3xl:col-span-2 @7xl:col-span-1"
+              onOpenAutomations={openAutomations}
+              onOpenThread={openThread}
+            />
           </div>
         </div>
       </div>
@@ -567,232 +503,5 @@ function SummaryRow({ icon, label, children }: { icon: React.ReactNode; label: s
       <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
       <dd className="min-w-0 flex-1 break-words text-foreground">{children}</dd>
     </div>
-  );
-}
-
-// ── Tile ─────────────────────────────────────────────────────────────────────
-
-function AgentTile({
-  agent,
-  state,
-  selected,
-  focused,
-  isLead,
-  onToggle,
-}: {
-  agent: WorkspaceAgent;
-  state: AgentState;
-  selected: boolean;
-  focused: boolean;
-  isLead: boolean;
-  onToggle: () => void;
-}) {
-  const offline = state === 'offline';
-  const stateWord = state === 'working' ? 'Working' : state === 'online' ? 'Online' : 'Offline';
-  const tile = (
-    <button
-      type="button"
-      aria-pressed={selected}
-      // aria-disabled, not disabled: a disabled button fires no pointer
-      // events, so the Hint that explains WHY it is disabled could never open.
-      aria-disabled={offline || undefined}
-      onClick={offline ? undefined : onToggle}
-      className={cn(
-        'relative flex min-w-0 flex-col items-center gap-1.5 rounded-lg border px-2 pb-2 pt-3 text-center outline-none transition-colors',
-        'focus-visible:ring-2 focus-visible:ring-ring',
-        selected
-          ? 'border-foreground/70 bg-surface2 ring-1 ring-foreground/70'
-          : 'border-border bg-background hover:border-border-accent hover:bg-surface2/60',
-        focused && selected && 'bg-surface2',
-        offline && 'cursor-not-allowed opacity-55 hover:border-border hover:bg-background',
-      )}
-    >
-      {selected && (
-        <span className="absolute right-1.5 top-1.5 flex size-3.5 items-center justify-center rounded-full bg-foreground text-background">
-          <Check className="size-2.5" strokeWidth={3} />
-        </span>
-      )}
-      <AgentAvatar name={agent.agentName} agentType={agent.agentType} size={28} status={agent.status} />
-      <span className="w-full truncate text-xs font-medium text-foreground">{agent.agentName}</span>
-      <span className="inline-flex items-center gap-1 text-3xs text-muted-foreground">
-        <StatusDot state={state} />
-        {isLead ? 'Lead' : stateWord}
-      </span>
-    </button>
-  );
-  return offline ? (
-    <Hint label={`@${agent.agentName} is offline. Connect it in Agents to add it.`}>{tile}</Hint>
-  ) : (
-    tile
-  );
-}
-
-// ── Configuration card ───────────────────────────────────────────────────────
-
-function AgentConfigCard({
-  agent,
-  usage,
-  models,
-  reportedModel,
-  modelPick,
-  onModelPick,
-  effortPick,
-  onEffortPick,
-  contextRows,
-  threadTitle,
-  mode,
-  isLead,
-  canUnsetLead,
-  onLeadChange,
-  onOpenProfile,
-}: {
-  agent: WorkspaceAgent;
-  usage: AgentUsage | null | undefined;
-  models: ReturnType<typeof modelsFor>;
-  reportedModel?: string;
-  modelPick?: string;
-  onModelPick: (modelId: string | null) => void;
-  effortPick?: string;
-  onEffortPick: (effort: string | null) => void;
-  contextRows: ReturnType<typeof useAgentContexts>['rows'];
-  threadTitle: (sessionId: string) => string | null;
-  mode: OrchestrationMode;
-  isLead: boolean;
-  canUnsetLead: boolean;
-  onLeadChange: (on: boolean) => void;
-  onOpenProfile: () => void;
-}) {
-  const name = agent.agentName;
-  const short = (id: string) => (id.includes('/') ? id.slice(id.indexOf('/') + 1) : id);
-  const efforts = React.useMemo(() => parseReportedModels(usage?.available_efforts), [usage?.available_efforts]);
-
-  // The agent's most recent context report, from any thread. Context belongs
-  // to the agent's CLI session per thread, so a new session starts fresh; this
-  // is shown as "how full it got last time", not as this session's number.
-  const lastContext = React.useMemo(() => {
-    const mine = contextRows.filter((r) => r.agentName.toLowerCase() === name.toLowerCase());
-    return mine.sort((a, b) => (new Date(b.updatedAt).getTime() || 0) - (new Date(a.updatedAt).getTime() || 0))[0] ?? null;
-  }, [contextRows, name]);
-  const pct = lastContext ? contextPercent(lastContext) : null;
-
-  const subtitle = modelPick
-    ? effortPick
-      ? 'Custom model and reasoning effort'
-      : 'Custom model'
-    : effortPick
-      ? 'Custom reasoning effort'
-      : 'Using defaults';
-
-  return (
-    <HomePanel
-      id="home-agent-config"
-      title={
-        <span className="inline-flex items-center gap-2">
-          <AgentAvatar name={name} agentType={agent.agentType} size={18} />
-          {name} configuration
-        </span>
-      }
-      subtitle={subtitle}
-      action={
-        <Button variant="ghost" size="sm" onClick={onOpenProfile}>
-          Agent details
-        </Button>
-      }
-    >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="min-w-0">
-          <FieldLabel>Model</FieldLabel>
-          {models.length > 0 ? (
-            <Select value={modelPick ?? DEFAULT_MODEL} onValueChange={(v) => onModelPick(v === DEFAULT_MODEL ? null : v)}>
-              <SelectTrigger size="sm" className="w-full text-xs" aria-label={`Model for ${name}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={DEFAULT_MODEL}>
-                  Agent default{reportedModel ? ` (${short(reportedModel)})` : ''}
-                </SelectItem>
-                {models.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.shortName}
-                    {m.provider ? <span className="text-foreground-extra-muted"> · {m.provider}</span> : null}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <FieldValue className="text-muted-foreground">
-              <span className="truncate">{reportedModel ? short(reportedModel) : 'Agent default'}</span>
-            </FieldValue>
-          )}
-          <p className="mt-1 text-2xs text-foreground-extra-muted">
-            {models.length > 0 ? 'For this session only.' : 'This agent has not reported a model list.'}
-          </p>
-        </div>
-
-        {efforts.length > 0 && (
-          <div className="min-w-0">
-            <FieldLabel>Reasoning effort</FieldLabel>
-            <Select value={effortPick ?? DEFAULT_MODEL} onValueChange={(v) => onEffortPick(v === DEFAULT_MODEL ? null : v)}>
-              <SelectTrigger size="sm" className="w-full text-xs" aria-label={`Reasoning effort for ${name}`}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={DEFAULT_MODEL}>
-                  Current{usage?.current_effort ? ` (${usage.current_effort})` : ''}
-                </SelectItem>
-                {efforts.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="mt-1 text-2xs text-foreground-extra-muted">
-              Changes this agent's default, for sessions without their own level.
-            </p>
-          </div>
-        )}
-
-        <div className="min-w-0">
-          <FieldLabel>Last reported context</FieldLabel>
-          <FieldValue>
-            <ContextRing pct={pct} size={14} />
-            {lastContext && lastContext.contextWindow > 0 ? (
-              <span className="truncate tabular-nums">
-                {pct ?? 0}% of {fmtTokens(lastContext.contextWindow)}
-                {threadTitle(lastContext.channelName) && (
-                  <span className="text-foreground-extra-muted"> · {threadTitle(lastContext.channelName)}</span>
-                )}
-              </span>
-            ) : (
-              <span className="truncate text-muted-foreground">Not reported yet</span>
-            )}
-          </FieldValue>
-          <p className="mt-1 text-2xs text-foreground-extra-muted">A new session starts with a fresh context.</p>
-        </div>
-
-        {mode === 'master' && (
-          <div className="min-w-0">
-            <FieldLabel htmlFor="home-lead-switch">Lead agent</FieldLabel>
-            <div className="flex h-8 items-center gap-2.5">
-              <Switch
-                id="home-lead-switch"
-                size="sm"
-                checked={isLead}
-                disabled={isLead && !canUnsetLead}
-                onCheckedChange={onLeadChange}
-                aria-label={`Make @${name} the lead`}
-              />
-              <span className="text-xs text-foreground">{isLead ? `@${name} leads` : 'Not the lead'}</span>
-            </div>
-            <p className="mt-1 text-2xs text-foreground-extra-muted">
-              {isLead && !canUnsetLead
-                ? 'Master mode needs a lead. Add another agent to hand it over.'
-                : 'The lead receives every message and delegates.'}
-            </p>
-          </div>
-        )}
-      </div>
-    </HomePanel>
   );
 }

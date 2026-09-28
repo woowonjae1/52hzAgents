@@ -212,7 +212,7 @@ interface WorkspaceContextValue {
   consumeSkipFocus: () => boolean;
   setSelectedFileId: (id: string | null) => void;
   setCurrentFilePath: (path: string) => void;
-  createSession: (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string }) => Promise<WorkspaceSession>;
+  createSession: (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string; orchestrationMode?: string }) => Promise<WorkspaceSession>;
   /** The open, not-yet-sent new chat, if any. Never in `sessions`. See isDraftSessionId. */
   draftSession: WorkspaceSession | null;
   /** Create the draft on the server (first send) and return the real session id. */
@@ -1856,7 +1856,7 @@ export function WorkspaceProvider({
   }, [workspaceId, refreshDiscovery, refreshRoutines, refreshTodos, refreshTimers, refreshNotifications]);
 
 
-  const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string }) => {
+  const createSession = useCallback(async (opts?: { title?: string; master?: string; participants?: string[]; resumeFrom?: string; workingDir?: string; orchestrationMode?: string }) => {
     // A draft, not a channel: nothing reaches the server until the first
     // message is sent (see DRAFT_SESSION_PREFIX). Opening a second new chat
     // simply replaces an unsent one.
@@ -1871,7 +1871,9 @@ export function WorkspaceProvider({
       // Only set a leader when one is explicitly requested (e.g. the
       // single-agent DM path); dynamic mode needs none.
       master: opts?.master ?? null,
-      orchestrationMode: 'dynamic',
+      // Home's setup picks the mode before the draft exists; the first send
+      // PATCHes any non-dynamic mode (materializeDraft).
+      orchestrationMode: opts?.orchestrationMode || 'dynamic',
       orchestrationInstruction: null,
       createdAt: new Date().toISOString(),
       lastEventAt: null,

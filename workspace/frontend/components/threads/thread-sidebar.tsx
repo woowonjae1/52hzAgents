@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, House, CalendarClock, Inbox, Users, BookOpen, CircleCheck } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, CalendarClock, Inbox, BookOpen, CircleCheck } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -516,10 +516,15 @@ export function ThreadSidebar() {
         beside the list it creates into (the Projects header below).
       */}
       <nav className="flex flex-col gap-0.5" aria-label="Workspace navigation">
-        {/* The one solid control in the sidebar: where a session starts. */}
+        {/*
+          The one solid control in the sidebar, and the way Home: a session
+          starts there. A separate "Home" row went to the same place and was
+          dropped (see the sidebar audit in home-dashboard).
+        */}
         <button
           type="button"
           onClick={startNewSession}
+          aria-current={isHome ? 'page' : undefined}
           className="mb-1 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Plus className="size-4 shrink-0" />
@@ -538,15 +543,6 @@ export function ThreadSidebar() {
         </button>
 
         <NavSection label="Main">
-          <button
-            type="button"
-            className={cn(NAV_ROW_CLASS, isHome && NAV_ROW_ACTIVE)}
-            aria-current={isHome ? 'page' : undefined}
-            onClick={() => setViewMode('home')}
-          >
-            <House className="size-4 shrink-0" />
-            Home
-          </button>
           {/*
             Was "Runs": Tasks' Runs page is where scheduled work and its
             history live, so the row is named for what it holds.
@@ -578,14 +574,6 @@ export function ThreadSidebar() {
         </NavSection>
 
         <NavSection label="Workspace">
-          <button
-            type="button"
-            className={cn(NAV_ROW_CLASS, viewMode === 'mission' && NAV_ROW_ACTIVE)}
-            onClick={() => setViewMode('mission')}
-          >
-            <Users className="size-4 shrink-0" />
-            Agents
-          </button>
           {/*
             The workspace's shared files: what you uploaded and what agents
             produced (adapters register files they write each turn). The tree

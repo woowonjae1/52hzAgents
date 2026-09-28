@@ -32,6 +32,8 @@ interface ActivityTimelineProps {
   onOpenThread: (sessionId: string) => void;
   loading?: boolean;
   className?: string;
+  /** Drop the panel's own title bar when a host card already titles it (Home). */
+  hideHeader?: boolean;
 }
 
 /*
@@ -65,6 +67,7 @@ export function ActivityTimeline({
   onOpenThread,
   loading = false,
   className,
+  hideHeader = false,
 }: ActivityTimelineProps) {
   const [selectedType, setSelectedType] = React.useState<string>('all');
 
@@ -153,11 +156,13 @@ export function ActivityTimeline({
     >
       {/* Title bar — `.app-header` so this panel's first divider sits on the
           same baseline as the main pane's and the sidebar's. */}
-      <div className="app-header px-3.5">
-        <span className="text-xs font-semibold tracking-tight text-foreground">
-          Live activity
-        </span>
-      </div>
+      {!hideHeader && (
+        <div className="app-header px-3.5">
+          <span className="text-xs font-semibold tracking-tight text-foreground">
+            Live activity
+          </span>
+        </div>
+      )}
 
       <div className="px-3.5 py-2.5 shrink-0">
         {/* Filter Chips */}

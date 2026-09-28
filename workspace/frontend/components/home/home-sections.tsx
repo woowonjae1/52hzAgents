@@ -2,7 +2,12 @@
 
 import * as React from 'react';
 import {
+  Archive,
   ArrowRight,
+  Inbox,
+  Pencil,
+  Plus,
+  SquarePen,
   CalendarClock,
   CircleAlert,
   CirclePause,
@@ -14,6 +19,10 @@ import {
   Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Hint } from '@/components/ui/hint';
+import { PromptDialog } from '@/components/ui/prompt-dialog';
+import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
+import { useAgentTurns } from '@/lib/use-agent-turns';
 import { AgentAvatarStack } from '@/components/agents/agent-avatar';
 import { useWorkspace, isUnusedSession } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
@@ -47,11 +56,13 @@ function useThreadTitle() {
 export function NeedsAttentionPanel({
   onOpenThread,
   onOpenAutomations,
+  onOpenInbox,
 }: {
   onOpenThread: (sessionId: string) => void;
   onOpenAutomations: () => void;
+  onOpenInbox: () => void;
 }) {
-  const { sessions, routines } = useWorkspace();
+  const { sessions, routines, unreadNotificationCount } = useWorkspace();
   const threadTitle = useThreadTitle();
   const approvals = usePendingToolApprovals(sessions);
   const parallel = useParallelAttention(sessions);
@@ -207,7 +218,15 @@ export function NeedsAttentionPanel({
       }
     >
       {rows.length === 0 ? (
-        <p className="text-xs text-foreground-extra-muted">Nothing needs you right now.</p>
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-xs text-foreground-extra-muted">Nothing needs you right now.</p>
+          {unreadNotificationCount > 0 && (
+            <Button variant="outline" size="sm" onClick={onOpenInbox}>
+              <Inbox className="size-3.5" />
+              {unreadNotificationCount} unread in Inbox
+            </Button>
+          )}
+        </div>
       ) : (
         <ul className="-mx-2 flex flex-col">{rows}</ul>
       )}
@@ -217,8 +236,31 @@ export function NeedsAttentionPanel({
 
 // ── Recent sessions ──────────────────────────────────────────────────────────
 
-export function RecentSessionsPanel({ onOpenThread }: { onOpenThread: (sessionId: string) => void }) {
-  const { sessions, agents, lastMessageBySession, activeSessionIds } = useWorkspace();
+export function RecentSessionsPanel({
+  onOpenThread,
+  onNewSession,
+}: {
+  onOpenThread: (sessionId: string) => void;
+  onNewSession: () => void;
+}) {
+  const { sessions, agents, lastMessageBySession, activeSessionIds, renameSession, updateSession } = useWorkspace();
+  const { rows: turnRows } = useAgentTurns();
+  const [renaming, setRenaming] = React.useState<WorkspaceSession | null>(null);
+
+  // A thread whose agent reported a failed turn in the last hour and has not
+  // run since: the same rule as the sidebar's red dot.
+  const failedByChannel = React.useMemo(() => {
+    const map = new Map<string, boolean>();
+    const recentMs = 60 * 60 * 1000;
+    for (const t of turnRows) {
+      if (t.state === 'running') map.set(t.channelName, false);
+      else if (t.state === 'error' && !map.has(t.channelName)) {
+        const ended = t.endedAt ? new Date(t.endedAt).getTime() : 0;
+        if (ended && Date.now() - ended < recentMs) map.set(t.channelName, true);
+      }
+    }
+    return map;
+  }, [turnRows]);
 
   const recent = React.useMemo(
     () =>
@@ -241,7 +283,13 @@ export function RecentSessionsPanel({ onOpenThread }: { onOpenThread: (sessionId
       subtitle={recent.length === 0 ? 'Sessions you start appear here.' : 'Pick up where you left off.'}
     >
       {recent.length === 0 ? (
-        <p className="text-xs text-foreground-extra-muted">No sessions yet.</p>
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-xs text-foreground-extra-muted">No sessions yet.</p>
+          <Button variant="outline" size="sm" onClick={onNewSession}>
+            <SquarePen className="size-3.5" />
+            Describe a task
+          </Button>
+        </div>
       ) : (
         <ul className="-mx-2 flex flex-col">
           {recent.map((s) => {
@@ -249,6 +297,8 @@ export function RecentSessionsPanel({ onOpenThread }: { onOpenThread: (sessionId
             const title = getSmartSessionTitle(s, last);
             const who = extractSessionAgents(s, agents, last, title);
             const running = activeSessionIds.has(s.sessionId);
+            const failed = !running && failedByChannel.get(s.sessionId) === true;
+            const mode = s.orchestrationMode === 'parallel' ? 'Parallel' : s.orchestrationMode === 'master' ? 'Master' : null;
             return (
               <HomeRow
                 key={s.sessionId}
@@ -263,17 +313,57 @@ export function RecentSessionsPanel({ onOpenThread }: { onOpenThread: (sessionId
                 detail={
                   <>
                     {running && <span className="event-running me-1.5">Working</span>}
+                    {failed && <span className="me-1.5 text-destructive">Stopped mid-turn</span>}
                     {s.workingDir ? basename(s.workingDir) : 'Direct chat'}
+                    {mode && ` · ${mode}`}
                     {who.length > 0 && ` · ${who.map((a) => `@${a.name}`).join(', ')}`}
                   </>
                 }
                 meta={formatCompactRelativeTime(sessionTime(s))}
                 onClick={() => onOpenThread(s.sessionId)}
+                actions={
+                  <span className="flex items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    <Hint label="Rename">
+                      <button
+                        type="button"
+                        onClick={() => setRenaming(s)}
+                        aria-label={`Rename ${title}`}
+                        className="grid size-6 place-items-center rounded-md text-foreground-extra-muted hover:bg-surface2 hover:text-foreground"
+                      >
+                        <Pencil className="size-3" />
+                      </button>
+                    </Hint>
+                    <Hint label="Archive">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void updateSession(s.sessionId, { status: 'archived' });
+                          toast.success('Session archived');
+                        }}
+                        aria-label={`Archive ${title}`}
+                        className="grid size-6 place-items-center rounded-md text-foreground-extra-muted hover:bg-surface2 hover:text-foreground"
+                      >
+                        <Archive className="size-3" />
+                      </button>
+                    </Hint>
+                  </span>
+                }
               />
             );
           })}
         </ul>
       )}
+      <PromptDialog
+        open={renaming !== null}
+        onOpenChange={(open) => !open && setRenaming(null)}
+        title="Rename session"
+        initialValue={renaming ? getSmartSessionTitle(renaming, lastMessageBySession[renaming.sessionId]) : ''}
+        confirmLabel="Rename"
+        onSubmit={async (value) => {
+          if (renaming && value.trim()) await renameSession(renaming.sessionId, value.trim());
+          setRenaming(null);
+        }}
+      />
     </HomePanel>
   );
 }
@@ -318,11 +408,14 @@ function describeSchedule(r: RoutineItem): string {
 export function UpcomingPanel({
   onOpenAutomations,
   onOpenThread,
+  className,
 }: {
   onOpenAutomations: () => void;
   onOpenThread: (sessionId: string) => void;
+  className?: string;
 }) {
-  const { routines, timers, sessions } = useWorkspace();
+  const { routines, timers, sessions, agents, createRoutine } = useWorkspace();
+  const [creating, setCreating] = React.useState(false);
   const threadTitle = useThreadTitle();
   // Re-read the clock with the data rather than on a ticker: "in 3h" does not
   // need to move while you look at it, and the lists refresh over SSE anyway.
@@ -348,6 +441,7 @@ export function UpcomingPanel({
   return (
     <HomePanel
       id="home-upcoming"
+      className={className}
       title="Upcoming"
       subtitle={upcoming.length === 0 ? 'Nothing is scheduled.' : 'Scheduled work, soonest first.'}
       action={
@@ -358,9 +452,15 @@ export function UpcomingPanel({
       }
     >
       {upcoming.length === 0 ? (
-        <p className="text-xs text-foreground-extra-muted">
-          Ask an agent to do something on a schedule, or add one in Automations.
-        </p>
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-xs text-foreground-extra-muted">
+            Have an agent do something on a schedule: a nightly audit, a morning summary.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setCreating(true)}>
+            <Plus className="size-3.5" />
+            Create an automation
+          </Button>
+        </div>
       ) : (
         <ul className="-mx-2 flex flex-col">
           {upcoming.map((u) =>
@@ -390,6 +490,7 @@ export function UpcomingPanel({
           )}
         </ul>
       )}
+      <CreateRoutineDialog open={creating} onOpenChange={setCreating} agents={agents} onCreateRoutine={createRoutine} />
     </HomePanel>
   );
 }

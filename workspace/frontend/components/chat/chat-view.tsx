@@ -54,6 +54,7 @@ import {
 } from './transcript-filter';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
+import { SEND_FIRST_MESSAGE_EVENT, type FirstMessageRequest } from '@/lib/first-message';
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
@@ -883,6 +884,19 @@ export function ChatView() {
     right", not "add this below what I was writing". Anything already typed
     would be a different thought and joining the two produces neither.
   */
+  // Home's task box: "start the session and send this". See lib/first-message.
+  const handleSendRef = useRef(handleSend);
+  handleSendRef.current = handleSend;
+  useEffect(() => {
+    const onRequest = (e: Event) => {
+      const detail = (e as CustomEvent<FirstMessageRequest>).detail;
+      if (!detail || detail.sessionId !== currentSessionIdRef.current) return;
+      void handleSendRef.current(detail.text.trim());
+    };
+    window.addEventListener(SEND_FIRST_MESSAGE_EVENT, onRequest);
+    return () => window.removeEventListener(SEND_FIRST_MESSAGE_EVENT, onRequest);
+  }, []);
+
   const handleReusePrompt = useCallback((msg: WorkspaceMessage) => {
     handleDraftChange(msg.content);
     setFocusKey((k) => k + 1);

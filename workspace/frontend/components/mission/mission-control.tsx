@@ -7,7 +7,8 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentStation, type StationData, type StationStatus } from './agent-station';
 import { ActionRequiredBanner, pendingApprovalsFromMessages, type PendingActionItem } from './action-required-banner';
-import { ActivityTimeline, type TimelineEventItem } from './activity-timeline';
+import { ActivityTimeline } from './activity-timeline';
+import { useActivityFeed } from './use-activity-feed';
 import { ConnectAgentModal } from './connect-agent-modal';
 import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 import { parseReportedModels } from '@/components/chat/agent-model-switcher';
@@ -23,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useScrollRestore } from '@/hooks/use-scroll-restore';
 import { workspaceApi } from '@/lib/api';
-import { eventToMessage, type ONMEvent, stripAddressPrefix } from '@/lib/types';
+import { eventToMessage } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { toast } from '@/lib/toast';
 import { extractSessionAgents } from '@/components/threads/thread-list';
@@ -37,8 +38,6 @@ import { useAgentTurns, summarizeAgentTurns } from '@/lib/use-agent-turns';
   here that asks the reader to act, and `--destructive` is the token this
   project reserves for exactly that.
 */
-/** Events shown in Live activity — after reply previews are dropped. */
-const FEED_SIZE = 40;
 
 function FilterChip({
   label,
@@ -112,9 +111,6 @@ export function MissionControl() {
   const [agentTokens, setAgentTokens] = useState<Record<string, number>>({});
   const [pendingApprovals, setPendingApprovals] = useState<PendingActionItem[]>([]);
 
-  // Activity feed
-  const [activityFeed, setActivityFeed] = useState<TimelineEventItem[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
 
   const fetchRecentData = useCallback(async () => {
     const updates: Record<string, { content: string; senderName: string; isStatus?: boolean; timestamp: number }> = {};
@@ -172,67 +168,10 @@ export function MissionControl() {
     setPendingApprovals(approvals);
   }, [sessions]);
 
-  const fetchFeed = useCallback(async () => {
-    const titleFor = (channel: string) => sessions.find((s) => s.sessionId === channel)?.title || channel;
-    try {
-      /*
-        THE FEED WAS FULL OF ONE REPLY, CUT INTO TOKENS.
-
-        Most adapters stream the answer as it is written, one `thinking`
-        message per delta with `reply_preview` set; the finished reply then
-        lands as a message of its own. This feed took the last 40 raw messages,
-        so a single 40-token answer filled all of it with fragments — "把伞。",
-        "备", "可", "，出门" — newest first, which is the sentence read
-        backwards, and pushed every real event out. Previews are dropped (the
-        reply they preview is in the feed as itself), and more is fetched than
-        is shown, because the limit is spent before the filter runs.
-
-        Agent replies were also typed 'command', so every answer wore the
-        terminal icon and counted under "Tool calls". A tool call is the
-        message that carries `tool_name`; a reply is just a reply.
-      */
-      const res = await workspaceApi.pollEvents({ type: 'workspace.message', sort: 'desc', limit: 160 });
-      const lines: TimelineEventItem[] = [];
-      // Some adapters post the same reasoning twice (streamed, then again at
-      // block end), which showed as back-to-back identical rows. The same
-      // text from the same speaker in the same thread is one event.
-      const seen = new Set<string>();
-      for (let idx = 0; idx < res.events.length && lines.length < FEED_SIZE; idx++) {
-        const ev = res.events[idx] as ONMEvent;
-        const m = eventToMessage(ev);
-        if (m.messageType === 'thinking' && m.metadata?.reply_preview) continue;
-        const channel = (ev.target || '').replace(/^channel\//, '');
-        const dedupKey = `${m.senderName || ev.source}|${channel}|${(m.content || '').trim()}`;
-        if (seen.has(dedupKey)) continue;
-        seen.add(dedupKey);
-        let type: TimelineEventItem['type'] = 'info';
-        if (m.messageType === 'thinking') type = m.metadata?.tool_name ? 'command' : 'thinking';
-        else if (m.metadata?.tool_approval_request) type = 'approval';
-        else if (m.messageType === 'status') type = /failed|error|stopped|denied/i.test(m.content) ? 'error' : 'success';
-        lines.push({
-          id: m.messageId || ev.event_id || `activity-${idx}-${ev.timestamp || Date.now()}`,
-          time: m.createdAt ? new Date(m.createdAt) : new Date(ev.timestamp),
-          sender: m.senderName || stripAddressPrefix(ev.source),
-          channel: titleFor(channel),
-          channelId: channel,
-          content: m.content,
-          type,
-        });
-      }
-      setActivityFeed(lines);
-    } catch {
-      /* keep last feed */
-    } finally {
-      setFeedLoading(false);
-    }
-  }, [sessions]);
-
   // Unified overview polling: 5s interval, fully paused on document.hidden
-  const fetchMissionOverview = useCallback(async () => {
-    await Promise.allSettled([fetchRecentData(), fetchFeed()]);
-  }, [fetchRecentData, fetchFeed]);
-
-  useVisibilityPolling(fetchMissionOverview, 5000);
+  useVisibilityPolling(fetchRecentData, 5000);
+  // The feed is shared with Home (use-activity-feed); same 5s cadence.
+  const { events: activityFeed, loading: feedLoading } = useActivityFeed(sessions);
 
   /*
     Keeps the shared model store (lib/agent-model-store.ts) warm for every
