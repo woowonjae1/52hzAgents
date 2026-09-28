@@ -508,7 +508,23 @@ func batchSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLane
 	var b strings.Builder
 	b.WriteString("**Parallel batch finished**")
 	if batch.Isolation == "worktree" && batch.BaseBranch != "" {
-		b.WriteString(fmt.Sprintf(" — merged into `%s`", batch.BaseBranch))
+		// The headline must say what the merge step actually did. Claiming
+		// "merged into main" when every lane conflicted, failed or was kept
+		// tells the user their work landed when none of it did.
+		merged := 0
+		for _, l := range lanes {
+			if l.Status == laneMerged {
+				merged++
+			}
+		}
+		switch {
+		case merged == 0:
+			b.WriteString(fmt.Sprintf(" — nothing was merged into `%s`", batch.BaseBranch))
+		case merged < len(lanes):
+			b.WriteString(fmt.Sprintf(" — %d of %d lanes merged into `%s`", merged, len(lanes), batch.BaseBranch))
+		default:
+			b.WriteString(fmt.Sprintf(" — merged into `%s`", batch.BaseBranch))
+		}
 	}
 	b.WriteString("\n\n")
 	icon := map[string]string{laneMerged: "✅", laneKept: "⏸", laneConflict: "⚠️", laneFailed: "❌", laneDone: "✅"}

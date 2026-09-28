@@ -309,3 +309,66 @@ func TestParallelMergesWithoutAHostGitIdentity(t *testing.T) {
 		t.Fatal("the merge must not write an identity into the user's repo config")
 	}
 }
+
+// postedSummary returns the batch-finished message posted to the channel.
+func postedSummary(t *testing.T, channelName string) string {
+	t.Helper()
+	var rows []models.EventRecord
+	db.DB.Where("source = ? AND target = ?", "system:parallel", "channel/"+channelName).Find(&rows)
+	for _, r := range rows {
+		if s := string(r.Payload); strings.Contains(s, "Parallel batch finished") {
+			return s
+		}
+	}
+	t.Fatal("no batch summary posted to the channel")
+	return ""
+}
+
+func TestBatchSummaryOnlyClaimsAMergeThatHappened(t *testing.T) {
+	batch := &models.ParallelBatchRecord{Isolation: "worktree", BaseBranch: "main"}
+	lane := func(agent, status string) models.ParallelLaneRecord {
+		return models.ParallelLaneRecord{Agent: agent, Status: status, Branch: "parallel/x-" + agent}
+	}
+	cases := []struct {
+		name  string
+		lanes []models.ParallelLaneRecord
+		want  string
+	}{
+		{"all merged", []models.ParallelLaneRecord{lane("a", laneMerged), lane("b", laneMerged)}, " — merged into `main`"},
+		{"some merged", []models.ParallelLaneRecord{lane("a", laneMerged), lane("b", laneConflict)}, " — 1 of 2 lanes merged into `main`"},
+		{"all conflicted", []models.ParallelLaneRecord{lane("a", laneConflict), lane("b", laneConflict)}, " — nothing was merged into `main`"},
+		{"kept and failed", []models.ParallelLaneRecord{lane("a", laneKept), lane("b", laneFailed)}, " — nothing was merged into `main`"},
+	}
+	for _, c := range cases {
+		got := batchSummary(batch, c.lanes, "")
+		head := strings.SplitN(got, "\n", 2)[0]
+		if head != "**Parallel batch finished**"+c.want {
+			t.Errorf("%s: headline = %q, want suffix %q", c.name, head, c.want)
+		}
+	}
+	// A shared-directory batch never merges, so it never talks about merging.
+	shared := &models.ParallelBatchRecord{Isolation: "shared"}
+	if got := batchSummary(shared, []models.ParallelLaneRecord{lane("a", laneDone)}, ""); strings.Contains(got, "merged") {
+		t.Errorf("shared batch summary mentions a merge: %q", got)
+	}
+}
+
+func TestParallelSummaryOfAnUnmergedBatchSaysNothingMerged(t *testing.T) {
+	// End to end: a dirty base keeps alpha's branch and beta fails, so the
+	// posted summary must not claim anything reached main.
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	batch, lanes := startTestBatch(t, ws, repo, "alpha", "beta")
+	os.WriteFile(filepath.Join(lanes["alpha"].WorktreePath, "alpha.txt"), []byte("a\n"), 0644)
+	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("user is editing\n"), 0644)
+	finish(t, batch.ID, "alpha", false)
+	finish(t, batch.ID, "beta", true)
+
+	s := postedSummary(t, batch.ChannelName)
+	if strings.Contains(s, "— merged into") || strings.Contains(s, "lanes merged into") {
+		t.Fatalf("summary claims a merge that did not happen: %s", s)
+	}
+	if !strings.Contains(s, "nothing was merged into `main`") {
+		t.Fatalf("summary does not say nothing was merged: %s", s)
+	}
+}
