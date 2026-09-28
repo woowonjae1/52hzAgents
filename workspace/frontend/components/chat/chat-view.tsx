@@ -979,7 +979,7 @@ export function ChatView() {
             <Button
               variant="outline"
               className="mt-5 gap-1.5"
-              onClick={agents.length > 0 ? openNewThread : () => setViewMode('mission')}
+              onClick={agents.length > 0 ? openNewThread : () => setViewMode('home')}
             >
               <Plus className="size-4" />
               {agents.length > 0 ? 'New channel' : 'Connect an agent'}
@@ -1342,7 +1342,7 @@ export function ChatView() {
                 {!hasOnlineAgents && (
                   <button
                     type="button"
-                    onClick={() => setViewMode('mission')}
+                    onClick={() => setViewMode('home')}
                     className="text-foreground-extra-muted hover:text-foreground transition-colors ml-0.5 underline underline-offset-2"
                   >
                     Connect agent
@@ -1582,7 +1582,7 @@ export function ChatView() {
                     ))}
                     <button
                       type="button"
-                      onClick={() => setViewMode('mission')}
+                      onClick={() => setViewMode('home')}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface2 hover:bg-surface3 border border-border/60 text-foreground text-2xs font-medium transition-colors"
                     >
                       <span>Connect</span>

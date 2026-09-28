@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, CalendarClock, Inbox, BookOpen, CircleCheck } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, CalendarClock, Inbox, BookOpen, CircleCheck, Users } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -543,6 +543,17 @@ export function ThreadSidebar() {
         </button>
 
         <NavSection label="Main">
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, (isHome || viewMode === 'mission') && NAV_ROW_ACTIVE)}
+            onClick={() => {
+              setCurrentSessionId(null);
+              setViewMode('home');
+            }}
+          >
+            <Users className="size-4 shrink-0" />
+            Agents
+          </button>
           {/*
             Was "Runs": Tasks' Runs page is where scheduled work and its
             history live, so the row is named for what it holds.

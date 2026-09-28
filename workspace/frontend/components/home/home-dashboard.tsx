@@ -34,6 +34,7 @@ import { FieldLabel, FieldValue, HomePanel } from './home-panel';
 import { NeedsAttentionPanel, RecentSessionsPanel, UpcomingPanel } from './home-sections';
 import { AgentGrid } from './agent-grid';
 import { AgentDetailPanel, type AgentState } from './agent-detail-panel';
+import { ConnectAgentModal } from '@/components/mission/connect-agent-modal';
 
 /*
   HOME: CONFIGURE, THEN ENTER THE CHAT.
@@ -103,6 +104,7 @@ export function HomeDashboard() {
   const [effortPicks, setEffortPicks] = React.useState<Record<string, string>>({});
   const [task, setTask] = React.useState('');
   const [starting, setStarting] = React.useState(false);
+  const [connectOpen, setConnectOpen] = React.useState(false);
   const taskRef = React.useRef<HTMLTextAreaElement>(null);
 
   // One agent online: it is the only possible choice, so it starts selected.
@@ -282,7 +284,7 @@ export function HomeDashboard() {
     <div className="flex h-full min-h-0 flex-col bg-surface0">
       <div className={cn('app-header ps-6', !isSidebarOpen && !isMobile && 'ps-14')}>
         <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
-          <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Home</h1>
+          <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Agents</h1>
           {agents.length > 0 && <p className="truncate text-xs tabular-nums text-muted-foreground">{headerCounts}</p>}
         </div>
       </div>
@@ -359,7 +361,7 @@ export function HomeDashboard() {
                 leadName={effectiveLead}
                 onOpen={setOpenName}
                 onToggleSelected={(n) => setAgentSelected(n, !selected.includes(n))}
-                onAddAgent={() => setViewMode('mission')}
+                onAddAgent={() => setConnectOpen(true)}
                 renderPanel={renderPanel}
               />
             </HomePanel>
@@ -492,6 +494,7 @@ export function HomeDashboard() {
           </div>
         </div>
       </div>
+      <ConnectAgentModal open={connectOpen} onOpenChange={setConnectOpen} />
     </div>
   );
 }

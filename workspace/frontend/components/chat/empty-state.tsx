@@ -62,7 +62,7 @@ export function EmptyState() {
   const handleStartChat = async () => {
     if (onlineAgents.length === 0) {
       toast.error('No agents online — connect one first');
-      setViewMode('mission');
+      setViewMode('home');
       return;
     }
     if (participants.size === 0) {
@@ -168,14 +168,14 @@ export function EmptyState() {
           {startButton}
           <div className="flex items-center justify-between text-2xs pt-1">
             <button
-              onClick={() => setViewMode('mission')}
+              onClick={() => setViewMode('home')}
               className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors"
             >
               <Plug className="size-3.5 opacity-70" />
               Connect a new agent
             </button>
             <button
-              onClick={() => setViewMode('mission')}
+              onClick={() => setViewMode('home')}
               className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium transition-colors"
             >
               <Cloud className="size-3.5 opacity-70" />

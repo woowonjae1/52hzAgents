@@ -49,7 +49,7 @@ export const GOTO_SEQUENCE: Record<string, { view: string; label: string }> = {
   h: { view: 'home', label: 'Home' },
   t: { view: 'threads', label: 'Threads' },
   a: { view: 'tasks', label: 'Tasks' },
-  m: { view: 'mission', label: 'Agents' },
+  m: { view: 'home', label: 'Agents' },
   f: { view: 'files', label: 'Files' },
   k: { view: 'knowledge', label: 'Knowledge' },
   e: { view: 'skills', label: 'Skills' },

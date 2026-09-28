@@ -5,7 +5,7 @@ import { useLayout } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 
 const VIEW_LABEL: Record<string, string> = {
-  home: 'Home',
+  home: 'Agents',
   mission: 'Agents',
   files: 'Files',
   browser: 'Browser',

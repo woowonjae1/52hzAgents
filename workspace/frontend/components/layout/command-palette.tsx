@@ -171,10 +171,10 @@ export function CommandPalette() {
         id: 'nav-mission',
         category: 'Navigation',
         title: 'Agents',
-        subtitle: 'Who is online, and what each one is working on',
+        subtitle: 'Configure agents, check activity and start sessions',
         icon: <Compass className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'M'],
-        action: () => setViewMode('mission'),
+        action: () => setViewMode('home'),
       },
       {
         id: 'nav-skills',

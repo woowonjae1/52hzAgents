@@ -102,7 +102,7 @@ export function AgentStatusStrip() {
     <Hint label="Open agent station">
       <button
         type="button"
-        onClick={() => setViewMode('mission')}
+        onClick={() => setViewMode('home')}
         className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-surface2 transition-colors text-left"
       >
         {/* -space-x-1.5, not -1: at 4px the discs merely touched, which reads as

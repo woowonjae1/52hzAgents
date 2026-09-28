@@ -15,7 +15,6 @@ import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { TasksView } from '@/components/tasks/tasks-view';
 import { InboxView } from '@/components/inbox/inbox-view';
-import { MissionControl } from '@/components/mission/mission-control';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
 import { HomeDashboard } from '@/components/home/home-dashboard';
@@ -236,11 +235,7 @@ function WrapperInner() {
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[env(safe-area-inset-bottom)]">
           {/* Full-screen views (no list/detail split) */}
-          {viewMode === 'mission' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <MissionControl />
-            </div>
-          ) : viewMode === 'home' || (isHome && mobilePane === 'detail') ? (
+          {viewMode === 'mission' || viewMode === 'home' || (isHome && mobilePane === 'detail') ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <HomeDashboard />
             </div>
@@ -365,8 +360,7 @@ function WrapperInner() {
                     <ChatView />
                   </main>
                 </div>
-                {isHome && <HomeDashboard />}
-                {viewMode === 'mission' && <MissionControl />}
+                {(isHome || viewMode === 'mission') && <HomeDashboard />}
                 {viewMode === 'connect' && <ConnectAgentView />}
                 {viewMode === 'files' && <FilePreview />}
                 {viewMode === 'tasks' && <TasksView />}
