@@ -340,9 +340,9 @@ export function HomeDashboard() {
       </div>
 
       <div className="@container min-h-0 flex-1 overflow-y-auto">
-        <div className="grid w-full grid-cols-1 gap-4 p-4 sm:p-5 @5xl:grid-cols-[minmax(0,1fr)_320px] @7xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid w-full grid-cols-1 items-start gap-4 p-4 sm:p-5 @5xl:grid-cols-[minmax(0,1fr)_320px] @7xl:grid-cols-[minmax(0,1fr)_360px]">
           {/* ── Main: what to do, and who does it ── */}
-          <div className="flex min-w-0 flex-col gap-4">
+          <div className="@container flex min-w-0 flex-col gap-4">
             <section
               aria-label="New session"
               className="rounded-xl border border-border bg-card p-3 focus-within:border-border-accent"
@@ -418,6 +418,17 @@ export function HomeDashboard() {
                 renderPanel={renderPanel}
               />
             </HomePanel>
+
+            {/* ── What is going on, right below agents with no blank space ── */}
+            <div className="grid min-w-0 grid-cols-1 gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">
+              <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} onOpenInbox={() => setViewMode('inbox')} />
+              <RecentSessionsPanel onOpenThread={openThread} onNewSession={() => taskRef.current?.focus()} />
+              <UpcomingPanel
+                className="@2xl:col-span-2 @4xl:col-span-1"
+                onOpenAutomations={openAutomations}
+                onOpenThread={openThread}
+              />
+            </div>
           </div>
 
           {/* ── Rail: where, how, and what Start will do ── */}
@@ -535,10 +546,10 @@ export function HomeDashboard() {
               </dl>
             </HomePanel>
 
-            {/* Takes whatever height the main column leaves, and scrolls. */}
+            {/* Takes a neat scrollable height */}
             <section
               aria-labelledby="home-activity-title"
-              className="flex min-h-[18rem] flex-1 basis-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
+              className="flex min-h-[18rem] max-h-[34rem] flex-col overflow-hidden rounded-xl border border-border bg-card"
             >
               <div className="px-4 pt-4">
                 <h2 id="home-activity-title" className="text-sm font-semibold tracking-tight text-foreground">
@@ -549,24 +560,13 @@ export function HomeDashboard() {
               <ActivityTimeline
                 hideHeader
                 events={feed.events}
-                agents={agents.map((a) => a.agentName)}
+                agents={allAvailableAgents.map((a) => a.agentName)}
                 onOpenThread={openThread}
                 loading={feed.loading}
-                className="min-h-0 flex-1 border-l-0 bg-transparent"
+                className="min-h-0 flex-1 border-l-0 bg-transparent overflow-y-auto"
               />
             </section>
           </aside>
-
-          {/* ── What is going on, from data the app already tracks ── */}
-          <div className="grid min-w-0 grid-cols-1 gap-4 @3xl:grid-cols-2 @5xl:col-span-2 @7xl:grid-cols-3">
-            <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} onOpenInbox={() => setViewMode('inbox')} />
-            <RecentSessionsPanel onOpenThread={openThread} onNewSession={() => taskRef.current?.focus()} />
-            <UpcomingPanel
-              className="@3xl:col-span-2 @7xl:col-span-1"
-              onOpenAutomations={openAutomations}
-              onOpenThread={openThread}
-            />
-          </div>
         </div>
       </div>
       <ConnectAgentModal open={connectOpen} onOpenChange={setConnectOpen} />
