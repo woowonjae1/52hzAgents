@@ -41,6 +41,28 @@ type SendEventRequest struct {
 	Metadata        map[string]interface{} `json:"metadata"`                   // 附加元数据信息图
 	Visibility      string                 `json:"visibility"`                 // 消息可见度范围限制（默认为 channel）
 	Network         string                 `json:"network" binding:"required"` // 工作区 ID 或 Slug (必填)
+
+	// afterCommit holds work routing decided on inside the event transaction
+	// but must only run once it has committed. SQLite has one writer: a write
+	// through db.DB while the transaction holds the lock does not fail fast, it
+	// waits out busy_timeout (10s) and then fails. That is how the parallel
+	// batch's state event held every "@a @b" message in a parallel thread for
+	// ~11s before any lane could start, and was then lost anyway.
+	afterCommit []func()
+}
+
+// deferUntilCommitted queues fn to run after the event transaction commits.
+func (r *SendEventRequest) deferUntilCommitted(fn func()) {
+	r.afterCommit = append(r.afterCommit, fn)
+}
+
+// runAfterCommit runs, once, the work routing deferred until commit.
+func (r *SendEventRequest) runAfterCommit() {
+	fns := r.afterCommit
+	r.afterCommit = nil
+	for _, fn := range fns {
+		fn()
+	}
 }
 
 // verifyWorkspaceAccess 校验客户端请求是否拥有该工作区的合法访问权限。
@@ -268,6 +290,7 @@ func SendEvent(c *gin.Context) {
 			Payload:     string(fullEventBytes),
 		})
 	}
+	req.runAfterCommit()
 
 	// Check if this event finishes an agent turn and should trigger the next pipeline step
 	if isAgentSource(req.Source) && messageType(req.Payload) == "chat" {
@@ -603,6 +626,7 @@ func StreamEventsWS(c *gin.Context) {
 				Payload:     string(fullEventBytes),
 			})
 		}
+		parsedReq.runAfterCommit()
 
 		if isAgentSource(parsedReq.Source) && messageType(parsedReq.Payload) == "chat" {
 			CheckAndTriggerNextPipelineStep(workspace.ID, parsedReq.Target, parsedReq.Source)

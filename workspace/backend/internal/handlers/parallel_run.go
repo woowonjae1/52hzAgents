@@ -281,12 +281,21 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 		}
 		dispatch[lanes[i].Agent] = dispatchFor(&lanes[i])
 	}
-	_ = PublishWorkspaceStateEvent(workspaceID, "workspace.parallel.batch", "system:parallel", channel.Name, gin.H{"batch_id": batch.ID, "status": batch.Status})
+	// No state event here: tx is the routing transaction, which holds SQLite's
+	// only write lock, and PublishWorkspaceStateEvent writes through db.DB. The
+	// caller publishes it once the transaction commits (publishBatchStarted).
 	return map[string]interface{}{
 		"batch_id":  batch.ID,
 		"isolation": batch.Isolation,
 		"lanes":     dispatch,
 	}
+}
+
+// publishBatchStarted records and broadcasts that a batch started. It writes
+// through db.DB, so it must run after the routing transaction has committed.
+func publishBatchStarted(workspaceID, channelName string, meta map[string]interface{}) {
+	_ = PublishWorkspaceStateEvent(workspaceID, "workspace.parallel.batch", "system:parallel", channelName,
+		gin.H{"batch_id": meta["batch_id"], "status": batchRunning})
 }
 
 // postChannelMessage inserts a message event and broadcasts it, the same way

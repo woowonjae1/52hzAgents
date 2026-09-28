@@ -355,7 +355,12 @@ func LatestEventsPerChannel(c *gin.Context) {
 }
 
 func materializeEvent(workspaceID string, req *SendEventRequest, timestamp int64) error {
-	return materializeEventTx(db.DB, workspaceID, req, timestamp)
+	// No transaction here, so work deferred until commit can run right away.
+	if err := materializeEventTx(db.DB, workspaceID, req, timestamp); err != nil {
+		return err
+	}
+	req.runAfterCommit()
+	return nil
 }
 
 func materializeEventTx(tx *gorm.DB, workspaceID string, req *SendEventRequest, timestamp int64) error {

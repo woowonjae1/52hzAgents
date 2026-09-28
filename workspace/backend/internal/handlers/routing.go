@@ -900,6 +900,8 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 		if isHumanSource(req.Source) && len(mentions) > 0 {
 			if meta := startParallelBatch(tx, workspaceID, channel, "mention", mentions, laneTasksFromMessage(req, mentions), nil); meta != nil {
 				req.Metadata["parallel_batch"] = meta
+				channelName := channel.Name
+				req.deferUntilCommitted(func() { publishBatchStarted(workspaceID, channelName, meta) })
 			}
 			return mentions, true, nil
 		}
@@ -922,6 +924,8 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 				tasks, scopes := laneTasksFromBoard(loadOpenBatch(workspaceID, channel.Name), wake)
 				if meta := startParallelBatch(tx, workspaceID, channel, "board", wake, tasks, scopes); meta != nil {
 					req.Metadata["parallel_batch"] = meta
+					channelName := channel.Name
+					req.deferUntilCommitted(func() { publishBatchStarted(workspaceID, channelName, meta) })
 				}
 			}
 			return wake, true, nil
