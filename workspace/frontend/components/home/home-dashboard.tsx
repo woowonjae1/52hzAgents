@@ -420,7 +420,9 @@ export function HomeDashboard() {
               />
             </HomePanel>
 
-            {/* ── What is going on, right below agents with no blank space ── */}
+            <OutputPanel onOpenThread={openThread} />
+
+            {/* ── What is going on: attention, recent sessions, upcoming ── */}
             <div className="grid min-w-0 grid-cols-1 gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">
               <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} onOpenInbox={() => setViewMode('inbox')} />
               <RecentSessionsPanel onOpenThread={openThread} onNewSession={() => taskRef.current?.focus()} />
@@ -430,8 +432,6 @@ export function HomeDashboard() {
                 onOpenThread={openThread}
               />
             </div>
-
-            <OutputPanel onOpenThread={openThread} />
           </div>
 
           {/* ── Rail: where, how, and what Start will do ── */}
