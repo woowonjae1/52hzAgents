@@ -11,6 +11,99 @@
 // the frontend's own camelCase types in lib/api rather than using them in UI.
 
 /**
+ * ActivityCommit is one commit on the calendar.
+ *
+ * Go: handlers.ActivityCommit
+ */
+export interface ActivityCommit {
+  hash: string;
+  /**
+   * Time is the author time in unix milliseconds. The client buckets it into
+   * days in its own time zone.
+   */
+  time: number;
+  repo: string;
+  subject: string;
+  /**
+   * Agent is set when the commit falls inside exactly one agent's turn.
+   */
+  agent?: string;
+  /**
+   * Shared is set when several agents had a turn open on the repository at
+   * the time, so the commit cannot be pinned on one of them.
+   */
+  shared?: boolean;
+}
+
+/**
+ * ActivityCommitsResponse is GET /v1/workspaces/:id/activity/commits.
+ *
+ * Go: handlers.ActivityCommitsResponse
+ */
+export interface ActivityCommitsResponse {
+  since: number;
+  repos: ActivityRepo[];
+  commits: ActivityCommit[];
+}
+
+/**
+ * ActivityRepo is one repository the calendar read.
+ *
+ * Go: handlers.ActivityRepo
+ */
+export interface ActivityRepo {
+  name: string;
+  path: string;
+  /**
+   * Email is the git identity commits were filtered by. Empty means the
+   * repository has no user.email configured, so every commit in it counts.
+   */
+  email: string;
+  /**
+   * Error is set when git could not be read; the repository contributes no
+   * commits rather than failing the whole calendar.
+   */
+  error?: string;
+}
+
+/**
+ * ActivityTurn is one agent turn on the day timeline.
+ *
+ * Go: handlers.ActivityTurn
+ */
+export interface ActivityTurn {
+  id: string;
+  agent_name: string;
+  channel_name: string;
+  status: string;
+  started_at: number;
+  /**
+   * FinishedAt is nil while the turn is running, and also when the agent
+   * never reported back -- see EndUnknown.
+   */
+  finished_at: number | null;
+  /**
+   * EndUnknown marks a turn that was expired because its agent never
+   * reported back. The time it was expired is not when the work ended, so it
+   * is withheld rather than drawn as the turn's length.
+   */
+  end_unknown: boolean;
+  additions: number;
+  deletions: number;
+  file_count: number;
+  contended: boolean;
+}
+
+/**
+ * ActivityTurnsResponse is GET /v1/workspaces/:id/activity/turns.
+ *
+ * Go: handlers.ActivityTurnsResponse
+ */
+export interface ActivityTurnsResponse {
+  turns: ActivityTurn[];
+}
+
+/**
  * Go: models.Agent
  */
 export interface Agent {

@@ -8,6 +8,7 @@ import { PlanningApi, parseScheduleDays } from './api/planning';
 import { AgentsApi } from './api/agents';
 import { GitApi } from './api/git';
 import { OrchestrationApi } from './api/orchestration';
+import { ActivityApi } from './api/activity';
 
 export { mapCustomSkill, parseScheduleDays, mapFileResponse };
 
@@ -35,7 +36,8 @@ export interface WorkspaceApi extends
   PlanningApi,
   AgentsApi,
   GitApi,
-  OrchestrationApi {}
+  OrchestrationApi,
+  ActivityApi {}
 
 export class WorkspaceApi extends BaseWorkspaceApi {}
 
@@ -49,6 +51,7 @@ applyMixins(WorkspaceApi, [
   AgentsApi,
   GitApi,
   OrchestrationApi,
+  ActivityApi,
 ]);
 
 export const workspaceApi = new WorkspaceApi();

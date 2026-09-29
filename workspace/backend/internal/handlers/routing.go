@@ -933,9 +933,15 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 		// No open batch. Fall through, so a channel parked in parallel mode
 		// still answers an ordinary question between batches.
 	}
-	if len(mentions) > 0 {
-		// Fast path: Explicit @mention directly routes to the targeted agent(s)
-		// without invoking routeWithLLM. Explicit mention is authoritative and saves 1-3s latency.
+	if len(mentions) > 0 && isHumanSource(req.Source) {
+		// Fast path: when the PERSON names an agent, that agent does it -- in
+		// Dynamic without asking the router, in Master without going through the
+		// master. The master only gets what nobody was named for.
+		//
+		// Human messages only. An agent naming another agent in its reply keeps
+		// the mode's own rules below (masterTargets / router / fallback);
+		// letting every agent-to-agent @ wake its target directly is how two
+		// agents end up waking each other forever.
 		targets = mentions
 		if mode != "parallel" && len(targets) > 1 {
 			targets = targets[:1]

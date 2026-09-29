@@ -61,6 +61,11 @@ const (
 	checkpointPruneBatch = 50
 )
 
+// staleTurnReason is recorded on a turn expired by expireStaleTurns. Readers
+// match on it to tell "the agent never reported back" -- whose finished_at is
+// only when the expiry ran -- from a turn that genuinely ended.
+const staleTurnReason = "agent never reported back; change set cannot be attributed"
+
 // checkpointRefPrefix namespaces the refs that keep pre-turn snapshots alive.
 // A private namespace keeps them out of `git branch`, `git tag`, and pushes.
 const checkpointRefPrefix = "refs/52hz/checkpoints/"
@@ -773,7 +778,7 @@ func expireStaleTurns(workspaceID string) {
 		Where("workspace_id = ? AND status = ? AND started_at < ?", workspaceID, "open", cutoff).
 		Updates(map[string]interface{}{
 			"status":      "unavailable",
-			"reason":      "agent never reported back; change set cannot be attributed",
+			"reason":      staleTurnReason,
 			"finished_at": nowMs,
 		}).Error; err != nil {
 		log.Printf("turn-changes: failed to expire stale turns: %v", err)

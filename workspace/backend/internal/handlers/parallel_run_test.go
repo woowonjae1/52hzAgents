@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -184,9 +185,11 @@ func TestParallelConflictingLaneKeepsItsBranch(t *testing.T) {
 	approve(t, batch.ID)
 
 	got := lanesOf(batch.ID)
-	if got["alpha"].Status != laneMerged || got["beta"].Status != laneConflict {
-		t.Fatalf("want alpha merged, beta conflict; got %s / %s", got["alpha"].Status, got["beta"].Status)
+	// beta conflicted on merge and was sent straight back to resolve it, once.
+	if got["alpha"].Status != laneMerged || got["beta"].Status != laneRunning || got["beta"].Attempts != 2 {
+		t.Fatalf("want alpha merged, beta back to running on attempt 2; got %s / %s (attempt %d)", got["alpha"].Status, got["beta"].Status, got["beta"].Attempts)
 	}
+	assertRedispatchedInWorktree(t, batch.ChannelName, got["beta"], "conflicts with")
 	if !strings.Contains(git(t, repo, "branch", "--list", got["beta"].Branch), got["beta"].Branch) {
 		t.Fatal("conflicting branch was deleted")
 	}
@@ -204,6 +207,12 @@ func TestParallelDirtyBaseKeepsEverythingAndFailedLaneIsNotMerged(t *testing.T) 
 	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("user is editing\n"), 0644) // uncommitted work in the base
 	finish(t, batch.ID, "alpha", false)
 	finish(t, batch.ID, "beta", true)
+	// The first failure goes back to beta, in its worktree, with the error.
+	if l := lanesOf(batch.ID)["beta"]; l.Status != laneRunning || l.Attempts != 2 {
+		t.Fatalf("failed lane should be bounced once: %s attempt %d", l.Status, l.Attempts)
+	}
+	assertRedispatchedInWorktree(t, batch.ChannelName, lanesOf(batch.ID)["beta"], "failed (boom)")
+	finish(t, batch.ID, "beta", true) // fails again: now it is left for the user
 	approve(t, batch.ID)
 
 	got := lanesOf(batch.ID)
@@ -386,6 +395,7 @@ func TestParallelSummaryOfAnUnmergedBatchSaysNothingMerged(t *testing.T) {
 	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("user is editing\n"), 0644)
 	finish(t, batch.ID, "alpha", false)
 	finish(t, batch.ID, "beta", true)
+	finish(t, batch.ID, "beta", true) // its one automatic retry fails too
 	approve(t, batch.ID)
 
 	s := postedSummary(t, batch.ChannelName)
@@ -499,4 +509,39 @@ func TestParallelResumeMetadataOnlyForARunningLane(t *testing.T) {
 	if ParallelResumeMetadata("", "alpha") != nil || ParallelResumeMetadata(batch.ID, "nobody") != nil {
 		t.Fatal("unknown batch or agent must give nil")
 	}
+}
+
+// assertRedispatchedInWorktree checks the lane was sent back through the lane
+// path: a message targeting it whose parallel_batch metadata carries its own
+// worktree -- not a bare @mention, which would run it in the main checkout.
+func assertRedispatchedInWorktree(t *testing.T, channelName string, lane models.ParallelLaneRecord, wantText string) {
+	t.Helper()
+	var rows []models.EventRecord
+	db.DB.Where("source = ? AND target = ? AND type = ?", "system:parallel", "channel/"+channelName, "workspace.message.posted").
+		Order("timestamp DESC").Find(&rows)
+	for _, r := range rows {
+		var meta map[string]interface{}
+		_ = json.Unmarshal(r.Metadata, &meta)
+		pb, _ := meta["parallel_batch"].(map[string]interface{})
+		if pb == nil {
+			continue
+		}
+		lanes, _ := pb["lanes"].(map[string]interface{})
+		d, _ := lanes[lane.Agent].(map[string]interface{})
+		if d == nil {
+			continue
+		}
+		if d["working_dir"] != lane.WorktreePath || lane.WorktreePath == "" {
+			t.Fatalf("redispatch runs outside the lane worktree: %v", d["working_dir"])
+		}
+		targets, _ := meta["target_agents"].([]interface{})
+		if len(targets) != 1 || targets[0] != lane.Agent {
+			t.Fatalf("redispatch targets %v, want only %s", targets, lane.Agent)
+		}
+		if !strings.Contains(string(r.Payload), wantText) {
+			t.Fatalf("redispatch message lacks %q: %s", wantText, r.Payload)
+		}
+		return
+	}
+	t.Fatalf("no lane redispatch message for %s", lane.Agent)
 }

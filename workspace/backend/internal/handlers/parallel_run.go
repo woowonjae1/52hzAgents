@@ -435,10 +435,36 @@ func finishLane(batch *models.ParallelBatchRecord, lane *models.ParallelLaneReco
 	var running int64
 	db.DB.Model(&models.ParallelLaneRecord{}).Where("batch_id = ? AND status = ?", batch.ID, laneRunning).Count(&running)
 	if running == 0 {
+		// A failed lane goes back to its agent, in its worktree, once, with the
+		// error -- before the user is asked to review a batch with a hole in it.
+		if bounceFailedLanes(batch) {
+			return
+		}
 		if !enterReview(batch) {
 			finalizeBatch(batch)
 		}
 	}
+}
+
+// bounceFailedLanes redispatches every failed lane that still has its automatic
+// retry. Returns true if any went back, i.e. the batch is running again.
+func bounceFailedLanes(batch *models.ParallelBatchRecord) bool {
+	var failed []models.ParallelLaneRecord
+	db.DB.Where("batch_id = ? AND status = ?", batch.ID, laneFailed).Order("agent").Find(&failed)
+	bounced := false
+	for i := range failed {
+		lane := &failed[i]
+		if !canBounce(lane) {
+			continue
+		}
+		diag := strings.TrimSpace(lane.Error)
+		if diag == "" {
+			diag = "unknown failure"
+		}
+		redispatchLane(batch, lane, fmt.Sprintf("Your part of the parallel batch failed (%s). Look at what went wrong and finish it.", diag))
+		bounced = true
+	}
+	return bounced
 }
 
 // baseRef is what lane branches are compared against and merged into.
@@ -500,18 +526,11 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 		return false
 	}
 
-	var failedAgents []string
-	for _, l := range lanes {
-		if l.Status == laneFailed {
-			failedAgents = append(failedAgents, l.Agent)
-		}
-	}
-
 	batch.Status = batchReview
 	batch.Summary = reviewSummary(batch, lanes)
 	db.DB.Save(batch)
 	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
-	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, failedAgents, map[string]interface{}{
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID, "review": true},
 	})
 	return true
@@ -520,11 +539,9 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 func reviewSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLaneRecord) string {
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("**Parallel batch ready for review** — nothing has been merged into `%s` yet. Review each lane, then Merge or Discard in the panel above.\n\n", baseRef(batch)))
-	var failedLanes []models.ParallelLaneRecord
 	for _, l := range lanes {
 		switch {
 		case l.Status == laneFailed:
-			failedLanes = append(failedLanes, l)
 			b.WriteString(fmt.Sprintf("❌ **@%s** — failed", l.Agent))
 			if l.Error != "" {
 				b.WriteString(" · " + l.Error)
@@ -537,16 +554,6 @@ func reviewSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLan
 		b.WriteString("\n")
 		if l.Reply != "" {
 			b.WriteString("  > " + strings.ReplaceAll(truncateRunes(l.Reply, 280), "\n", " ") + "\n")
-		}
-	}
-	if len(failedLanes) > 0 {
-		b.WriteString("\n")
-		for _, fl := range failedLanes {
-			diag := fl.Error
-			if diag == "" {
-				diag = "unknown execution failure"
-			}
-			b.WriteString(fmt.Sprintf("⚠️ @%s [Task Issue Bounced Back] Your parallel lane failed: %s. Please inspect branch `%s` and worktree `%s` to fix the problem.\n", fl.Agent, diag, fl.Branch, fl.WorktreePath))
 		}
 	}
 	return strings.TrimSpace(b.String())
@@ -721,32 +728,25 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 		}
 	}
 
-	var issueAgents []string
-	for _, l := range lanes {
-		if l.Status == laneFailed || l.Status == laneConflict {
-			issueAgents = append(issueAgents, l.Agent)
-			targets = append(targets, l.Agent)
-		}
-	}
-
 	content := batch.Summary
 	if hasMaster && len(targets) > 0 {
 		content += "\n\n@" + *channel.MasterAgent + " please review the combined result above: check the merged changes fit together, and resolve or report anything listed as a conflict or failure."
 	}
-	if len(issueAgents) > 0 {
-		for _, l := range lanes {
-			if l.Status == laneFailed || l.Status == laneConflict {
-				diag := l.Error
-				if diag == "" {
-					diag = l.Status
-				}
-				content += fmt.Sprintf("\n\n⚠️ @%s [Task Issue Bounced Back] Your parallel lane encountered an issue (%s): %s. Please review your branch `%s` and worktree `%s` to resolve it.", l.Agent, l.Status, diag, l.Branch, l.WorktreePath)
-			}
-		}
-	}
 	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", content, targets, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID},
 	})
+	// A lane whose branch conflicts goes back to its agent, in its worktree, to
+	// merge the base in and resolve it; it then returns to review like any lane.
+	base := baseRef(batch)
+	for i := range lanes {
+		lane := &lanes[i]
+		if lane.Status != laneConflict || !canBounce(lane) {
+			continue
+		}
+		redispatchLane(batch, lane, fmt.Sprintf(
+			"Your branch `%s` conflicts with `%s`, so it was not merged. For this run only: in your worktree run `git merge %s`, resolve every conflict, and leave the result uncommitted -- it is committed for you.",
+			lane.Branch, base, base))
+	}
 }
 
 func batchSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLaneRecord, baseDirty string) string {
@@ -828,26 +828,55 @@ func RetryParallelLane(c *gin.Context) {
 			return
 		}
 	}
+	redispatchLane(&batch, &lane, fmt.Sprintf("Retrying @%s's part of the parallel batch (attempt %d).", lane.Agent, lane.Attempts+1))
+	c.JSON(200, gin.H{"lane": lane})
+}
+
+// redispatchLane runs a lane again in its OWN worktree: the message carries the
+// lane's parallel_batch metadata, so the adapter enters the worktree with the
+// lane brief (no commits, no branch switching) exactly as on the first run.
+// Waking the agent with a plain @mention instead would run it in the channel's
+// project folder -- the main checkout -- with none of those rules.
+func redispatchLane(batch *models.ParallelBatchRecord, lane *models.ParallelLaneRecord, note string) {
 	lane.Status = laneRunning
 	lane.Error = ""
 	lane.FinishedAt = nil
 	lane.Attempts++
 	lane.StartedAt = time.Now().UTC()
-	db.DB.Save(&lane)
+	db.DB.Save(lane)
 	if batch.Status != batchRunning {
 		batch.Status = batchRunning
 		batch.FinishedAt = nil
-		db.DB.Save(&batch)
+		db.DB.Save(batch)
 	}
-	postChannelMessage(workspace.ID, batch.ChannelName, "system:parallel",
-		fmt.Sprintf("Retrying @%s's part of the parallel batch (attempt %d).\n\n%s", lane.Agent, lane.Attempts, lane.Task),
+	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.lane", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "lane": lane})
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel",
+		strings.TrimSpace(note+"\n\n"+lane.Task),
 		[]string{lane.Agent},
 		map[string]interface{}{"parallel_batch": map[string]interface{}{
 			"batch_id":  batch.ID,
 			"isolation": batch.Isolation,
-			"lanes":     map[string]laneDispatch{lane.Agent: dispatchFor(&lane)},
+			"lanes":     map[string]laneDispatch{lane.Agent: dispatchFor(lane)},
 		}})
-	c.JSON(200, gin.H{"lane": lane})
+}
+
+// maxAutoBounces is how many times a lane is sent back automatically (after a
+// failure, or to resolve a merge conflict) before it is left for the user. One:
+// a lane that fails twice needs a person, and more would let a broken lane loop.
+const maxAutoBounces = 1
+
+// canBounce reports whether lane may be sent back on its own: it has not used
+// its automatic retry, and its worktree (when it has one) still exists.
+func canBounce(lane *models.ParallelLaneRecord) bool {
+	if lane.Attempts > maxAutoBounces {
+		return false
+	}
+	if lane.WorktreePath != "" {
+		if _, err := os.Stat(lane.WorktreePath); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 // ExpireStaleParallelLanes fails lanes that have been running past the

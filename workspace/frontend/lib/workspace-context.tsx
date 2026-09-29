@@ -1904,9 +1904,12 @@ export function WorkspaceProvider({
       // The folder binding and a non-default mode ride a separate PATCH --
       // channel creation goes through the event pipeline, which carries
       // neither. Best-effort: a failed PATCH still leaves a usable thread.
-      const patch: { workingDir?: string; orchestrationMode?: string; verificationCmd?: string } = {};
+      const patch: { workingDir?: string; orchestrationMode?: string; verificationCmd?: string; masterAgent?: string } = {};
       if (draft.workingDir) patch.workingDir = draft.workingDir;
       if (draft.orchestrationMode && draft.orchestrationMode !== 'dynamic') patch.orchestrationMode = draft.orchestrationMode;
+      // The server refuses Master without a master; send it alongside the mode
+      // rather than trusting channel creation to have stored it.
+      if (patch.orchestrationMode === 'master' && draft.master) patch.masterAgent = draft.master;
       if (draft.verificationCmd) patch.verificationCmd = draft.verificationCmd;
       if (Object.keys(patch).length > 0) {
         try {

@@ -63,6 +63,9 @@ var sources = []source{
 		// token_stats.go: GET .../tokens/stats
 		"WorkspaceTokenStatsResponse",
 		"AgentTokenStat",
+		// activity.go: GET .../activity/commits, .../activity/turns
+		"ActivityCommitsResponse",
+		"ActivityTurnsResponse",
 	}},
 }
 

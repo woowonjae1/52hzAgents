@@ -34,6 +34,7 @@ import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { FieldLabel, FieldValue, HomePanel } from './home-panel';
 import { NeedsAttentionPanel, RecentSessionsPanel, UpcomingPanel } from './home-sections';
 import { AgentGrid } from './agent-grid';
+import { OutputPanel } from './output-panel';
 import { AgentDetailPanel, type AgentState } from './agent-detail-panel';
 import { ConnectAgentModal } from '@/components/mission/connect-agent-modal';
 
@@ -429,6 +430,8 @@ export function HomeDashboard() {
                 onOpenThread={openThread}
               />
             </div>
+
+            <OutputPanel onOpenThread={openThread} />
           </div>
 
           {/* ── Rail: where, how, and what Start will do ── */}

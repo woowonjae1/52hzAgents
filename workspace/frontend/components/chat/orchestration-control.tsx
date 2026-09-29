@@ -3,6 +3,9 @@
 import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import { Waypoints, Crown, Sparkles } from 'lucide-react';
+import { Popover as PopoverPrimitive } from 'radix-ui';
+import { Popover, PopoverContent } from '@/components/ui/popover';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { cn } from '@/lib/utils';
 import type { WorkspaceSession, WorkspaceAgent } from '@/lib/types';
 
@@ -46,6 +49,12 @@ interface Props {
   session: WorkspaceSession;
   agents: WorkspaceAgent[];
   onChange: (updates: { mode?: Mode; instruction?: string | null; verificationCmd?: string | null }) => void;
+  /**
+   * Sets the thread's master agent. Master mode is only entered once one is
+   * set: without a master, the router has nobody to give an un-addressed
+   * message to and silently behaves like Dynamic.
+   */
+  onMasterChange?: (agentName: string) => void;
 }
 
 /**
@@ -59,7 +68,8 @@ interface Props {
  * and the explanation moved to the hover, where it is read once and then
  * never again.
  */
-export function OrchestrationControl({ session, onChange }: Props) {
+export function OrchestrationControl({ session, agents, onChange, onMasterChange }: Props) {
+  const [pickingMaster, setPickingMaster] = React.useState(false);
   const stored = (session.orchestrationMode || 'dynamic') as Mode | 'workflow';
   // A thread saved under the removed 'workflow' mode reads as dynamic, which is
   // what it effectively already was.
@@ -71,8 +81,30 @@ export function OrchestrationControl({ session, onChange }: Props) {
     instead of asking for the split a second time here.
   */
   const select = (next: Mode) => {
-    if (next !== mode) onChange({ mode: next });
+    if (next === mode) return;
+    // Master needs a master. Ask for one first, and switch only once it is
+    // picked -- a Master thread with no master routes like Dynamic.
+    if (next === 'master' && !session.master && onMasterChange) {
+      setPickingMaster(true);
+      return;
+    }
+    onChange({ mode: next });
   };
+
+  const pickMaster = (agentName: string) => {
+    onMasterChange?.(agentName);
+    onChange({ mode: 'master' });
+    setPickingMaster(false);
+  };
+
+  // Candidates: the thread's agents, online ones first. `participants` is the
+  // workspace roster (see channel-participants-are-roster), so it is the right
+  // list to choose a lead from.
+  const candidates = React.useMemo(() => {
+    const names = new Set((session.participants || []).map((n) => n.toLowerCase()));
+    const pool = agents.filter((a) => names.size === 0 || names.has(a.agentName.toLowerCase()));
+    return [...pool].sort((a, b) => Number(b.status === 'online') - Number(a.status === 'online'));
+  }, [agents, session.participants]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -85,6 +117,8 @@ export function OrchestrationControl({ session, onChange }: Props) {
   };
 
   return (
+    <Popover open={pickingMaster} onOpenChange={(open) => { if (!open) setPickingMaster(false); }}>
+    <PopoverPrimitive.Anchor asChild>
     <div
       role="radiogroup"
       aria-label="Collaboration mode"
@@ -132,5 +166,32 @@ export function OrchestrationControl({ session, onChange }: Props) {
         );
       })}
     </div>
+    </PopoverPrimitive.Anchor>
+    <PopoverContent side="top" align="start" className="w-64 p-2">
+      <p className="px-1.5 pb-1.5 text-xs font-medium text-foreground">Pick the master agent</p>
+      <p className="px-1.5 pb-2 text-2xs text-foreground-muted leading-snug">
+        It gets every message you do not address with @, and hands work out.
+      </p>
+      {candidates.length === 0 ? (
+        <p className="px-1.5 py-1 text-2xs text-foreground-muted">No agents in this thread yet.</p>
+      ) : (
+        <ul className="max-h-60 overflow-y-auto">
+          {candidates.map((a) => (
+            <li key={a.agentName}>
+              <button
+                type="button"
+                onClick={() => pickMaster(a.agentName)}
+                className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <AgentAvatar name={a.agentName} agentType={a.agentType} size={18} status={a.status} showStatus />
+                <span className="truncate">{a.agentName}</span>
+                {a.status !== 'online' && <span className="ml-auto text-2xs text-foreground-muted">offline</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PopoverContent>
+    </Popover>
   );
 }

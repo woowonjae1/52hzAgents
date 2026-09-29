@@ -6,7 +6,6 @@ import (
 	"encoding/json" // 编码事件负载。
 	"fmt"
 	"log"  // 打印到期任务触发日志。
-	"sync"
 	"time" // 控制轮询间隔与到期比对。
 
 	"github.com/google/uuid" // 生成事件唯一 UUID 主键。
@@ -17,14 +16,12 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"   // 表模型结构体。
 )
 
-var (
-	nextTimerWakeMu   sync.RWMutex
-	nextTimerWake     time.Time
-	nextRoutineWakeMu sync.RWMutex
-	nextRoutineWake   time.Time
-)
-
-// StartScheduler 启动定时任务常驻协程，采用分级频率与内存时间轮感知，降低空转扫表消耗。
+// StartScheduler 启动定时任务常驻协程：到期扫描每 5 秒一次，过期清理分级降频。
+//
+// 到期扫描（timers / routines）不做内存缓存。曾经缓存过「最早一条的触发时刻」
+// 并在此之前跳过扫描，但新建提醒、批准/恢复周期任务都不会更新这个缓存，于是
+// 已有一条 2 小时后的提醒时，新建的 1 分钟提醒要等 2 小时才响。那条查询走
+// (status, fires_at) 索引，每 5 秒一次几乎零成本，不值得用正确性去换。
 func StartScheduler() {
 	go func() {
 		log.Println("Starting background scheduler loop with tiered interval checks...")
@@ -40,7 +37,7 @@ func StartScheduler() {
 						log.Printf("Recovered from panic in background scheduler loop: %v", r)
 					}
 				}()
-				// Tier 1: 高频心跳与即时计时器扫描 (每 5 秒，带内存唤醒缓存)
+				// Tier 1: 高频心跳与到期扫描 (每 5 秒)
 				expireStaleAgents()
 				expireOrphanedAgentTurns()
 				fireDueTimers()
@@ -121,13 +118,6 @@ func fireDueTimers() {
 		return
 	}
 	now := time.Now().UTC() // 获取当前的 UTC 时刻。
-
-	nextTimerWakeMu.RLock()
-	wake := nextTimerWake
-	nextTimerWakeMu.RUnlock()
-	if !wake.IsZero() && now.Before(wake) {
-		return
-	}
 
 	var dueTimers []models.TimerRecord // 声明列表存放被捕获的到期定时器。
 
@@ -261,18 +251,6 @@ func fireDueTimers() {
 
 		log.Printf("Timer %s successfully fired in channel: %s", timer.ID, timer.ChannelName)
 	}
-
-	// 动态计算下一次最早触发时刻，避免空转反复扫表
-	var earliestTimer models.TimerRecord
-	if err := db.DB.Where("status = ?", "active").Order("fires_at ASC").Limit(1).Find(&earliestTimer).Error; err == nil && earliestTimer.ID != "" {
-		nextTimerWakeMu.Lock()
-		nextTimerWake = earliestTimer.FiresAt
-		nextTimerWakeMu.Unlock()
-	} else {
-		nextTimerWakeMu.Lock()
-		nextTimerWake = now.Add(25 * time.Second)
-		nextTimerWakeMu.Unlock()
-	}
 }
 
 // fireDueRoutines 扫描并触发周期性循环定时任务。
@@ -281,13 +259,6 @@ func fireDueRoutines() {
 		return
 	}
 	now := time.Now().UTC() // 当前 UTC 时间。
-
-	nextRoutineWakeMu.RLock()
-	wake := nextRoutineWake
-	nextRoutineWakeMu.RUnlock()
-	if !wake.IsZero() && now.Before(wake) {
-		return
-	}
 
 	var dueRoutines []models.RoutineRecord // 存储临时结果。
 
@@ -328,18 +299,6 @@ func fireDueRoutines() {
 		} else {
 			log.Printf("Routine %s (%s, Name: %s) successfully triggered in channel: %s", r.ID, r.ShortID, r.Name, r.ChannelName)
 		}
-	}
-
-	// 动态计算周期任务下一次最早触发时刻
-	var earliestRoutine models.RoutineRecord
-	if err := db.DB.Where("status = ?", "active").Order("next_fires_at ASC").Limit(1).Find(&earliestRoutine).Error; err == nil && earliestRoutine.ID != "" {
-		nextRoutineWakeMu.Lock()
-		nextRoutineWake = earliestRoutine.NextFiresAt
-		nextRoutineWakeMu.Unlock()
-	} else {
-		nextRoutineWakeMu.Lock()
-		nextRoutineWake = now.Add(25 * time.Second)
-		nextRoutineWakeMu.Unlock()
 	}
 }
 

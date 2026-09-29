@@ -512,20 +512,34 @@ class PiAdapter extends BaseAdapter {
             name: toolName,
             args: input,
             status: 'running',
-            id: event.id || event.toolCallId || event.tool_call_id,
+            // Same precedence as the end event below, so the two always pair.
+            id: event.toolCallId || event.id || event.tool_call_id,
           });
         } catch {}
       }
 
-      if (eventType === 'tool_execution_end' && (event.isError || event.error)) {
+      // Every tool END is reported, success included, under the same id as its
+      // start (pi's agent loop puts `toolCallId` on both). The workspace pairs
+      // them by `tool_call_id` and shows one line in its final state; reporting
+      // only failures left every successful call reading "running" forever.
+      if (eventType === 'tool_execution_end') {
         const toolName = event.toolName || event.name || event.tool || event.tool_name || 'tool';
-        const errMsg = event.result || event.error || '';
+        const failed = Boolean(event.isError || event.error);
+        let errMsg = '';
+        if (failed) {
+          // `result` is pi's tool result object ({ content: [{ type, text }] }),
+          // not a string; fall back to `error` when there is no text in it.
+          const parts = event.result && Array.isArray(event.result.content) ? event.result.content : [];
+          errMsg = parts.map((c) => (c && typeof c.text === 'string' ? c.text : '')).join(' ').trim()
+            || (typeof event.result === 'string' ? event.result : '')
+            || (typeof event.error === 'string' ? event.error : '');
+        }
         try {
           await this.sendToolCall(channelName, {
             name: toolName,
-            status: 'failed',
+            status: failed ? 'failed' : 'ok',
             id: event.toolCallId || event.id || event.tool_call_id,
-            summary: typeof errMsg === 'string' ? errMsg.slice(0, 100) : undefined,
+            summary: errMsg ? errMsg.slice(0, 100) : undefined,
           });
         } catch {}
       }

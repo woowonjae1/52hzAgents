@@ -354,3 +354,38 @@ test('PiAdapter passes userMessage to _resolveWorkingDir to support directory ov
   assert.equal(capturedMessageText, '工作目录 D:\\code\\override check recent commit');
 });
 
+
+test('PiAdapter reports every tool END under the start\'s id, so the workspace can close the running line', async () => {
+  // pi's agent loop puts `toolCallId` on both tool_execution_start and _end.
+  // Only failures used to be reported, so every successful call read
+  // "running" in the transcript for ever.
+  const client = createMockClient();
+  const adapter = new PiAdapter({ agentName: 'pi-test', workspaceId: 'ws-1', endpoint: 'http://localhost:3000', token: 't', client });
+  const fakeProc = createFakeProc();
+  adapter._findPiBinary = () => 'node';
+  adapter._resolveWorkingDir = async () => process.cwd();
+  adapter._spawnProc = () => fakeProc;
+  const runPromise = adapter._runPi('p', 'ch-1');
+  await delay(10);
+  const push = (e) => fakeProc.stdout.push(JSON.stringify(e) + '\n');
+  push({ type: 'tool_execution_start', toolCallId: 'tc_1', toolName: 'bash', args: { command: 'ls' } });
+  push({ type: 'tool_execution_end', toolCallId: 'tc_1', toolName: 'bash', result: { content: [{ type: 'text', text: 'a b' }] }, isError: false });
+  push({ type: 'tool_execution_start', toolCallId: 'tc_2', toolName: 'read', args: { path: 'x' } });
+  push({ type: 'tool_execution_end', toolCallId: 'tc_2', toolName: 'read', result: { content: [{ type: 'text', text: 'ENOENT: no such file' }] }, isError: true });
+  push({ type: 'message_end', message: { role: 'assistant', content: [{ type: 'text', text: 'done' }] } });
+  fakeProc.stdout.push(null);
+  fakeProc.stderr.push(null);
+  await delay(10);
+  fakeProc.emit('exit', 0);
+  await runPromise;
+
+  const calls = client.sentMessages
+    .filter((m) => m.opts && m.opts.metadata && m.opts.metadata.tool_name)
+    .map((m) => [m.opts.metadata.tool_call_id, m.opts.metadata.tool_status, m.opts.metadata.tool_summary]);
+  assert.deepEqual(calls, [
+    ['tc_1', 'running', undefined],
+    ['tc_1', 'ok', undefined],
+    ['tc_2', 'running', undefined],
+    ['tc_2', 'failed', 'ENOENT: no such file'],
+  ]);
+});

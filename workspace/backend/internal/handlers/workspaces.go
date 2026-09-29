@@ -294,6 +294,13 @@ func PatchChannel(c *gin.Context) {
 		ch.MasterAgent = req.MasterAgent
 	}
 	if req.OrchestrationMode != nil {
+		// Master needs a master: without one an un-addressed message has nobody
+		// to go to and the thread silently routes like Dynamic. Either the
+		// channel already has one or this same request sets it.
+		if *req.OrchestrationMode == "master" && (ch.MasterAgent == nil || strings.TrimSpace(*ch.MasterAgent) == "") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "master mode needs a master agent: set master_agent in the same request"})
+			return
+		}
 		ch.OrchestrationMode = *req.OrchestrationMode
 	}
 	if req.OrchestrationInstruction != nil {

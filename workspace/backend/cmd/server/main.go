@@ -124,6 +124,8 @@ func main() { // 服务程序运行主入口函数。
 		v1.PATCH("/workspaces/:workspace_id/channels/:channel_name", handlers.PatchChannel)      // 修改会话通道属性。
 		v1.GET("/workspaces/:workspace_id/channels/:channel_name", handlers.GetChannel)          // 获取单通道详情。
 		v1.GET("/workspaces/:workspace_id/tokens/stats", handlers.GetWorkspaceTokenStatsHandler) // 获取工作区多智能体 Token 治理与上下文健康大盘
+		v1.GET("/workspaces/:workspace_id/activity/commits", handlers.GetActivityCommits) // 工作区仓库的本地 commit 日历（含 agent 归属）
+		v1.GET("/workspaces/:workspace_id/activity/turns", handlers.GetActivityTurns)     // 某一天各 agent 的轮次时间线
 		v1.GET("/workspaces/:workspace_id/policy/exec", handlers.GetWorkspaceExecPolicy)         // 获取命令执行安全策略
 		v1.PUT("/workspaces/:workspace_id/policy/exec", handlers.UpdateWorkspaceExecPolicy)      // 更新命令执行安全策略
 

@@ -74,7 +74,11 @@ export function AgentGrid({
   React.useEffect(() => {
     if (!openName) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      // Not gated on defaultPrevented: the global Esc handler (global-shortcuts)
+      // also clears Studio state that is not drawn on this view and marks the
+      // event handled, which swallowed this Esc entirely. Open layers are
+      // checked directly instead.
+      if (e.key !== 'Escape') return;
       if (document.querySelector('[role="listbox"], [role="dialog"], [role="alertdialog"], [role="menu"]')) return;
       onOpen(null);
     };

@@ -522,13 +522,12 @@ const SingleStep = memo(function SingleStep({ message, live }: { message: Worksp
           if (status === 'failed' || status === 'error') return 'failed' as const;
           if (status === 'blocked') return 'blocked' as const;
           if (status === 'running' || status === 'pending' || status === 'in_progress') {
-            // A tool call is only in an active 'running' state if the containing trace is live
-            // and the step is not stale (> 5 minutes old). Once settled or aged out,
-            // historical running states render resolved as 'ok' rather than ticking live forever.
-            const isStale = message.createdAt
-              ? Date.now() - new Date(message.createdAt).getTime() > 5 * 60_000
-              : false;
-            return live && !isStale ? ('running' as const) : ('ok' as const);
+            // Still 'running' here means no end was reported for this call (a
+            // reported end is folded in by resolveToolPairs). It is only drawn
+            // as running while it is the live edge of a live trace; once the
+            // trace has moved on or settled it reads as done. No age cutoff:
+            // a 10-minute `npm install` at the live edge IS still running.
+            return live ? ('running' as const) : ('ok' as const);
           }
           return 'ok' as const;
         })()}
@@ -754,7 +753,7 @@ const ParallelTools = memo(function ParallelTools({ messages, live }: { messages
 });
 
 function StepRuns({ steps, live }: { steps: WorkspaceMessage[]; live?: boolean }) {
-  const runs = coalesceThinking(steps);
+  const runs = coalesceThinking(resolveToolPairs(steps));
   return (
     <>
       {runs.map((run, runIdx) =>
@@ -823,6 +822,60 @@ function runDuration(messages: WorkspaceMessage[]): number | undefined {
   if (!first || !last || messages.length < 2) return undefined;
   const ms = new Date(last).getTime() - new Date(first).getTime();
   return ms > 0 ? ms : undefined;
+}
+
+const OPEN_TOOL_STATUSES = new Set(['', 'running', 'pending', 'in_progress']);
+
+/**
+ * Fold each tool call's start and end into ONE step, in its final state.
+ *
+ * Adapters report a call as two messages -- 'running' when it starts, 'ok' /
+ * 'failed' when it ends -- sharing `metadata.tool_call_id`. Drawn one per
+ * message, the start line said "running" for ever and the end drew a second
+ * line under it. Paired here by sender + id: the step keeps the start's
+ * position, arguments and start time, and takes the end's status and summary.
+ * Calls without an id, or with no reported end, pass through unchanged.
+ */
+function resolveToolPairs(steps: WorkspaceMessage[]): WorkspaceMessage[] {
+  const keyOf = (m: WorkspaceMessage) => {
+    const id = m.metadata?.tool_call_id;
+    return isToolCallMessage(m) && typeof id === 'string' && id ? `${m.senderName}\u0000${id}` : null;
+  };
+  const statusOf = (m: WorkspaceMessage) => String(m.metadata?.tool_status || '').toLowerCase();
+
+  const ends = new Map<string, WorkspaceMessage>();
+  for (const m of steps) {
+    const k = keyOf(m);
+    if (k && !OPEN_TOOL_STATUSES.has(statusOf(m))) ends.set(k, m);
+  }
+  if (ends.size === 0) return steps;
+
+  const drawn = new Set<string>();
+  const out: WorkspaceMessage[] = [];
+  for (const m of steps) {
+    const k = keyOf(m);
+    const end = k ? ends.get(k) : undefined;
+    if (!k || !end) {
+      out.push(m);
+      continue;
+    }
+    if (drawn.has(k)) continue; // the pair is already drawn at its first message
+    drawn.add(k);
+    if (m === end) {
+      out.push(m); // an end whose start never arrived
+      continue;
+    }
+    const endSummary = end.metadata?.tool_summary;
+    out.push({
+      ...m,
+      metadata: {
+        ...m.metadata,
+        tool_status: end.metadata?.tool_status,
+        ...(typeof endSummary === 'string' && endSummary ? { tool_summary: endSummary } : {}),
+      },
+    });
+  }
+  return out;
 }
 
 function coalesceThinking(steps: WorkspaceMessage[]): StepRun[] {
@@ -980,7 +1033,7 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
 }: ToolCallsDisclosureProps) {
   const [open, setOpen] = useState(defaultOpen);
 
-  const renderable = (steps || []).filter((s) => !isPlaceholderThinking(s));
+  const renderable = resolveToolPairs((steps || []).filter((s) => !isPlaceholderThinking(s)));
   if (renderable.length === 0) return null;
 
   const runs = coalesceThinking(renderable);

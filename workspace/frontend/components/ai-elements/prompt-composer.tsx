@@ -948,6 +948,7 @@ export function PromptComposer({
                 session={session}
                 agents={agents}
                 onChange={onOrchestrationChange}
+                onMasterChange={onMasterChange}
               />
             )}
 
