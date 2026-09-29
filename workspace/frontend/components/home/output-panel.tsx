@@ -22,6 +22,7 @@ import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 import { useWorkspace } from '@/lib/workspace-context';
 import { cn } from '@/lib/utils';
 import { HomePanel } from './home-panel';
+import { OutputDayLists } from './output-day-lists';
 
 /*
   OUTPUT: what got made, and who made it.
@@ -60,22 +61,37 @@ function keyToDate(key: string) {
   return new Date(y, m - 1, d);
 }
 
-/** How many week columns fit in `width`, measured from the element itself. */
-function useFitWeeks(ref: React.RefObject<HTMLElement | null>) {
-  const [weeks, setWeeks] = React.useState(20);
+/** Below this panel width the stats move under the calendar instead of beside it. */
+const SIDE_STATS_MIN = 820;
+const SIDE_STATS_WIDTH = 220;
+const SIDE_GAP = 28;
+const MIN_CELL = 10;
+const MAX_CELL = 15;
+
+/**
+ * Fits the calendar to the width it actually has: as many weeks as fit at the
+ * smallest cell, up to a year, then cells grown to use the remaining width, so
+ * a wide panel is filled rather than left with an empty strip on the right.
+ */
+function useCalendarFit(ref: React.RefObject<HTMLElement | null>) {
+  const [fit, setFit] = React.useState({ weeks: 20, cell: HEAT_CELL, side: false });
   React.useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const measure = () => {
-      const fit = Math.floor((el.clientWidth - HEAT_LABEL_WIDTH + HEAT_GAP) / (HEAT_CELL + HEAT_GAP));
-      setWeeks(Math.max(MIN_WEEKS, Math.min(FETCH_WEEKS, fit)));
+      const width = el.clientWidth;
+      const side = width >= SIDE_STATS_MIN;
+      const room = (side ? width - SIDE_STATS_WIDTH - SIDE_GAP : width) - HEAT_LABEL_WIDTH + HEAT_GAP;
+      const weeks = Math.max(MIN_WEEKS, Math.min(FETCH_WEEKS, Math.floor(room / (MIN_CELL + HEAT_GAP))));
+      const cell = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(room / weeks) - HEAT_GAP));
+      setFit((prev) => (prev.weeks === weeks && prev.cell === cell && prev.side === side ? prev : { weeks, cell, side }));
     };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, [ref]);
-  return weeks;
+  return fit;
 }
 
 interface DayStats {
@@ -93,7 +109,7 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
   );
   const workspaceId = workspace?.workspaceId;
   const measureRef = React.useRef<HTMLDivElement>(null);
-  const weeks = useFitWeeks(measureRef);
+  const { weeks, cell, side } = useCalendarFit(measureRef);
 
   const [data, setData] = React.useState<ActivityCommitsResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -184,17 +200,39 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
     return out;
   }, [today, weeks, statsByDay]);
 
-  const rangeTotals = React.useMemo(() => {
+  const summary = React.useMemo(() => {
     let total = 0;
     let byAgents = 0;
+    let activeDays = 0;
+    let shownDays = 0;
+    let busiest: HeatCalendarDay | null = null;
     for (const d of days) {
+      if (d.future) continue;
+      shownDays += 1;
       const s = statsByDay.get(d.key);
       if (!s) continue;
       total += s.total;
+      activeDays += 1;
       for (const n of s.byAgent.values()) byAgents += n;
+      if (!busiest || d.count > busiest.count) busiest = d;
     }
-    return { total, byAgents };
-  }, [days, statsByDay]);
+    const weekStart = addDays(today, -((today.getDay() + 6) % 7)).getTime();
+    const monthStart = addDays(today, -29).getTime();
+    const shownFrom = days[0]?.date.getTime() ?? 0;
+    let thisWeek = 0;
+    let last30 = 0;
+    const repoCounts = new Map<string, number>();
+    for (const c of data?.commits ?? []) {
+      if (c.time >= weekStart) thisWeek += 1;
+      if (c.time >= monthStart) last30 += 1;
+      if (c.time >= shownFrom) repoCounts.set(c.repo, (repoCounts.get(c.repo) ?? 0) + 1);
+    }
+    const repos = (data?.repos ?? [])
+      .filter((r) => !r.error)
+      .map((r) => ({ name: r.name, path: r.path, count: repoCounts.get(r.name) ?? 0 }))
+      .sort((a, b) => b.count - a.count);
+    return { total, byAgents, activeDays, shownDays, busiest, thisWeek, last30, repos };
+  }, [days, statsByDay, data, today]);
 
   const dayCommits = React.useMemo<ActivityCommit[]>(
     () => (data?.commits ?? []).filter((c) => c.time >= dayStart && c.time < dayEnd),
@@ -212,9 +250,17 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
 
   const repos = data?.repos ?? [];
   const noRepos = data !== null && repos.length === 0;
-  const readableRepos = repos.filter((r) => !r.error);
+  const unreadable = repos.filter((r) => r.error).length;
   const selectedDate = keyToDate(selectedKey);
   const selectedStats = statsByDay.get(selectedKey);
+
+  const dayLabel = isToday
+    ? 'Today'
+    : selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  const dayDiff = (dayTurns ?? []).reduce(
+    (acc, t) => ({ add: acc.add + t.additions, del: acc.del + t.deletions }),
+    { add: 0, del: 0 },
+  );
 
   return (
     <HomePanel
@@ -224,7 +270,7 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
       subtitle={
         data === null || noRepos
           ? 'Commits in your project repositories, and what each agent did.'
-          : `${plural(rangeTotals.total, 'commit')} in ${weeks} weeks${rangeTotals.byAgents ? `, ${rangeTotals.byAgents} made during agent turns` : ''}.`
+          : `${plural(summary.total, 'commit')} in the last ${weeks} weeks${summary.byAgents ? `, ${summary.byAgents} made during agent turns` : ''}.`
       }
       action={
         <Hint label="Refresh">
@@ -241,49 +287,164 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
             commits show up here.
           </p>
         ) : (
-          <HeatCalendar days={days} unit="commit" selectedKey={selectedKey} onSelect={onSelect}>
-            <HeatCalendarGrid>
-              <HeatCalendarTooltip>{(day) => <DayTooltip day={day} stats={statsByDay.get(day.key)} />}</HeatCalendarTooltip>
-            </HeatCalendarGrid>
-            <HeatCalendarLegend>
-              {error ? (
-                <span className="text-status-danger">{error}</span>
-              ) : readableRepos.length > 0 ? (
-                <span>
-                  From {readableRepos.map((r) => r.name).join(', ')}
-                  {repos.length > readableRepos.length && ` · ${repos.length - readableRepos.length} unreadable`}
-                </span>
-              ) : null}
-            </HeatCalendarLegend>
-          </HeatCalendar>
+          <div
+            className={cn('flex min-w-0', side ? 'flex-row items-start justify-between' : 'flex-col gap-4')}
+            style={side ? { gap: SIDE_GAP } : undefined}
+          >
+            <HeatCalendar days={days} unit="commit" cellSize={cell} selectedKey={selectedKey} onSelect={onSelect} className="min-w-0">
+              <HeatCalendarGrid>
+                <HeatCalendarTooltip>{(day) => <DayTooltip day={day} stats={statsByDay.get(day.key)} />}</HeatCalendarTooltip>
+              </HeatCalendarGrid>
+              <HeatCalendarLegend>
+                {error ? (
+                  <span className="text-status-danger">{error}</span>
+                ) : unreadable > 0 ? (
+                  <span>
+                    {unreadable} {unreadable === 1 ? 'repository' : 'repositories'} could not be read
+                  </span>
+                ) : null}
+              </HeatCalendarLegend>
+            </HeatCalendar>
+            {data !== null && <OutputStats side={side} summary={summary} onSelectDay={setSelectedKey} />}
+          </div>
         )}
       </div>
 
-      <div className="mt-4 border-t border-border pt-3">
-        <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h3 className="text-xs font-medium text-foreground">
-            {isToday ? 'Today' : selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-          </h3>
-          <span className="text-2xs tabular-nums text-foreground-extra-muted">
-            {dayTurns ? plural(dayTurns.length, 'turn') : '…'} · {plural(selectedStats?.total ?? 0, 'commit')}
-            {!isToday && (
-              <button
-                type="button"
-                className="ms-2 underline underline-offset-2 hover:text-foreground"
-                onClick={() => setSelectedKey(dayKey(today))}
-              >
-                Back to today
-              </button>
-            )}
-          </span>
+      <div className="mt-5 border-t border-border pt-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+            <h3 className="text-sm font-semibold tracking-tight text-foreground">{dayLabel}</h3>
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {dayTurns ? plural(dayTurns.length, 'turn') : '…'} · {plural(selectedStats?.total ?? 0, 'commit')}
+              {(dayDiff.add > 0 || dayDiff.del > 0) && (
+                <span className="ms-2 font-mono">
+                  <span className="text-status-success">+{dayDiff.add}</span>{' '}
+                  <span className="text-status-danger">−{dayDiff.del}</span>
+                </span>
+              )}
+            </span>
+          </div>
+          {!isToday && (
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" onClick={() => setSelectedKey(dayKey(today))}>
+              Back to today
+            </Button>
+          )}
         </div>
         {dayTurns === null ? (
-          <div className="h-16 animate-pulse rounded-md bg-foreground/[0.04]" />
+          <div className="h-24 animate-pulse rounded-md bg-foreground/[0.04]" />
         ) : (
-          <AgentDayTimeline dayStart={dayStart} turns={dayTurns} commits={dayCommits} now={now} onOpenThread={onOpenThread} sessionLabel={sessionLabel} />
+          <>
+            <AgentDayTimeline
+              dayStart={dayStart}
+              turns={dayTurns}
+              commits={dayCommits}
+              now={now}
+              onOpenThread={onOpenThread}
+              sessionLabel={sessionLabel}
+            />
+            {(dayTurns.length > 0 || dayCommits.length > 0) && (
+              <OutputDayLists
+                className="mt-5"
+                commits={dayCommits}
+                turns={dayTurns}
+                now={now}
+                sessionLabel={sessionLabel}
+                onOpenThread={onOpenThread}
+              />
+            )}
+          </>
         )}
       </div>
     </HomePanel>
+  );
+}
+
+interface Summary {
+  total: number;
+  byAgents: number;
+  activeDays: number;
+  shownDays: number;
+  busiest: HeatCalendarDay | null;
+  thisWeek: number;
+  last30: number;
+  repos: { name: string; path: string; count: number }[];
+}
+
+function Stat({
+  label,
+  value,
+  detail,
+  onClick,
+}: {
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+  onClick?: () => void;
+}) {
+  const body = (
+    <>
+      <span className="block text-2xs text-muted-foreground">{label}</span>
+      <span className="mt-0.5 block text-lg font-semibold leading-tight tabular-nums text-foreground">{value}</span>
+      {detail && <span className="block truncate text-2xs text-foreground-extra-muted">{detail}</span>}
+    </>
+  );
+  return onClick ? (
+    <button
+      type="button"
+      onClick={onClick}
+      className="min-w-0 rounded-md text-left outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {body}
+    </button>
+  ) : (
+    <div className="min-w-0">{body}</div>
+  );
+}
+
+/** Numbers read off the same commits the calendar draws; nothing here is estimated. */
+function OutputStats({
+  side,
+  summary,
+  onSelectDay,
+}: {
+  side: boolean;
+  summary: Summary;
+  onSelectDay: (key: string) => void;
+}) {
+  const maxRepo = Math.max(1, ...summary.repos.map((r) => r.count));
+  const busiest = summary.busiest;
+  return (
+    <div className={cn('min-w-0', side ? 'shrink-0' : 'w-full')} style={side ? { width: SIDE_STATS_WIDTH } : undefined}>
+      <div className={cn('grid gap-x-4 gap-y-3', side ? 'grid-cols-2' : 'grid-cols-2 @xl:grid-cols-4')}>
+        <Stat label="This week" value={summary.thisWeek} />
+        <Stat label="Last 30 days" value={summary.last30} />
+        <Stat label="Active days" value={summary.activeDays} detail={`of ${summary.shownDays}`} />
+        <Stat
+          label="Busiest day"
+          value={busiest ? busiest.count : '–'}
+          detail={busiest ? busiest.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : undefined}
+          onClick={busiest ? () => onSelectDay(busiest.key) : undefined}
+        />
+      </div>
+      {summary.repos.length > 0 && (
+        <div className="mt-4">
+          <div className="mb-1.5 text-2xs text-muted-foreground">By repository</div>
+          <ul className={cn('grid gap-y-1.5', !side && 'gap-x-6 @xl:grid-cols-2')}>
+            {summary.repos.map((r) => (
+              <li key={r.path} className="text-xs">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate text-foreground">{r.name}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{r.count}</span>
+                </div>
+                <div className="mt-0.5 h-1 rounded-full bg-foreground/[0.06]">
+                  <div className="h-full rounded-full bg-foreground/45" style={{ width: `${(r.count / maxRepo) * 100}%` }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 

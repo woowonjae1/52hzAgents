@@ -175,8 +175,12 @@ func GetActivityTurns(c *gin.Context) {
 	if err := db.DB.Model(&models.AgentTurnChange{}).
 		Select("id", "agent_name", "channel_name", "status", "reason", "started_at", "finished_at",
 			"additions", "deletions", "file_count", "contended").
-		Where("workspace_id = ? AND status <> ? AND started_at < ? AND (finished_at IS NULL OR finished_at > ?)",
-			workspace.ID, "queued", to, from).
+		// A turn with no end overlaps the range only if it is still running.
+		// One settled without an end time is a point at its start: matching
+		// it on "no end yet" would put it on every day after it happened.
+		Where("workspace_id = ? AND status <> ? AND started_at < ? AND "+
+			"(finished_at > ? OR (finished_at IS NULL AND (status = ? OR started_at >= ?)))",
+			workspace.ID, "queued", to, from, "open", from).
 		Order("started_at asc").
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load turns"})

@@ -37,6 +37,7 @@ interface HeatCalendarContextValue {
   days: HeatCalendarDay[];
   unit: string;
   max: number;
+  cell: number;
   selectedKey?: string | null;
   onSelect?: (day: HeatCalendarDay) => void;
   hovered: { day: HeatCalendarDay; anchor: ChartAnchor } | null;
@@ -72,6 +73,7 @@ export function HeatCalendar({
   days,
   unit,
   maxCount,
+  cellSize = HEAT_CELL,
   selectedKey,
   onSelect,
   className,
@@ -83,6 +85,8 @@ export function HeatCalendar({
   unit: string;
   /** Count at which a cell is fully shaded. Defaults to the busiest day shown. */
   maxCount?: number;
+  /** Side of one day cell in px, so a caller can fill the width it has. */
+  cellSize?: number;
   selectedKey?: string | null;
   onSelect?: (day: HeatCalendarDay) => void;
   className?: string;
@@ -91,8 +95,8 @@ export function HeatCalendar({
   const [hovered, setHovered] = React.useState<HeatCalendarContextValue['hovered']>(null);
   const max = maxCount ?? days.reduce((m, d) => Math.max(m, d.count), 0);
   const value = React.useMemo(
-    () => ({ days, unit, max, selectedKey, onSelect, hovered, setHovered }),
-    [days, unit, max, selectedKey, onSelect, hovered],
+    () => ({ days, unit, max, cell: cellSize, selectedKey, onSelect, hovered, setHovered }),
+    [days, unit, max, cellSize, selectedKey, onSelect, hovered],
   );
   return (
     <HeatCalendarContext.Provider value={value}>
@@ -104,7 +108,7 @@ export function HeatCalendar({
 const WEEKDAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''];
 
 export function HeatCalendarGrid({ children, className }: { children?: React.ReactNode; className?: string }) {
-  const { days, max, unit, selectedKey, onSelect, setHovered } = useHeatCalendar();
+  const { days, max, unit, cell, selectedKey, onSelect, setHovered } = useHeatCalendar();
   const containerRef = React.useRef<HTMLDivElement>(null);
   const weeks = Math.floor(days.length / 7);
 
@@ -130,7 +134,7 @@ export function HeatCalendarGrid({ children, className }: { children?: React.Rea
     if (containerRef.current) setHovered({ day, anchor: anchorOf(el, containerRef.current) });
   };
 
-  const step = HEAT_CELL + HEAT_GAP;
+  const step = cell + HEAT_GAP;
 
   return (
     <div ref={containerRef} className={cn('relative w-fit max-w-full', className)} onMouseLeave={() => setHovered(null)}>
@@ -145,7 +149,7 @@ export function HeatCalendarGrid({ children, className }: { children?: React.Rea
         <div
           aria-hidden
           className="grid shrink-0 text-2xs leading-none text-foreground-extra-muted"
-          style={{ width: HEAT_LABEL_WIDTH, gridTemplateRows: `repeat(7, ${HEAT_CELL}px)`, rowGap: HEAT_GAP }}
+          style={{ width: HEAT_LABEL_WIDTH, gridTemplateRows: `repeat(7, ${cell}px)`, rowGap: HEAT_GAP }}
         >
           {WEEKDAY_LABELS.map((label, i) => (
             <span key={i} className="flex items-center">
@@ -158,8 +162,8 @@ export function HeatCalendarGrid({ children, className }: { children?: React.Rea
           aria-label={`${unit}s per day`}
           className="grid grid-flow-col"
           style={{
-            gridTemplateRows: `repeat(7, ${HEAT_CELL}px)`,
-            gridAutoColumns: `${HEAT_CELL}px`,
+            gridTemplateRows: `repeat(7, ${cell}px)`,
+            gridAutoColumns: `${cell}px`,
             gap: HEAT_GAP,
           }}
         >
@@ -218,13 +222,15 @@ export function HeatCalendarTooltip({ children }: { children?: (day: HeatCalenda
 }
 
 export function HeatCalendarLegend({ className, children }: { className?: string; children?: React.ReactNode }) {
+  const { cell } = useHeatCalendar();
+  const swatch = Math.min(cell, HEAT_CELL);
   return (
     <div className={cn('flex flex-wrap items-center justify-between gap-2 text-2xs text-foreground-extra-muted', className)}>
       <span className="min-w-0">{children}</span>
       <span className="flex items-center gap-1">
         Less
         {LEVEL_CLASS.map((cls) => (
-          <span key={cls} aria-hidden className={cn('rounded-[2px]', cls)} style={{ width: HEAT_CELL, height: HEAT_CELL }} />
+          <span key={cls} aria-hidden className={cn('rounded-[2px]', cls)} style={{ width: swatch, height: swatch }} />
         ))}
         More
       </span>

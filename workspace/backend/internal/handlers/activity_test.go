@@ -204,6 +204,7 @@ func TestActivityTurnsWindowAndExpiredEnd(t *testing.T) {
 	insert("claude", "closed", "", from-3*hour, p(from-2*hour)) // previous day
 	insert("claude", "open", "", from+20*hour, nil)             // still running
 	insert("antigravity", "unavailable", "not a git repository", from+21*hour, nil)
+	insert("antigravity", "unavailable", "not a git repository", from-5*hour, nil) // earlier day, no end: not on this day
 
 	rec := getActivity(t, GetActivityTurns, workspace.ID,
 		"from="+strconv.FormatInt(from, 10)+"&to="+strconv.FormatInt(to, 10))
