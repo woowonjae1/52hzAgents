@@ -337,7 +337,7 @@ export function FileList() {
     // opening a window before downloading — in the desktop shell that landed
     // in setWindowOpenHandler instead of in a download.
     targets.forEach((f) => {
-      downloadUrl(workspaceApi.getFileUrl(f.id), basename(f.filename));
+      downloadUrl(workspaceApi.getFileUrl(f.id, { download: true }), basename(f.filename));
     });
     toast.success(`Downloading ${targets.length} file${targets.length > 1 ? 's' : ''}`);
   };
@@ -559,7 +559,7 @@ export function FileList() {
                       icon: Download,
                       onSelect: () =>
                         downloadUrl(
-                          workspaceApi.getFileUrl(selectedFile.id),
+                          workspaceApi.getFileUrl(selectedFile.id, { download: true }),
                           basename(selectedFile.filename)
                         ),
                     },

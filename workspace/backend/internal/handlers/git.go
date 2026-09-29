@@ -126,8 +126,8 @@ func sanitizeGitFilePath(dir, p string) (string, error) {
 		return "", errors.New("file path cannot start with hyphen")
 	}
 
-	// Prevent path traversal
-	if filepath.IsAbs(p) {
+	// Prevent path traversal and rooted/absolute paths
+	if filepath.IsAbs(p) || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "\\") {
 		return "", errors.New("absolute paths are not allowed")
 	}
 

@@ -848,37 +848,39 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 	// back to master and master's unmentioned completion yields noResponseAgent.
 	mode := strings.ToLower(strings.TrimSpace(channel.OrchestrationMode))
 	isMasterMode := mode == "master" && channel.MasterAgent != nil && strings.TrimSpace(*channel.MasterAgent) != ""
-	if isAgentSource(req.Source) && !isMasterMode {
+	if isAgentSource(req.Source) {
 		// If a sequential pipeline is actively running in this channel, pipeline steps are strictly
 		// governed and sequenced by CheckAndTriggerNextPipelineStep. Do NOT allow conversational mentions
-		// inside an agent's narrative report to bypass the pipeline sequence and spawn parallel turns.
+		// or worker responses inside an agent's turn to bypass the pipeline sequence and spawn parallel turns.
 		var activePipeline models.ChannelPipeline
 		if err := database.Where("channel_id = ? AND status IN ?", channel.ID, []string{"running", "retrying"}).First(&activePipeline).Error; err == nil {
 			return nil, false, nil
 		}
 
-		if len(mentions) > 0 {
-			sender := agentNameFromSource(req.Source)
-			var nextTargets []string
-			for _, m := range mentions {
-				if !strings.EqualFold(m, sender) {
-					nextTargets = append(nextTargets, m)
-				}
-			}
-			if len(nextTargets) > 0 {
-				for _, target := range nextTargets {
-					var cm models.ChannelMember
-					if err := database.Where("channel_id = ? AND agent_name = ?", channel.ID, target).First(&cm).Error; err != nil {
-						_ = database.Create(&models.ChannelMember{
-							ChannelID: channel.ID,
-							AgentName: target,
-						}).Error
+		if !isMasterMode {
+			if len(mentions) > 0 {
+				sender := agentNameFromSource(req.Source)
+				var nextTargets []string
+				for _, m := range mentions {
+					if !strings.EqualFold(m, sender) {
+						nextTargets = append(nextTargets, m)
 					}
 				}
-				return nextTargets, true, nil
+				if len(nextTargets) > 0 {
+					for _, target := range nextTargets {
+						var cm models.ChannelMember
+						if err := database.Where("channel_id = ? AND agent_name = ?", channel.ID, target).First(&cm).Error; err != nil {
+							_ = database.Create(&models.ChannelMember{
+								ChannelID: channel.ID,
+								AgentName: target,
+							}).Error
+						}
+					}
+					return nextTargets, true, nil
+				}
 			}
+			return nil, false, nil
 		}
-		return nil, false, nil
 	}
 
 	if len(participants) == 0 {

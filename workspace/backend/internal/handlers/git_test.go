@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -32,14 +33,24 @@ func TestSanitizeGitFilePath(t *testing.T) {
 		}
 	}
 
-	// Test invalid / malicious paths (Path Traversal & Flag Injection)
+	// Test invalid / malicious paths (Path Traversal, Flag Injection & Absolute/Rooted Paths)
 	invalidPaths := []string{
 		"../../etc/passwd",
 		"../foo.ts",
 		"src/../../outside.ts",
 		"-f",
 		"--exec=calc.exe",
-		os.Getenv("SystemRoot") + "\\System32\\cmd.exe",
+		"/etc/passwd",
+		"/bin/sh",
+		"\\System32\\cmd.exe",
+		"\\etc\\passwd",
+	}
+	if runtime.GOOS == "windows" {
+		winRoot := os.Getenv("SystemRoot")
+		if winRoot == "" {
+			winRoot = "C:\\Windows"
+		}
+		invalidPaths = append(invalidPaths, winRoot+"\\System32\\cmd.exe", "C:\\foo.txt")
 	}
 	for _, p := range invalidPaths {
 		_, err := sanitizeGitFilePath(tempDir, p)

@@ -51,7 +51,7 @@ func setupRoutingDB(t *testing.T, mode, master string) (models.Workspace, models
 }
 
 func TestRoutingMasterMode(t *testing.T) {
-	workspace, _ := setupRoutingDB(t, "master", "codex-agent")
+	workspace, channel := setupRoutingDB(t, "master", "codex-agent")
 	req := &SendEventRequest{Type: "workspace.message.posted", Source: "human:user", Target: "channel/general", Payload: map[string]interface{}{"content": "Please investigate this", "message_type": "chat"}}
 	if err := materializeEvent(workspace.ID, req, time.Now().UnixMilli()); err != nil {
 		t.Fatal(err)
@@ -61,6 +61,16 @@ func TestRoutingMasterMode(t *testing.T) {
 		t.Fatalf("human target = %v, want codex-agent", targets)
 	}
 
+	// Worker reply routes back to master codex-agent
+	req = &SendEventRequest{Type: "workspace.message.posted", Source: "openagents:claude-agent", Target: "channel/general", Payload: map[string]interface{}{"content": "Work complete", "message_type": "chat"}, Metadata: map[string]interface{}{"session_id": "claude-agent-session"}}
+	if err := materializeEvent(workspace.ID, req, time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	targets = req.Metadata["target_agents"].([]string)
+	if len(targets) != 1 || targets[0] != "codex-agent" {
+		t.Fatalf("worker reply target = %v, want codex-agent", targets)
+	}
+
 	req = &SendEventRequest{Type: "workspace.message.posted", Source: "openagents:codex-agent", Target: "channel/general", Payload: map[string]interface{}{"content": "Done", "message_type": "chat"}, Metadata: map[string]interface{}{"session_id": "codex-agent-session"}}
 	if err := materializeEvent(workspace.ID, req, time.Now().UnixMilli()); err != nil {
 		t.Fatal(err)
@@ -68,6 +78,21 @@ func TestRoutingMasterMode(t *testing.T) {
 	targets = req.Metadata["target_agents"].([]string)
 	if len(targets) != 1 || targets[0] != noResponseAgent {
 		t.Fatalf("master final target = %v, want sentinel", targets)
+	}
+
+	// Active pipeline suppresses agent-driven routing turns
+	pipeline := models.ChannelPipeline{
+		ChannelID: channel.ID,
+		Status:    "running",
+	}
+	db.DB.Create(&pipeline)
+
+	req = &SendEventRequest{Type: "workspace.message.posted", Source: "openagents:claude-agent", Target: "channel/general", Payload: map[string]interface{}{"content": "Pipeline mid-step report", "message_type": "chat"}, Metadata: map[string]interface{}{"session_id": "claude-agent-session"}}
+	if err := materializeEvent(workspace.ID, req, time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	if tgs, exists := req.Metadata["target_agents"]; exists && len(tgs.([]string)) > 0 {
+		t.Fatalf("active pipeline must suppress agent routing turns, got: %v", tgs)
 	}
 }
 

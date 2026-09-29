@@ -449,7 +449,30 @@ func DownloadFile(c *gin.Context) {
 	if filename == "" {
 		filename = "download"
 	}
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(filename)))
+
+	isDownload := c.Query("download") == "true" || c.Query("download") == "1"
+	isInline := c.Query("inline") == "true" || c.Query("preview") == "1" || c.Query("preview") == "true"
+
+	ct := strings.ToLower(record.ContentType)
+	fn := strings.ToLower(record.Filename)
+	isHtmlOrSvg := ct == "text/html" || ct == "image/svg+xml" || strings.HasSuffix(fn, ".html") || strings.HasSuffix(fn, ".htm") || strings.HasSuffix(fn, ".svg")
+
+	if isDownload {
+		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(filename)))
+	} else if isInline {
+		c.Header("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(filename)))
+		if isHtmlOrSvg {
+			c.Header("Content-Security-Policy", "sandbox")
+		}
+	} else {
+		// Default behavior: HTML and SVG default to attachment to prevent script execution on direct navigation;
+		// safe media (images, video, audio, PDF, etc.) defaults to inline.
+		if isHtmlOrSvg {
+			c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(filename)))
+		} else {
+			c.Header("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(filename)))
+		}
+	}
 	http.ServeFile(c.Writer, c.Request, fullPath)
 }
 

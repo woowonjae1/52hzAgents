@@ -295,17 +295,30 @@ func OpenLocalPath(c *gin.Context) {
 	}
 
 	stat, err := os.Stat(clean)
-	if err != nil || !stat.IsDir() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "path does not exist or is not a directory"})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path does not exist"})
 		return
 	}
 
-	if runtime.GOOS == "windows" {
-		_ = exec.Command("explorer.exe", clean).Start()
-	} else if runtime.GOOS == "darwin" {
-		_ = exec.Command("open", clean).Start()
-	} else {
-		_ = exec.Command("xdg-open", clean).Start()
+	if stat.IsDir() {
+		if runtime.GOOS == "windows" {
+			_ = exec.Command("explorer.exe", clean).Start()
+		} else if runtime.GOOS == "darwin" {
+			_ = exec.Command("open", clean).Start()
+		} else {
+			_ = exec.Command("xdg-open", clean).Start()
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "directory"})
+		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "directory"})
+
+	// For regular files, reveal safely in native file manager without executing
+	if runtime.GOOS == "windows" {
+		_ = exec.Command("explorer.exe", "/select,"+clean).Start()
+	} else if runtime.GOOS == "darwin" {
+		_ = exec.Command("open", "-R", clean).Start()
+	} else {
+		_ = exec.Command("xdg-open", filepath.Dir(clean)).Start()
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "file_revealed"})
 }

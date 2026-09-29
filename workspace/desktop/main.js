@@ -88,7 +88,7 @@ const devToolsEnabled =
   !app.isPackaged ||
   process.env.OPENAGENTS_DEVTOOLS === '1' ||
   process.argv.includes('--devtools');
-const DEFAULT_PORT = 8000;
+const DEFAULT_PORT = parseInt(process.env.API_PORT || process.env.PORT || '8000', 10);
 let serverPort = DEFAULT_PORT;
 let TARGET_URL = process.env.FRONTEND_URL || (isPackaged ? `http://127.0.0.1:${DEFAULT_PORT}/` : 'http://127.0.0.1:3005/');
 
@@ -503,7 +503,7 @@ function ensureDevStackRunning() {
   checkServerReady(TARGET_URL, (ready) => {
     if (ready) {
       console.log('[52hzAgents Desktop] Connected to local server at 127.0.0.1:3005.');
-      subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || 8000}`);
+      subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || DEFAULT_PORT}`);
       return;
     }
     if (devStackSpawned) return;
@@ -516,7 +516,7 @@ function ensureDevStackRunning() {
       stdio: 'ignore',
     });
     devServerProcess.unref();
-    setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || 8000}`), 5000);
+    setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || DEFAULT_PORT}`), 5000);
   });
 }
 
@@ -1538,9 +1538,9 @@ ipcMain.on('window-maximize', () => {
   }
 });
 ipcMain.on('get-api-url-sync', (event) => {
-  event.returnValue = isPackaged ? `http://127.0.0.1:${serverPort}` : 'http://127.0.0.1:8000';
+  event.returnValue = `http://127.0.0.1:${serverPort || DEFAULT_PORT}`;
 });
-ipcMain.handle('get-api-url', () => (isPackaged ? `http://127.0.0.1:${serverPort}` : 'http://127.0.0.1:8000'));
+ipcMain.handle('get-api-url', () => `http://127.0.0.1:${serverPort || DEFAULT_PORT}`);
 ipcMain.on('window-close', () => {
   if (tray) {
     mainWindow?.hide();

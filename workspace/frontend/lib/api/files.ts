@@ -53,10 +53,12 @@ export class FilesApi extends BaseWorkspaceApi {
     };
   }
 
-  getFileUrl(fileId: string): string {
+  getFileUrl(fileId: string, options?: { inline?: boolean; download?: boolean }): string {
     const params = new URLSearchParams();
     if (this.workspaceId) params.set('network', this.workspaceId);
     if (this.token) params.set('token', this.token);
+    if (options?.inline) params.set('inline', 'true');
+    if (options?.download) params.set('download', 'true');
     const qs = params.toString();
     return `${getApiBaseUrl()}/v1/files/${fileId}${qs ? `?${qs}` : ''}`;
   }

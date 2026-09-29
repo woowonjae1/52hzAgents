@@ -239,7 +239,7 @@ export function FileGrid() {
     const targets = fileEntries.filter((e) => selectedFileIds.has(e.file.id));
     if (targets.length === 0) return;
     targets.forEach((e) => {
-      downloadUrl(workspaceApi.getFileUrl(e.file.id), basename(e.file.filename));
+      downloadUrl(workspaceApi.getFileUrl(e.file.id, { download: true }), basename(e.file.filename));
     });
     toast.success(`Downloading ${targets.length} file${targets.length > 1 ? 's' : ''}`);
   };
@@ -603,7 +603,7 @@ export function FileGrid() {
                       {
                         label: 'Download',
                         icon: Download,
-                        onSelect: () => downloadUrl(workspaceApi.getFileUrl(file.id), basename(file.filename)),
+                        onSelect: () => downloadUrl(workspaceApi.getFileUrl(file.id, { download: true }), basename(file.filename)),
                       },
                       {
                         label: 'Copy link',

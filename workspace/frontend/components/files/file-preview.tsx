@@ -110,7 +110,7 @@ export function FilePreview() {
     // Direct blob/URL types
     if (isHtml || isPdf || isVideo || isAudio) {
       setContent(null);
-      const url = workspaceApi.getFileUrl(file.id);
+      const url = workspaceApi.getFileUrl(file.id, { inline: true });
       if (blobUrl) URL.revokeObjectURL(blobUrl);
       setBlobUrl(url);
       setLoading(false);
@@ -174,7 +174,7 @@ export function FilePreview() {
   const handleDownload = () => {
     // Was `window.open(url, '_blank')`, which the desktop shell denied and
     // replaced with nothing. See lib/download.ts.
-    downloadUrl(workspaceApi.getFileUrl(file.id), basename(file.filename));
+    downloadUrl(workspaceApi.getFileUrl(file.id, { download: true }), basename(file.filename));
   };
 
   const handleCopy = () => {
@@ -281,7 +281,7 @@ export function FilePreview() {
             src={blobUrl}
             title={file.filename}
             className="w-full h-full border-0 bg-white"
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts"
           />
         ) : isPdf && blobUrl ? (
           <iframe
