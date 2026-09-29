@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/google/uuid"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -22,9 +21,6 @@ func notificationTestRouter(t *testing.T) (*gin.Engine, models.Workspace, string
 	gin.SetMode(gin.TestMode)
 	database, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", uuid.NewString())), &gorm.Config{})
 	if err != nil {
-		if strings.Contains(err.Error(), "requires cgo") {
-			t.Skip("SQLite integration test requires CGO_ENABLED=1")
-		}
 		t.Fatalf("open test database: %v", err)
 	}
 	if err := database.AutoMigrate(&models.Workspace{}, &models.EventRecord{}, &models.NotificationRecord{}); err != nil {
@@ -33,7 +29,7 @@ func notificationTestRouter(t *testing.T) (*gin.Engine, models.Workspace, string
 	db.DB = database
 	token := "notification-token"
 	hash := hashWorkspaceToken(token)
-	workspace := models.Workspace{ID: uuid.NewString(), Name: "Notification test", PasswordHash: &hash}
+	workspace := models.Workspace{ID: uuid.NewString(), Slug: uuid.NewString(), Name: "Notification test", PasswordHash: &hash}
 	if err := database.Create(&workspace).Error; err != nil {
 		t.Fatalf("create workspace: %v", err)
 	}
@@ -141,7 +137,7 @@ func TestNotificationMutationRejectsOtherWorkspaceToken(t *testing.T) {
 
 	otherToken := "other-token"
 	otherHash := hashWorkspaceToken(otherToken)
-	otherWorkspace := models.Workspace{ID: uuid.NewString(), Name: "Other workspace", PasswordHash: &otherHash}
+	otherWorkspace := models.Workspace{ID: uuid.NewString(), Slug: uuid.NewString(), Name: "Other workspace", PasswordHash: &otherHash}
 	if err := db.DB.Create(&otherWorkspace).Error; err != nil {
 		t.Fatalf("create other workspace: %v", err)
 	}

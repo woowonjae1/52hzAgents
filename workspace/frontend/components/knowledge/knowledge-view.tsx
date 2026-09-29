@@ -50,6 +50,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
 import { KnowledgeEditor } from './knowledge-editor';
+import { usePendingKnowledgeIntent, type KnowledgeDraft, type KnowledgeIntent } from '@/lib/knowledge-intent';
 import {
   KNOWLEDGE_IMPORT_ACCEPT,
   KnowledgeDropOverlay,
@@ -160,6 +161,8 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const [loadingContent, setLoadingContent] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<(KnowledgeEntry & { content: string }) | null>(null);
+  const [editorDraft, setEditorDraft] = useState<KnowledgeDraft | null>(null);
+  const [wantedId, setWantedId] = useState<string | null>(null);
   const [mobileDetail, setMobileDetail] = useState(false);
   const [importFiles, setImportFiles] = useState<File[]>([]);
   const [query, setQuery] = useState('');
@@ -279,14 +282,38 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
     }
   }, [deleteKnowledge, pendingDelete, selectedId]);
 
+  // From elsewhere in the app: open an entry (command palette) or start a new
+  // one from text (a chat message). The entry may not be in the list yet.
+  const onIntent = useCallback((intent: KnowledgeIntent) => {
+    if (intent.kind === 'open') {
+      setQuery('');
+      setActiveCategory('all');
+      setWantedId(intent.id);
+    } else {
+      setEditingEntry(null);
+      setEditorDraft(intent.draft);
+      setEditorOpen(true);
+    }
+  }, []);
+  usePendingKnowledgeIntent(onIntent);
+  useEffect(() => {
+    if (!wantedId) return;
+    const entry = knowledge.find((k) => k.id === wantedId);
+    if (!entry) return;
+    setWantedId(null);
+    void handleSelect(entry);
+  }, [wantedId, knowledge, handleSelect]);
+
   const handleEditorClose = useCallback(() => {
     setEditorOpen(false);
     setEditingEntry(null);
+    setEditorDraft(null);
   }, []);
 
   const handleEditorSaved = useCallback(async () => {
     setEditorOpen(false);
     setEditingEntry(null);
+    setEditorDraft(null);
     await refreshKnowledge();
     if (selectedId) {
       try {
@@ -306,6 +333,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
 
   const openNewEntry = useCallback(() => {
     setEditingEntry(null);
+    setEditorDraft(null);
     setEditorOpen(true);
   }, []);
 
@@ -873,6 +901,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       <KnowledgeEditor
         open={editorOpen}
         entry={editingEntry}
+        draft={editorDraft}
         onClose={handleEditorClose}
         onSaved={handleEditorSaved}
       />

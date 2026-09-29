@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Check, RotateCw, Download, FileText, Sparkles } from 'lucide-react';
+import { BookPlus, Copy, Check, RotateCw, Download, FileText, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
@@ -14,6 +14,8 @@ export interface MessageActionsProps {
   onRegenerate?: () => void;
   onExportMarkdown?: () => void;
   onOpenCanvas?: () => void;
+  /** Opens the knowledge editor with this message as the draft. */
+  onSaveToKnowledge?: () => void;
   className?: string;
 }
 
@@ -32,6 +34,7 @@ export function MessageActions({
   onRegenerate,
   onExportMarkdown,
   onOpenCanvas,
+  onSaveToKnowledge,
   className,
 }: MessageActionsProps) {
   const [copied, setCopied] = useState(false);
@@ -134,6 +137,27 @@ export function MessageActions({
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}>
               Open in Canvas
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {onSaveToKnowledge && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSaveToKnowledge();
+                }}
+                className={ghostButton}
+                aria-label="Save to knowledge base"
+              >
+                <BookPlus className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={4}>
+              Save to knowledge
             </TooltipContent>
           </Tooltip>
         )}

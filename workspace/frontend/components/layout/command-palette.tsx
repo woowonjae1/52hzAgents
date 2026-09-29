@@ -33,6 +33,7 @@ import {
   Users,
   House,
 } from 'lucide-react';
+import { requestKnowledgeIntent } from '@/lib/knowledge-intent';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
@@ -46,7 +47,7 @@ import { isComposing } from '@/lib/ime';
 
 interface CommandItem {
   id: string;
-  category: 'Navigation' | 'Actions' | 'Agents' | 'Threads' | 'Files' | 'Tasks';
+  category: 'Navigation' | 'Actions' | 'Agents' | 'Threads' | 'Files' | 'Tasks' | 'Knowledge';
   title: string;
   subtitle?: string;
   icon: React.ReactNode;
@@ -69,7 +70,7 @@ export function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null);
 
   const { setViewMode, openSettings, openNewThread, setActiveRightTab, isMobile, openMobileDetail, sidebarToggle } = useLayout();
-  const { agents, currentSessionId, currentUser, sessions, files, todos, setCurrentSessionId, setSelectedFileId, workspaceId, createSession } = useWorkspace();
+  const { agents, currentSessionId, currentUser, sessions, files, todos, knowledge, setCurrentSessionId, setSelectedFileId, workspaceId, createSession } = useWorkspace();
   const { theme, setTheme } = useTheme();
 
   /*
@@ -374,6 +375,22 @@ export function CommandPalette() {
       };
     });
 
+    // Titles, slugs and summaries only: entry bodies are not loaded here.
+    const knowledgeItems: CommandItem[] = (knowledge || [])
+      .filter((k) => k.status !== 'deleted')
+      .map((k) => ({
+        id: `knowledge-${k.id}`,
+        category: 'Knowledge',
+        title: k.title,
+        subtitle: `@knowledge:${k.slug}${k.description ? ` • ${k.description}` : ''}`,
+        icon: <BookOpen className="size-4 text-foreground-muted" />,
+        action: () => {
+          requestKnowledgeIntent({ kind: 'open', id: k.id });
+          setViewMode('knowledge');
+          if (isMobile) openMobileDetail();
+        },
+      }));
+
     const sortedAgents = [...agents].sort((a, b) => {
       if (a.status !== b.status) {
         return a.status === 'online' ? -1 : 1;
@@ -393,8 +410,8 @@ export function CommandPalette() {
     }));
 
     return {
-      allCommands: [...actions, ...threadItems, ...fileItems, ...taskItems, ...nav, ...agentItems],
-      defaultCommands: [...actions, ...threadItems.slice(0, 4), ...fileItems.slice(0, 4), ...taskItems.slice(0, 4), ...nav, ...agentItems],
+      allCommands: [...actions, ...threadItems, ...fileItems, ...taskItems, ...knowledgeItems, ...nav, ...agentItems],
+      defaultCommands: [...actions, ...threadItems.slice(0, 4), ...fileItems.slice(0, 4), ...taskItems.slice(0, 4), ...knowledgeItems.slice(0, 3), ...nav, ...agentItems],
     };
   }, [
     setViewMode,
@@ -407,6 +424,7 @@ export function CommandPalette() {
     sessions,
     files,
     todos,
+    knowledge,
     currentSessionId,
     workspaceId,
     setCurrentSessionId,

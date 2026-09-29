@@ -444,6 +444,12 @@ func DownloadFile(c *gin.Context) {
 	if record.ContentType != "" && record.ContentType != "application/octet-stream" {
 		c.Header("Content-Type", record.ContentType)
 	}
+	c.Header("X-Content-Type-Options", "nosniff")
+	filename := record.Filename
+	if filename == "" {
+		filename = "download"
+	}
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(filename)))
 	http.ServeFile(c.Writer, c.Request, fullPath)
 }
 

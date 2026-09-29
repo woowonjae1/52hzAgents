@@ -2,15 +2,14 @@ package handlers
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/glebarez/sqlite"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/config"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -18,13 +17,10 @@ func setupRoutingDB(t *testing.T, mode, master string) (models.Workspace, models
 	t.Helper()
 	database, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:%s?mode=memory&cache=shared", uuid.NewString())), &gorm.Config{})
 	if err != nil {
-		if strings.Contains(err.Error(), "requires cgo") {
-			t.Skip("SQLite integration test requires CGO_ENABLED=1")
-		}
 		t.Fatal(err)
 	}
 	db.DB = database
-	if err := db.DB.AutoMigrate(&models.Workspace{}, &models.WorkspaceMember{}, &models.Channel{}, &models.ChannelMember{}, &models.EventRecord{}); err != nil {
+	if err := db.DB.AutoMigrate(&models.Workspace{}, &models.WorkspaceMember{}, &models.Channel{}, &models.ChannelMember{}, &models.EventRecord{}, &models.ChannelPipeline{}); err != nil {
 		t.Fatal(err)
 	}
 	config.GlobalConfig = &config.Config{AgentTimeoutSeconds: 60}

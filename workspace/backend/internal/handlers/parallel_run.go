@@ -221,6 +221,7 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 	if len(agents) < 2 || runningBatch(tx, workspaceID, channel.Name) != nil {
 		return nil
 	}
+	now := time.Now().UTC()
 	batch := models.ParallelBatchRecord{
 		ID:          uuid.NewString(),
 		WorkspaceID: workspaceID,
@@ -228,6 +229,7 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 		Isolation:   "shared",
 		Origin:      origin,
 		Status:      batchRunning,
+		CreatedAt:   now,
 	}
 
 	repo := ""
@@ -235,7 +237,6 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 		repo = gitRepoRoot(*channel.WorkingDir)
 	}
 	lanes := make([]models.ParallelLaneRecord, 0, len(agents))
-	now := time.Now().UTC()
 	ports := allocateLanePorts(tx, len(agents))
 	for i, agent := range agents {
 		port := 0
@@ -559,8 +560,14 @@ func reviewSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLan
 	return strings.TrimSpace(b.String())
 }
 
+func hasKeptLanes(batchID string) bool {
+	var count int64
+	db.DB.Model(&models.ParallelLaneRecord{}).Where("batch_id = ? AND status = ?", batchID, laneKept).Count(&count)
+	return count > 0
+}
+
 // batchForReview loads the batch named in the URL and checks it is waiting for
-// review. Writes the error response and returns nil otherwise.
+// review, or is a finished batch with kept lanes ready for a re-merge.
 func batchForReview(c *gin.Context) *models.ParallelBatchRecord {
 	workspace, ok := requestWorkspace(c)
 	if !ok {
@@ -571,8 +578,8 @@ func batchForReview(c *gin.Context) *models.ParallelBatchRecord {
 		c.JSON(404, gin.H{"error": "batch not found"})
 		return nil
 	}
-	if batch.Status != batchReview {
-		c.JSON(409, gin.H{"error": "the batch is not waiting for review", "status": batch.Status})
+	if batch.Status != batchReview && !(batch.Status == batchDone && hasKeptLanes(batch.ID)) {
+		c.JSON(409, gin.H{"error": "the batch is not waiting for review or re-merge", "status": batch.Status})
 		return nil
 	}
 	return &batch
@@ -611,7 +618,7 @@ func discardBatch(batch *models.ParallelBatchRecord) {
 		if lane.Branch != "" {
 			_, _ = runGit(batch.RepoDir, "branch", "-D", lane.Branch)
 		}
-		if lane.Status == laneDone || lane.Status == laneFailed {
+		if lane.Status == laneDone || lane.Status == laneFailed || lane.Status == laneKept {
 			lane.Status = laneDiscarded
 		}
 		db.DB.Save(lane)
@@ -621,6 +628,21 @@ func discardBatch(batch *models.ParallelBatchRecord) {
 	batch.FinishedAt = &now
 	batch.Summary = fmt.Sprintf("**Parallel batch discarded** — nothing was merged into `%s`; every lane's worktree and branch was removed.", baseRef(batch))
 	db.DB.Save(batch)
+
+	if batch.Origin == "board" {
+		var laneAgents []string
+		for _, l := range lanes {
+			laneAgents = append(laneAgents, l.Agent)
+		}
+		if len(laneAgents) > 0 {
+			db.DB.Model(&models.TodoRecord{}).
+				Where("workspace_id = ? AND channel_name = ? AND assignee IN ? AND status = ?",
+					batch.WorkspaceID, batch.ChannelName, laneAgents, "completed").
+				Updates(map[string]interface{}{"status": "pending", "completed_at": gorm.Expr("NULL")})
+			_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.todos.updated", "system:parallel", batch.ChannelName, gin.H{"status": "pending"})
+		}
+	}
+
 	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
 	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID},
@@ -678,7 +700,7 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 	}
 	for i := range lanes {
 		lane := &lanes[i]
-		if batch.Isolation != "worktree" || lane.Status != laneDone {
+		if batch.Isolation != "worktree" || (lane.Status != laneDone && lane.Status != laneKept) {
 			continue
 		}
 		switch {
@@ -700,6 +722,13 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 		if lane.Status == laneMerged {
 			_ = RemoveGitWorktree(batch.RepoDir, lane.WorktreePath, true)
 			_, _ = runGit(batch.RepoDir, "branch", "-D", lane.Branch)
+			if batch.Origin == "board" {
+				now := time.Now().UTC()
+				db.DB.Model(&models.TodoRecord{}).
+					Where("workspace_id = ? AND channel_name = ? AND assignee = ? AND status IN ?",
+						batch.WorkspaceID, batch.ChannelName, lane.Agent, openTodoStatuses).
+					Updates(map[string]interface{}{"status": "completed", "completed_at": now})
+			}
 		}
 		db.DB.Save(lane)
 	}

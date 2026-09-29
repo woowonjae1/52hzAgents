@@ -292,19 +292,20 @@ func OpenLocalPath(c *gin.Context) {
 			clean = clean[1:]
 		}
 		clean = filepath.FromSlash(clean)
-		stat, err := os.Stat(clean)
-		if err == nil && stat.IsDir() {
-			exec.Command("explorer.exe", clean).Start()
-			c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "directory"})
-			return
-		}
-		exec.Command("rundll32", "url.dll,FileProtocolHandler", clean).Start()
-		c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "file"})
-		return
-	} else if runtime.GOOS == "darwin" {
-		exec.Command("open", clean).Start()
-	} else {
-		exec.Command("xdg-open", clean).Start()
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true})
+
+	stat, err := os.Stat(clean)
+	if err != nil || !stat.IsDir() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "path does not exist or is not a directory"})
+		return
+	}
+
+	if runtime.GOOS == "windows" {
+		_ = exec.Command("explorer.exe", clean).Start()
+	} else if runtime.GOOS == "darwin" {
+		_ = exec.Command("open", clean).Start()
+	} else {
+		_ = exec.Command("xdg-open", clean).Start()
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "opened": true, "type": "directory"})
 }

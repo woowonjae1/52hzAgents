@@ -98,7 +98,7 @@ func approve(t *testing.T, batchID string) {
 	t.Helper()
 	var batch models.ParallelBatchRecord
 	db.DB.Where("id = ?", batchID).First(&batch)
-	if batch.Status != batchReview {
+	if batch.Status != batchReview && !(batch.Status == batchDone && hasKeptLanes(batch.ID)) {
 		t.Fatalf("batch should wait for review before merging, got %s", batch.Status)
 	}
 	finalizeBatch(&batch)
@@ -544,4 +544,95 @@ func assertRedispatchedInWorktree(t *testing.T, channelName string, lane models.
 		return
 	}
 	t.Fatalf("no lane redispatch message for %s", lane.Agent)
+}
+
+func TestParallelRetryMergeAfterCleaningBaseTree(t *testing.T) {
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	batch, lanes := startTestBatch(t, ws, repo, "alpha", "beta")
+	os.WriteFile(filepath.Join(lanes["alpha"].WorktreePath, "alpha.txt"), []byte("a\n"), 0644)
+	finish(t, batch.ID, "alpha", false)
+	finish(t, batch.ID, "beta", false)
+
+	// Make base dirty with an uncommitted edit
+	os.WriteFile(filepath.Join(repo, "shared.txt"), []byte("uncommitted\n"), 0644)
+
+	// First merge attempt: base is dirty, so lanes are kept and batch is not merged
+	approve(t, batch.ID)
+	got := lanesOf(batch.ID)
+	if got["alpha"].Status != laneKept {
+		t.Fatalf("expected laneKept for alpha on dirty base, got %s", got["alpha"].Status)
+	}
+
+	// User cleans the base directory
+	git(t, repo, "checkout", "--", "shared.txt")
+
+	// Retry merge now that base is clean
+	approve(t, batch.ID)
+	got = lanesOf(batch.ID)
+	if got["alpha"].Status != laneMerged {
+		t.Fatalf("expected laneMerged for alpha after cleaning base, got %s", got["alpha"].Status)
+	}
+	if b, err := os.ReadFile(filepath.Join(repo, "alpha.txt")); err != nil || strings.TrimSpace(string(b)) != "a" {
+		t.Fatalf("alpha.txt not merged to base repo: %v", err)
+	}
+}
+
+func TestParallelDiscardRevertsBoardTodos(t *testing.T) {
+	ws := parallelTestDB(t)
+	repo := newRepo(t)
+	ch := models.Channel{ID: uuid.NewString(), WorkspaceID: ws, Name: "board-ch", WorkingDir: &repo}
+	db.DB.Create(&ch)
+
+	todo := models.TodoRecord{
+		ID:          uuid.NewString(),
+		WorkspaceID: ws,
+		ChannelName: ch.Name,
+		Assignee:    "alpha",
+		Content:     "Implement alpha feature",
+		Status:      "in_progress",
+	}
+	db.DB.Create(&todo)
+
+	todoB := models.TodoRecord{
+		ID:          uuid.NewString(),
+		WorkspaceID: ws,
+		ChannelName: ch.Name,
+		Assignee:    "beta",
+		Content:     "Implement beta feature",
+		Status:      "in_progress",
+	}
+	db.DB.Create(&todoB)
+
+	tasks := map[string]string{"alpha": "Implement alpha feature", "beta": "Implement beta feature"}
+	meta := startParallelBatch(db.DB, ws, &ch, "board", []string{"alpha", "beta"}, tasks, nil)
+	if meta == nil {
+		t.Fatal("board batch failed to start")
+	}
+	var batch models.ParallelBatchRecord
+	db.DB.Where("id = ?", meta["batch_id"]).First(&batch)
+
+	var laneA, laneB models.ParallelLaneRecord
+	db.DB.Where("batch_id = ? AND agent = ?", batch.ID, "alpha").First(&laneA)
+	db.DB.Where("batch_id = ? AND agent = ?", batch.ID, "beta").First(&laneB)
+	os.WriteFile(filepath.Join(laneA.WorktreePath, "alpha.txt"), []byte("code\n"), 0644)
+	finishLane(&batch, &laneA, false, "", "done")
+	finishLane(&batch, &laneB, false, "", "done")
+
+	// Verify todo was marked completed on lane completion
+	var checkTodo models.TodoRecord
+	db.DB.Where("id = ?", todo.ID).First(&checkTodo)
+	if checkTodo.Status != "completed" {
+		t.Fatalf("expected todo completed while in review, got %s", checkTodo.Status)
+	}
+
+	// Discard the batch
+	discardBatch(&batch)
+
+	// Verify todo was reverted back to pending and completed_at cleared
+	var reverted models.TodoRecord
+	db.DB.Where("id = ?", todo.ID).First(&reverted)
+	if reverted.Status != "pending" || reverted.CompletedAt != nil {
+		t.Fatalf("expected todo reverted to pending with nil completed_at, got status=%s, completed_at=%v", reverted.Status, reverted.CompletedAt)
+	}
 }

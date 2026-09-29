@@ -3,7 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
+import { BookPlus, Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -27,6 +27,7 @@ import { TurnChangesCapsule } from './turn-changes-capsule';
 import { workspaceApi } from '@/lib/api';
 import { downloadUrl } from '@/lib/download';
 import { useLayout } from '@/components/layout/layout-context';
+import { draftFromMessage, requestKnowledgeIntent } from '@/lib/knowledge-intent';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useArtifacts, type ArtifactItem } from '@/lib/artifacts-context';
 import { ArtifactInlineCard } from '../canvas/artifact-inline-card';
@@ -228,6 +229,7 @@ export const ChatMessage = memo(function ChatMessage({
   onReusePrompt,
 }: ChatMessageProps) {
   const { currentUser } = useWorkspace();
+  const { setViewMode } = useLayout();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
   const isSystem = message.messageType === 'status';
   const [localStatus, setLocalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
@@ -634,6 +636,15 @@ export const ChatMessage = memo(function ChatMessage({
     navigator.clipboard.writeText(message.content);
     toast.success('Markdown source copied');
   }, [message.content]);
+
+  // Nothing is written here: the editor opens on the message text and the
+  // person decides what, if anything, becomes an entry every agent can read.
+  const handleSaveToKnowledge = useCallback(() => {
+    const text = (cleanContent || message.content || '').trim();
+    if (!text) return;
+    requestKnowledgeIntent({ kind: 'draft', draft: draftFromMessage(text, message.senderName) });
+    setViewMode('knowledge');
+  }, [cleanContent, message.content, message.senderName, setViewMode]);
 
   const handleQuote = useCallback(() => {
     if (onQuoteReply) {
@@ -1248,6 +1259,7 @@ export const ChatMessage = memo(function ChatMessage({
                 senderType="agent"
                 variant="toolbar"
                 onOpenCanvas={inferredArtifact ? () => openArtifact(inferredArtifact) : undefined}
+                onSaveToKnowledge={handleSaveToKnowledge}
                 onRegenerate={handleRegenerate}
               />
             </div>
@@ -1275,6 +1287,10 @@ export const ChatMessage = memo(function ChatMessage({
           <span>Open in Canvas</span>
         </ContextMenuItem>
       )}
+      <ContextMenuItem onClick={handleSaveToKnowledge}>
+        <BookPlus className="size-4 mr-2 text-muted-foreground" />
+        <span>Save to Knowledge…</span>
+      </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onClick={handleRegenerate}>
         <RotateCw className="size-4 mr-2 text-primary" />

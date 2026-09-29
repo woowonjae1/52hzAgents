@@ -299,7 +299,7 @@ async function startProductionStack() {
           DATABASE_URL: `sqlite://${dbPath.replace(/\\/g, '/')}`,
           FILE_STORAGE_PATH: filesPath,
           AUTH_MODE: 'none',
-          CORS_ORIGINS: '*',
+          CORS_ORIGINS: `http://127.0.0.1:${serverPort},http://localhost:${serverPort},http://127.0.0.1:3005,http://localhost:3005`,
           FRONTEND_STATIC_PATH: publicPath,
         },
         stdio: 'ignore',
@@ -350,9 +350,39 @@ async function startProductionStack() {
   setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort}`), 3000);
 }
 
-function subscribeWorkspaceEvents(baseUrl) {
+let activeWorkspaceNetwork = '52hz';
+
+function resolveWorkspaceNetwork(baseUrl) {
+  return new Promise((resolve) => {
+    const req = http.get(`${baseUrl}/v1/workspaces`, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json && Array.isArray(json.items) && json.items.length > 0) {
+            const first = json.items[0];
+            const net = first.slug || first.id || '52hz';
+            return resolve(net);
+          }
+        } catch (_) {}
+        resolve('52hz');
+      });
+    });
+    req.on('error', () => resolve('52hz'));
+    req.setTimeout(2500, () => { req.destroy(); resolve('52hz'); });
+  });
+}
+
+async function subscribeWorkspaceEvents(baseUrl) {
   try {
-    const sseUrl = `${baseUrl}/v1/events/stream?network=default`;
+    if (sseReq) {
+      try { sseReq.destroy(); } catch (_) {}
+      sseReq = null;
+    }
+    const network = await resolveWorkspaceNetwork(baseUrl);
+    activeWorkspaceNetwork = network;
+    const sseUrl = `${baseUrl}/v1/events/stream?network=${encodeURIComponent(network)}`;
     sseReq = http.get(sseUrl, (res) => {
       if (res.statusCode !== 200) {
         console.warn(`[52hzAgents Desktop] SSE stream returned HTTP ${res.statusCode}, retrying in 5s...`);
@@ -473,7 +503,7 @@ function ensureDevStackRunning() {
   checkServerReady(TARGET_URL, (ready) => {
     if (ready) {
       console.log('[52hzAgents Desktop] Connected to local server at 127.0.0.1:3005.');
-      subscribeWorkspaceEvents('http://127.0.0.1:8000');
+      subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || 8000}`);
       return;
     }
     if (devStackSpawned) return;
@@ -486,7 +516,7 @@ function ensureDevStackRunning() {
       stdio: 'ignore',
     });
     devServerProcess.unref();
-    setTimeout(() => subscribeWorkspaceEvents('http://127.0.0.1:8000'), 5000);
+    setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || 8000}`), 5000);
   });
 }
 

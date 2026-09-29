@@ -39,10 +39,13 @@ import { useWorkspace } from '@/lib/workspace-context';
 import type { KnowledgeEntry } from '@/lib/types';
 import { toast } from '@/lib/toast';
 import { isComposing } from '@/lib/ime';
+import type { KnowledgeDraft } from '@/lib/knowledge-intent';
 
 interface KnowledgeEditorProps {
   open: boolean;
   entry: (KnowledgeEntry & { content: string }) | null;
+  /** Starting text for a NEW entry (ignored when editing one). */
+  draft?: KnowledgeDraft | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -51,7 +54,7 @@ const MICRO = 'text-3xs font-medium uppercase tracking-wider text-foreground-ext
 
 type EditorViewMode = 'edit' | 'split' | 'preview';
 
-export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEditorProps) {
+export function KnowledgeEditor({ open, entry, draft, onClose, onSaved }: KnowledgeEditorProps) {
   const { createKnowledge, updateKnowledge, agents } = useWorkspace();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -78,12 +81,12 @@ export function KnowledgeEditor({ open, entry, onClose, onSaved }: KnowledgeEdit
         setCategory(entry.category || '');
         setContent(entry.content || '');
       } else {
-        setTitle('');
-        setDescription('');
-        setContent('');
+        setTitle(draft?.title ?? '');
+        setDescription(draft?.description ?? '');
+        setContent(draft?.content ?? '');
       }
     }
-  }, [open, entry]);
+  }, [open, entry, draft]);
 
   const isDirty = useMemo(() => {
     if (entry) {

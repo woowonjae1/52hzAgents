@@ -844,7 +844,11 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 	// another agent. Without a mention, the reply is stored but must NOT wake
 	// another agent — otherwise every agent reply triggers the next agent's
 	// turn, creating an infinite echo storm.
-	if isAgentSource(req.Source) {
+	// In master mode, the master orchestrates the channel: worker replies route
+	// back to master and master's unmentioned completion yields noResponseAgent.
+	mode := strings.ToLower(strings.TrimSpace(channel.OrchestrationMode))
+	isMasterMode := mode == "master" && channel.MasterAgent != nil && strings.TrimSpace(*channel.MasterAgent) != ""
+	if isAgentSource(req.Source) && !isMasterMode {
 		// If a sequential pipeline is actively running in this channel, pipeline steps are strictly
 		// governed and sequenced by CheckAndTriggerNextPipelineStep. Do NOT allow conversational mentions
 		// inside an agent's narrative report to bypass the pipeline sequence and spawn parallel turns.
@@ -880,8 +884,6 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 	if len(participants) == 0 {
 		return []string{noResponseAgent}, true, nil
 	}
-
-	mode := strings.ToLower(strings.TrimSpace(channel.OrchestrationMode))
 	if mode == "parallel" {
 		/*
 			Naming several agents IS the assignment.

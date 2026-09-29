@@ -70,6 +70,7 @@ func main() { // 服务程序运行主入口函数。
 
 	// Initialize Gin router
 	router := gin.Default() // 使用默认日志与恢复中间件初始化 Gin。
+	_ = router.SetTrustedProxies(nil)
 	router.Use(middleware.RateLimit(config.GlobalConfig.RequestsPerMinute))
 	router.Use(middleware.AuditMutations())
 	router.Use(func(c *gin.Context) {
