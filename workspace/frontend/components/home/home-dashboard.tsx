@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowUp, Cpu, Folder, GitBranch, Users } from 'lucide-react';
+import { ArrowUp, Cpu, Eye, Folder, GitBranch, Users, Waypoints, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Hint } from '@/components/ui/hint';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
   ProjectFolderPicker,
@@ -60,6 +61,28 @@ import { ConnectAgentModal } from '@/components/mission/connect-agent-modal';
   - effort          -> `set_effort` control, agent-wide (a draft has no channel)
   - the task text   -> ChatView's own send path (lib/first-message)
 */
+
+/*
+  SCENE PRESETS: two controls set in one click.
+
+  A preset is only ever a (collaboration mode, work mode) pair. It does not tick
+  agents or pick a folder: the roster has no notion of which agent is a
+  reviewer, and Home has no "current repo" to mount. Which preset is lit is
+  derived from those two values, so changing either control by hand turns it
+  off without any extra state to keep in sync.
+*/
+const PRESETS: {
+  id: string;
+  label: string;
+  hint: string;
+  icon: React.ElementType;
+  mode: OrchestrationMode;
+  profile: AgentProfileId;
+}[] = [
+  { id: 'review', label: 'Code review', hint: 'Router picks who speaks; read-only', icon: Eye, mode: 'dynamic', profile: 'review' },
+  { id: 'parallel', label: 'Parallel feature', hint: 'Everyone starts at once, own worktree in a git folder', icon: Waypoints, mode: 'parallel', profile: 'fix' },
+  { id: 'bugfix', label: 'Bug fix', hint: 'A lead agent delegates and edits', icon: Wrench, mode: 'master', profile: 'fix' },
+];
 
 function samePath(a: string | null | undefined, b: string): boolean {
   if (!a) return false;
@@ -216,12 +239,13 @@ export function HomeDashboard() {
 
   // ── Start ──
   const canStart = activeOnlineSelected.length > 0 && !starting;
-  const startHint =
+  // Why Start is off; when it is on, the chips under the task say what it will do.
+  const blockedHint =
     counts.online === 0
       ? 'No agent is online. Connect an agent below to start a session.'
       : activeOnlineSelected.length === 0
         ? 'Tick at least one online agent below to start.'
-        : `Starts with ${activeOnlineSelected.map((n) => `@${n}`).join(', ')}. Enter to start, Shift+Enter for a new line.`;
+        : null;
 
   const handleStart = async () => {
     if (!canStart) return;
@@ -265,22 +289,29 @@ export function HomeDashboard() {
     }
   };
 
+  const activePreset = PRESETS.find((p) => p.mode === mode && p.profile === profile) ?? null;
+  const applyPreset = (p: (typeof PRESETS)[number]) => {
+    // Clicking the lit preset puts both controls back to their defaults.
+    setMode(activePreset?.id === p.id ? 'dynamic' : p.mode);
+    setProfile(activePreset?.id === p.id ? DEFAULT_PROFILE_ID : p.profile);
+  };
+
   // ── Derived display ──
   const shownAgents = tab === 'online' ? onlineAgents : tab === 'workspace' ? agents : allAvailableAgents;
   const modeInfo = ORCHESTRATION_MODES.find((m) => m.value === mode)!;
   const profileInfo = getProfile(profile);
+  // Only meaningful for Parallel in a folder; elsewhere the folder chip says it all.
   const isolation =
-    mode !== 'parallel'
-      ? dir
-        ? 'Shared folder'
-        : 'No folder'
-      : !dir
-        ? 'No folder'
-        : isRepo === true
-          ? 'Own worktree per agent'
-          : isRepo === false
-            ? 'Shared folder (not a git repo)'
-            : 'Own worktree if the folder is a git repo';
+    mode !== 'parallel' || !dir
+      ? null
+      : isRepo === true
+        ? 'Own worktree per agent'
+        : isRepo === false
+          ? 'Shared folder (not a git repo)'
+          : 'Own worktree if a git repo';
+  const pickedModels = Object.entries(modelPicks)
+    .filter(([n]) => activeOnlineSelected.includes(n))
+    .map(([n, m]) => `@${n}: ${m.includes('/') ? m.slice(m.indexOf('/') + 1) : m}`);
 
   const headerCounts = [
     `${counts.online} of ${counts.total} ${counts.total === 1 ? 'agent' : 'agents'} online`,
@@ -364,8 +395,51 @@ export function HomeDashboard() {
                 placeholder="What should the agents do?"
                 className="block max-h-48 min-h-[3rem] w-full resize-none bg-transparent px-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <p className="min-w-0 flex-1 truncate px-1 text-2xs text-muted-foreground">{startHint}</p>
+              <div role="group" aria-label="Start from a preset" className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="px-1 text-2xs text-foreground-extra-muted">Start from</span>
+                {PRESETS.map((p) => (
+                  <Hint key={p.id} label={p.hint}>
+                    <button
+                      type="button"
+                      aria-pressed={activePreset?.id === p.id}
+                      onClick={() => applyPreset(p)}
+                      className={cn(
+                        'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                        activePreset?.id === p.id
+                          ? 'border-border-accent bg-surface2 text-foreground'
+                          : 'border-border text-foreground-muted hover:bg-surface2/60 hover:text-foreground',
+                      )}
+                    >
+                      <p.icon className="size-3" />
+                      {p.label}
+                    </button>
+                  </Hint>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 px-1" aria-live="polite">
+                  {blockedHint ? (
+                    <p className="text-2xs text-muted-foreground">{blockedHint}</p>
+                  ) : (
+                    <>
+                      <SetupChip icon={<Users />}>{activeOnlineSelected.map((n) => `@${n}`).join(', ')}</SetupChip>
+                      <SetupChip icon={<modeInfo.icon />}>
+                        {modeInfo.label}
+                        {effectiveLead && ` · lead @${effectiveLead}`}
+                      </SetupChip>
+                      <SetupChip icon={<profileInfo.icon />}>
+                        {profileInfo.label}
+                        {profile === 'review' && ' · read-only'}
+                      </SetupChip>
+                      <SetupChip icon={<Folder />} warn={mode === 'parallel' && !dir}>
+                        {dir ? basename(dir) : mode === 'parallel' ? 'No folder, no worktrees' : 'No folder, plain chat'}
+                      </SetupChip>
+                      {isolation && <SetupChip icon={<GitBranch />}>{isolation}</SetupChip>}
+                      {pickedModels.length > 0 && <SetupChip icon={<Cpu />}>{pickedModels.join(', ')}</SetupChip>}
+                      <span className="hidden text-2xs text-foreground-extra-muted @lg:inline">Enter to start</span>
+                    </>
+                  )}
+                </div>
                 <Button variant="primary" size="sm" disabled={!canStart} onClick={handleStart}>
                   {starting ? 'Starting…' : task.trim() ? 'Start and send' : 'Start session'}
                   <ArrowUp className="size-3.5" />
@@ -420,8 +494,6 @@ export function HomeDashboard() {
               />
             </HomePanel>
 
-            <OutputPanel onOpenThread={openThread} />
-
             {/* ── What is going on: attention, recent sessions, upcoming ── */}
             <div className="grid min-w-0 grid-cols-1 gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">
               <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} onOpenInbox={() => setViewMode('inbox')} />
@@ -432,9 +504,12 @@ export function HomeDashboard() {
                 onOpenThread={openThread}
               />
             </div>
+
+            {/* Retrospective, so it sits under what needs doing now; collapsed to a line by default. */}
+            <OutputPanel onOpenThread={openThread} />
           </div>
 
-          {/* ── Rail: where, how, and what Start will do ── */}
+          {/* ── Rail: where, and how ── */}
           <aside aria-label="Session settings" className="flex min-w-0 flex-col gap-4">
             <HomePanel id="home-project" title="Project" subtitle="The folder agents read and write. Optional.">
               <ProjectFolderPicker
@@ -456,22 +531,9 @@ export function HomeDashboard() {
                           </span>
                         )}
                       </FieldValue>
-                      <p className="text-2xs text-muted-foreground">
-                        {mode === 'parallel'
-                          ? 'Each agent works in its own isolated worktree branch in Parallel mode.'
-                          : 'Agents will read and edit files in this git repository.'}
-                      </p>
                     </>
                   ) : git && !git.available ? (
-                    <p className="text-2xs text-muted-foreground">
-                      Not a git repository. {mode === 'parallel' ? 'In Parallel mode, agents share this folder (worktree isolation requires git).' : 'Agents can read and edit files in this folder.'}
-                    </p>
-                  ) : !sibling ? (
-                    <p className="text-2xs text-foreground-extra-muted">
-                      {mode === 'parallel'
-                        ? 'In Parallel mode, git repositories automatically get isolated per-agent worktrees.'
-                        : 'Agents will be given access to this directory.'}
-                    </p>
+                    <p className="text-2xs text-muted-foreground">Not a git repository.</p>
                   ) : null}
                 </div>
               ) : (
@@ -481,7 +543,7 @@ export function HomeDashboard() {
               )}
             </HomePanel>
 
-            <HomePanel id="home-mode" title="Collaboration" subtitle="How the agents take turns.">
+            <HomePanel id="home-mode" title="Collaboration">
               <SegmentedControl
                 size="sm"
                 className="w-full [&>button]:flex-1"
@@ -499,16 +561,10 @@ export function HomeDashboard() {
                   (effectiveLead
                     ? ` Lead: @${effectiveLead}. Switch lead in any agent's panel.`
                     : ' Tick an online agent below to act as lead.')}
-                {mode === 'parallel' &&
-                  (dir && git?.available
-                    ? ' Agents work concurrently in isolated git worktrees.'
-                    : dir
-                      ? ' Agents work concurrently in this shared folder.'
-                      : ' Agents work concurrently in plain chat.')}
               </p>
             </HomePanel>
 
-            <HomePanel id="home-profile" title="Work mode" subtitle="Review is read-only.">
+            <HomePanel id="home-profile" title="Work mode">
               <SegmentedControl
                 size="sm"
                 className="w-full [&>button]:flex-1"
@@ -517,36 +573,6 @@ export function HomeDashboard() {
                 options={AGENT_PROFILES.map((p) => ({ value: p.id, label: p.label, icon: p.icon }))}
               />
               <p className="mt-2 text-2xs text-muted-foreground">{profileInfo.whenToUse}</p>
-            </HomePanel>
-
-            <HomePanel id="home-summary" title="Summary" subtitle="What Start will open.">
-              <dl className="space-y-2 text-xs">
-                <SummaryRow icon={<Folder className="size-3.5" />} label="Folder">
-                  {dir ? <span title={dir}>{basename(dir)}</span> : <span className="text-foreground-extra-muted">None, plain chat</span>}
-                </SummaryRow>
-                <SummaryRow icon={<Users className="size-3.5" />} label="Agents">
-                  {selected.length > 0 ? selected.map((n) => `@${n}`).join(', ') : <span className="text-foreground-extra-muted">None ticked</span>}
-                </SummaryRow>
-                <SummaryRow icon={<modeInfo.icon className="size-3.5" />} label="Mode">
-                  {modeInfo.label}
-                  {effectiveLead && <span className="text-foreground-muted"> · lead @{effectiveLead}</span>}
-                </SummaryRow>
-                <SummaryRow icon={<profileInfo.icon className="size-3.5" />} label="Work mode">
-                  {profileInfo.label}
-                  {profile === 'review' && <span className="text-foreground-muted"> · read-only</span>}
-                </SummaryRow>
-                <SummaryRow icon={<GitBranch className="size-3.5" />} label="Isolation">
-                  {isolation}
-                </SummaryRow>
-                {Object.keys(modelPicks).some((n) => selected.includes(n)) && (
-                  <SummaryRow icon={<Cpu className="size-3.5" />} label="Models">
-                    {Object.entries(modelPicks)
-                      .filter(([n]) => selected.includes(n))
-                      .map(([n, m]) => `@${n}: ${m.includes('/') ? m.slice(m.indexOf('/') + 1) : m}`)
-                      .join(', ')}
-                  </SummaryRow>
-                )}
-              </dl>
             </HomePanel>
 
             {/* Takes a neat scrollable height */}
@@ -577,12 +603,17 @@ export function HomeDashboard() {
   );
 }
 
-function SummaryRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
+/** One fact about what Start will open; read-only, the controls live elsewhere. */
+function SetupChip({ icon, warn, children }: { icon?: React.ReactNode; warn?: boolean; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2">
-      <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center text-foreground-extra-muted">{icon}</span>
-      <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1 break-words text-foreground">{children}</dd>
-    </div>
+    <span
+      className={cn(
+        'inline-flex max-w-full items-center gap-1 rounded-md bg-surface2/60 px-1.5 py-0.5 text-2xs',
+        warn ? 'text-status-warning' : 'text-foreground-muted',
+      )}
+    >
+      {icon && <span className="flex shrink-0 [&>svg]:size-3">{icon}</span>}
+      <span className="truncate">{children}</span>
+    </span>
   );
 }

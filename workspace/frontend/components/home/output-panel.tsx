@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { RotateCw } from 'lucide-react';
+import { ChevronDown, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/hint';
 import { AgentDayTimeline } from '@/components/charts/agent-day-timeline';
@@ -73,11 +73,11 @@ const MAX_CELL = 15;
  * smallest cell, up to a year, then cells grown to use the remaining width, so
  * a wide panel is filled rather than left with an empty strip on the right.
  */
-function useCalendarFit(ref: React.RefObject<HTMLElement | null>) {
+function useCalendarFit(ref: React.RefObject<HTMLElement | null>, active: boolean) {
   const [fit, setFit] = React.useState({ weeks: 20, cell: HEAT_CELL, side: false });
   React.useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!active || !el) return;
     const measure = () => {
       const width = el.clientWidth;
       const side = width >= SIDE_STATS_MIN;
@@ -90,8 +90,27 @@ function useCalendarFit(ref: React.RefObject<HTMLElement | null>) {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [ref]);
+  }, [ref, active]);
   return fit;
+}
+
+const OPEN_KEY = 'home.output.open';
+
+/** Collapsed unless the viewer opened it before; storage may be blocked. */
+function readOpen(): boolean {
+  try {
+    return window.localStorage.getItem(OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeOpen(open: boolean) {
+  try {
+    window.localStorage.setItem(OPEN_KEY, open ? '1' : '0');
+  } catch {
+    /* per-viewer convenience only */
+  }
 }
 
 interface DayStats {
@@ -109,7 +128,10 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
   );
   const workspaceId = workspace?.workspaceId;
   const measureRef = React.useRef<HTMLDivElement>(null);
-  const { weeks, cell, side } = useCalendarFit(measureRef);
+  // Read after mount so the server render and the first client render agree.
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => setOpen(readOpen()), []);
+  const { weeks, cell, side } = useCalendarFit(measureRef, open);
 
   const [data, setData] = React.useState<ActivityCommitsResponse | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -262,99 +284,139 @@ export function OutputPanel({ onOpenThread, className }: { onOpenThread?: (sessi
     { add: 0, del: 0 },
   );
 
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    writeOpen(next);
+    // Collapsed, the summary line is about today; a day picked in the calendar
+    // would leave it describing something else.
+    if (!next) setSelectedKey(dayKey(today));
+  };
+
+  // Collapsed: today only, from data already fetched for the calendar and lanes.
+  const todayTurns = isToday ? dayTurns : null;
+  const collapsedSubtitle = noRepos
+    ? 'No git repository is linked to this workspace yet.'
+    : data === null
+      ? 'Loading today…'
+      : `Today: ${plural(statsByDay.get(dayKey(today))?.total ?? 0, 'commit')}${todayTurns ? ` · ${plural(todayTurns.length, 'turn')}` : ''}.`;
+
   return (
     <HomePanel
       id="home-output"
       className={className}
       title="Output"
       subtitle={
-        data === null || noRepos
-          ? 'Commits in your project repositories, and what each agent did.'
-          : `${plural(summary.total, 'commit')} in the last ${weeks} weeks${summary.byAgents ? `, ${summary.byAgents} made during agent turns` : ''}.`
+        !open
+          ? collapsedSubtitle
+          : data === null || noRepos
+            ? 'Commits in your project repositories, and what each agent did.'
+            : `${plural(summary.total, 'commit')} in the last ${weeks} weeks${summary.byAgents ? `, ${summary.byAgents} made during agent turns` : ''}.`
       }
       action={
-        <Hint label="Refresh">
-          <Button variant="ghost" size="icon" className="size-7" onClick={refresh} disabled={refreshing} aria-label="Refresh output">
-            <RotateCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-          </Button>
-        </Hint>
+        <div className="flex items-center gap-0.5">
+          {open && (
+            <Hint label="Refresh">
+              <Button variant="ghost" size="icon" className="size-7" onClick={refresh} disabled={refreshing} aria-label="Refresh output">
+                <RotateCw className={cn('size-3.5', refreshing && 'animate-spin')} />
+              </Button>
+            </Hint>
+          )}
+          <Hint label={open ? 'Collapse' : 'Show calendar and timeline'}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              onClick={toggle}
+              aria-expanded={open}
+              aria-controls="home-output-body"
+              aria-label={open ? 'Collapse output' : 'Expand output'}
+            >
+              <ChevronDown className={cn('size-4 transition-transform', open && 'rotate-180')} />
+            </Button>
+          </Hint>
+        </div>
       }
     >
-      <div ref={measureRef} className="min-w-0">
-        {noRepos ? (
-          <p className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
-            No git repository is linked to this workspace yet. Pick a project folder when you start a session and its
-            commits show up here.
-          </p>
-        ) : (
-          <div
-            className={cn('flex min-w-0', side ? 'flex-row items-start justify-between' : 'flex-col gap-4')}
-            style={side ? { gap: SIDE_GAP } : undefined}
-          >
-            <HeatCalendar days={days} unit="commit" cellSize={cell} selectedKey={selectedKey} onSelect={onSelect} className="min-w-0">
-              <HeatCalendarGrid>
-                <HeatCalendarTooltip>{(day) => <DayTooltip day={day} stats={statsByDay.get(day.key)} />}</HeatCalendarTooltip>
-              </HeatCalendarGrid>
-              <HeatCalendarLegend>
-                {error ? (
-                  <span className="text-status-danger">{error}</span>
-                ) : unreadable > 0 ? (
-                  <span>
-                    {unreadable} {unreadable === 1 ? 'repository' : 'repositories'} could not be read
-                  </span>
-                ) : null}
-              </HeatCalendarLegend>
-            </HeatCalendar>
-            {data !== null && <OutputStats side={side} summary={summary} onSelectDay={setSelectedKey} />}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-5 border-t border-border pt-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
-            <h3 className="text-sm font-semibold tracking-tight text-foreground">{dayLabel}</h3>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {dayTurns ? plural(dayTurns.length, 'turn') : '…'} · {plural(selectedStats?.total ?? 0, 'commit')}
-              {(dayDiff.add > 0 || dayDiff.del > 0) && (
-                <span className="ms-2 font-mono">
-                  <span className="text-status-success">+{dayDiff.add}</span>{' '}
-                  <span className="text-status-danger">−{dayDiff.del}</span>
-                </span>
-              )}
-            </span>
-          </div>
-          {!isToday && (
-            <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" onClick={() => setSelectedKey(dayKey(today))}>
-              Back to today
-            </Button>
-          )}
-        </div>
-        {dayTurns === null ? (
-          <div className="h-24 animate-pulse rounded-md bg-foreground/[0.04]" />
-        ) : (
-          <>
-            <AgentDayTimeline
-              dayStart={dayStart}
-              turns={dayTurns}
-              commits={dayCommits}
-              now={now}
-              onOpenThread={onOpenThread}
-              sessionLabel={sessionLabel}
-            />
-            {(dayTurns.length > 0 || dayCommits.length > 0) && (
-              <OutputDayLists
-                className="mt-5"
-                commits={dayCommits}
-                turns={dayTurns}
-                now={now}
-                sessionLabel={sessionLabel}
-                onOpenThread={onOpenThread}
-              />
+      {open ? (
+        <div id="home-output-body">
+          <div ref={measureRef} className="min-w-0">
+            {noRepos ? (
+              <p className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">
+                No git repository is linked to this workspace yet. Pick a project folder when you start a session and its
+                commits show up here.
+              </p>
+            ) : (
+              <div
+                className={cn('flex min-w-0', side ? 'flex-row items-start justify-between' : 'flex-col gap-4')}
+                style={side ? { gap: SIDE_GAP } : undefined}
+              >
+                <HeatCalendar days={days} unit="commit" cellSize={cell} selectedKey={selectedKey} onSelect={onSelect} className="min-w-0">
+                  <HeatCalendarGrid>
+                    <HeatCalendarTooltip>{(day) => <DayTooltip day={day} stats={statsByDay.get(day.key)} />}</HeatCalendarTooltip>
+                  </HeatCalendarGrid>
+                  <HeatCalendarLegend>
+                    {error ? (
+                      <span className="text-status-danger">{error}</span>
+                    ) : unreadable > 0 ? (
+                      <span>
+                        {unreadable} {unreadable === 1 ? 'repository' : 'repositories'} could not be read
+                      </span>
+                    ) : null}
+                  </HeatCalendarLegend>
+                </HeatCalendar>
+                {data !== null && <OutputStats side={side} summary={summary} onSelectDay={setSelectedKey} />}
+              </div>
             )}
-          </>
-        )}
-      </div>
+          </div>
+
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <div className="flex min-w-0 flex-wrap items-baseline gap-x-3">
+                <h3 className="text-sm font-semibold tracking-tight text-foreground">{dayLabel}</h3>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {dayTurns ? plural(dayTurns.length, 'turn') : '…'} · {plural(selectedStats?.total ?? 0, 'commit')}
+                  {(dayDiff.add > 0 || dayDiff.del > 0) && (
+                    <span className="ms-2 font-mono">
+                      <span className="text-status-success">+{dayDiff.add}</span>{' '}
+                      <span className="text-status-danger">−{dayDiff.del}</span>
+                    </span>
+                  )}
+                </span>
+              </div>
+              {!isToday && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-2xs" onClick={() => setSelectedKey(dayKey(today))}>
+                  Back to today
+                </Button>
+              )}
+            </div>
+            {dayTurns === null ? (
+              <div className="h-24 animate-pulse rounded-md bg-foreground/[0.04]" />
+            ) : (
+              <>
+                <AgentDayTimeline
+                  dayStart={dayStart}
+                  turns={dayTurns}
+                  commits={dayCommits}
+                  now={now}
+                  onOpenThread={onOpenThread}
+                  sessionLabel={sessionLabel}
+                />
+                {(dayTurns.length > 0 || dayCommits.length > 0) && (
+                  <OutputDayLists
+                    className="mt-5"
+                    commits={dayCommits}
+                    turns={dayTurns}
+                    now={now}
+                    sessionLabel={sessionLabel}
+                    onOpenThread={onOpenThread}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      ) : undefined}
     </HomePanel>
   );
 }
