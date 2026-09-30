@@ -3,6 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { memo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { formatElapsed } from '@/lib/use-elapsed';
 import {
   Brain,
   Wrench,
@@ -830,6 +831,9 @@ function runDuration(messages: WorkspaceMessage[]): number | undefined {
   return ms > 0 ? ms : undefined;
 }
 
+/** A trace shorter than this carries no elapsed time in its header: 4s is the normal case. */
+const TRACE_ELAPSED_MIN_MS = 15_000;
+
 const OPEN_TOOL_STATUSES = new Set(['', 'running', 'pending', 'in_progress']);
 
 /**
@@ -1058,29 +1062,43 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   */
   const stepCount = toolCount + thoughtCount || renderable.length;
 
-  return (
-    <div className="mb-2 min-w-0">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="group flex min-w-0 items-center gap-1.5 text-left text-sm font-medium text-foreground/90 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-        >
-          <span className="truncate">
-            Completed {stepCount} step{stepCount === 1 ? '' : 's'}
-          </span>
-          <ChevronDown
-            className={cn(
-              'size-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:text-muted-foreground',
-              open && 'rotate-180'
-            )}
-          />
-        </button>
+  /*
+    THE TRACE IS AN ASIDE, AND IT MUST LOOK LIKE ONE.
 
-      </div>
+    This header used to be `text-sm font-medium text-foreground/90` -- the same
+    size and nearly the same colour as the answer under it -- and the opened
+    trace had no edge, so a thought, a tool row and the reply all sat on one
+    left margin in one type scale and the reader could not tell where the work
+    ended and the answer began. Now the header is small muted text, the opened
+    trace hangs off a rail of its own, and the answer keeps the full scale.
+
+    The elapsed time follows the same rule as a single thought: it only speaks
+    when it has news (see Reasoning), so a fast turn carries no number.
+  */
+  const elapsedMs = runDuration(renderable);
+  const elapsed = elapsedMs && elapsedMs >= TRACE_ELAPSED_MIN_MS ? formatElapsed(elapsedMs) : null;
+
+  return (
+    <div className={cn('min-w-0 transition-[margin]', open ? 'mb-4' : 'mb-2')}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="group flex min-w-0 items-center gap-1 rounded-md text-left text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="truncate">
+          Worked through {stepCount} step{stepCount === 1 ? '' : 's'}
+          {elapsed && <span className="text-muted-foreground/70"> · {elapsed}</span>}
+        </span>
+        <ChevronDown
+          className={cn(
+            'size-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:text-muted-foreground',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
       <AgentDisclosure open={open}>
-        <div className="pt-1.5">
+        <div className="mt-2 ml-1.5 border-l border-border/80 pl-3">
           <StepRuns steps={renderable} />
         </div>
       </AgentDisclosure>
