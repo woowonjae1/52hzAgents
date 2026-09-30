@@ -41,7 +41,7 @@ export interface AgentActivityTool {
   additions?: number;
   deletions?: number;
   /** A call that did not succeed draws its action in the danger tone. */
-  status?: "ok" | "failed" | "blocked";
+  status?: "ok" | "running" | "failed" | "blocked";
   /** When present the row opens to show it (arguments, output). */
   detail?: ReactNode;
 }

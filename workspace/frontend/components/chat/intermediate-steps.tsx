@@ -32,7 +32,6 @@ import {
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentActivity, type AgentActivityItem } from '@/components/agents/agent-activity';
 import { WorkingIndicator } from './working-indicator';
-import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
 import { SubagentList } from '@/components/ai-elements/subagent-list';
 import { MarkdownContent } from './markdown-content';
@@ -732,108 +731,6 @@ function joinThoughts(messages: WorkspaceMessage[]): string {
 }
 
 /**
- * A run of steps, drawn.
- *
- * Both places that show an agent's steps render through this: the live trace
- * above a reply (`IntermediateSteps`) and the collapsed disclosure inside one
- * (`ToolCallsDisclosure`). They used to have separate copies of the loop, which
- * is how the fragmented-thinking fix landed in one of them and not the other —
- * the live trace was repaired while the disclosure kept splitting a single
- * thought across four rows.
- */
-/**
- * One row for a batch of tool calls issued together.
- *
- * Names the tools instead of counting them: "3 tools" tells the reader nothing
- * they can act on, whereas "Read, Read, Grep" says what the agent reached for
- * without opening anything. Repeats are kept rather than deduplicated — four
- * reads of four different files is four reads, and collapsing that to "Read"
- * would hide the scale of what happened.
- */
-const ParallelTools = memo(function ParallelTools({ messages, live }: { messages: WorkspaceMessage[]; live?: boolean }) {
-  const names = messages.map((m) => parseMessageStep(m).toolDisplay || 'Tool');
-  // The batch's own icon is whichever tool it led with; a wrench for a batch of
-  // four reads would be less informative than the read glyph.
-  const Icon = getStepIcon(parseMessageStep(messages[0]));
-
-  return (
-    <EventLine
-      icon={<Icon />}
-      label={`${messages.length} parallel tools`}
-      detail={names.join(', ')}
-      meta={`×${messages.length}`}
-    >
-      {/*
-        The individual calls, each still its own `SingleStep` — so a batch member
-        expands to its arguments exactly like a lone tool call does. Nesting a
-        disclosure inside a disclosure is acceptable here because the outer one
-        is a summary of a moment and the inner one is the detail of one action.
-      */}
-      <div className="py-0.5">
-        {messages.map((m, i) => (
-          <SingleStep key={`${m.messageId || 'batch'}-${i}`} message={m} live={live} />
-        ))}
-      </div>
-    </EventLine>
-  );
-});
-
-function StepRuns({ steps, live }: { steps: WorkspaceMessage[]; live?: boolean }) {
-  const runs = coalesceThinking(resolveToolPairs(steps));
-  return (
-    <>
-      {runs.map((run, runIdx) =>
-        run.kind === 'thinking' ? (
-          <Reasoning
-            key={`think-${run.messages[0]?.messageId || runIdx}`}
-            content={joinThoughts(run.messages)}
-            startTime={
-              run.messages[0]?.createdAt
-                ? new Date(run.messages[0].createdAt).getTime()
-                : undefined
-            }
-            durationMs={runDuration(run.messages)}
-            // Only the LAST run of a live trace is still streaming. Left always
-            // true, every historical thought in the scrollback would shimmer
-            // forever; left always false, the one actually in flight would not.
-            isStreaming={Boolean(live) && runIdx === runs.length - 1}
-            defaultExpanded={false}
-          />
-        ) : run.kind === 'reply' ? (
-          /*
-           * The answer, typing itself out. No disclosure, no "Thought" heading,
-           * no icon — it is the reply, so it looks like the reply. A blinking
-           * cursor while it is the live edge is the whole affordance; the row
-           * simply gets replaced by the real message when that arrives.
-           */
-          <div
-            key={`reply-${run.messages[0]?.messageId || runIdx}`}
-            className="py-0.5 text-sm leading-relaxed text-foreground"
-          >
-            <MarkdownContent content={joinThoughts(run.messages)} />
-            {Boolean(live) && runIdx === runs.length - 1 && (
-              <span className="streaming-cursor" aria-hidden />
-            )}
-          </div>
-        ) : run.kind === 'tools' ? (
-          <ParallelTools
-            key={`tools-${run.messages[0]?.messageId || runIdx}`}
-            messages={run.messages}
-            live={Boolean(live) && runIdx === runs.length - 1}
-          />
-        ) : (
-          <SingleStep
-            key={`${run.message.messageId || 'step'}-${runIdx}`}
-            message={run.message}
-            live={Boolean(live) && runIdx === runs.length - 1}
-          />
-        )
-      )}
-    </>
-  );
-}
-
-/**
  * Wall time from the run's first fragment to its last.
  *
  * The only honest duration available for a finished thought: the caller holds
@@ -1060,58 +957,125 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   steps,
   defaultOpen = false,
 }: ToolCallsDisclosureProps) {
-  const renderable = useMemo(
-    () => resolveToolPairs((steps || []).filter((s) => !isPlaceholderThinking(s))),
-    [steps]
-  );
-  const runs = useMemo(() => coalesceThinking(renderable), [renderable]);
-  const items = useMemo(() => runsToActivity(runs), [runs]);
-  if (renderable.length === 0 || items.length === 0) return null;
+  return <TraceActivity steps={steps || []} defaultOpen={defaultOpen} />;
+});
 
-  const toolCount = renderable.filter((s) => {
-    if (isToolCallMessage(s)) return true;
-    if (s.messageType === 'todos' || s.messageType === 'thinking') return false;
-    return parseMessageStep(s).type === 'tool_call';
-  }).length;
-  const thoughtCount = runs.filter((r) => r.kind === 'thinking').length;
-  const stepCount = toolCount + thoughtCount || renderable.length;
+/** Readable height of a finished trace before it scrolls inside itself. */
+const TRACE_MAX_HEIGHT = 360;
+/** The live window: only the newest few rows, gliding up as more arrive. */
+const LIVE_TRACE_HEIGHT = 224;
 
-  /*
-    THE TRACE IS AN ASIDE, AND IT MUST LOOK LIKE ONE.
+/**
+ * An agent's run of steps, live or finished, as one `AgentActivity`.
+ *
+ * THE TRACE IS AN ASIDE, AND IT MUST LOOK LIKE ONE. Drawn as a stack of
+ * "Thought" cards and "2 parallel tools  bash, bash" rows it read as part of the
+ * answer: same type scale, same left margin, and a batch of tools named only by
+ * how many there were. Here the agent's own words are quiet lines, every tool
+ * call is its own "Action  target" row, and the window is capped -- live it
+ * shows the newest rows and glides, finished it folds to one line -- so a long
+ * run never pushes the answer off screen.
+ *
+ * One component for both states on purpose: when the turn ends the same
+ * instance flips from working to complete and folds itself, instead of a live
+ * block being swapped for a different-looking settled one.
+ *
+ * The reply that is being typed out is NOT part of the window. It is the
+ * answer, so it is drawn below as the answer -- inside a 224px viewport it would
+ * scroll past like a log line.
+ */
+const TraceActivity = memo(function TraceActivity({
+  steps,
+  live = false,
+  multiAgent = false,
+  defaultOpen = false,
+}: {
+  steps: WorkspaceMessage[];
+  live?: boolean;
+  multiAgent?: boolean;
+  defaultOpen?: boolean;
+}) {
+  const model = useMemo(() => {
+    const visible = steps.filter((st) => !isPlaceholderThinking(st));
+    const senders: { sender: string; steps: WorkspaceMessage[] }[] = [];
+    for (const step of visible) {
+      const last = senders[senders.length - 1];
+      if (last && last.sender === step.senderName) last.steps.push(step);
+      else senders.push({ sender: step.senderName, steps: [step] });
+    }
 
-    Drawn as a stack of "Thought" and "bash { json }" rows it read as part of the
-    answer: same type scale, same left margin, nothing to say where the work
-    ended. It is now beUI's `AgentActivity`: the agent's own words as quiet
-    lines, each tool call as "Action  target", and a capped viewport so a long
-    trace scrolls inside itself instead of pushing the answer off screen.
+    const items: AgentActivityItem[] = [];
+    let tail: WorkspaceMessage[] | null = null;
+    let thoughts = 0;
+    senders.forEach((group, gi) => {
+      let runs = coalesceThinking(resolveToolPairs(group.steps));
+      const isLast = gi === senders.length - 1;
+      const edge = runs[runs.length - 1];
+      // The live edge, when it is the reply being typed, is the answer.
+      if (live && isLast && edge && edge.kind === 'reply') {
+        tail = edge.messages;
+        runs = runs.slice(0, -1);
+      }
+      thoughts += runs.filter((r) => r.kind === 'thinking').length;
+      if (multiAgent && gi > 0) {
+        items.push({
+          id: `who-${gi}`,
+          type: 'custom',
+          node: (
+            <div className="flex items-baseline gap-1.5 pt-1">
+              <AgentAvatar name={group.sender} size={14} className="translate-y-px" />
+              <span className="text-3xs font-medium text-foreground-muted">{group.sender}</span>
+            </div>
+          ),
+        });
+      }
+      items.push(...runsToActivity(runs, { live: live && isLast, prefix: `g${gi}` }));
+    });
 
-    The elapsed time only speaks when it has news (see Reasoning), so a fast
-    turn carries no number.
-  */
-  const elapsedMs = runDuration(renderable);
+    const tools = items.filter((it) => it.type === 'tool').length;
+    const first = visible[0]?.createdAt;
+    return {
+      items,
+      tail: tail as WorkspaceMessage[] | null,
+      stepCount: tools + thoughts || visible.length,
+      elapsedMs: runDuration(visible),
+      startTime: first ? new Date(first).getTime() : undefined,
+    };
+  }, [steps, live, multiAgent]);
+
+  const { items, tail, stepCount, elapsedMs, startTime } = model;
+  if (!live && items.length === 0) return null;
+
+  /* The elapsed time only speaks when it has news (see Reasoning). */
   const elapsed = elapsedMs && elapsedMs >= TRACE_ELAPSED_MIN_MS ? formatElapsed(elapsedMs) : null;
 
   return (
-    <AgentActivity
-      items={items}
-      status="complete"
-      defaultOpen={defaultOpen}
-      collapseOnComplete={false}
-      maxHeight={TRACE_MAX_HEIGHT}
-      duration={(elapsedMs ?? 0) / 1000}
-      summary={
-        <>
-          Worked through {stepCount} step{stepCount === 1 ? '' : 's'}
-          {elapsed && <span className="font-normal text-muted-foreground/70"> · {elapsed}</span>}
-        </>
-      }
-      className="mb-3"
-    />
+    <>
+      <AgentActivity
+        items={items}
+        status={live ? 'working' : 'complete'}
+        defaultOpen={defaultOpen}
+        collapseOnComplete
+        maxHeight={live ? LIVE_TRACE_HEIGHT : TRACE_MAX_HEIGHT}
+        duration={(elapsedMs ?? 0) / 1000}
+        renderWorkingStatus={() => <ActivityIndicator startTime={startTime} />}
+        summary={
+          <>
+            Worked through {stepCount} step{stepCount === 1 ? '' : 's'}
+            {elapsed && <span className="font-normal text-muted-foreground/70"> · {elapsed}</span>}
+          </>
+        }
+        className={items.length > 0 || live ? 'mb-3' : undefined}
+      />
+      {tail && (
+        <div className="py-0.5 text-sm leading-relaxed text-foreground">
+          <MarkdownContent content={joinThoughts(tail)} />
+          <span className="streaming-cursor" aria-hidden />
+        </div>
+      )}
+    </>
   );
 });
-
-/** Readable height of an opened trace before it scrolls inside itself. */
-const TRACE_MAX_HEIGHT = 360;
 
 /** The row verb for a tool, in beUI's vocabulary; unknown tools keep their own name. */
 function toolAction(display: string): string {
@@ -1142,7 +1106,10 @@ function prettyToolArgs(args: string): string {
  * list, a subagent tree, a status line) is drawn by the same `SingleStep` the
  * live trace uses, so nothing that was visible before is lost.
  */
-function runsToActivity(runs: StepRun[]): AgentActivityItem[] {
+function runsToActivity(
+  runs: StepRun[],
+  { live = false, prefix = 'r' }: { live?: boolean; prefix?: string } = {}
+): AgentActivityItem[] {
   const items: AgentActivityItem[] = [];
 
   const pushText = (key: string, text: string) => {
@@ -1163,7 +1130,7 @@ function runsToActivity(runs: StepRun[]): AgentActivityItem[] {
       );
   };
 
-  const pushStep = (message: WorkspaceMessage, key: string) => {
+  const pushStep = (message: WorkspaceMessage, key: string, running = false) => {
     if (isPlaceholderThinking(message)) return;
     const parsed =
       message.messageType === 'todos'
@@ -1182,7 +1149,14 @@ function runsToActivity(runs: StepRun[]): AgentActivityItem[] {
         action: toolAction(parsed.toolDisplay || 'Tool'),
         // parseMessageStep appends " · failed" to the summary; the row draws its own badge.
         target: (parsed.summary || parsed.toolDisplay || 'Tool').replace(/ · failed$/, ''),
-        status: status === 'failed' || status === 'error' ? 'failed' : status === 'blocked' ? 'blocked' : 'ok',
+        status:
+          status === 'failed' || status === 'error'
+            ? 'failed'
+            : status === 'blocked'
+            ? 'blocked'
+            : running && OPEN_TOOL_STATUSES.has(status)
+            ? 'running'
+            : 'ok',
         detail: parsed.args ? <EventLinePre>{prettyToolArgs(parsed.args)}</EventLinePre> : undefined,
       });
       return;
@@ -1195,12 +1169,15 @@ function runsToActivity(runs: StepRun[]): AgentActivityItem[] {
   };
 
   runs.forEach((run, i) => {
+    const isEdge = i === runs.length - 1;
     if (run.kind === 'thinking' || run.kind === 'reply') {
-      pushText(`${run.kind}-${run.messages[0]?.messageId || i}`, joinThoughts(run.messages));
+      pushText(`${prefix}-${run.kind}-${run.messages[0]?.messageId || i}`, joinThoughts(run.messages));
     } else if (run.kind === 'tools') {
-      run.messages.forEach((m, j) => pushStep(m, `${m.messageId || 'tool'}-${i}-${j}`));
+      run.messages.forEach((m, j) =>
+        pushStep(m, `${prefix}-${m.messageId || 'tool'}-${i}-${j}`, live && isEdge && j === run.messages.length - 1)
+      );
     } else {
-      pushStep(run.message, `${run.message.messageId || 'step'}-${i}`);
+      pushStep(run.message, `${prefix}-${run.message.messageId || 'step'}-${i}`, live && isEdge);
     }
   });
   return items;
@@ -1216,40 +1193,14 @@ interface IntermediateStepsProps {
 
 export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents, isActive = false }: IntermediateStepsProps) {
   if (!steps || steps.length === 0) return null;
-  const renderableSteps = steps.filter((s) => !isPlaceholderThinking(s));
+  const renderableSteps = steps.filter((st) => !isPlaceholderThinking(st));
   if (renderableSteps.length === 0) return null;
   const hasTerminalStatus = steps.some(isTerminalStatus);
 
-  const hasMultipleAgents = (agents?.length ?? 0) > 1;
-  const senderGroups: { sender: string; steps: WorkspaceMessage[] }[] = [];
-  for (const step of steps) {
-    const last = senderGroups[senderGroups.length - 1];
-    if (last && last.sender === step.senderName) {
-      last.steps.push(step);
-    } else {
-      senderGroups.push({ sender: step.senderName, steps: [step] });
-    }
-  }
-
-  const primarySender = senderGroups[0]?.sender || '';
+  const primarySender = steps[0]?.senderName || '';
   const primaryAgent = agents?.find((a) => a.agentName === primarySender);
-
-  // If steps are settled and not currently active, fold them inside ToolCallsDisclosure
-  if (!isActive) {
-    return (
-      <div className="flex items-start gap-3 py-1">
-        <AgentAvatar
-          name={primarySender}
-          agentType={primaryAgent?.agentType}
-          size={28}
-          className="mt-0.5 shrink-0"
-        />
-        <div className="min-w-0 flex-1 py-0.5">
-          <ToolCallsDisclosure steps={renderableSteps} defaultOpen={false} />
-        </div>
-      </div>
-    );
-  }
+  // A stopped run is finished even if the channel still reads as active.
+  const live = isActive && !hasTerminalStatus;
 
   return (
     <div className="flex items-start gap-3 py-1">
@@ -1259,31 +1210,8 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
         size={28}
         className="mt-0.5 shrink-0"
       />
-      <div className="grid min-w-0 flex-1 grid-cols-[1rem_1fr] gap-x-1.5 py-0.5 [&>*:nth-child(even)]:min-w-0">
-        <span aria-hidden className="mx-auto h-full w-px bg-border" />
-        <div className="min-w-0">
-        {senderGroups.map((group, gi) => (
-          <div key={`${group.sender}-${gi}`}>
-            {hasMultipleAgents && gi > 0 && (
-              <div className="flex items-baseline gap-1.5 mb-0.5 mt-1.5">
-                <AgentAvatar name={group.sender} size={14} className="translate-y-px" />
-                <span className="text-3xs font-medium text-foreground-muted">
-                  {group.sender}
-                </span>
-              </div>
-            )}
-            <StepRuns steps={group.steps} live={isActive} />
-          </div>
-        ))}
-          {isActive && !hasTerminalStatus && (
-            <div className="flex items-center justify-between py-1">
-              <ActivityIndicator
-                startTime={steps[0]?.createdAt ? new Date(steps[0].createdAt).getTime() : undefined}
-              />
-
-            </div>
-          )}
-        </div>
+      <div className="min-w-0 flex-1 py-0.5">
+        <TraceActivity steps={renderableSteps} live={live} multiAgent={(agents?.length ?? 0) > 1} />
       </div>
     </div>
   );

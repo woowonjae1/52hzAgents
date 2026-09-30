@@ -228,6 +228,9 @@ function ToolRow({ item }: { item: AgentActivityTool }) {
           {item.status === "blocked" ? "blocked" : "failed"}
         </span>
       ) : null}
+      {item.status === "running" ? (
+        <span className="event-running shrink-0 text-xs">running</span>
+      ) : null}
       {typeof item.additions === "number" || typeof item.deletions === "number" ? (
         <span className="flex shrink-0 items-center gap-2 font-mono tabular-nums">
           {typeof item.additions === "number" ? (
