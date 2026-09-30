@@ -85,10 +85,9 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   const historyLoadedRef = useRef(false);
   // Track current session to discard stale responses
   const currentSessionRef = useRef<string | null>(sessionId);
-  // True while the newest message is an agent step (status/thinking) — i.e. an
-  // agent is mid-work. Drives fast polling in the fallback path so the final
-  // answer lands quickly even when the user is idle (common while waiting).
   const agentWorkingRef = useRef(false);
+  // Track in-flight poll concurrency to prevent overlapping fetch cascades
+  const isPollingRef = useRef(false);
 
   // Reset when session changes
   useEffect(() => {
@@ -194,12 +193,15 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
 
   // Forward poll: fetch new messages since the newest known
   const poll = useCallback(async () => {
-    if (!sessionId || !historyLoadedRef.current) return;
+    if (!sessionId || !historyLoadedRef.current || isPollingRef.current) return;
+    isPollingRef.current = true;
 
     try {
       // Keep fetching while there are more events (handles bursts of status messages)
       let hasMore = true;
-      while (hasMore) {
+      let iterations = 0;
+      while (hasMore && iterations < 25) {
+        iterations++;
         const result = dmPair
           ? await (async () => {
               const r = await workspaceApi.pollConversation(dmPair[0], dmPair[1], {
@@ -232,6 +234,8 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       }
     } catch {
       // Polling error — will retry on next interval
+    } finally {
+      isPollingRef.current = false;
     }
   }, [sessionId, dmPair]);
 
@@ -381,10 +385,21 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       startPolling();
     }
 
+    let reconciliationInterval: ReturnType<typeof setInterval> | null = null;
+    if (usingSSE) {
+      // Periodic background reconciliation in SSE mode to catch any dropped frames
+      reconciliationInterval = setInterval(() => {
+        if (sessionId === currentSessionRef.current) {
+          poll();
+        }
+      }, 30_000);
+    }
+
     return () => {
       if (eventSource) eventSource.close();
       if (timeout) clearTimeout(timeout);
       if (sseRetryTimeoutRef.current) clearTimeout(sseRetryTimeoutRef.current);
+      if (reconciliationInterval) clearInterval(reconciliationInterval);
     };
   }, [sessionId, enabled, poll, reconnectNonce]);
 

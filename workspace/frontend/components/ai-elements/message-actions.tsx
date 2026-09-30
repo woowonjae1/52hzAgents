@@ -1,6 +1,6 @@
 'use client';
 
-import { BookPlus, Copy, Check, RotateCw, Download, FileText, Sparkles } from 'lucide-react';
+import { BookPlus, Copy, Check, RotateCw, Download, FileText, Sparkles, Quote } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
 import { downloadBlob } from '@/lib/download';
@@ -12,6 +12,7 @@ export interface MessageActionsProps {
   senderType?: 'user' | 'agent' | 'system';
   variant?: 'capsule' | 'toolbar';
   onRegenerate?: () => void;
+  onQuote?: () => void;
   onExportMarkdown?: () => void;
   onOpenCanvas?: () => void;
   /** Opens the knowledge editor with this message as the draft. */
@@ -32,6 +33,7 @@ export function MessageActions({
   senderType = 'agent',
   variant = 'capsule',
   onRegenerate,
+  onQuote,
   onExportMarkdown,
   onOpenCanvas,
   onSaveToKnowledge,
@@ -88,6 +90,27 @@ export function MessageActions({
             {copied ? 'Copied' : 'Copy content'}
           </TooltipContent>
         </Tooltip>
+
+        {onQuote && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuote();
+                }}
+                className={ghostButton}
+                aria-label="Quote reply"
+              >
+                <Quote className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={4}>
+              Quote reply
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {senderType === 'agent' && onRegenerate && (
           <Tooltip>

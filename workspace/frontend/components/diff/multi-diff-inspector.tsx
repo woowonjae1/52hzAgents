@@ -204,7 +204,7 @@ export function MultiDiffInspector({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-6 animate-in fade-in duration-150" role="dialog" aria-modal="true" aria-labelledby="diff-inspector-title">
       <div
         className="w-full max-w-6xl h-[88vh] flex flex-col rounded-2xl bg-surface1 border border-border shadow-xl overflow-hidden animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
@@ -286,9 +286,9 @@ export function MultiDiffInspector({
         </div>
 
         {/* ── Main Split View ── */}
-        <div className="flex-1 flex min-h-0 divide-x divide-border">
+        <div className="flex-1 flex flex-col md:flex-row min-h-0 divide-y md:divide-y-0 md:divide-x divide-border">
           {/* Left Column: File List */}
-          <div className="w-80 shrink-0 flex flex-col bg-surface1/60">
+          <div className="w-full md:w-80 shrink-0 max-h-48 md:max-h-none flex flex-col bg-surface1/60">
             {/* Search filter if > 4 files */}
             {files.length > 4 && (
               <div className="p-2.5 border-b border-border">
@@ -298,7 +298,7 @@ export function MultiDiffInspector({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="筛选文件 (↑/↓ 切换)…"
+                    placeholder="Filter files (↑/↓ to switch)..."
                     className="w-full bg-surface2 border border-border rounded-lg pl-8 pr-2.5 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted outline-none focus:border-accent transition-colors"
                   />
                   {searchQuery && (
@@ -373,12 +373,12 @@ export function MultiDiffInspector({
                   <Kbd className="min-w-4.5 h-4 px-1 text-3xs">↑</Kbd>
                   <Kbd className="min-w-4.5 h-4 px-1 text-3xs">↓</Kbd>
                 </div>
-                <span className="text-foreground-muted truncate">切换文件</span>
-                <span className="text-foreground-extra-muted/60 text-3xs shrink-0">或 J/K</span>
+                <span className="text-foreground-muted truncate">Switch file</span>
+                <span className="text-foreground-extra-muted/60 text-3xs shrink-0">or J/K</span>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <Kbd className="h-4 px-1.5 text-3xs">Esc</Kbd>
-                <span className="text-foreground-muted">关闭</span>
+                <span className="text-foreground-muted">Close</span>
               </div>
             </div>
           </div>

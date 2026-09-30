@@ -222,6 +222,25 @@ func ListEvents(c *gin.Context) {
 	if target := c.Query("target"); target != "" {
 		query = query.Where("target = ?", target)
 	}
+	if conv := strings.TrimSpace(c.Query("conversation")); conv != "" {
+		parts := strings.Split(conv, ",")
+		if len(parts) == 2 {
+			a, b := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+			vA := []string{a}
+			if strings.HasPrefix(a, "agent:") {
+				vA = append(vA, strings.TrimPrefix(a, "agent:"))
+			} else if !strings.HasPrefix(a, "human:") {
+				vA = append(vA, "agent:"+a)
+			}
+			vB := []string{b}
+			if strings.HasPrefix(b, "agent:") {
+				vB = append(vB, strings.TrimPrefix(b, "agent:"))
+			} else if !strings.HasPrefix(b, "human:") {
+				vB = append(vB, "agent:"+b)
+			}
+			query = query.Where("((source IN ? AND target IN ?) OR (source IN ? AND target IN ?))", vA, vB, vB, vA)
+		}
+	}
 	if eventType := c.Query("type"); eventType != "" {
 		if eventType == "workspace.message" {
 			query = query.Where("type LIKE ?", "workspace.message%")
@@ -264,6 +283,25 @@ func ListEvents(c *gin.Context) {
 		}
 		if target := c.Query("target"); target != "" {
 			headQuery = headQuery.Where("target = ?", target)
+		}
+		if conv := strings.TrimSpace(c.Query("conversation")); conv != "" {
+			parts := strings.Split(conv, ",")
+			if len(parts) == 2 {
+				a, b := strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+				vA := []string{a}
+				if strings.HasPrefix(a, "agent:") {
+					vA = append(vA, strings.TrimPrefix(a, "agent:"))
+				} else if !strings.HasPrefix(a, "human:") {
+					vA = append(vA, "agent:"+a)
+				}
+				vB := []string{b}
+				if strings.HasPrefix(b, "agent:") {
+					vB = append(vB, strings.TrimPrefix(b, "agent:"))
+				} else if !strings.HasPrefix(b, "human:") {
+					vB = append(vB, "agent:"+b)
+				}
+				headQuery = headQuery.Where("((source IN ? AND target IN ?) OR (source IN ? AND target IN ?))", vA, vB, vB, vA)
+			}
 		}
 		if eventType := c.Query("type"); eventType != "" {
 			if eventType == "workspace.message" {

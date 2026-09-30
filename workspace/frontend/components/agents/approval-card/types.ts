@@ -11,6 +11,7 @@ export type ApprovalCardStatus =
 export interface ApprovalCardOption {
   value: string;
   label: string;
+  description?: ReactNode;
   disabled?: boolean;
 }
 

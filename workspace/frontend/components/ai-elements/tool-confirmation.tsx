@@ -58,6 +58,7 @@ export function ToolConfirmation({
       description="The agent needs permission before this runs."
       parameters={parameters}
       status={status}
+      defaultOpen={true}
       onApprove={() => void onApprove()}
       onDeny={() => void onDeny()}
       className={className}

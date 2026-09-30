@@ -196,3 +196,47 @@ func TestListEventsIncludesEventID(t *testing.T) {
 		}
 	}
 }
+
+func TestListEventsConversationFilter(t *testing.T) {
+	router, workspace, token, _ := eventCursorTestRouter(t, 1)
+
+	// Insert DM messages between alice and bob
+	db.DB.Create(&models.EventRecord{
+		ID:        "evt-dm-1",
+		NetworkID: workspace.ID,
+		Type:      "workspace.message.posted",
+		Source:    "agent:alice",
+		Target:    "agent:bob",
+		Timestamp: 100,
+		Payload:   []byte(`{"content":"hello bob"}`),
+	})
+	db.DB.Create(&models.EventRecord{
+		ID:        "evt-dm-2",
+		NetworkID: workspace.ID,
+		Type:      "workspace.message.posted",
+		Source:    "agent:bob",
+		Target:    "agent:alice",
+		Timestamp: 101,
+		Payload:   []byte(`{"content":"hello alice"}`),
+	})
+	db.DB.Create(&models.EventRecord{
+		ID:        "evt-dm-3",
+		NetworkID: workspace.ID,
+		Type:      "workspace.message.posted",
+		Source:    "agent:charlie",
+		Target:    "agent:bob",
+		Timestamp: 102,
+		Payload:   []byte(`{"content":"hello bob from charlie"}`),
+	})
+
+	// Query conversation=alice,bob
+	resp := listEvents(t, router, token, fmt.Sprintf("network=%s&conversation=alice,bob", workspace.ID))
+	if len(resp.Events) != 2 {
+		t.Fatalf("got %d events for alice,bob conversation, want 2", len(resp.Events))
+	}
+	for _, ev := range resp.Events {
+		if ev.ID != "evt-dm-1" && ev.ID != "evt-dm-2" {
+			t.Fatalf("unexpected event %s in conversation", ev.ID)
+		}
+	}
+}

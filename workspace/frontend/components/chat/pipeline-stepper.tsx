@@ -10,6 +10,8 @@ import {
   Square,
   GitFork,
   ChevronRight,
+  Play,
+  PauseCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -54,6 +56,7 @@ export function PipelineStepper({
 }) {
   const [pipeline, setPipeline] = useState<PipelineData | null>(null);
   const [halting, setHalting] = useState(false);
+  const [resuming, setResuming] = useState(false);
 
   const fetchPipeline = useCallback(async () => {
     if (!channelId) return;
@@ -85,12 +88,27 @@ export function PipelineStepper({
     }
   };
 
+  const handleResume = async () => {
+    if (!channelId || resuming) return;
+    setResuming(true);
+    try {
+      await workspaceApi.resumeChannelPipeline(channelId);
+      toast.success('Pipeline execution resumed');
+      await fetchPipeline();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed to resume pipeline');
+    } finally {
+      setResuming(false);
+    }
+  };
+
   if (!pipeline || !pipeline.active || !pipeline.steps || pipeline.steps.length === 0) {
     return null;
   }
 
   const steps = pipeline.steps;
   const currentIdx = pipeline.current_index ?? 0;
+  const isPaused = pipeline.status === 'paused';
 
   return (
     <div
@@ -101,8 +119,10 @@ export function PipelineStepper({
     >
       <div className="flex items-center gap-2 min-w-0 overflow-x-auto py-0.5">
         <div className="flex items-center gap-1.5 text-foreground-extra-muted shrink-0">
-          <GitFork className="size-3.5 text-primary" />
-          <span className="font-semibold text-3xs uppercase tracking-wider text-primary">Pipeline</span>
+          <GitFork className={cn('size-3.5', isPaused ? 'text-status-warning' : 'text-primary')} />
+          <span className={cn('font-semibold text-3xs uppercase tracking-wider', isPaused ? 'text-status-warning' : 'text-primary')}>
+            {isPaused ? 'Pipeline Paused' : 'Pipeline'}
+          </span>
         </div>
 
         <div className="flex items-center gap-1.5 min-w-0">
@@ -110,7 +130,8 @@ export function PipelineStepper({
             const isCurrent = idx === currentIdx;
             const isDone = step.status === 'done' || idx < currentIdx;
             const isRetrying = step.status === 'retrying';
-            const isRunning = isCurrent && (step.status === 'running' || !step.status);
+            const isRunning = isCurrent && !isPaused && (step.status === 'running' || !step.status);
+            const isStepPaused = isCurrent && isPaused;
 
             return (
               <div key={idx} className="flex items-center gap-1.5 shrink-0">
@@ -119,15 +140,19 @@ export function PipelineStepper({
                     'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium border transition-colors',
                     isDone
                       ? 'bg-surface3/80 text-foreground-muted border-border/60'
-                      : isRunning
-                        ? 'bg-primary/10 text-primary border-primary/30 font-semibold shadow-xs'
-                        : isRetrying
-                          ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
-                          : 'bg-surface2 text-foreground-extra-muted border-border/60'
+                      : isStepPaused
+                        ? 'bg-status-warning/10 text-status-warning border-status-warning/30 font-semibold shadow-xs'
+                        : isRunning
+                          ? 'bg-primary/10 text-primary border-primary/30 font-semibold shadow-xs'
+                          : isRetrying
+                            ? 'bg-status-warning/10 text-status-warning border-status-warning/30'
+                            : 'bg-surface2 text-foreground-extra-muted border-border/60'
                   )}
                 >
                   {isDone ? (
                     <CheckCircle2 className="size-3 text-status-success shrink-0" />
+                  ) : isStepPaused ? (
+                    <PauseCircle className="size-3 text-status-warning shrink-0" />
                   ) : isRetrying ? (
                     <AlertCircle className="size-3 text-status-warning shrink-0" />
                   ) : isRunning ? (
@@ -155,6 +180,19 @@ export function PipelineStepper({
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
+        {isPaused && (
+          <Hint label="Resume pipeline execution">
+            <button
+              type="button"
+              onClick={handleResume}
+              disabled={resuming}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-primary/10 hover:bg-primary/20 text-primary transition-colors border border-primary/30"
+            >
+              {resuming ? <Loader2 className="size-2.5 animate-spin" /> : <Play className="size-2.5 fill-current" />}
+              Resume
+            </button>
+          </Hint>
+        )}
         <Hint label="Stop running pipeline">
           <button
             type="button"

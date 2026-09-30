@@ -111,7 +111,7 @@ export function ToolApproval({
   parameters = [],
   status = "pending",
   open,
-  defaultOpen = false,
+  defaultOpen,
   onOpenChange,
   onApprove,
   onAlwaysAllow,
@@ -122,7 +122,8 @@ export function ToolApproval({
   const baseId = useId();
   const detailsId = `${baseId}-details`;
   const previousStatus = useRef(status);
-  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const isPending = status === "pending";
+  const [internalOpen, setInternalOpen] = useState(defaultOpen ?? isPending);
   const currentOpen = open ?? internalOpen;
   const setOpen = useCallback(
     (next: boolean) => {

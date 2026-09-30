@@ -36,7 +36,7 @@ function parseQueuedMessage(rawContent: string): {
 
   return {
     targetAgent,
-    cleanPreview: clean || '排队消息',
+    cleanPreview: clean || 'Queued message',
   };
 }
 
@@ -170,7 +170,14 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
     pollTimers();
   }, [pollTimers]);
 
+  const [confirmCancelTodos, setConfirmCancelTodos] = useState(false);
+
   const handleCancelTodos = useCallback(async () => {
+    if (!confirmCancelTodos) {
+      setConfirmCancelTodos(true);
+      return;
+    }
+    setConfirmCancelTodos(false);
     const agents = Array.from(new Set(channelTodos.map((t) => (t.createdBy || '')))).filter(Boolean);
     for (const source of agents) {
       try {
@@ -178,7 +185,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
       } catch {}
     }
     refreshTodos();
-  }, [channelTodos, channelName, refreshTodos]);
+  }, [confirmCancelTodos, channelTodos, channelName, refreshTodos]);
 
   const handleCancelQueued = useCallback(async (queueId: string) => {
     setCancelledQueueIds((prev) => new Set(prev).add(queueId));
@@ -283,14 +290,36 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                   {tasksExpanded ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />}
                 </button>
               </Hint>
-              <Hint label="Cancel all tasks">
-                <button
-                  onClick={handleCancelTodos}
-                  className="ml-1 p-0.5 rounded hover:bg-surface3 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="size-3" />
-                </button>
-              </Hint>
+              {confirmCancelTodos ? (
+                <span className="inline-flex items-center gap-1.5 ml-1 px-1.5 py-0.5 rounded bg-status-danger/10 text-status-danger text-3xs font-medium border border-status-danger/20">
+                  <span>Cancel all?</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelTodos}
+                    className="underline hover:text-status-danger-hover font-semibold cursor-pointer"
+                  >
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmCancelTodos(false)}
+                    className="hover:underline text-foreground-extra-muted cursor-pointer"
+                  >
+                    No
+                  </button>
+                </span>
+              ) : (
+                <Hint label="Cancel all tasks">
+                  <button
+                    type="button"
+                    onClick={handleCancelTodos}
+                    className="ml-1 p-0.5 rounded hover:bg-surface3 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    aria-label="Cancel all tasks"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Hint>
+              )}
             </span>
           )}
           {activeTimers.map((t) => {
@@ -329,7 +358,7 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                   {/* Status Badge */}
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold tracking-tight bg-brand-subtle text-brand border border-brand/20 shrink-0 select-none">
                     <Clock className="size-2.5 animate-pulse" />
-                    <span>排队中</span>
+                    <span>Queued</span>
                   </span>
 
                   {/* Target Agent Pill */}
@@ -350,11 +379,11 @@ export function ThreadStatusBar({ channelName, messages = [] }: { channelName: s
                 </div>
 
                 {/* Cancel Action */}
-                <Hint label="取消此排队消息">
+                <Hint label="Cancel queued message">
                   <button
                     type="button"
                     onClick={() => handleCancelQueued(q.queueId)}
-                    className="size-5 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors shrink-0"
+                    className="size-5 rounded-md hover:bg-surface3 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors shrink-0 cursor-pointer"
                   >
                     <X className="size-3" />
                   </button>

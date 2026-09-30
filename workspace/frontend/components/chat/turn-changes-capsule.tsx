@@ -81,8 +81,14 @@ export function TurnChangesCapsule({
         setRolledBack(true);
         setShowConfirm(false);
         toast.success(`Rolled back ${res.reverted?.length || 0} file(s) safely`);
+      } else if (res.status === 'partially_rolled_back' || res.status === 'partial') {
+        setRolledBack(true);
+        setShowConfirm(false);
+        const failCount = Object.keys(res.failed || {}).length;
+        toast.info(`Partially rolled back (${res.reverted?.length || 0} succeeded, ${failCount} failed)`);
       } else {
-        toast.error('Rollback completed with warnings');
+        const firstErr = res.failed ? Object.values(res.failed)[0] : 'Rollback failed';
+        toast.error(`Rollback failed: ${firstErr}`);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Rollback failed');

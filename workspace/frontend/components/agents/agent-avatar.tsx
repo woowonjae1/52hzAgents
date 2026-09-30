@@ -57,6 +57,10 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
   const initial = (cleanName || '?').charAt(0).toUpperCase();
   // A real brand mark renders bare; only the generated initial tile is framed.
   const hasBrandMark = Boolean(matchedAgent) && !imgError;
+  const isVariant = Boolean(matchedAgent && lowercaseName !== matchedAgent && cleanName.length > matchedAgent.length);
+  const variantSuffix = isVariant
+    ? cleanName.replace(new RegExp(`^${matchedAgent}[-_]?`, 'i'), '').slice(0, 2).toUpperCase()
+    : null;
 
   return (
     <div
@@ -67,17 +71,6 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
       )}
       style={{ width: size, height: size }}
     >
-      {/*
-        The chrome below is the LETTER TILE's chrome, not the logo's. A brand
-        mark (chatgpt, claude, cline, ...) already is a designed object; boxing
-        it in a bordered, tinted, blurred, shadowed circle was the single
-        biggest source of the "plastic" read — 28px of frame around 22px of
-        logo. The generated initial tile does need a shape, so it keeps one.
-
-        The online state also dropped `shadow-status-success/20 ring-1
-        ring-status-success/30`: a coloured glow, off-token, and redundant with
-        the `showStatus` dot that already reports the same thing.
-      */}
       <div
         className={cn(
           'flex items-center justify-center shrink-0 overflow-hidden',
@@ -94,9 +87,6 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
             alt={cleanName}
             onError={() => setImgError(true)}
             className={cn(
-              // No `p-1` inset and no `drop-shadow-xs`: with the frame gone
-              // there is nothing to insert the mark into, and the shadow was
-              // depth under a flat logo.
               'w-full h-full object-contain',
               ['cursor', 'openai', 'codex', 'grok', 'xai', 'pi', 'cline', 'kilo', 'opencode', 'copilot'].includes(matchedAgent) && 'dark:invert'
             )}
@@ -105,7 +95,7 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
           <span
             className="flex h-full w-full items-center justify-center font-bold text-white uppercase tracking-wider"
             style={{
-              background: `linear-gradient(135deg, ${identityFill} 0%, color-mix(in srgb, ${identityFill} 75%, black) 100%)`,
+              background: `linear-gradient(135deg, color-mix(in srgb, ${identityFill} 80%, black) 0%, color-mix(in srgb, ${identityFill} 50%, black) 100%)`,
               fontSize: Math.max(9, Math.round(size * 0.42))
             }}
             aria-label={cleanName}
@@ -114,6 +104,13 @@ export function AgentAvatar({ name = '', agentType, size = 28, status, showStatu
           </span>
         )}
       </div>
+      {hasBrandMark && variantSuffix && size >= 24 && (
+        <span
+          className="absolute -top-1 -right-1 px-1 py-0.2 rounded-md bg-surface3 text-foreground font-mono font-bold text-[9px] border border-border shadow-xs leading-tight pointer-events-none select-none"
+        >
+          {variantSuffix}
+        </span>
+      )}
       {showStatus && size >= 20 && (
         <span className={cn(
           'absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-surface0',

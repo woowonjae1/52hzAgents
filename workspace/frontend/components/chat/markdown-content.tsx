@@ -28,8 +28,10 @@ import { downloadUrl } from '@/lib/download';
 import { Citation, type CitationItem } from '@/components/agents/citations';
 import { getBridge, copyTextToClipboard } from '@/lib/desktop';
 
+import remarkBreaks from 'remark-breaks';
+
 // Stable plugin arrays — avoids re-creating on every render
-const remarkPlugins = [remarkGfm];
+const remarkPlugins = [remarkGfm, remarkBreaks];
 const rehypePlugins = [rehypeHighlight];
 
 // Recursively flatten a React children tree to its raw text. rehype-highlight
@@ -196,12 +198,14 @@ interface IdeCodeBlockProps {
 
 function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBlockProps) {
   const [copied, setCopied] = React.useState(false);
-  const lineCount = React.useMemo(() => rawCodeText.split('\n').length, [rawCodeText]);
+  const cleanCode = React.useMemo(() => rawCodeText.replace(/\r\n/g, '\n').replace(/\n$/, ''), [rawCodeText]);
+  const lineCount = React.useMemo(() => cleanCode ? cleanCode.split('\n').length : 1, [cleanCode]);
   const isLong = lineCount > 35;
   const [expanded, setExpanded] = React.useState(!isLong);
+  const [wrapLines, setWrapLines] = React.useState(false);
 
   const handleCopy = async () => {
-    const text = rawCodeText.trim();
+    const text = cleanCode.trim();
     if (!text) return;
     const ok = await copyTextToClipboard(text);
     if (ok) {
@@ -214,15 +218,6 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
   };
 
   return (
-    /*
-      ON THE RAMP, NOT TWO HARDCODED GREYS.
-
-      `#f8f9fa` sat FOUR units away from the assistant bubble it now lives
-      inside (`bg-muted`, `#f4f4f6`) — a code block you could not see the
-      edge of. `--surface3` is `--muted` stepped 8% toward the text colour,
-      so it is one deliberate step from the bubble in light AND dark rather
-      than a literal that happened to work on the old ground.
-    */
     <div className="not-prose my-3 overflow-hidden rounded-lg border border-border/70 bg-surface3 text-foreground font-mono">
       <div className="flex items-center justify-between px-3 py-1.5 bg-surface4/70 text-3xs font-medium text-foreground-muted select-none border-b border-border/50">
         <div className="flex items-center gap-2 min-w-0">
@@ -234,10 +229,22 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
           ) : (
             <span className="font-mono uppercase tracking-wider font-semibold text-foreground/80">{language}</span>
           )}
-          <span className="text-muted-foreground/60 text-3xs">({lineCount} lines)</span>
+          <span className="text-muted-foreground/60 text-3xs">({lineCount} line{lineCount === 1 ? '' : 's'})</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
+            type="button"
+            onClick={() => setWrapLines((w) => !w)}
+            className={cn(
+              "px-1.5 py-0.5 rounded text-3xs font-sans font-medium transition-colors cursor-pointer",
+              wrapLines ? "bg-primary/10 text-primary" : "hover:bg-surface3 text-foreground-muted hover:text-foreground"
+            )}
+            title={wrapLines ? "Disable line wrap" : "Enable line wrap"}
+          >
+            Wrap
+          </button>
+          <button
+            type="button"
             onClick={handleCopy}
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground transition-colors text-3xs font-sans font-medium cursor-pointer"
           >
@@ -246,11 +253,29 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
           </button>
         </div>
       </div>
-      <div className="relative overflow-x-auto max-h-[560px] overflow-y-auto">
-        <pre className="p-3.5 text-[12.5px] leading-[1.6] font-mono bg-transparent selection:bg-primary/20">
+      <div
+        className={cn(
+          "relative overflow-x-auto transition-all",
+          expanded ? "max-h-none overflow-y-auto" : "max-h-[350px] overflow-hidden"
+        )}
+      >
+        <pre className={cn("p-3.5 text-[12.5px] leading-[1.6] font-mono bg-transparent selection:bg-primary/20", wrapLines ? "whitespace-pre-wrap break-all" : "whitespace-pre")}>
           {children}
         </pre>
+        {isLong && !expanded && (
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface3 to-transparent pointer-events-none flex items-end justify-center pb-2" />
+        )}
       </div>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-sans font-medium text-foreground-muted hover:text-foreground bg-surface4/40 hover:bg-surface4/70 border-t border-border/40 transition-colors cursor-pointer"
+        >
+          {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+          <span>{expanded ? 'Collapse code' : `Show all ${lineCount} lines`}</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -319,10 +344,38 @@ export const MarkdownContent = memo(function MarkdownContent({
     code: ({ className, children, ...props }) => {
       const isInline = !className && typeof children === 'string';
       if (isInline) {
+        const text = String(children).trim();
+        const filePathMatch = /^([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+)(?::(\d+))?$/.exec(text);
+        if (filePathMatch) {
+          const filePath = filePathMatch[1];
+          const lineNum = filePathMatch[2];
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const bridge = getBridge() as Record<string, unknown> | null;
+                if (typeof bridge?.openFile === 'function') {
+                  (bridge.openFile as (p: string, l?: number) => void)(filePath, lineNum ? parseInt(lineNum, 10) : undefined);
+                } else if (workingDir) {
+                  window.dispatchEvent(
+                    new CustomEvent('oa:open-editor', {
+                      detail: { path: `${workingDir}/${filePath}`, line: lineNum ? parseInt(lineNum, 10) : undefined },
+                    })
+                  );
+                }
+              }}
+              className="bg-surface3 hover:bg-surface4 text-primary font-mono px-1.5 py-0.5 rounded text-[0.875em] border border-primary/20 hover:border-primary/40 inline-flex items-center gap-1 align-baseline cursor-pointer transition-colors"
+              title={`Open ${filePath}${lineNum ? ` at line ${lineNum}` : ''}`}
+            >
+              <FileCode className="size-3 text-primary/70 shrink-0" />
+              <span>{children}</span>
+            </button>
+          );
+        }
+
         return (
           <code
-            /* Same reason as the block above: `--surface2` is `--card`,
-               which on a `bg-muted` bubble is the wrong direction. */
             className="bg-surface3 text-foreground font-mono px-1.5 py-0.5 rounded text-[0.875em] border border-border/50 inline align-baseline font-normal"
             {...props}
           >

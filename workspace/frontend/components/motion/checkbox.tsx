@@ -5,6 +5,8 @@ import { useId } from "react";
 import { EASE_OUT, SPRING_PRESS } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
+import type { ReactNode } from "react";
+
 const CHECK_PATH = "M5 13l4 4L19 7";
 const INDETERMINATE_PATH = "M6 12h12";
 
@@ -13,7 +15,8 @@ export interface CheckboxProps {
   onCheckedChange: (checked: boolean) => void;
   disabled?: boolean;
   indeterminate?: boolean;
-  label?: string;
+  label?: ReactNode;
+  description?: ReactNode;
   className?: string;
   id?: string;
   "aria-label"?: string;
@@ -27,6 +30,7 @@ export function Checkbox({
   disabled,
   indeterminate,
   label,
+  description,
   className,
   id: idProp,
   "aria-label": ariaLabel,
@@ -113,11 +117,18 @@ export function Checkbox({
           ) : null}
         </AnimatePresence>
       </motion.button>
-      {label ? (
-        <span className={cn("select-none text-sm text-foreground", disabled && "opacity-60")}>
-          {label}
-        </span>
-      ) : null}
+      <div className="flex flex-col min-w-0">
+        {label ? (
+          <span className={cn("select-none text-sm text-foreground", disabled && "opacity-60")}>
+            {label}
+          </span>
+        ) : null}
+        {description ? (
+          <span className={cn("select-none text-xs text-muted-foreground mt-0.5", disabled && "opacity-60")}>
+            {description}
+          </span>
+        ) : null}
+      </div>
     </label>
   );
 }

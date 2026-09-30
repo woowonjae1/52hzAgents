@@ -684,11 +684,17 @@ function joinThoughts(messages: WorkspaceMessage[]): string {
       result = text;
       continue;
     }
-    // If the accumulated result already contains this fragment, skip it
-    if (result.includes(trimmed)) continue;
-    // If the new fragment is a complete superset of the accumulated result, replace it
-    if (trimmed.includes(result.trim())) {
+    // If new text is an accumulated superset, replace with the fuller text
+    if (trimmed.startsWith(result.trim())) {
       result = text;
+      continue;
+    }
+    // If we already fully contain this exact prefix, skip duplicate
+    if (result.trim().startsWith(trimmed)) {
+      continue;
+    }
+    // If the exact same fragment was just appended at the tail, skip duplicate
+    if (result.trim().endsWith(trimmed)) {
       continue;
     }
     if (result.endsWith('\n\n') || text.startsWith('\n\n')) {
@@ -1109,6 +1115,23 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
 
   const primarySender = senderGroups[0]?.sender || '';
   const primaryAgent = agents?.find((a) => a.agentName === primarySender);
+
+  // If steps are settled and not currently active, fold them inside ToolCallsDisclosure
+  if (!isActive) {
+    return (
+      <div className="flex items-start gap-3 py-1">
+        <AgentAvatar
+          name={primarySender}
+          agentType={primaryAgent?.agentType}
+          size={28}
+          className="mt-0.5 shrink-0"
+        />
+        <div className="min-w-0 flex-1 py-0.5">
+          <ToolCallsDisclosure steps={renderableSteps} defaultOpen={false} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-start gap-3 py-1">

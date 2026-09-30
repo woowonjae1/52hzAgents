@@ -63,6 +63,8 @@ import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { threadAgentMode } from '@/lib/agent-profiles';
 import { PipelineStepper } from './pipeline-stepper';
+import { useAgentTurns } from '@/lib/use-agent-turns';
+import { TRANSCRIPT_REVEAL_EVENT } from './chat-messages';
 import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
@@ -356,23 +358,22 @@ export function ChatView() {
     [currentSessionId, messages]
   );
 
-  // Per-thread message drafts
+  // Per-thread message drafts stored without triggering full ChatView re-renders
   const draftsRef = useRef<Record<string, string>>({});
-  const [currentDraft, setCurrentDraft] = useState('');
+  const [injectedDraft, setInjectedDraft] = useState<string | undefined>(undefined);
 
   // Save/restore draft when switching threads + cache messages
   const prevSessionIdRef = useRef<string | null>(null);
   useEffect(() => {
-    // Save draft and messages from previous session
-    if (prevSessionIdRef.current && prevSessionIdRef.current !== currentSessionId) {
-      draftsRef.current[prevSessionIdRef.current] = currentDraft;
-      // Cache messages for instant switching back
-      if (messages.length > 0) {
-        cacheMessages(prevSessionIdRef.current, messages);
-      }
+    // Cache messages for instant switching back
+    if (prevSessionIdRef.current && prevSessionIdRef.current !== currentSessionId && messages.length > 0) {
+      cacheMessages(prevSessionIdRef.current, messages);
     }
     // Restore draft for new session
-    setCurrentDraft(currentSessionId ? (draftsRef.current[currentSessionId] ?? '') : '');
+    const restored = currentSessionId
+      ? (draftsRef.current[currentSessionId] ?? (typeof window !== 'undefined' ? localStorage.getItem(`composer_draft_${currentSessionId}`) ?? '' : ''))
+      : '';
+    setInjectedDraft(restored);
     prevSessionIdRef.current = currentSessionId;
     // Clear optimistic messages when switching sessions
     setOptimisticMessages([]);
@@ -390,9 +391,11 @@ export function ChatView() {
   }, [currentSessionId, messages]);
 
   const handleDraftChange = useCallback((draft: string) => {
-    setCurrentDraft(draft);
     if (currentSessionId) {
       draftsRef.current[currentSessionId] = draft;
+      try {
+        localStorage.setItem(`composer_draft_${currentSessionId}`, draft);
+      } catch {}
     }
     notifyTyping();
   }, [currentSessionId, notifyTyping]);
@@ -495,7 +498,26 @@ export function ChatView() {
   }, [sessionParticipants, onlineAgents, workingAgentNames]);
 
   const channelAgentNames = currentSession?.participants ?? [];
-  const workingHere = activeHeaderAgents.filter((name) => workingAgentNames.has(name));
+  const { rows: agentTurnRows } = useAgentTurns();
+
+  const channelTurnRows = useMemo(
+    () => currentSessionId ? agentTurnRows.filter((r) => r.channelName === currentSessionId) : [],
+    [agentTurnRows, currentSessionId]
+  );
+
+  const runningAgentsInChannel = useMemo(() => {
+    const s = new Set<string>();
+    for (const r of channelTurnRows) {
+      if (r.state === 'running') {
+        s.add(r.agentName.toLowerCase());
+      }
+    }
+    return s;
+  }, [channelTurnRows]);
+
+  const workingHere = useMemo(() => {
+    return activeHeaderAgents.filter((name) => runningAgentsInChannel.has(name.toLowerCase()));
+  }, [activeHeaderAgents, runningAgentsInChannel]);
 
   const activeModelAgentName = useMemo(() => {
     if (currentSession?.master) {
@@ -608,6 +630,36 @@ export function ChatView() {
     setTranscriptFilter(EMPTY_TRANSCRIPT_FILTER);
   }, []);
 
+  const pendingActions = useMemo(() => {
+    const list: { id: string; type: string; label: string }[] = [];
+    for (const m of displayMessages) {
+      if (m.metadata?.tool_approval_request && !m.metadata?.tool_approval_response) {
+        list.push({ id: m.messageId, type: 'approval', label: 'Tool approval' });
+      }
+      if ((m.metadata?.questions || m.metadata?.decision_questions) && m.metadata?.decision_status !== 'answered') {
+        list.push({ id: m.messageId, type: 'decision', label: 'Decision needed' });
+      }
+      if (m.metadata?.routine_proposal && m.metadata?.proposal_status === 'pending_approval') {
+        list.push({ id: m.messageId, type: 'routine', label: 'Routine proposal' });
+      }
+    }
+    return list;
+  }, [displayMessages]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        const target = e.target as HTMLElement | null;
+        if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') || target === titleInputRef.current) {
+          e.preventDefault();
+          setFilterOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
   const startEditingTitle = () => {
     setTitleDraft(currentSession?.title || '');
     setEditingTitle(true);
@@ -651,41 +703,49 @@ export function ChatView() {
   useEffect(() => {
     prevActiveSessionRef.current = currentSessionId;
 
-    if (!currentSessionId || displayMessages.length === 0) {
-      if (currentSessionId) {
-        setSessionActive(currentSessionId, false, null);
-      }
+    if (!currentSessionId) {
       return;
     }
+
+    const isRunning = channelTurnRows.some((r) => r.state === 'running');
+    const runningAgent = channelTurnRows.find((r) => r.state === 'running')?.agentName || null;
+    const hasOptimistic = sessionOptimisticMessages.some((m) => m.messageType === 'loading');
+
+    if (isRunning) {
+      setSessionActive(currentSessionId, true, runningAgent);
+      return;
+    }
+
+    if (hasOptimistic) {
+      setSessionActive(currentSessionId, true, null);
+      return;
+    }
+
+    // Authoritative idle if turns are reported
+    if (channelTurnRows.length > 0) {
+      setSessionActive(currentSessionId, false, null);
+      return;
+    }
+
+    // Fallback heuristic only when turns have not been reported yet
+    if (displayMessages.length === 0) {
+      setSessionActive(currentSessionId, false, null);
+      return;
+    }
+
     const lastMsg = displayMessages[displayMessages.length - 1];
     if (lastMsg.senderType !== 'agent') {
-      // If the latest message in this thread is not an agent message and there is no pending loading row,
-      // the agent is not working.
-      const hasOptimisticLoading = displayMessages.some((m) => m.messageType === 'loading');
-      if (!hasOptimisticLoading) {
-        setSessionActive(currentSessionId, false, null);
-      }
+      setSessionActive(currentSessionId, false, null);
       return;
     }
     const isTerm = isTerminalStatus(lastMsg.content);
-    const isOptimistic = Boolean(lastMsg.messageId?.startsWith('optimistic-'));
-    const msgTime = lastMsg.createdAt ? new Date(lastMsg.createdAt).getTime() : 0;
-    const isRecent = isOptimistic || (msgTime > 0 && Date.now() - msgTime < 60_000);
-    const isAgentWorking = !isTerm && isRecent && (
+    const isAgentWorking = !isTerm && (
       lastMsg.messageType === 'status' ||
       lastMsg.messageType === 'thinking' ||
       lastMsg.messageType === 'loading'
     );
-    setSessionActive(currentSessionId, isAgentWorking, isOptimistic ? null : (isAgentWorking ? lastMsg.senderName : null));
-
-    if (isAgentWorking && !isOptimistic && msgTime > 0) {
-      const remainingMs = Math.max(1000, 60_000 - (Date.now() - msgTime));
-      const timer = setTimeout(() => {
-        setSessionActive(currentSessionId, false, null);
-      }, remainingMs);
-      return () => clearTimeout(timer);
-    }
-  }, [currentSessionId, displayMessages, setSessionActive, isTerminalStatus]);
+    setSessionActive(currentSessionId, isAgentWorking, isAgentWorking ? lastMsg.senderName : null);
+  }, [currentSessionId, channelTurnRows, sessionOptimisticMessages, displayMessages, setSessionActive, isTerminalStatus]);
 
   // Extract agent mode from status message metadata
   useEffect(() => {
@@ -864,20 +924,42 @@ export function ChatView() {
   const handleRegenerateMessage = useCallback(async (msg: WorkspaceMessage) => {
     if (!currentSessionId) return;
     const agentName = msg.senderName;
-    const prompt = `@${agentName} please regenerate your previous response with improvements`;
+    const msgIdx = messages.findIndex((m) => m.messageId === msg.messageId);
+    let promptSnippet = '';
+    if (msgIdx > 0) {
+      for (let i = msgIdx - 1; i >= 0; i--) {
+        const prev = messages[i];
+        if (prev.senderType === 'human' || prev.senderType === 'user') {
+          promptSnippet = prev.content.trim().split('\n').slice(0, 3).join(' ');
+          break;
+        }
+      }
+    }
+    const isOldTurn = msgIdx >= 0 && msgIdx < messages.length - 2;
+    const prompt = (isOldTurn && promptSnippet)
+      ? `@${agentName} regarding "${promptSnippet}", please regenerate your response with improvements.`
+      : `@${agentName} please regenerate your previous response with improvements`;
     toast.info(`Regenerating response from @${agentName}...`);
     await handleSend(prompt, [agentName]);
-  }, [currentSessionId, handleSend]);
+  }, [currentSessionId, handleSend, messages]);
 
   const handleQuoteReply = useCallback((msg: WorkspaceMessage) => {
     const lines = msg.content.trim().split('\n');
     const quoteSnippet = lines.slice(0, 4).map((l) => `> ${l}`).join('\n') + (lines.length > 4 ? '\n> ...' : '');
-    const prefix = `@${msg.senderName} `;
-    const next = currentDraft ? `${currentDraft}\n\n${quoteSnippet}\n\n${prefix}` : `${quoteSnippet}\n\n${prefix}`;
-    handleDraftChange(next);
+    const isSelfOrHuman = msg.senderType === 'human' || msg.senderType === 'user' || msg.senderName === 'User' || (currentUser?.name && msg.senderName === currentUser.name);
+    const prefix = isSelfOrHuman ? '' : `@${msg.senderName} `;
+    const curDraft = (currentSessionIdRef.current && draftsRef.current[currentSessionIdRef.current]) || '';
+    const next = curDraft ? `${curDraft}\n\n${quoteSnippet}\n\n${prefix}` : `${quoteSnippet}\n\n${prefix}`;
+    if (currentSessionIdRef.current) {
+      draftsRef.current[currentSessionIdRef.current] = next;
+      try {
+        localStorage.setItem(`composer_draft_${currentSessionIdRef.current}`, next);
+      } catch {}
+    }
+    setInjectedDraft(next);
     setFocusKey((k) => k + 1);
-    toast.success(`Quoted @${msg.senderName}'s message into composer`);
-  }, [currentDraft, handleDraftChange]);
+    toast.success(isSelfOrHuman ? 'Quoted message into composer' : `Quoted @${msg.senderName}'s message into composer`);
+  }, [currentUser?.name]);
 
   /*
     Replace the draft rather than append to it: this is "say that again, but
@@ -898,9 +980,15 @@ export function ChatView() {
   }, []);
 
   const handleReusePrompt = useCallback((msg: WorkspaceMessage) => {
-    handleDraftChange(msg.content);
+    if (currentSessionIdRef.current) {
+      draftsRef.current[currentSessionIdRef.current] = msg.content;
+      try {
+        localStorage.setItem(`composer_draft_${currentSessionIdRef.current}`, msg.content);
+      } catch {}
+    }
+    setInjectedDraft(msg.content);
     setFocusKey((k) => k + 1);
-  }, [handleDraftChange]);
+  }, []);
 
   /*
     RECORD WHAT THIS THREAD IS ABOUT, ONCE.
@@ -1069,9 +1157,17 @@ export function ChatView() {
             */
             <Hint label="Click to rename">
               <div className="flex min-w-0 flex-col" onClick={startEditingTitle}>
-                <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
-                  {currentSession?.title ? stripTitleMentions(currentSession.title) : 'Channel'}
-                </h2>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
+                    {currentSession?.title ? stripTitleMentions(currentSession.title) : 'Channel'}
+                  </h2>
+                  {currentSession?.master && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0" title={`Master agent: ${currentSession.master}`}>
+                      <Crown className="size-2.5" />
+                      <span>{currentSession.master}</span>
+                    </span>
+                  )}
+                </div>
                 <span className="truncate text-[11px] leading-tight text-muted-foreground">
                   {[
                     currentSessionWorkingDir ? basename(currentSessionWorkingDir) : null,
@@ -1311,44 +1407,62 @@ export function ChatView() {
       {/* Messages */}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {loading && displayMessages.length === 0 ? (
-          /*
-            `.event-running` — the app's ONE "still going" signal — instead of a
-            ring spinner. globals.css says not to add a second one, and this was
-            a second one: a 24px `animate-spin` in the middle of an otherwise
-            empty pane, which reads as a stalled page rather than a thread that
-            is a few hundred milliseconds from arriving.
-          */
-          <div className="flex items-center justify-center flex-1">
-            <span className="event-running text-xs text-foreground-muted">Loading conversation</span>
+          <div className="flex-1 flex flex-col justify-end p-6 space-y-5 max-w-(--chat-column) mx-auto w-full animate-pulse select-none">
+            <div className="flex items-start gap-3">
+              <div className="size-8 rounded-full bg-surface2 shrink-0" />
+              <div className="space-y-2 flex-1">
+                <div className="h-4 bg-surface2 rounded w-28" />
+                <div className="h-16 bg-surface2/70 rounded-2xl w-3/4" />
+              </div>
+            </div>
+            <div className="flex items-start gap-3 justify-end">
+              <div className="space-y-2 w-1/2">
+                <div className="h-12 bg-surface3/80 rounded-2xl" />
+              </div>
+            </div>
           </div>
         ) : displayMessages.length === 0 ? (
-          <div className="relative flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
-            <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6 my-auto py-6">
-              {/* Refined subtle status pill */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] text-2xs font-medium text-muted-foreground shadow-xs">
-                <span
-                  className={cn(
-                    'size-1.5 rounded-full shrink-0',
-                    hasOnlineAgents
-                      ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                      : 'bg-muted-foreground/40'
+          !loading && currentSession && !isDraftSessionId(currentSession.sessionId) && currentSession.lastEventAt ? (
+            <div className="relative flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
+              <AlertTriangle className="size-8 text-foreground-muted mb-3 opacity-60" />
+              <h3 className="text-sm font-semibold text-foreground">Could not load messages</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                This thread has past activity, but messages could not be retrieved from the server.
+              </p>
+              <button
+                type="button"
+                onClick={() => forceRefresh()}
+                className="mt-4 px-3.5 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 border border-border text-xs font-medium text-foreground transition-colors cursor-pointer"
+              >
+                Retry loading
+              </button>
+            </div>
+          ) : (
+            <div className="relative flex-1 flex flex-col items-center justify-center p-6 select-none overflow-y-auto">
+              <div className="relative z-10 w-full max-w-2xl flex flex-col items-center text-center space-y-6 my-auto py-6">
+                {/* Refined subtle status pill */}
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] text-2xs font-medium text-muted-foreground shadow-xs">
+                  <span
+                    className={cn(
+                      'size-1.5 rounded-full shrink-0',
+                      hasOnlineAgents ? 'bg-emerald-500' : 'bg-muted-foreground/40'
+                    )}
+                  />
+                  <span>
+                    {hasOnlineAgents
+                      ? `${onlineAgents.length} ${onlineAgents.length === 1 ? 'agent' : 'agents'} online`
+                      : 'Autonomous Workspace Ready'}
+                  </span>
+                  {!hasOnlineAgents && (
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('home')}
+                      className="text-foreground-extra-muted hover:text-foreground transition-colors ml-0.5 underline underline-offset-2"
+                    >
+                      Connect agent
+                    </button>
                   )}
-                />
-                <span>
-                  {hasOnlineAgents
-                    ? `${onlineAgents.length} ${onlineAgents.length === 1 ? 'agent' : 'agents'} online`
-                    : 'Autonomous Workspace Ready'}
-                </span>
-                {!hasOnlineAgents && (
-                  <button
-                    type="button"
-                    onClick={() => setViewMode('home')}
-                    className="text-foreground-extra-muted hover:text-foreground transition-colors ml-0.5 underline underline-offset-2"
-                  >
-                    Connect agent
-                  </button>
-                )}
-              </div>
+                </div>
 
               {/* Brand SignalMark with subtle ambient scale */}
               <div className="relative flex items-center justify-center">
@@ -1443,7 +1557,7 @@ export function ChatView() {
               </div>
             </div>
           </div>
-        ) : (
+        )) : (
           <>
           {(filterOpen || filterActive) && (
             <div className="px-4 lg:px-8 pt-2">
@@ -1455,6 +1569,43 @@ export function ChatView() {
                 shown={filteredMessages.length}
                 total={displayMessages.length}
               />
+              {hasOlder && (
+                <div className="mt-1.5 px-2.5 py-1 bg-surface2/60 border border-border/50 rounded-lg text-3xs text-foreground-extra-muted flex items-center justify-between">
+                  <span>Showing matches from loaded messages. Earlier messages are not searched.</span>
+                  <button
+                    type="button"
+                    onClick={() => loadOlder?.()}
+                    disabled={loadingOlder}
+                    className="text-primary hover:underline font-medium ml-2 cursor-pointer"
+                  >
+                    {loadingOlder ? 'Loading...' : 'Load earlier messages'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {pendingActions.length > 0 && (
+            <div className="px-4 lg:px-8 pt-2">
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="size-4 shrink-0 text-amber-500" />
+                  <span>
+                    You have <strong>{pendingActions.length}</strong> item{pendingActions.length > 1 ? 's' : ''} waiting for your review ({pendingActions[0].label})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent(TRANSCRIPT_REVEAL_EVENT, { detail: { messageId: pendingActions[0].id } })
+                    );
+                  }}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 font-medium transition-colors cursor-pointer text-2xs"
+                >
+                  Jump to item
+                </button>
+              </div>
             </div>
           )}
           <ChatMessages
@@ -1621,7 +1772,7 @@ export function ChatView() {
                 session={currentSession || undefined}
                 onOrchestrationChange={(updates) => currentSessionId && setSessionOrchestration(currentSessionId, updates)}
                 onMasterChange={(agentName) => currentSessionId && setSessionMaster(currentSessionId, agentName)}
-                draft={currentDraft}
+                draft={injectedDraft}
                 onDraftChange={handleDraftChange}
                 onFocusChange={(focused) => focused ? notifyFocus() : notifyBlur()}
                 focusKey={focusKey}
@@ -1631,6 +1782,15 @@ export function ChatView() {
                 stopping={!!currentSessionId && stoppingSessionIds.has(currentSessionId)}
                 onStop={() => currentSessionId && stopAllAgents(currentSessionId)}
                 disabled={!currentUser.name.trim() || !canChatInCurrentSession}
+                disabledReason={
+                  !currentUser.name.trim()
+                    ? 'Set your username in settings to start chatting'
+                    : !canChatInCurrentSession
+                    ? (hasSpecificParticipants
+                        ? 'All participant agents in this thread are currently offline'
+                        : 'No agents are currently online in this workspace')
+                    : undefined
+                }
               />
             </div>
           </div>

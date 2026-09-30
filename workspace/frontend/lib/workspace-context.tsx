@@ -284,6 +284,7 @@ interface WorkspaceContextValue {
   }) => Promise<void>;
   cancelTimer: (timerId: string) => Promise<void>;
   routines: RoutineItem[];
+  routinesLoaded: boolean;
   refreshRoutines: () => Promise<void>;
   createRoutine: (params: {
     name: string;
@@ -439,6 +440,10 @@ export function WorkspaceProvider({
         return next;
       });
     }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('session-selected', { detail: { sessionId: id } }));
+      document.dispatchEvent(new CustomEvent('session-selected', { detail: { sessionId: id } }));
+    }
   }, [workspaceId]);
   const consumeSkipFocus = useCallback(() => {
     const v = skipFocusRef.current;
@@ -469,6 +474,7 @@ export function WorkspaceProvider({
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [timers, setTimers] = useState<TimerItem[]>([]);
   const [routines, setRoutines] = useState<RoutineItem[]>([]);
+  const [routinesLoaded, setRoutinesLoaded] = useState(false);
   const [knowledge, setKnowledge] = useState<KnowledgeEntry[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -1195,8 +1201,10 @@ export function WorkspaceProvider({
     try {
       const result = await workspaceApi.listRoutines();
       setRoutines(result.routines);
+      setRoutinesLoaded(true);
     } catch {
       // Non-critical
+      setRoutinesLoaded(true);
     }
   }, []);
 
@@ -1322,7 +1330,10 @@ export function WorkspaceProvider({
       workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
       workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {});
       workspaceApi.listTimers().then((r) => setTimers(r.timers)).catch(() => {});
-      workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {});
+      workspaceApi.listRoutines().then((r) => {
+        setRoutines(r.routines);
+        setRoutinesLoaded(true);
+      }).catch(() => { setRoutinesLoaded(true); });
       workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {});
       workspaceApi.listNotifications().then((r) => {
         setNotifications(r.notifications);
@@ -1533,7 +1544,10 @@ export function WorkspaceProvider({
           workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {}),
           workspaceApi.listTodos().then((r) => setTodos(r.todos)).catch(() => {}),
           workspaceApi.listTimers().then((r) => setTimers(r.timers)).catch(() => {}),
-          workspaceApi.listRoutines().then((r) => setRoutines(r.routines)).catch(() => {}),
+          workspaceApi.listRoutines().then((r) => {
+            setRoutines(r.routines);
+            setRoutinesLoaded(true);
+          }).catch(() => { setRoutinesLoaded(true); }),
           workspaceApi.listKnowledge().then((r) => setKnowledge(r.entries)).catch(() => {}),
           workspaceApi.listNotifications().then((r) => {
             setNotifications(r.notifications);
@@ -1650,12 +1664,15 @@ export function WorkspaceProvider({
     return () => { cancelled = true; };
   }, [workspaceId, effectiveToken, bearerToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist previews to localStorage for instant rendering on reload
+  // Persist previews to localStorage for instant rendering on reload (debounced to avoid thrashing during streaming)
   useEffect(() => {
-    if (Object.keys(lastMessageBySession).length === 0) return;
-    try {
-      localStorage.setItem(`previews:${workspaceId}`, JSON.stringify(lastMessageBySession));
-    } catch { /* storage full */ }
+    if (Object.keys(lastMessageBySession).length === 0 || !workspaceId) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(`previews:${workspaceId}`, JSON.stringify(lastMessageBySession));
+      } catch { /* storage full */ }
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [lastMessageBySession, workspaceId]);
 
   // Discovery polling — adaptive: 5s when agents are active, 15s when idle
@@ -2288,6 +2305,7 @@ export function WorkspaceProvider({
     createTimer,
     cancelTimer,
     routines,
+    routinesLoaded,
     refreshRoutines,
     createRoutine,
     updateRoutine,
@@ -2322,7 +2340,7 @@ export function WorkspaceProvider({
     reconnectBrowserTab, browserContexts, refreshBrowserContexts, persistBrowserTab,
     unpersistBrowserTab, deleteBrowserContext, openBrowserTabWithContext, dmConversations,
     refreshDMConversations, todos, refreshTodos, replaceTodos, createTodo, updateTodo, deleteTodo,
-    timers, refreshTimers, createTimer, cancelTimer, routines, refreshRoutines,
+    timers, refreshTimers, createTimer, cancelTimer, routines, routinesLoaded, refreshRoutines,
     createRoutine, updateRoutine, toggleRoutine, triggerRoutine, cancelRoutine, knowledge,
     refreshKnowledge, createKnowledge, updateKnowledge, deleteKnowledge, notifications,
     unreadNotificationCount, refreshNotifications, markNotificationRead, markAllNotificationsRead,

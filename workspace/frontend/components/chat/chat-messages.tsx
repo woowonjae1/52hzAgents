@@ -118,11 +118,7 @@ function groupMessages(messages: WorkspaceMessage[], isChannelActive = false): M
 
   const dedupedMessages = deduplicateAndSortMessages(messages);
   const visibleMessages = dedupedMessages.filter(
-    (msg) =>
-      !msg.content.startsWith('__queue_cancel:') &&
-      msg.senderType !== 'pipeline' &&
-      msg.senderName !== 'Pipeline Relay' &&
-      msg.senderName !== 'Pipeline Supervisor'
+    (msg) => !msg.content.startsWith('__queue_cancel:')
   );
 
   visibleMessages.forEach((msg) => {
@@ -440,9 +436,12 @@ interface ChatMessagesProps {
   onReusePrompt?: (message: WorkspaceMessage) => void;
 }
 
+const sessionScrollPositions = new Map<string, number>();
+
 export function ChatMessages({ messages, agents, showAllSteps, className, scrollKey, loadOlder, hasOlder, loadingOlder, workingDir, onRegenerate, onQuoteReply, onReusePrompt }: ChatMessagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
 
   const { openPreview } = useLayout();
 
@@ -455,12 +454,20 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   // view must not re-hijack the panel with an hours-old address.
   const handledPreviewRef = useRef<string | null>(null);
   useEffect(() => {
+    // Only auto-open if window is wide enough (>= 1024px) so narrow windows aren't crushed
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return;
+
     for (let i = messages.length - 1; i >= 0; i--) {
       const preview = messages[i].metadata?.preview;
       if (!preview?.url) continue;
       const id = messages[i].messageId;
       if (!id || handledPreviewRef.current === id) return;
       handledPreviewRef.current = id;
+      // Only auto-open for live servers reported recently (< 30s)
+      const ca = messages[i].createdAt;
+      const msgTime = typeof ca === 'string' || typeof ca === 'number' ? new Date(ca).getTime() : 0;
+      if (msgTime > 0 && Date.now() - msgTime > 30_000) return;
+
       openPreview(preview.url);
       return;
     }
@@ -607,27 +614,76 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     return map;
   }, [messages]);
 
-  const answeredDecisionIds = useMemo(() => {
-    const set = new Set<string>();
+  const { answeredDecisionIds, answeredDecisions } = useMemo(() => {
+    const ids = new Set<string>();
+    const map = new Map<string, Record<string, string>>();
     for (const m of messages) {
-      const srcId = m.metadata?.decision_response?.source_message_id;
+      const resp = m.metadata?.decision_response as { source_message_id?: string; answers?: Record<string, string | string[]> } | undefined;
+      const srcId = resp?.source_message_id;
       if (srcId) {
-        set.add(srcId);
+        ids.add(srcId);
+        if (resp?.answers) {
+          const flatAnswers: Record<string, string> = {};
+          for (const [k, v] of Object.entries(resp.answers)) {
+            flatAnswers[k] = Array.isArray(v) ? v.join(', ') : String(v);
+          }
+          map.set(srcId, flatAnswers);
+        }
       }
     }
-    return set;
+    return { answeredDecisionIds: ids, answeredDecisions: map };
   }, [messages]);
 
+  const [initialLastReadId, setInitialLastReadId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentSessionId) return;
+    try {
+      const stored = localStorage.getItem(`last_read_msg_${currentSessionId}`);
+      setInitialLastReadId(stored);
+    } catch {}
+  }, [currentSessionId]);
+
+  // Update last read on idle or after messages load
+  useEffect(() => {
+    if (!currentSessionId || realMessages.length === 0) return;
+    const latestId = realMessages[realMessages.length - 1]?.messageId;
+    if (!latestId) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(`last_read_msg_${currentSessionId}`, latestId);
+      } catch {}
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [currentSessionId, realMessages]);
+
+  const lastReadIndex = useMemo(() => {
+    if (!initialLastReadId || groups.length === 0) return -1;
+    const idx = groups.findIndex((g) => {
+      const msg = 'message' in g ? (g as { message?: WorkspaceMessage }).message : ('messages' in g ? (g as { messages?: WorkspaceMessage[] }).messages?.[0] : undefined);
+      return msg?.messageId === initialLastReadId;
+    });
+    if (idx >= 0 && idx < groups.length - 1) {
+      return idx + 1;
+    }
+    return -1;
+  }, [groups, initialLastReadId]);
+
   // ── Virtualizer ──
+  const getItemKey = useCallback(
+    (index: number) => {
+      if (index < groups.length) return groupKey(groups[index], index);
+      return 'loading-indicator';
+    },
+    [groups]
+  );
+
   const virtualizer = useVirtualizer({
     count: totalCount,
     getScrollElement: () => containerRef.current,
     estimateSize: () => 140, // 140px is a much closer match to typical message height, preventing scroll jumps
     overscan: 10,
-    getItemKey: (index) => {
-      if (index < groups.length) return groupKey(groups[index], index);
-      return 'loading-indicator';
-    },
+    getItemKey,
   });
 
   /*
@@ -734,10 +790,11 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     const el = containerRef.current;
     if (!el) return;
 
-    // ① Thread switch (incl. first mount, cache-seeded switch): always scroll
-    //    to bottom. This is the only scroll-to-bottom source for cache-hit
-    //    switches, where scrollKey may not change.
+    // ① Thread switch: restore previous position for this session if saved, else scroll to bottom
     if (currentSessionId !== prevSessionRef.current) {
+      if (prevSessionRef.current && el) {
+        sessionScrollPositions.set(prevSessionRef.current, el.scrollTop);
+      }
       prevSessionRef.current = currentSessionId;
       prevLengthRef.current = messages.length;
       prevFirstIdRef.current = firstId;
@@ -745,10 +802,27 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
       prevScrollHeightRef.current = null;
       prevScrollTopRef.current = null;
       lastScrollTopRef.current = 0;
-      userScrolledUpRef.current = false;
       settlingRef.current = false; // cancel any in-flight settle from the old session
-      scrollDebug('session-switch', el, { messageCount: messages.length, totalCount });
-      requestAnimationFrame(() => scrollToBottom());
+      setUnseenCount(0);
+
+      const savedScroll = currentSessionId ? sessionScrollPositions.get(currentSessionId) : undefined;
+      if (savedScroll !== undefined && savedScroll > 0) {
+        userScrolledUpRef.current = true;
+        setShowScrollBtn(true);
+        requestAnimationFrame(() => {
+          if (el) el.scrollTop = savedScroll;
+        });
+      } else if (lastReadIndex > 0) {
+        userScrolledUpRef.current = true;
+        setShowScrollBtn(true);
+        requestAnimationFrame(() => {
+          virtualizer.scrollToIndex(lastReadIndex, { align: 'start' });
+        });
+      } else {
+        userScrolledUpRef.current = false;
+        setShowScrollBtn(false);
+        requestAnimationFrame(() => scrollToBottom());
+      }
       return;
     }
 
@@ -756,6 +830,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     //    message is unchanged → older history loaded at the top. Never scroll to bottom.
     const grew = messages.length > prevLengthRef.current;
     const isPrepend = grew && firstId !== prevFirstIdRef.current && lastId === prevLastIdRef.current;
+    const addedCount = grew ? messages.length - prevLengthRef.current : 0;
     prevLengthRef.current = messages.length;
     prevFirstIdRef.current = firstId;
     prevLastIdRef.current = lastId;
@@ -782,6 +857,9 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
     // ③ Append / replace / new (streamed) message: follow only when the user is
     //    already near the bottom.
     if (userScrolledUpRef.current) {
+      if (grew && !isPrepend) {
+        setUnseenCount((c) => c + addedCount);
+      }
       scrollDebug('append-skip-userUp', el, { messageCount: messages.length, totalCount });
       return;
     }
@@ -810,10 +888,16 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
 
     const onScroll = async () => {
       const currentScrollTop = el.scrollTop;
+      if (currentSessionId) {
+        sessionScrollPositions.set(currentSessionId, currentScrollTop);
+      }
       const isScrollingUp = currentScrollTop < lastScrollTopRef.current;
       const isNearBottom = el.scrollHeight - currentScrollTop - el.clientHeight < 100;
       setShowScrollBtn(!isNearBottom);
       userScrolledUpRef.current = !isNearBottom;
+      if (isNearBottom) {
+        setUnseenCount(0);
+      }
 
       // Infinite scroll: ONLY trigger when user is actively scrolling UP and is near the top
       if (
@@ -857,23 +941,29 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
       el.removeEventListener('touchmove', cancelSettle);
       el.removeEventListener('mousedown', cancelSettle);
     };
-  }, [hasOlder, loadingOlder, loadOlder]);
+  }, [hasOlder, loadingOlder, loadOlder, currentSessionId]);
+
+  // Re-stick to bottom when late images/diagrams finish rendering and user is tailing
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (!userScrolledUpRef.current) {
+        scrollToBottom();
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scrollToBottom]);
 
   /*
-    Reveal a message the trace panel pointed at. `groups` is the same array the
-    virtualiser indexes, so finding the group that contains the id gives the
-    row directly — no DOM query, and it works for a row that is not currently
-    mounted, which is the whole reason a scroll-into-view would not have done.
-
-    `align: 'center'` rather than 'start': the point of jumping here is to read
-    what surrounds the step, so landing it against the top edge with its
-    context above the fold would defeat the request.
+    Reveal a message the trace panel pointed at.
   */
   useEffect(() => {
-    const onReveal = (e: Event) => {
+    const onReveal = async (e: Event) => {
       const id = (e as CustomEvent<{ messageId?: string }>).detail?.messageId;
       if (!id) return;
-      const index = groups.findIndex((g) =>
+      let index = groups.findIndex((g) =>
         g.type === 'chat'
           ? g.message.messageId === id || g.steps?.some((st) => st.messageId === id)
           : g.type === 'thinking' || g.type === 'steps'
@@ -882,13 +972,25 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
               ? g.message.messageId === id
               : false,
       );
+      if (index < 0 && hasOlder && loadOlder) {
+        await loadOlder();
+        index = groups.findIndex((g) =>
+          g.type === 'chat'
+            ? g.message.messageId === id || g.steps?.some((st) => st.messageId === id)
+            : g.type === 'thinking' || g.type === 'steps'
+              ? g.messages.some((m) => m.messageId === id)
+              : g.type === 'speech_act'
+                ? g.message.messageId === id
+                : false,
+        );
+      }
       if (index < 0) return;
       userScrolledUpRef.current = true; // a deliberate jump is not "tailing"
       virtualizer.scrollToIndex(index, { align: 'center' });
     };
     window.addEventListener(TRANSCRIPT_REVEAL_EVENT, onReveal);
     return () => window.removeEventListener(TRANSCRIPT_REVEAL_EVENT, onReveal);
-  }, [groups, virtualizer]);
+  }, [groups, virtualizer, hasOlder, loadOlder]);
 
   /*
     Which tick is lit. Derived during render from the rows the virtualizer has
@@ -971,6 +1073,8 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
         <div
           /* beUI's viewport padding: `px-3 py-5 sm:px-5`. */
           className="mx-auto w-full max-w-(--chat-column) px-3 py-5 sm:px-5"
+          role="log"
+          aria-live="polite"
           style={{
             height: virtualizer.getTotalSize(),
             position: 'relative',
@@ -1060,6 +1164,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
             }
 
             const group = groups[index];
+            const isLastReadBoundary = index === lastReadIndex;
             return (
               <div
                 key={groupKey(group, index)}
@@ -1073,6 +1178,15 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
               >
+                {isLastReadBoundary && (
+                  <div className="my-4 flex items-center gap-3 select-none" role="separator" aria-label="You last read here">
+                    <div className="h-px flex-1 bg-border/60" />
+                    <span className="text-3xs font-medium uppercase tracking-wider text-muted-foreground bg-surface2 px-2.5 py-0.5 rounded-full border border-border/60">
+                      You last read here
+                    </span>
+                    <div className="h-px flex-1 bg-border/60" />
+                  </div>
+                )}
                 {group.type === 'chat' ? (
                   (() => {
                     const approvalRequest = group.message.metadata?.tool_approval_request;
@@ -1099,8 +1213,15 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         steps={group.steps}
                         hideHeader={group.continuesFrom}
                         isDecisionAnswered={isDecisionAnswered}
+                        savedDecisionAnswers={group.message.messageId ? answeredDecisions.get(group.message.messageId) : undefined}
                         isLast={index === groups.length - 1}
-                        isStreaming={index === groups.length - 1 && isChannelActive && !hasTerminalStatus}
+                        isStreaming={
+                          index === groups.length - 1 &&
+                          isChannelActive &&
+                          !hasTerminalStatus &&
+                          group.message.messageType === 'chat' &&
+                          (group.message.createdAt ? Date.now() - new Date(group.message.createdAt).getTime() < 12_000 : true)
+                        }
                         isIntermediate={group.isIntermediate}
                         workingDir={workingDir}
                         onRegenerate={onRegenerate}
@@ -1145,15 +1266,22 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
       </PreviewRail>
 
       {showScrollBtn && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
           <Button
             variant="secondary"
             size="sm"
-            className="rounded-full shadow-lg"
-            onClick={() => { scrollDebug('user-click-scroll-bottom', containerRef.current); userScrolledUpRef.current = false; scrollToBottom(); }}
+            className="rounded-full shadow-lg border border-border/60 bg-surface2 hover:bg-surface3 text-foreground transition-all duration-150"
+            onClick={() => {
+              scrollDebug('user-click-scroll-bottom', containerRef.current);
+              userScrolledUpRef.current = false;
+              setUnseenCount(0);
+              scrollToBottom();
+            }}
           >
-            <ArrowDown className="size-4 mr-1" />
-            New messages
+            <ArrowDown className="size-3.5 mr-1.5" />
+            <span>
+              {unseenCount > 0 ? `${unseenCount} new message${unseenCount > 1 ? 's' : ''}` : 'Scroll to bottom'}
+            </span>
           </Button>
         </div>
       )}

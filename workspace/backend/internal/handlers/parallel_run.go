@@ -830,6 +830,73 @@ func batchSummary(batch *models.ParallelBatchRecord, lanes []models.ParallelLane
 	return strings.TrimSpace(b.String())
 }
 
+// StopParallelBatch handles POST /v1/workspaces/:workspace_id/parallel-batches/:batch_id/stop.
+// Cancels all running lanes in the batch immediately and halts associated turns.
+func StopParallelBatch(c *gin.Context) {
+	workspace, ok := requestWorkspace(c)
+	if !ok {
+		return
+	}
+	var batch models.ParallelBatchRecord
+	if db.DB.Where("id = ? AND workspace_id = ?", c.Param("batch_id"), workspace.ID).Limit(1).Find(&batch).RowsAffected == 0 {
+		c.JSON(404, gin.H{"error": "batch not found"})
+		return
+	}
+	if batch.Status != batchRunning {
+		c.JSON(409, gin.H{"error": "batch is not running"})
+		return
+	}
+
+	var lanes []models.ParallelLaneRecord
+	db.DB.Where("batch_id = ?", batch.ID).Find(&lanes)
+
+	var channel models.Channel
+	_ = db.DB.Where("id = ? OR name = ?", batch.ChannelName, batch.ChannelName).First(&channel).Error
+
+	stoppedAny := false
+	for i := range lanes {
+		lane := &lanes[i]
+		if lane.Status == laneRunning {
+			lane.Status = laneFailed
+			lane.Error = "Stopped by user"
+			now := time.Now().UTC()
+			lane.FinishedAt = &now
+			db.DB.Save(lane)
+			if channel.ID != "" {
+				closeAgentTurn(workspace.ID, &channel, lane.Agent)
+			}
+			stoppedAny = true
+			_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.lane", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "lane": lane})
+		}
+	}
+
+	anyDoneWithChanges := false
+	for _, l := range lanes {
+		if l.Status == laneDone && l.Diffstat != "" {
+			anyDoneWithChanges = true
+			break
+		}
+	}
+
+	now := time.Now().UTC()
+	if anyDoneWithChanges {
+		batch.Status = batchReview
+	} else {
+		batch.Status = batchDone
+		batch.FinishedAt = &now
+	}
+	db.DB.Save(&batch)
+
+	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch": batch})
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel",
+		"Parallel batch stopped by user.",
+		nil,
+		map[string]interface{}{"parallel_batch_stopped": true, "batch_id": batch.ID},
+	)
+
+	c.JSON(200, gin.H{"batch": batch, "stopped": stoppedAny})
+}
+
 // RetryParallelLane handles POST /v1/parallel-batches/:batch_id/lanes/:agent/retry.
 // Only a failed lane can be retried; it runs again on its own worktree.
 func RetryParallelLane(c *gin.Context) {

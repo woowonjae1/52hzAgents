@@ -102,6 +102,7 @@ function QuestionOptions({
                 checked={answer.selected.includes(option.value)}
                 disabled={disabled || option.disabled}
                 label={option.label}
+                description={option.description}
                 onCheckedChange={(checked) =>
                   onChange({
                     ...answer,
@@ -128,6 +129,7 @@ function QuestionOptions({
                 key={option.value}
                 value={option.value}
                 label={option.label}
+                description={option.description}
                 disabled={disabled || option.disabled}
                 className="min-h-9 rounded-lg px-1.5 py-1"
               />
@@ -457,9 +459,31 @@ export function ApprovalCard({
           </AgentDisclosure>
 
           {!interactive ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {result ?? statusLabel}
-            </p>
+            <div className="mt-2 space-y-2 border-t border-border/40 pt-2 text-xs">
+              {questionMode ? (
+                <div className="space-y-1.5">
+                  {questions.map((q) => {
+                    const ans = currentAnswers[q.id];
+                    const chosenVal = ans?.custom?.trim() || ans?.selected?.[0];
+                    const chosenOption = q.options?.find((o) => o.value === chosenVal);
+                    const displayChoice = chosenOption?.label || chosenVal;
+                    return (
+                      <div key={q.id} className="flex flex-col gap-0.5">
+                        <span className="font-medium text-foreground-muted">{q.title}:</span>
+                        <div className="flex items-center gap-1.5 pl-2 text-foreground font-medium">
+                          <Check className="size-3 text-status-success shrink-0" />
+                          <span>{displayChoice || "No response recorded"}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {result ?? statusLabel}
+                </p>
+              )}
+            </div>
           ) : null}
         </div>
       </div>

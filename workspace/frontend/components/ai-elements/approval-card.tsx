@@ -36,18 +36,19 @@ export interface ApprovalCardQuestion {
 export interface ApprovalCardProps {
   questions: ApprovalCardQuestion[];
   status?: ApprovalCardStatus;
+  answers?: Record<string, string>;
   onSubmit?: (answers: Record<string, string>) => void;
   result?: string;
   className?: string;
 }
 
-export function ApprovalCard({ questions, status, onSubmit, result, className }: ApprovalCardProps) {
+export function ApprovalCard({ questions, status, answers, onSubmit, result, className }: ApprovalCardProps) {
   const mapped = React.useMemo<BeuiApprovalCardQuestion[]>(
     () =>
       questions.map((q) => ({
         id: q.id,
         title: q.title,
-        options: q.options.map((o) => ({ value: o.value, label: o.label })),
+        options: q.options.map((o) => ({ value: o.value, label: o.label, description: o.description })),
         allowCustom: q.allowCustom,
         customPlaceholder: q.customPlaceholder,
         autoAdvance: true,
@@ -55,11 +56,20 @@ export function ApprovalCard({ questions, status, onSubmit, result, className }:
     [questions]
   );
 
+  const beuiAnswers = React.useMemo<ApprovalCardAnswers | undefined>(() => {
+    if (!answers) return undefined;
+    const res: ApprovalCardAnswers = {};
+    for (const [k, v] of Object.entries(answers)) {
+      res[k] = { selected: [v], custom: '' };
+    }
+    return res;
+  }, [answers]);
+
   const handleSubmit = React.useCallback(
-    (answers: ApprovalCardAnswers) => {
+    (submitted: ApprovalCardAnswers) => {
       if (!onSubmit) return;
       const flat: Record<string, string> = {};
-      for (const [id, answer] of Object.entries(answers)) {
+      for (const [id, answer] of Object.entries(submitted)) {
         const value = answer.custom?.trim() || answer.selected?.[0];
         if (value) flat[id] = value;
       }
@@ -72,6 +82,7 @@ export function ApprovalCard({ questions, status, onSubmit, result, className }:
     <BeuiApprovalCard
       questions={mapped}
       status={status}
+      answers={beuiAnswers}
       onSubmit={handleSubmit}
       result={result}
       className={className}

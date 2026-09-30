@@ -41,12 +41,14 @@ function FileRow({
   onViewDiff?: (path: string) => void;
   onDiscard?: (path: string) => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
+
   return (
-    <div className="group flex items-center gap-2 px-3 py-1 text-2xs hover:bg-surface3/60 transition-colors">
+    <div className="group flex items-center gap-2 px-3 py-1 text-2xs hover:bg-surface3/60 focus-within:bg-surface3/60 transition-colors">
       <StatusLetter letter={file.status} />
       <Hint label={file.path}>
         <span
-          className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono hover:text-foreground hover:underline"
+          className="flex-1 min-w-0 truncate text-left text-foreground-muted font-mono hover:text-foreground hover:underline cursor-pointer"
           dir="rtl"
           onClick={() => onViewDiff?.(file.path)}
         >
@@ -58,28 +60,55 @@ function FileRow({
         {file.additions > 0 && file.deletions > 0 && ' '}
         {file.deletions > 0 && <span className="text-status-danger">−{file.deletions}</span>}
       </span>
-      <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
-        {onViewDiff && (
-          <Hint label="View Diff">
+      <div className="opacity-100 sm:opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-1 shrink-0 transition-opacity">
+        {confirming ? (
+          <div className="flex items-center gap-1 bg-status-danger/10 text-status-danger px-1.5 py-0.5 rounded text-3xs font-medium border border-status-danger/20">
+            <span>Discard?</span>
             <button
               type="button"
-              onClick={() => onViewDiff(file.path)}
-              className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors"
+              onClick={() => {
+                setConfirming(false);
+                onDiscard?.(file.path);
+              }}
+              className="underline hover:text-status-danger-hover font-semibold cursor-pointer"
             >
-              <FileDiff className="size-3" />
+              Yes
             </button>
-          </Hint>
-        )}
-        {onDiscard && !file.staged && (
-          <Hint label="Discard Changes">
             <button
               type="button"
-              onClick={() => onDiscard(file.path)}
-              className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors"
+              onClick={() => setConfirming(false)}
+              className="hover:underline text-foreground-extra-muted cursor-pointer"
             >
-              <Undo2 className="size-3" />
+              No
             </button>
-          </Hint>
+          </div>
+        ) : (
+          <>
+            {onViewDiff && (
+              <Hint label="View Diff">
+                <button
+                  type="button"
+                  onClick={() => onViewDiff(file.path)}
+                  className="size-4.5 rounded hover:bg-surface4 text-foreground-extra-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label={`View diff for ${file.path}`}
+                >
+                  <FileDiff className="size-3" />
+                </button>
+              </Hint>
+            )}
+            {onDiscard && !file.staged && (
+              <Hint label="Discard Changes">
+                <button
+                  type="button"
+                  onClick={() => setConfirming(true)}
+                  className="size-4.5 rounded hover:bg-status-danger/20 text-foreground-extra-muted hover:text-status-danger flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label={`Discard changes in ${file.path}`}
+                >
+                  <Undo2 className="size-3" />
+                </button>
+              </Hint>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -83,7 +83,8 @@ export function RadioGroup({
 
 export interface RadioGroupItemProps {
   value: string;
-  label?: string;
+  label?: ReactNode;
+  description?: ReactNode;
   disabled?: boolean;
   className?: string;
   id?: string;
@@ -92,6 +93,7 @@ export interface RadioGroupItemProps {
 export function RadioGroupItem({
   value,
   label,
+  description,
   disabled,
   className,
   id: idProp,
@@ -138,11 +140,18 @@ export function RadioGroupItem({
           />
         ) : null}
       </motion.button>
-      {label ? (
-        <span className={cn("select-none text-sm text-foreground", disabled && "opacity-60")}>
-          {label}
-        </span>
-      ) : null}
+      <div className="flex flex-col min-w-0">
+        {label ? (
+          <span className={cn("select-none text-sm text-foreground", disabled && "opacity-60")}>
+            {label}
+          </span>
+        ) : null}
+        {description ? (
+          <span className={cn("select-none text-xs text-muted-foreground mt-0.5", disabled && "opacity-60")}>
+            {description}
+          </span>
+        ) : null}
+      </div>
     </label>
   );
 }

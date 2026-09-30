@@ -23,10 +23,12 @@ import type { RoutineProposalMetadata } from '@/lib/types';
   shown until the list catches up.
 */
 
-type Outcome = 'active' | 'paused' | 'cancelled' | 'pending_approval' | 'gone';
+type Outcome = 'active' | 'paused' | 'cancelled' | 'pending_approval' | 'gone' | 'loading';
 
 function outcomeText(outcome: Outcome): string {
   switch (outcome) {
+    case 'loading':
+      return 'Checking status...';
     case 'active':
       return 'Approved, active';
     case 'paused':
@@ -41,7 +43,7 @@ function outcomeText(outcome: Outcome): string {
 }
 
 export function RoutineProposalCard({ proposal }: { proposal: RoutineProposalMetadata }) {
-  const { routines, refreshRoutines } = useWorkspace();
+  const { routines, routinesLoaded, refreshRoutines } = useWorkspace();
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [local, setLocal] = useState<Outcome | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +53,11 @@ export function RoutineProposalCard({ proposal }: { proposal: RoutineProposalMet
   // loaded means rejected or deleted.
   const fromList: Outcome | null = listed
     ? (listed.status as Outcome)
-    : routines.length > 0
+    : routinesLoaded
       ? 'gone'
       : null;
-  const outcome: Outcome = local ?? fromList ?? 'pending_approval';
-  const pending = outcome === 'pending_approval';
+  const outcome: Outcome = local ?? fromList ?? (routinesLoaded ? 'pending_approval' : 'loading');
+  const pending = routinesLoaded && outcome === 'pending_approval';
 
   const act = async (action: 'approve' | 'reject') => {
     setBusy(action);

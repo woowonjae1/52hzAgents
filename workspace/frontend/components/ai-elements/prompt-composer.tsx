@@ -16,7 +16,10 @@ import {
   ChevronDown,
   ChevronRight,
   FileEdit,
+  Brain,
+  Info,
 } from 'lucide-react';
+import { toast } from '@/lib/toast';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ActionSwapRollIcon } from '@/components/motion/action-swap-roll';
 import { Magnetic } from '@/components/motion/magnetic';
@@ -50,36 +53,50 @@ export function extractMentionSegments(
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  // Match all @mentions with their positions
-  const mentionRegex = /@([\w:.-]+)/g;
-  const matches = Array.from(trimmed.matchAll(mentionRegex));
-  if (matches.length === 0) return [];
-
   const allowedMap = new Map<string, string>();
   if (knownAgents && knownAgents.length > 0) {
     for (const a of knownAgents) {
       const name = typeof a === 'string' ? a : a.agentName;
-      if (name && name.toLowerCase() !== 'knowledge') {
+      if (name && name.toLowerCase() !== 'knowledge' && !name.toLowerCase().startsWith('knowledge:')) {
         allowedMap.set(name.toLowerCase(), name);
       }
     }
   }
 
+  // Match mentions not preceded by word characters or @ (e.g. not email like bob@example.com),
+  // and excluding trailing colons/periods
+  const mentionRegex = /(?:^|[^\w@])@([a-zA-Z0-9_-]+)/g;
+  const matches: { index: number; fullLength: number; name: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = mentionRegex.exec(trimmed)) !== null) {
+    const rawName = m[1];
+    if (rawName.toLowerCase() === 'knowledge' || rawName.toLowerCase().startsWith('knowledge')) continue;
+    // Calculate the index of the '@' character
+    const atIndex = m.index + m[0].indexOf('@');
+    // If known agents are given, only consider valid known agents
+    if (allowedMap.size > 0 && !allowedMap.has(rawName.toLowerCase())) {
+      continue;
+    }
+    const agentName = allowedMap.size > 0 ? allowedMap.get(rawName.toLowerCase())! : rawName;
+    matches.push({
+      index: atIndex,
+      fullLength: rawName.length + 1, // '@' + name
+      name: agentName,
+    });
+  }
+
+  if (matches.length === 0) return [];
+
   const segments: MentionSegment[] = [];
   for (let i = 0; i < matches.length; i++) {
     const match = matches[i];
-    const rawName = match[1];
-    if (rawName.toLowerCase() === 'knowledge') continue;
+    const matchEnd = match.index + match.fullLength;
+    const nextMatchStart = i + 1 < matches.length ? matches[i + 1].index : trimmed.length;
 
-    const agentName = allowedMap.size > 0 ? (allowedMap.get(rawName.toLowerCase()) || rawName) : rawName;
-
-    const matchStart = match.index ?? 0;
-    const matchEnd = matchStart + match[0].length;
-    const nextMatchStart = i + 1 < matches.length ? (matches[i + 1].index ?? trimmed.length) : trimmed.length;
-
-    const instruction = trimmed.slice(matchEnd, nextMatchStart).trim();
+    let instruction = trimmed.slice(matchEnd, nextMatchStart).trim();
+    instruction = instruction.replace(/^[:：\s]+/, '').trim();
     segments.push({
-      agent: agentName,
+      agent: match.name,
       instruction,
     });
   }
@@ -90,6 +107,7 @@ export function extractMentionSegments(
 export interface PromptComposerProps {
   onSend: (content: string, mentions: string[], files: PendingFile[], segments?: MentionSegment[]) => void;
   disabled?: boolean;
+  disabledReason?: string;
   className?: string;
   agents?: WorkspaceAgent[];
   knowledge?: KnowledgeEntry[];
@@ -117,6 +135,7 @@ const pillButton = composerPillClass;
 export function PromptComposer({
   onSend,
   disabled,
+  disabledReason,
   className,
   agents = [],
   knowledge = [],
@@ -135,6 +154,14 @@ export function PromptComposer({
 }: PromptComposerProps) {
   const [message, setMessage] = React.useState(draft ?? '');
   const [showMentions, setShowMentions] = React.useState(false);
+
+  // Sync draft prop changes into local message state without requiring full ChatView re-renders
+  React.useEffect(() => {
+    if (draft !== undefined) {
+      setMessage(draft);
+      requestAnimationFrame(() => resizeTextarea());
+    }
+  }, [draft]);
   /*
     Which character opened the picker. `@` offers agents and knowledge docs;
     `/` offers knowledge only. One popover, two entrances -- the placeholder
@@ -159,7 +186,6 @@ export function PromptComposer({
     'claude';
   const [masterDropdownOpen, setMasterDropdownOpen] = React.useState(false);
 
-
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   /*
@@ -171,16 +197,75 @@ export function PromptComposer({
    * multi-agent prompts this composer exists to write.
    *
    * Local to the composer on purpose: it is what THIS box sent, which is the
-   * thing Up is expected to return. The history resets with the channel, so
-   * Up in one channel never resurfaces a prompt written for another.
+   * thing Up is expected to return. The history persists per channel across
+   * reloads in localStorage.
    */
   const historyRef = React.useRef<string[]>([]);
   const [historyIndex, setHistoryIndex] = React.useState(-1);
   const sessionKey = session?.sessionId ?? null;
   React.useEffect(() => {
-    historyRef.current = [];
+    // Clear pending files when switching threads to prevent cross-thread attachment leaks
+    setPendingFiles([]);
     setHistoryIndex(-1);
+    if (!sessionKey) {
+      historyRef.current = [];
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(`composer_history_${sessionKey}`);
+      historyRef.current = stored ? JSON.parse(stored) : [];
+    } catch {
+      historyRef.current = [];
+    }
   }, [sessionKey]);
+
+  const REASONING_EFFORTS = ['auto', 'low', 'medium', 'high'] as const;
+  type ReasoningEffort = typeof REASONING_EFFORTS[number];
+
+  const [reasoningEffort, setReasoningEffort] = React.useState<ReasoningEffort>('auto');
+
+  React.useEffect(() => {
+    if (!sessionKey || typeof window === 'undefined') {
+      setReasoningEffort('auto');
+      return;
+    }
+    try {
+      const stored = localStorage.getItem(`reasoning_effort_${sessionKey}`) as ReasoningEffort | null;
+      if (stored && (REASONING_EFFORTS as readonly string[]).includes(stored)) {
+        setReasoningEffort(stored);
+      } else {
+        setReasoningEffort('auto');
+      }
+    } catch {
+      setReasoningEffort('auto');
+    }
+  }, [sessionKey]);
+
+  const cycleReasoningEffort = () => {
+    const idx = REASONING_EFFORTS.indexOf(reasoningEffort);
+    const next = REASONING_EFFORTS[(idx + 1) % REASONING_EFFORTS.length];
+    setReasoningEffort(next);
+    if (sessionKey && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`reasoning_effort_${sessionKey}`, next);
+      } catch {}
+    }
+  };
+
+  const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    const ta = e.currentTarget;
+    const pos = ta.selectionStart;
+    const active = findActiveTrigger(ta.value.slice(0, pos));
+    if (active) {
+      setMentionTrigger(active.char);
+      setMentionFilter(active.query);
+      setShowMentions(true);
+      setMentionIndex(0);
+    } else {
+      setShowMentions(false);
+    }
+  };
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const mentionListRef = React.useRef<HTMLDivElement>(null);
   const dragCountRef = React.useRef(0);
@@ -222,9 +307,14 @@ export function PromptComposer({
     }
   }, [focusKey]);
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
   const addFiles = React.useCallback((files: FileList | File[]) => {
     const newPending: PendingFile[] = [];
     Array.from(files).forEach((file) => {
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File "${file.name}" exceeds the 50MB size limit`);
+        return;
+      }
       if (isImageFile(file)) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -466,23 +556,46 @@ export function PromptComposer({
   // The preview must not draw numbered steps and arrows for that.
   const previewIsParallel = session?.orchestrationMode === 'parallel';
 
+  const lastSendTimeRef = React.useRef(0);
+
+  const handleStopClick = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    if (Date.now() - lastSendTimeRef.current < 800) {
+      return;
+    }
+    onStop?.();
+  };
+
   const handleSend = () => {
     const trimmed = message.trim();
-    if ((!trimmed && pendingFiles.length === 0) || disabled || isWorking) return;
+    if ((!trimmed && pendingFiles.length === 0) || disabled) return;
 
+    lastSendTimeRef.current = Date.now();
     const segments = extractMentionSegments(trimmed, agents);
-    const mentionMatches = trimmed.match(/@([\w:.-]+)/g) || [];
-    const mentions = segments.length > 0 ? segments.map((s) => s.agent) : mentionMatches.map((m) => m.slice(1));
+    const mentionMatches = Array.from(trimmed.matchAll(/(?:^|[^\w@])@([a-zA-Z0-9_-]+)/g)).map((m) => m[1]);
+    const filteredMatches = mentionMatches.filter((m) => m.toLowerCase() !== 'knowledge' && !m.toLowerCase().startsWith('knowledge:'));
+    const mentions = segments.length > 0 ? segments.map((s) => s.agent) : filteredMatches;
 
     onSend(trimmed, mentions, pendingFiles, segments.length >= 2 ? segments : undefined);
 
     if (trimmed) {
-      historyRef.current = [trimmed, ...historyRef.current.filter((h) => h !== trimmed)].slice(0, 50);
+      const updatedHistory = [trimmed, ...historyRef.current.filter((h) => h !== trimmed)].slice(0, 50);
+      historyRef.current = updatedHistory;
+      if (sessionKey) {
+        try {
+          localStorage.setItem(`composer_history_${sessionKey}`, JSON.stringify(updatedHistory));
+        } catch {}
+      }
     }
     setHistoryIndex(-1);
     setMessage('');
     setPendingFiles([]);
     onDraftChange?.('');
+    if (sessionKey) {
+      try {
+        localStorage.removeItem(`composer_draft_${sessionKey}`);
+      } catch {}
+    }
     setShowMentions(false);
     requestAnimationFrame(() => {
       resizeTextarea();
@@ -552,6 +665,10 @@ export function PromptComposer({
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
+      const isMobile = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768);
+      if (isMobile) {
+        return;
+      }
       e.preventDefault();
       handleSend();
     }
@@ -887,11 +1004,19 @@ export function PromptComposer({
           )}
         </AnimatePresence>
 
+        {disabled && disabledReason && (
+          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-status-warning bg-status-warning/10 border-b border-status-warning/20 rounded-t-xl select-none">
+            <Info className="size-3.5 shrink-0" />
+            <span>{disabledReason}</span>
+          </div>
+        )}
+
         {/* Text Area */}
         <textarea
           ref={textareaRef}
           value={message}
           onChange={handleInput}
+          onSelect={handleSelect}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onFocus={() => {
@@ -904,7 +1029,7 @@ export function PromptComposer({
           }}
           placeholder={
             disabled
-              ? 'Connect an agent to start chatting…'
+              ? (disabledReason || 'Connect an agent to start chatting…')
               : 'Message 52hzAgents… (@ for agents, / for knowledge)'
           }
           disabled={disabled}
@@ -913,8 +1038,8 @@ export function PromptComposer({
         />
 
         {/* Bottom Control Row */}
-        <div className="mt-1 flex min-h-8 items-center justify-between gap-1 px-2 pb-1">
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div className="mt-1 flex min-h-8 items-center justify-between gap-1.5 px-2 pb-1 overflow-x-auto scrollbar-hide flex-nowrap">
+          <div className="flex items-center gap-1.5 min-w-0 shrink flex-nowrap overflow-x-auto scrollbar-hide">
             <AgentModelSwitcher
               agentName={masterAgentName}
               participants={session?.participants}
@@ -924,26 +1049,10 @@ export function PromptComposer({
             {/*
               THE MODE MOVED HERE, AND BECAME A CONTROL.
 
-              It used to be two half-things. A ghost button in the thread
-              header — first in a row of six that the header's own comment
-              calls "a row of assorted widgets" — and, down here, a read-only
-              chip that only appeared when the mode was not dynamic. So the
-              place you could SEE the mode and the place you could CHANGE it
-              were different places, and neither said what it did.
-
-              The mode decides what pressing Enter does: who wakes, and how
-              many of them. That is a property of sending, not of the thread's
-              title bar, so it belongs beside the model select — the other
-              control that answers "what happens when I send this". beUI's
-              composer carries model select, add and send; this is the third
-              thing that genuinely belongs in that set.
-
-              Always rendered, including for dynamic. A control that appears
-              only in the non-default state cannot be used to LEAVE the
-              default, which is why the old chip needed a second control
-              elsewhere in the first place.
+              In a single-agent thread, switching orchestration modes is meaningless.
+              Only display OrchestrationControl when more than 1 agent is present.
             */}
-            {session && onOrchestrationChange && (
+            {session && onOrchestrationChange && agents.length > 1 && (
               <OrchestrationControl
                 session={session}
                 agents={agents}
@@ -955,6 +1064,24 @@ export function PromptComposer({
             {/* Fix / Review: the other "what happens when I send" setting —
                 whether the agents may edit. Profiles live in lib/agent-profiles. */}
             {session && <AgentProfileControl session={session} />}
+
+            {/* In-thread reasoning effort control */}
+            <Hint label={`Thinking Effort: ${reasoningEffort.toUpperCase()} (click to cycle)`}>
+              <button
+                type="button"
+                onClick={cycleReasoningEffort}
+                className={cn(
+                  pillButton,
+                  'text-xs font-mono lowercase capitalize gap-1 shrink-0',
+                  reasoningEffort !== 'auto' && 'bg-surface3 text-foreground font-medium border border-border'
+                )}
+                aria-label={`Thinking Effort: ${reasoningEffort}`}
+              >
+                <Brain className="size-3.5 shrink-0 text-foreground-extra-muted" />
+                <span className="hidden sm:inline">Effort:</span>
+                <span className="capitalize">{reasoningEffort}</span>
+              </button>
+            </Hint>
 
             {/*
               THE SAME TWO KINDS OF THING AS THE HEADER ROW, NOW SAID THE SAME WAY.
@@ -1052,46 +1179,43 @@ export function PromptComposer({
               `Magnetic` is a no-op under `prefers-reduced-motion` and on
               touch, so nothing below changes on either.
             */}
-            <Magnetic strength={0.2}>
-            <Hint label={isWorking ? 'Stop response' : 'Send message (Enter)'}>
-              <button
-                type="button"
-                onClick={isWorking ? onStop : handleSend}
-                disabled={isWorking ? stopping : !canSend}
-                className={cn(
-                  'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                  'transition-all duration-150 select-none active:scale-95',
-                  isWorking
-                    ? 'bg-destructive text-destructive-foreground hover:opacity-90 shadow-md shadow-destructive/25 cursor-pointer'
-                    : canSend
-                      /*
-                        Accent position two of three: the primary ACTION.
-
-                        It was `--primary`, which is near-black — the same
-                        value as the body text, the sidebar labels and every
-                        border-accent in the window. The one button that
-                        commits what you typed looked exactly like everything
-                        that merely sits there.
-
-                        `hover:bg-brand-hover` rather than `hover:opacity-90`:
-                        fading a filled button toward its background is a web
-                        default that makes the control look like it is turning
-                        off as you reach for it.
-                      */
-                      ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-md shadow-brand/25 cursor-pointer'
-                    : 'bg-surface1 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
-                )}
-              >
-                <ActionSwapRollIcon value={isWorking ? 'stop' : 'arrow'}>
-                  {isWorking ? (
+            {isWorking && (
+              <Magnetic strength={0.2}>
+                <Hint label="Stop response">
+                  <button
+                    type="button"
+                    onClick={handleStopClick}
+                    disabled={stopping}
+                    className="relative flex items-center justify-center size-8 rounded-full shrink-0 bg-destructive text-destructive-foreground hover:opacity-90 shadow-md shadow-destructive/25 cursor-pointer transition-all duration-150 select-none active:scale-95"
+                    aria-label="Stop response"
+                  >
                     <Square className="size-3 fill-current" />
-                  ) : (
+                  </button>
+                </Hint>
+              </Magnetic>
+            )}
+
+            {(!isWorking || canSend) && (
+              <Magnetic strength={0.2}>
+                <Hint label={isWorking ? 'Queue message (Enter)' : 'Send message (Enter)'}>
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={!canSend}
+                    className={cn(
+                      'relative flex items-center justify-center size-8 rounded-full shrink-0',
+                      'transition-all duration-150 select-none active:scale-95',
+                      canSend
+                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-md shadow-brand/25 cursor-pointer'
+                        : 'bg-surface1 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
+                    )}
+                    aria-label={isWorking ? 'Queue message' : 'Send message'}
+                  >
                     <ArrowUp className="size-4 stroke-[2.5]" />
-                  )}
-                </ActionSwapRollIcon>
-              </button>
-            </Hint>
-            </Magnetic>
+                  </button>
+                </Hint>
+              </Magnetic>
+            )}
           </div>
         </div>
       </div>
@@ -1124,7 +1248,9 @@ function findActiveTrigger(
   for (const char of ['@', '/'] as const) {
     const index = textBefore.lastIndexOf(char);
     if (index < 0) continue;
-    if (index !== 0 && !/\s/.test(textBefore[index - 1])) continue;
+    // Reject if preceded by ASCII word character (e.g. bob@example.com, and/or, file/path)
+    // but permit CJK characters, whitespace, and punctuation (e.g. 请@claude, @pi)
+    if (index !== 0 && /[a-zA-Z0-9_]/.test(textBefore[index - 1])) continue;
     if (!best || index > best.index) best = { char, index };
   }
   if (!best) return null;

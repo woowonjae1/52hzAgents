@@ -112,6 +112,14 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     );
   }
 
+  /** Stop a running parallel batch immediately. */
+  async stopParallelBatch(batchId: string): Promise<void> {
+    await this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/stop`,
+      { method: 'POST' }
+    );
+  }
+
   async getRouterConfig(): Promise<RouterConfigResponse> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.request<RouterConfigResponse>(`/v1/router-config?${params}`);

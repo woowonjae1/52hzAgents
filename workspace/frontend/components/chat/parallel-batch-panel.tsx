@@ -35,7 +35,7 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!active || !channelName) {
+    if (!channelName) {
       setBatch(null);
       return;
     }
@@ -45,7 +45,12 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
       try {
         const next = await workspaceApi.getParallelBatch(channelName);
         if (!cancelled) {
-          setBatch(next);
+          const isLiveOrReview = next?.run?.batch.status === 'running' || next?.run?.batch.status === 'review';
+          if (active || isLiveOrReview) {
+            setBatch(next);
+          } else {
+            setBatch(null);
+          }
           setError(null);
         }
       } catch (e) {
@@ -63,12 +68,13 @@ export function ParallelBatchPanel({ channelName, active, className }: Props) {
     };
   }, [channelName, active]);
 
-  if (!active || !batch) return null;
+  if (!batch) return null;
 
   const run = batch.run;
   // A batch under review still owns the channel -- no new batch can start
   // until it is merged or discarded -- so the next-batch preview stays hidden.
   const runLive = run?.batch.status === 'running' || run?.batch.status === 'review';
+  if (!active && !runLive) return null;
   const reload = async () => {
     try {
       setBatch(await workspaceApi.getParallelBatch(channelName));
@@ -172,6 +178,7 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
   const [retrying, setRetrying] = React.useState<string | null>(null);
   const [deciding, setDeciding] = React.useState<'merge' | 'discard' | null>(null);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
+  const [stopping, setStopping] = React.useState(false);
   const live = run.batch.status === 'running';
   const reviewing = run.batch.status === 'review';
   const finished = run.lanes.filter((l) => l.status !== 'running').length;
@@ -184,6 +191,19 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
     const t = setTimeout(() => setConfirmDiscard(false), 4000);
     return () => clearTimeout(t);
   }, [confirmDiscard]);
+
+  const stopBatch = async () => {
+    setStopping(true);
+    try {
+      await workspaceApi.stopParallelBatch(run.batch.id);
+      toast.success('Parallel batch stopped');
+      onRetried();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not stop batch');
+    } finally {
+      setStopping(false);
+    }
+  };
 
   const decide = async (action: 'merge' | 'discard') => {
     setDeciding(action);
@@ -232,9 +252,22 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
               : 'shared folder'}
           </span>
         </div>
-        <span className="text-2xs tabular-nums text-muted-foreground shrink-0">
-          {finished}/{run.lanes.length} finished
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-2xs tabular-nums text-muted-foreground">
+            {finished}/{run.lanes.length} finished
+          </span>
+          {live && (
+            <button
+              type="button"
+              disabled={stopping}
+              onClick={() => void stopBatch()}
+              className="inline-flex items-center gap-1 rounded-md border border-status-danger/40 bg-status-danger/10 px-2 py-0.5 text-2xs text-status-danger hover:bg-status-danger/20 transition-colors disabled:opacity-60"
+            >
+              {stopping ? <Loader2 className="size-3 animate-spin" /> : <XCircle className="size-3" />}
+              Stop Batch
+            </button>
+          )}
+        </div>
       </header>
       <ul className="space-y-2">
         {run.lanes.map((lane) => {

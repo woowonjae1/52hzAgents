@@ -94,22 +94,49 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 		return nil
 	}
 
-	var segments []models.PipelineStep
-	for i := 0; i < len(matches); i++ {
-		nameStart, nameEnd := matches[i][2], matches[i][3]
+	type validMatch struct {
+		agentName string
+		atStart   int
+		afterName int
+	}
+	var valid []validMatch
+	for _, m := range matches {
+		nameStart, nameEnd := m[2], m[3]
 		rawName := strings.ToLower(content[nameStart:nameEnd])
-		if rawName == "knowledge" {
+		if rawName == "knowledge" || strings.HasPrefix(rawName, "knowledge:") {
+			continue
+		}
+		// If followed immediately by a colon and non-whitespace, it's not a bare mention or pipeline step (e.g. @knowledge:spec)
+		if nameEnd < len(content) && content[nameEnd] == ':' && nameEnd+1 < len(content) && content[nameEnd+1] != ' ' && content[nameEnd+1] != '\n' && content[nameEnd+1] != '\r' {
 			continue
 		}
 		agentName, ok := allowed[rawName]
 		if !ok {
 			continue
 		}
+		// Find actual '@' index within the match prefix
+		matchedStr := content[m[0]:m[1]]
+		atOffset := strings.Index(matchedStr, "@")
+		if atOffset < 0 {
+			atOffset = 0
+		}
+		valid = append(valid, validMatch{
+			agentName: agentName,
+			atStart:   m[0] + atOffset,
+			afterName: m[1],
+		})
+	}
 
-		instructionStart := matches[i][1]
+	if len(valid) < 2 {
+		return nil
+	}
+
+	var segments []models.PipelineStep
+	for i := 0; i < len(valid); i++ {
+		instructionStart := valid[i].afterName
 		var instructionEnd int
-		if i+1 < len(matches) {
-			instructionEnd = matches[i+1][0]
+		if i+1 < len(valid) {
+			instructionEnd = valid[i+1].atStart
 		} else {
 			instructionEnd = len(content)
 		}
@@ -126,7 +153,7 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 		}
 
 		segments = append(segments, models.PipelineStep{
-			Agent:       agentName,
+			Agent:       valid[i].agentName,
 			Instruction: instruction,
 			Status:      "pending",
 			MaxRetries:  3,
@@ -331,6 +358,15 @@ func HaltChannelPipeline(c *gin.Context) {
 	if err := db.DB.Where("id = ?", channelID).First(&channel).Error; err == nil {
 		RelayPipelineAlert(workspace.ID, "channel/"+channel.Name, "Pipeline execution was stopped by user.")
 		StopActiveRoutineRunsAndTasks(workspace.ID, "", channel.Name)
+
+		// Halt active agent turn for current pipeline step
+		var steps []models.PipelineStep
+		if err := json.Unmarshal(record.Steps, &steps); err == nil && record.CurrentIndex >= 0 && record.CurrentIndex < len(steps) {
+			currentAgent := steps[record.CurrentIndex].Agent
+			if currentAgent != "" {
+				closeAgentTurn(workspace.ID, &channel, currentAgent)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "halted", "finished_at": nowMs})
@@ -705,7 +741,7 @@ func relayPipelineStep(workspaceID string, target string, nextSeg models.Pipelin
 const noResponseAgent = "__no_response__"
 
 var errSessionRevoked = errors.New("session_revoked")
-var mentionPattern = regexp.MustCompile(`@([A-Za-z0-9_-]+)`)
+var mentionPattern = regexp.MustCompile(`(?i)(?:^|[^\w@])@([A-Za-z0-9_-]+)`)
 
 // routeMessage applies the original WorkspaceMod routing rules to one chat
 // event. It returns routed=false for operational/status events, which must be

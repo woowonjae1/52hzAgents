@@ -172,4 +172,11 @@ export class WorkspacesApi extends BaseWorkspaceApi {
       method: 'POST',
     });
   }
+
+  async resumeChannelPipeline(channelId: string): Promise<Record<string, unknown>> {
+    const params = new URLSearchParams({ network: this.requireWorkspace() });
+    return this.request<Record<string, unknown>>(`/v1/channels/${channelId}/pipeline/resume?${params}`, {
+      method: 'POST',
+    });
+  }
 }

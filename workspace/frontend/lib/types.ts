@@ -623,7 +623,7 @@ export interface ONMEvent {
 
 export function eventToMessage(event: ONMEvent): WorkspaceMessage {
   const payload = event.payload || {};
-  const metadata = (event.metadata || {}) as WorkspaceMessageMetadata;
+  const metadata = { ...((event.metadata || {}) as WorkspaceMessageMetadata) };
   const source = event.source || '';
   const rawType = payload.sender_type as string;
   const senderType = rawType || (source.startsWith('human:') || source.startsWith('user') ? 'human' : 'agent');
@@ -631,6 +631,18 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
   const sessionId = (event.target || '').replace(/^channel\//, '');
   const clientMsgId = (metadata.client_message_id as string) || (payload.client_message_id as string) || (event.client_message_id as string) || undefined;
   const messageId = event.event_id || (event as { id?: string }).id || '';
+
+  // Ensure todos and plan from payload are available in metadata
+  if (!metadata.todos && (payload.todos || payload.plan)) {
+    metadata.todos = (payload.todos || payload.plan) as any;
+  }
+  if (!metadata.plan && payload.plan) {
+    metadata.plan = payload.plan as any;
+  }
+
+  const messageType = (payload.message_type as string) ||
+    (event.type === 'workspace.agent.thinking' ? 'thinking' :
+     event.type === 'workspace.agent.todos' || payload.todos ? 'todos' : 'chat');
 
   return {
     messageId,
@@ -641,7 +653,7 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
     content: (payload.content as string) || '',
     mentions: (metadata.target_agents as string[]) || [],
     targetAgents: (metadata.target_agents as string[]) || null,
-    messageType: (payload.message_type as string) || (event.type === 'workspace.agent.thinking' ? 'thinking' : 'chat'),
+    messageType: messageType,
     metadata: metadata,
     createdAt: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
     clientMessageId: clientMsgId,
@@ -651,15 +663,15 @@ export function eventToMessage(event: ONMEvent): WorkspaceMessage {
 /**
  * Deduplicate workspace messages based on:
  * 1. Exact messageId match
- * 2. Exact clientMessageId match
- * 3. Semantic match (same senderName, same content, within 15 seconds for chat messages)
+ * 2. Exact clientMessageId match (real message replaces optimistic)
  *
- * Authoritative / earlier-in-list messages take precedence.
+ * Runs in strict O(N) using Set and Map. Legitimate repeated messages
+ * (e.g. repeated "continue" prompts or "Done." status) are preserved.
  */
 export function deduplicateMessages(messages: WorkspaceMessage[]): WorkspaceMessage[] {
   const result: WorkspaceMessage[] = [];
   const seenIds = new Set<string>();
-  const seenClientIds = new Set<string>();
+  const clientMsgIndex = new Map<string, number>();
 
   for (const m of messages) {
     if (!m) continue;
@@ -670,37 +682,22 @@ export function deduplicateMessages(messages: WorkspaceMessage[]): WorkspaceMess
     }
 
     // 2. Check clientMessageId match
-    if (m.clientMessageId && seenClientIds.has(m.clientMessageId)) {
-      continue;
-    }
-
-    // 3. Check semantic duplicate for chat messages: same sender, same content, within 15 seconds
-    const isChatMsg = !m.messageType || m.messageType === 'chat' || m.senderType === 'human' || m.senderType === 'user';
-    if (isChatMsg) {
-      const mTime = m.createdAt ? new Date(m.createdAt).getTime() : 0;
-      const isSemanticDup = result.some((existing) => {
-        const isExistingChat = !existing.messageType || existing.messageType === 'chat' || existing.senderType === 'human' || existing.senderType === 'user';
-        if (!isExistingChat) return false;
-        if (existing.senderName !== m.senderName || existing.content !== m.content) {
-          return false;
+    if (m.clientMessageId) {
+      const existingIdx = clientMsgIndex.get(m.clientMessageId);
+      if (existingIdx !== undefined) {
+        const existing = result[existingIdx];
+        // If the existing one is optimistic and this one is confirmed/real, replace it in-place
+        if (existing.messageId.startsWith('optimistic-') && !m.messageId.startsWith('optimistic-')) {
+          if (existing.messageId) seenIds.delete(existing.messageId);
+          result[existingIdx] = m;
+          if (m.messageId) seenIds.add(m.messageId);
         }
-        if (existing.clientMessageId && m.clientMessageId && existing.clientMessageId !== m.clientMessageId) {
-          return false;
-        }
-        const existingTime = existing.createdAt ? new Date(existing.createdAt).getTime() : 0;
-        if (mTime && existingTime) {
-          return Math.abs(mTime - existingTime) < 15_000;
-        }
-        return true;
-      });
-
-      if (isSemanticDup) {
         continue;
       }
     }
 
     if (m.messageId) seenIds.add(m.messageId);
-    if (m.clientMessageId) seenClientIds.add(m.clientMessageId);
+    if (m.clientMessageId) clientMsgIndex.set(m.clientMessageId, result.length);
     result.push(m);
   }
 

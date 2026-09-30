@@ -67,7 +67,7 @@ import { Network, X, PanelLeft, FileText, Globe } from 'lucide-react';
 export function WorkspaceLoadingScreen() {
   return (
     <div
-      className="flex h-screen w-full overflow-hidden bg-surface0"
+      className="flex h-screen h-dvh w-full overflow-hidden bg-surface0"
       role="status"
       aria-busy="true"
       aria-label="Opening workspace"
@@ -231,7 +231,7 @@ function WrapperInner() {
   // ── Mobile layout: single-pane with list/detail switching ──
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen w-full bg-surface0 [&_.container-fluid]:px-5">
+      <div className="flex flex-col h-screen h-dvh w-full bg-surface0 [&_.container-fluid]:px-5">
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[env(safe-area-inset-bottom)]">
           {/* Full-screen views (no list/detail split) */}
@@ -291,7 +291,7 @@ function WrapperInner() {
   return (
     <div
       ref={desktopContainerRef}
-      className="app-root-container flex h-screen w-full bg-surface0 [&_.container-fluid]:px-5"
+      className="app-root-container flex h-screen h-dvh w-full bg-surface0 [&_.container-fluid]:px-5"
     >
       {shouldShowSidebar && <Sidebar />}
 

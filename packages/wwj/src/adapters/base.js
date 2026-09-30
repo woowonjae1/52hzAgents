@@ -2080,22 +2080,75 @@ class BaseAdapter {
     // Skip empty thinking traces entirely.
     if (!content || !content.trim()) return;
     const isReplyPreview = Boolean(opts && opts.isReplyPreview);
+
+    if (!this._thinkingBuffers) {
+      this._thinkingBuffers = new Map();
+    }
+    const bufKey = `${channel}:${isReplyPreview ? 'preview' : 'thinking'}`;
+    let entry = this._thinkingBuffers.get(bufKey);
+    if (!entry) {
+      entry = {
+        chunks: [],
+        timer: null,
+        promise: null,
+        resolve: null,
+      };
+      this._thinkingBuffers.set(bufKey, entry);
+    }
+
+    entry.chunks.push(content);
+
+    if (!entry.timer) {
+      entry.promise = new Promise((res) => {
+        entry.resolve = res;
+      });
+      entry.timer = setTimeout(() => {
+        this._flushThinkingBuffer(channel, bufKey, isReplyPreview);
+      }, 150);
+    }
+    return entry.promise;
+  }
+
+  async _flushThinkingBuffer(channel, bufKey, isReplyPreview) {
+    if (!this._thinkingBuffers) return;
+    const entry = this._thinkingBuffers.get(bufKey);
+    if (!entry) return;
+    this._thinkingBuffers.delete(bufKey);
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    const combinedContent = entry.chunks.join('');
+    if (!combinedContent.trim()) {
+      if (entry.resolve) entry.resolve();
+      return;
+    }
     try {
-      await this.client.sendMessage(this.workspaceId, channel, this.token, content, {
+      await this.client.sendMessage(this.workspaceId, channel, this.token, combinedContent, {
         senderType: 'agent',
         senderName: this.agentName,
         messageType: 'thinking',
         metadata: {
           agent_mode: this._mode,
-          // Omitted rather than set false when absent, so an adapter that has
-          // not been updated is distinguishable from one asserting "this really
-          // is reasoning".
           ...(isReplyPreview ? { reply_preview: true } : {}),
         },
         sessionId: this._sessionId,
       });
     } catch (e) {
       if (e instanceof SessionRevokedError) this._onSessionRevoked();
+    } finally {
+      if (entry.resolve) entry.resolve();
+    }
+  }
+
+  async flushAllThinkingBuffers() {
+    if (!this._thinkingBuffers || this._thinkingBuffers.size === 0) return;
+    const entries = Array.from(this._thinkingBuffers.entries());
+    for (const [bufKey, entry] of entries) {
+      const parts = bufKey.split(':');
+      const channel = parts[0];
+      const isReplyPreview = bufKey.endsWith(':preview');
+      await this._flushThinkingBuffer(channel, bufKey, isReplyPreview);
     }
   }
 
@@ -2138,6 +2191,7 @@ class BaseAdapter {
    * @param {string} [call.summary] - one line; derived by the workspace if omitted
    */
   async sendToolCall(channel, call) {
+    await this.flushAllThinkingBuffers();
     const name = call && typeof call.name === 'string' ? call.name.trim() : '';
     if (!name) return;
 
@@ -2168,6 +2222,7 @@ class BaseAdapter {
   }
 
   async sendResponse(channel, content) {
+    await this.flushAllThinkingBuffers();
     // Promote an explicit ```decision block into metadata the workspace renders
     // as an interactive card. Sits here rather than in each adapter because
     // every adapter funnels its final reply through this one method — the

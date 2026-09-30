@@ -81,10 +81,9 @@ function extractThinking(text: string): { thinking: string | null; answer: strin
 }
 
 function Attachments({ items }: { items: Attachment[] }) {
-  if (!items || items.length === 0) return null;
-
   const { setViewMode } = useLayout();
   const { setSelectedFileId } = useWorkspace();
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; filename: string } | null>(null);
 
   const openPreview = useCallback((fileId: string) => {
     setSelectedFileId(fileId);
@@ -96,12 +95,14 @@ function Attachments({ items }: { items: Attachment[] }) {
   }, []);
 
   const fixedItems = useMemo(() =>
-    items.map((a) => ({ ...a, url: workspaceApi.getFileUrl(a.fileId) })),
+    (items || []).map((a) => ({ ...a, url: workspaceApi.getFileUrl(a.fileId) })),
     [items]
   );
 
-  const images = fixedItems.filter((a) => a.contentType?.startsWith('image/'));
-  const files = fixedItems.filter((a) => !a.contentType?.startsWith('image/'));
+  const images = useMemo(() => fixedItems.filter((a) => a.contentType?.startsWith('image/')), [fixedItems]);
+  const files = useMemo(() => fixedItems.filter((a) => !a.contentType?.startsWith('image/')), [fixedItems]);
+
+  if (!items || items.length === 0) return null;
 
   return (
     <div className="mt-2 space-y-2">
@@ -111,13 +112,13 @@ function Attachments({ items }: { items: Attachment[] }) {
             <button
               key={img.fileId}
               type="button"
-              onClick={() => openPreview(img.fileId)}
-              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md ui-transition max-w-sm text-left"
+              onClick={() => setLightboxImage({ url: img.url, filename: img.filename })}
+              className="block rounded-xl overflow-hidden border border-border hover:border-primary/40 hover:shadow-md ui-transition max-w-sm text-left cursor-zoom-in"
             >
               <img
                 src={img.url}
                 alt={img.filename}
-                className="max-h-64 w-auto object-contain"
+                className="max-h-64 min-h-[48px] w-auto object-contain bg-surface2/30"
                 loading="lazy"
               />
             </button>
@@ -161,6 +162,43 @@ function Attachments({ items }: { items: Attachment[] }) {
           })}
         </div>
       )}
+
+      {/* Inline Image Lightbox Modal */}
+      {lightboxImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLightboxImage(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-150 select-none"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
+              <button
+                type="button"
+                onClick={() => downloadUrl(lightboxImage.url, lightboxImage.filename)}
+                className="size-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                title="Download image"
+              >
+                <Download className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                className="size-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                title="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <img
+              src={lightboxImage.url}
+              alt={lightboxImage.filename}
+              className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
+            />
+            <p className="mt-2 text-xs text-white/80 font-mono truncate">{lightboxImage.filename}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -185,6 +223,7 @@ interface ChatMessageProps {
    * on reload and re-arms a card that has already been answered.
    */
   isDecisionAnswered?: boolean;
+  savedDecisionAnswers?: Record<string, string>;
   /**
    * The newest message in the channel. Its action toolbar stays visible;
    * every other message reveals one on hover. See the note at the toolbar.
@@ -220,6 +259,7 @@ export const ChatMessage = memo(function ChatMessage({
   steps,
   hideHeader = false,
   isDecisionAnswered = false,
+  savedDecisionAnswers,
   isLast = false,
   isStreaming = false,
   isIntermediate = false,
@@ -231,7 +271,17 @@ export const ChatMessage = memo(function ChatMessage({
   const { currentUser } = useWorkspace();
   const { setViewMode } = useLayout();
   const isHuman = message.senderType === 'human' || message.senderType === 'user';
-  const isSystem = message.messageType === 'status';
+  const isSystemSender =
+    message.senderType === 'system' ||
+    message.senderType === 'parallel' ||
+    message.senderType === 'routine' ||
+    message.senderType === 'pipeline' ||
+    message.senderName === 'parallel' ||
+    message.senderName === 'routine' ||
+    message.senderName === 'system' ||
+    message.senderName === 'Pipeline Relay' ||
+    message.senderName === 'Pipeline Supervisor';
+  const isSystem = message.messageType === 'status' || isSystemSender;
   const [localStatus, setLocalStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   // Submission state for the decision card. ApprovalCard implements
@@ -241,11 +291,13 @@ export const ChatMessage = memo(function ChatMessage({
   // the card live, which let the same decision be posted to the agent twice.
   const [localDecisionStatus, setDecisionStatus] =
     useState<'pending' | 'submitting' | 'answered'>('pending');
+  const [localAnswers, setLocalAnswers] = useState<Record<string, string> | undefined>();
 
   // The durable flag wins: it comes from an actual `[Decision]` message in the
   // channel, so it holds across reloads and remounts. Local state only covers
   // the gap between clicking Confirm and that message coming back round.
   const decisionStatus = isDecisionAnswered ? 'answered' : localDecisionStatus;
+  const currentDecisionAnswers = localAnswers || savedDecisionAnswers;
 
   const approvalRequest = message.metadata?.tool_approval_request;
   const currentApproved = isApproved || localStatus === 'approved';
@@ -440,13 +492,13 @@ export const ChatMessage = memo(function ChatMessage({
   }, [message.metadata]);
 
   // Extract file diff if any
-  const fileDiff = useMemo<{ file: string; lines?: DiffLine[]; rawDiff?: string } | null>(() => {
-    const raw = message.metadata?.file_diff as { file?: string; lines?: DiffLine[]; rawDiff?: string } | undefined;
+  const fileDiff = useMemo<{ file: string; lines?: DiffLine[]; rawDiff?: string; status?: 'streaming' | 'complete' } | null>(() => {
+    const raw = message.metadata?.file_diff as { file?: string; lines?: DiffLine[]; rawDiff?: string; status?: 'streaming' | 'complete' } | undefined;
     if (raw && raw.file) {
-      return { file: raw.file, lines: raw.lines, rawDiff: raw.rawDiff };
+      return { file: raw.file, lines: raw.lines, rawDiff: raw.rawDiff, status: raw.status || (isStreaming ? 'streaming' : 'complete') };
     }
     return null;
-  }, [message.metadata]);
+  }, [message.metadata, isStreaming]);
 
   // Extract approval decision questions if any
   const decisionQuestions = useMemo<ApprovalCardQuestion[] | null>(() => {
@@ -564,13 +616,14 @@ export const ChatMessage = memo(function ChatMessage({
 
   // Detect system errors or daemon interruptions (only for short runtime error notices, not content responses)
   const isErrorMessage = useMemo(() => {
-    if (!cleanContent) return false;
-    // Deliverable content, code blocks, or markdown articles are NEVER system errors
-    if (cleanContent.length > 300 || cleanContent.includes('```') || /^#{1,4}\s+/m.test(cleanContent)) {
-      return false;
-    }
+    // 1. Explicit error signals from backend or runtime
     if (message.messageType === 'error' || Boolean(message.metadata?.error || message.metadata?.is_error)) {
       return true;
+    }
+    if (!cleanContent) return false;
+    // 2. Deliverable content, code blocks, or markdown articles are NEVER system errors
+    if (cleanContent.length > 300 || cleanContent.includes('```') || /^#{1,4}\s+/m.test(cleanContent)) {
+      return false;
     }
     const lower = cleanContent.toLowerCase().trim();
     // Only detect genuine short runtime fault strings from daemon or adapter
@@ -582,7 +635,8 @@ export const ChatMessage = memo(function ChatMessage({
       lower.startsWith('invalid api key') ||
       lower.startsWith('daemon restarting') ||
       lower.startsWith('error: quota reached') ||
-      lower.startsWith('error: rate limit')
+      lower.startsWith('error: rate limit') ||
+      lower.startsWith('error:')
     );
   }, [cleanContent, message.messageType, message.metadata]);
 
@@ -592,39 +646,16 @@ export const ChatMessage = memo(function ChatMessage({
       ? 'streaming'
       : 'complete';
 
-  // An agent's proposed routine: decided in place (Approve / Reject). Same
-  // early-return position as a status line, so hook order matches that path.
-  const routineProposal = message.metadata?.routine_proposal;
-  if (routineProposal && typeof routineProposal === 'object' && routineProposal.routine_id) {
-    return (
-      <div className="py-1">
-        <RoutineProposalCard proposal={routineProposal} />
-      </div>
-    );
-  }
-
-  if (isSystem) {
-    const isQueued = message.content.includes('queued');
-    return (
-      <div className="flex justify-center py-2">
-        <span className={cn(
-          'text-xs font-mono px-3 py-0.5 rounded-full border border-border/60 bg-surface1/60',
-          isQueued
-            ? 'text-foreground-muted'
-            : 'text-muted-foreground'
-        )}>
-          {message.senderName}: {message.content}
-        </span>
-      </div>
-    );
-  }
-
   const handleCopyPlain = useCallback(() => {
     const raw = cleanContent || message.content;
     const plain = raw
       .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-z]*\n?/gi, '').replace(/```/g, ''))
       .replace(/`([^`]+)`/g, '$1')
-      .replace(/[*_~]{1,3}([^*_~]+)[*_~]{1,3}/g, '$1')
+      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
+      .replace(/~~([^~]+)~~/g, '$1')
+      .replace(/(^|[\s.,!?;:([{"'])___([^_]+)___(?=$|[\s.,!?;:)\]}"'])/g, '$1$2')
+      .replace(/(^|[\s.,!?;:([{"'])__([^_]+)__(?=$|[\s.,!?;:)\]}"'])/g, '$1$2')
+      .replace(/(^|[\s.,!?;:([{"'])_([^_]+)_(?=$|[\s.,!?;:)\]}"'])/g, '$1$2')
       .replace(/^#+\s+/gm, '')
       .replace(/^>\s+/gm, '')
       .trim();
@@ -662,9 +693,13 @@ export const ChatMessage = memo(function ChatMessage({
       const agentName = message.senderName;
       try {
         toast.info(`Regenerating response from @${agentName}...`);
+        const preview = (cleanContent || message.content || '').slice(0, 80).replace(/\n/g, ' ').trim();
+        const prompt = preview
+          ? `@${agentName} please regenerate your response to "${preview}..." with improvements`
+          : `@${agentName} please regenerate your previous response with improvements`;
         await workspaceApi.sendMessage(
           message.sessionId,
-          `@${agentName} please regenerate your previous response with improvements`,
+          prompt,
           currentUser.name || 'user',
           [agentName]
         );
@@ -672,7 +707,34 @@ export const ChatMessage = memo(function ChatMessage({
         toast.error('Failed to trigger regenerate');
       }
     }
-  }, [onRegenerate, message, currentUser.name]);
+  }, [onRegenerate, message, currentUser.name, cleanContent]);
+
+  // An agent's proposed routine: decided in place (Approve / Reject).
+  const routineProposal = message.metadata?.routine_proposal;
+  if (routineProposal && typeof routineProposal === 'object' && routineProposal.routine_id) {
+    return (
+      <div className="py-1">
+        <RoutineProposalCard proposal={routineProposal} />
+      </div>
+    );
+  }
+
+  if (isSystem) {
+    const isQueued = message.content.includes('queued');
+    return (
+      <div className="flex justify-center py-2 my-0.5">
+        <span className={cn(
+          'text-xs font-mono px-3 py-1 rounded-md border border-border/60 bg-surface1/60 inline-flex items-center gap-1.5 max-w-xl text-center',
+          isQueued
+            ? 'text-foreground-muted'
+            : 'text-muted-foreground'
+        )}>
+          <span className="font-semibold text-foreground-extra-muted">{message.senderName}:</span>
+          <span>{message.content}</span>
+        </span>
+      </div>
+    );
+  }
 
   // ── User Messages (Modern ChatGPT/Claude Refined Bubble Card) ──
   if (isHuman) {
@@ -882,9 +944,29 @@ export const ChatMessage = memo(function ChatMessage({
                       </span>
                     )}
                     {message.deliveryStatus === 'failed' && (
-                      <span className="text-destructive font-medium inline-flex items-center gap-0.5">
-                        <X className="size-2.5" />
-                        <span>Failed</span>
+                      <span className="text-destructive font-medium inline-flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-0.5">
+                          <X className="size-2.5" />
+                          <span>Failed</span>
+                        </span>
+                        {onReusePrompt && (
+                          <button
+                            type="button"
+                            onClick={() => onReusePrompt(message)}
+                            className="underline underline-offset-2 hover:text-foreground transition-colors ml-0.5 cursor-pointer"
+                          >
+                            Restore
+                          </button>
+                        )}
+                        {onRegenerate && (
+                          <button
+                            type="button"
+                            onClick={() => onRegenerate(message)}
+                            className="underline underline-offset-2 hover:text-foreground transition-colors cursor-pointer"
+                          >
+                            Retry
+                          </button>
+                        )}
                       </span>
                     )}
                   </span>
@@ -1039,6 +1121,15 @@ export const ChatMessage = memo(function ChatMessage({
             <span className="font-medium text-foreground">
               {message.senderName}
             </span>
+            {(() => {
+              const handoffFrom = (message.metadata?.handoff_from || message.metadata?.previous_agent || message.metadata?.delegated_from || message.metadata?.handed_off_by) as string | undefined;
+              if (!handoffFrom) return null;
+              return (
+                <span className="inline-flex items-center gap-1 text-3xs text-foreground-extra-muted bg-surface2 px-1.5 py-0.5 rounded border border-border/50 font-mono">
+                  <span>Handed off by @{handoffFrom}</span>
+                </span>
+              );
+            })()}
             {timestamp && (
               <span className="ml-auto tabular-nums">{timestamp}</span>
             )}
@@ -1078,7 +1169,7 @@ export const ChatMessage = memo(function ChatMessage({
                 </div>
               </div>
             </div>
-          ) : cleanContent ? (
+          ) : cleanContent && (!inferredArtifact || inferredArtifact.content.trim() !== cleanContent.trim()) ? (
             <StreamingResponse
               status={streamingStatus}
               copyText={cleanContent}
@@ -1113,6 +1204,7 @@ export const ChatMessage = memo(function ChatMessage({
               file={fileDiff.file}
               lines={fileDiff.lines}
               rawDiff={fileDiff.rawDiff}
+              status={fileDiff.status === 'streaming' ? 'in-progress' : 'complete'}
             />
           ) : null}
 
@@ -1121,6 +1213,8 @@ export const ChatMessage = memo(function ChatMessage({
             <ApprovalCard
               questions={decisionQuestions}
               status={decisionStatus}
+              answers={decisionStatus === 'answered' ? currentDecisionAnswers : undefined}
+              result={decisionStatus === 'answered' ? 'Decision confirmed' : undefined}
               onSubmit={async (answers) => {
                 // Guard against a second post: the card locks itself once
                 // `status` leaves `pending`, but a remount resets its internal
@@ -1139,27 +1233,23 @@ export const ChatMessage = memo(function ChatMessage({
                   .join('\n');
 
                 setDecisionStatus('submitting');
+                setLocalAnswers(answers);
+                const userName = currentUser.name || currentUser.id || 'User';
                 try {
-                  // Was fire-and-forget: a failed post looked identical to a
-                  // successful one, so the agent silently never received the
-                  // decision and the user had no reason to retry.
-                  //
-                  // Posted via sendEvent rather than sendMessage only because
-                  // sendMessage takes no metadata and this needs to carry the
-                  // back-reference. Every other field below is exactly what
-                  // sendMessage would have produced, so delivery and
-                  // attribution are unchanged.
                   await workspaceApi.sendEvent({
                     type: 'workspace.message.posted',
-                    source: 'human:User',
+                    source: `human:${currentUser.id || 'user'}`,
                     target: `channel/${message.sessionId}`,
                     payload: {
                       content: `[Decision]\n${answerSummary}`,
                       sender_type: 'human',
-                      sender_name: 'User',
+                      sender_name: userName,
                     },
                     metadata: {
-                      decision_response: { source_message_id: message.messageId },
+                      decision_response: {
+                        source_message_id: message.messageId,
+                        answers,
+                      },
                     },
                     visibility: 'channel',
                   });
@@ -1260,6 +1350,7 @@ export const ChatMessage = memo(function ChatMessage({
                 variant="toolbar"
                 onOpenCanvas={inferredArtifact ? () => openArtifact(inferredArtifact) : undefined}
                 onSaveToKnowledge={handleSaveToKnowledge}
+                onQuote={handleQuote}
                 onRegenerate={handleRegenerate}
               />
             </div>

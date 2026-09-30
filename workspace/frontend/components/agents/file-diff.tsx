@@ -70,20 +70,46 @@ function ChangeCount({ value, type }: { value: number; type: "added" | "removed"
   );
 }
 
+function detectLanguageFromPath(filePath: string): AgentCodeLanguage {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'js':
+    case 'jsx':
+    case 'tsx':
+      return 'tsx';
+    case 'ts':
+    case 'mts':
+    case 'cts':
+      return 'typescript';
+    case 'json':
+      return 'json';
+    case 'sh':
+    case 'bash':
+    case 'zsh':
+      return 'bash';
+    case 'diff':
+    case 'patch':
+      return 'diff';
+    default:
+      return 'typescript';
+  }
+}
+
 export function FileDiff({
   file,
   lines,
-  status = "streaming",
+  status = "complete",
   open,
   defaultOpen = true,
   onOpenChange,
   collapseOnComplete = true,
   maxHeight = 220,
-  language = "typescript",
+  language,
   copyText,
   onCopy,
   className,
 }: FileDiffProps) {
+  const resolvedLanguage = language || (typeof file === 'string' ? detectLanguageFromPath(file) : 'typescript');
   const reduce = useReducedMotion() ?? false;
   const baseId = useId();
   const triggerId = `${baseId}-trigger`;
@@ -99,7 +125,7 @@ export function FileDiff({
   const deletions = lines.filter((line) => line.type === "removed").length;
   const canCopy = Boolean(copyText || onCopy);
   const code = lines.map((line) => line.content).join("\n");
-  const tokens = useAgentCodeTokens(code, language);
+  const tokens = useAgentCodeTokens(code, resolvedLanguage);
 
   const setOpen = useCallback(
     (next: boolean) => {

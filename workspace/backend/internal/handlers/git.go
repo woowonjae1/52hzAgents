@@ -920,19 +920,55 @@ func RollbackTurnChanges(c *gin.Context) {
 		}
 	}
 
+	// Determine status based on reverted vs failed paths
+	statusToSet := "rolled_back"
+	if len(failedPaths) > 0 {
+		if len(revertedPaths) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":   "error",
+				"error":    "Failed to rollback files in this turn",
+				"turn_id":  turn.ID,
+				"reverted": revertedPaths,
+				"failed":   failedPaths,
+			})
+			return
+		}
+		statusToSet = "partially_rolled_back"
+	}
+
 	// Update turn status in DB to indicate rollback
 	db.DB.Model(&turn).Updates(map[string]interface{}{
-		"status": "rolled_back",
+		"status": statusToSet,
 	})
+
+	// Also persist rolled_back status to associated EventRecord metadata so it survives page reloads
+	var evs []models.EventRecord
+	if err := db.DB.Where("network_id = ? AND metadata LIKE ?", workspace.ID, "%"+turn.ID+"%").Find(&evs).Error; err == nil {
+		for _, ev := range evs {
+			var meta map[string]interface{}
+			if err := json.Unmarshal(ev.Metadata, &meta); err == nil {
+				if tc, ok := meta["turn_changes"].(map[string]interface{}); ok {
+					if tid, _ := tc["turn_id"].(string); tid == turn.ID {
+						tc["status"] = statusToSet
+						meta["turn_changes"] = tc
+						if updatedBytes, err := json.Marshal(meta); err == nil {
+							db.DB.Model(&ev).Update("metadata", updatedBytes)
+						}
+					}
+				}
+			}
+		}
+	}
 
 	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.git.turn.rolled_back", turn.AgentName, turn.ChannelName, gin.H{
 		"turn_id":  turn.ID,
+		"status":   statusToSet,
 		"reverted": revertedPaths,
 		"failed":   failedPaths,
 	})
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":   "ok",
+		"status":   statusToSet,
 		"turn_id":  turn.ID,
 		"reverted": revertedPaths,
 		"failed":   failedPaths,
