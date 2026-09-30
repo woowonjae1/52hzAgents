@@ -310,6 +310,10 @@ class PiAdapter extends BaseAdapter {
   // ------------------------------------------------------------------
 
   _buildPiCmd(prompt, channelName, contextFile = null) {
+    if (typeof this._findPiBinary === 'function') {
+      const detected = this._findPiBinary();
+      if (detected) this._piBin = detected;
+    }
     if (!this._piBin) {
       throw new Error('pi CLI not found. Install with: npm install -g @earendil-works/pi-coding-agent');
     }
@@ -371,6 +375,10 @@ class PiAdapter extends BaseAdapter {
     delete env.ELECTRON_NO_ASAR;
     const cwd = await this._resolveWorkingDir(channelName, userMessage);
 
+    if (typeof this._findPiBinary === 'function') {
+      const detected = this._findPiBinary();
+      if (detected) this._piBin = detected;
+    }
     let spawnBin = this._piBin;
     let spawnArgs = args;
     if (this._piViaWsl) {

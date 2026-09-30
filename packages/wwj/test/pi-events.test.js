@@ -325,6 +325,7 @@ test('PiAdapter passes userMessage to _resolveWorkingDir to support directory ov
     token: 'test-token',
     client,
   });
+  adapter._findPiBinary = () => 'node';
 
   let capturedMessageText = '';
   adapter._resolveWorkingDir = async (channel, messageText) => {

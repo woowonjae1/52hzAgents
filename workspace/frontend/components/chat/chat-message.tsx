@@ -648,16 +648,22 @@ export const ChatMessage = memo(function ChatMessage({
 
   const handleCopyPlain = useCallback(() => {
     const raw = cleanContent || message.content;
-    const plain = raw
+    let plain = raw
       .replace(/```[\s\S]*?```/g, (m) => m.replace(/```[a-z]*\n?/gi, '').replace(/```/g, ''))
       .replace(/`([^`]+)`/g, '$1')
-      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1')
-      .replace(/~~([^~]+)~~/g, '$1')
-      .replace(/(^|[\s.,!?;:([{"'])___([^_]+)___(?=$|[\s.,!?;:)\]}"'])/g, '$1$2')
-      .replace(/(^|[\s.,!?;:([{"'])__([^_]+)__(?=$|[\s.,!?;:)\]}"'])/g, '$1$2')
-      .replace(/(^|[\s.,!?;:([{"'])_([^_]+)_(?=$|[\s.,!?;:)\]}"'])/g, '$1$2')
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/(?<!\S)\*{3}(?!\s)([^*]+?)(?<!\s)\*{3}(?!\S)/g, '$1')
+      .replace(/(?<!\S)\*{2}(?!\s)([^*]+?)(?<!\s)\*{2}(?!\S)/g, '$1')
+      .replace(/(?<!\S)\*(?!\s)([^*]+?)(?<!\s)\*(?!\S)/g, '$1')
+      .replace(/~~(?!\s)([^~]+?)(?<!\s)~~/g, '$1')
+      .replace(/(?:^|(?<=\s))___(?!\s)([^_]+?\s+[^_]+?)(?<!\s)___(?=\s|$|[.,!?;:](?:\s|$))/g, '$1')
+      .replace(/(?:^|(?<=\s))__(?!\s)([^_]+?\s+[^_]+?)(?<!\s)__(?=\s|$|[.,!?;:](?:\s|$))/g, '$1')
+      .replace(/(?:^|(?<=\s))_(?!\s)([^_]+?\s+[^_]+?)(?<!\s)_(?=\s|$|[.,!?;:](?:\s|$))/g, '$1')
       .replace(/^#+\s+/gm, '')
-      .replace(/^>\s+/gm, '')
+      .replace(/^>\s*/gm, '')
+      .replace(/^(\s*)[*+-]\s+/gm, '$1')
+      .replace(/^(\s*)\d+\.\s+/gm, '$1')
       .trim();
     navigator.clipboard.writeText(plain || raw);
     toast.success('Plain text copied');
@@ -1214,12 +1220,35 @@ export const ChatMessage = memo(function ChatMessage({
               questions={decisionQuestions}
               status={decisionStatus}
               answers={decisionStatus === 'answered' ? currentDecisionAnswers : undefined}
-              result={decisionStatus === 'answered' ? 'Decision confirmed' : undefined}
+              result={
+                decisionStatus === 'answered'
+                  ? currentDecisionAnswers && Object.keys(currentDecisionAnswers).length > 0
+                    ? Object.entries(currentDecisionAnswers)
+                        .map(([k, v]) => {
+                          const title = decisionQuestions.find((q) => q.id === k)?.title || k;
+                          const valStr = typeof v === 'string' ? v : ((v as { custom?: string; selected?: string[] })?.custom || (v as { custom?: string; selected?: string[] })?.selected?.join(', ') || '');
+                          return `${title}: ${valStr}`;
+                        })
+                        .join('; ')
+                    : 'Decision confirmed'
+                  : undefined
+              }
               onSubmit={async (answers) => {
                 // Guard against a second post: the card locks itself once
                 // `status` leaves `pending`, but a remount resets its internal
                 // answers and would re-arm the button.
                 if (decisionStatus !== 'pending') return;
+
+                // Flatten answers so values are human-readable strings
+                const flatLocalAnswers: Record<string, string> = {};
+                for (const [k, v] of Object.entries(answers)) {
+                  if (typeof v === 'string') {
+                    flatLocalAnswers[k] = v;
+                  } else if (v && typeof v === 'object') {
+                    const obj = v as { selected?: string[]; custom?: string };
+                    flatLocalAnswers[k] = obj.custom?.trim() || obj.selected?.join(', ') || '';
+                  }
+                }
 
                 // Key the reply by the question's TITLE, not its id. The agent
                 // reads this text to learn what was decided, and an id it
@@ -1228,12 +1257,12 @@ export const ChatMessage = memo(function ChatMessage({
                 const titleById = new Map(
                   decisionQuestions.map((q) => [q.id, q.title])
                 );
-                const answerSummary = Object.entries(answers)
+                const answerSummary = Object.entries(flatLocalAnswers)
                   .map(([k, v]) => `${titleById.get(k) || k}: ${v}`)
                   .join('\n');
 
                 setDecisionStatus('submitting');
-                setLocalAnswers(answers);
+                setLocalAnswers(flatLocalAnswers);
                 const userName = currentUser.name || currentUser.id || 'User';
                 try {
                   await workspaceApi.sendEvent({

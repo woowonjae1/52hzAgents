@@ -280,12 +280,15 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
   );
 }
 
+const EMPTY_AGENT_NAMES: string[] = [];
+const EMPTY_CITATION_SOURCES: CitationItem[] = [];
+
 export const MarkdownContent = memo(function MarkdownContent({
   content,
-  agentNames = [],
+  agentNames = EMPTY_AGENT_NAMES,
   sessionId,
   workingDir,
-  citationSources = [],
+  citationSources = EMPTY_CITATION_SOURCES,
   sourceIdPrefix,
   onSelectCitation,
 }: MarkdownContentProps) {

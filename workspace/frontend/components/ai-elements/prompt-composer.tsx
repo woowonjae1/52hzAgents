@@ -16,7 +16,6 @@ import {
   ChevronDown,
   ChevronRight,
   FileEdit,
-  Brain,
   Info,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
@@ -57,7 +56,7 @@ export function extractMentionSegments(
   if (knownAgents && knownAgents.length > 0) {
     for (const a of knownAgents) {
       const name = typeof a === 'string' ? a : a.agentName;
-      if (name && name.toLowerCase() !== 'knowledge' && !name.toLowerCase().startsWith('knowledge:')) {
+      if (name && name.toLowerCase() !== 'knowledge') {
         allowedMap.set(name.toLowerCase(), name);
       }
     }
@@ -70,7 +69,7 @@ export function extractMentionSegments(
   let m: RegExpExecArray | null;
   while ((m = mentionRegex.exec(trimmed)) !== null) {
     const rawName = m[1];
-    if (rawName.toLowerCase() === 'knowledge' || rawName.toLowerCase().startsWith('knowledge')) continue;
+    if (rawName.toLowerCase() === 'knowledge') continue;
     // Calculate the index of the '@' character
     const atIndex = m.index + m[0].indexOf('@');
     // If known agents are given, only consider valid known agents
@@ -218,39 +217,6 @@ export function PromptComposer({
       historyRef.current = [];
     }
   }, [sessionKey]);
-
-  const REASONING_EFFORTS = ['auto', 'low', 'medium', 'high'] as const;
-  type ReasoningEffort = typeof REASONING_EFFORTS[number];
-
-  const [reasoningEffort, setReasoningEffort] = React.useState<ReasoningEffort>('auto');
-
-  React.useEffect(() => {
-    if (!sessionKey || typeof window === 'undefined') {
-      setReasoningEffort('auto');
-      return;
-    }
-    try {
-      const stored = localStorage.getItem(`reasoning_effort_${sessionKey}`) as ReasoningEffort | null;
-      if (stored && (REASONING_EFFORTS as readonly string[]).includes(stored)) {
-        setReasoningEffort(stored);
-      } else {
-        setReasoningEffort('auto');
-      }
-    } catch {
-      setReasoningEffort('auto');
-    }
-  }, [sessionKey]);
-
-  const cycleReasoningEffort = () => {
-    const idx = REASONING_EFFORTS.indexOf(reasoningEffort);
-    const next = REASONING_EFFORTS[(idx + 1) % REASONING_EFFORTS.length];
-    setReasoningEffort(next);
-    if (sessionKey && typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`reasoning_effort_${sessionKey}`, next);
-      } catch {}
-    }
-  };
 
   const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
     const ta = e.currentTarget;
@@ -573,7 +539,7 @@ export function PromptComposer({
     lastSendTimeRef.current = Date.now();
     const segments = extractMentionSegments(trimmed, agents);
     const mentionMatches = Array.from(trimmed.matchAll(/(?:^|[^\w@])@([a-zA-Z0-9_-]+)/g)).map((m) => m[1]);
-    const filteredMatches = mentionMatches.filter((m) => m.toLowerCase() !== 'knowledge' && !m.toLowerCase().startsWith('knowledge:'));
+    const filteredMatches = mentionMatches.filter((m) => m.toLowerCase() !== 'knowledge');
     const mentions = segments.length > 0 ? segments.map((s) => s.agent) : filteredMatches;
 
     onSend(trimmed, mentions, pendingFiles, segments.length >= 2 ? segments : undefined);
@@ -1064,24 +1030,6 @@ export function PromptComposer({
             {/* Fix / Review: the other "what happens when I send" setting —
                 whether the agents may edit. Profiles live in lib/agent-profiles. */}
             {session && <AgentProfileControl session={session} />}
-
-            {/* In-thread reasoning effort control */}
-            <Hint label={`Thinking Effort: ${reasoningEffort.toUpperCase()} (click to cycle)`}>
-              <button
-                type="button"
-                onClick={cycleReasoningEffort}
-                className={cn(
-                  pillButton,
-                  'text-xs font-mono lowercase capitalize gap-1 shrink-0',
-                  reasoningEffort !== 'auto' && 'bg-surface3 text-foreground font-medium border border-border'
-                )}
-                aria-label={`Thinking Effort: ${reasoningEffort}`}
-              >
-                <Brain className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                <span className="hidden sm:inline">Effort:</span>
-                <span className="capitalize">{reasoningEffort}</span>
-              </button>
-            </Hint>
 
             {/*
               THE SAME TWO KINDS OF THING AS THE HEADER ROW, NOW SAID THE SAME WAY.

@@ -117,6 +117,7 @@ export function TranscriptFilterBar({ value, onChange, onClose, agentNames, show
         <Search className="size-3.5 shrink-0 text-foreground-extra-muted" />
         <input
           ref={inputRef}
+          data-transcript-search="true"
           value={value.query}
           onChange={(e) => onChange({ ...value, query: e.target.value })}
           onKeyDown={(e) => {

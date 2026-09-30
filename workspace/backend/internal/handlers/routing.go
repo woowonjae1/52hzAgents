@@ -103,7 +103,7 @@ func parseAgentPipeline(content string, participants []string) []models.Pipeline
 	for _, m := range matches {
 		nameStart, nameEnd := m[2], m[3]
 		rawName := strings.ToLower(content[nameStart:nameEnd])
-		if rawName == "knowledge" || strings.HasPrefix(rawName, "knowledge:") {
+		if rawName == "knowledge" {
 			continue
 		}
 		// If followed immediately by a colon and non-whitespace, it's not a bare mention or pipeline step (e.g. @knowledge:spec)
@@ -359,12 +359,13 @@ func HaltChannelPipeline(c *gin.Context) {
 		RelayPipelineAlert(workspace.ID, "channel/"+channel.Name, "Pipeline execution was stopped by user.")
 		StopActiveRoutineRunsAndTasks(workspace.ID, "", channel.Name)
 
-		// Halt active agent turn for current pipeline step
+		// Halt active agent turn and send stop control to current pipeline agent
 		var steps []models.PipelineStep
 		if err := json.Unmarshal(record.Steps, &steps); err == nil && record.CurrentIndex >= 0 && record.CurrentIndex < len(steps) {
 			currentAgent := steps[record.CurrentIndex].Agent
 			if currentAgent != "" {
 				closeAgentTurn(workspace.ID, &channel, currentAgent)
+				emitAgentControlEvent(workspace.ID, currentAgent, "stop", gin.H{"channel": channel.Name})
 			}
 		}
 	}

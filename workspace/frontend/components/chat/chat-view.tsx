@@ -246,7 +246,7 @@ async function refreshCachedSession(sessionId: string): Promise<void> {
 }
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, knowledge, recordUserMessageSent, workspaceId, draftSession, materializeDraft } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, routines, routinesLoaded, knowledge, recordUserMessageSent, workspaceId, draftSession, materializeDraft } = useWorkspace();
   
   useEffect(() => {
     console.log('[52hzAgents Monitor] [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
@@ -315,8 +315,10 @@ export function ChatView() {
 
   // The single poll for this session — shared with TracePanel. See
   // SessionMessagesProvider above.
-  const { messages, loading, forceRefresh, generation, loadOlder, hasOlder, loadingOlder } =
+  const { messages, loading, error: messagesError, forceRefresh, retryInitial, generation, loadOlder, hasOlder, loadingOlder } =
     useSessionMessages();
+
+  const [parallelReviewNeeded, setParallelReviewNeeded] = useState(false);
 
   // Persisted (not just component state): dismissing this once shouldn't mean
   // seeing it again on every reload — that's what made it feel like a
@@ -630,30 +632,65 @@ export function ChatView() {
     setTranscriptFilter(EMPTY_TRANSCRIPT_FILTER);
   }, []);
 
+  const approvalResponses = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of displayMessages) {
+      const resp = m.metadata?.tool_approval_response;
+      if (resp?.approval_id) {
+        set.add(resp.approval_id);
+      }
+    }
+    return set;
+  }, [displayMessages]);
+
+  const answeredDecisionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const m of displayMessages) {
+      const resp = m.metadata?.decision_response;
+      if (resp?.source_message_id) {
+        ids.add(resp.source_message_id);
+      }
+    }
+    return ids;
+  }, [displayMessages]);
+
   const pendingActions = useMemo(() => {
     const list: { id: string; type: string; label: string }[] = [];
     for (const m of displayMessages) {
-      if (m.metadata?.tool_approval_request && !m.metadata?.tool_approval_response) {
+      const req = m.metadata?.tool_approval_request;
+      if (req?.approval_id && !approvalResponses.has(req.approval_id)) {
         list.push({ id: m.messageId, type: 'approval', label: 'Tool approval' });
       }
-      if ((m.metadata?.questions || m.metadata?.decision_questions) && m.metadata?.decision_status !== 'answered') {
+      const hasQuestions =
+        (Array.isArray(m.metadata?.questions) && m.metadata.questions.length > 0) ||
+        (Array.isArray(m.metadata?.decision_questions) && m.metadata.decision_questions.length > 0);
+      if (hasQuestions && !answeredDecisionIds.has(m.messageId)) {
         list.push({ id: m.messageId, type: 'decision', label: 'Decision needed' });
       }
-      if (m.metadata?.routine_proposal && m.metadata?.proposal_status === 'pending_approval') {
-        list.push({ id: m.messageId, type: 'routine', label: 'Routine proposal' });
+      const routineId = m.metadata?.routine_proposal?.routine_id;
+      if (routineId) {
+        const listed = (routines || []).find((r) => r.id === routineId);
+        const isPending = listed ? listed.status === 'pending_approval' : !routinesLoaded;
+        if (isPending) {
+          list.push({ id: m.messageId, type: 'routine', label: 'Routine proposal' });
+        }
       }
     }
+    if (parallelReviewNeeded) {
+      list.push({ id: 'parallel-batch-panel', type: 'merge', label: 'Parallel merge review' });
+    }
     return list;
-  }, [displayMessages]);
+  }, [displayMessages, approvalResponses, answeredDecisionIds, routines, routinesLoaded, parallelReviewNeeded]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
         const target = e.target as HTMLElement | null;
-        if (!target || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') || target === titleInputRef.current) {
-          e.preventDefault();
-          setFilterOpen(true);
+        if (target && target.getAttribute('data-transcript-search') === 'true') {
+          return;
         }
+        e.preventDefault();
+        setFilterOpen(true);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -1396,10 +1433,11 @@ export function ChatView() {
         messages themselves.
       */}
       {serverSessionId && (
-        <div className="px-3 pb-2">
+        <div className="px-3 pb-2" id="parallel-batch-panel">
           <ParallelBatchPanel
             channelName={serverSessionId}
             active={(currentSession?.orchestrationMode || '') === 'parallel'}
+            onReviewStateChange={setParallelReviewNeeded}
           />
         </div>
       )}
@@ -1422,17 +1460,20 @@ export function ChatView() {
             </div>
           </div>
         ) : displayMessages.length === 0 ? (
-          !loading && currentSession && !isDraftSessionId(currentSession.sessionId) && currentSession.lastEventAt ? (
+          !loading && (messagesError || (currentSession && !isDraftSessionId(currentSession.sessionId) && currentSession.lastEventAt)) ? (
             <div className="relative flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
-              <AlertTriangle className="size-8 text-foreground-muted mb-3 opacity-60" />
+              <AlertTriangle className="size-8 text-status-warning mb-3 opacity-80" />
               <h3 className="text-sm font-semibold text-foreground">Could not load messages</h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                This thread has past activity, but messages could not be retrieved from the server.
+                {messagesError || 'This thread has past activity, but messages could not be retrieved from the server.'}
               </p>
               <button
                 type="button"
-                onClick={() => forceRefresh()}
-                className="mt-4 px-3.5 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 border border-border text-xs font-medium text-foreground transition-colors cursor-pointer"
+                onClick={() => {
+                  if (retryInitial) retryInitial();
+                  else forceRefresh();
+                }}
+                className="mt-4 px-3.5 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 border border-border text-xs font-medium text-foreground transition-colors cursor-pointer hover:border-border-hover"
               >
                 Retry loading
               </button>

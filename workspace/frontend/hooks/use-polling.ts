@@ -68,6 +68,7 @@ function eventsToScopedMessages(
 export function useMessagePolling({ sessionId, enabled = true, initialMessages }: UsePollingOptions) {
   const [messages, setMessages] = useState<WorkspaceMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [hasOlder, setHasOlder] = useState(false);
   // Increments when messages are bulk-replaced (backfill/session switch) to signal scroll-to-bottom
@@ -119,6 +120,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       oldestIdRef.current = null;
       historyLoadedRef.current = false;
       setHasOlder(false);
+      setError(null);
       setLoading(false);
     }
   }, [sessionId]); // intentionally omit initialMessages — only seed on session change
@@ -151,6 +153,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     if (!sessionId) return;
 
     setLoading(true);
+    setError(null);
     try {
       const result = dmPair
         ? await workspaceApi.pollConversation(dmPair[0], dmPair[1], { sort: 'desc', limit: 50 })
@@ -184,8 +187,9 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
       }
 
       historyLoadedRef.current = true;
-    } catch {
+    } catch (e) {
       historyLoadedRef.current = true;
+      setError(e instanceof Error ? e.message : 'Failed to load thread history');
     } finally {
       setLoading(false);
     }
@@ -453,5 +457,10 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     poll();
   }, [poll]);
 
-  return { messages, loading, forceRefresh, generation, loadOlder, hasOlder, loadingOlder };
+  const retryInitial = useCallback(() => {
+    historyLoadedRef.current = false;
+    loadHistory();
+  }, [loadHistory]);
+
+  return { messages, loading, error, forceRefresh, retryInitial, generation, loadOlder, hasOlder, loadingOlder };
 }

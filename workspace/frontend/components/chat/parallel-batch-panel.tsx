@@ -26,13 +26,19 @@ interface Props {
   /** Only rendered for a thread actually in parallel mode. */
   active: boolean;
   className?: string;
+  onReviewStateChange?: (reviewNeeded: boolean) => void;
 }
 
 const POLL_MS = 4000;
 
-export function ParallelBatchPanel({ channelName, active, className }: Props) {
+export function ParallelBatchPanel({ channelName, active, className, onReviewStateChange }: Props) {
   const [batch, setBatch] = React.useState<ParallelBatch | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+
+  const isReviewing = Boolean(batch?.run?.batch.status === 'review');
+  React.useEffect(() => {
+    onReviewStateChange?.(isReviewing);
+  }, [isReviewing, onReviewStateChange]);
 
   React.useEffect(() => {
     if (!channelName) {

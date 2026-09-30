@@ -463,8 +463,8 @@ export function ApprovalCard({
               {questionMode ? (
                 <div className="space-y-1.5">
                   {questions.map((q) => {
-                    const ans = currentAnswers[q.id];
-                    const chosenVal = ans?.custom?.trim() || ans?.selected?.[0];
+                    const ans = currentAnswers[q.id] as { selected?: string[]; custom?: string } | string | undefined;
+                    const chosenVal = typeof ans === 'string' ? ans : (ans?.custom?.trim() || ans?.selected?.[0]);
                     const chosenOption = q.options?.find((o) => o.value === chosenVal);
                     const displayChoice = chosenOption?.label || chosenVal;
                     return (
