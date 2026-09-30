@@ -1,7 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
-import { memo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatElapsed } from '@/lib/use-elapsed';
 import {
@@ -30,7 +30,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { AgentDisclosure } from '@/components/agents/agent-disclosure';
+import { AgentActivity, type AgentActivityItem } from '@/components/agents/agent-activity';
 import { WorkingIndicator } from './working-indicator';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { EventLine, EventLineAction, EventLinePre } from '@/components/ai-elements/event-line';
@@ -215,7 +215,26 @@ function cleanToolName(name: string): string {
   return name;
 }
 
+/** Arguments that name what a call acted on, most telling first. */
+const SUMMARY_ARG_KEYS = ['command', 'cmd', 'file_path', 'filePath', 'path', 'pattern', 'query', 'url', 'description'];
+
 function extractToolSummary(tool: string, args: string): string {
+  // Adapters send arguments as JSON. The patterns below were written for the
+  // older single-quoted form, so a bash call drew its whole `{ "command": ... }`
+  // object in the row instead of the command.
+  const trimmedArgs = args.trim();
+  if (trimmedArgs.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(trimmedArgs) as Record<string, unknown>;
+      for (const key of SUMMARY_ARG_KEYS) {
+        const value = parsed[key];
+        if (typeof value === 'string' && value.trim()) return value.replace(/\s+/g, ' ').trim().slice(0, 200);
+      }
+    } catch {
+      /* fall through to the legacy patterns */
+    }
+  }
+
   const fileMatch = args.match(/'file_path':\s*'([^']+)'/);
   if (fileMatch && ['Write', 'Read', 'Edit'].includes(tool)) {
     return fileMatch[1];
@@ -1041,70 +1060,151 @@ export const ToolCallsDisclosure = memo(function ToolCallsDisclosure({
   steps,
   defaultOpen = false,
 }: ToolCallsDisclosureProps) {
-  const [open, setOpen] = useState(defaultOpen);
+  const renderable = useMemo(
+    () => resolveToolPairs((steps || []).filter((s) => !isPlaceholderThinking(s))),
+    [steps]
+  );
+  const runs = useMemo(() => coalesceThinking(renderable), [renderable]);
+  const items = useMemo(() => runsToActivity(runs), [runs]);
+  if (renderable.length === 0 || items.length === 0) return null;
 
-  const renderable = resolveToolPairs((steps || []).filter((s) => !isPlaceholderThinking(s)));
-  if (renderable.length === 0) return null;
-
-  const runs = coalesceThinking(renderable);
   const toolCount = renderable.filter((s) => {
     if (isToolCallMessage(s)) return true;
     if (s.messageType === 'todos' || s.messageType === 'thinking') return false;
     return parseMessageStep(s).type === 'tool_call';
   }).length;
   const thoughtCount = runs.filter((r) => r.kind === 'thinking').length;
-
-  /*
-    beUI labels this "Completed 3 steps" — one count, no breakdown — and
-    draws it as bare text with a chevron, not as a row with an icon and a
-    surface. The `EventLine` wrapper it replaces was the latter, and it made
-    the disclosure look like one of the tool cards it is introducing.
-  */
   const stepCount = toolCount + thoughtCount || renderable.length;
 
   /*
     THE TRACE IS AN ASIDE, AND IT MUST LOOK LIKE ONE.
 
-    This header used to be `text-sm font-medium text-foreground/90` -- the same
-    size and nearly the same colour as the answer under it -- and the opened
-    trace had no edge, so a thought, a tool row and the reply all sat on one
-    left margin in one type scale and the reader could not tell where the work
-    ended and the answer began. Now the header is small muted text, the opened
-    trace hangs off a rail of its own, and the answer keeps the full scale.
+    Drawn as a stack of "Thought" and "bash { json }" rows it read as part of the
+    answer: same type scale, same left margin, nothing to say where the work
+    ended. It is now beUI's `AgentActivity`: the agent's own words as quiet
+    lines, each tool call as "Action  target", and a capped viewport so a long
+    trace scrolls inside itself instead of pushing the answer off screen.
 
-    The elapsed time follows the same rule as a single thought: it only speaks
-    when it has news (see Reasoning), so a fast turn carries no number.
+    The elapsed time only speaks when it has news (see Reasoning), so a fast
+    turn carries no number.
   */
   const elapsedMs = runDuration(renderable);
   const elapsed = elapsedMs && elapsedMs >= TRACE_ELAPSED_MIN_MS ? formatElapsed(elapsedMs) : null;
 
   return (
-    <div className={cn('min-w-0 transition-[margin]', open ? 'mb-4' : 'mb-2')}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="group flex min-w-0 items-center gap-1 rounded-md text-left text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="truncate">
+    <AgentActivity
+      items={items}
+      status="complete"
+      defaultOpen={defaultOpen}
+      collapseOnComplete={false}
+      maxHeight={TRACE_MAX_HEIGHT}
+      duration={(elapsedMs ?? 0) / 1000}
+      summary={
+        <>
           Worked through {stepCount} step{stepCount === 1 ? '' : 's'}
-          {elapsed && <span className="text-muted-foreground/70"> · {elapsed}</span>}
-        </span>
-        <ChevronDown
-          className={cn(
-            'size-3.5 shrink-0 text-muted-foreground/50 transition-transform group-hover:text-muted-foreground',
-            open && 'rotate-180'
-          )}
-        />
-      </button>
-      <AgentDisclosure open={open}>
-        <div className="mt-2 ml-1.5 border-l border-border/80 pl-3">
-          <StepRuns steps={renderable} />
-        </div>
-      </AgentDisclosure>
-    </div>
+          {elapsed && <span className="font-normal text-muted-foreground/70"> · {elapsed}</span>}
+        </>
+      }
+      className="mb-3"
+    />
   );
 });
+
+/** Readable height of an opened trace before it scrolls inside itself. */
+const TRACE_MAX_HEIGHT = 360;
+
+/** The row verb for a tool, in beUI's vocabulary; unknown tools keep their own name. */
+function toolAction(display: string): string {
+  const name = display.toLowerCase();
+  if (/^(read|view|cat|open)/.test(name)) return 'read';
+  if (/(edit|write|patch|replace|create)/.test(name)) return 'edit';
+  if (/(bash|shell|exec|command|terminal|^run)/.test(name)) return 'run';
+  return display;
+}
+
+function prettyToolArgs(args: string): string {
+  const trimmed = args.trim();
+  if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+    try {
+      return JSON.stringify(JSON.parse(trimmed), null, 2);
+    } catch {
+      return args;
+    }
+  }
+  return args;
+}
+
+/**
+ * A finished run of steps as `AgentActivity` rows.
+ *
+ * Thoughts become quiet paragraphs, tool calls become "Action target" rows that
+ * open to their arguments, and everything this mapping does not know (a to-do
+ * list, a subagent tree, a status line) is drawn by the same `SingleStep` the
+ * live trace uses, so nothing that was visible before is lost.
+ */
+function runsToActivity(runs: StepRun[]): AgentActivityItem[] {
+  const items: AgentActivityItem[] = [];
+
+  const pushText = (key: string, text: string) => {
+    text
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean)
+      .forEach((paragraph, i) =>
+        items.push({
+          id: `${key}-${i}`,
+          type: 'text',
+          content: (
+            <div className="min-w-0 text-[13px] leading-relaxed [&_li]:text-muted-foreground [&_p]:my-0 [&_p]:text-muted-foreground">
+              <MarkdownContent content={paragraph} />
+            </div>
+          ),
+        })
+      );
+  };
+
+  const pushStep = (message: WorkspaceMessage, key: string) => {
+    if (isPlaceholderThinking(message)) return;
+    const parsed =
+      message.messageType === 'todos'
+        ? null
+        : isToolCallMessage(message)
+        ? parseMessageStep(message)
+        : message.messageType === 'thinking'
+        ? null
+        : parseStepContent(message.content);
+
+    if (parsed && parsed.type === 'tool_call') {
+      const status = String(message.metadata?.tool_status || '').toLowerCase();
+      items.push({
+        id: key,
+        type: 'tool',
+        action: toolAction(parsed.toolDisplay || 'Tool'),
+        // parseMessageStep appends " · failed" to the summary; the row draws its own badge.
+        target: (parsed.summary || parsed.toolDisplay || 'Tool').replace(/ · failed$/, ''),
+        status: status === 'failed' || status === 'error' ? 'failed' : status === 'blocked' ? 'blocked' : 'ok',
+        detail: parsed.args ? <EventLinePre>{prettyToolArgs(parsed.args)}</EventLinePre> : undefined,
+      });
+      return;
+    }
+    if (message.messageType === 'thinking' && message.content?.trim()) {
+      pushText(key, message.content);
+      return;
+    }
+    items.push({ id: key, type: 'custom', node: <SingleStep message={message} /> });
+  };
+
+  runs.forEach((run, i) => {
+    if (run.kind === 'thinking' || run.kind === 'reply') {
+      pushText(`${run.kind}-${run.messages[0]?.messageId || i}`, joinThoughts(run.messages));
+    } else if (run.kind === 'tools') {
+      run.messages.forEach((m, j) => pushStep(m, `${m.messageId || 'tool'}-${i}-${j}`));
+    } else {
+      pushStep(run.message, `${run.message.messageId || 'step'}-${i}`);
+    }
+  });
+  return items;
+}
 
 // ── Intermediate Steps Group ──
 

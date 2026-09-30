@@ -12,9 +12,11 @@ import {
   Wrench,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useState, type KeyboardEvent } from "react";
 import { EASE_OUT, SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 import type {
+  AgentActivityCustom,
   AgentActivityItem,
   AgentActivitySearch,
   AgentActivityStep,
@@ -175,20 +177,57 @@ function ActionIcon({ action }: { action: string }) {
 }
 
 function ToolRow({ item }: { item: AgentActivityTool }) {
+  const [open, setOpen] = useState(false);
   const action = item.action.charAt(0).toUpperCase() + item.action.slice(1);
+  const failed = item.status === "failed" || item.status === "blocked";
+  const expandable = item.detail != null;
+  const toggle = () => setOpen((value) => !value);
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggle();
+    }
+  };
 
-  return (
-    <div className="flex min-h-8 min-w-0 items-center gap-2.5 rounded-md px-1.5 py-0.5 leading-5">
+  const row = (
+    <div
+      {...(expandable
+        ? {
+            role: "button",
+            tabIndex: 0,
+            "aria-expanded": open,
+            onClick: toggle,
+            onKeyDown,
+          }
+        : {})}
+      className={cn(
+        "flex min-h-8 min-w-0 items-center gap-2.5 rounded-md px-1.5 py-0.5 leading-5",
+        expandable &&
+          "cursor-pointer outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring",
+      )}
+    >
       <span
         aria-hidden="true"
         className="grid size-4 shrink-0 place-items-center text-muted-foreground/70"
       >
         <ActionIcon action={item.action} />
       </span>
-      <span className="shrink-0 font-medium text-foreground/90">{action}</span>
+      <span
+        className={cn(
+          "shrink-0 font-medium",
+          failed ? "text-status-danger" : "text-foreground/90",
+        )}
+      >
+        {action}
+      </span>
       <span className="min-w-0 flex-1 truncate rounded-lg bg-muted/80 px-2.5 py-1 font-mono text-xs text-muted-foreground/70">
         {item.target}
       </span>
+      {failed ? (
+        <span className="shrink-0 text-xs text-status-danger">
+          {item.status === "blocked" ? "blocked" : "failed"}
+        </span>
+      ) : null}
       {typeof item.additions === "number" || typeof item.deletions === "number" ? (
         <span className="flex shrink-0 items-center gap-2 font-mono tabular-nums">
           {typeof item.additions === "number" ? (
@@ -201,6 +240,18 @@ function ToolRow({ item }: { item: AgentActivityTool }) {
       ) : null}
     </div>
   );
+
+  if (!expandable) return row;
+  return (
+    <div>
+      {row}
+      {open ? <div className="mb-1 ml-7 mt-0.5 min-w-0">{item.detail}</div> : null}
+    </div>
+  );
+}
+
+function CustomRow({ item }: { item: AgentActivityCustom }) {
+  return <div className="min-w-0 px-1.5 py-0.5">{item.node}</div>;
 }
 
 function TraceIcon({ kind }: { kind: AgentActivityTrace["kind"] }) {
@@ -238,5 +289,6 @@ export function ActivityRow({ item }: { item: AgentActivityItem }) {
   if (item.type === "search") return <SearchRow item={item} />;
   if (item.type === "tool") return <ToolRow item={item} />;
   if (item.type === "trace") return <TraceRow item={item} />;
+  if (item.type === "custom") return <CustomRow item={item} />;
   return <StepRow item={item} />;
 }

@@ -29,6 +29,7 @@ import type {
 
 export type {
   AgentActivityContentType,
+  AgentActivityCustom,
   AgentActivityItem,
   AgentActivityProps,
   AgentActivitySearch,

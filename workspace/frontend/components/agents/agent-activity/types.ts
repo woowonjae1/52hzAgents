@@ -40,6 +40,17 @@ export interface AgentActivityTool {
   target: ReactNode;
   additions?: number;
   deletions?: number;
+  /** A call that did not succeed draws its action in the danger tone. */
+  status?: "ok" | "failed" | "blocked";
+  /** When present the row opens to show it (arguments, output). */
+  detail?: ReactNode;
+}
+
+/** A row the caller draws itself: a to-do list, a subagent tree, a status line. */
+export interface AgentActivityCustom {
+  id: string;
+  type: "custom";
+  node: ReactNode;
 }
 
 export type AgentTraceKind =
@@ -64,7 +75,8 @@ export type AgentActivityItem =
   | AgentActivityText
   | AgentActivitySearch
   | AgentActivityTool
-  | AgentActivityTrace;
+  | AgentActivityTrace
+  | AgentActivityCustom;
 
 export type AgentActivityContentType = AgentActivityItem["type"] | "mixed";
 
