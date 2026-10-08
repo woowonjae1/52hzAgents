@@ -14,6 +14,7 @@ import { deriveIdentityColor } from '@/lib/identity-colors';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { MarkdownContent } from './markdown-content';
 import { extractThinking } from '@/lib/message-text';
+import { inferArtifact } from '@/lib/artifacts';
 import { ToolCallsDisclosure } from './intermediate-steps';
 import { Reasoning } from '@/components/ai-elements/reasoning';
 import { ToolCard } from '@/components/ai-elements/tool-card';
@@ -578,106 +579,8 @@ export const ChatMessage = memo(function ChatMessage({
 
   // Extract or infer structured artifact for Canvas (code deliverables, standalone HTML/SVG, explicit artifact tags/metadata)
   // Conversational Q&A, markdown text answers, explanations, and lists are NEVER turned into artifacts.
-  const inferredArtifact = useMemo<ArtifactItem | null>(() => {
-    if (message.senderType !== 'agent' || !cleanContent) return null;
-
-    // 1. Explicit metadata artifact from backend or tool execution
-    if (message.metadata?.artifact && typeof message.metadata.artifact === 'object') {
-      const meta = message.metadata.artifact as Partial<ArtifactItem>;
-      if (meta.title && meta.content) {
-        return {
-          id: meta.id || `art-${message.messageId}`,
-          title: meta.title,
-          type: meta.type || 'markdown',
-          content: meta.content,
-          authorAgent: meta.authorAgent || message.senderName,
-          sourceMessageId: message.messageId,
-          updatedAt: typeof message.createdAt === 'number' ? message.createdAt : Date.now(),
-          filePath: meta.filePath,
-        };
-      }
-    }
-
-    // 2. Explicit <artifact ...> or <antArtifact ...> markup tags
-    const artifactTagMatch = cleanContent.match(/<(?:artifact|antArtifact)\s+([^>]*?)>([\s\S]*?)<\/(?:artifact|antArtifact)>/i);
-    if (artifactTagMatch) {
-      const attrs = artifactTagMatch[1];
-      const body = artifactTagMatch[2].trim();
-      const titleMatch = attrs.match(/title="([^"]+)"/i);
-      const typeMatch = attrs.match(/type="([^"]+)"/i);
-      const identifierMatch = attrs.match(/identifier="([^"]+)"/i);
-      return {
-        id: identifierMatch ? identifierMatch[1] : `art-${message.messageId}`,
-        title: titleMatch ? titleMatch[1] : `${message.senderName} Deliverable`,
-        type: (typeMatch?.[1] === 'code' ? 'code' : 'markdown') as 'code' | 'markdown',
-        content: body,
-        authorAgent: message.senderName,
-        sourceMessageId: message.messageId,
-        updatedAt: typeof message.createdAt === 'number' ? message.createdAt : Date.now(),
-      };
-    }
-
-    // 3. Standalone HTML / SVG deliverables
-    if (
-      cleanContent.includes('<!DOCTYPE html>') ||
-      (cleanContent.includes('<html') && cleanContent.includes('</html>')) ||
-      (cleanContent.includes('<svg xmlns="http://www.w3.org/2000/svg"') && cleanContent.includes('</svg>'))
-    ) {
-      const isSvg = cleanContent.includes('<svg');
-      return {
-        id: `art-${message.messageId}`,
-        title: isSvg ? `${message.senderName} Vector Graphic (SVG)` : `${message.senderName} Webpage Deliverable`,
-        type: 'code',
-        language: isSvg ? 'svg' : 'html',
-        content: cleanContent,
-        authorAgent: message.senderName,
-        sourceMessageId: message.messageId,
-        updatedAt: typeof message.createdAt === 'number' ? message.createdAt : Date.now(),
-      };
-    }
-
-    // 4. Standalone Code File Deliverable:
-    // Only when the message contains a code block explicitly tagged with a filename (e.g. ```tsx:App.tsx or ```python:main.py)
-    // or has a file header comment like `// filename: ...`, OR is a large standalone code block (>= 30 lines) that dominates the message (>= 75% code).
-    const codeBlocks = Array.from(cleanContent.matchAll(/```([a-zA-Z0-9_\-\.\/]+)?\n([\s\S]*?)```/g));
-    if (codeBlocks.length === 1) {
-      const match = codeBlocks[0];
-      const fenceTag = (match[1] || '').trim();
-      const codeBody = match[2].trim();
-      const lineCount = codeBody.split('\n').length;
-      const isNamedFile = /\.[a-zA-Z0-9]{1,6}$/.test(fenceTag);
-      const fileHeaderMatch = codeBody.match(/^(?:\/\/|#|--|\/\*)\s*(?:file(?:name)?|path):\s*([a-zA-Z0-9_\-\.\/]+)/im);
-      const isDominantCode = lineCount >= 30 && (codeBody.length / cleanContent.length) >= 0.75;
-
-      if (isNamedFile || fileHeaderMatch || isDominantCode) {
-        const title = isNamedFile
-          ? fenceTag
-          : fileHeaderMatch
-          ? fileHeaderMatch[1].trim()
-          : `${message.senderName} Code File`;
-        const language = fenceTag.includes(':')
-          ? fenceTag.split(':')[0]
-          : fenceTag.includes('.')
-          ? fenceTag.split('.').pop() || 'code'
-          : fenceTag || 'code';
-
-        return {
-          id: `art-${message.messageId}`,
-          title,
-          type: 'code',
-          language,
-          content: codeBody,
-          filePath: isNamedFile ? fenceTag : fileHeaderMatch ? fileHeaderMatch[1].trim() : undefined,
-          authorAgent: message.senderName,
-          sourceMessageId: message.messageId,
-          updatedAt: typeof message.createdAt === 'number' ? message.createdAt : Date.now(),
-        };
-      }
-    }
-
-    // 5. Normal markdown text, explanations, lists, Q&A: NEVER an artifact
-    return null;
-  }, [message.messageId, message.senderName, message.senderType, message.createdAt, message.metadata?.artifact, cleanContent]);
+  // Shared with the Outputs panel, which lists the same documents (lib/artifacts.ts).
+  const inferredArtifact = useMemo(() => inferArtifact(message, cleanContent), [message, cleanContent]);
 
   // Detect system errors or daemon interruptions (only for short runtime error notices, not content responses)
   const isErrorMessage = useMemo(() => {

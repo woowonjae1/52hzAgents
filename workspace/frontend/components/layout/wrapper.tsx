@@ -119,7 +119,14 @@ function WrapperInner() {
 
   const { isMobile, viewMode, isAgentPanelOpen, isSidebarOpen, sidebarToggle, setSidebarOpen, isSidebarResizing, isDetailExpanded, mobilePane, splitBrowser, showBrowserPreview, activeRightTab, setActiveRightTab } = useLayout();
   const { monitorMode, loading, workspace, currentSessionId } = useWorkspace();
-  const { activeArtifact, isCanvasOpen, closeCanvas } = useArtifacts();
+  const { isCanvasOpen, closeCanvas, openSeq } = useArtifacts();
+
+  // Opening an output from anywhere brings the panel forward, whatever Studio
+  // tab was showing. Without it, "Open in Canvas" with Preview up changed
+  // nothing visible.
+  React.useEffect(() => {
+    if (openSeq > 0) setActiveRightTab('canvas');
+  }, [openSeq, setActiveRightTab]);
   /*
     HOME IS WHERE A WINDOW WITH NO OPEN SESSION LANDS.
 
@@ -162,7 +169,7 @@ function WrapperInner() {
   const effectiveStudioTab =
     activeRightTab !== null
       ? activeRightTab
-      : isCanvasOpen && activeArtifact
+      : isCanvasOpen
       ? 'canvas'
       : null;
 
@@ -401,7 +408,7 @@ function WrapperInner() {
                   </Hint>
 
                   {/* Studio Header Bar (Rendered when not in canvas mode; Canvas provides its own unified 38px header) */}
-                  {effectiveStudioTab !== 'canvas' && (
+                  {effectiveStudioTab !== 'canvas' && effectiveStudioTab !== 'file' && (
                     /*
                       `.app-header` already owns the fill and the underline for
                       every top-level header in the app — that is the whole
@@ -413,16 +420,15 @@ function WrapperInner() {
                     */
                     <div className="app-header justify-between px-3 shrink-0 flex-nowrap select-none">
                       <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
-                        {activeArtifact && (
-                          <button
-                            type="button"
-                            onClick={() => setActiveRightTab('canvas')}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2"
-                          >
-                            <FileText className="size-3.5" />
-                            <span>Canvas</span>
-                          </button>
-                        )}
+                        {/* Always reachable: the thread's outputs exist whether or not one was just opened. */}
+                        <button
+                          type="button"
+                          onClick={() => setActiveRightTab('canvas')}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2"
+                        >
+                          <FileText className="size-3.5" />
+                          <span>Outputs</span>
+                        </button>
                         {/*
                           THE CLOSE BUTTON LIVES ON THE TAB, AND SHOWS ON HOVER.
 
@@ -468,9 +474,9 @@ function WrapperInner() {
 
                   {/* Studio Content Pane */}
                   <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
-                    {effectiveStudioTab === 'canvas' && <ArtifactsCanvas embedded />}
+                    {/* Canvas and File are one panel now: the outputs list with its viewer. */}
+                    {(effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file') && <ArtifactsCanvas embedded />}
                     {effectiveStudioTab === 'preview' && <LocalPreview />}
-                    {effectiveStudioTab === 'file' && <FilePreview />}
 
                     {/*
                       Trace is gone. It rendered the same messages as the chat

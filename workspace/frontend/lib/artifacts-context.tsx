@@ -1,120 +1,60 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import type { ArtifactItem } from '@/lib/artifacts';
 
-export interface ArtifactAnnotation {
-  id: string;
-  authorAgent: string; // e.g. "claude", "antigravity"
-  title?: string;
-  type: 'comment' | 'suggestion' | 'diff' | 'review';
-  paragraphIndex?: number;
-  content: string;
-  suggestedText?: string;
-  createdAt: number;
-}
+export type { ArtifactItem, ArtifactKind, ArtifactGroup } from '@/lib/artifacts';
 
-export interface ArtifactItem {
-  id: string;
-  title: string;
-  type: 'markdown' | 'code' | 'deliverable' | 'diff';
-  language?: string;
-  content: string;
-  authorAgent?: string;
-  filePath?: string;
-  updatedAt: number;
-  sourceMessageId?: string;
-  annotations?: ArtifactAnnotation[];
-  version?: number;
-}
+/*
+  WHICH OUTPUT THE OUTPUTS PANEL IS SHOWING.
+
+  The panel lists every output of the current thread (derived from its
+  messages -- see lib/artifacts.ts), so this holds only the selection, never a
+  copy of the content. What used to live here -- an annotations store that was
+  never sent anywhere, an unused history and an edit function with no caller --
+  is gone with the review layer it backed.
+*/
+export type OutputSelection =
+  | { kind: 'document'; key: string; versionId?: string }
+  | { kind: 'change'; path: string; turnId: string }
+  | { kind: 'file' };
 
 interface ArtifactsContextValue {
-  activeArtifact: ArtifactItem | null;
+  selection: OutputSelection | null;
   isCanvasOpen: boolean;
-  artifactsHistory: ArtifactItem[];
+  /** Bumped on every explicit open, so the shell can bring the panel forward. */
+  openSeq: number;
+  /** Open a document (any version of it) from the transcript. */
   openArtifact: (artifact: ArtifactItem) => void;
+  openOutput: (selection: OutputSelection) => void;
   closeCanvas: () => void;
   toggleCanvas: () => void;
-  addAnnotation: (artifactId: string, annotation: Omit<ArtifactAnnotation, 'id' | 'createdAt'>) => void;
-  updateArtifactContent: (artifactId: string, newContent: string) => void;
 }
 
 const ArtifactsContext = createContext<ArtifactsContextValue | null>(null);
 
 export function ArtifactsProvider({ children }: { children: React.ReactNode }) {
-  const [activeArtifact, setActiveArtifact] = useState<ArtifactItem | null>(null);
+  const [selection, setSelection] = useState<OutputSelection | null>(null);
   const [isCanvasOpen, setIsCanvasOpen] = useState(false);
-  const [artifactsHistory, setArtifactsHistory] = useState<ArtifactItem[]>([]);
+  const [openSeq, setOpenSeq] = useState(0);
 
-  const openArtifact = useCallback((artifact: ArtifactItem) => {
-    setActiveArtifact(artifact);
+  const openOutput = useCallback((next: OutputSelection) => {
+    setSelection(next);
     setIsCanvasOpen(true);
-    setArtifactsHistory((prev) => {
-      const idx = prev.findIndex((a) => a.id === artifact.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = artifact;
-        return next;
-      }
-      return [artifact, ...prev];
-    });
+    setOpenSeq((n) => n + 1);
   }, []);
 
-  const closeCanvas = useCallback(() => {
-    setIsCanvasOpen(false);
-  }, []);
+  const openArtifact = useCallback(
+    (artifact: ArtifactItem) => openOutput({ kind: 'document', key: artifact.key, versionId: artifact.id }),
+    [openOutput]
+  );
 
-  const toggleCanvas = useCallback(() => {
-    setIsCanvasOpen((prev) => !prev);
-  }, []);
-
-  const addAnnotation = useCallback((artifactId: string, ann: Omit<ArtifactAnnotation, 'id' | 'createdAt'>) => {
-    const fullAnn: ArtifactAnnotation = {
-      ...ann,
-      id: `ann-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      createdAt: Date.now(),
-    };
-
-    setActiveArtifact((prev) => {
-      if (!prev || prev.id !== artifactId) return prev;
-      return {
-        ...prev,
-        annotations: [...(prev.annotations || []), fullAnn],
-      };
-    });
-
-    setArtifactsHistory((prevList) =>
-      prevList.map((item) =>
-        item.id === artifactId
-          ? { ...item, annotations: [...(item.annotations || []), fullAnn] }
-          : item
-      )
-    );
-  }, []);
-
-  const updateArtifactContent = useCallback((artifactId: string, newContent: string) => {
-    setActiveArtifact((prev) => {
-      if (!prev || prev.id !== artifactId) return prev;
-      return {
-        ...prev,
-        content: newContent,
-        updatedAt: Date.now(),
-        version: (prev.version || 1) + 1,
-      };
-    });
-  }, []);
+  const closeCanvas = useCallback(() => setIsCanvasOpen(false), []);
+  const toggleCanvas = useCallback(() => setIsCanvasOpen((prev) => !prev), []);
 
   const value = useMemo(
-    () => ({
-      activeArtifact,
-      isCanvasOpen,
-      artifactsHistory,
-      openArtifact,
-      closeCanvas,
-      toggleCanvas,
-      addAnnotation,
-      updateArtifactContent,
-    }),
-    [activeArtifact, isCanvasOpen, artifactsHistory, openArtifact, closeCanvas, toggleCanvas, addAnnotation, updateArtifactContent]
+    () => ({ selection, isCanvasOpen, openSeq, openArtifact, openOutput, closeCanvas, toggleCanvas }),
+    [selection, isCanvasOpen, openSeq, openArtifact, openOutput, closeCanvas, toggleCanvas]
   );
 
   return <ArtifactsContext.Provider value={value}>{children}</ArtifactsContext.Provider>;

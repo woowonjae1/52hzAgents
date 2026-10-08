@@ -13,8 +13,8 @@ export function ArtifactInlineCard({
   artifact: ArtifactItem;
   className?: string;
 }) {
-  const { openArtifact, activeArtifact, isCanvasOpen } = useArtifacts();
-  const isActive = isCanvasOpen && activeArtifact?.id === artifact.id;
+  const { openArtifact, selection, isCanvasOpen } = useArtifacts();
+  const isActive = isCanvasOpen && selection?.kind === 'document' && selection.key === artifact.key;
 
   /*
    * The first two lines of prose, with the markdown taken off.
