@@ -3,7 +3,7 @@
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { BookPlus, Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
+import { BookPlus, Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil, Clock, PlayCircle, AlertTriangle, Info, ChevronDown } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { copyWithToast } from '@/lib/desktop';
 import { SignalMark } from '@/components/brand/signal-mark';
@@ -250,6 +250,102 @@ function isCurrentHumanMessage(message: WorkspaceMessage, currentUser: { id: str
   const currentUserName = currentUser.name.trim().toLocaleLowerCase();
   const senderName = message.senderName.trim().toLocaleLowerCase();
   return Boolean(currentUserName && senderName === currentUserName);
+}
+
+/*
+  SYSTEM NOTICES (pipeline supervisor, routines, parallel runs, status).
+
+  These used to be one centred monospace line with the content as plain text:
+  backticks, `**` and `###` showed raw, a long message became a centred block
+  of monospace prose, and the supervisor's "queue finished" notice -- which
+  carries the whole forwarded task for the agent -- printed that entire task
+  into the transcript. The queued styling never applied either: it looked for
+  the English word "queued" in content the backend writes in Chinese.
+
+  Now: an icon chosen from metadata (falling back to the content's leading
+  emoji, which is dropped -- the UI uses icons, not emoji), the sender as a
+  small label, the text rendered as markdown, and anything after the first
+  paragraph (the forwarded task) folded behind a toggle. The agent still
+  receives the full message; only the display is shorter.
+*/
+const LEADING_EMOJI = /^\s*(\p{Extended_Pictographic})\uFE0F?\s*/u;
+const LONG_NOTICE_CHARS = 280;
+
+function SystemNotice({
+  message,
+  agentNames,
+  workingDir,
+}: {
+  message: WorkspaceMessage;
+  agentNames: string[];
+  workingDir?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const raw = (message.content || '').trim();
+  const emoji = raw.match(LEADING_EMOJI)?.[1];
+  const content = raw.replace(LEADING_EMOJI, '');
+  const meta = (message.metadata || {}) as Record<string, unknown>;
+
+  const kind: 'started' | 'queued' | 'warning' | 'info' = meta.queued_wake
+    ? 'started'
+    : emoji === '⏳' || /排队中|queued/i.test(content)
+      ? 'queued'
+      : emoji === '⚠' || emoji === '❌' || emoji === '🛑'
+        ? 'warning'
+        : 'info';
+  const Icon = { started: PlayCircle, queued: Clock, warning: AlertTriangle, info: Info }[kind];
+
+  // First paragraph is the notice; the rest (a forwarded task) is detail.
+  const split = content.search(/\n\s*\n/);
+  const summary = split >= 0 ? content.slice(0, split).trim() : content;
+  const detail = split >= 0 ? content.slice(split).trim() : '';
+  const longSummary = !detail && summary.length > LONG_NOTICE_CHARS;
+  const canExpand = !!detail || longSummary;
+
+  const timestamp = message.createdAt
+    ? new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : '';
+
+  return (
+    <div className="py-1.5">
+      <div
+        className={cn(
+          'rounded-lg border bg-surface1/60 px-3 py-2 text-xs text-muted-foreground',
+          kind === 'warning' ? 'border-status-warning/30' : 'border-border/60'
+        )}
+      >
+        <div className="flex items-center gap-1.5 text-2xs leading-none select-none">
+          <Icon className={cn('size-3.5 shrink-0', kind === 'warning' ? 'text-status-warning' : 'text-foreground-extra-muted')} />
+          <span className="font-medium text-foreground-muted">{message.senderName}</span>
+          {timestamp && <span className="ml-auto tabular-nums text-foreground-extra-muted">{timestamp}</span>}
+        </div>
+        <div
+          className={cn(
+            'mt-1.5 pl-5 [&_.markdown-content]:text-xs [&_p]:my-0',
+            longSummary && !open && 'line-clamp-3'
+          )}
+        >
+          <MarkdownContent content={summary} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
+        </div>
+        {open && detail && (
+          <div className="mt-2 ml-5 max-h-96 overflow-y-auto rounded-md border border-border/50 bg-surface0/60 px-3 py-2 [&_.markdown-content]:text-xs">
+            <MarkdownContent content={detail} agentNames={agentNames} sessionId={message.sessionId} workingDir={workingDir} />
+          </div>
+        )}
+        {canExpand && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="mt-1.5 ml-5 inline-flex items-center gap-1 text-2xs text-foreground-muted hover:text-foreground"
+          >
+            <ChevronDown className={cn('size-3 transition-transform', open && 'rotate-180')} />
+            {open ? 'Hide' : detail ? 'Show forwarded task' : 'Show more'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -724,20 +820,7 @@ export const ChatMessage = memo(function ChatMessage({
   }
 
   if (isSystem) {
-    const isQueued = message.content.includes('queued');
-    return (
-      <div className="flex justify-center py-2 my-0.5">
-        <span className={cn(
-          'text-xs font-mono px-3 py-1 rounded-md border border-border/60 bg-surface1/60 inline-flex items-center gap-1.5 max-w-xl text-center',
-          isQueued
-            ? 'text-foreground-muted'
-            : 'text-muted-foreground'
-        )}>
-          <span className="font-semibold text-foreground-extra-muted">{message.senderName}:</span>
-          <span>{message.content}</span>
-        </span>
-      </div>
-    );
+    return <SystemNotice message={message} agentNames={agentNames} workingDir={workingDir} />;
   }
 
   // ── User Messages (Modern ChatGPT/Claude Refined Bubble Card) ──
