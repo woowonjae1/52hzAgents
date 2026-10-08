@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
+import { copyWithToast } from '@/lib/desktop';
 import {
   EventLine,
   EventLineAction,
@@ -120,10 +121,11 @@ export function ToolCard({
     e.stopPropagation();
     const textToCopy = toolOutput || error || inputStr || '';
     if (!textToCopy) return;
-    navigator.clipboard.writeText(textToCopy);
-    setCopied(true);
-    toast.success('Tool output copied');
-    setTimeout(() => setCopied(false), 2000);
+    void copyWithToast(textToCopy, 'Tool output copied').then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   return (

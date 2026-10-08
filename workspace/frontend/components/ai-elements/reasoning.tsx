@@ -3,6 +3,7 @@
 import { Brain, Copy, Check, Sparkles } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from '@/lib/toast';
+import { copyWithToast } from '@/lib/desktop';
 import { MarkdownContent } from '@/components/chat/markdown-content';
 import { EventLine, EventLineAction } from './event-line';
 import { ThinkingShimmer } from '@/components/agents/loading-states/thinking-shimmer';
@@ -53,10 +54,11 @@ export function Reasoning({
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!content) return;
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    toast.success('Reasoning process copied');
-    setTimeout(() => setCopied(false), 2000);
+    void copyWithToast(content, 'Reasoning process copied').then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   if (!content && !isStreaming) return null;

@@ -1904,16 +1904,19 @@ export function ChatView() {
                 isWorking={!!currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId))}
                 stopping={!!currentSessionId && stoppingSessionIds.has(currentSessionId)}
                 onStop={() => currentSessionId && stopAllAgents(currentSessionId)}
-                disabled={!currentUser.name.trim() || !canChatInCurrentSession}
-                disabledReason={
-                  !currentUser.name.trim()
-                    ? 'Set your username in settings to start chatting'
-                    : !canChatInCurrentSession
+                disabled={!currentUser.name.trim()}
+                disabledReason={!currentUser.name.trim() ? 'Set your username in settings to start chatting' : undefined}
+                // Offline agents block SENDING only: the box stays editable so a
+                // message can be drafted while you bring an agent back.
+                sendBlockedReason={
+                  !canChatInCurrentSession
                     ? (hasSpecificParticipants
-                        ? 'All participant agents in this thread are currently offline'
-                        : 'No agents are currently online in this workspace')
+                        ? 'All participant agents in this thread are offline. Connect one to send.'
+                        : 'No agents are online in this workspace. Connect one to send.')
                     : undefined
                 }
+                // The offline banner right above already says this.
+                suppressSendBlockedNotice={isMissingParticipant}
               />
             </div>
           </div>

@@ -13,6 +13,22 @@ interface UsePollingOptions {
 }
 
 /** Parse a DM session ID like "dm:agentA,agentB" into agent addresses. */
+/** History walk: page size after the first request, and the most one call fetches. */
+const BACKFILL_PAGE = 200;
+const BACKFILL_MAX_EVENTS = 1000;
+
+function isHumanMessage(m: WorkspaceMessage): boolean {
+  return m.senderType === 'human' || m.senderType === 'user';
+}
+
+/**
+ * Renders as its own row in the transcript. Thinking, status and todos events
+ * fold into their turn's existing step group, so loading them adds nothing.
+ */
+function isRowMessage(m: WorkspaceMessage): boolean {
+  return m.messageType !== 'thinking' && m.messageType !== 'status' && m.messageType !== 'todos';
+}
+
 function parseDMSession(sessionId: string | null): [string, string] | null {
   if (!sessionId?.startsWith('dm:')) return null;
   const parts = sessionId.slice(3).split(',', 2);
@@ -149,37 +165,76 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
   // Load recent history (newest messages first, then reverse for display)
   const dmPair = useMemo(() => parseDMSession(sessionId), [sessionId]);
 
+  /*
+    WALK BACK UNTIL THE PAGE HAS SOMETHING TO SHOW.
+
+    History is paged by raw events, and an agent turn is mostly events nobody
+    sees as rows: every streamed thinking chunk, tool call and status line is
+    one event, folded into the turn's single "Thought" group. A long turn is
+    hundreds of them. So the newest 50 events were often all one turn: the
+    thread opened on the agent's answer without the question that prompted it,
+    and "Load older messages" fetched 30 more chunks of the same turn -- four
+    clicks in a row with nothing changing on screen.
+
+    Both paths now keep paging (BACKFILL_PAGE events at a time, at most
+    BACKFILL_MAX_EVENTS per call) until `enough` says the loaded batch holds
+    what the user came for. Returns null if the session changed mid-walk.
+  */
+  const walkBack = useCallback(
+    async (start: string | undefined, firstLimit: number, enough: (batch: WorkspaceMessage[]) => boolean) => {
+      if (!sessionId) return null;
+      let before = start;
+      let limit = firstLimit;
+      let fetched = 0;
+      let hasMore = true;
+      let batch: WorkspaceMessage[] = [];
+      for (;;) {
+        const result = dmPair
+          ? await workspaceApi.pollConversation(dmPair[0], dmPair[1], { before, sort: 'desc', limit })
+          : await workspaceApi.loadMessageHistory(sessionId, { before, limit });
+        if (sessionId !== currentSessionRef.current) return null;
+        // Newest-first from sort=desc; reverse for chronological order. Older
+        // pages go in front of what is already collected.
+        batch = [...eventsToScopedMessages(result.events, sessionId, dmPair).reverse(), ...batch];
+        fetched += result.events.length;
+        hasMore = result.has_more && result.events.length > 0;
+        // The cursor is the oldest RAW event, so a page that scoping emptied
+        // (DM traffic for other pairs) still moves the walk on.
+        if (result.events.length > 0) before = eventToMessage(result.events[result.events.length - 1]).messageId;
+        if (!hasMore || fetched >= BACKFILL_MAX_EVENTS || enough(batch)) break;
+        limit = BACKFILL_PAGE;
+      }
+      return { batch, hasMore, oldestCursor: before ?? null };
+    },
+    [sessionId, dmPair]
+  );
+
   const loadHistory = useCallback(async () => {
     if (!sessionId) return;
 
     setLoading(true);
     setError(null);
     try {
-      const result = dmPair
-        ? await workspaceApi.pollConversation(dmPair[0], dmPair[1], { sort: 'desc', limit: 50 })
-        : await workspaceApi.loadMessageHistory(sessionId, { limit: 50 });
+      // Far enough back to include the user's latest message, so the thread
+      // never opens on an answer whose question is out of view.
+      const walked = await walkBack(undefined, 50, (batch) => batch.some(isHumanMessage));
+      if (!walked) return;
 
-      // Discard if session changed
-      if (sessionId !== currentSessionRef.current) return;
-
-      if (result.events.length > 0) {
-        // Events come newest-first from sort=desc, reverse for chronological display
-        const historicMessages = eventsToScopedMessages(result.events, sessionId, dmPair).reverse();
+      if (walked.batch.length > 0) {
+        const historicMessages = walked.batch;
         setMessages((prev) => {
           if (prev.length === 0) return historicMessages;
           return deduplicateAndSortMessages([...historicMessages, ...prev]);
         });
 
-        if (historicMessages.length > 0) {
-          if (!oldestIdRef.current) {
-            oldestIdRef.current = historicMessages[0].messageId;
-          }
-          const lastHistoric = historicMessages[historicMessages.length - 1];
-          if (!newestIdRef.current) {
-            newestIdRef.current = lastHistoric.messageId;
-          }
+        // The walk reached at least as far back as any seed (cache/snapshot
+        // hold the tail only), so its cursor is where "older" starts.
+        oldestIdRef.current = walked.oldestCursor ?? historicMessages[0].messageId;
+        const lastHistoric = historicMessages[historicMessages.length - 1];
+        if (!newestIdRef.current) {
+          newestIdRef.current = lastHistoric.messageId;
         }
-        setHasOlder(historicMessages.length > 0 && result.has_more);
+        setHasOlder(walked.hasMore);
         setGeneration((g) => g + 1);
       } else {
         setMessages((prev) => (prev.length > 0 ? prev : []));
@@ -193,7 +248,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     } finally {
       setLoading(false);
     }
-  }, [sessionId, dmPair]);
+  }, [sessionId, walkBack]);
 
   // Forward poll: fetch new messages since the newest known
   const poll = useCallback(async () => {
@@ -249,36 +304,22 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
 
     setLoadingOlder(true);
     try {
-      const result = dmPair
-        ? await workspaceApi.pollConversation(dmPair[0], dmPair[1], {
-            before: oldestIdRef.current ?? undefined,
-            sort: 'desc',
-            limit: 30,
-          })
-        : await workspaceApi.loadMessageHistory(sessionId, {
-            before: oldestIdRef.current ?? undefined,
-            limit: 30,
-          });
+      // One click must change what is on screen: keep going until the batch
+      // holds at least one message that renders as its own row.
+      const walked = await walkBack(oldestIdRef.current ?? undefined, 50, (batch) => batch.some(isRowMessage));
+      if (!walked) return;
 
-      if (sessionId !== currentSessionRef.current) return;
-
-      if (result.events.length > 0) {
-        const olderMessages = eventsToScopedMessages(result.events, sessionId, dmPair).reverse();
-        oldestIdRef.current = olderMessages.length > 0 ? olderMessages[0].messageId : oldestIdRef.current;
-        setHasOlder(olderMessages.length > 0 && result.has_more);
-
-        setMessages((prev) => {
-          return deduplicateAndSortMessages([...olderMessages, ...prev]);
-        });
-      } else {
-        setHasOlder(false);
+      if (walked.oldestCursor) oldestIdRef.current = walked.oldestCursor;
+      setHasOlder(walked.hasMore);
+      if (walked.batch.length > 0) {
+        setMessages((prev) => deduplicateAndSortMessages([...walked.batch, ...prev]));
       }
     } catch {
       // Best-effort
     } finally {
       setLoadingOlder(false);
     }
-  }, [sessionId, hasOlder, loadingOlder, dmPair]);
+  }, [sessionId, hasOlder, loadingOlder, walkBack]);
 
   const sseFailedRef = useRef(false);
   const sseRetryCountRef = useRef(0);

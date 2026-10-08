@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { BookPlus, Copy, Check, X, User, FileIcon, Download, Eye, GitBranch, Sparkles, AlertCircle, Quote, FileCode, RotateCw , Pencil} from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { copyWithToast } from '@/lib/desktop';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
@@ -665,13 +666,11 @@ export const ChatMessage = memo(function ChatMessage({
       .replace(/^(\s*)[*+-]\s+/gm, '$1')
       .replace(/^(\s*)\d+\.\s+/gm, '$1')
       .trim();
-    navigator.clipboard.writeText(plain || raw);
-    toast.success('Plain text copied');
+    void copyWithToast(plain || raw, 'Plain text copied');
   }, [cleanContent, message.content]);
 
   const handleCopyMarkdown = useCallback(() => {
-    navigator.clipboard.writeText(message.content);
-    toast.success('Markdown source copied');
+    void copyWithToast(message.content, 'Markdown source copied');
   }, [message.content]);
 
   // Nothing is written here: the editor opens on the message text and the
@@ -687,8 +686,7 @@ export const ChatMessage = memo(function ChatMessage({
     if (onQuoteReply) {
       onQuoteReply(message);
     } else {
-      navigator.clipboard.writeText(`> ${message.content.slice(0, 200)}...\n\n@${message.senderName} `);
-      toast.success('Quote copied to clipboard');
+      void copyWithToast(`> ${message.content.slice(0, 200)}...\n\n@${message.senderName} `, 'Quote copied to clipboard');
     }
   }, [onQuoteReply, message]);
 

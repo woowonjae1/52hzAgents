@@ -3,6 +3,7 @@
 import { BookPlus, Copy, Check, RotateCw, Download, FileText, Sparkles, Quote } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
+import { copyWithToast } from '@/lib/desktop';
 import { downloadBlob } from '@/lib/download';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -45,10 +46,11 @@ export function MessageActions({
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!content) return;
-    navigator.clipboard.writeText(content);
-    setCopied(true);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopied(false), 2000);
+    void copyWithToast(content, 'Copied to clipboard').then((ok) => {
+      if (!ok) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
 

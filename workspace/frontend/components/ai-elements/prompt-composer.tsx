@@ -107,6 +107,15 @@ export interface PromptComposerProps {
   onSend: (content: string, mentions: string[], files: PendingFile[], segments?: MentionSegment[]) => void;
   disabled?: boolean;
   disabledReason?: string;
+  /**
+   * Nobody can receive a message right now (e.g. every agent in the thread is
+   * offline). Unlike `disabled`, the box stays editable -- a draft can be
+   * written and files attached while waiting -- only sending is refused, and
+   * Enter says why instead of doing nothing.
+   */
+  sendBlockedReason?: string;
+  /** The caller already shows `sendBlockedReason` (a banner above), so do not repeat it here. */
+  suppressSendBlockedNotice?: boolean;
   className?: string;
   agents?: WorkspaceAgent[];
   knowledge?: KnowledgeEntry[];
@@ -135,6 +144,8 @@ export function PromptComposer({
   onSend,
   disabled,
   disabledReason,
+  sendBlockedReason,
+  suppressSendBlockedNotice = false,
   className,
   agents = [],
   knowledge = [],
@@ -550,6 +561,11 @@ export function PromptComposer({
   const handleSend = () => {
     const trimmed = message.trim();
     if ((!trimmed && pendingFiles.length === 0) || disabled) return;
+    if (sendBlockedReason) {
+      // The draft is kept; say why it did not go rather than swallowing Enter.
+      toast.info(sendBlockedReason);
+      return;
+    }
 
     lastSendTimeRef.current = Date.now();
     const segments = extractMentionSegments(trimmed, agents);
@@ -646,8 +662,12 @@ export function PromptComposer({
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
-      const isMobile = typeof window !== 'undefined' && (window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 768);
-      if (isMobile) {
+      // On a touch keyboard Return is the only way to get a newline, so it
+      // stays a newline there. Decided by the input device, not the width:
+      // a desktop window dragged narrow still has a hardware keyboard, and
+      // Enter silently stopped sending in it.
+      const isTouchKeyboard = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
+      if (isTouchKeyboard) {
         return;
       }
       e.preventDefault();
@@ -655,7 +675,8 @@ export function PromptComposer({
     }
   };
 
-  const canSend = (message.trim().length > 0 || pendingFiles.length > 0) && !disabled;
+  const canSend = (message.trim().length > 0 || pendingFiles.length > 0) && !disabled && !sendBlockedReason;
+  const notice = disabled ? disabledReason : !suppressSendBlockedNotice ? sendBlockedReason : undefined;
   const showHint = isFocused && !message.trim() && pendingFiles.length === 0 && !isWorking;
 
   return (
@@ -985,10 +1006,10 @@ export function PromptComposer({
           )}
         </AnimatePresence>
 
-        {disabled && disabledReason && (
+        {notice && (
           <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-status-warning bg-status-warning/10 border-b border-status-warning/20 rounded-t-xl select-none">
             <Info className="size-3.5 shrink-0" />
-            <span>{disabledReason}</span>
+            <span>{notice}</span>
           </div>
         )}
 
@@ -1161,7 +1182,7 @@ export function PromptComposer({
 
             {(!isWorking || canSend) && (
               <Magnetic strength={0.2}>
-                <Hint label={isWorking ? 'Queue message (Enter)' : 'Send message (Enter)'}>
+                <Hint label={sendBlockedReason ? sendBlockedReason : isWorking ? 'Queue message (Enter)' : 'Send message (Enter)'}>
                   <button
                     type="button"
                     onClick={handleSend}

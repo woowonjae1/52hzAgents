@@ -162,6 +162,20 @@ export function getBridge(): ElectronBridge | null {
  * Robust clipboard copy that uses the desktop bridge when available and
  * falls back cleanly to the browser navigator.clipboard.
  */
+/**
+ * Copy, then report what actually happened. The copy buttons used to fire
+ * `navigator.clipboard.writeText` without waiting and toast success at once,
+ * so a refused write (no focus, non-secure origin, permission) still said
+ * "copied". Resolves to whether the text reached the clipboard.
+ */
+export async function copyWithToast(text: string, successMessage: string): Promise<boolean> {
+  const ok = await copyTextToClipboard(text);
+  const { toast } = await import('@/lib/toast');
+  if (ok) toast.success(successMessage);
+  else toast.error('Could not copy to the clipboard');
+  return ok;
+}
+
 export async function copyTextToClipboard(text: string): Promise<boolean> {
   const bridge = getBridge();
   if (bridge?.writeClipboard) {
