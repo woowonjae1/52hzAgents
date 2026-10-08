@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -153,8 +153,22 @@ export function CreateRoutineDialog({
     return `${abs} · ${rel}`;
   }, [nextFireAt]);
 
+  const prevOpenRef = useRef(false);
+  const prevRoutineIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      prevOpenRef.current = false;
+      return;
+    }
+    const isNewOpen = !prevOpenRef.current;
+    const routineId = routine ? (routine as any).id || (routine as any).routineId || routine.name : null;
+    const isRoutineChanged = prevRoutineIdRef.current !== routineId;
+
+    if (!isNewOpen && !isRoutineChanged) return;
+
+    prevOpenRef.current = true;
+    prevRoutineIdRef.current = routineId;
     setSubmitting(false);
     setError(null);
 
@@ -190,7 +204,7 @@ export function CreateRoutineDialog({
     setDays(new Set(ALL_DAYS));
     setIntervalMinutes(60);
     setTimezone(localTimezone());
-  }, [open, defaultAgent, routine]);
+  }, [open, routine, defaultAgent]);
 
   const handleMessageChange = useCallback((value: string) => {
     setMessage(value);

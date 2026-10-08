@@ -49,7 +49,7 @@ export function InvitationDialog() {
   }, [open]);
 
   const handleCreate = async () => {
-    if (!agentName.trim()) return;
+    if (!agentName.trim() || creating) return;
     setCreating(true);
     try {
       await workspaceApi.createInvitation(agentName.trim());

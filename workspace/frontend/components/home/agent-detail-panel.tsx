@@ -133,7 +133,7 @@ export function AgentDetailPanel({
   const online = state !== 'offline';
   const isCloud = agent.agentType?.startsWith('cloud:') ?? false;
   const { sessions, agents, lastMessageBySession, createSession, refreshAgents, token } = useWorkspace();
-  const { setViewMode, setSelectedAgentName } = useLayout();
+  const { setViewMode, setSelectedAgentName, isMobile, openMobileDetail } = useLayout();
   const { rows: contextRows } = useAgentContexts();
   const { rows: turnRows } = useAgentTurns();
   const modelState = useAgentModels();
@@ -252,6 +252,7 @@ export function AgentDetailPanel({
   const chat = async () => {
     await createSession({ master: name, participants: [name] });
     setViewMode('threads');
+    if (isMobile) openMobileDetail();
   };
 
   // Description + autostart (updateMember), as in the profile slide-over.
@@ -876,7 +877,10 @@ export function AgentDetailPanel({
         </div>
       ) : (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setSelectedAgentName(name)}>
+          <Button variant="ghost" size="sm" onClick={() => {
+            setSelectedAgentName(name);
+            if (isMobile) openMobileDetail();
+          }}>
             Full profile{isCloud ? ' and API key' : ''}
           </Button>
           <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setConfirmRemove(true)}>

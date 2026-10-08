@@ -356,7 +356,13 @@ export function FileList() {
           // Continue deleting others
         }
       }
-      toast.success(`Deleted ${successCount} file${successCount > 1 ? 's' : ''}`);
+      if (successCount === ids.length) {
+        toast.success(`Deleted ${successCount} file${successCount > 1 ? 's' : ''}`);
+      } else if (successCount > 0) {
+        toast.info(`Deleted ${successCount} of ${ids.length} files`);
+      } else {
+        toast.error('Failed to delete selected files');
+      }
       if (selectedFileId && selectedFileIds.has(selectedFileId)) {
         setSelectedFileId(null);
       }

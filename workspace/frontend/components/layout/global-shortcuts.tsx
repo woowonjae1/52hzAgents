@@ -227,7 +227,12 @@ export function GlobalShortcuts() {
 
       // -- Escape: close the topmost thing, one layer per press -----------
       if (e.key === 'Escape') {
+        if (e.defaultPrevented) return;
         if (h.helpOpen) return; // the dialog closes itself
+        // If an inner dropdown/dialog/popover is visible, let it consume Escape first
+        if (typeof document !== 'undefined' && document.querySelector('[data-radix-popper-content-wrapper], [role="dialog"], [role="menu"]')) {
+          return;
+        }
         if (pendingPrefixRef.current) {
           armPrefixRef.current(null);
           return;

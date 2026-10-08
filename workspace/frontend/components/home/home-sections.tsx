@@ -336,9 +336,13 @@ export function RecentSessionsPanel({
                     <Hint label="Archive">
                       <button
                         type="button"
-                        onClick={() => {
-                          void updateSession(s.sessionId, { status: 'archived' });
-                          toast.success('Session archived');
+                        onClick={async () => {
+                          try {
+                            await updateSession(s.sessionId, { status: 'archived' });
+                            toast.success('Session archived');
+                          } catch (err) {
+                            toast.error(err instanceof Error ? err.message : 'Failed to archive session');
+                          }
                         }}
                         aria-label={`Archive ${title}`}
                         className="grid size-6 place-items-center rounded-md text-foreground-extra-muted hover:bg-surface2 hover:text-foreground"

@@ -224,7 +224,7 @@ export function SettingsView() {
     }
     setExporting(true);
     try {
-      const res = await workspaceApi.loadMessageHistory(sessionId, { limit: 100 });
+      const res = await workspaceApi.loadMessageHistory(sessionId, { limit: 1000 });
       const msgs = res.events.map(eventToMessage).filter((m) => m.sessionId === sessionId);
       const title = currentSession?.title || sessionId;
       const md = messagesToMarkdown(msgs.reverse(), {
@@ -233,7 +233,7 @@ export function SettingsView() {
         participants: currentSession?.participants,
       });
       downloadTextFile(conversationFilename(title), md);
-      toast.success('Conversation exported as Markdown');
+      toast.success(`Exported ${msgs.length} messages as Markdown`);
     } catch (err) {
       toast.error('Export failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {

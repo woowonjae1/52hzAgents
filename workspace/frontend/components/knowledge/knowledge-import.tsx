@@ -356,7 +356,16 @@ export function KnowledgeImportDialog({ files, onClose, onImported }: KnowledgeI
           error: null,
         });
       }
-      if (!cancelled) { setDocs(parsed); setParsing(false); }
+      if (!cancelled) {
+        setDocs((prevDocs) => {
+          const prevActions = new Map(prevDocs.map((d) => [d.key, d.action]));
+          return parsed.map((doc) => {
+            const existing = prevActions.get(doc.key);
+            return existing ? { ...doc, action: existing } : doc;
+          });
+        });
+        setParsing(false);
+      }
     })();
 
     return () => { cancelled = true; };

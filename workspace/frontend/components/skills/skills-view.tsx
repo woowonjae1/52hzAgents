@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 // ---------------------------------------------------------------------------
 // Skill data
@@ -297,6 +298,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
     : '';
   const { agents, refreshWorkspace } = useWorkspace();
   const [installing, setInstalling] = useState<string | null>(null);
+  const [confirmUninstallAgent, setConfirmUninstallAgent] = useState<string | null>(null);
 
   const handleInstall = useCallback(async (agentName: string) => {
     setInstalling(agentName);
@@ -420,7 +422,7 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
                         <AgentAvatar name={agent.agentName} size={20} status={agent.status} showStatus />
                         <span className="flex-1 text-xs font-medium truncate">{agent.agentName}</span>
                         <button
-                          onClick={() => handleUninstall(agent.agentName)}
+                          onClick={() => setConfirmUninstallAgent(agent.agentName)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-3xs font-medium bg-status-success/10 text-status-success hover:bg-surface3 hover:text-status-danger transition-colors"
                         >
                           <Check className="size-3" />
@@ -546,6 +548,23 @@ function SkillDetail({ skill, onClose }: { skill: Skill; onClose: () => void }) 
           )}
         </div>
       </DialogContent>
+
+      <ConfirmDialog
+        open={Boolean(confirmUninstallAgent)}
+        onOpenChange={(open) => {
+          if (!open) setConfirmUninstallAgent(null);
+        }}
+        title="Uninstall Skill"
+        description={`Are you sure you want to uninstall "${skill.name}" from @${confirmUninstallAgent}?`}
+        confirmLabel="Uninstall"
+        variant="destructive"
+        onConfirm={async () => {
+          if (confirmUninstallAgent) {
+            await handleUninstall(confirmUninstallAgent);
+            setConfirmUninstallAgent(null);
+          }
+        }}
+      />
     </Dialog>
   );
 }

@@ -572,6 +572,7 @@ function ResourceRow({
           }}
           onKeyDown={(event) => {
             event.stopPropagation();
+            if (event.nativeEvent.isComposing || event.key === 'Process') return;
             if (event.key === "Enter") {
               skipRenameBlurRef.current = true;
               onRenameCommit(draft);

@@ -735,6 +735,7 @@ export function WorkspaceProvider({
       ? [targetSessionId]
       : Array.from(activeSessionIds);
     if (sessionIds.length === 0) return;
+    if (sessionIds.every((sid) => stoppingSessionIds.has(sid))) return;
 
     setStoppingSessionIds((prev) => {
       const next = new Set(prev);
