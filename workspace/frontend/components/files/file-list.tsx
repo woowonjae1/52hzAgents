@@ -567,7 +567,7 @@ export function FileList() {
                       label: 'Copy link',
                       icon: LinkIcon,
                       onSelect: () => {
-                        navigator.clipboard.writeText(workspaceApi.getFileUrl(selectedFile.id));
+                        navigator.clipboard.writeText(workspaceApi.getFileUrl(selectedFile.id, { includeToken: false }));
                         toast.success('Link copied');
                       },
                     },

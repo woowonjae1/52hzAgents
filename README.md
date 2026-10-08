@@ -76,8 +76,6 @@ wwj connect my-agent <workspace-token>  # 接进工作区
 
 其中 `deepseek` 和 `kimi` 走直连 API,**不需要本地装 CLI**,配个 Key 就能用;`custom` 用来挂任意本地命令。
 
-嫌 Node.js 重的话,[`packages/agn_go`](packages/agn_go) 是同一个连接器的 Go 重写版,编译成单个静态二进制。
-
 ## 长什么样
 
 ```
@@ -90,12 +88,12 @@ wwj connect my-agent <workspace-token>  # 接进工作区
         SQLite (纯 Go,无 CGO) 或 PostgreSQL
                  ▲
                  │  join + WebSocket / stdin↔stdout
-       Agent 连接器  wwj (Node) · agn (Go)
+        Agent 连接器  wwj (Node)
                  │
    Claude Code · Codex · Cursor · Copilot · DeepSeek · …
 ```
 
-仓库分三块:`workspace/`(后端 + 前端 + Electron 外壳)、`packages/`(两个 Agent 连接器和一个实验性的独立 Web 客户端)、`.github/workflows/`(CI)。
+仓库主要分为三部分:`workspace/`(后端 + 前端 + Electron 外壳)、`packages/`(Agent 连接器 wwj 与配套组件)、`.github/workflows/`(CI)。
 
 后端是 Go 1.21 + Gin + GORM,前端是 Next.js 16 + React 19 + Tailwind 4,桌面壳是 Electron。
 

@@ -105,6 +105,7 @@ export default function QuickBarPage() {
         `quick-${Date.now()}`
       );
 
+      const sentTimestamp = Date.now();
       setStatusText(`Agent @${selectedAgent || 'Agent'} is processing...`);
       setPrompt('');
 
@@ -116,8 +117,14 @@ export default function QuickBarPage() {
           const pollRes = await workspaceApi.pollMessages(sId!);
           const msgs = pollRes.messages || [];
           if (msgs && msgs.length > 0) {
-            const agentMsgs = msgs.filter((m: WorkspaceMessage) => m.senderType === 'agent' && m.messageType === 'chat');
-            const statusMsgs = msgs.filter((m: WorkspaceMessage) => m.senderType === 'agent' && (m.messageType === 'status' || m.messageType === 'thinking'));
+            // Only accept responses created during or after this command was submitted
+            const freshMsgs = msgs.filter((m: WorkspaceMessage) => {
+              if (!m.createdAt) return true;
+              const t = new Date(m.createdAt).getTime();
+              return isNaN(t) || t >= sentTimestamp - 1500;
+            });
+            const agentMsgs = freshMsgs.filter((m: WorkspaceMessage) => m.senderType === 'agent' && m.messageType === 'chat');
+            const statusMsgs = freshMsgs.filter((m: WorkspaceMessage) => m.senderType === 'agent' && (m.messageType === 'status' || m.messageType === 'thinking'));
             
             if (statusMsgs.length > 0) {
               setStatusText(statusMsgs[statusMsgs.length - 1].content || 'Processing...');

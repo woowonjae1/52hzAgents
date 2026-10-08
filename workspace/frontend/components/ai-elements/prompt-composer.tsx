@@ -980,6 +980,7 @@ export function PromptComposer({
         {/* Text Area */}
         <textarea
           ref={textareaRef}
+          data-chat-input="true"
           value={message}
           onChange={handleInput}
           onSelect={handleSelect}

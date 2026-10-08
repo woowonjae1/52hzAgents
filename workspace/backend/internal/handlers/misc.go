@@ -275,8 +275,14 @@ type openPathReq struct {
 	Path string `json:"path" binding:"required"`
 }
 
-// OpenLocalPath handles POST /v1/system/open-path to open a local folder or file directly in the host OS.
 func OpenLocalPath(c *gin.Context) {
+	// Restrict to localhost loopback to prevent remote triggering of host GUI processes
+	clientIP := c.ClientIP()
+	if clientIP != "127.0.0.1" && clientIP != "::1" && clientIP != "localhost" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Opening local paths is restricted to localhost loopback calls only"})
+		return
+	}
+
 	var req openPathReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

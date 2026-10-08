@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  onIdTokenChanged,
   type User,
 } from 'firebase/auth';
 
@@ -35,6 +36,10 @@ export async function signOutUser() {
 
 export function onAuthChange(callback: (user: User | null) => void) {
   return onAuthStateChanged(auth, callback);
+}
+
+export function onTokenChange(callback: (user: User | null) => void) {
+  return onIdTokenChanged(auth, callback);
 }
 
 export async function getIdToken(): Promise<string | null> {

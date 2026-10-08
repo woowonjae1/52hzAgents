@@ -960,6 +960,20 @@ export function ChatView() {
 
   const handleRegenerateMessage = useCallback(async (msg: WorkspaceMessage) => {
     if (!currentSessionId) return;
+    const isHuman = msg.senderType === 'human' || msg.senderType === 'user' || msg.senderName === 'User' || (currentUser?.name && msg.senderName === currentUser.name);
+
+    if (isHuman) {
+      // Re-send user prompt directly to target agent(s) instead of requesting regeneration from user themselves
+      const targetAgent = currentSession?.master || (agents.find((a) => a.status === 'online')?.agentName);
+      if (targetAgent) {
+        toast.info(`Retrying message to @${targetAgent}...`);
+        await handleSend(msg.content, [targetAgent]);
+      } else {
+        await handleSend(msg.content);
+      }
+      return;
+    }
+
     const agentName = msg.senderName;
     const msgIdx = messages.findIndex((m) => m.messageId === msg.messageId);
     let promptSnippet = '';
@@ -978,7 +992,7 @@ export function ChatView() {
       : `@${agentName} please regenerate your previous response with improvements`;
     toast.info(`Regenerating response from @${agentName}...`);
     await handleSend(prompt, [agentName]);
-  }, [currentSessionId, handleSend, messages]);
+  }, [currentSessionId, handleSend, messages, currentSession, agents, currentUser?.name]);
 
   const handleQuoteReply = useCallback((msg: WorkspaceMessage) => {
     const lines = msg.content.trim().split('\n');
@@ -1807,6 +1821,7 @@ export function ChatView() {
 
               {serverSessionId && <ThreadStatusBar channelName={serverSessionId} messages={displayMessages} />}
               <ChatInput
+                key={currentSessionId || 'empty'}
                 onSend={handleSend}
                 agents={agents}
                 knowledge={knowledge}

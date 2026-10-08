@@ -22,7 +22,7 @@ import { getApiBaseUrl } from '@/lib/config';
  */
 const WIN_DRIVE = /^[a-zA-Z]:[\\/]/;
 import { BookOpen, Check, Copy, ChevronDown, ChevronUp, FileCode } from 'lucide-react';
-import { ApprovalCard, type ApprovalCardQuestion } from '@/components/ai-elements/approval-card';
+import { ApprovalCard, type ApprovalCardQuestion, type ApprovalCardStatus } from '@/components/ai-elements/approval-card';
 import { workspaceApi } from '@/lib/api';
 import { downloadUrl } from '@/lib/download';
 import { Citation, type CitationItem } from '@/components/agents/citations';
@@ -187,6 +187,49 @@ class MarkdownErrorBoundary extends React.Component<
     }
     return this.props.children;
   }
+}
+
+interface InteractiveDecisionCardProps {
+  questions: ApprovalCardQuestion[];
+  sessionId?: string;
+}
+
+function InteractiveDecisionCard({ questions, sessionId }: InteractiveDecisionCardProps) {
+  const [status, setStatus] = React.useState<ApprovalCardStatus>('pending');
+  const [answers, setAnswers] = React.useState<Record<string, string>>({});
+
+  const handleSubmit = async (submittedAnswers: Record<string, string>) => {
+    if (status !== 'pending') return;
+    if (!sessionId) {
+      toast.error('Cannot submit decisions in read-only or shared view');
+      return;
+    }
+    setStatus('submitting');
+    try {
+      const titleById = new Map(questions.map((q) => [q.id, q.title]));
+      const answerSummary = Object.entries(submittedAnswers)
+        .map(([k, v]) => `${titleById.get(k) || k}: ${v}`)
+        .join('\n');
+      await workspaceApi.sendMessage(sessionId, `[Decision]\n${answerSummary}`, 'User');
+      setAnswers(submittedAnswers);
+      setStatus('answered');
+      toast.success('Answer sent');
+    } catch (err) {
+      setStatus('pending');
+      toast.error(err instanceof Error ? err.message : 'Failed to send answer');
+    }
+  };
+
+  return (
+    <div className="my-3 not-prose">
+      <ApprovalCard
+        questions={questions}
+        status={status}
+        answers={status === 'answered' ? answers : undefined}
+        onSubmit={handleSubmit}
+      />
+    </div>
+  );
 }
 
 interface IdeCodeBlockProps {
@@ -437,23 +480,7 @@ export const MarkdownContent = memo(function MarkdownContent({
               allowCustom: q.allowCustom ?? q.allow_custom ?? true,
               customPlaceholder: q.customPlaceholder ?? q.custom_placeholder,
             }));
-            return (
-              <div className="my-3 not-prose">
-                <ApprovalCard
-                  questions={formattedQuestions}
-                  onSubmit={(answers) => {
-                    const titleById = new Map(formattedQuestions.map((q) => [q.id, q.title]));
-                    const answerSummary = Object.entries(answers)
-                      .map(([k, v]) => `${titleById.get(k) || k}: ${v}`)
-                      .join('\n');
-                    if (sessionId) {
-                      workspaceApi.sendMessage(sessionId, `[Decision]\n${answerSummary}`, 'User');
-                      toast.success('Answer sent');
-                    }
-                  }}
-                />
-              </div>
-            );
+            return <InteractiveDecisionCard questions={formattedQuestions} sessionId={sessionId} />;
           }
         } catch {
           // If JSON is invalid, fall through to default code block rendering
@@ -488,26 +515,47 @@ export const MarkdownContent = memo(function MarkdownContent({
 
     // Links
     a: ({ href, children }) => {
-      const isInternalFile = href && (href.includes('/api/files/') || href.startsWith('/api/files/'));
-      const isHttp = href && !isInternalFile && (href.startsWith('http://') || href.startsWith('https://'));
-      const isEditorScheme = href && (href.startsWith('vscode:') || href.startsWith('cursor:'));
-      const isLocalPath = href && !isHttp && !isEditorScheme && !isInternalFile && (
-        href.startsWith('file://') ||
-        href.startsWith('file:') ||
-        WIN_DRIVE.test(href) ||
-        href.startsWith('/') ||
-        href.startsWith('./') ||
-        href.startsWith('../') ||
-        (!href.includes('://') && !href.startsWith('mailto:') && !href.startsWith('#'))
+      let normalizedHref = (href || '').trim();
+      if (/^(javascript|data|vbscript):/i.test(normalizedHref)) {
+        return <span className="text-muted-foreground">{children}</span>;
+      }
+      if (/^www\./i.test(normalizedHref)) {
+        normalizedHref = `https://${normalizedHref}`;
+      }
+      const isInternalFile = Boolean(normalizedHref && (normalizedHref.includes('/api/files/') || normalizedHref.startsWith('/api/files/')));
+      const isHttp = !isInternalFile && (normalizedHref.startsWith('http://') || normalizedHref.startsWith('https://'));
+      const isEditorScheme = Boolean(normalizedHref && (normalizedHref.startsWith('vscode:') || normalizedHref.startsWith('cursor:')));
+      const isExplicitLocal = Boolean(
+        normalizedHref &&
+        (normalizedHref.startsWith('file://') ||
+         normalizedHref.startsWith('file:') ||
+         WIN_DRIVE.test(normalizedHref) ||
+         normalizedHref.startsWith('./') ||
+         normalizedHref.startsWith('.\\') ||
+         normalizedHref.startsWith('../') ||
+         normalizedHref.startsWith('..\\') ||
+         normalizedHref.startsWith('/'))
       );
+      const isRelativeFilePath =
+        Boolean(normalizedHref) &&
+        !isHttp &&
+        !isEditorScheme &&
+        !isInternalFile &&
+        !normalizedHref.startsWith('#') &&
+        !normalizedHref.startsWith('mailto:') &&
+        !normalizedHref.includes('://') &&
+        Boolean(workingDir) &&
+        (/[\/\\]/.test(normalizedHref) || /\.[a-zA-Z0-9]{1,8}(:\d+)?$/.test(normalizedHref));
+
+      const isLocalPath = !isHttp && !isEditorScheme && !isInternalFile && (isExplicitLocal || isRelativeFilePath);
 
       if (isInternalFile) {
         return (
-          <Hint label={href}>
+          <Hint label={normalizedHref}>
             <button
               type="button"
               onClick={() => {
-                downloadUrl(href!);
+                downloadUrl(normalizedHref);
               }}
               className="text-primary underline underline-offset-2 hover:text-primary/80 text-left"
             >
@@ -522,7 +570,7 @@ export const MarkdownContent = memo(function MarkdownContent({
        */
       if (isLocalPath || isEditorScheme) {
         const openLocal = async () => {
-          let targetPath = href || '';
+          let targetPath = normalizedHref;
 
           if (
             workingDir &&
@@ -570,7 +618,7 @@ export const MarkdownContent = memo(function MarkdownContent({
         };
 
         return (
-          <Hint label={`Open locally: ${href}`}>
+          <Hint label={`Open locally: ${normalizedHref}`}>
             <button
               type="button"
               onClick={openLocal}

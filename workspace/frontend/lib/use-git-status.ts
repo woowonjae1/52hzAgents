@@ -89,6 +89,15 @@ export function useGitStatus(channelId: string | null | undefined) {
     }
   }, [boundChannelId]);
 
+  // Clear stale status when switching threads
+  useEffect(() => {
+    setStatus(null);
+    setError(null);
+    if (boundChannelId) {
+      void refresh();
+    }
+  }, [boundChannelId, channelId, refresh]);
+
   useVisibilityPolling(refresh, POLL_MS, { enabled: !!boundChannelId });
 
   // `channelId` is echoed back so write calls (stage, commit) go to the same

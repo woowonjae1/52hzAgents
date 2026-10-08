@@ -405,6 +405,7 @@ export function WorkspaceProvider({
   const [draftSession, setDraftSession] = useState<WorkspaceSession | null>(null);
   const draftSessionRef = useRef<WorkspaceSession | null>(null);
   draftSessionRef.current = draftSession;
+  const pendingDeletedFileIdsRef = useRef<Set<string>>(new Set());
   // Extra create options the draft carries to the server (not session fields).
   const draftCreateOptsRef = useRef<{ resumeFrom?: string }>({});
   const [currentSessionId, _setCurrentSessionId] = useState<string | null>(() => {
@@ -1099,7 +1100,7 @@ export function WorkspaceProvider({
   const refreshFiles = useCallback(async () => {
     try {
       const result = await workspaceApi.listFiles();
-      setFiles(result.files);
+      setFiles(result.files.filter((f) => !pendingDeletedFileIdsRef.current.has(f.id)));
     } catch {
       // Non-critical
     }
@@ -1324,7 +1325,9 @@ export function WorkspaceProvider({
   useEffect(() => {
     const refreshAuxiliaryState = () => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      workspaceApi.listFiles().then((r) => setFiles(r.files)).catch(() => {});
+      workspaceApi.listFiles().then((r) => {
+        setFiles(r.files.filter((f) => !pendingDeletedFileIdsRef.current.has(f.id)));
+      }).catch(() => {});
       workspaceApi.listBrowserTabs().then((r) => setBrowserTabs(r.tabs)).catch(() => {});
       workspaceApi.listBrowserContexts().then((r) => setBrowserContexts(r.contexts)).catch(() => {});
       workspaceApi.listConversations().then((c) => setDMConversations(c)).catch(() => {});
@@ -1426,6 +1429,7 @@ export function WorkspaceProvider({
     runUndoable({
       message: `Deleted ${displayName}`,
       onOptimistic: () => {
+        pendingDeletedFileIdsRef.current.add(fileId);
         setFiles((prev) => {
           removedAt = prev.findIndex((f) => f.id === fileId);
           removed = removedAt >= 0 ? prev[removedAt] : undefined;
@@ -1434,6 +1438,7 @@ export function WorkspaceProvider({
         setSelectedFileId((cur) => (cur === fileId ? null : cur));
       },
       onRevert: () => {
+        pendingDeletedFileIdsRef.current.delete(fileId);
         if (!removed) return;
         setFiles((prev) => {
           if (prev.some((f) => f.id === fileId)) return prev;
@@ -1444,7 +1449,13 @@ export function WorkspaceProvider({
           return next;
         });
       },
-      onCommit: () => workspaceApi.deleteFile(fileId),
+      onCommit: async () => {
+        try {
+          await workspaceApi.deleteFile(fileId);
+        } finally {
+          pendingDeletedFileIdsRef.current.delete(fileId);
+        }
+      },
       errorMessage: `Could not delete ${displayName}`,
     });
   }, []);

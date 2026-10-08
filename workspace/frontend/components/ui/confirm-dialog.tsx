@@ -64,6 +64,8 @@ export function ConfirmDialog({
           if (e.key !== 'Enter' || busy) return;
           const target = e.target as HTMLElement;
           if (target.tagName === 'TEXTAREA' && !(e.metaKey || e.ctrlKey)) return;
+          // If focus is already on a button (e.g. Cancel), let native click handling occur
+          if (target.tagName === 'BUTTON') return;
           e.preventDefault();
           void handleConfirm();
         }}

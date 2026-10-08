@@ -1250,12 +1250,20 @@ export function ThreadList() {
         return;
       }
 
-      // Skip when modifier keys are held (Cmd+1, Ctrl+R, etc.)
+      // Skip modifier keys
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const isInsideList = listContainerRef.current && target ? listContainerRef.current.contains(target) : false;
+      const isChatArea = Boolean(target?.closest?.('[data-chat-area], .reading-prose, [data-chat-column], [role="dialog"], [role="menu"]'));
+
+      // Don't hijack Arrow keys or Enter if user is interacting with chat messages or dialogs
+      if (isChatArea && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) {
+        return;
+      }
 
       // 1-9 → open thread by index
       const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= 9) {
+      if (num >= 1 && num <= 9 && !isChatArea) {
         const session = visualOrder[num - 1];
         if (session) {
           e.preventDefault();
@@ -1266,7 +1274,7 @@ export function ThreadList() {
       }
 
       // j / ArrowDown → move to next thread
-      if (e.key === 'j' || e.key === 'ArrowDown') {
+      if (e.key === 'j' || (e.key === 'ArrowDown' && (isInsideList || !isChatArea))) {
         if (visualOrder.length === 0) return;
         e.preventDefault();
         const currentIndex = visualOrder.findIndex((s) => s.sessionId === currentSessionId);
@@ -1280,7 +1288,7 @@ export function ThreadList() {
       }
 
       // k / ArrowUp → move to previous thread
-      if (e.key === 'k' || e.key === 'ArrowUp') {
+      if (e.key === 'k' || (e.key === 'ArrowUp' && (isInsideList || !isChatArea))) {
         if (visualOrder.length === 0) return;
         e.preventDefault();
         const currentIndex = visualOrder.findIndex((s) => s.sessionId === currentSessionId);
@@ -1294,7 +1302,7 @@ export function ThreadList() {
       }
 
       // '/' → search threads
-      if (e.key === '/') {
+      if (e.key === '/' && !isChatArea) {
         e.preventDefault();
         setShowSearch(true);
         setTimeout(() => searchInputRef.current?.focus(), 10);
@@ -1302,15 +1310,15 @@ export function ThreadList() {
       }
 
       // 'c' → create new conversation
-      if (e.key === 'c') {
+      if (e.key === 'c' && !isChatArea) {
         e.preventDefault();
         setViewMode('threads');
         startChannel(null);
         return;
       }
 
-      // 'i' or 'Enter' → focus the chat input composer
-      if (e.key === 'i' || e.key === 'Enter') {
+      // 'i' or 'Enter' (when inside thread list) → focus the chat input composer
+      if (e.key === 'i' || (e.key === 'Enter' && isInsideList)) {
         if (currentSessionId) {
           e.preventDefault();
           const el = document.querySelector<HTMLTextAreaElement>('textarea[data-chat-input]');

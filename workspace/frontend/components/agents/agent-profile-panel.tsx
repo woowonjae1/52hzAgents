@@ -1,6 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Switch } from '@/components/ui/switch';
 import { useState, useEffect, useCallback } from 'react';
 import { X, Copy, Check, Plus, Globe, Folder, Monitor, UserRoundCog, Cloud, Trash2, KeyRound, RefreshCw, Sparkles, ExternalLink, Terminal, ShieldCheck, ShieldX, Activity, Power, Cpu, ChevronDown, Coins } from 'lucide-react';
@@ -143,6 +144,7 @@ export function AgentProfilePanel() {
     });
   }, [isCloud, agent?.agentName]);
 
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const handleRemoveCloudAgent = useCallback(async () => {
     if (!agent) return;
     try {
@@ -796,15 +798,26 @@ export function AgentProfilePanel() {
               Start a Channel
             </button>
             {isCloud && (
-              <Hint label="Remove cloud agent">
-                <button
-                  onClick={handleRemoveCloudAgent}
-                  className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border-accent text-status-danger hover:bg-surface3 transition-colors"
-                >
-                  <Trash2 className="size-3" />
-                  Remove
-                </button>
-              </Hint>
+              <>
+                <Hint label="Remove cloud agent">
+                  <button
+                    onClick={() => setShowRemoveConfirm(true)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border-accent text-status-danger hover:bg-surface3 transition-colors"
+                  >
+                    <Trash2 className="size-3" />
+                    Remove
+                  </button>
+                </Hint>
+                <ConfirmDialog
+                  open={showRemoveConfirm}
+                  onOpenChange={setShowRemoveConfirm}
+                  title="Remove Cloud Agent"
+                  description={`Are you sure you want to remove "${agent.agentName}"? Its saved configuration and credentials will be removed.`}
+                  confirmLabel="Remove"
+                  variant="destructive"
+                  onConfirm={handleRemoveCloudAgent}
+                />
+              </>
             )}
           </div>
         </div>

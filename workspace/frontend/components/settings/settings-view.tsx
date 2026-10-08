@@ -243,7 +243,7 @@ export function SettingsView() {
 
   const { isCopied: shareCopied, copyToClipboard: copyShare } = useCopyToClipboard();
   const workspaceShareUrl = typeof window !== 'undefined' && workspace
-    ? `${window.location.origin}/share/${workspace.workspaceId || 'default'}`
+    ? `${window.location.origin}/${workspace.workspaceId || 'default'}`
     : '';
 
   const PANELS_LIST: { id: RightPanelTab; name: string; icon: typeof Globe; desc: string }[] = [

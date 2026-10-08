@@ -79,12 +79,14 @@ export function Sidebar() {
     ).map((el) => ({ el, declared: el.style.width }));
     let pending = 0;
     let frame = 0;
+    let hasMoved = false;
 
     const flush = () => {
       frame = 0;
       for (const { el } of sized) el.style.width = `${pending}px`;
     };
     const onMove = (event: PointerEvent) => {
+      hasMoved = true;
       // The sidebar is pinned to the start edge, so clientX *is* the width.
       // If dragged past collapse threshold (< 140px), snap to 0 to signal collapse
       if (event.clientX < 140) {
@@ -97,6 +99,11 @@ export function Sidebar() {
     const onUp = () => {
       if (frame) cancelAnimationFrame(frame);
       frame = 0;
+      if (!hasMoved) {
+        for (const { el, declared } of sized) el.style.width = declared;
+        setIsResizing(false);
+        return;
+      }
       if (pending === 0) {
         if (isSidebarOpen) sidebarToggle();
       } else if (pending) {

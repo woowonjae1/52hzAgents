@@ -8,6 +8,9 @@ const nextConfig = {
     unoptimized: true,
   },
   devIndicators: false,
+  turbopack: {
+    root: '.',
+  },
 };
 
 export default nextConfig;

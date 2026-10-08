@@ -47,8 +47,8 @@ export function OpenAgentsAuthProvider({ children }: { children: React.ReactNode
     // Dynamically import firebase to avoid loading it on non-openagents domains
     let unsubscribe: (() => void) | undefined;
 
-    import('./firebase').then(({ onAuthChange, getIdToken }) => {
-      unsubscribe = onAuthChange(async (firebaseUser) => {
+    import('./firebase').then(({ onTokenChange, getIdToken }) => {
+      unsubscribe = onTokenChange(async (firebaseUser) => {
         if (firebaseUser) {
           const token = await getIdToken();
           setUser({

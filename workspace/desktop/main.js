@@ -327,6 +327,10 @@ async function startProductionStack() {
   const wwjEntry = possibleWwjPaths.find((p) => fs.existsSync(p));
   if (wwjEntry) {
     console.log(`[52hzAgents Desktop] Starting WWJ connector from ${wwjEntry} (endpoint: http://127.0.0.1:${serverPort})`);
+    let consecutiveConnectorCrashes = 0;
+    let connectorResetTimer = null;
+    const MAX_CRASH_RETRIES = 5;
+
     const spawnConnector = () => {
       connectorProcess = fork(wwjEntry, ['up', '--foreground', '--endpoint', `http://127.0.0.1:${serverPort}`], {
         env: {
@@ -336,10 +340,28 @@ async function startProductionStack() {
         },
         stdio: 'ignore',
       });
+
+      // If connector runs stably for at least 15s, reset crash counter
+      if (connectorResetTimer) clearTimeout(connectorResetTimer);
+      connectorResetTimer = setTimeout(() => {
+        consecutiveConnectorCrashes = 0;
+      }, 15000);
+
       connectorProcess.on('exit', (code, signal) => {
+        if (connectorResetTimer) clearTimeout(connectorResetTimer);
         if (!isQuitting) {
-          console.warn(`[52hzAgents Desktop] WWJ connector exited unexpectedly (code: ${code}, signal: ${signal}), restarting in 1.5s...`);
-          setTimeout(spawnConnector, 1500);
+          consecutiveConnectorCrashes += 1;
+          if (consecutiveConnectorCrashes > MAX_CRASH_RETRIES) {
+            console.error(
+              `[52hzAgents Desktop] WWJ connector crashed ${consecutiveConnectorCrashes} times repeatedly. Halting auto-restart to prevent crash loop.`
+            );
+            return;
+          }
+          const backoffDelay = Math.min(1500 * Math.pow(2, consecutiveConnectorCrashes - 1), 15000);
+          console.warn(
+            `[52hzAgents Desktop] WWJ connector exited unexpectedly (code: ${code}, signal: ${signal}), restarting in ${backoffDelay}ms (attempt ${consecutiveConnectorCrashes}/${MAX_CRASH_RETRIES})...`
+          );
+          setTimeout(spawnConnector, backoffDelay);
         }
       });
     };

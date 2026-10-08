@@ -20,6 +20,7 @@ import { FileList } from '@/components/files/file-list';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Hint } from '@/components/ui/hint';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 /*
   THE SIDEBAR, AS beUI DRAWS IT.
@@ -119,6 +120,7 @@ export function ThreadSidebar() {
   const [query, setQuery] = React.useState('');
   const searchRef = React.useRef<HTMLInputElement>(null);
   const [browsingFolder, setBrowsingFolder] = React.useState(false);
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null);
 
   /*
     Opening the native folder dialog is the same call in both cases; what
@@ -472,7 +474,10 @@ export function ThreadSidebar() {
             className={ROW_CLASS}
             onClick={(e) => {
               e.stopPropagation();
-              void updateSession(item.id, { status: 'archived' });
+              const sessionId = item.id;
+              void updateSession(sessionId, { status: 'archived' })
+                .then(() => toast.success('Thread archived'))
+                .catch((err) => toast.error(err instanceof Error ? err.message : 'Failed to archive thread'));
               controls.close();
             }}
           >
@@ -484,7 +489,7 @@ export function ThreadSidebar() {
             className={cn(ROW_CLASS, 'text-destructive')}
             onClick={(e) => {
               e.stopPropagation();
-              void updateSession(item.id, { status: 'deleted' });
+              setDeleteTarget({ id: item.id, name: item.label });
               controls.close();
             }}
           >
@@ -494,7 +499,7 @@ export function ThreadSidebar() {
         </>
       );
     },
-    [byId, updateSession, createSession, setSidebarOpen, browsingFolder, changeSessionFolder, moveSessionToFolder]
+    [byId, updateSession, createSession, setSidebarOpen, browsingFolder, changeSessionFolder, moveSessionToFolder, setDeleteTarget]
   );
 
   return (
@@ -670,6 +675,28 @@ export function ThreadSidebar() {
         />
         )}
       </div>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Delete thread"
+        description={`Are you sure you want to delete "${deleteTarget?.name || 'this thread'}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await updateSession(deleteTarget.id, { status: 'deleted' });
+            toast.success('Thread deleted');
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : 'Failed to delete thread');
+          } finally {
+            setDeleteTarget(null);
+          }
+        }}
+      />
     </div>
   );
 }

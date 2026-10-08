@@ -143,7 +143,6 @@ const icoTargets = [
   'workspace/desktop/build/icon.ico',
   'workspace/desktop/resources/public/favicon.ico',
   'workspace/frontend/public/favicon.ico',
-  'packages/go/web/public/favicon.ico'
 ];
 
 for (const rel of icoTargets) {
