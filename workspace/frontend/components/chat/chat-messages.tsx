@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { flushSync } from 'react-dom';
 import { PreviewRail, type PreviewRailItem } from '@/components/motion/preview-rail';
 import { deduplicateAndSortMessages } from '@/lib/types';
 import type { WorkspaceMessage, WorkspaceAgent } from '@/lib/types';
@@ -687,6 +688,52 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
   });
 
   /*
+    ROWS THAT GROW MOVE THE ROWS BELOW IN THE SAME FRAME.
+
+    A "Thought" or tool line is a native <details> whose height animates open
+    in CSS, so its row grows a little every frame for the whole animation.
+    The virtualizer does observe its rows, but it applies a size change with
+    an ordinary async re-render -- so on every frame of that animation the rows
+    below were still placed for the previous frame's height, and the opening
+    row drew its text over the reply underneath it.
+
+    This observer is created during the first render, before the virtualizer
+    creates its own in the ref callbacks, so ResizeObserver (which calls
+    observers in creation order) runs it first. It applies the new size inside
+    flushSync, before paint; the virtualizer's own observer then sees an
+    unchanged size and does nothing.
+  */
+  const virtualizerRef = useRef(virtualizer);
+  virtualizerRef.current = virtualizer;
+  const [syncResizeObserver] = useState(() =>
+    typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver((entries, observer) => {
+          const v = virtualizerRef.current;
+          flushSync(() => {
+            for (const entry of entries) {
+              const el = entry.target as HTMLElement;
+              if (!el.isConnected) {
+                observer.unobserve(el);
+                continue;
+              }
+              const index = Number(el.dataset.index);
+              if (!Number.isFinite(index)) continue;
+              v.resizeItem(index, v.options.measureElement(el, entry, v));
+            }
+          });
+        })
+  );
+  useEffect(() => () => syncResizeObserver?.disconnect(), [syncResizeObserver]);
+  const measureRow = useCallback(
+    (el: HTMLDivElement | null) => {
+      virtualizer.measureElement(el);
+      if (el) syncResizeObserver?.observe(el);
+    },
+    [virtualizer, syncResizeObserver]
+  );
+
+  /*
     THE TRANSCRIPT RAIL.
 
     beUI ships a `MessageScroller` that drives `PreviewRail` by querying
@@ -1088,7 +1135,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
               return (
                 <div
                   key="loading-indicator"
-                  ref={virtualizer.measureElement}
+                  ref={measureRow}
                   data-index={index}
                   style={{
                     position: 'absolute',
@@ -1168,7 +1215,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
             return (
               <div
                 key={groupKey(group, index)}
-                ref={virtualizer.measureElement}
+                ref={measureRow}
                 data-index={index}
                 style={{
                   position: 'absolute',
