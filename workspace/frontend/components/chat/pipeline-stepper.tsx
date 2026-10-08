@@ -12,6 +12,8 @@ import {
   ChevronRight,
   Play,
   PauseCircle,
+  ShieldCheck,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -49,9 +51,17 @@ export interface PipelineData {
 
 export function PipelineStepper({
   channelId,
+  verificationCmd,
   className,
 }: {
   channelId: string | null;
+  /**
+   * The channel's verification command. The backend runs it after every
+   * step's turn (evaluator.EvaluateTurnWithVerification) and sends a failing
+   * step back for a retry, so it is a stage of every step -- shown here
+   * because otherwise "Retry 1/3" appears with no visible cause.
+   */
+  verificationCmd?: string | null;
   className?: string;
 }) {
   const [pipeline, setPipeline] = useState<PipelineData | null>(null);
@@ -109,6 +119,17 @@ export function PipelineStepper({
   const steps = pipeline.steps;
   const currentIdx = pipeline.current_index ?? 0;
   const isPaused = pipeline.status === 'paused';
+  const doneCount = steps.filter((s, i) => s.status === 'done' || (i < currentIdx && s.status !== 'failed')).length;
+  const verify = verificationCmd?.trim() || '';
+
+  // What the pill's tooltip says: the instruction, then why it is retrying or failed.
+  const stepHint = (step: PipelineStepItem) => {
+    const parts = [step.instruction?.trim().split(/\r?\n/)[0]?.slice(0, 200)];
+    if (step.last_error && (step.status === 'retrying' || step.status === 'failed')) {
+      parts.push(`${verify ? 'Verification failed' : 'Failed'}: ${step.last_error.trim().split(/\r?\n/)[0].slice(0, 200)}`);
+    }
+    return parts.filter(Boolean).join(' — ') || `@${step.agent}`;
+  };
 
   return (
     <div
@@ -123,22 +144,30 @@ export function PipelineStepper({
           <span className={cn('font-semibold text-3xs uppercase tracking-wider', isPaused ? 'text-status-warning' : 'text-primary')}>
             {isPaused ? 'Pipeline Paused' : 'Pipeline'}
           </span>
+          <span className="tabular-nums text-3xs">
+            {doneCount}/{steps.length}
+          </span>
         </div>
 
         <div className="flex items-center gap-1.5 min-w-0">
           {steps.map((step, idx) => {
             const isCurrent = idx === currentIdx;
-            const isDone = step.status === 'done' || idx < currentIdx;
+            const isFailed = step.status === 'failed';
+            const isDone = !isFailed && (step.status === 'done' || idx < currentIdx);
             const isRetrying = step.status === 'retrying';
             const isRunning = isCurrent && !isPaused && (step.status === 'running' || !step.status);
             const isStepPaused = isCurrent && isPaused;
 
             return (
               <div key={idx} className="flex items-center gap-1.5 shrink-0">
+                <Hint label={stepHint(step)}>
                 <div
+                  tabIndex={0}
                   className={cn(
-                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium border transition-colors',
-                    isDone
+                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium border transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                    isFailed
+                      ? 'bg-status-danger/10 text-status-danger border-status-danger/30'
+                      : isDone
                       ? 'bg-surface3/80 text-foreground-muted border-border/60'
                       : isStepPaused
                         ? 'bg-status-warning/10 text-status-warning border-status-warning/30 font-semibold shadow-xs'
@@ -149,7 +178,9 @@ export function PipelineStepper({
                             : 'bg-surface2 text-foreground-extra-muted border-border/60'
                   )}
                 >
-                  {isDone ? (
+                  {isFailed ? (
+                    <XCircle className="size-3 text-status-danger shrink-0" />
+                  ) : isDone ? (
                     <CheckCircle2 className="size-3 text-status-success shrink-0" />
                   ) : isStepPaused ? (
                     <PauseCircle className="size-3 text-status-warning shrink-0" />
@@ -169,6 +200,7 @@ export function PipelineStepper({
                     </span>
                   )}
                 </div>
+                </Hint>
 
                 {idx < steps.length - 1 && (
                   <ChevronRight className="size-3 text-foreground-extra-muted/60 shrink-0" />
@@ -177,6 +209,19 @@ export function PipelineStepper({
             );
           })}
         </div>
+
+        {verify && (
+          <Hint label={`Every step is checked with \`${verify}\` when its turn ends; a failure sends that step back for a retry.`}>
+            <span
+              tabIndex={0}
+              className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-border/60 bg-surface2 px-2 py-1 text-2xs text-foreground-muted shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+            >
+              <ShieldCheck className="size-3 shrink-0" />
+              <span className="shrink-0">Verify</span>
+              <code className="truncate font-mono text-3xs">{verify}</code>
+            </span>
+          </Hint>
+        )}
       </div>
 
       <div className="flex items-center gap-2 shrink-0">

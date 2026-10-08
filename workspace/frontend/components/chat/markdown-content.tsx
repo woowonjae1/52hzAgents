@@ -4,7 +4,7 @@ import { Hint } from '@/components/ui/hint';
 import * as React from 'react';
 import { memo, type ReactNode, useMemo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
-import rehypeHighlight from 'rehype-highlight';
+import rehypeHighlightCached from '@/lib/rehype-highlight-cached';
 import remarkGfm from 'remark-gfm';
 import { deriveIdentityColor } from '@/lib/identity-colors';
 import { cn } from '@/lib/utils';
@@ -32,7 +32,8 @@ import remarkBreaks from 'remark-breaks';
 
 // Stable plugin arrays — avoids re-creating on every render
 const remarkPlugins = [remarkGfm, remarkBreaks];
-const rehypePlugins = [rehypeHighlight];
+// Cached across mounts: the transcript is virtualised, so rows remount on scroll.
+const rehypePlugins = [rehypeHighlightCached];
 
 // Recursively flatten a React children tree to its raw text. rehype-highlight
 // replaces a code block's string child with an array of highlight <span>s, so

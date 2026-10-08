@@ -119,6 +119,22 @@ export function useListKeyboardNav({
         return;
       }
 
+      // If focus is currently within an inline button, menuitem, or action inside a row,
+      // let that interactive element handle Enter, Space, and Delete directly.
+      const isInteractiveChild = Boolean(
+        target &&
+          (target.closest('button') ||
+            target.closest('a') ||
+            target.closest('[role="button"]') ||
+            target.closest('[role="menuitem"]'))
+      );
+      if (
+        isInteractiveChild &&
+        (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace')
+      ) {
+        return;
+      }
+
       const from = cursor < 0 ? -1 : cursor;
 
       switch (e.key) {

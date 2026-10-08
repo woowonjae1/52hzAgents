@@ -12,6 +12,7 @@ import { ThreadStatusBar } from './thread-status-bar';
 import { EmptyState } from './empty-state';
 import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
+import { loadWorkspaceSnapshots, saveThreadSnapshot, SNAPSHOT_THREADS } from '@/lib/message-snapshot';
 import { useComposingSignal } from '@/hooks/use-composing-signal';
 import { isComposing } from '@/lib/ime';
 import { workspaceApi } from '@/lib/api';
@@ -63,6 +64,7 @@ import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { threadAgentMode } from '@/lib/agent-profiles';
 import { PipelineStepper } from './pipeline-stepper';
+import { AgentLanes } from './agent-lanes';
 import { useAgentTurns } from '@/lib/use-agent-turns';
 import { TRANSCRIPT_REVEAL_EVENT } from './chat-messages';
 import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
@@ -102,7 +104,10 @@ const PROMPT_SUGGESTIONS = [
 // Module-level message cache — survives component re-renders/unmounts.
 // Keyed by sessionId, stores the last known messages for instant thread switching.
 const messageCache = new Map<string, WorkspaceMessage[]>();
-const CACHE_MAX_SESSIONS = 10;
+// Matches SNAPSHOT_THREADS so every thread restored from IndexedDB fits.
+const CACHE_MAX_SESSIONS = SNAPSHOT_THREADS;
+// Which workspace cacheMessages persists snapshots under; set by the provider.
+let snapshotWorkspaceId: string | null = null;
 // Track last seen message ID per cached session for incremental refresh
 const cacheLastSeenId = new Map<string, string>();
 
@@ -136,8 +141,12 @@ function cacheMessages(sessionId: string, msgs: WorkspaceMessage[]) {
     // Never overwrite an existing populated cache with empty during session transitions
     return;
   }
+  // Delete first so a refresh moves the thread to the newest end of the
+  // eviction order instead of leaving it where it was first inserted.
+  messageCache.delete(sessionId);
   messageCache.set(sessionId, scopedMessages);
   cacheLastSeenId.set(sessionId, scopedMessages[scopedMessages.length - 1].messageId);
+  saveThreadSnapshot(snapshotWorkspaceId, sessionId, scopedMessages);
   // Evict oldest entries if cache grows too large
   if (messageCache.size > CACHE_MAX_SESSIONS) {
     const oldest = messageCache.keys().next().value;
@@ -172,7 +181,9 @@ type SessionMessagesValue = ReturnType<typeof useMessagePolling>;
 const SessionMessagesContext = React.createContext<SessionMessagesValue | null>(null);
 
 export function SessionMessagesProvider({ children }: { children: React.ReactNode }) {
-  const { currentSessionId } = useWorkspace();
+  const { currentSessionId, workspaceId } = useWorkspace();
+  const currentSessionIdRef = useRef(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
 
   // Cached messages for this session, read once per session switch.
   const initialMessagesRef = useRef<WorkspaceMessage[] | undefined>(undefined);
@@ -189,6 +200,40 @@ export function SessionMessagesProvider({ children }: { children: React.ReactNod
     sessionId: isDraftSessionId(currentSessionId) ? null : currentSessionId,
     initialMessages: initialMessagesRef.current,
   });
+
+  /*
+    Restore the persisted thread snapshots (lib/message-snapshot.ts) into the
+    in-memory cache, so the first switch to any recent thread after a start is
+    instant. The thread already open when they arrive is seeded through
+    seedIfEmpty, which does nothing if its real history beat IndexedDB to it.
+  */
+  const { seedIfEmpty } = value;
+  useEffect(() => {
+    snapshotWorkspaceId = workspaceId ?? null;
+    if (!workspaceId) return;
+    let cancelled = false;
+    void loadWorkspaceSnapshots(workspaceId).then((snapshots) => {
+      if (cancelled || snapshotWorkspaceId !== workspaceId) return;
+      for (const [sessionId, msgs] of snapshots) {
+        // A live entry is fresher than anything on disk.
+        if (messageCache.has(sessionId)) continue;
+        messageCache.set(sessionId, msgs);
+        cacheLastSeenId.set(sessionId, msgs[msgs.length - 1].messageId);
+      }
+      while (messageCache.size > CACHE_MAX_SESSIONS) {
+        const oldest = messageCache.keys().next().value;
+        if (oldest === undefined) break;
+        messageCache.delete(oldest);
+        cacheLastSeenId.delete(oldest);
+      }
+      const open = currentSessionIdRef.current;
+      const snapshot = open && !isDraftSessionId(open) ? snapshots.get(open) : undefined;
+      if (open && snapshot) seedIfEmpty(open, snapshot);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, seedIfEmpty]);
 
   return (
     <SessionMessagesContext.Provider value={value}>{children}</SessionMessagesContext.Provider>
@@ -505,6 +550,15 @@ export function ChatView() {
   const channelTurnRows = useMemo(
     () => currentSessionId ? agentTurnRows.filter((r) => r.channelName === currentSessionId) : [],
     [agentTurnRows, currentSessionId]
+  );
+
+  const runningTurnsHere = useMemo(
+    () => channelTurnRows.filter((r) => r.state === 'running'),
+    [channelTurnRows]
+  );
+  const agentTypeByName = useMemo(
+    () => new Map(agents.map((a) => [a.agentName.toLowerCase(), a.agentType] as const)),
+    [agents]
   );
 
   const runningAgentsInChannel = useMemo(() => {
@@ -1438,7 +1492,20 @@ export function ChatView() {
       })()}
 
       {/* Pipeline Stepper Widget */}
-      <PipelineStepper channelId={serverSessionId} />
+      <PipelineStepper channelId={serverSessionId} verificationCmd={currentSession?.verificationCmd} />
+
+      {/*
+        Several agents mid-turn at once: one lane each. Parallel mode is left
+        to ParallelBatchPanel below, whose lanes also carry worktree and diff.
+      */}
+      {(currentSession?.orchestrationMode || '') !== 'parallel' && (
+        <AgentLanes
+          className="mx-3 mb-2"
+          runningTurns={runningTurnsHere}
+          messages={messages}
+          agentTypes={agentTypeByName}
+        />
+      )}
 
       {/*
         Parallel batches get their own view because the transcript stops being

@@ -230,6 +230,82 @@ function killProcessTree(pid) {
   } catch (e) {}
 }
 
+/*
+  WINDOWS JOB OBJECT: NOTHING WE START OUTLIVES US.
+
+  `52hz-server.exe --job-guard` holds a Job Object with KILL_ON_JOB_CLOSE (see
+  workspace/backend/cmd/server/jobguard_windows.go). Every child is adopted by
+  writing its PID to the guard's stdin; whatever those children start later is
+  in the job too. The guard's stdin is a pipe only this process holds, so when
+  Electron ends -- including a Task Manager kill, where `before-quit` never
+  runs -- the guard sees EOF, gives the server a few seconds to close SQLite,
+  and exits; the kernel then kills everything left in the job.
+
+  Children are spawned DETACHED while the guard is up. Without that, libuv puts
+  each one in its own kill-on-close job, which (a) kills the server the instant
+  Electron dies, before it can checkpoint the database, and (b) is configured
+  with silent breakaway, so anything the server or connector launches -- agent
+  CLIs, verification commands, terminals -- escapes it and is orphaned.
+*/
+let jobGuardProcess = null;
+let jobGuardBin = null;
+
+function jobGuardActive() {
+  return process.platform === 'win32' && !!(jobGuardProcess && jobGuardProcess.pid);
+}
+
+function adoptIntoJob(child) {
+  if (!jobGuardActive() || !child || !child.pid) return;
+  try {
+    jobGuardProcess.stdin.write(`${child.pid}\n`);
+  } catch (e) {
+    console.warn(`[52hzAgents Desktop] Could not adopt PID ${child.pid} into the job: ${e.message}`);
+  }
+}
+
+function startJobGuard(bin) {
+  if (process.platform !== 'win32' || !bin) return;
+  jobGuardBin = bin;
+  try {
+    jobGuardProcess = spawn(bin, ['--job-guard'], {
+      env: { ...process.env, PARENT_PID: `${process.pid}` },
+      stdio: ['pipe', 'ignore', 'ignore'],
+      windowsHide: true,
+      // Outside libuv's job, or it would be killed with us before its grace period.
+      detached: true,
+    });
+  } catch (e) {
+    console.warn(`[52hzAgents Desktop] Job guard failed to start: ${e.message}`);
+    jobGuardProcess = null;
+    return;
+  }
+  const guard = jobGuardProcess;
+  guard.stdin.on('error', () => {});
+  guard.on('error', (e) => {
+    console.warn(`[52hzAgents Desktop] Job guard error: ${e.message}`);
+    if (jobGuardProcess === guard) jobGuardProcess = null;
+  });
+  guard.on('exit', (code) => {
+    if (jobGuardProcess === guard) jobGuardProcess = null;
+    if (isQuitting) return;
+    // Its job took the server and connector with it; their own exit handlers
+    // are respawning them. Come back first so the respawned ones are adopted.
+    console.warn(`[52hzAgents Desktop] Job guard exited unexpectedly (code: ${code}), restarting`);
+    startJobGuard(jobGuardBin);
+  });
+  // A restart: adopt whatever is still running.
+  for (const child of [backendProcess, connectorProcess]) {
+    if (child && child.exitCode === null && child.signalCode === null) adoptIntoJob(child);
+  }
+}
+
+function stopJobGuard() {
+  if (!jobGuardProcess) return;
+  try {
+    jobGuardProcess.stdin.end();
+  } catch (e) {}
+}
+
 // Clean up any lingering 52hz-server orphan processes from previous crashes
 function cleanupOrphans() {
   if (process.platform === 'win32') {
@@ -289,6 +365,8 @@ async function startProductionStack() {
 
   if (serverBin) {
     console.log(`[52hzAgents Desktop] Starting bundled server from ${serverBin}`);
+    // Before any child exists, so each one can be adopted as it starts.
+    startJobGuard(serverBin);
     const spawnServer = () => {
       backendProcess = spawn(serverBin, [], {
         env: {
@@ -303,8 +381,11 @@ async function startProductionStack() {
           FRONTEND_STATIC_PATH: publicPath,
         },
         stdio: 'ignore',
-        detached: false,
+        windowsHide: true,
+        // Only while the guard's job is there to hold it; see startJobGuard.
+        detached: jobGuardActive(),
       });
+      adoptIntoJob(backendProcess);
       backendProcess.on('exit', (code, signal) => {
         if (!isQuitting) {
           console.warn(`[52hzAgents Desktop] 52hz-server exited unexpectedly (code: ${code}, signal: ${signal}), restarting in 1s...`);
@@ -339,7 +420,10 @@ async function startProductionStack() {
           WWJ_WORKSPACE_ENDPOINT: `http://127.0.0.1:${serverPort}`,
         },
         stdio: 'ignore',
+        windowsHide: true,
+        detached: jobGuardActive(),
       });
+      adoptIntoJob(connectorProcess);
 
       // If connector runs stably for at least 15s, reset crash counter
       if (connectorResetTimer) clearTimeout(connectorResetTimer);
@@ -1874,6 +1958,9 @@ app.on('before-quit', () => {
   if (sseReq) sseReq.destroy();
   if (backendProcess) killProcessTree(backendProcess.pid);
   if (connectorProcess) killProcessTree(connectorProcess.pid);
+  // Anything that left the trees above (terminals, reparented helpers) is
+  // still in the job; releasing the guard takes it down.
+  stopJobGuard();
   cleanupDevStack();
 });
 

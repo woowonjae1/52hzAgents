@@ -462,5 +462,27 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
     loadHistory();
   }, [loadHistory]);
 
-  return { messages, loading, error, forceRefresh, retryInitial, generation, loadOlder, hasOlder, loadingOlder };
+  /*
+    Show a stored snapshot (lib/message-snapshot.ts) for a thread whose history
+    is still loading. Used on a cold start, when the thread is already open
+    before IndexedDB has answered. Ignored once real history has landed or the
+    user has moved on, so it can only ever fill an empty transcript.
+
+    The cursors follow the snapshot: the poll then asks for everything `after`
+    its newest message, which closes any gap between the snapshot and the
+    50-message history window. History still loads and merges as usual.
+  */
+  const seedIfEmpty = useCallback((forSession: string, snapshot: WorkspaceMessage[]) => {
+    if (forSession !== currentSessionRef.current || historyLoadedRef.current) return;
+    const scoped = deduplicateAndSortMessages(scopeMessagesToSession(snapshot, forSession, parseDMSession(forSession)));
+    if (scoped.length === 0) return;
+    setMessages((prev) => (prev.length > 0 ? prev : scoped));
+    // Only fills cursors nothing has set: with history not loaded, nothing but
+    // this seed can have put messages (and so cursors) in place.
+    newestIdRef.current = newestIdRef.current ?? scoped[scoped.length - 1].messageId;
+    oldestIdRef.current = oldestIdRef.current ?? scoped[0].messageId;
+    setGeneration((g) => g + 1);
+  }, []);
+
+  return { messages, loading, error, forceRefresh, retryInitial, generation, loadOlder, hasOlder, loadingOlder, seedIfEmpty };
 }

@@ -303,27 +303,39 @@ export function PromptComposer({
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
+  /*
+    Only FILE drags are ours. These handlers used to preventDefault every drag,
+    which made the textarea refuse the one drop it handles natively: text
+    dragged in from the transcript or another app. A text drag now falls
+    through to the browser untouched. A file drag is still stopped here, so the
+    window-level dropzone (shared-storage upload) never sees it as well.
+  */
+  const isFileDrag = (e: React.DragEvent) => Array.from(e.dataTransfer.types).includes('Files');
+
   const handleDragEnter = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
     e.preventDefault();
     e.stopPropagation();
     dragCountRef.current += 1;
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsDragging(true);
-    }
+    if (!disabled) setIsDragging(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
     e.preventDefault();
     e.stopPropagation();
-    dragCountRef.current -= 1;
+    dragCountRef.current = Math.max(0, dragCountRef.current - 1);
     if (dragCountRef.current === 0) {
       setIsDragging(false);
     }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
     e.preventDefault();
     e.stopPropagation();
+    // The cursor says up front whether the drop will be taken.
+    e.dataTransfer.dropEffect = disabled ? 'none' : 'copy';
   };
 
   /**
@@ -370,10 +382,13 @@ export function PromptComposer({
   };
 
   const handleDrop = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     dragCountRef.current = 0;
+    // A disabled composer cannot send, so it must not collect attachments either.
+    if (disabled) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       addFiles(e.dataTransfer.files);
     }

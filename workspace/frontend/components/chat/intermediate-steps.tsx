@@ -289,6 +289,33 @@ function isPlaceholderThinking(message: WorkspaceMessage): boolean {
   return t === '' || t === 'thinking...' || t === 'thinking';
 }
 
+/**
+ * One line for a step in a compact view (the agent lanes), using the same
+ * parsing as the transcript so both say the same thing about it. Null for a
+ * bare "thinking..." placeholder, which says nothing.
+ */
+export function describeStep(message: WorkspaceMessage): { label: string; Icon: typeof Wrench } | null {
+  if (message.messageType === 'todos') return { label: 'Updated the todo list', Icon: Activity };
+  if (isPlaceholderThinking(message)) return null;
+  const parsed = isToolCallMessage(message)
+    ? parseMessageStep(message)
+    : message.messageType === 'thinking'
+    ? { type: 'thinking' as const, text: message.content }
+    : parseStepContent(message.content);
+  const firstLine = (s?: string) => (s || '').replace(/^\*\*Thinking:\*\*\s*/, '').trim().split(/\r?\n/)[0].slice(0, 160);
+  let label: string;
+  if (parsed.type === 'tool_call') {
+    label = parsed.summary ? `${parsed.toolDisplay} · ${firstLine(parsed.summary)}` : parsed.toolDisplay || 'Tool call';
+  } else if (parsed.type === 'subagents') {
+    label = `Subagents (${parsed.subagents?.length ?? 0})`;
+  } else if (parsed.type === 'compacting') {
+    label = 'Compacting context';
+  } else {
+    label = firstLine(parsed.text) || (parsed.type === 'thinking' ? 'Thinking' : 'Working');
+  }
+  return { label, Icon: getStepIcon(parsed) };
+}
+
 function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
   const [open, setOpen] = useState(true);
   const [copiedId, setCopiedId] = useState<number | null>(null);

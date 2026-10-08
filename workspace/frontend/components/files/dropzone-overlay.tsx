@@ -23,30 +23,40 @@ export function DropzoneOverlay() {
     }
     let dragCounter = 0;
 
+    /*
+      Files only. These window listeners used to preventDefault EVERY drag and
+      raise the upload overlay for any of them, so dragging a sentence from the
+      transcript into the composer, or text from another app into any field,
+      was refused app-wide and flashed "drop to upload" on the way.
+    */
+    const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
+
     const handleDragEnter = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
       dragCounter++;
-      if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
-        setIsDragging(true);
-      }
+      setIsDragging(true);
     };
 
     const handleDragLeave = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
-      dragCounter--;
+      dragCounter = Math.max(0, dragCounter - 1);
       if (dragCounter === 0) {
         setIsDragging(false);
       }
     };
 
     const handleDragOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
     };
 
     const handleDrop = async (e: DragEvent) => {
+      if (!isFileDrag(e)) return;
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);

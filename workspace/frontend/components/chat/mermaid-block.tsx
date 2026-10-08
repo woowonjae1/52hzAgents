@@ -8,6 +8,29 @@ let mermaidRenderQueue: Promise<void> = Promise.resolve();
 let mermaidInitializedTheme: "default" | "dark" | null = null;
 let mermaidRenderSequence = 0;
 
+/*
+  Rendered SVG by theme + source. The transcript is virtualised, so a diagram
+  scrolled out and back is a fresh mount: without this it re-ran mermaid.render
+  every time and showed the short "Rendering..." placeholder first, and the
+  height change made the virtualizer re-measure and the list jump.
+*/
+const SVG_CACHE_MAX = 60;
+const svgCache = new Map<string, string>();
+
+function svgCacheKey(theme: "default" | "dark", chart: string) {
+	return `${theme}\u0000${chart}`;
+}
+
+function rememberSvg(key: string, svg: string) {
+	svgCache.delete(key);
+	svgCache.set(key, svg);
+	while (svgCache.size > SVG_CACHE_MAX) {
+		const oldest = svgCache.keys().next().value;
+		if (oldest === undefined) break;
+		svgCache.delete(oldest);
+	}
+}
+
 export function runMermaidRender<T>(task: () => Promise<T>): Promise<T> {
 	const run = mermaidRenderQueue.then(task, task);
 	mermaidRenderQueue = run.then(
@@ -38,11 +61,19 @@ export function MermaidBlock({
 	const { resolvedTheme } = useTheme();
 	const reactId = useId();
 	const renderId = `mermaid-${reactId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-	const [svg, setSvg] = useState<string | null>(null);
+	const cacheKey = svgCacheKey(resolvedTheme === "dark" ? "dark" : "default", chart);
+	const [svg, setSvg] = useState<string | null>(() => svgCache.get(cacheKey) ?? null);
 	const [error, setError] = useState<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
+		const cached = svgCache.get(cacheKey);
+		if (cached) {
+			setError(null);
+			setSvg(cached);
+			return;
+		}
+
 		let cancelled = false;
 		let activeRenderId: string | null = null;
 		let errorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -71,6 +102,9 @@ export function MermaidBlock({
 					const cleanChart = sanitizeMermaidSource(chart);
 					const result = await mermaid.render(activeRenderId, cleanChart);
 					removeMermaidRenderArtifacts(activeRenderId);
+					// Not while streaming (deferErrors): every chunk is a new
+					// half-finished source that will never be asked for again.
+					if (!deferErrors) rememberSvg(cacheKey, result.svg);
 					if (!cancelled) {
 						setSvg(result.svg);
 					}
@@ -109,7 +143,7 @@ export function MermaidBlock({
 				removeMermaidRenderArtifacts(activeRenderId);
 			}
 		};
-	}, [chart, deferErrors, renderId, resolvedTheme]);
+	}, [chart, deferErrors, renderId, resolvedTheme, cacheKey]);
 
 	useEffect(() => {
 		if (svg && containerRef.current) {

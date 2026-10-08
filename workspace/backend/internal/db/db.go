@@ -113,3 +113,17 @@ func InitDB() {
 
 	log.Println("Database auto-migration completed successfully.")
 }
+
+// Close releases the connection pool. For SQLite in WAL mode, closing the last
+// connection checkpoints the WAL into the main database file, so a stopped
+// server leaves one self-contained workspace.db behind.
+func Close() error {
+	if DB == nil {
+		return nil
+	}
+	sqlDB, err := DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
+}

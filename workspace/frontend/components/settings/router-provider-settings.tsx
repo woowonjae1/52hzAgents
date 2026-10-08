@@ -92,8 +92,22 @@ export function RouterProviderSettings() {
   };
 
   const test = async () => {
+    if (!config) return;
     setTesting(true);
     try {
+      // First save current inputs so testing validates current configuration
+      // and prevent refreshed server config from wiping in-progress user changes.
+      const response = await workspaceApi.updateRouterConfig({
+        ...(enabledTouched ? { enabled: config.enabled } : {}),
+        provider: config.provider,
+        model: config.model,
+        api_key: config.api_key,
+        base_url: config.base_url || null,
+      });
+      setConfig(response.config);
+      setSource(response.source);
+      setEnabledTouched(false);
+
       const result = await workspaceApi.testRouterConfig();
       if (result.ok) {
         toast.success('The router answered. Settings are working.');

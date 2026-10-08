@@ -160,6 +160,9 @@ func DiscoverNetwork(c *gin.Context) {
 			"participants":              participants, "created_at": channel.CreatedAt.UnixMilli(),
 			"last_event_at": channel.LastEventAt, "status": channel.Status, "starred": channel.Starred,
 			"working_dir": channel.WorkingDir,
+			// Without it every poll reset the client's copy to null: the thread's
+			// quality gate was set and enforced, but never visible after a reload.
+			"verification_cmd": channel.VerificationCmd,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{"agents": agents, "channels": channelItems, "mods": []string{}, "resources": []string{"files", "todos", "timers", "routines", "notifications"}})

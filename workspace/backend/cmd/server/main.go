@@ -3,15 +3,19 @@ package main // 声明 main 主包。
 // 引入所需标准库，以及 Gin 框架和内部编写的配置、数据库、事件处理器、广播 Hub 以及后台调度器。
 import (
 	"bytes"         // 把内嵌文件包成 ReadSeeker 交给 http.ServeContent。
+	"context"       // 优雅关闭的超时控制
+	"errors"        // 区分正常关闭与启动失败
 	"fmt"           // 用于进行格式化拼接生成监听地址字符串。
 	"io/fs"         // 读取内嵌前端导出的 fs.FS。
 	"log"           // 用于输出后台服务的启动和错误日志。
 	"net/http"      // 包含标准 HTTP 状态码定义。
 	"os"            // 文件系统操作与路径探测
+	"os/signal"     // SIGINT/SIGTERM 触发优雅关闭
 	"path"          // URL 路径（斜杠语义），与 filepath 的平台语义不同
 	"path/filepath" // 文件路径处理
 	"strconv"       // 进程 ID 转换
 	"strings"       // 字符串前缀判断
+	"syscall"       // SIGTERM
 	"time"          // 监控定时器
 	// 内嵌 IANA 时区库。Windows 没有 /usr/share/zoneinfo，缺了它
 	// time.LoadLocation("Asia/Shanghai") 会失败，所有定时任务都会静默退回
@@ -28,27 +32,39 @@ import (
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/webui"     // 内嵌前端导出，使二进制自包含。
 )
 
-func startParentWatchdog(ppid int) {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		if !isParentAlive(ppid) {
-			log.Printf("[52hz-server] Parent process (PID %d) has exited. Cleanly shutting down server...", ppid)
-			os.Exit(0)
-		}
+// shutdownRequests carries the reason the server should stop. Buffered so a
+// request that arrives before the listener is up (the parent dying during DB
+// init) is not lost; later requests are dropped, the first one wins.
+var shutdownRequests = make(chan string, 1)
+
+func requestShutdown(reason string) {
+	select {
+	case shutdownRequests <- reason:
+	default:
 	}
 }
 
 func main() { // 服务程序运行主入口函数。
+	// The desktop shell's Job Object holder. A different program sharing this
+	// binary so the installer ships one executable; see jobguard_windows.go.
+	if len(os.Args) > 1 && os.Args[1] == "--job-guard" {
+		runJobGuard()
+		return
+	}
+
 	log.Println("Initializing 52hzAgents Workspace Server (Go Edition)...") // 打印初始化提示日志。
 
-	// Parent watchdog: if launched by desktop shell, terminate cleanly if parent dies
+	// Parent watchdog: when the desktop shell that launched us is gone, stop
+	// gracefully (close the listener, then SQLite) instead of being orphaned.
 	if ppidStr := os.Getenv("PARENT_PID"); ppidStr != "" {
 		if ppid, err := strconv.Atoi(ppidStr); err == nil && ppid > 0 {
 			log.Printf("[52hz-server] Attached to parent process PID %d with watchdog", ppid)
-			go startParentWatchdog(ppid)
+			watchParent(ppid, func() { requestShutdown(fmt.Sprintf("parent process %d exited", ppid)) })
 		}
 	}
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+	go func() { requestShutdown(fmt.Sprintf("received %v", <-signals)) }()
 
 	// Load configuration
 	config.LoadConfig()                                               // 调用并加载所有的环境变量配置。
@@ -125,8 +141,8 @@ func main() { // 服务程序运行主入口函数。
 		v1.PATCH("/workspaces/:workspace_id/channels/:channel_name", handlers.PatchChannel)      // 修改会话通道属性。
 		v1.GET("/workspaces/:workspace_id/channels/:channel_name", handlers.GetChannel)          // 获取单通道详情。
 		v1.GET("/workspaces/:workspace_id/tokens/stats", handlers.GetWorkspaceTokenStatsHandler) // 获取工作区多智能体 Token 治理与上下文健康大盘
-		v1.GET("/workspaces/:workspace_id/activity/commits", handlers.GetActivityCommits) // 工作区仓库的本地 commit 日历（含 agent 归属）
-		v1.GET("/workspaces/:workspace_id/activity/turns", handlers.GetActivityTurns)     // 某一天各 agent 的轮次时间线
+		v1.GET("/workspaces/:workspace_id/activity/commits", handlers.GetActivityCommits)        // 工作区仓库的本地 commit 日历（含 agent 归属）
+		v1.GET("/workspaces/:workspace_id/activity/turns", handlers.GetActivityTurns)            // 某一天各 agent 的轮次时间线
 		v1.GET("/workspaces/:workspace_id/policy/exec", handlers.GetWorkspaceExecPolicy)         // 获取命令执行安全策略
 		v1.PUT("/workspaces/:workspace_id/policy/exec", handlers.UpdateWorkspaceExecPolicy)      // 更新命令执行安全策略
 
@@ -409,7 +425,26 @@ func main() { // 服务程序运行主入口函数。
 
 	address := fmt.Sprintf("%s:%d", config.GlobalConfig.Host, config.GlobalConfig.Port) // 格式化拼接生成服务监听地址。
 	log.Printf("Starting server on %s", address)                                        // 打印准备开始监听的日志。
-	if err := router.Run(address); err != nil {                                         // 启动 HTTP 服务开始接收请求。
-		log.Fatalf("Server failed to run: %v", err) // 如果运行失败，强制崩溃退出并打印日志。
-	} // 结束运行校验。
+	srv := &http.Server{Addr: address, Handler: router}
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Server failed to run: %v", err) // 如果运行失败，强制崩溃退出并打印日志。
+		}
+	}()
+
+	reason := <-shutdownRequests
+	log.Printf("[52hz-server] Shutting down: %s", reason)
+	// SSE streams never go idle, so Shutdown waits out the whole timeout while
+	// they are open. Keep it short: nothing is waiting on an orderly goodbye.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		log.Printf("[52hz-server] HTTP shutdown: %v", err)
+	}
+	// Closing the pool is what checkpoints SQLite's WAL back into the main
+	// file. os.Exit, which this used to call, skipped it.
+	if err := db.Close(); err != nil {
+		log.Printf("[52hz-server] Closing database: %v", err)
+	}
+	log.Printf("[52hz-server] Stopped")
 } // 结束 main 函数。
