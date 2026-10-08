@@ -238,17 +238,29 @@ export function HomeDashboard() {
   }, [setTasksTab, setViewMode]);
 
   // ── Start ──
-  const canStart = activeOnlineSelected.length > 0 && !starting;
-  // Why Start is off; when it is on, the chips under the task say what it will do.
+  const effectiveParticipants = React.useMemo(() => {
+    if (activeOnlineSelected.length > 0) return activeOnlineSelected;
+    if (selected.length > 0) return selected;
+    if (onlineAgents.length > 0) return [onlineAgents[0].agentName];
+    if (agents.length > 0) return [agents[0].agentName];
+    if (allAvailableAgents.length > 0) return [allAvailableAgents[0].agentName];
+    return [];
+  }, [activeOnlineSelected, selected, onlineAgents, agents, allAvailableAgents]);
+
+  const canStart = !starting;
   const blockedHint =
-    counts.online === 0
-      ? 'No agent is online. Connect an agent below to start a session.'
-      : activeOnlineSelected.length === 0
-        ? 'Tick at least one online agent below to start.'
+    allAvailableAgents.length === 0
+      ? 'No agent available. Connect an agent below to start a session.'
+      : counts.online === 0 && selected.length === 0
+        ? 'No agent is online. You can still start or connect an agent below.'
         : null;
 
   const handleStart = async () => {
-    if (!canStart) return;
+    if (starting) return;
+    if (effectiveParticipants.length === 0 && allAvailableAgents.length === 0) {
+      toast.error('No agents available. Please connect or configure an agent first.');
+      return;
+    }
     setStarting(true);
     const text = task.trim();
     // The view switches in the same flush that opens the draft, so the chat is
@@ -258,7 +270,7 @@ export function HomeDashboard() {
     if (isMobile) openMobileDetail();
     try {
       const session = await createSession({
-        participants: activeOnlineSelected,
+        participants: effectiveParticipants,
         workingDir: dir || undefined,
         master: effectiveLead ?? undefined,
         orchestrationMode: mode,
@@ -266,12 +278,12 @@ export function HomeDashboard() {
       const id = session.sessionId;
       saveThreadProfile(id, profile);
       for (const [agentName, modelId] of Object.entries(modelPicks)) {
-        if (!activeOnlineSelected.includes(agentName)) continue;
+        if (!effectiveParticipants.includes(agentName)) continue;
         rememberForSession(id, agentName, modelId);
         setCurrentModel(agentName, modelId);
       }
       for (const [agentName, effort] of Object.entries(effortPicks)) {
-        if (!activeOnlineSelected.includes(agentName)) continue;
+        if (!effectiveParticipants.includes(agentName)) continue;
         workspaceApi
           .sendAgentControl(agentName, 'set_effort', { effort })
           .catch((e) =>

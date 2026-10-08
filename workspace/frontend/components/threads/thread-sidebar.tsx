@@ -90,10 +90,15 @@ export function ThreadSidebar() {
     carries all of it. The quick path (an immediate draft with everyone) is
     still C / the palette's "New chat", and "New chat here" on a project row.
   */
-  const startNewSession = React.useCallback(() => {
-    setCurrentSessionId(null);
-    setViewMode('home');
-  }, [setCurrentSessionId, setViewMode]);
+  const startNewSession = React.useCallback(async () => {
+    try {
+      await createSession();
+      setViewMode('threads');
+      if (isMobile) openMobileDetail();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create new session');
+    }
+  }, [createSession, setViewMode, isMobile, openMobileDetail]);
 
   /*
     Per channel, what the agents themselves reported: a channel with any
