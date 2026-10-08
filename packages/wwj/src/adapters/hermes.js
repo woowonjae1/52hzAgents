@@ -371,7 +371,7 @@ class HermesAdapter extends BaseAdapter {
     if (!proc || proc.exitCode !== null) return;
     try {
       if (IS_WINDOWS) {
-        try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000 }); } catch {}
+        try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000, windowsHide: true, stdio: 'ignore' }); } catch {}
       } else {
         try { process.kill(-proc.pid, 'SIGTERM'); } catch {
           proc.kill('SIGTERM');

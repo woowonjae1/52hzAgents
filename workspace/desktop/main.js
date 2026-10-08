@@ -223,7 +223,7 @@ function killProcessTree(pid) {
   if (!pid) return;
   try {
     if (process.platform === 'win32') {
-      execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore' });
+      execSync(`taskkill /PID ${pid} /T /F`, { stdio: 'ignore', windowsHide: true });
     } else {
       process.kill(-pid, 'SIGKILL');
     }
@@ -310,7 +310,7 @@ function stopJobGuard() {
 function cleanupOrphans() {
   if (process.platform === 'win32') {
     try {
-      execSync('taskkill /IM 52hz-server.exe /F', { stdio: 'ignore' });
+      execSync('taskkill /IM 52hz-server.exe /F', { stdio: 'ignore', windowsHide: true });
     } catch (e) {}
   }
   // Clear any stale WWJ daemon PID file and kill stale daemon process
@@ -620,6 +620,7 @@ function ensureDevStackRunning() {
       cwd: path.resolve(__dirname, '..'),
       detached: true,
       stdio: 'ignore',
+      windowsHide: true,
     });
     devServerProcess.unref();
     setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort || DEFAULT_PORT}`), 5000);

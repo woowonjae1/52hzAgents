@@ -201,6 +201,7 @@ func RunVerificationCommand(dir, command string, timeout time.Duration) (*Verifi
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
+	setWindowsHidden(cmd)
 	cmd.Dir = dir
 
 	// 3. Strict Environment Whitelist: never inherit secrets/keys

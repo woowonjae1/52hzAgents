@@ -526,7 +526,7 @@ class OpenClawAdapter extends BaseAdapter {
         try { proc.kill('SIGINT'); } catch {}
         await new Promise((resolve) => setTimeout(resolve, 300));
         if (proc.exitCode === null) {
-          try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000 }); } catch {}
+          try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000, windowsHide: true, stdio: 'ignore' }); } catch {}
         }
       } else {
         try { process.kill(-proc.pid, 'SIGTERM'); } catch { proc.kill('SIGTERM'); }

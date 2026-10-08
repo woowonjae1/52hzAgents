@@ -353,7 +353,7 @@ class AmpAdapter extends BaseAdapter {
     if (!proc || proc.exitCode !== null) return;
     try {
       if (IS_WINDOWS) {
-        try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000 }); } catch {}
+        try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000, windowsHide: true, stdio: 'ignore' }); } catch {}
         return;
       }
       // POSIX: kill the whole process group (proc was detached) so child

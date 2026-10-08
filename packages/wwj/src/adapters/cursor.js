@@ -142,7 +142,7 @@ class CursorAdapter extends BaseAdapter {
           proc.once('exit', () => { clearTimeout(timeout); resolve(true); });
         });
         if (!exited) {
-          try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000 }); } catch {}
+          try { execSync(`taskkill /F /T /PID ${proc.pid}`, { timeout: 5000, windowsHide: true, stdio: 'ignore' }); } catch {}
         }
       } else {
         try { process.kill(-proc.pid, 'SIGTERM'); } catch {

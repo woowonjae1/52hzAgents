@@ -359,7 +359,7 @@ class Daemon {
     for (const pid of pids) {
       try {
         if (IS_WINDOWS) {
-          execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore', timeout: 5000 });
+          execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore', timeout: 5000, windowsHide: true });
         } else {
           process.kill(pid, 'SIGTERM');
         }
@@ -373,14 +373,14 @@ class Daemon {
       let alive = Daemon._isAlive(pid);
       for (let i = 0; alive && i < 5; i++) {
         execSync(IS_WINDOWS ? 'ping -n 2 127.0.0.1 >nul' : 'sleep 0.5', {
-          stdio: 'ignore', timeout: 5000,
+          stdio: 'ignore', timeout: 5000, windowsHide: true,
         });
         alive = Daemon._isAlive(pid);
       }
       if (alive) {
         try {
           if (IS_WINDOWS) {
-            execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore', timeout: 5000 });
+            execSync(`taskkill /F /PID ${pid}`, { stdio: 'ignore', timeout: 5000, windowsHide: true });
           } else {
             process.kill(pid, 'SIGKILL');
           }
@@ -757,6 +757,7 @@ class Daemon {
       // On Windows, always use shell so .cmd/.ps1 shims on PATH are found
       // Use cmd /c with chcp 65001 to force UTF-8 output (fixes GBK garbled text)
       spawnOpts.shell = true;
+      spawnOpts.windowsHide = true;
     }
 
     const proc = spawn(binary, args, spawnOpts);
@@ -848,7 +849,7 @@ class Daemon {
     // Try graceful termination
     try {
       if (IS_WINDOWS) {
-        execSync(`taskkill /PID ${proc.pid}`, { stdio: 'ignore', timeout: 5000 });
+        execSync(`taskkill /PID ${proc.pid}`, { stdio: 'ignore', timeout: 5000, windowsHide: true });
       } else {
         proc.kill('SIGTERM');
       }
@@ -863,7 +864,7 @@ class Daemon {
     if (!died) {
       try {
         if (IS_WINDOWS) {
-          execSync(`taskkill /F /PID ${proc.pid}`, { stdio: 'ignore', timeout: 5000 });
+          execSync(`taskkill /F /PID ${proc.pid}`, { stdio: 'ignore', timeout: 5000, windowsHide: true });
         } else {
           proc.kill('SIGKILL');
         }

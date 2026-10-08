@@ -162,6 +162,7 @@ func runGitTimeout(dir string, timeout time.Duration, args ...string) (string, e
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
+	setWindowsHidden(cmd)
 	cmd.Dir = dir
 
 	var stdoutBuf, stderrBuf bytes.Buffer
@@ -605,6 +606,7 @@ func runGitNet(dir string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), gitNetworkTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
+	setWindowsHidden(cmd)
 	cmd.Dir = dir
 	// GIT_TERMINAL_PROMPT=0 makes git fail with "could not read Username" rather
 	// than waiting forever; the empty ASKPASS vars stop any GUI helper from
