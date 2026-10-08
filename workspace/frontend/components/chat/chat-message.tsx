@@ -1119,6 +1119,17 @@ export const ChatMessage = memo(function ChatMessage({
         )}
 
         <div className="flex-1 min-w-0 space-y-1.5">
+          {/*
+            A reply that continues its own Thought group hides the header (the
+            name is already on the group above), and the time went with it --
+            so agent replies showed no time while the user's did. Keep the
+            time, right-aligned where the header would have put it.
+          */}
+          {hideHeader && timestamp && (
+            <div className="flex justify-end px-1 text-[11px] leading-none text-muted-foreground tabular-nums select-none">
+              {timestamp}
+            </div>
+          )}
           {/* Identity Header */}
           {!hideHeader && (
           <div className="flex items-center gap-1.5 px-1 text-[11px] leading-none text-muted-foreground select-none">

@@ -132,7 +132,7 @@ function renderMentions(
           return (
             <span
               key={`mention-${keyCounter}`}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs leading-[1.35] align-middle"
+              className="mention-chip inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-surface2 border border-border text-foreground font-medium text-2xs leading-[1.35] align-middle"
               style={{ color }}
             >
               <span className="size-1.5 rounded-full shrink-0" style={{ background: color }} />

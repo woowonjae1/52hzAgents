@@ -2035,3 +2035,20 @@ textarea,
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 0 0 1px rgba(255, 255, 255, 0.05);
 }
+
+/*
+  MENTION CHIPS INSIDE THE USER'S OWN BUBBLE.
+
+  The chip is a dark surface with the agent's identity colour as its text. On
+  the transcript that reads fine; inside the saturated user bubble it was a
+  dark-on-blue smudge whose label (often a blue identity colour) all but
+  vanished. In the bubble it takes the bubble's own language instead: a
+  translucent white plate and the bubble's foreground. The dot keeps the
+  identity colour, so which agent it is still reads at a glance.
+  `!important` on colour only, to beat the inline identity colour.
+*/
+.text-bubble-user-foreground .mention-chip {
+  background: rgb(255 255 255 / 0.16);
+  border-color: rgb(255 255 255 / 0.3);
+  color: var(--bubble-user-foreground) !important;
+}
