@@ -918,3 +918,17 @@ type WorkProfile struct {
 }
 
 func (WorkProfile) TableName() string { return "work_profiles" }
+
+// SavedWorkflow is a reusable, named multi-agent pipeline/workflow template.
+// Steps are stored as a JSON-encoded array of PipelineStep items.
+type SavedWorkflow struct {
+	ID          string    `gorm:"primaryKey;type:text" json:"id"`
+	WorkspaceID string    `gorm:"type:uuid;not null;uniqueIndex:uq_saved_workflow_name" json:"workspace_id"`
+	Name        string    `gorm:"type:text;not null;uniqueIndex:uq_saved_workflow_name" json:"name"`
+	Description string    `gorm:"type:text;not null;default:''" json:"description"`
+	StepsJSON   string    `gorm:"type:text;not null" json:"steps_json"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (SavedWorkflow) TableName() string { return "saved_workflows" }

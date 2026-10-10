@@ -54,6 +54,7 @@ import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { SkillsView } from '@/components/skills/skills-view';
 import { RouterProviderSettings } from './router-provider-settings';
 import { WorkProfilesSettings } from './work-profiles-settings';
+import { SavedWorkflowsSettings } from './saved-workflows-settings';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
@@ -656,6 +657,8 @@ export function SettingsView() {
               {!showConnectAgent && <RouterProviderSettings />}
               {/* Who delegated work goes to, and how: agents pick from these. */}
               {!showConnectAgent && <WorkProfilesSettings />}
+              {/* Reusable multi-agent relay pipelines */}
+              {!showConnectAgent && <SavedWorkflowsSettings />}
               {showConnectAgent ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">

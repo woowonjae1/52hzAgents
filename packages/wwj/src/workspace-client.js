@@ -1170,6 +1170,20 @@ class WorkspaceClient {
     return this._get(`/v1/workspaces/${encodeURIComponent(workspaceId)}/profiles`, this._wsHeaders(token));
   }
 
+  /** Reusable pipeline workflows saved in the workspace. */
+  async listWorkflows(workspaceId, token) {
+    return this._get(`/v1/workspaces/${encodeURIComponent(workspaceId)}/workflows`, this._wsHeaders(token));
+  }
+
+  /** Run a saved workflow in a channel. */
+  async runWorkflow(workspaceId, workflowId, token, { channel, source }) {
+    return this._post(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/workflows/${encodeURIComponent(workflowId)}/run`,
+      { channel, source },
+      this._wsHeaders(token),
+    );
+  }
+
   /**
    * Start a delegation in `channelName`: one isolated lane per task.
    * @param {Array<{profile?: string, agent?: string, mode?: string, task: string, scope?: string}>} tasks

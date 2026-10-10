@@ -226,6 +226,10 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/profiles", handlers.CreateWorkProfile)
 		v1.PATCH("/workspaces/:workspace_id/profiles/:profile_id", handlers.UpdateWorkProfile)
 		v1.DELETE("/workspaces/:workspace_id/profiles/:profile_id", handlers.DeleteWorkProfile)
+		v1.GET("/workspaces/:workspace_id/workflows", handlers.ListSavedWorkflows)                                            // 可保存复用的流水线工作流
+		v1.POST("/workspaces/:workspace_id/workflows", handlers.SaveWorkflow)
+		v1.DELETE("/workspaces/:workspace_id/workflows/:id", handlers.DeleteSavedWorkflow)
+		v1.POST("/workspaces/:workspace_id/workflows/:id/run", handlers.RunSavedWorkflow)
 		v1.GET("/router-config", handlers.GetRouterConfig)
 		v1.PUT("/router-config", handlers.UpdateRouterConfig)
 		v1.POST("/router-config/test", handlers.TestRouterConfig)

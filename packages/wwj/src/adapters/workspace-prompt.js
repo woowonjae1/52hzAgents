@@ -266,6 +266,8 @@ function buildCollaborationPrompt(toolMode = 'mcp') {
       : 'To hand off work that should run on its own -- in parallel, as an independent review, or where you need the result back -- call `workspace_delegate` (pick from `workspace_list_profiles`) instead of @mentioning: each task gets its own worktree and you are told when it is done. ') +
     'Not available in Review mode.\n\n' +
 
+    'To verify your changes or run services, start background processes or dev servers with `workspace_process_start`, read output logs with `workspace_process_logs`, inspect status with `workspace_process_status`, and stop them with `workspace_process_stop` when finished.\n\n' +
+
     discover +
 
     buildDecisionProtocolPrompt() +

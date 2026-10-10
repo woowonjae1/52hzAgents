@@ -20,6 +20,25 @@ const { WorkspaceClient } = require('./workspace-client');
 // Active tunnels: port → { proc, url }
 const _activeTunnels = {};
 
+// Active background processes: name → { proc, command, pid, port, startTime, running, logs }
+const _activeProcesses = {};
+
+function _cleanupBackgroundProcesses() {
+  for (const k of Object.keys(_activeProcesses)) {
+    const p = _activeProcesses[k];
+    if (p && p.running && p.pid) {
+      try {
+        if (process.platform === 'win32') {
+          execSync(`taskkill /F /T /PID ${p.pid}`, { stdio: 'ignore', windowsHide: true });
+        } else {
+          p.proc.kill('SIGKILL');
+        }
+      } catch {}
+    }
+  }
+}
+process.on('exit', _cleanupBackgroundProcesses);
+
 // ── Tool definitions ────────────────────────────────────────────────────────
 
 function buildToolDefs(disabledModules) {
@@ -441,6 +460,22 @@ function buildToolDefs(disabledModules) {
           required: ['id'],
         },
       },
+      {
+        name: 'workspace_list_workflows',
+        description: 'List saved multi-agent workflow / pipeline templates in the workspace.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'workspace_run_workflow',
+        description: 'Run a saved multi-agent workflow / pipeline template in the current thread.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            workflow_id: { type: 'string', description: 'ID of the workflow to run' },
+          },
+          required: ['workflow_id'],
+        },
+      },
     );
   }
 
@@ -534,7 +569,7 @@ function buildToolDefs(disabledModules) {
     );
   }
 
-  // -- Terminal Execution --
+  // -- Terminal Execution & Background Processes --
   if (!disabledModules.has('terminal')) {
     tools.push({
       name: 'workspace_terminal_execute',
@@ -549,6 +584,60 @@ function buildToolDefs(disabledModules) {
           approval_id: { type: 'string', description: 'Approval ID if granted by human (optional)' },
         },
         required: ['command'],
+      },
+    });
+
+    tools.push({
+      name: 'workspace_process_start',
+      description:
+        'Start a long-running background command or dev server (e.g. "npm run dev", "go run .", "npm test") ' +
+        'for self-verifying changes. Output is buffered and can be inspected with workspace_process_logs.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Unique name identifier for this process (e.g. "dev-server")' },
+          command: { type: 'string', description: 'Shell command to execute' },
+          working_dir: { type: 'string', description: 'Working directory relative to workspace root (optional)' },
+          port: { type: 'integer', description: 'Port number the service is expected to use (optional)' },
+        },
+        required: ['name', 'command'],
+      },
+    });
+
+    tools.push({
+      name: 'workspace_process_status',
+      description:
+        'Check status of background processes started with workspace_process_start (running state, exit code, uptime, port, log count).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Process name to check; omit to list all background processes' },
+        },
+      },
+    });
+
+    tools.push({
+      name: 'workspace_process_logs',
+      description: 'Read recent stdout/stderr output lines from a background process started with workspace_process_start.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Process name to read logs for' },
+          tail: { type: 'integer', description: 'Number of recent lines to return (default 50)', default: 50 },
+        },
+        required: ['name'],
+      },
+    });
+
+    tools.push({
+      name: 'workspace_process_stop',
+      description: 'Stop a running background process started with workspace_process_start.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Process name to stop' },
+        },
+        required: ['name'],
       },
     });
   }
@@ -1110,6 +1199,25 @@ class McpServer {
         );
       }
 
+      case 'workspace_list_workflows': {
+        const res = await this.ws.listWorkflows(this.workspaceId, this.token);
+        const wfs = res && res.workflows ? res.workflows : [];
+        if (wfs.length === 0) return text('No saved workflows in this workspace.');
+        const lines = wfs.map((w) => {
+          const steps = (w.steps || []).map((s) => `@${s.agent}: ${s.instruction}`).join(' -> ');
+          return `- "${w.name}" (ID: ${w.id}): ${w.description || '(no description)'}\n  Steps: ${steps}`;
+        });
+        return text(`Saved workflows:\n` + lines.join('\n\n'));
+      }
+
+      case 'workspace_run_workflow': {
+        const res = await this.ws.runWorkflow(this.workspaceId, args.workflow_id, this.token, {
+          channel: this.channelName,
+          source: `agent:${this.agentName}`,
+        });
+        return text(`Workflow "${res.workflow}" launched successfully (Pipeline ID: ${res.pipeline_id}). First step started with @${res.step ? res.step.agent : 'agent'}.`);
+      }
+
       case 'workspace_send_notification': {
         const result = await this.ws.createNotification(
           this.workspaceId, this.token,
@@ -1228,6 +1336,117 @@ class McpServer {
           return text(`[EXECUTION DENIED] Command blocked by workspace security policy.\nReason: ${res.reason}`);
         }
         return text(`[COMMAND EXECUTED (exit code: ${res.exit_code || 0})]\n${res.output || '(No output)'}`);
+      }
+
+      // ── Process & Dev Server Management ──
+
+      case 'workspace_process_start': {
+        const pName = String(args.name || '').trim();
+        if (!pName) throw new Error('Missing process name');
+        if (_activeProcesses[pName] && _activeProcesses[pName].running) {
+          return text(`Process "${pName}" is already running (PID: ${_activeProcesses[pName].pid}). Use workspace_process_stop first if you want to restart it.`);
+        }
+        const path = require('path');
+        const cwd = args.working_dir ? path.resolve(process.cwd(), args.working_dir) : process.cwd();
+        const env = { ...process.env };
+        if (args.port) env.PORT = String(args.port);
+        const child = spawnChild(args.command, {
+          shell: true,
+          cwd,
+          env,
+          windowsHide: true,
+        });
+        const record = {
+          name: pName,
+          command: args.command,
+          pid: child.pid,
+          port: args.port || null,
+          startTime: Date.now(),
+          running: true,
+          exitCode: null,
+          signal: null,
+          proc: child,
+          logs: [],
+        };
+        const appendLog = (data) => {
+          const lines = String(data).split('\n');
+          for (const line of lines) {
+            if (line.length > 0) {
+              record.logs.push(`[${new Date().toISOString().slice(11, 19)}] ${line}`);
+              if (record.logs.length > 1000) record.logs.shift();
+            }
+          }
+        };
+        if (child.stdout) child.stdout.on('data', appendLog);
+        if (child.stderr) child.stderr.on('data', appendLog);
+        child.on('exit', (code, sig) => {
+          record.running = false;
+          record.exitCode = code;
+          record.signal = sig;
+          appendLog(`[Process exited with code ${code}${sig ? ` (${sig})` : ''}]`);
+        });
+        child.on('error', (err) => {
+          record.running = false;
+          appendLog(`[Process error: ${err.message}]`);
+        });
+        _activeProcesses[pName] = record;
+        return text(
+          `Process "${pName}" started in background (PID: ${child.pid}${args.port ? `, PORT: ${args.port}` : ''}).\n` +
+          `Use workspace_process_logs(name: "${pName}") to inspect output, and workspace_process_stop(name: "${pName}") when finished.`
+        );
+      }
+
+      case 'workspace_process_status': {
+        const pName = args.name ? String(args.name).trim() : null;
+        if (pName) {
+          const p = _activeProcesses[pName];
+          if (!p) return text(`No process found with name "${pName}".`);
+          const uptime = p.running ? `${Math.round((Date.now() - p.startTime) / 1000)}s` : 'stopped';
+          return text(JSON.stringify({
+            name: p.name,
+            running: p.running,
+            pid: p.pid,
+            port: p.port,
+            uptime,
+            exitCode: p.exitCode,
+            logLines: p.logs.length,
+          }, null, 2));
+        }
+        const keys = Object.keys(_activeProcesses);
+        if (keys.length === 0) return text('No background processes have been started.');
+        const list = keys.map((k) => {
+          const p = _activeProcesses[k];
+          const uptime = p.running ? `${Math.round((Date.now() - p.startTime) / 1000)}s` : 'stopped';
+          return `${p.name}: ${p.running ? 'RUNNING' : 'STOPPED'} (PID ${p.pid}, uptime ${uptime}${p.port ? `, port ${p.port}` : ''}, ${p.logs.length} logs)`;
+        });
+        return text(`Active background processes:\n` + list.join('\n'));
+      }
+
+      case 'workspace_process_logs': {
+        const pName = String(args.name || '').trim();
+        const p = _activeProcesses[pName];
+        if (!p) return text(`No process found with name "${pName}".`);
+        const tail = Number(args.tail) > 0 ? Number(args.tail) : 50;
+        const slice = p.logs.slice(-tail);
+        return text(slice.length > 0 ? slice.join('\n') : '(No log output yet)');
+      }
+
+      case 'workspace_process_stop': {
+        const pName = String(args.name || '').trim();
+        const p = _activeProcesses[pName];
+        if (!p) return text(`No process found with name "${pName}".`);
+        if (!p.running) return text(`Process "${pName}" is already stopped (exit code: ${p.exitCode}).`);
+        try {
+          if (process.platform === 'win32') {
+            execSync(`taskkill /F /T /PID ${p.pid}`, { stdio: 'ignore', windowsHide: true });
+          } else {
+            p.proc.kill('SIGTERM');
+          }
+        } catch {
+          try { p.proc.kill('SIGKILL'); } catch {}
+        }
+        p.running = false;
+        return text(`Process "${pName}" (PID ${p.pid}) stopped successfully.`);
       }
 
       default:

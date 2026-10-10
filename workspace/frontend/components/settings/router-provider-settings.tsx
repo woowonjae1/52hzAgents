@@ -142,8 +142,8 @@ export function RouterProviderSettings() {
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">Router model</h3>
           <p className="text-xs text-foreground-muted mt-1 leading-relaxed">
-            In Dynamic mode this model reads the conversation and picks which agent answers next.
-            Without it, a thread with several agents falls back to @mentions.
+            Optional routing assistant: reads the conversation to predict which agent answers next.
+            Recommended: Disabled. Direct orchestration (@mentions, master agent, and agent delegation tools) is faster, deterministic, and saves tokens.
           </p>
           {source === 'env' && (
             <p className="text-xs text-foreground-muted mt-1.5">

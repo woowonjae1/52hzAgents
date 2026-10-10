@@ -1022,6 +1022,22 @@ export interface RoutineRunRecord {
 }
 
 /**
+ * SavedWorkflow is a reusable, named multi-agent pipeline/workflow template.
+ * Steps are stored as a JSON-encoded array of PipelineStep items.
+ *
+ * Go: models.SavedWorkflow
+ */
+export interface SavedWorkflow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  steps_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
  * ScopeConflict names two tasks whose declared scopes overlap.
  *
  * Go: handlers.ScopeConflict

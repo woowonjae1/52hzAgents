@@ -186,6 +186,29 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     await this.request(`/v1/workspaces/${this.requireWorkspace()}/profiles/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
+  /** Reusable multi-agent workflow / pipeline templates. */
+  async listSavedWorkflows(): Promise<{ workflows: Array<{ id: string; name: string; description: string; steps: Wire.PipelineStep[]; created_at: string; updated_at: string }> }> {
+    return this.request(`/v1/workspaces/${this.requireWorkspace()}/workflows`);
+  }
+
+  async saveWorkflow(input: { name: string; description?: string; steps: Wire.PipelineStep[] }): Promise<Wire.SavedWorkflow> {
+    return this.request<Wire.SavedWorkflow>(`/v1/workspaces/${this.requireWorkspace()}/workflows`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async deleteSavedWorkflow(id: string): Promise<void> {
+    await this.request(`/v1/workspaces/${this.requireWorkspace()}/workflows/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+
+  async runSavedWorkflow(id: string, input: { channel: string; source?: string }): Promise<{ ok: boolean; pipeline_id: string; workflow: string; step: Wire.PipelineStep }> {
+    return this.request(`/v1/workspaces/${this.requireWorkspace()}/workflows/${encodeURIComponent(id)}/run`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
   async getRouterConfig(): Promise<RouterConfigResponse> {
     const params = new URLSearchParams({ network: this.requireWorkspace() });
     return this.request<RouterConfigResponse>(`/v1/router-config?${params}`);
