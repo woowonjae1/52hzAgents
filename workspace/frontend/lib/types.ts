@@ -44,6 +44,8 @@ export interface SkillCatalogEntry {
   source_repo: string;
   source_path: string;
   author: string;
+  trigger?: string;
+  featured?: boolean;
 }
 
 export interface WorkspaceCustomSkill {
@@ -53,6 +55,7 @@ export interface WorkspaceCustomSkill {
   category: 'custom';
   tags?: string[];
   author?: string;
+  trigger?: string;
   sourceType: 'workspace_file';
   fileId: string;
   filename: string;

@@ -420,6 +420,18 @@ export function ChatView() {
     if (prevSessionIdRef.current && prevSessionIdRef.current !== currentSessionId && messages.length > 0) {
       cacheMessages(prevSessionIdRef.current, messages);
     }
+    // Check if a pending draft was requested (e.g. from Skills view "Use in Chat")
+    const pendingDraft = typeof window !== 'undefined' ? localStorage.getItem('52hz_pending_composer_draft') : null;
+    if (pendingDraft) {
+      try {
+        localStorage.removeItem('52hz_pending_composer_draft');
+      } catch {}
+      setInjectedDraft(pendingDraft);
+      prevSessionIdRef.current = currentSessionId;
+      setOptimisticMessages([]);
+      if (currentSessionId && !consumeSkipFocus()) setFocusKey((k) => k + 1);
+      return;
+    }
     // Restore draft for new session
     const restored = currentSessionId
       ? (draftsRef.current[currentSessionId] ?? (typeof window !== 'undefined' ? localStorage.getItem(`composer_draft_${currentSessionId}`) ?? '' : ''))
@@ -433,6 +445,19 @@ export function ChatView() {
     // the user wanted to navigate, not start typing.
     if (currentSessionId && !consumeSkipFocus()) setFocusKey((k) => k + 1);
   }, [currentSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Also listen for runtime draft injection (e.g. while already in the thread view)
+  useEffect(() => {
+    const handleApplyDraft = (e: Event) => {
+      const custom = e as CustomEvent<string>;
+      if (typeof custom.detail === 'string') {
+        setInjectedDraft(custom.detail);
+        setFocusKey((k) => k + 1);
+      }
+    };
+    window.addEventListener('52hz_apply_composer_draft', handleApplyDraft);
+    return () => window.removeEventListener('52hz_apply_composer_draft', handleApplyDraft);
+  }, []);
 
   // Keep cache updated with latest messages for the current session
   useEffect(() => {

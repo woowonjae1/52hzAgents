@@ -24,7 +24,7 @@ import { ActionSwapRollIcon } from '@/components/motion/action-swap-roll';
 import { Magnetic } from '@/components/motion/magnetic';
 import { cn } from '@/lib/utils';
 import { isComposing } from '@/lib/ime';
-import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession } from '@/lib/types';
+import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession, WorkspaceCustomSkill } from '@/lib/types';
 import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
@@ -32,6 +32,8 @@ import { composerPillClass } from './composer-pill';
 import { OrchestrationControl } from '@/components/chat/orchestration-control';
 import { AgentProfileControl } from '@/components/chat/agent-profile-control';
 import { ContextHealthIndicator } from '@/components/chat/context-health-indicator';
+import { CURATED_SKILLS, type CuratedSkill } from '@/lib/curated-skills';
+import { workspaceApi } from '@/lib/api';
 
 export type OrchestrationMode = 'dynamic' | 'master' | 'parallel';
 
@@ -227,6 +229,17 @@ export function PromptComposer({
     } catch {
       historyRef.current = [];
     }
+  }, [sessionKey]);
+
+  const [customSkills, setCustomSkills] = React.useState<WorkspaceCustomSkill[]>([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    workspaceApi.getCustomSkills()
+      .then((skills) => {
+        if (!cancelled && Array.isArray(skills)) setCustomSkills(skills);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [sessionKey]);
 
   const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>) => {
@@ -449,18 +462,50 @@ export function PromptComposer({
     return [...agentList, ...knowledgeList];
   }, [agents, knowledge, masterAgentName]);
 
+  type AgentMentionItem = { type: 'agent'; name: string; agent: WorkspaceAgent; isOnline: boolean };
+  type KnowledgeMentionItem = { type: 'knowledge'; name: string; knowledge: KnowledgeEntry };
+  type SkillMentionItem = {
+    type: 'skill';
+    name: string;
+    trigger: string;
+    description: string;
+    skill: CuratedSkill | WorkspaceCustomSkill;
+    author?: string;
+  };
+  type MentionItem = AgentMentionItem | KnowledgeMentionItem | SkillMentionItem;
+
+  const skillList: SkillMentionItem[] = React.useMemo(() => {
+    const list: SkillMentionItem[] = CURATED_SKILLS.map((s) => ({
+      type: 'skill',
+      name: s.trigger.replace(/^\//, ''),
+      trigger: s.trigger,
+      description: s.description,
+      skill: s,
+      author: s.author,
+    }));
+    for (const c of customSkills) {
+      const trig = c.trigger || `/${c.id.replace(/^[/-]+/, '')}`;
+      list.push({
+        type: 'skill',
+        name: trig.replace(/^\//, ''),
+        trigger: trig,
+        description: c.description || c.name,
+        skill: c,
+        author: c.author || 'Custom',
+      });
+    }
+    return list;
+  }, [customSkills]);
+
   /*
-    `/` is a knowledge-only entrance, so it drops the agents rather than
-    ranking them lower: someone who typed `/` is looking for a document, and
-    a list that answers with eight agents first has not understood the
-    question. `@` keeps both groups.
+    `/` offers skills and knowledge docs. `@` offers agents and knowledge docs.
   */
-  const scopedMentionItems = React.useMemo(
+  const scopedMentionItems = React.useMemo<MentionItem[]>(
     () =>
       mentionTrigger === '/'
-        ? mentionItems.filter((item) => item.type === 'knowledge')
+        ? [...skillList, ...mentionItems.filter((item): item is KnowledgeMentionItem => item.type === 'knowledge')]
         : mentionItems,
-    [mentionItems, mentionTrigger],
+    [mentionItems, skillList, mentionTrigger],
   );
 
   const filteredMentions = React.useMemo(() => {
@@ -469,6 +514,14 @@ export function PromptComposer({
     return scopedMentionItems.filter((item) => {
       if (item.type === 'agent') {
         return item.name.toLowerCase().includes(q) || item.agent.agentType?.toLowerCase().includes(q);
+      }
+      if (item.type === 'skill') {
+        return (
+          item.name.toLowerCase().includes(q) ||
+          item.trigger.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q) ||
+          item.skill.name.toLowerCase().includes(q)
+        );
       }
       return (
         item.name.toLowerCase().includes(q) ||
@@ -479,30 +532,46 @@ export function PromptComposer({
   }, [scopedMentionItems, mentionFilter]);
 
   const mentionGroups = React.useMemo(() => {
-    type AgentItem = { type: 'agent'; name: string; agent: WorkspaceAgent; isOnline: boolean };
-    type KnowledgeItem = { type: 'knowledge'; name: string; knowledge: KnowledgeEntry };
-    const agentMatches: AgentItem[] = [];
-    const knowledgeMatches: KnowledgeItem[] = [];
+    const agentMatches: AgentMentionItem[] = [];
+    const skillMatches: SkillMentionItem[] = [];
+    const knowledgeMatches: KnowledgeMentionItem[] = [];
     for (const item of filteredMentions) {
       if (item.type === 'agent') agentMatches.push(item);
+      else if (item.type === 'skill') skillMatches.push(item);
       else knowledgeMatches.push(item);
     }
-    return { agents: agentMatches, knowledge: knowledgeMatches };
+    return { agents: agentMatches, skills: skillMatches, knowledge: knowledgeMatches };
   }, [filteredMentions]);
 
-  const insertMention = (item: (typeof mentionItems)[number]) => {
+  const insertMention = (item: MentionItem) => {
     const ta = textareaRef.current;
     const val = message;
     const pos = ta?.selectionStart ?? val.length;
     const textBefore = val.slice(0, pos);
-    /*
-      Replace from whichever character opened the picker. What goes IN is
-      always `@name`: `/` is an entrance, not a second wire format, so
-      `extractMentionSegments` and the send path keep seeing one syntax.
-    */
     const active = findActiveTrigger(textBefore);
-    const atIdx = active ? active.index : textBefore.lastIndexOf('@');
 
+    if (item.type === 'skill') {
+      const slashIdx = active ? active.index : textBefore.lastIndexOf('/');
+      const insertText = `${item.trigger} `;
+      const updated = slashIdx >= 0 ? val.slice(0, slashIdx) + insertText + val.slice(pos) : insertText + val;
+
+      setMessage(updated);
+      onDraftChange?.(updated);
+      setShowMentions(false);
+      setMentionFilter('');
+
+      requestAnimationFrame(() => {
+        if (ta) {
+          const newPos = (slashIdx >= 0 ? slashIdx : 0) + insertText.length;
+          ta.setSelectionRange(newPos, newPos);
+          ta.focus();
+          resizeTextarea();
+        }
+      });
+      return;
+    }
+
+    const atIdx = active ? active.index : textBefore.lastIndexOf('@');
     const mentionText = `@${item.name} `;
     const updated = atIdx >= 0 ? val.slice(0, atIdx) + mentionText + val.slice(pos) : mentionText + val;
 
@@ -759,8 +828,57 @@ export function PromptComposer({
               </div>
             )}
 
-            {mentionGroups.knowledge.length > 0 && (
+            {mentionGroups.skills.length > 0 && (
               <div className={cn(mentionGroups.agents.length > 0 && 'pt-2.5')}>
+                <div className="flex items-center justify-between px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-primary select-none">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="size-3 text-primary" />
+                    <span>Skills ({mentionGroups.skills.length})</span>
+                  </div>
+                  <span className="text-3xs text-muted-foreground font-mono">Slash Commands</span>
+                </div>
+                <div className="space-y-0.5">
+                  {mentionGroups.skills.map((item) => {
+                    const globalIdx = filteredMentions.indexOf(item);
+                    const isSelected = globalIdx === mentionIndex;
+                    return (
+                      <button
+                        key={`${item.type}-${item.trigger}`}
+                        type="button"
+                        data-selected={isSelected ? 'true' : undefined}
+                        onClick={() => insertMention(item)}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-left transition-colors text-xs group select-none',
+                          isSelected
+                            ? 'bg-surface3 text-foreground font-medium ring-1 ring-border/60'
+                            : 'hover:bg-surface2/80 text-foreground'
+                        )}
+                      >
+                        <div className="size-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0 font-mono text-xs font-bold">
+                          /
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span className="truncate font-semibold font-mono text-primary text-xs">
+                              {item.trigger}
+                            </span>
+                            <span className="text-3xs text-muted-foreground truncate font-sans">
+                              {item.skill.name}
+                            </span>
+                          </div>
+                          <p className="text-2xs text-muted-foreground truncate leading-tight mt-0.5">
+                            {item.description}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {mentionGroups.knowledge.length > 0 && (
+              <div className={cn((mentionGroups.agents.length > 0 || mentionGroups.skills.length > 0) && 'pt-2.5')}>
                 <div className="flex items-center gap-1.5 px-2.5 py-1 text-3xs font-semibold uppercase tracking-wider text-status-warning select-none">
                   <BookOpen className="size-3" />
                   <span>Knowledge ({mentionGroups.knowledge.length})</span>
@@ -1033,7 +1151,7 @@ export function PromptComposer({
           placeholder={
             disabled
               ? (disabledReason || 'Connect an agent to start chatting…')
-              : 'Message 52hzAgents… (@ for agents, / for knowledge)'
+              : 'Message 52hzAgents… (@ for agents, / for skills)'
           }
           disabled={disabled}
           rows={1}

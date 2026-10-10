@@ -8,13 +8,15 @@ import type {
 import { BaseWorkspaceApi } from './base';
 
 export function mapCustomSkill(raw: Record<string, unknown>): WorkspaceCustomSkill {
+  const id = raw.id as string;
   return {
-    id: raw.id as string,
+    id,
     name: (raw.name || raw.id) as string,
     description: (raw.description as string) || '',
     category: 'custom',
     tags: (raw.tags as string[]) || [],
     author: (raw.author as string) || 'Workspace user',
+    trigger: (raw.trigger as string) || (id ? `/${id.replace(/^[/-]+/, '')}` : undefined),
     sourceType: 'workspace_file',
     fileId: (raw.file_id || raw.fileId) as string,
     filename: (raw.filename as string) || '',
