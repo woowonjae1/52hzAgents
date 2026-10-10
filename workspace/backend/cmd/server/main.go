@@ -216,6 +216,13 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/merge", handlers.MergeParallelBatch)                   // 用户确认后合并
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/discard", handlers.DiscardParallelBatch)               // 用户放弃整批改动
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/stop", handlers.StopParallelBatch)                     // 用户手动停止并行批次
+		v1.POST("/workspaces/:workspace_id/delegations", handlers.DelegateTasks)                                             // agent 委派：按 profile/agent 开并行分道
+		v1.GET("/workspaces/:workspace_id/delegations/:batch_id", handlers.GetDelegation)                                    // 委派状态（批次 + 各分道）
+		v1.POST("/workspaces/:workspace_id/delegations/:batch_id/cancel", handlers.CancelDelegation)                         // 委派者取消自己的委派
+		v1.GET("/workspaces/:workspace_id/profiles", handlers.ListWorkProfiles)                                              // 已保存的 profile（agent+model+mode）
+		v1.POST("/workspaces/:workspace_id/profiles", handlers.CreateWorkProfile)
+		v1.PATCH("/workspaces/:workspace_id/profiles/:profile_id", handlers.UpdateWorkProfile)
+		v1.DELETE("/workspaces/:workspace_id/profiles/:profile_id", handlers.DeleteWorkProfile)
 		v1.GET("/router-config", handlers.GetRouterConfig)
 		v1.PUT("/router-config", handlers.UpdateRouterConfig)
 		v1.POST("/router-config/test", handlers.TestRouterConfig)

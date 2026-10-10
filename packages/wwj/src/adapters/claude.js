@@ -1211,6 +1211,14 @@ class ClaudeAdapter extends BaseAdapter {
     mcpTools.push(`${pfx}workspace_get_todos`, `${pfx}workspace_list_timers`, `${pfx}workspace_list_routines`);
     mcpWriteTools.push(`${pfx}workspace_put_todos`, `${pfx}workspace_create_timer`, `${pfx}workspace_cancel_timer`, `${pfx}workspace_create_routine`, `${pfx}workspace_cancel_routine`);
 
+    // Delegation: reading profiles and a batch's status is fine in Review;
+    // starting or stopping lanes is not -- a read-only turn must not hand the
+    // edit it may not make to another agent.
+    if (!this.disabledModules.has('delegation')) {
+      mcpTools.push(`${pfx}workspace_list_profiles`, `${pfx}workspace_delegation_status`);
+      mcpWriteTools.push(`${pfx}workspace_delegate`, `${pfx}workspace_cancel_delegation`);
+    }
+
     if (this._modeFor(channelName) === 'plan') {
       cmd.push('--permission-mode', 'plan');
       cmd.push('--allowedTools', ...mcpTools, 'Read', 'Glob', 'Grep');

@@ -1,5 +1,11 @@
 /**
- * AGENT PROFILES — one-click presets for the kind of work a thread is for.
+ * WORK MODES (Fix / Review) — one-click presets for the kind of work a thread is for.
+ *
+ * Named "profiles" in code for historical reasons. In the UI these are MODES:
+ * a "profile" is a saved agent + model + mode preset that orchestrating agents
+ * delegate to (lib/api/orchestration `WorkProfile`, Settings > Agents >
+ * Profiles), and it reuses exactly these two modes, their labels and
+ * `isReadOnlyEnforced`, so there is one vocabulary for "may this agent edit".
  *
  * A profile bundles the settings that belong together so switching from
  * "look at this" to "change this" is one click. Every setting here is applied

@@ -169,10 +169,35 @@ type laneDispatch struct {
 	Branch     string `json:"branch,omitempty"`
 	Scope      string `json:"scope,omitempty"`
 	Port       int    `json:"port,omitempty"`
+	// Mode and Model come from the profile a delegated lane was given. The
+	// adapter runs the lane's turn in that mode and with that model, whatever
+	// the message around it says (wwj base.js _enterTurnMode/_enterParallelLane).
+	Mode    string `json:"mode,omitempty"`
+	Model   string `json:"model,omitempty"`
+	Profile string `json:"profile,omitempty"`
 }
 
 func dispatchFor(lane *models.ParallelLaneRecord) laneDispatch {
-	return laneDispatch{Task: lane.Task, WorkingDir: lane.WorktreePath, Branch: lane.Branch, Scope: lane.Scope, Port: lane.Port}
+	return laneDispatch{Task: lane.Task, WorkingDir: lane.WorktreePath, Branch: lane.Branch, Scope: lane.Scope, Port: lane.Port,
+		Mode: lane.Mode, Model: lane.Model, Profile: lane.Profile}
+}
+
+// batchMeta is the `parallel_batch` metadata a message dispatching these lanes
+// of batch carries. `delegated_by` tells a lane whom its result goes to.
+func batchMeta(batch *models.ParallelBatchRecord, lanes ...*models.ParallelLaneRecord) map[string]interface{} {
+	dispatch := map[string]laneDispatch{}
+	for _, l := range lanes {
+		dispatch[l.Agent] = dispatchFor(l)
+	}
+	meta := map[string]interface{}{
+		"batch_id":  batch.ID,
+		"isolation": batch.Isolation,
+		"lanes":     dispatch,
+	}
+	if batch.DelegatedBy != "" {
+		meta["delegated_by"] = batch.DelegatedBy
+	}
+	return meta
 }
 
 // laneBasePort is where lane dev-server ports start: lane ports are
@@ -218,8 +243,54 @@ func allocateLanePorts(tx *gorm.DB, n int) []int {
 // metadata the routed message carries. Returns nil when no batch should be
 // started (fewer than two agents, or one is already running).
 func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel, origin string, agents []string, tasks, scopes map[string]string) map[string]interface{} {
-	if len(agents) < 2 || runningBatch(tx, workspaceID, channel.Name) != nil {
+	spec := batchSpec{Origin: origin}
+	for _, agent := range agents {
+		spec.Lanes = append(spec.Lanes, laneSpec{Agent: agent, Task: tasks[agent], Scope: scopes[agent]})
+	}
+	batch, lanes, err := createBatch(tx, workspaceID, channel, spec)
+	if err != nil {
 		return nil
+	}
+	ptrs := make([]*models.ParallelLaneRecord, len(lanes))
+	for i := range lanes {
+		ptrs[i] = &lanes[i]
+	}
+	return batchMeta(batch, ptrs...)
+}
+
+// batchSpec describes a batch to create: who starts it and one laneSpec per
+// agent. MinLanes defaults to 2 -- people fan out to several agents at once --
+// while an agent may delegate a single task to one isolated lane.
+type batchSpec struct {
+	Origin      string
+	DelegatedBy string
+	MinLanes    int
+	Lanes       []laneSpec
+}
+
+type laneSpec struct {
+	Agent, Task, Scope   string
+	Profile, Mode, Model string
+}
+
+var (
+	errTooFewLanes  = fmt.Errorf("too few lanes")
+	errBatchRunning = fmt.Errorf("a parallel batch is already running or waiting for review in this channel")
+)
+
+// createBatch records a batch and its lanes -- with a git worktree per lane
+// when the channel's folder is a repository -- inside tx. It refuses with
+// errBatchRunning when the channel already has an unfinished batch.
+func createBatch(tx *gorm.DB, workspaceID string, channel *models.Channel, spec batchSpec) (*models.ParallelBatchRecord, []models.ParallelLaneRecord, error) {
+	minLanes := spec.MinLanes
+	if minLanes <= 0 {
+		minLanes = 2
+	}
+	if len(spec.Lanes) < minLanes {
+		return nil, nil, errTooFewLanes
+	}
+	if runningBatch(tx, workspaceID, channel.Name) != nil {
+		return nil, nil, errBatchRunning
 	}
 	now := time.Now().UTC()
 	batch := models.ParallelBatchRecord{
@@ -227,7 +298,8 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 		WorkspaceID: workspaceID,
 		ChannelName: channel.Name,
 		Isolation:   "shared",
-		Origin:      origin,
+		Origin:      spec.Origin,
+		DelegatedBy: spec.DelegatedBy,
 		Status:      batchRunning,
 		CreatedAt:   now,
 	}
@@ -236,16 +308,17 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 	if channel.WorkingDir != nil {
 		repo = gitRepoRoot(*channel.WorkingDir)
 	}
-	lanes := make([]models.ParallelLaneRecord, 0, len(agents))
-	ports := allocateLanePorts(tx, len(agents))
-	for i, agent := range agents {
+	lanes := make([]models.ParallelLaneRecord, 0, len(spec.Lanes))
+	ports := allocateLanePorts(tx, len(spec.Lanes))
+	for i, ls := range spec.Lanes {
 		port := 0
 		if i < len(ports) {
 			port = ports[i]
 		}
 		lanes = append(lanes, models.ParallelLaneRecord{
-			ID: uuid.NewString(), BatchID: batch.ID, Agent: agent,
-			Task: tasks[agent], Scope: scopes[agent], Status: laneRunning, StartedAt: now, Port: port,
+			ID: uuid.NewString(), BatchID: batch.ID, Agent: ls.Agent,
+			Task: ls.Task, Scope: ls.Scope, Status: laneRunning, StartedAt: now, Port: port,
+			Profile: ls.Profile, Mode: ls.Mode, Model: ls.Model,
 		})
 	}
 
@@ -283,23 +356,18 @@ func startParallelBatch(tx *gorm.DB, workspaceID string, channel *models.Channel
 	}
 
 	if err := tx.Create(&batch).Error; err != nil {
-		return nil
+		return nil, nil, err
 	}
-	dispatch := map[string]laneDispatch{}
 	for i := range lanes {
 		if err := tx.Create(&lanes[i]).Error; err != nil {
-			return nil
+			return nil, nil, err
 		}
-		dispatch[lanes[i].Agent] = dispatchFor(&lanes[i])
 	}
-	// No state event here: tx is the routing transaction, which holds SQLite's
-	// only write lock, and PublishWorkspaceStateEvent writes through db.DB. The
-	// caller publishes it once the transaction commits (publishBatchStarted).
-	return map[string]interface{}{
-		"batch_id":  batch.ID,
-		"isolation": batch.Isolation,
-		"lanes":     dispatch,
-	}
+	// No state event here: tx may be the routing transaction, which holds
+	// SQLite's only write lock, and PublishWorkspaceStateEvent writes through
+	// db.DB. The caller publishes it once the transaction commits
+	// (publishBatchStarted).
+	return &batch, lanes, nil
 }
 
 // publishBatchStarted records and broadcasts that a batch started. It writes
@@ -497,7 +565,11 @@ func laneAhead(batch *models.ParallelBatchRecord, lane *models.ParallelLaneRecor
 // to merge, recording each lane's diff and asking the user to merge or
 // discard. Returns false when there is nothing to review (shared folder, or no
 // lane changed anything), in which case the caller finalizes directly.
-func enterReview(batch *models.ParallelBatchRecord) bool {
+func enterReview(batch *models.ParallelBatchRecord) bool { return enterReviewWith(batch, true) }
+
+// enterReviewWith is enterReview; notify=false leaves a delegated batch's
+// delegator asleep (it stopped the batch itself and already knows).
+func enterReviewWith(batch *models.ParallelBatchRecord, notify bool) bool {
 	if batch.Isolation != "worktree" {
 		return false
 	}
@@ -531,7 +603,12 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 	batch.Summary = reviewSummary(batch, lanes)
 	db.DB.Save(batch)
 	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
-	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
+	content, targets := batch.Summary, []string(nil)
+	if note := delegatorNote(batch); note != "" && notify {
+		content += "\n\n" + note
+		targets = []string{batch.DelegatedBy}
+	}
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", content, targets, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID, "review": true},
 	})
 	return true
@@ -666,12 +743,9 @@ func ParallelResumeMetadata(batchID, agent string) map[string]interface{} {
 		Limit(1).Find(&lane).RowsAffected == 0 {
 		return nil
 	}
-	return map[string]interface{}{
-		"batch_id":  batch.ID,
-		"isolation": batch.Isolation,
-		"resume":    true,
-		"lanes":     map[string]laneDispatch{lane.Agent: dispatchFor(&lane)},
-	}
+	meta := batchMeta(&batch, &lane)
+	meta["resume"] = true
+	return meta
 }
 
 // mergeIdentityArgs supplies a committer for the merge commit when the host
@@ -688,7 +762,11 @@ func mergeIdentityArgs(repo string) []string {
 }
 
 // finalizeBatch merges finished lanes back and posts the summary.
-func finalizeBatch(batch *models.ParallelBatchRecord) {
+func finalizeBatch(batch *models.ParallelBatchRecord) { finalizeBatchWith(batch, true) }
+
+// finalizeBatchWith is finalizeBatch; wake=false posts the summary without
+// waking the master or the delegator (the batch was stopped on purpose).
+func finalizeBatchWith(batch *models.ParallelBatchRecord, wake bool) {
 	var lanes []models.ParallelLaneRecord
 	db.DB.Where("batch_id = ?", batch.ID).Order("agent").Find(&lanes)
 
@@ -743,7 +821,10 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 	// Wake the master to review, or bounce issues back to responsible lane agents
 	var targets []string
 	var channel models.Channel
-	hasMaster := db.DB.Where("workspace_id = ? AND name = ?", batch.WorkspaceID, batch.ChannelName).Limit(1).Find(&channel).RowsAffected > 0 &&
+	// A delegated batch reports to the agent that delegated it -- the one
+	// orchestrating this work -- instead of the channel's master.
+	hasMaster := wake && batch.DelegatedBy == "" &&
+		db.DB.Where("workspace_id = ? AND name = ?", batch.WorkspaceID, batch.ChannelName).Limit(1).Find(&channel).RowsAffected > 0 &&
 		channel.MasterAgent != nil && *channel.MasterAgent != ""
 	if hasMaster {
 		isLane := false
@@ -760,6 +841,10 @@ func finalizeBatch(batch *models.ParallelBatchRecord) {
 	content := batch.Summary
 	if hasMaster && len(targets) > 0 {
 		content += "\n\n@" + *channel.MasterAgent + " please review the combined result above: check the merged changes fit together, and resolve or report anything listed as a conflict or failure."
+	}
+	if note := delegatorNote(batch); note != "" && wake {
+		content += "\n\n" + note
+		targets = []string{batch.DelegatedBy}
 	}
 	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", content, targets, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID},
@@ -846,55 +931,58 @@ func StopParallelBatch(c *gin.Context) {
 		c.JSON(409, gin.H{"error": "batch is not running"})
 		return
 	}
+	stopped := stopBatch(&batch, "user", "")
+	c.JSON(200, gin.H{"batch": batch, "stopped": len(stopped) > 0})
+}
 
+// stopBatch stops every running lane of a running batch on behalf of `by`
+// ("user", or "@agent" for a delegator cancelling its own delegation) and
+// returns the agents that were stopped.
+//
+// Marking a lane failed is not enough on its own: the agent keeps working in
+// its worktree until its turn ends. Each one is sent the same `stop` control
+// the chat's Stop button sends -- except `self`, the agent asking, whose own
+// turn is the one making this call. Lanes that had already finished keep their
+// work: the batch goes to review (or finishes) like any batch whose lanes have
+// all ended, without the automatic retry -- that would restart what was just
+// stopped -- and without waking anyone, since whoever stopped it knows.
+func stopBatch(batch *models.ParallelBatchRecord, by, self string) []string {
 	var lanes []models.ParallelLaneRecord
 	db.DB.Where("batch_id = ?", batch.ID).Find(&lanes)
 
 	var channel models.Channel
-	_ = db.DB.Where("id = ? OR name = ?", batch.ChannelName, batch.ChannelName).First(&channel).Error
+	_ = db.DB.Where("workspace_id = ? AND name = ?", batch.WorkspaceID, batch.ChannelName).Limit(1).Find(&channel).Error
 
-	stoppedAny := false
+	var stopped []string
 	for i := range lanes {
 		lane := &lanes[i]
-		if lane.Status == laneRunning {
-			lane.Status = laneFailed
-			lane.Error = "Stopped by user"
-			now := time.Now().UTC()
-			lane.FinishedAt = &now
-			db.DB.Save(lane)
-			if channel.ID != "" {
-				closeAgentTurn(workspace.ID, &channel, lane.Agent)
-			}
-			stoppedAny = true
-			_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.lane", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "lane": lane})
+		if lane.Status != laneRunning {
+			continue
 		}
-	}
-
-	anyDoneWithChanges := false
-	for _, l := range lanes {
-		if l.Status == laneDone && l.Diffstat != "" {
-			anyDoneWithChanges = true
-			break
+		lane.Status = laneFailed
+		lane.Error = "Stopped by " + by
+		now := time.Now().UTC()
+		lane.FinishedAt = &now
+		db.DB.Save(lane)
+		if channel.ID != "" {
+			closeAgentTurn(batch.WorkspaceID, &channel, lane.Agent)
 		}
+		if !strings.EqualFold(lane.Agent, self) {
+			emitAgentControlEvent(batch.WorkspaceID, lane.Agent, "stop", gin.H{"channel": batch.ChannelName})
+		}
+		stopped = append(stopped, lane.Agent)
+		_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.lane", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "lane": lane})
 	}
 
-	now := time.Now().UTC()
-	if anyDoneWithChanges {
-		batch.Status = batchReview
-	} else {
-		batch.Status = batchDone
-		batch.FinishedAt = &now
-	}
-	db.DB.Save(&batch)
-
-	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch": batch})
 	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel",
-		"Parallel batch stopped by user.",
+		"Parallel batch stopped by "+by+".",
 		nil,
 		map[string]interface{}{"parallel_batch_stopped": true, "batch_id": batch.ID},
 	)
-
-	c.JSON(200, gin.H{"batch": batch, "stopped": stoppedAny})
+	if !enterReviewWith(batch, false) {
+		finalizeBatchWith(batch, false)
+	}
+	return stopped
 }
 
 // RetryParallelLane handles POST /v1/parallel-batches/:batch_id/lanes/:agent/retry.
@@ -949,11 +1037,7 @@ func redispatchLane(batch *models.ParallelBatchRecord, lane *models.ParallelLane
 	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel",
 		strings.TrimSpace(note+"\n\n"+lane.Task),
 		[]string{lane.Agent},
-		map[string]interface{}{"parallel_batch": map[string]interface{}{
-			"batch_id":  batch.ID,
-			"isolation": batch.Isolation,
-			"lanes":     map[string]laneDispatch{lane.Agent: dispatchFor(lane)},
-		}})
+		map[string]interface{}{"parallel_batch": batchMeta(batch, lane)})
 }
 
 // maxAutoBounces is how many times a lane is sent back automatically (after a

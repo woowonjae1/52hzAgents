@@ -23,10 +23,14 @@ interface Props {
 }
 
 /**
- * The thread's work profile — Fix / Review — as a segmented switch beside the
+ * The thread's work mode — Fix / Review — as a segmented switch beside the
  * collaboration mode, in the same visual recipe as OrchestrationControl.
  *
- * Picking a profile only stores it for this thread. Every message the thread
+ * Shown as a MODE, not a profile: "profile" means a saved agent + model + mode
+ * preset that agents delegate to (Settings > Agents > Profiles), and those use
+ * these same two modes. The `Profile` identifiers here predate that.
+ *
+ * Picking a mode only stores it for this thread. Every message the thread
  * sends then carries the matching `agent_mode` (chat-view handleSend), and the
  * adapter runs that turn in it — so nothing is broadcast to the agents, an
  * agent can review here while fixing elsewhere, and an adapter restart loses
@@ -80,7 +84,7 @@ export function AgentProfileControl({ session }: Props) {
   return (
     <div
       role="radiogroup"
-      aria-label="Work profile"
+      aria-label="Work mode"
       onKeyDown={onKeyDown}
       className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-surface1 p-0.5"
     >
@@ -111,7 +115,7 @@ export function AgentProfileControl({ session }: Props) {
               type="button"
               role="radio"
               aria-checked={isActive}
-              aria-label={`${p.label} profile`}
+              aria-label={`${p.label} mode`}
               data-profile={p.id}
               tabIndex={isActive ? 0 : -1}
               onClick={() => select(p.id)}

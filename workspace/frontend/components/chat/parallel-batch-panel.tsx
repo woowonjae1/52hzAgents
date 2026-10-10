@@ -250,6 +250,11 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
           <span className="text-xs font-medium text-foreground">
             {live ? 'Working in parallel' : reviewing ? 'Ready for review' : 'Last parallel batch'}
           </span>
+          {run.batch.delegated_by && (
+            <span className="text-2xs text-foreground shrink-0" title="An agent delegated this work; it is told when the lanes finish.">
+              delegated by @{run.batch.delegated_by}
+            </span>
+          )}
           <span className="text-2xs text-muted-foreground truncate">
             {reviewing
               ? `nothing merged into ${base} yet`
@@ -290,6 +295,18 @@ function RunView({ run, onRetried }: { run: ParallelRun; onRetried: () => void }
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="flex items-baseline gap-1.5 min-w-0">
                     <span className="text-2xs font-medium text-foreground truncate">{lane.agent}</span>
+                    {(lane.profile || lane.mode === 'plan') && (
+                      <span
+                        className="text-2xs text-muted-foreground shrink-0"
+                        title={[
+                          lane.profile && `Profile ${lane.profile}`,
+                          lane.mode === 'plan' && 'Review: read-only',
+                          lane.model && `Model ${lane.model}`,
+                        ].filter(Boolean).join(' · ')}
+                      >
+                        {[lane.profile, lane.mode === 'plan' && 'Review'].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                     {lane.port ? (
                       <code className="text-2xs text-muted-foreground shrink-0" title="Dev-server port for this lane">
                         :{lane.port}

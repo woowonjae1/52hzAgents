@@ -778,7 +778,10 @@ class BaseAdapter {
    */
   _enterTurnMode(channel, msg) {
     if (!this._turnModeOverride) this._turnModeOverride = {};
-    const m = msg && msg.metadata && msg.metadata.agent_mode;
+    // A delegated lane carries its profile's mode, and that wins over the
+    // message's: a Review lane stays read-only whatever the delegator was in.
+    const lane = this._laneDispatch(msg);
+    const m = (lane && TURN_MODES.has(lane.mode) && lane.mode) || (msg && msg.metadata && msg.metadata.agent_mode);
     if (typeof m === 'string' && TURN_MODES.has(m)) this._turnModeOverride[channel] = m;
     else delete this._turnModeOverride[channel];
   }
@@ -1698,12 +1701,26 @@ class BaseAdapter {
    * with what this agent's part is and how to behave next to the others.
    * Returns the lane (with batch id) or null.
    */
-  _enterParallelLane(channel, msg) {
+  /** This agent's entry in a message's `parallel_batch.lanes`, or null. */
+  _laneDispatch(msg) {
     const pb = msg && msg.metadata && msg.metadata.parallel_batch;
     if (!pb || !pb.batch_id || !pb.lanes || typeof pb.lanes !== 'object') return null;
     const key = Object.keys(pb.lanes).find((k) => k.toLowerCase() === String(this.agentName).toLowerCase());
-    if (!key) return null;
-    const lane = { ...pb.lanes[key], batchId: pb.batch_id, isolation: pb.isolation, others: Object.keys(pb.lanes).length - 1 };
+    return key ? pb.lanes[key] : null;
+  }
+
+  _enterParallelLane(channel, msg) {
+    const pb = msg && msg.metadata && msg.metadata.parallel_batch;
+    const dispatch = this._laneDispatch(msg);
+    if (!dispatch) return null;
+    const lane = { ...dispatch, batchId: pb.batch_id, isolation: pb.isolation, others: Object.keys(pb.lanes).length - 1 };
+    // The profile's model, the same way the composer's per-agent model choice
+    // arrives (metadata.agent_models), so every adapter that honours that
+    // honours this -- for the first dispatch, retries and resumes alike.
+    if (lane.model && msg.metadata) {
+      msg.metadata.agent_models = { ...(msg.metadata.agent_models || {}), [this.agentName]: lane.model };
+    }
+    const delegator = typeof pb.delegated_by === 'string' && pb.delegated_by ? pb.delegated_by : null;
     this._activeLanes = this._activeLanes || {};
     this._activeLanes[channel] = lane;
 
@@ -1721,17 +1738,24 @@ class BaseAdapter {
     // A resume is the agent's own timer waking it back into a lane it paused
     // (see _deferParallelLane). Same folder and rules; the headline says so,
     // because the conversation already holds the original brief.
+    let headline;
+    if (pb.resume) headline = '[Parallel batch] Resuming your part after the wait you scheduled. Pick up where you left off.';
+    else if (delegator && lane.others === 0) headline = `[Delegated] @${delegator} handed you this task to do on your own.`;
+    else if (delegator) headline = `[Delegated] @${delegator} split work between ${lane.others + 1} agents working at the same time; this is your part.`;
+    else headline = `[Parallel batch] You are one of ${lane.others + 1} agents working at the same time on separate parts.`;
     const lines = [
-      pb.resume
-        ? '[Parallel batch] Resuming your part after the wait you scheduled. Pick up where you left off.'
-        : `[Parallel batch] You are one of ${lane.others + 1} agents working at the same time on separate parts.`,
+      headline,
       '',
       'Your part:',
       lane.task || '(see the message below)',
       '',
     ];
+    if (lane.mode === 'plan') {
+      lines.push('This is a review: read, run read-only checks and report. Do not modify any files.');
+    }
     if (lane.working_dir) {
-      lines.push(`Work only inside ${lane.working_dir} -- your own git worktree on branch ${lane.branch}. The other agents are editing their own copies. Do not commit, merge, push or switch branches: your changes are committed and merged for you when you finish.`);
+      const others = lane.others > 0 ? 'The other agents are editing their own copies.' : 'The main checkout is not yours to change.';
+      lines.push(`Work only inside ${lane.working_dir} -- your own git worktree on branch ${lane.branch}. ${others} Do not commit, merge, push or switch branches: your changes are committed and merged for you when you finish.`);
     } else if (lane.scope) {
       lines.push(`The other agents share this folder. Change files only under ${lane.scope}.`);
     } else {
@@ -1748,7 +1772,13 @@ class BaseAdapter {
       this._turnEnvOverride[channel] = { PORT: String(port) };
       lines.push(`If you start a dev server or any listening process, use port ${port} -- other agents are using other ports.`);
     }
-    lines.push('Finish with a short summary of what you changed.', '', '---', '');
+    if (delegator) {
+      // The batch tells the delegator when every lane is done. A lane that
+      // also @mentions it wakes it once per lane, mid-batch, for nothing.
+      lines.push(`Finish with a short summary of what you did and found. It is delivered to @${delegator} automatically when all parts are done -- do not @mention anyone in it.`, '', '---', '');
+    } else {
+      lines.push('Finish with a short summary of what you changed.', '', '---', '');
+    }
     if (msg && typeof msg.content === 'string') msg.content = lines.join('\n') + msg.content;
     this._log(`Parallel: lane of batch ${String(lane.batchId).slice(0, 8)}${lane.working_dir ? ` in ${lane.working_dir}` : ''}`);
     return lane;

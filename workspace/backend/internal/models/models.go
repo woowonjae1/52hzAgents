@@ -809,7 +809,8 @@ type ParallelBatchRecord struct {
 	WorkspaceID string `gorm:"type:uuid;not null;index:idx_parallel_batches_channel" json:"workspace_id"`
 	ChannelName string `gorm:"type:text;not null;index:idx_parallel_batches_channel" json:"channel_name"`
 	Isolation   string `gorm:"type:text;not null;default:'shared'" json:"isolation"`
-	// "board" (the channel's open tasks) or "mention" (a human named the agents).
+	// "board" (the channel's open tasks), "mention" (a human named the agents) or
+	// "agent" (an agent delegated, by tool or by naming agents in its reply).
 	Origin     string     `gorm:"type:text;not null;default:'mention'" json:"origin"`
 	RepoDir    string     `gorm:"type:text;not null;default:''" json:"repo_dir"`
 	BaseBranch string     `gorm:"type:text;not null;default:''" json:"base_branch"`
@@ -817,6 +818,9 @@ type ParallelBatchRecord struct {
 	Summary    string     `gorm:"type:text;not null;default:''" json:"summary"`
 	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	// DelegatedBy is the agent that started an "agent" batch. It is told when the
+	// batch reaches review or finishes, and only it may cancel the batch.
+	DelegatedBy string `gorm:"type:text;not null;default:''" json:"delegated_by"`
 }
 
 func (ParallelBatchRecord) TableName() string { return "parallel_batches" }
@@ -848,6 +852,32 @@ type ParallelLaneRecord struct {
 	Port         int        `gorm:"not null;default:0" json:"port"` // dev-server port reserved for this lane; 0 = none
 	StartedAt    time.Time  `json:"started_at"`
 	FinishedAt   *time.Time `json:"finished_at,omitempty"`
+	// Profile, Mode and Model are what a delegated lane runs with: the saved
+	// profile it was picked from (if any), execute|plan ("" = the message's own
+	// mode), and the model ("" = the agent's own). Every dispatch of the lane,
+	// retries included, carries them, so a Review lane stays read-only on its
+	// second attempt too.
+	Profile string `gorm:"type:text;not null;default:''" json:"profile"`
+	Mode    string `gorm:"type:text;not null;default:''" json:"mode"`
+	Model   string `gorm:"type:text;not null;default:''" json:"model"`
 }
 
 func (ParallelLaneRecord) TableName() string { return "parallel_lanes" }
+
+// WorkProfile is a saved, named way of running one workspace agent: which
+// agent, which model, and whether it may edit (execute, shown as Fix) or only
+// read and propose (plan, shown as Review). Orchestrating agents list these
+// and pick one per task when they delegate; `when_to_use` is what they pick by.
+type WorkProfile struct {
+	ID          string    `gorm:"primaryKey;type:text" json:"id"`
+	WorkspaceID string    `gorm:"type:uuid;not null;uniqueIndex:uq_work_profile_name" json:"workspace_id"`
+	Name        string    `gorm:"type:text;not null;uniqueIndex:uq_work_profile_name" json:"name"`
+	Agent       string    `gorm:"type:text;not null" json:"agent"`
+	Model       string    `gorm:"type:text;not null;default:''" json:"model"`
+	Mode        string    `gorm:"type:text;not null;default:'execute'" json:"mode"` // execute | plan
+	WhenToUse   string    `gorm:"type:text;not null;default:''" json:"when_to_use"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+}
+
+func (WorkProfile) TableName() string { return "work_profiles" }

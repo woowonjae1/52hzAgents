@@ -53,6 +53,7 @@ import { useMarkColor } from '@/hooks/use-mark-color';
 import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { SkillsView } from '@/components/skills/skills-view';
 import { RouterProviderSettings } from './router-provider-settings';
+import { WorkProfilesSettings } from './work-profiles-settings';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
@@ -653,6 +654,8 @@ export function SettingsView() {
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
               {/* How agents get chosen belongs beside who the agents are. */}
               {!showConnectAgent && <RouterProviderSettings />}
+              {/* Who delegated work goes to, and how: agents pick from these. */}
+              {!showConnectAgent && <WorkProfilesSettings />}
               {showConnectAgent ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
