@@ -987,10 +987,33 @@ func routeMessage(tx *gorm.DB, workspaceID string, channel *models.Channel, req 
 			if len(mentions) > 0 {
 				sender := agentNameFromSource(req.Source)
 				var nextTargets []string
+				// An agent running a lane is busy in its own worktree. Naming it
+				// ("I've asked @bob to ...") must not wake it a second time, in
+				// the shared folder, outside its lane.
+				busy := runningLaneAgents(database, workspaceID, channel.Name)
 				for _, m := range mentions {
-					if !strings.EqualFold(m, sender) {
+					if !strings.EqualFold(m, sender) && !busy[strings.ToLower(m)] {
 						nextTargets = append(nextTargets, m)
 					}
+				}
+				// In parallel mode an agent handing work to several agents is a
+				// delegation: they get worktrees, the merge waits for the user,
+				// and the sender hears back. Woken plainly, they ran one after
+				// another in the shared folder, uncommitted and unreviewed.
+				if mode == "parallel" && len(nextTargets) >= 2 {
+					meta, refusal := agentFanOut(database, workspaceID, channel, req, sender, nextTargets, availableCandidates)
+					channelName := channel.Name
+					if refusal != "" {
+						req.deferUntilCommitted(func() {
+							postChannelMessage(workspaceID, channelName, "system:parallel", refusal, nil, map[string]interface{}{"delegation_refused": true})
+						})
+						return nil, false, nil
+					}
+					if req.Metadata == nil {
+						req.Metadata = map[string]interface{}{}
+					}
+					req.Metadata["parallel_batch"] = meta
+					req.deferUntilCommitted(func() { publishBatchStarted(workspaceID, channelName, meta) })
 				}
 				if len(nextTargets) > 0 {
 					for _, target := range nextTargets {

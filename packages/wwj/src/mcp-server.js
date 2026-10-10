@@ -385,6 +385,65 @@ function buildToolDefs(disabledModules) {
     );
   }
 
+  // -- Delegation (isolated lanes, saved profiles) --
+  if (!disabledModules.has('delegation')) {
+    tools.push(
+      {
+        name: 'workspace_list_profiles',
+        description: 'List the saved profiles you can delegate to: each names a workspace agent, an optional model, a mode (execute = may edit, plan = read-only review) and when to use it, plus whether that agent is online. Call this before workspace_delegate to pick who does each task.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'workspace_delegate',
+        description:
+          'Hand tasks to other agents, each in its own isolated lane: in a git project every lane gets its own worktree and branch, so lanes cannot overwrite each other or the main checkout. ' +
+          'Use it for work that can run independently (separate parts of a change, an independent review, a second opinion). 1-4 tasks, each to a different agent; give each task a profile (preferred, see workspace_list_profiles) or an agent. ' +
+          'Returns at once. Do NOT poll, wait, or @mention the agents you delegated to: end your turn. You get a message in this thread when every lane has finished; nothing is merged until the user approves it. ' +
+          'Fails with a reason if a batch is already running or waiting for review in this thread -- tell the user then. You cannot delegate from inside a lane.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            tasks: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 4,
+              items: {
+                type: 'object',
+                properties: {
+                  profile: { type: 'string', description: 'Saved profile name (sets agent, model and mode). Give this or agent.' },
+                  agent: { type: 'string', description: 'Agent name, when no profile fits.' },
+                  mode: { type: 'string', enum: ['execute', 'plan'], description: 'Only with agent: execute (may edit, default) or plan (read-only review).' },
+                  task: { type: 'string', description: 'Self-contained instructions: the agent starts fresh in its own checkout and does not see your reasoning. Say what to change or check and what to report.' },
+                  scope: { type: 'string', description: 'Optional folder this lane may change (e.g. "web/src"). Needed for two editing lanes when the project is not a git repository.' },
+                },
+                required: ['task'],
+              },
+            },
+          },
+          required: ['tasks'],
+        },
+      },
+      {
+        name: 'workspace_delegation_status',
+        description: 'Status of a delegation (parallel batch) by id or its 8-character prefix: each lane\'s agent, status, branch, diffstat and reply. For when the user asks, or after you were told it finished -- not for polling.',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string', description: 'Batch id or its first 8 characters' } },
+          required: ['id'],
+        },
+      },
+      {
+        name: 'workspace_cancel_delegation',
+        description: 'Stop the running lanes of a delegation you started (e.g. the user changed their mind). Lanes that already finished stay for the user to review. A batch already waiting for review cannot be cancelled -- that is the user\'s decision.',
+        inputSchema: {
+          type: 'object',
+          properties: { id: { type: 'string', description: 'Batch id or its first 8 characters' } },
+          required: ['id'],
+        },
+      },
+    );
+  }
+
   // -- Notifications --
   if (!disabledModules.has('notifications')) {
     tools.push(
@@ -1004,6 +1063,53 @@ class McpServer {
         return text(`Routine cancelled: ${args.routine_id}`);
       }
 
+      case 'workspace_list_profiles': {
+        const data = await this.ws.listProfiles(this.workspaceId, this.token);
+        const profiles = (data && data.profiles) || [];
+        if (!profiles.length) {
+          return text('No saved profiles in this workspace. Delegate by agent name instead (workspace_get_agents lists them), or ask the user to add profiles under Settings > Agents.');
+        }
+        const status = (data && data.agent_status) || {};
+        return text(profiles.map((p) => formatProfile(p, status[p.agent])).join('\n'));
+      }
+
+      case 'workspace_delegate': {
+        const tasks = Array.isArray(args.tasks) ? args.tasks : [];
+        const run = await this.ws.delegate(this.workspaceId, this.channelName, this.token, {
+          source: `52hz:${this.agentName}`,
+          tasks,
+        });
+        const batch = (run && run.batch) || {};
+        const lanes = (run && run.lanes) || [];
+        const id8 = String(batch.id || '').slice(0, 8);
+        const lines = [
+          `Delegation started: batch ${id8} (${batch.isolation === 'worktree' ? 'each lane in its own worktree' : 'lanes share the project folder'}).`,
+          ...lanes.map((l) => `- ${l.agent}${l.profile ? ` [${l.profile}]` : ''} ${l.mode === 'plan' ? 'review (read-only)' : 'fix'}${l.branch ? ` on ${l.branch}` : ''}`),
+          '',
+          'Now end your turn. Do not poll, wait or @mention these agents -- that would wake them outside their lane. ' +
+          'You will get a message in this thread when every lane has finished; nothing is merged until the user approves it. ' +
+          'Tell the user briefly what you delegated and to whom.',
+        ];
+        return text(lines.join('\n'));
+      }
+
+      case 'workspace_delegation_status': {
+        const run = await this.ws.getDelegation(this.workspaceId, args.id, this.token);
+        return text(formatRun(run));
+      }
+
+      case 'workspace_cancel_delegation': {
+        const res = await this.ws.cancelDelegation(this.workspaceId, args.id, this.token, { source: `52hz:${this.agentName}` });
+        const stopped = (res && res.stopped) || [];
+        const batch = (res && res.batch) || {};
+        return text(
+          `Stopped ${stopped.length ? stopped.join(', ') : 'no running lanes'} of batch ${String(batch.id || args.id).slice(0, 8)}. ` +
+          (batch.status === 'review'
+            ? 'Lanes that had finished are waiting for the user to review; tell the user.'
+            : 'Nothing is left to merge.'),
+        );
+      }
+
       case 'workspace_send_notification': {
         const result = await this.ws.createNotification(
           this.workspaceId, this.token,
@@ -1136,6 +1242,36 @@ class McpServer {
   _log(msg) {
     process.stderr.write(`[mcp] ${msg}\n`);
   }
+}
+
+// ── Delegation formatting ───────────────────────────────────────────────────
+// Agent names are written without "@": an agent that echoes a tool result into
+// its reply would otherwise @mention its own lanes and wake them.
+
+function formatProfile(p, agentStatus) {
+  const mode = p.mode === 'plan' ? 'review (read-only)' : 'fix (may edit)';
+  const state = agentStatus && agentStatus !== 'online' ? ` -- ${p.agent} is ${agentStatus}` : '';
+  return `- ${p.name}: agent ${p.agent}, ${mode}${p.model ? `, model ${p.model}` : ''}${state}` +
+    (p.when_to_use ? `\n    when: ${p.when_to_use}` : '');
+}
+
+function formatRun(run) {
+  const batch = (run && run.batch) || {};
+  const lanes = (run && run.lanes) || [];
+  const head = `Batch ${String(batch.id || '').slice(0, 8)}: ${batch.status || 'unknown'}` +
+    (batch.delegated_by ? ` (delegated by ${batch.delegated_by})` : '') +
+    (batch.status === 'review' ? ' -- waiting for the user to merge or discard' : '');
+  const body = lanes.map((l) => {
+    const parts = [`- ${l.agent}: ${l.status}`];
+    if (l.profile) parts.push(`profile ${l.profile}`);
+    if (l.branch) parts.push(`branch ${l.branch}`);
+    if (l.diffstat) parts.push(l.diffstat);
+    if (l.error) parts.push(`error: ${l.error}`);
+    let line = parts.join(' | ');
+    if (l.reply) line += `\n    reply: ${String(l.reply).replace(/\s+/g, ' ').trim()}`;
+    return line;
+  });
+  return [head, ...body].join('\n');
 }
 
 // ── JSON-RPC helpers ────────────────────────────────────────────────────────

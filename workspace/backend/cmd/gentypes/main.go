@@ -56,6 +56,9 @@ var sources = []source{
 		"ParallelWorker",
 		"ScopeConflict",
 		"ParallelRunView",
+		// work_profiles.go: GET/POST/PATCH .../profiles
+		"WorkProfilesResponse",
+		"WorkProfileRequest",
 		// agent_context.go: POST .../agents/:name/context
 		"ReportAgentContextRequest",
 		// agent_turns.go: POST .../agents/:name/turn

@@ -53,7 +53,8 @@ export type ParallelRun = Narrow<
       Wire.ParallelBatchRecord,
       {
         isolation: 'worktree' | 'shared';
-        origin: 'board' | 'mention';
+        /** `agent`: an agent delegated (workspace_delegate, or naming agents in a parallel thread); see `delegated_by`. */
+        origin: 'board' | 'mention' | 'agent';
         /** `review`: every lane ended and there is something to merge; waiting for the user. */
         status: 'running' | 'review' | 'done';
       }
@@ -68,6 +69,17 @@ export type ParallelRun = Narrow<
  * actually started in this channel.
  */
 export type ParallelBatch = Narrow<Wire.ParallelBatch, { state: ParallelBatchState; run?: ParallelRun | null }>;
+
+/** Fix (`execute`) or Review (`plan`): the same mode the composer's switch sets for a thread. */
+export type WorkMode = 'execute' | 'plan';
+
+/** A saved profile: which agent, which model, Fix or Review, and when to use it. */
+export type WorkProfile = Narrow<Wire.WorkProfile, { mode: WorkMode }>;
+
+export type WorkProfileInput = Wire.WorkProfileRequest;
+
+/** `agent_status` maps each profile's agent to online | offline | missing. */
+export type WorkProfilesResponse = Narrow<Wire.WorkProfilesResponse, { profiles: WorkProfile[] }>;
 
 export type RouterProvider = 'openai' | 'anthropic';
 
@@ -148,6 +160,30 @@ export class OrchestrationApi extends BaseWorkspaceApi {
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/stop`,
       { method: 'POST' }
     );
+  }
+
+  /** Saved profiles orchestrating agents pick from when they delegate. */
+  async listWorkProfiles(): Promise<WorkProfilesResponse> {
+    return this.request<WorkProfilesResponse>(`/v1/workspaces/${this.requireWorkspace()}/profiles`);
+  }
+
+  async createWorkProfile(input: WorkProfileInput): Promise<WorkProfile> {
+    return this.request<WorkProfile>(`/v1/workspaces/${this.requireWorkspace()}/profiles`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  /** Omitted fields keep their value. */
+  async updateWorkProfile(id: string, input: WorkProfileInput): Promise<WorkProfile> {
+    return this.request<WorkProfile>(`/v1/workspaces/${this.requireWorkspace()}/profiles/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async deleteWorkProfile(id: string): Promise<void> {
+    await this.request(`/v1/workspaces/${this.requireWorkspace()}/profiles/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   async getRouterConfig(): Promise<RouterConfigResponse> {

@@ -258,6 +258,14 @@ function buildCollaborationPrompt(toolMode = 'mcp') {
 
     'cannot reach it, say so plainly rather than simulating the hand-off.\n\n' +
 
+    // @mention wakes the agent in the shared project folder and nothing comes
+    // back to you; delegation gives each task its own worktree, a mode and
+    // model from a saved profile, and a message to you when it is done.
+    (toolMode === 'skills'
+      ? 'To hand off work that should run on its own -- in parallel, as an independent review, or where you need the result back -- use the skill\'s "Delegation" section instead of an @mention: each task gets its own worktree and you are told when it is done. '
+      : 'To hand off work that should run on its own -- in parallel, as an independent review, or where you need the result back -- call `workspace_delegate` (pick from `workspace_list_profiles`) instead of @mentioning: each task gets its own worktree and you are told when it is done. ') +
+    'Not available in Review mode.\n\n' +
+
     discover +
 
     buildDecisionProtocolPrompt() +
@@ -1115,6 +1123,39 @@ function buildApiSkillsPrompt({ endpoint, workspaceId, token, agentName, channel
   }
 
 
+
+  // Delegation: hand tasks to other agents, each in an isolated lane. Starting
+  // and stopping lanes is left out in plan (Review) mode -- a read-only turn
+  // must not hand the edit it may not make to another agent.
+  if (!disabled.has('delegation')) {
+    let delegation =
+      '\n### Delegation (isolated lanes)\n\n' +
+      'Hand tasks to other agents, each in its own lane: in a git project every lane gets its own ' +
+      'worktree and branch, so lanes cannot overwrite each other or the main checkout. Pick who does ' +
+      'each task from the saved profiles (agent + model + mode + when to use).\n\n' +
+      '**List profiles** (and whether each agent is online):\n' +
+      `\`${curl} -s -H "${h}" ${baseUrl}/v1/workspaces/${workspaceId}/profiles\`\n\n` +
+      '**Status of a delegation** (id or its 8-character prefix; lanes, branches, diffstats, replies):\n' +
+      `\`${curl} -s -H "${h}" ${baseUrl}/v1/workspaces/${workspaceId}/delegations/BATCH_ID\`\n`;
+    if (!isPlan) {
+      delegation +=
+        '\n**Delegate** 1-4 tasks, each to a different agent. Give each a `profile` (preferred) or an `agent` ' +
+        '(optionally with `"mode":"plan"` for a read-only review), self-contained instructions in `task`, and ' +
+        'optionally a `scope` folder:\n' +
+        `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json" ` +
+        `${baseUrl}/v1/workspaces/${workspaceId}/delegations -d '{"channel":"${channelName}",` +
+        `"source":"52hz:${agentName}","tasks":[{"profile":"reviewer","task":"Review the parser for edge cases and report"},` +
+        `{"agent":"AGENT_NAME","task":"Fix the date bug in api/dates.js and add a test"}]}'\`\n\n` +
+        'It returns at once. Then end your turn: do not poll, wait or @mention the agents you delegated to (that ' +
+        'wakes them outside their lane). You get a message in this thread when every lane has finished, and ' +
+        'nothing is merged until the user approves it. An error response says why nothing started (for ' +
+        'example a batch already running or waiting for review in this thread) -- tell the user.\n\n' +
+        '**Cancel** a delegation you started (lanes that already finished stay for the user to review):\n' +
+        `\`${curl} -s -X POST -H "${h}" -H "Content-Type: application/json" ` +
+        `${baseUrl}/v1/workspaces/${workspaceId}/delegations/BATCH_ID/cancel -d '{"source":"52hz:${agentName}"}'\`\n`;
+    }
+    sections.push(delegation);
+  }
 
   // Notifications / Inbox
 

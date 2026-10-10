@@ -81,6 +81,7 @@ func InitDB() {
 		&models.AgentTurnState{},
 		&models.ParallelBatchRecord{},
 		&models.ParallelLaneRecord{},
+		&models.WorkProfile{},
 		&models.AgentLogRecord{},
 		&models.AgentApprovalRecord{},
 		&models.AuditRecord{},

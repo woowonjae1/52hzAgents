@@ -685,7 +685,8 @@ export interface ParallelBatchRecord {
   channel_name: string;
   isolation: string;
   /**
-   * "board" (the channel's open tasks) or "mention" (a human named the agents).
+   * "board" (the channel's open tasks), "mention" (a human named the agents) or
+   * "agent" (an agent delegated, by tool or by naming agents in its reply).
    */
   origin: string;
   repo_dir: string;
@@ -697,6 +698,11 @@ export interface ParallelBatchRecord {
   summary: string;
   created_at: string;
   finished_at?: string | null;
+  /**
+   * DelegatedBy is the agent that started an "agent" batch. It is told when the
+   * batch reaches review or finishes, and only it may cancel the batch.
+   */
+  delegated_by: string;
 }
 
 /**
@@ -756,6 +762,16 @@ export interface ParallelLaneRecord {
    */
   reviewed_commit: string;
   review_started_at?: string | null;
+  /**
+   * Profile, Mode and Model are what a delegated lane runs with: the saved
+   * profile it was picked from (if any), execute|plan ("" = the message's own
+   * mode), and the model ("" = the agent's own). Every dispatch of the lane,
+   * retries included, carries them, so a Review lane stays read-only on its
+   * second attempt too.
+   */
+  profile: string;
+  mode: string;
+  model: string;
 }
 
 /**
@@ -1144,6 +1160,54 @@ export interface TodoRecord {
 export interface VerifySnapshot {
   exit_code: number;
   errors?: string[];
+}
+
+/**
+ * WorkProfile is a saved, named way of running one workspace agent: which
+ * agent, which model, and whether it may edit (execute, shown as Fix) or only
+ * read and propose (plan, shown as Review). Orchestrating agents list these
+ * and pick one per task when they delegate; `when_to_use` is what they pick by.
+ *
+ * Go: models.WorkProfile
+ */
+export interface WorkProfile {
+  id: string;
+  workspace_id: string;
+  name: string;
+  agent: string;
+  model: string;
+  /**
+   * execute | plan
+   */
+  mode: string;
+  when_to_use: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * WorkProfileRequest is the body of POST and PATCH .../profiles. On PATCH an
+ * omitted field keeps its value.
+ *
+ * Go: handlers.WorkProfileRequest
+ */
+export interface WorkProfileRequest {
+  name?: string | null;
+  agent?: string | null;
+  model?: string | null;
+  mode?: string | null;
+  when_to_use?: string | null;
+}
+
+/**
+ * WorkProfilesResponse is GET .../profiles: the profiles, and whether each
+ * profile's agent is online, offline or gone from the workspace.
+ *
+ * Go: handlers.WorkProfilesResponse
+ */
+export interface WorkProfilesResponse {
+  profiles: WorkProfile[];
+  agent_status: Record<string, string>;
 }
 
 /**

@@ -1163,6 +1163,46 @@ class WorkspaceClient {
     );
   }
 
+  // ── Delegation & saved profiles ──
+
+  /** Saved profiles (agent + model + mode + when to use) and each agent's status. */
+  async listProfiles(workspaceId, token) {
+    return this._get(`/v1/workspaces/${encodeURIComponent(workspaceId)}/profiles`, this._wsHeaders(token));
+  }
+
+  /**
+   * Start a delegation in `channelName`: one isolated lane per task.
+   * @param {Array<{profile?: string, agent?: string, mode?: string, task: string, scope?: string}>} tasks
+   * Resolves to { batch, lanes }; rejects with the backend's reason (e.g. a
+   * batch already running in the thread), which is written for the agent.
+   */
+  async delegate(workspaceId, channelName, token, { source, tasks }) {
+    return this._post(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/delegations`,
+      { channel: channelName, source, tasks },
+      this._wsHeaders(token),
+      // A worktree per lane is created before this returns.
+      60000,
+    );
+  }
+
+  /** A batch with its lanes, by full id or the 8-character prefix messages show. */
+  async getDelegation(workspaceId, batchId, token) {
+    return this._get(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/delegations/${encodeURIComponent(batchId)}`,
+      this._wsHeaders(token),
+    );
+  }
+
+  /** Stop the running lanes of a delegation this agent started. */
+  async cancelDelegation(workspaceId, batchId, token, { source }) {
+    return this._post(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/delegations/${encodeURIComponent(batchId)}/cancel`,
+      { source },
+      this._wsHeaders(token),
+    );
+  }
+
   /**
    * Report that this agent's review of another agent's lane has ended.
    * `laneAgent` is the lane's author; the backend reads the verdict block

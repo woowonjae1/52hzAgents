@@ -219,6 +219,13 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/review", handlers.RetryLaneReview)               // 重新审查一个分道
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/review/complete", handlers.CompleteLaneReview)   // 审查者回报结论
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/send-back", handlers.SendBackParallelLane)       // 带着审查意见退回作者
+		v1.POST("/workspaces/:workspace_id/delegations", handlers.DelegateTasks)                                             // agent 委派：按 profile/agent 开并行分道
+		v1.GET("/workspaces/:workspace_id/delegations/:batch_id", handlers.GetDelegation)                                    // 委派状态（批次 + 各分道）
+		v1.POST("/workspaces/:workspace_id/delegations/:batch_id/cancel", handlers.CancelDelegation)                         // 委派者取消自己的委派
+		v1.GET("/workspaces/:workspace_id/profiles", handlers.ListWorkProfiles)                                              // 已保存的 profile（agent+model+mode）
+		v1.POST("/workspaces/:workspace_id/profiles", handlers.CreateWorkProfile)
+		v1.PATCH("/workspaces/:workspace_id/profiles/:profile_id", handlers.UpdateWorkProfile)
+		v1.DELETE("/workspaces/:workspace_id/profiles/:profile_id", handlers.DeleteWorkProfile)
 		v1.GET("/router-config", handlers.GetRouterConfig)
 		v1.PUT("/router-config", handlers.UpdateRouterConfig)
 		v1.POST("/router-config/test", handlers.TestRouterConfig)
