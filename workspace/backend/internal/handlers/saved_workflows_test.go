@@ -30,6 +30,11 @@ func setupWorkflowTestRouter(t *testing.T) (*gin.Engine, models.Workspace, model
 		&models.Channel{},
 		&models.SavedWorkflow{},
 		&models.ChannelPipeline{},
+		&models.ChannelMember{},
+		&models.WorkspaceMember{},
+		&models.EventRecord{},
+		&models.AgentTurnState{},
+		&models.AgentTurnChange{},
 	)
 
 	ws := models.Workspace{ID: uuid.NewString(), Name: "wf-ws"}
@@ -117,6 +122,21 @@ func TestSavedWorkflowsCRUDAndRun(t *testing.T) {
 	}
 	if active.StartedBy != "test-runner" {
 		t.Fatalf("expected started by test-runner, got %s", active.StartedBy)
+	}
+
+	// Verify step 0 message event was posted and targeted to alice
+	var event models.EventRecord
+	if err := db.DB.Where("network_id = ? AND target = ?", ws.ID, "channel/"+ch.Name).First(&event).Error; err != nil {
+		t.Fatalf("expected step 0 event record in DB: %v", err)
+	}
+	var meta map[string]interface{}
+	_ = json.Unmarshal(event.Metadata, &meta)
+	targets, _ := meta["target_agents"].([]interface{})
+	if len(targets) != 1 || targets[0] != "alice" {
+		t.Fatalf("expected target_agents to be [alice], got %v", targets)
+	}
+	if meta["pipeline_step"] != true {
+		t.Fatalf("expected pipeline_step to be true, got %v", meta["pipeline_step"])
 	}
 
 	// 4. Delete the workflow

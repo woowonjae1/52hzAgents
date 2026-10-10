@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/db"
+	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/hub"
 	"github.com/woowonjae1/52hzAgents/workspace/backend/internal/models"
 )
 
@@ -187,6 +189,12 @@ func RunSavedWorkflow(c *gin.Context) {
 		return
 	}
 
+	for i := range steps {
+		if steps[i].MaxRetries <= 0 {
+			steps[i].MaxRetries = 3
+		}
+	}
+
 	now := time.Now().UnixMilli()
 	steps[0].Status = "running"
 	steps[0].StartedAt = &now
@@ -196,6 +204,8 @@ func RunSavedWorkflow(c *gin.Context) {
 	if source == "" {
 		source = "workflow:" + wf.Name
 	}
+
+	clearPipeline(db.DB, channel.ID)
 
 	pipeline := models.ChannelPipeline{
 		ID:              uuid.NewString(),
@@ -212,6 +222,74 @@ func RunSavedWorkflow(c *gin.Context) {
 	if err := db.DB.Create(&pipeline).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start workflow pipeline"})
 		return
+	}
+
+	// Ensure step 0 agent is registered as a channel member
+	var cm models.ChannelMember
+	if err := db.DB.Where("channel_id = ? AND agent_name = ?", channel.ID, steps[0].Agent).First(&cm).Error; err != nil {
+		_ = db.DB.Create(&models.ChannelMember{
+			ChannelID: channel.ID,
+			AgentName: steps[0].Agent,
+		}).Error
+	}
+
+	_ = db.DB.Model(&channel).Update("last_event_at", now)
+
+	// Dispatch step 0 message to wake up agent and initialize turn
+	taskID := pipelineTaskID(pipeline.ID, 0)
+	msgContent := fmt.Sprintf("@%s %s", steps[0].Agent, steps[0].Instruction)
+	payload := map[string]interface{}{
+		"content":      msgContent,
+		"sender_name":  "Workflow: " + wf.Name,
+		"sender_type":  "workflow",
+		"message_type": "chat",
+	}
+	metadata := map[string]interface{}{
+		"target_agents": []string{steps[0].Agent},
+		"pipeline_step": true,
+		"auto_relay":    true,
+		"task_id":       taskID,
+		"workflow":      wf.Name,
+		"step_index":    0,
+	}
+
+	eventID := uuid.NewString()
+	payloadBytes, _ := json.Marshal(payload)
+	metaBytes, _ := json.Marshal(metadata)
+	eventRec := models.EventRecord{
+		ID:         eventID,
+		NetworkID:  workspace.ID,
+		Type:       "workspace.message.posted",
+		Source:     source,
+		Target:     "channel/" + channel.Name,
+		Payload:    payloadBytes,
+		Metadata:   metaBytes,
+		Timestamp:  now,
+		Visibility: "channel",
+	}
+
+	if err := db.DB.Create(&eventRec).Error; err == nil {
+		recordRelayTurn(workspace.ID, eventRec.Target, steps[0].Agent, taskID, eventID)
+		fullEvent := gin.H{
+			"id":         eventRec.ID,
+			"event_id":   eventRec.ID,
+			"network":    workspace.ID,
+			"type":       eventRec.Type,
+			"source":     eventRec.Source,
+			"target":     eventRec.Target,
+			"payload":    payload,
+			"metadata":   metadata,
+			"timestamp":  eventRec.Timestamp,
+			"visibility": eventRec.Visibility,
+			"status":     "confirmed",
+		}
+		if fullEventBytes, err := json.Marshal(fullEvent); err == nil && hub.GlobalHub != nil {
+			hub.GlobalHub.Broadcast(hub.BroadcastMsg{
+				WorkspaceID: workspace.ID,
+				ChannelName: eventRec.Target,
+				Payload:     string(fullEventBytes),
+			})
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
