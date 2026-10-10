@@ -9,7 +9,7 @@ import {
   type SidebarResourceMove,
 } from '@/components/agents/ai-sidebar';
 import { AgentAvatar, AgentAvatarStack } from '@/components/agents/agent-avatar';
-import { useWorkspace, isUnusedSession } from '@/lib/workspace-context';
+import { useWorkspace, isUnusedSession, isReviewThreadId } from '@/lib/workspace-context';
 import { useThreadSeen } from '@/lib/thread-seen';
 import { useAgentTurns } from '@/lib/use-agent-turns';
 import { useLayout } from '@/components/layout/layout-context';
@@ -175,6 +175,8 @@ export function ThreadSidebar() {
         (s) =>
           s.status !== 'deleted' &&
           s.status !== 'archived' &&
+          // Review threads open from the parallel panel, not from here.
+          !isReviewThreadId(s.sessionId) &&
           (s.sessionId === currentSessionId || !isUnusedSession(s, lastMessageBySession))
       ),
     [sessions, currentSessionId, lastMessageBySession]

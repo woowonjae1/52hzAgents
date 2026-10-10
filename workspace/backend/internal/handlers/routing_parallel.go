@@ -272,6 +272,8 @@ type ParallelBatch struct {
 	// Isolated: the channel's folder is a git repository, so lanes run in
 	// their own worktrees and scope conflicts do not block a start.
 	Isolated bool `json:"isolated"`
+	// ReviewAgent is the channel's review-before-merge setting, "" when off.
+	ReviewAgent string `json:"review_agent"`
 	// Run is the latest batch actually started in the channel, with its lanes.
 	Run *ParallelRunView `json:"run,omitempty"`
 }

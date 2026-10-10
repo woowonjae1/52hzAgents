@@ -28,8 +28,22 @@ export type ScopeConflict = Wire.ScopeConflict;
 
 export type ParallelLaneStatus = 'running' | 'done' | 'failed' | 'merged' | 'conflict' | 'kept' | 'discarded';
 
+/**
+ * Review before merge: another agent's verdict on a lane while the batch waits.
+ * '' = not reviewed (review off, or the lane changed nothing).
+ */
+export type LaneReviewStatus =
+  | ''
+  | 'running'
+  | 'approved'
+  | 'changes_requested'
+  | 'failed'
+  | 'skipped'
+  | 'timed_out'
+  | 'cancelled';
+
 /** One agent's share of a started batch. `port` 0 = no dev-server port reserved. */
-export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus }>;
+export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus; review_status: LaneReviewStatus }>;
 
 /** A batch that was actually started, with its lanes. */
 export type ParallelRun = Narrow<
@@ -108,6 +122,22 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   async discardParallelBatch(batchId: string): Promise<void> {
     await this.request(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/discard`,
+      { method: 'POST' }
+    );
+  }
+
+  /** Review a lane again, after its review failed, timed out, was skipped or cancelled. */
+  async retryLaneReview(batchId: string, agent: string): Promise<void> {
+    await this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/review`,
+      { method: 'POST' }
+    );
+  }
+
+  /** Send a reviewed lane back to its author with the review; it is reviewed again when it returns. */
+  async sendBackParallelLane(batchId: string, agent: string): Promise<void> {
+    await this.request(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/send-back`,
       { method: 'POST' }
     );
   }

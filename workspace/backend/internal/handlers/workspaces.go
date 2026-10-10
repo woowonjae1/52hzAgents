@@ -248,6 +248,7 @@ type EditChannelRequest struct {
 	OrchestrationInstruction *string `json:"orchestration_instruction"` // 编排指令内容
 	WorkingDir               *string `json:"working_dir"`               // 该线程绑定的本地项目目录（Open Folder 模式），空字符串表示解绑
 	VerificationCmd          *string `json:"verification_cmd"`          // 该线程质量门执行的真实验证命令（如 go test ./... 或 npm test）
+	ReviewAgent              *string `json:"review_agent"`              // 并行批次合并前的审查者（agent 名），空字符串表示关闭
 }
 
 // PatchChannel 处理 PATCH /v1/workspaces/:workspace_id/channels/:channel_name 路由，更新通道配置。
@@ -318,6 +319,13 @@ func PatchChannel(c *gin.Context) {
 			ch.VerificationCmd = nil
 		} else {
 			ch.VerificationCmd = req.VerificationCmd
+		}
+	}
+	if req.ReviewAgent != nil {
+		if v := strings.TrimSpace(*req.ReviewAgent); v == "" {
+			ch.ReviewAgent = nil
+		} else {
+			ch.ReviewAgent = &v
 		}
 	}
 

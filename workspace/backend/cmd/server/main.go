@@ -216,6 +216,9 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/merge", handlers.MergeParallelBatch)                   // 用户确认后合并
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/discard", handlers.DiscardParallelBatch)               // 用户放弃整批改动
 		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/stop", handlers.StopParallelBatch)                     // 用户手动停止并行批次
+		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/review", handlers.RetryLaneReview)               // 重新审查一个分道
+		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/review/complete", handlers.CompleteLaneReview)   // 审查者回报结论
+		v1.POST("/workspaces/:workspace_id/parallel-batches/:batch_id/lanes/:agent/send-back", handlers.SendBackParallelLane)       // 带着审查意见退回作者
 		v1.GET("/router-config", handlers.GetRouterConfig)
 		v1.PUT("/router-config", handlers.UpdateRouterConfig)
 		v1.POST("/router-config/test", handlers.TestRouterConfig)

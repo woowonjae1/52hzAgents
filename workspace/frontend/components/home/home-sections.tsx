@@ -24,7 +24,7 @@ import { PromptDialog } from '@/components/ui/prompt-dialog';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { useAgentTurns } from '@/lib/use-agent-turns';
 import { AgentAvatarStack } from '@/components/agents/agent-avatar';
-import { useWorkspace, isUnusedSession } from '@/lib/workspace-context';
+import { useWorkspace, isUnusedSession, isReviewThreadId } from '@/lib/workspace-context';
 import { workspaceApi } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { formatCompactRelativeTime } from '@/lib/helpers';
@@ -269,6 +269,7 @@ export function RecentSessionsPanel({
           (s) =>
             s.status !== 'archived' &&
             s.status !== 'deleted' &&
+            !isReviewThreadId(s.sessionId) &&
             !isUnusedSession(s, lastMessageBySession),
         )
         .sort((a, b) => sessionTime(b) - sessionTime(a))

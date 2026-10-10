@@ -1164,6 +1164,20 @@ class WorkspaceClient {
   }
 
   /**
+   * Report that this agent's review of another agent's lane has ended.
+   * `laneAgent` is the lane's author; the backend reads the verdict block
+   * from `reply`.
+   * @param {{reviewer: string, status: 'done'|'failed', error?: string, reply?: string}} result
+   */
+  async completeLaneReview(workspaceId, batchId, laneAgent, result, token) {
+    return this._post(
+      `/v1/workspaces/${encodeURIComponent(workspaceId)}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(laneAgent)}/review/complete`,
+      result,
+      this._wsHeaders(token)
+    );
+  }
+
+  /**
    * How full this agent's own context is in one channel, as its CLI measured
    * it on the turn that just ended. Separate from reportAgentUsage because that
    * endpoint replaces the quota fields wholesale.

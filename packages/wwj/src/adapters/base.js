@@ -1636,6 +1636,7 @@ class BaseAdapter {
     const turnStartedAt = Date.now();
     this._enterTurnMode(channel, msg);
     const lane = this._enterParallelLane(channel, msg);
+    const review = this._enterParallelReview(channel, msg);
     try {
       if (msg && typeof msg.content === 'string') {
         msg.content = await this._resolveKnowledgeMentions(msg.content, { autoRag: !isSystemMessage(msg) });
@@ -1651,6 +1652,7 @@ class BaseAdapter {
       await this._releaseStaleTodos(channel, 'turn ended');
       this._registerFilesTouchedSince(channel, turnStartedAt).catch(() => {});
       if (lane) await this._exitParallelLane(channel, lane);
+      if (review) await this._exitParallelReview(channel, review);
       this._exitTurnMode(channel);
     }
 
@@ -1667,6 +1669,7 @@ class BaseAdapter {
       const queuedStartedAt = Date.now();
       this._enterTurnMode(channel, nextMsg);
       const queuedLane = this._enterParallelLane(channel, nextMsg);
+      const queuedReview = this._enterParallelReview(channel, nextMsg);
       try {
         if (nextMsg && typeof nextMsg.content === 'string') {
           nextMsg.content = await this._resolveKnowledgeMentions(nextMsg.content, { autoRag: !isSystemMessage(nextMsg) });
@@ -1682,6 +1685,7 @@ class BaseAdapter {
         await this._releaseStaleTodos(channel, 'queued turn ended');
         this._registerFilesTouchedSince(channel, queuedStartedAt).catch(() => {});
         if (queuedLane) await this._exitParallelLane(channel, queuedLane);
+        if (queuedReview) await this._exitParallelReview(channel, queuedReview);
         this._exitTurnMode(channel);
       }
     }
@@ -1806,6 +1810,56 @@ class BaseAdapter {
       }, this.token);
     } catch (e) {
       this._log(`Parallel: could not report lane completion: ${e && e.message ? e.message : e}`);
+    }
+  }
+
+  /**
+   * If this message asks THIS agent to review another agent's lane before the
+   * user merges it (the backend's parallel_review.go), run the turn in the
+   * read-only copy of that lane's branch. The message is the whole brief, it
+   * arrives in the lane's own review thread (so the conversation is fresh),
+   * and metadata.agent_mode=plan makes it read-only where the CLI enforces
+   * that. Returns the review or null.
+   */
+  _enterParallelReview(channel, msg) {
+    const pr = msg && msg.metadata && msg.metadata.parallel_review;
+    if (!pr || !pr.batch_id || !pr.lane) return null;
+    const targets = msg.metadata.target_agents;
+    const self = String(this.agentName).toLowerCase();
+    if (Array.isArray(targets) && targets.length > 0 && !targets.some((t) => String(t).toLowerCase() === self)) return null;
+    const review = { batchId: String(pr.batch_id), lane: String(pr.lane), workingDir: pr.working_dir ? String(pr.working_dir) : '' };
+    if (review.workingDir) {
+      if (fs.existsSync(review.workingDir)) {
+        this._turnDirOverride = this._turnDirOverride || {};
+        this._turnDirOverride[channel] = review.workingDir;
+      } else {
+        this._log(`Review: copy ${review.workingDir} is missing; running in the thread's folder`);
+      }
+    }
+    this._lastReply = this._lastReply || {};
+    delete this._lastReply[channel];
+    this._log(`Review: @${review.lane}'s part of batch ${review.batchId.slice(0, 8)}${review.workingDir ? ` in ${review.workingDir}` : ''}`);
+    return review;
+  }
+
+  /** Report the review's reply to the backend, which reads the verdict block. */
+  async _exitParallelReview(channel, review) {
+    if (this._turnDirOverride) delete this._turnDirOverride[channel];
+    const failed = Boolean(this._turnFailed && this._turnFailed.has(channel));
+    const reply = String((this._lastReply && this._lastReply[channel]) || '');
+    // The backend removes the copy on this report; a process still running
+    // inside it would pin the directory on Windows.
+    try { await this._releaseLaneProcess(channel); } catch {}
+    try {
+      await this.client.completeLaneReview(this.workspaceId, review.batchId, review.lane, {
+        reviewer: this.agentName,
+        status: failed ? 'failed' : 'done',
+        error: failed ? ((this._turnErrors && this._turnErrors[channel]) || 'the review turn ended with an error') : '',
+        // The verdict block closes the reply, so a long one keeps its end.
+        reply: reply.length > 16000 ? reply.slice(-16000) : reply,
+      }, this.token);
+    } catch (e) {
+      this._log(`Review: could not report the verdict: ${e && e.message ? e.message : e}`);
     }
   }
 
