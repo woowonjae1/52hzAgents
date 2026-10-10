@@ -341,35 +341,7 @@ function WrapperInner() {
             <>
               {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
               <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", undefined)}>
-                {!isSidebarOpen && !isSettings && (viewMode !== 'threads' || isHome) && (
-                  <Hint label="Expand sidebar" side="right">
-                    <button
-                      onClick={sidebarToggle}
-                      /*
-                        `data-no-drag` — this button is positioned against the
-                        main pane, but `top-1.5` lands it inside `.app-header`'s
-                        40px band, which is the window's drag region on
-                        desktop. It is not a DESCENDANT of the header, so the
-                        header's own no-drag rule never reached it, and an
-                        app-region drag rect swallows whatever merely paints on
-                        top of it: the click moved the window, a double-click
-                        maximised it, and a right-click opened Windows' native
-                        window menu. Since the button only exists while the
-                        sidebar is collapsed, that was the whole symptom.
-                      */
-                      data-no-drag
-                      /* `backdrop-blur` (bare) was the one site not on the blur
-                         ramp — it reads `--blur`, which is still Tailwind's 8px.
-                         `hover:scale-105` and `transition-all` went with it: a
-                         chrome button that grows under the cursor is a web
-                         affordance, and a desktop tool answers a hover with
-                         colour, not with size. */
-                      className="absolute top-1.5 left-3.5 z-30 size-7 rounded-lg bg-surface2/90 backdrop-blur-sm border border-border text-foreground-muted hover:text-foreground hover:bg-surface3/90 shadow-sm flex items-center justify-center transition-colors"
-                    >
-                      <PanelLeft className="size-4" />
-                    </button>
-                  </Hint>
-                )}
+
                 {/* Keep ChatView alive in DOM to prevent SSE disconnection, dropped messages, and re-fetch flicker */}
                 <div className={cn("h-full w-full", (viewMode !== 'threads' || isHome) && "hidden")}>
                   <main className="h-full">

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Hint } from '@/components/ui/hint';
 import { useTheme } from 'next-themes';
-import { PanelLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -29,7 +29,7 @@ import { getBridge } from '@/lib/desktop';
  */
 export function AppTitlebar() {
   const { workspace, realtimeStatus } = useWorkspace();
-  const { isSidebarOpen, sidebarToggle, goBack, goForward, canGoBack, canGoForward } = useLayout();
+  const { isSidebarOpen, sidebarToggle } = useLayout();
   const { resolvedTheme } = useTheme();
   const isLive = realtimeStatus === 'live';
   const isConnecting = realtimeStatus === 'connecting';
@@ -145,39 +145,7 @@ export function AppTitlebar() {
           </TooltipContent>
         </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={goBack}
-              disabled={!canGoBack}
-              aria-label="Back"
-              className="size-6 shrink-0 rounded-md flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-30 disabled:pointer-events-none"
-            >
-              <ChevronLeft className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            Back (Alt+←)
-          </TooltipContent>
-        </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={goForward}
-              disabled={!canGoForward}
-              aria-label="Forward"
-              className="size-6 shrink-0 rounded-md flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors disabled:opacity-30 disabled:pointer-events-none"
-            >
-              <ChevronRight className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" sideOffset={6}>
-            Forward (Alt+→)
-          </TooltipContent>
-        </Tooltip>
       </div>
 
       <span className="h-3.5 w-px bg-border shrink-0" />

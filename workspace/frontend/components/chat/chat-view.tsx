@@ -1154,17 +1154,7 @@ export function ChatView() {
         {/* Empty state header providing window drag region and sidebar toggle */}
         <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
           <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
-            {!isMobile && !isSidebarOpen && (
-              <Hint label="Expand sidebar">
-                <button
-                  onClick={sidebarToggle}
-                  aria-label="Expand sidebar"
-                  className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1"
-                >
-                  <PanelLeft className="size-4" />
-                </button>
-              </Hint>
-            )}
+
             <span className="text-xs font-medium text-foreground-extra-muted">
               {isRoutinesView ? 'Routines' : 'Messages'}
             </span>
@@ -1247,18 +1237,7 @@ export function ChatView() {
       */}
       <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
         <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
-          {/* Sidebar Toggle — desktop only, shown when sidebar is collapsed */}
-          {!isMobile && !isSidebarOpen && (
-            <Hint label="Expand sidebar">
-              <button
-                onClick={sidebarToggle}
-                aria-label="Expand sidebar"
-                className="size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 -ml-1"
-              >
-                <PanelLeft className="size-4" />
-              </button>
-            </Hint>
-          )}
+
           {isDM ? (
             <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
               <MessageSquare className="size-4 text-muted-foreground" />
@@ -1339,37 +1318,12 @@ export function ChatView() {
             (`.event-running`), on the words themselves. One signal for "still
             going", everywhere in the app.
           */}
-          {!isDM && activeHeaderAgents.length > 0 && (
+          {!isDM && workingHere.length > 0 && (
             <div className="hidden sm:flex items-baseline gap-2 shrink min-w-0 max-w-[45%]">
-              {workingHere.length > 0 ? (
-                <span className="event-running inline-flex items-baseline gap-1.5 text-xs min-w-0 text-foreground-muted">
-                  <span className="truncate text-foreground">{workingHere.join(', ')}</span>
-                  <span className="shrink-0">working</span>
-                </span>
-              ) : (
-                <Hint label={`${activeHeaderAgents.length} connected agent${activeHeaderAgents.length > 1 ? 's' : ''} — ${activeHeaderAgents.join(', ')}`}>
-                  <span className="flex items-center gap-1.5 min-w-0 text-xs text-foreground-muted">
-                    <span className="flex items-center -space-x-1.5">
-                      {activeHeaderAgents.slice(0, 4).map((name) => (
-                        <AgentAvatar
-                          key={name}
-                          name={name}
-                          agentType={agents.find((a) => a.agentName === name)?.agentType}
-                          size={18}
-                          status="online"
-                          className="ring-1 ring-surface0 rounded-full shrink-0"
-                        />
-                      ))}
-                    </span>
-                    {activeHeaderAgents.length > 4 && (
-                      <span className="shrink-0 text-3xs font-mono tabular-nums text-foreground-extra-muted">
-                        +{activeHeaderAgents.length - 4}
-                      </span>
-                    )}
-                    <span className="shrink-0 text-3xs font-mono text-emerald-500 font-medium">online</span>
-                  </span>
-                </Hint>
-              )}
+              <span className="event-running inline-flex items-baseline gap-1.5 text-xs min-w-0 text-foreground-muted">
+                <span className="truncate text-foreground">{workingHere.join(', ')}</span>
+                <span className="shrink-0">working</span>
+              </span>
             </div>
           )}
         </div>
@@ -1398,12 +1352,6 @@ export function ChatView() {
             one recipe the grouping no longer needs a container to be legible.
           */}
           <div className="flex items-center gap-1.5">
-            {/*
-              Context moved to the composer — it is a budget for the message you
-              are about to send, not a fact about the thread's name. See
-              ContextHealthIndicator.
-            */}
-            <AgentQuotaCapsule agentName={activeModelAgentName} />
             <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
           </div>
 
@@ -1439,8 +1387,7 @@ export function ChatView() {
                 </button>
               </Hint>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => (filterOpen || filterActive ? closeFilter() : setFilterOpen(true))}>
                 <Filter className="size-4 mr-2 text-foreground-muted" />
                 <span>{filterOpen || filterActive ? 'Clear filter' : 'Filter this thread'}</span>
@@ -1449,15 +1396,6 @@ export function ChatView() {
               <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
                 <Download className="size-4 mr-2" />
                 <span>Export as Markdown</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShareDialogOpen(true)}>
-                <Share2 className="size-4 mr-2" />
-                <span>Share conversation</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setViewMode(viewMode === 'tasks' ? 'threads' : 'tasks')}>
-                <ListChecks className="size-4 mr-2" />
-                <span>Tasks &amp; Issues</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

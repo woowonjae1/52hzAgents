@@ -550,7 +550,7 @@ export function ThreadSidebar() {
           Search
         </button>
 
-        <NavSection label="Main">
+        <NavSection label="Workspace">
           <button
             type="button"
             className={cn(NAV_ROW_CLASS, (isHome || viewMode === 'mission') && NAV_ROW_ACTIVE)}
@@ -562,9 +562,6 @@ export function ThreadSidebar() {
             <Users className="size-4 shrink-0" />
             Agents
           </button>
-        </NavSection>
-
-        <NavSection label="Workspace">
           {/*
             The workspace's shared files: what you uploaded and what agents
             produced (adapters register files they write each turn). The tree

@@ -4,8 +4,6 @@ import { Hint } from '@/components/ui/hint';
 import { useState, useEffect } from 'react';
 import {
   Settings,
-  KeyRound,
-  Check,
   LogOut,
   LogIn,
 } from 'lucide-react';
@@ -13,9 +11,7 @@ import { useTheme } from 'next-themes';
 import { ThemeToggle } from '@/components/motion/theme-toggle';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useLayout } from './layout-context';
-import { useWorkspace } from '@/lib/workspace-context';
 import { cn } from '@/lib/utils';
-import { toast } from '@/lib/toast';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
 import { ThreadSidebar } from '@/components/threads/thread-sidebar';
 
@@ -24,23 +20,10 @@ export function SidebarContent() {
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
-  const { token } = useWorkspace();
-  const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
   const isDark = mounted && resolvedTheme === 'dark';
-
-  const handleCopyToken = () => {
-    if (!token) {
-      toast.error('No management token available');
-      return;
-    }
-    navigator.clipboard.writeText(token);
-    setTokenCopied(true);
-    toast.success('Management token copied');
-    setTimeout(() => setTokenCopied(false), 2000);
-  };
 
 
   return (
@@ -100,29 +83,8 @@ export function SidebarContent() {
           <span>Settings</span>
         </button>
 
-        {/* Right group: token, theme */}
+        {/* Right group: theme */}
         <div className="flex items-center gap-0.5">
-          {/*
-            Inbox, Tasks and Agents used to sit here as three unlabeled
-            icons. They are named rows in the grouped nav above now, so this
-            bar keeps only what is about the app itself.
-          */}
-          {token && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={handleCopyToken}
-                  aria-label="Copy management token"
-                  className="size-7 rounded-lg flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
-                >
-                  {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <KeyRound className="size-3.5" />}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top">Copy management token</TooltipContent>
-            </Tooltip>
-          )}
-
           <Tooltip>
             <TooltipTrigger asChild>
               <ThemeToggle

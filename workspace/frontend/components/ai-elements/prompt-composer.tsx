@@ -1203,18 +1203,7 @@ export function PromptComposer({
               placeholder says so; the button was a second door to it that
               spent the widest pill in the row on a keystroke.
             */}
-            {onCreateRoutine && (
-              <Hint label="Create a scheduled task">
-                <button
-                  type="button"
-                  onClick={onCreateRoutine}
-                  className={pillButton}
-                >
-                  <CalendarClock className="size-3.5 shrink-0 text-foreground-extra-muted" />
-                  <span className="hidden md:inline">Schedule</span>
-                </button>
-              </Hint>
-            )}
+
 
             <Hint label="Mention an agent (@)">
               <button
