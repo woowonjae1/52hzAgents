@@ -294,7 +294,11 @@ func SendEvent(c *gin.Context) {
 
 	// Check if this event finishes an agent turn and should trigger the next pipeline step
 	if isAgentSource(req.Source) && messageType(req.Payload) == "chat" {
-		CheckAndTriggerNextPipelineStep(workspace.ID, req.Target, req.Source)
+		// Agents that report turn state are evaluated when the turn ends
+		// (ReportAgentTurn); for the rest the reply is the only end signal.
+		if !agentReportsTurns(workspace.ID, agentNameFromSource(req.Source)) {
+			go CheckAndTriggerNextPipelineStep(workspace.ID, req.Target, req.Source)
+		}
 		CompleteRoutineRunIfApplicable(workspace.ID, req.Target, req.Source)
 	}
 
@@ -629,7 +633,9 @@ func StreamEventsWS(c *gin.Context) {
 		parsedReq.runAfterCommit()
 
 		if isAgentSource(parsedReq.Source) && messageType(parsedReq.Payload) == "chat" {
-			CheckAndTriggerNextPipelineStep(workspace.ID, parsedReq.Target, parsedReq.Source)
+			if !agentReportsTurns(workspace.ID, agentNameFromSource(parsedReq.Source)) {
+				go CheckAndTriggerNextPipelineStep(workspace.ID, parsedReq.Target, parsedReq.Source)
+			}
 			CompleteRoutineRunIfApplicable(workspace.ID, parsedReq.Target, parsedReq.Source)
 		}
 

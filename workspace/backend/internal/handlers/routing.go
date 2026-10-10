@@ -373,22 +373,48 @@ func HaltChannelPipeline(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "halted", "finished_at": nowMs})
 }
 
-// CheckAndTriggerNextPipelineStep evaluates the current step's execution quality
-// and either advances the chain to the next agent or triggers a self-correction retry.
+// CheckAndTriggerNextPipelineStep is the trigger for adapters that do not report
+// turn state: their chat reply is the only sign the turn ended.
 func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source string) {
 	if !strings.HasPrefix(target, "channel/") {
 		return
 	}
-	actor := agentNameFromSource(source)
-	if actor == "" {
+	EvaluatePipelineStep(workspaceID, strings.TrimPrefix(target, "channel/"), agentNameFromSource(source), "", 0)
+}
+
+// pipelineEvalLocks serialises step evaluation per channel. Evaluation runs
+// the verification command, and a turn-end report and a chat message can
+// arrive for the same step at nearly the same time.
+var pipelineEvalLocks sync.Map // channel ID -> *sync.Mutex
+
+// pipelineTurnTolerance absorbs clock skew between when a step was dispatched
+// and when the adapter reported its turn as started.
+const pipelineTurnTolerance = 2 * time.Second
+
+// EvaluatePipelineStep judges the attempt the current step of channelName's
+// chain is waiting on, once actor's turn there has ended.
+//
+//   - turnError is the adapter's error when the turn failed, "" otherwise.
+//   - turnStartedMs is when that turn started (0 when unknown). A turn that
+//     started before this attempt was dispatched is an older turn ending, not
+//     this attempt, and is ignored.
+//
+// Adapters that report turn state call this from the turn-end report; older
+// adapters still go through CheckAndTriggerNextPipelineStep on their reply.
+func EvaluatePipelineStep(workspaceID, channelName, actor, turnError string, turnStartedMs int64) {
+	if actor == "" || channelName == "" {
 		return
 	}
-	channelName := strings.TrimPrefix(target, "channel/")
+	target := "channel/" + channelName
 
 	var channel models.Channel
 	if err := db.DB.Where("workspace_id = ? AND name = ?", workspaceID, channelName).First(&channel).Error; err != nil {
 		return
 	}
+	lockAny, _ := pipelineEvalLocks.LoadOrStore(channel.ID, &sync.Mutex{})
+	lock := lockAny.(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
 
 	var record models.ChannelPipeline
 	if err := db.DB.Where("channel_id = ? AND status = ?", channel.ID, "running").First(&record).Error; err != nil {
@@ -408,36 +434,39 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 	if !strings.EqualFold(steps[idx].Agent, actor) {
 		return
 	}
-
-	// 1. Gather recent turn messages produced during this step for quality evaluation
-	var turnEvents []models.EventRecord
-	turnQuery := db.DB.Where("network_id = ? AND target = ? AND type LIKE ?", workspaceID, target, "workspace.message%")
-	if steps[idx].StartedAt != nil {
-		turnQuery = turnQuery.Where("timestamp >= ?", *steps[idx].StartedAt)
+	attemptStart := steps[idx].AttemptStartedAt
+	if attemptStart == nil {
+		attemptStart = steps[idx].StartedAt
 	}
-	turnQuery.Order("timestamp asc, id asc").Limit(20).Find(&turnEvents)
-
-	var turnMessages []string
-	for _, te := range turnEvents {
-		if !isAgentSource(te.Source) || !strings.EqualFold(agentNameFromSource(te.Source), actor) {
-			continue
-		}
-		var p map[string]interface{}
-		if json.Unmarshal(te.Payload, &p) == nil {
-			if c, ok := p["content"].(string); ok && strings.TrimSpace(c) != "" {
-				turnMessages = append(turnMessages, c)
-			}
-		}
+	if turnStartedMs > 0 && attemptStart != nil && turnStartedMs < *attemptStart-pipelineTurnTolerance.Milliseconds() {
+		return
 	}
 
-	// 2. Evaluate step execution quality using real verification command and delta regression check
+	// 1. The agent's replies in THIS attempt -- not thinking previews, status
+	// lines or tool output, and not what an earlier attempt said.
+	turnMessages := pipelineAttemptReplies(workspaceID, target, actor, attemptStart)
+
+	// 2. Judge the attempt against the state from before the step began.
 	dir := resolveTurnDir(workspaceID, &channel, actor)
 	var verificationCmd string
 	if channel.VerificationCmd != nil {
-		verificationCmd = *channel.VerificationCmd
+		verificationCmd = strings.TrimSpace(*channel.VerificationCmd)
 	}
-	baselineVerify := GetLatestTurnBaselineVerify(workspaceID, channel.ID, actor)
-	evalRes := evaluator.EvaluateTurnWithVerification(actor, steps[idx], turnMessages, dir, verificationCmd, baselineVerify)
+	var baseline *evaluator.VerificationRunResult
+	if s := steps[idx].Baseline; s != nil {
+		baseline = &evaluator.VerificationRunResult{ExitCode: s.ExitCode, Errors: s.Errors}
+	} else if steps[idx].RetryCount == 0 && verificationCmd != "" {
+		// Only on the first attempt: the turn's own baseline was taken when
+		// the step was dispatched. A retry's turn baseline would include the
+		// failure the first attempt left behind -- which is how a retry that
+		// changed nothing used to pass as "no new errors".
+		baseline = waitForTurnBaseline(workspaceID, channel.ID, actor, 35*time.Second)
+		if baseline != nil {
+			steps[idx].Baseline = &models.VerifySnapshot{ExitCode: baseline.ExitCode, Errors: baseline.Errors}
+		}
+	}
+	evalRes := evaluator.EvaluateStep(actor, steps[idx], turnError, dir, verificationCmd, baseline)
+	steps[idx].VerifiedBy = evalRes.VerifiedBy
 	nowMs := time.Now().UnixMilli()
 
 	// 3. Handle Failures with Bounded Self-Correction Loop & Spend Budget Gate
@@ -446,68 +475,51 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 		if maxRetries <= 0 {
 			maxRetries = 3
 		}
-
 		maxPipelineRetries := record.MaxTotalRetries
 		if maxPipelineRetries <= 0 {
 			maxPipelineRetries = 6
 		}
+		errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
+		steps[idx].LastError = &errDetailStr
 
 		if record.TotalRetries >= maxPipelineRetries {
 			// Pipeline-level retry budget exhausted to prevent run-away token burn
 			steps[idx].Status = "failed"
-			errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
-			steps[idx].LastError = &errDetailStr
 			steps[idx].FinishedAt = &nowMs
-
-			encoded, _ := json.Marshal(steps)
-			db.DB.Model(&models.ChannelPipeline{}).
-				Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
-				Updates(map[string]interface{}{
-					"steps":  encoded,
-					"status": "halted_budget",
-				})
-
-			haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted: Budget Exceeded] Total retries across pipeline reached limit (%d/%d). Halting to prevent infinite loop or token drain.\nLast error:\n> %s\nHuman intervention required.",
+			if !savePipelineSteps(&record, idx, steps, map[string]interface{}{"status": "halted_budget"}) {
+				return
+			}
+			haltMsg := fmt.Sprintf("[Pipeline halted: retry budget used up] %d of %d retries across the pipeline are spent.\nLast error:\n> %s\nA person needs to take over.",
 				record.TotalRetries, maxPipelineRetries, strings.Join(evalRes.ErrorDetails, "\n> "))
 			RelayPipelineAlert(workspaceID, target, haltMsg)
 			return
 		}
 
 		if steps[idx].RetryCount < maxRetries {
-			// Trigger self-correction retry
 			steps[idx].RetryCount++
 			steps[idx].Status = "retrying"
-			errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
-			steps[idx].LastError = &errDetailStr
-
-			encoded, _ := json.Marshal(steps)
-			db.DB.Model(&models.ChannelPipeline{}).
-				Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
-				Updates(map[string]interface{}{
-					"steps":         encoded,
-					"total_retries": record.TotalRetries + 1,
-				})
-
-			relaySelfCorrection(workspaceID, target, actor, evalRes.FeedbackMessage, pipelineTaskID(record.ID, idx))
+			steps[idx].AttemptStartedAt = &nowMs
+			if !savePipelineSteps(&record, idx, steps, map[string]interface{}{"total_retries": record.TotalRetries + 1}) {
+				return
+			}
+			// The feedback alone is not enough for an agent whose session did
+			// not survive: restate what the step is.
+			feedback := evalRes.FeedbackMessage
+			if instr := strings.TrimSpace(steps[idx].Instruction); instr != "" {
+				feedback += "\n\nYour task for this step (unchanged):\n> " + strings.ReplaceAll(instr, "\n", "\n> ")
+			}
+			relaySelfCorrection(workspaceID, target, actor, feedback, pipelineTaskID(record.ID, idx))
 			return
 		}
 
 		// Retries exhausted: fail the pipeline and halt
 		steps[idx].Status = "failed"
-		errDetailStr := strings.Join(evalRes.ErrorDetails, "\n")
-		steps[idx].LastError = &errDetailStr
 		steps[idx].FinishedAt = &nowMs
-
-		encoded, _ := json.Marshal(steps)
-		db.DB.Model(&models.ChannelPipeline{}).
-			Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
-			Updates(map[string]interface{}{
-				"steps":  encoded,
-				"status": "failed",
-			})
-
-		haltMsg := fmt.Sprintf("⚠️ [Pipeline Halted] Step %d (@%s) failed after %d attempts.\nErrors:\n> %s\nHuman intervention required.",
-			idx+1, actor, steps[idx].RetryCount, strings.Join(evalRes.ErrorDetails, "\n> "))
+		if !savePipelineSteps(&record, idx, steps, map[string]interface{}{"status": "failed"}) {
+			return
+		}
+		haltMsg := fmt.Sprintf("[Pipeline halted] Step %d (@%s) failed after %d attempts.\nErrors:\n> %s\nA person needs to take over.",
+			idx+1, actor, steps[idx].RetryCount+1, strings.Join(evalRes.ErrorDetails, "\n> "))
 		RelayPipelineAlert(workspaceID, target, haltMsg)
 		return
 	}
@@ -526,28 +538,13 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 	} else {
 		steps[nextIdx].Status = "running"
 		steps[nextIdx].StartedAt = &nowMs
+		// The run that just passed is the state the next step starts from.
+		if evalRes.Final != nil {
+			steps[nextIdx].Baseline = &models.VerifySnapshot{ExitCode: evalRes.Final.ExitCode, Errors: evalRes.Final.Errors}
+		}
 	}
 
-	encoded, err := json.Marshal(steps)
-	if err != nil {
-		log.Printf("pipeline: failed to encode chain %s: %v", record.ID, err)
-		return
-	}
-
-	// Compare-and-swap on (current_index, status) so two replies racing through
-	// this path cannot advance the chain twice.
-	result := db.DB.Model(&models.ChannelPipeline{}).
-		Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
-		Updates(map[string]interface{}{
-			"steps":         encoded,
-			"current_index": nextIdx,
-			"status":        nextStatus,
-		})
-	if result.Error != nil {
-		log.Printf("pipeline: failed to advance chain %s: %v", record.ID, result.Error)
-		return
-	}
-	if result.RowsAffected == 0 || nextStatus == "completed" {
+	if !savePipelineSteps(&record, idx, steps, map[string]interface{}{"current_index": nextIdx, "status": nextStatus}) || nextStatus == "completed" {
 		return
 	}
 
@@ -555,6 +552,98 @@ func CheckAndTriggerNextPipelineStep(workspaceID string, target string, source s
 	closeAgentTurn(workspaceID, &channel, actor)
 
 	relayPipelineStep(workspaceID, target, steps[nextIdx], actor, deliverable, pipelineTaskID(record.ID, nextIdx))
+}
+
+// savePipelineSteps writes steps plus extra columns with a compare-and-swap on
+// (current_index, status=running), so two evaluations racing for the same
+// attempt cannot both retry it or advance the chain twice. It reports whether
+// this caller won.
+func savePipelineSteps(record *models.ChannelPipeline, idx int, steps []models.PipelineStep, extra map[string]interface{}) bool {
+	encoded, err := json.Marshal(steps)
+	if err != nil {
+		log.Printf("pipeline: failed to encode chain %s: %v", record.ID, err)
+		return false
+	}
+	updates := map[string]interface{}{"steps": encoded}
+	for k, v := range extra {
+		updates[k] = v
+	}
+	result := db.DB.Model(&models.ChannelPipeline{}).
+		Where("id = ? AND current_index = ? AND status = ?", record.ID, idx, "running").
+		Updates(updates)
+	if result.Error != nil {
+		log.Printf("pipeline: failed to update chain %s: %v", record.ID, result.Error)
+		return false
+	}
+	return result.RowsAffected > 0
+}
+
+// pipelineAttemptReplies returns actor's chat replies in target since the
+// attempt started, oldest first. Thinking previews, status lines and tool
+// output are message types of their own and are left out: the handoff
+// summary was once built from a "thinking..." status line.
+func pipelineAttemptReplies(workspaceID, target, actor string, since *int64) []string {
+	var events []models.EventRecord
+	q := db.DB.Where("network_id = ? AND target = ? AND type LIKE ?", workspaceID, target, "workspace.message%")
+	if since != nil {
+		q = q.Where("timestamp >= ?", *since)
+	}
+	q.Order("timestamp desc, id desc").Limit(200).Find(&events)
+
+	var replies []string
+	for i := len(events) - 1; i >= 0; i-- {
+		ev := events[i]
+		if !isAgentSource(ev.Source) || !strings.EqualFold(agentNameFromSource(ev.Source), actor) {
+			continue
+		}
+		var p map[string]interface{}
+		if json.Unmarshal(ev.Payload, &p) != nil {
+			continue
+		}
+		if mt, _ := p["message_type"].(string); mt != "" && mt != "chat" {
+			continue
+		}
+		if c, ok := p["content"].(string); ok && strings.TrimSpace(c) != "" {
+			replies = append(replies, c)
+		}
+	}
+	return replies
+}
+
+// waitForTurnBaseline returns the baseline verification recorded when actor's
+// latest turn was dispatched. It is captured in the background, so a fast
+// agent can finish first; wait for a capture that is still running rather
+// than judge the step with no baseline at all.
+func waitForTurnBaseline(workspaceID, channelID, actor string, maxWait time.Duration) *evaluator.VerificationRunResult {
+	deadline := time.Now().Add(maxWait)
+	for {
+		if res := GetLatestTurnBaselineVerify(workspaceID, channelID, actor); res != nil {
+			return res
+		}
+		if !turnBaselinePending(workspaceID, channelID, actor) || time.Now().After(deadline) {
+			return nil
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+}
+
+// settlePipelineForTurn evaluates the pipeline step a finished turn belongs
+// to, in the background: evaluation runs the verification command, which
+// must not hold up the adapter's turn report.
+func settlePipelineForTurn(workspaceID, agentName, channel, state, errText string, turnStartedAt *time.Time) {
+	if state != models.AgentTurnIdle && state != models.AgentTurnError {
+		return
+	}
+	if state == models.AgentTurnIdle {
+		errText = ""
+	} else if strings.TrimSpace(errText) == "" {
+		errText = "turn failed"
+	}
+	var startedMs int64
+	if turnStartedAt != nil {
+		startedMs = turnStartedAt.UnixMilli()
+	}
+	go EvaluatePipelineStep(workspaceID, channel, agentName, errText, startedMs)
 }
 
 // relaySelfCorrection posts diagnostic feedback to the same agent to prompt self-repair.

@@ -812,6 +812,23 @@ export interface PipelineStep {
    * 结构化交付包
    */
   deliverable?: PipelineDeliverable | null;
+  /**
+   * AttemptStartedAt is when the current attempt (first run or a retry) was
+   * dispatched. Only messages after it belong to the attempt being judged.
+   */
+  attempt_started_at?: number | null;
+  /**
+   * Baseline is the verification result from BEFORE this step's first
+   * attempt. Retries are judged against it, never against the state the
+   * step's own earlier attempt left behind.
+   */
+  baseline?: VerifySnapshot | null;
+  /**
+   * VerifiedBy says how the step was judged: "command" when the channel's
+   * verification command ran, "turn_error" when the agent's turn failed,
+   * "unverified" when no command is configured.
+   */
+  verified_by?: string;
 }
 
 /**
@@ -1086,6 +1103,16 @@ export interface TodoRecord {
   scope?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * VerifySnapshot is the part of a verification run a later comparison needs.
+ *
+ * Go: models.VerifySnapshot
+ */
+export interface VerifySnapshot {
+  exit_code: number;
+  errors?: string[];
 }
 
 /**

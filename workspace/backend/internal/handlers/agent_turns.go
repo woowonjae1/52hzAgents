@@ -67,6 +67,7 @@ func ReportAgentTurn(c *gin.Context) {
 	// The end of a turn is what completes (idle) or fails (error) a routine
 	// run the agent was carrying out in this channel.
 	settleRoutineRunsForTurn(workspace.ID, agentName, channel, record.State, record.Error, record.StartedAt, "52hz:"+agentName)
+	settlePipelineForTurn(workspace.ID, agentName, channel, record.State, record.Error, record.StartedAt)
 	c.JSON(http.StatusOK, record)
 }
 
@@ -216,6 +217,7 @@ func ExpireOrphanedAgentTurns(heartbeatTimeout time.Duration) int {
 		turn.UpdatedAt = now
 		_ = PublishWorkspaceStateEvent(turn.WorkspaceID, agentTurnEventType, "system:watchdog", turn.ChannelName, gin.H{"turn": turn})
 		settleRoutineRunsForTurn(turn.WorkspaceID, turn.AgentName, turn.ChannelName, models.AgentTurnError, reason, turn.StartedAt, "system:watchdog")
+		settlePipelineForTurn(turn.WorkspaceID, turn.AgentName, turn.ChannelName, models.AgentTurnError, reason, turn.StartedAt)
 		log.Printf("scheduler: @%s turn in %s marked error: %s", turn.AgentName, turn.ChannelName, reason)
 	}
 	return moved

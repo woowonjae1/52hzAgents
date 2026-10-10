@@ -31,7 +31,10 @@ type EvaluationResult struct {
 	FeedbackMessage string     `json:"feedback_message,omitempty"`
 	ExitCode        *int       `json:"exit_code,omitempty"`
 	DurationMs      int64      `json:"duration_ms,omitempty"`
-	VerifiedBy      string     `json:"verified_by,omitempty"` // "command" | "fallback_regex"
+	VerifiedBy      string     `json:"verified_by,omitempty"` // "command" | "turn_error" | "unverified"
+	// Final is the verification run this verdict was based on, nil when no
+	// command ran. On a pass it is the state the next step starts from.
+	Final *VerificationRunResult `json:"-"`
 }
 
 // VerificationRunResult captures the raw execution output and parsed errors of a verification run.
@@ -77,14 +80,6 @@ var errorPatterns = []*regexp.Regexp{
 	// Git error states
 	regexp.MustCompile(`(?i)\bfatal:\s+.*`),
 	regexp.MustCompile(`(?i)\berror:\s+(failed to push|cannot spawn|unable to read)\b`),
-}
-
-// Explicit success signals for heuristic fallback
-var successPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)(^|\n)PASS(\s|$)`),
-	regexp.MustCompile(`(?i)(^|\n)ok\t`),
-	regexp.MustCompile(`(?i)\bAll tests passed\b`),
-	regexp.MustCompile(`(?i)\b(0 errors,\s*0 warnings|Build succeeded|Compiled successfully)\b`),
 }
 
 // ExtractErrorLines scans text lines for matching error patterns and returns up to maxLines informative snippets.
@@ -140,6 +135,14 @@ var allowedEnvPrefixes = []string{
 	"CARGO_HOME=", "RUSTUP_HOME=",
 	"PYTHONPATH=", "PYTHONHOME=", "VIRTUAL_ENV=",
 	"JAVA_HOME=", "DOTNET_ROOT=", "DOTNET_CLI_TELEMETRY_OPTOUT=",
+	// Windows locations toolchains resolve their caches from. Without
+	// LOCALAPPDATA `go test` fails with "build cache is required" and npm
+	// cannot find its cache -- every run failed the same way, so every step
+	// "passed" as pre-existing breakage. None of these hold secrets.
+	"LOCALAPPDATA=", "APPDATA=", "PROGRAMDATA=", "PROGRAMFILES=", "PROGRAMFILES(X86)=",
+	"PROGRAMW6432=", "COMMONPROGRAMFILES=", "SYSTEMDRIVE=", "USERNAME=", "OS=",
+	"NUMBER_OF_PROCESSORS=", "PROCESSOR_ARCHITECTURE=",
+	"GOMODCACHE=", "GOFLAGS=", "XDG_CACHE_HOME=", "XDG_CONFIG_HOME=",
 }
 
 // RunVerificationCommand executes the given verification command in the project directory
@@ -234,13 +237,14 @@ func RunVerificationCommand(dir, command string, timeout time.Duration) (*Verifi
 		}
 	}
 
-	extractedErrors := ExtractErrorLines(outputStr, 8)
+	extractedErrors := dropGenericErrorLines(ExtractErrorLines(outputStr, 8))
 	if exitCode != 0 && len(extractedErrors) == 0 {
-		// Fallback for failed commands whose output didn't match standard regexes: capture tail lines
+		// Nothing specific matched (or only "exit status 1"-style lines did):
+		// the tail of the output is the most specific evidence there is.
 		rawLines := strings.Split(outputStr, "\n")
 		for i := len(rawLines) - 1; i >= 0 && len(extractedErrors) < 4; i-- {
 			trimmed := strings.TrimSpace(rawLines[i])
-			if trimmed != "" {
+			if trimmed != "" && !isGenericErrorLine(trimmed) {
 				extractedErrors = append([]string{trimmed}, extractedErrors...)
 			}
 		}
@@ -260,7 +264,41 @@ func normalizeErrorLine(line string) string {
 	line = strings.TrimSpace(strings.ToLower(line))
 	// Strip leading line numbers, timestamp cues, or formatting characters
 	line = strings.TrimLeft(line, "> -*#0123456789.:\t")
+	// Digits elsewhere are line numbers and timings: an existing error that
+	// moved down a few lines, or a test that ran 0.53s instead of 0.48s, is
+	// still the same error.
+	line = digitRun.ReplaceAllString(line, "#")
 	return strings.TrimSpace(line)
+}
+
+var digitRun = regexp.MustCompile(`[0-9]+`)
+
+// genericErrorLines carry no information about WHAT failed. Two different
+// failures both end in "exit status 1", so comparing on such lines made a new
+// failure look identical to the baseline's.
+var genericErrorLines = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)^exit status \d+$`),
+	regexp.MustCompile(`(?i)^npm\s+ERR!\s+(code|errno|syscall|path|command failed|lifecycle|a complete log|this is probably|failed at)`),
+	regexp.MustCompile(`(?i)^\[quality gate\]`),
+}
+
+func isGenericErrorLine(line string) bool {
+	for _, re := range genericErrorLines {
+		if re.MatchString(strings.TrimSpace(line)) {
+			return true
+		}
+	}
+	return false
+}
+
+func dropGenericErrorLines(lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		if !isGenericErrorLine(l) {
+			out = append(out, l)
+		}
+	}
+	return out
 }
 
 // CalculateNewErrors calculates the delta between baseline errors and final errors,
@@ -291,195 +329,123 @@ func CalculateNewErrors(baselineErrors, finalErrors []string) []string {
 	return newErrors
 }
 
-// isAnalyticalInstruction checks if a step instruction is an analytical/review task
-// where reporting bugs/errors is the expected deliverable, not an execution failure.
-func isAnalyticalInstruction(instruction string) bool {
-	lower := strings.ToLower(instruction)
-	cues := []string{
-		"review", "audit", "analyze", "analysis", "inspect", "check", "diagnose", "optimize", "find",
-		"审查", "分析", "看看", "找找", "评估", "诊断", "优化", "检查", "建议", "排查", "评审",
-	}
-	for _, cue := range cues {
-		if strings.Contains(lower, cue) {
-			return true
-		}
-	}
-	return false
-}
-
-// EvaluateTurnWithVerification assesses step execution using real verification command execution
-// and delta regression comparison when configured, falling back to prose regex scanning when no command is set.
-func EvaluateTurnWithVerification(
+// EvaluateStep judges one attempt at a pipeline step from evidence only:
+//
+//  1. The agent's turn ended in an error (the adapter said so): fail.
+//  2. A verification command is configured: run it. Exit 0 passes. A failure
+//     passes only when every error was already there before the step's first
+//     attempt (baseline) -- pre-existing debt is not this step's regression.
+//  3. No command: pass, marked "unverified".
+//
+// There is deliberately no prose heuristic. Scanning the agent's reply for
+// "TypeError:" or "exit status 1" failed steps whenever an agent described
+// an error it had fixed, and a keyword list ("check", "优化", ...) that
+// exempted "analytical" steps also skipped the real command for any coding
+// step that happened to contain one of those words.
+func EvaluateStep(
 	agentName string,
 	step models.PipelineStep,
-	turnMessages []string,
+	turnError string,
 	dir string,
 	verificationCmd string,
-	baselineResult *VerificationRunResult,
+	baseline *VerificationRunResult,
 ) EvaluationResult {
-	// If this step is an analytical / review task (e.g. "代码审查", "分析架构"),
-	// reporting bugs or errors is an expected deliverable, not a pipeline failure.
-	if isAnalyticalInstruction(step.Instruction) {
+	retryNum := step.RetryCount + 1
+	maxRetries := step.MaxRetries
+	if maxRetries <= 0 {
+		maxRetries = 3
+	}
+
+	if turnError = strings.TrimSpace(turnError); turnError != "" {
+		details := []string{truncateLine(turnError, 400)}
+		var fb strings.Builder
+		fb.WriteString(fmt.Sprintf("[Pipeline Quality Gate - Retry %d/%d]\n", retryNum, maxRetries))
+		fb.WriteString(fmt.Sprintf("@%s's turn ended with an error:\n> %s\n", agentName, details[0]))
+		fb.WriteString("\nFix the cause and complete the step.")
 		return EvaluationResult{
-			Status:     EvalPass,
-			Reason:     "Analytical / review step completed successfully with reported findings",
-			VerifiedBy: "analytical_exemption",
+			Status:          EvalFail,
+			Reason:          "The agent's turn ended with an error",
+			ErrorDetails:    details,
+			FeedbackMessage: fb.String(),
+			VerifiedBy:      "turn_error",
 		}
 	}
 
 	verificationCmd = strings.TrimSpace(verificationCmd)
 	dir = strings.TrimSpace(dir)
-
-	// =========================================================================
-	// Path A: Real Verification Engine (Primary Ground Truth)
-	// =========================================================================
-	if verificationCmd != "" && dir != "" {
-		finalResult, runErr := RunVerificationCommand(dir, verificationCmd, 60*time.Second)
-		if runErr != nil && finalResult == nil {
-			return EvaluationResult{
-				Status:     EvalFail,
-				Reason:     fmt.Sprintf("Failed to run verification command '%s': %v", verificationCmd, runErr),
-				VerifiedBy: "command",
-			}
+	if verificationCmd == "" || dir == "" {
+		return EvaluationResult{
+			Status:     EvalPass,
+			Reason:     "Step finished without machine verification (no verification command configured)",
+			VerifiedBy: "unverified",
 		}
+	}
 
-		retryNum := step.RetryCount + 1
-		maxRetries := step.MaxRetries
-		if maxRetries <= 0 {
-			maxRetries = 3
-		}
-
-		// Case 1: Verification command exited 0 -> Clean Pass!
-		if finalResult.ExitCode == 0 {
-			return EvaluationResult{
-				Status:     EvalPass,
-				Reason:     fmt.Sprintf("Verification command succeeded (`%s` exited with code 0)", verificationCmd),
-				ExitCode:   &finalResult.ExitCode,
-				DurationMs: finalResult.DurationMs,
-				VerifiedBy: "command",
-			}
-		}
-
-		// Case 2: Verification command failed -> Compare with Baseline for Delta Regressions
-		var reportedErrors []string
-		if baselineResult != nil && baselineResult.ExitCode != 0 {
-			// Baseline was already broken before this turn began.
-			// Only fail if the agent introduced NEW errors (delta > 0).
-			newErrors := CalculateNewErrors(baselineResult.Errors, finalResult.Errors)
-			if len(newErrors) == 0 {
-				// No new regressions introduced; the failures were pre-existing repo debt!
-				return EvaluationResult{
-					Status:     EvalPass,
-					Reason:     fmt.Sprintf("Pre-existing repository build/test failures unchanged (`%s` exited %d); no new regressions introduced by @%s", verificationCmd, finalResult.ExitCode, agentName),
-					ExitCode:   &finalResult.ExitCode,
-					DurationMs: finalResult.DurationMs,
-					VerifiedBy: "command",
-				}
-			}
-			reportedErrors = newErrors
-		} else {
-			// Baseline was clean (exit 0) or no baseline -> all final errors are new regressions!
-			reportedErrors = finalResult.Errors
-		}
-
-		if len(reportedErrors) == 0 {
-			reportedErrors = []string{fmt.Sprintf("Command `%s` exited with non-zero status code %d", verificationCmd, finalResult.ExitCode)}
-		}
-
-		var feedbackSb strings.Builder
-		feedbackSb.WriteString(fmt.Sprintf("⚠️ [Pipeline Quality Gate - Retry %d/%d]\n", retryNum, maxRetries))
-		feedbackSb.WriteString(fmt.Sprintf("Verification command `%s` failed with exit code %d during @%s's turn.\n", verificationCmd, finalResult.ExitCode, agentName))
-		feedbackSb.WriteString("Detected error output:\n")
-		for _, errLine := range reportedErrors {
-			feedbackSb.WriteString(fmt.Sprintf("> %s\n", errLine))
-		}
-		feedbackSb.WriteString("\nPlease analyze the error details above, correct the code, and ensure the verification command passes.")
-
+	final, runErr := RunVerificationCommand(dir, verificationCmd, 60*time.Second)
+	if final == nil {
+		reason := fmt.Sprintf("Failed to run verification command `%s`: %v", verificationCmd, runErr)
 		return EvaluationResult{
 			Status:          EvalFail,
-			Reason:          fmt.Sprintf("Verification command failed with exit code %d (%d regression errors detected)", finalResult.ExitCode, len(reportedErrors)),
-			ErrorDetails:    reportedErrors,
-			FeedbackMessage: feedbackSb.String(),
-			ExitCode:        &finalResult.ExitCode,
-			DurationMs:      finalResult.DurationMs,
+			Reason:          reason,
+			ErrorDetails:    []string{reason},
+			FeedbackMessage: fmt.Sprintf("[Pipeline Quality Gate - Retry %d/%d]\n%s", retryNum, maxRetries, reason),
 			VerifiedBy:      "command",
 		}
 	}
-
-	// =========================================================================
-	// Path B: Dialogue Error Scanning (No Verification Command Configured)
-	// =========================================================================
-	if len(turnMessages) == 0 {
+	if final.ExitCode == 0 {
 		return EvaluationResult{
 			Status:     EvalPass,
-			Reason:     "Step completed with no dialogue messages; unverified (no test command configured)",
-			VerifiedBy: "unverified",
+			Reason:     fmt.Sprintf("Verification command succeeded (`%s` exited with code 0)", verificationCmd),
+			ExitCode:   &final.ExitCode,
+			DurationMs: final.DurationMs,
+			VerifiedBy: "command",
+			Final:      final,
 		}
 	}
 
-	combinedText := strings.Join(turnMessages, "\n")
-
-	// 1. Scan for hard failure signals in emitted output
-	var allErrors []string
-	for _, msg := range turnMessages {
-		errs := ExtractErrorLines(msg, 3)
-		allErrors = append(allErrors, errs...)
-	}
-
-	if len(allErrors) > 0 {
-		if len(allErrors) > 4 {
-			allErrors = allErrors[:4]
-		}
-
-		retryNum := step.RetryCount + 1
-		maxRetries := step.MaxRetries
-		if maxRetries <= 0 {
-			maxRetries = 3
-		}
-
-		var feedbackSb strings.Builder
-		feedbackSb.WriteString(fmt.Sprintf("⚠️ [Pipeline Quality Gate - Retry %d/%d]\n", retryNum, maxRetries))
-		feedbackSb.WriteString(fmt.Sprintf("Errors detected in @%s's output:\n", agentName))
-		for _, errLine := range allErrors {
-			feedbackSb.WriteString(fmt.Sprintf("> %s\n", errLine))
-		}
-		feedbackSb.WriteString("\nPlease analyze the error details above and correct the issue.")
-
-		return EvaluationResult{
-			Status:          EvalFail,
-			Reason:          fmt.Sprintf("Found %d execution error signals in dialogue (unverified mode)", len(allErrors)),
-			ErrorDetails:    allErrors,
-			FeedbackMessage: feedbackSb.String(),
-			VerifiedBy:      "unverified_error",
+	reported := final.Errors
+	if baseline != nil && baseline.ExitCode != 0 {
+		reported = CalculateNewErrors(baseline.Errors, final.Errors)
+		if len(reported) == 0 {
+			return EvaluationResult{
+				Status:     EvalPass,
+				Reason:     fmt.Sprintf("Failures already present before this step are unchanged (`%s` exited %d); no new errors from @%s", verificationCmd, final.ExitCode, agentName),
+				ExitCode:   &final.ExitCode,
+				DurationMs: final.DurationMs,
+				VerifiedBy: "command",
+				Final:      final,
+			}
 		}
 	}
-
-	// 2. Scan for positive pass signals vs standard completion
-	hasExplicitPass := false
-	for _, pat := range successPatterns {
-		if pat.MatchString(combinedText) {
-			hasExplicitPass = true
-			break
-		}
+	if len(reported) == 0 {
+		reported = []string{fmt.Sprintf("Command `%s` exited with non-zero status code %d", verificationCmd, final.ExitCode)}
 	}
 
-	if hasExplicitPass {
-		return EvaluationResult{
-			Status:     EvalPass,
-			Reason:     "Step completed with success signal in dialogue (unverified, no test command configured)",
-			VerifiedBy: "unverified",
-		}
+	var fb strings.Builder
+	fb.WriteString(fmt.Sprintf("[Pipeline Quality Gate - Retry %d/%d]\n", retryNum, maxRetries))
+	fb.WriteString(fmt.Sprintf("Verification command `%s` failed with exit code %d after @%s's turn.\n", verificationCmd, final.ExitCode, agentName))
+	fb.WriteString("Errors:\n")
+	for _, line := range reported {
+		fb.WriteString(fmt.Sprintf("> %s\n", line))
 	}
+	fb.WriteString("\nFix these and make sure the verification command passes.")
 
-	// 3. Default: completed without configured command
 	return EvaluationResult{
-		Status:     EvalPass,
-		Reason:     "Step completed without machine verification (no verification command configured)",
-		VerifiedBy: "unverified",
+		Status:          EvalFail,
+		Reason:          fmt.Sprintf("Verification command failed with exit code %d (%d new errors)", final.ExitCode, len(reported)),
+		ErrorDetails:    reported,
+		FeedbackMessage: fb.String(),
+		ExitCode:        &final.ExitCode,
+		DurationMs:      final.DurationMs,
+		VerifiedBy:      "command",
+		Final:           final,
 	}
 }
 
-// EvaluateTurn maintains backward compatibility by evaluating turn messages with fallback regex mode.
-func EvaluateTurn(agentName string, step models.PipelineStep, turnMessages []string) EvaluationResult {
-	return EvaluateTurnWithVerification(agentName, step, turnMessages, "", "", nil)
+func truncateLine(s string, n int) string {
+	r := []rune(strings.TrimSpace(s))
+	if len(r) <= n {
+		return string(r)
+	}
+	return string(r[:n]) + "..."
 }

@@ -121,6 +121,23 @@ type PipelineStep struct {
 	RetryCount  int                  `json:"retry_count,omitempty"` // Number of retry attempts made so far
 	LastError   *string              `json:"last_error,omitempty"`  // Diagnostic error string extracted on failure
 	Deliverable *PipelineDeliverable `json:"deliverable,omitempty"` // 结构化交付包
+	// AttemptStartedAt is when the current attempt (first run or a retry) was
+	// dispatched. Only messages after it belong to the attempt being judged.
+	AttemptStartedAt *int64 `json:"attempt_started_at,omitempty"`
+	// Baseline is the verification result from BEFORE this step's first
+	// attempt. Retries are judged against it, never against the state the
+	// step's own earlier attempt left behind.
+	Baseline *VerifySnapshot `json:"baseline,omitempty"`
+	// VerifiedBy says how the step was judged: "command" when the channel's
+	// verification command ran, "turn_error" when the agent's turn failed,
+	// "unverified" when no command is configured.
+	VerifiedBy string `json:"verified_by,omitempty"`
+}
+
+// VerifySnapshot is the part of a verification run a later comparison needs.
+type VerifySnapshot struct {
+	ExitCode int      `json:"exit_code"`
+	Errors   []string `json:"errors,omitempty"`
 }
 
 // ChannelPipeline persists the relay chain a human starts with a multi-agent

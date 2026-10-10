@@ -156,7 +156,7 @@ func FormatRelayPrompt(targetAgent, prevAgent string, prevDeliverable *models.Pi
 	sb.WriteString(fmt.Sprintf("@%s\n\n", targetAgent))
 
 	if prevDeliverable != nil && prevDeliverable.Summary != "" {
-		sb.WriteString(fmt.Sprintf("### 📋 Prior Stage Deliverables (from @%s)\n", prevAgent))
+		sb.WriteString(fmt.Sprintf("### Prior Stage Deliverables (from @%s)\n", prevAgent))
 		sb.WriteString(fmt.Sprintf("**Summary**: %s\n\n", prevDeliverable.Summary))
 
 		if len(prevDeliverable.KeyFindings) > 0 {
@@ -181,7 +181,7 @@ func FormatRelayPrompt(targetAgent, prevAgent string, prevDeliverable *models.Pi
 		sb.WriteString("---\n\n")
 	}
 
-	sb.WriteString(fmt.Sprintf("**👉 Next Hop Task & Directives**:\n%s", nextInstruction))
+	sb.WriteString(fmt.Sprintf("**Your task**:\n%s", nextInstruction))
 	return sb.String()
 }
 

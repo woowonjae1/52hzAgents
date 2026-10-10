@@ -1237,7 +1237,14 @@ export const IntermediateSteps = memo(function IntermediateSteps({ steps, agents
         size={28}
         className="mt-0.5 shrink-0"
       />
-      <div className="min-w-0 flex-1 py-0.5">
+      <div className="min-w-0 flex-1 py-0.5 space-y-1.5">
+        {primarySender && (
+          <div className="flex items-baseline gap-2 select-none mb-0.5">
+            <span className="text-sm font-medium text-foreground tracking-tight">
+              {primarySender}
+            </span>
+          </div>
+        )}
         <TraceActivity steps={renderableSteps} live={live} multiAgent={(agents?.length ?? 0) > 1} />
       </div>
     </div>

@@ -32,6 +32,7 @@ func setupPipelineDB(t *testing.T) (models.Workspace, models.Channel) {
 		&models.ChannelMember{},
 		&models.ChannelPipeline{},
 		&models.EventRecord{},
+		&models.AgentTurnChange{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -265,7 +266,8 @@ func TestPipelineSelfCorrectionOnFailure(t *testing.T) {
 		Timestamp: time.Now().UnixMilli(),
 	})
 
-	CheckAndTriggerNextPipelineStep(workspace.ID, "channel/general", "openagents:codex-agent")
+	// A failed turn is what fails a step; error words in a reply are not.
+	EvaluatePipelineStep(workspace.ID, "general", "codex-agent", "codex exited with code 1", 0)
 
 	// Verify step 0 did NOT advance and entered retrying state
 	record, steps := loadChain(t, channel.ID)
@@ -319,7 +321,7 @@ func TestPipelineHaltOnExhaustedRetries(t *testing.T) {
 		Timestamp: time.Now().UnixMilli(),
 	})
 
-	CheckAndTriggerNextPipelineStep(workspace.ID, "channel/general", "openagents:codex-agent")
+	EvaluatePipelineStep(workspace.ID, "general", "codex-agent", "Process crashed with exit status 1", 0)
 
 	// Verify pipeline failed and halted
 	updatedRecord, updatedSteps := loadChain(t, channel.ID)

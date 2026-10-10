@@ -485,12 +485,22 @@ func openAgentTurnWithBypass(workspaceID string, channel *models.Channel, agentN
 		pruneCheckpointRefs(workspaceID, dir)
 	}
 
-	// Capture Baseline Verification Run asynchronously so message dispatch is never blocked
+	if err := db.DB.Create(&record).Error; err != nil {
+		log.Printf("turn-changes: failed to open turn for @%s in %s: %v", agentName, channel.Name, err)
+		return false
+	}
+
+	// Capture the baseline verification run in the background so dispatch is
+	// never blocked. Only after the row exists: started before Create, the
+	// Update could land first, match no row, and lose the baseline.
 	if channel.VerificationCmd != nil && strings.TrimSpace(*channel.VerificationCmd) != "" {
 		cmdStr := strings.TrimSpace(*channel.VerificationCmd)
 		recID := record.ID
 		targetDir := dir
+		key := turnBaselineKey(workspaceID, channel.ID, agentName)
+		turnBaselinesPending.Store(key, recID)
 		go func() {
+			defer turnBaselinesPending.CompareAndDelete(key, recID)
 			if baselineRes, err := evaluator.RunVerificationCommand(targetDir, cmdStr, 30*time.Second); err == nil && baselineRes != nil {
 				encoded, _ := json.Marshal(baselineRes)
 				_ = db.DB.Model(&models.AgentTurnChange{}).Where("id = ?", recID).
@@ -498,12 +508,21 @@ func openAgentTurnWithBypass(workspaceID string, channel *models.Channel, agentN
 			}
 		}()
 	}
-
-	if err := db.DB.Create(&record).Error; err != nil {
-		log.Printf("turn-changes: failed to open turn for @%s in %s: %v", agentName, channel.Name, err)
-		return false
-	}
 	return true
+}
+
+// turnBaselinesPending holds, per (workspace, channel, agent), the turn whose
+// baseline verification is still running, so a step evaluation can wait for
+// it instead of judging with no baseline.
+var turnBaselinesPending sync.Map
+
+func turnBaselineKey(workspaceID, channelID, agentName string) string {
+	return workspaceID + "|" + channelID + "|" + strings.ToLower(agentName)
+}
+
+func turnBaselinePending(workspaceID, channelID, agentName string) bool {
+	_, ok := turnBaselinesPending.Load(turnBaselineKey(workspaceID, channelID, agentName))
+	return ok
 }
 
 // GetLatestTurnBaselineVerify retrieves the baseline verification result recorded at dispatch time.

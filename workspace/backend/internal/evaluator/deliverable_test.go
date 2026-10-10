@@ -46,7 +46,7 @@ func TestExtractDeliverableAndFormatPrompt(t *testing.T) {
 	if !strings.Contains(relayPrompt, "Prior Stage Deliverables (from @antigravity)") {
 		t.Errorf("expected prompt to contain deliverable header")
 	}
-	if !strings.Contains(relayPrompt, "Next Hop Task & Directives") {
+	if !strings.Contains(relayPrompt, "**Your task**") {
 		t.Errorf("expected prompt to contain next instruction header")
 	}
 	if !strings.Contains(relayPrompt, nextInstruction) {
