@@ -178,6 +178,39 @@ function WrapperInner() {
     closeCanvas();
   }, [setActiveRightTab, closeCanvas]);
 
+  // Synchronize canvas context when activeRightTab transitions to null
+  React.useEffect(() => {
+    if (activeRightTab === null && isCanvasOpen) {
+      closeCanvas();
+    }
+  }, [activeRightTab, isCanvasOpen, closeCanvas]);
+
+  // Auto-fold the left sidebar on viewports < 1200px when studio panel opens,
+  // preventing extreme crushing of the center chat pane.
+  // Restores the sidebar when the studio panel closes if it was auto-folded.
+  const autoFoldedByStudioRef = React.useRef(false);
+  const prevStudioOpenRef = React.useRef(isStudioOpen);
+
+  React.useEffect(() => {
+    if (isMobile) return;
+    const wasOpen = prevStudioOpenRef.current;
+    prevStudioOpenRef.current = isStudioOpen;
+
+    if (!wasOpen && isStudioOpen) {
+      if (typeof window !== 'undefined' && window.innerWidth < 1200 && isSidebarOpen) {
+        autoFoldedByStudioRef.current = true;
+        setSidebarOpen(false);
+      }
+    } else if (wasOpen && !isStudioOpen) {
+      if (autoFoldedByStudioRef.current) {
+        autoFoldedByStudioRef.current = false;
+        if (!isSidebarOpen) {
+          setSidebarOpen(true);
+        }
+      }
+    }
+  }, [isStudioOpen, isMobile, isSidebarOpen, setSidebarOpen]);
+
   /*
     ── ShellFit ──
 
@@ -467,8 +500,17 @@ function WrapperInner() {
                             </button>
                           </Hint>
                         </div>
-
                       </div>
+                      <Hint label="Close Studio (Esc)">
+                        <button
+                          type="button"
+                          aria-label="Close Studio"
+                          onClick={handleCloseStudio}
+                          className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors shrink-0"
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </Hint>
                     </div>
                   )}
 

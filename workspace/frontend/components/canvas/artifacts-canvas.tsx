@@ -152,6 +152,12 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
   const change =
     effective?.kind === 'change' ? outputs.changedFiles.find((f) => f.path === effective.path) ?? null : null;
 
+  const totalOutputs =
+    outputs.documents.length +
+    outputs.changedFiles.length +
+    (openFile ? 1 : 0);
+  const shouldShowList = listOpen && totalOutputs > 1;
+
   const close = () => {
     closeCanvas();
     setActiveRightTab(null);
@@ -166,7 +172,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
       )}
     >
       <div className="flex flex-1 min-h-0">
-        {listOpen && (
+        {shouldShowList && (
           <OutputsList
             documents={outputs.documents}
             changedFiles={outputs.changedFiles}
@@ -174,6 +180,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
             active={effective}
             onSelect={select}
             onSelectFile={() => setActiveRightTab('file')}
+            onCloseList={toggleList}
           />
         )}
 
@@ -182,8 +189,8 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
             // FilePreview brings its own header, so a collapsed list gets a
             // small way back instead of a second header row.
             <div className="relative flex-1 min-h-0 flex flex-col">
-              <FilePreview />
-              {!listOpen && (
+              <FilePreview onClose={close} />
+              {!listOpen && totalOutputs > 1 && (
                 <Hint label="Show outputs list">
                   <button
                     type="button"
@@ -212,6 +219,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                   onPreview={() => setActiveRightTab('preview')}
                   onClose={close}
                   actions={actions}
+                  totalOutputs={totalOutputs}
                 />
               )}
             />
@@ -233,6 +241,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                     icon: <FileDiff className="size-3.5" />,
                     meta: `@${change.agent}`,
                   }}
+                  totalOutputs={totalOutputs}
                 />
               }
             />
@@ -246,6 +255,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                 onPreview={() => setActiveRightTab('preview')}
                 onClose={close}
                 actions={{ title: 'Outputs', icon: <FileText className="size-3.5" /> }}
+                totalOutputs={totalOutputs}
               />
               <div className="flex flex-1 items-center justify-center p-8 text-center text-xs text-muted-foreground">
                 <div className="max-w-xs space-y-1.5">
@@ -272,6 +282,7 @@ function OutputsList({
   active,
   onSelect,
   onSelectFile,
+  onCloseList,
 }: {
   documents: ArtifactGroup[];
   changedFiles: ChangedFile[];
@@ -279,16 +290,31 @@ function OutputsList({
   active: OutputSelection | null;
   onSelect: (s: OutputSelection) => void;
   onSelectFile: () => void;
+  onCloseList?: () => void;
 }) {
   const row = (isActive: boolean) =>
     cn(
       'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors',
       isActive ? 'bg-surface3 text-foreground' : 'text-foreground-muted hover:bg-surface2 hover:text-foreground'
     );
-  const heading = 'px-2 pb-1 pt-3 text-3xs font-semibold uppercase tracking-wider text-foreground-extra-muted';
+  const heading = 'px-2 pb-1 pt-2.5 text-3xs font-semibold uppercase tracking-wider text-foreground-extra-muted';
 
   return (
-    <nav aria-label="Thread outputs" className="w-56 shrink-0 overflow-y-auto border-r border-border bg-surface1 px-1.5 pb-3">
+    <nav aria-label="Thread outputs" className="w-44 shrink-0 overflow-y-auto border-r border-border bg-surface1 px-1.5 pb-3">
+      <div className="flex items-center justify-between px-1.5 pt-2 pb-1 border-b border-border/40 mb-1">
+        <span className="text-3xs font-semibold uppercase tracking-wider text-foreground-extra-muted">Outputs</span>
+        {onCloseList && (
+          <Hint label="Hide outputs list">
+            <button
+              type="button"
+              onClick={onCloseList}
+              className="size-5 rounded hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
+            >
+              <PanelLeft className="size-3" />
+            </button>
+          </Hint>
+        )}
+      </div>
       {openFileName && (
         <>
           <div className={heading}>Open file</div>
@@ -372,6 +398,7 @@ function PanelHeader({
   onPreview,
   onClose,
   actions,
+  totalOutputs = 0,
 }: {
   listOpen: boolean;
   onToggleList: () => void;
@@ -380,17 +407,20 @@ function PanelHeader({
   onPreview: () => void;
   onClose: () => void;
   actions: HeaderActions;
+  totalOutputs?: number;
 }) {
   const iconBtn =
     'size-7 shrink-0 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors';
   return (
     <div className="app-header justify-between gap-2 px-2 flex-nowrap min-w-0 overflow-hidden shrink-0 border-b border-border bg-surface1 select-none">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <Hint label={listOpen ? 'Hide outputs list' : 'Show outputs list'}>
-          <button type="button" onClick={onToggleList} aria-pressed={listOpen} className={iconBtn}>
-            <PanelLeft className="size-3.5" />
-          </button>
-        </Hint>
+        {totalOutputs > 1 && (
+          <Hint label={listOpen ? 'Hide outputs list' : `Show outputs list (${totalOutputs})`}>
+            <button type="button" onClick={onToggleList} aria-pressed={listOpen} className={iconBtn}>
+              <PanelLeft className="size-3.5" />
+            </button>
+          </Hint>
+        )}
         <span className="shrink-0 text-foreground-muted">{actions.icon}</span>
         <Hint label={actions.title}>
           <span className="min-w-0 truncate text-xs font-semibold text-foreground">{actions.title}</span>

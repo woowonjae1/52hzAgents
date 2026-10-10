@@ -35,6 +35,7 @@ import { ShareDialog } from './share-dialog';
 
 import { ParallelBatchPanel } from './parallel-batch-panel';
 import { useLayout } from '@/components/layout/layout-context';
+import { useArtifacts } from '@/lib/artifacts-context';
 import { cn } from '@/lib/utils';
 import { headerIconButtonClass } from '@/components/headers/header-chip';
 import { getApiBaseUrl } from '@/lib/config';
@@ -315,6 +316,8 @@ export function ChatView() {
     setSelectedAgentName,
     openSettings,
   } = useLayout();
+  const { isCanvasOpen, closeCanvas } = useArtifacts();
+  const isStudioOpen = activeRightTab !== null || isCanvasOpen;
 
   // Continuously refresh message caches for top recent sessions in the background.
   // This ensures clicking any recent thread shows messages instantly and up-to-date.
@@ -1246,7 +1249,6 @@ export function ChatView() {
               onBlur={commitTitle}
               onKeyDown={(e) => {
                 if (isComposing(e)) return;
-                if (isComposing(e)) return;
                 if (e.key === 'Enter') commitTitle();
                 if (e.key === 'Escape') setEditingTitle(false);
               }}
@@ -1382,12 +1384,19 @@ export function ChatView() {
           <span className="h-4 w-px bg-border shrink-0 mx-0.5" aria-hidden />
 
           {/* Unified Studio Panel Toggle */}
-          <Hint label={activeRightTab !== null ? 'Close Studio panel' : 'Open Studio panel'}>
+          <Hint label={isStudioOpen ? 'Close Studio panel' : 'Open Studio panel'}>
             <button
-              onClick={() => setActiveRightTab(activeRightTab !== null ? null : 'preview')}
+              onClick={() => {
+                if (isStudioOpen) {
+                  setActiveRightTab(null);
+                  closeCanvas();
+                } else {
+                  setActiveRightTab('canvas');
+                }
+              }}
               className={cn(
                 headerIconButtonClass,
-                activeRightTab !== null && 'bg-surface3 text-foreground border border-border',
+                isStudioOpen && 'bg-surface3 text-foreground border border-border',
               )}
             >
               <PanelRight className="size-4" />

@@ -1,6 +1,6 @@
 import { Hint } from '@/components/ui/hint';
 import { useEffect, useState } from 'react';
-import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, ExternalLink, Music, Film, FileCode, Maximize2, Minimize2 } from 'lucide-react';
+import { FileText, Download, Trash2, Loader2, ChevronLeft, Copy, Check, ExternalLink, Music, Film, FileCode, Maximize2, Minimize2, X } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { workspaceApi } from '@/lib/api';
@@ -71,7 +71,7 @@ function fixMojibake(text: string): string {
   return text;
 }
 
-export function FilePreview() {
+export function FilePreview({ onClose }: { onClose?: () => void } = {}) {
   const { files, selectedFileId, deleteFile, setSelectedFileId } = useWorkspace();
   const { isMobile, openMobileList } = useLayout();
   const [content, setContent] = useState<string | null>(null);
@@ -268,6 +268,18 @@ export function FilePreview() {
             <Trash2 className="size-4" />
           </button>
         </Hint>
+
+        {onClose && (
+          <Hint label="Close Studio (Esc)">
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </Hint>
+        )}
       </div>
 
       {/* Content Body */}
