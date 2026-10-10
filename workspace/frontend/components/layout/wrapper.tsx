@@ -453,7 +453,18 @@ function WrapperInner() {
                       chrome seam. Dropping the two overrides is the fix.
                     */
                     <div className="app-header justify-between px-3 shrink-0 flex-nowrap select-none">
-                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                        <Hint label="Close Studio (Esc)">
+                          <button
+                            type="button"
+                            aria-label="Close Studio"
+                            onClick={handleCloseStudio}
+                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors shrink-0"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </Hint>
+                        <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
                         {/* Always reachable: the thread's outputs exist whether or not one was just opened. */}
                         <button
                           type="button"
@@ -463,55 +474,21 @@ function WrapperInner() {
                           <FileText className="size-3.5" />
                           <span>Outputs</span>
                         </button>
-                        {/*
-                          THE CLOSE BUTTON LIVES ON THE TAB, AND SHOWS ON HOVER.
-
-                          It sat at the far right of this header, a few pixels
-                          from the window's own minimise / maximise / close
-                          controls, so closing the panel and closing the app
-                          were one slip apart. On the tab it closes the thing
-                          it is attached to, like a browser tab, and stays out
-                          of sight until the pointer (or keyboard focus) is on
-                          the tab. Esc still closes the panel.
-                        */}
-                        <div
+                        <button
+                          type="button"
+                          onClick={() => setActiveRightTab('preview')}
                           className={cn(
-                            "group/tab inline-flex items-center rounded-md text-2xs font-medium transition-colors shrink-0",
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring",
                             effectiveStudioTab === 'preview'
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
                           )}
                         >
-                          <button
-                            type="button"
-                            onClick={() => setActiveRightTab('preview')}
-                            className="inline-flex items-center gap-1.5 py-1 pl-2.5 pr-1 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
-                          >
-                            <Globe className="size-3.5" />
-                            <span>Preview</span>
-                          </button>
-                          <Hint label="Close (Esc)">
-                            <button
-                              type="button"
-                              aria-label="Close Preview"
-                              onClick={handleCloseStudio}
-                              className="mr-1 grid size-4 place-items-center rounded text-foreground-muted opacity-0 outline-none transition-opacity hover:bg-surface2 hover:text-foreground group-hover/tab:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </Hint>
-                        </div>
-                      </div>
-                      <Hint label="Close Studio (Esc)">
-                        <button
-                          type="button"
-                          aria-label="Close Studio"
-                          onClick={handleCloseStudio}
-                          className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors shrink-0"
-                        >
-                          <X className="size-3.5" />
+                          <Globe className="size-3.5" />
+                          <span>Preview</span>
                         </button>
-                      </Hint>
+                      </div>
+                      <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
                     </div>
                   )}
 

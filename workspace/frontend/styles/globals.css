@@ -1236,8 +1236,8 @@ html {
 
 :root[data-desktop] aside[aria-label="Studio Panel"] .app-header,
 :root[style*="--window-controls-inset"] aside[aria-label="Studio Panel"] .app-header {
-  padding-inline-end: max(0.75rem, var(--window-controls-inset, 138px)) !important;
-  padding-right: max(0.75rem, var(--window-controls-inset, 138px)) !important;
+  padding-inline-end: calc(max(0.75rem, var(--window-controls-inset, 138px)) + 0.5rem) !important;
+  padding-right: calc(max(0.75rem, var(--window-controls-inset, 138px)) + 0.5rem) !important;
 }
 
 /* macOS puts traffic lights at the inline-start, clear the right side back to normal */

@@ -414,6 +414,12 @@ function PanelHeader({
   return (
     <div className="app-header justify-between gap-2 px-2 flex-nowrap min-w-0 overflow-hidden shrink-0 border-b border-border bg-surface1 select-none">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Hint label="Close Studio (Esc)">
+          <button type="button" onClick={onClose} aria-label="Close Studio" className={iconBtn}>
+            <X className="size-3.5" />
+          </button>
+        </Hint>
+        <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
         {totalOutputs > 1 && (
           <Hint label={listOpen ? 'Hide outputs list' : `Show outputs list (${totalOutputs})`}>
             <button type="button" onClick={onToggleList} aria-pressed={listOpen} className={iconBtn}>
@@ -439,11 +445,7 @@ function PanelHeader({
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
           </button>
         </Hint>
-        <Hint label="Close (Esc)">
-          <button type="button" onClick={onClose} className={iconBtn}>
-            <X className="size-3.5" />
-          </button>
-        </Hint>
+        <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
       </div>
     </div>
   );
@@ -553,7 +555,6 @@ function DocumentView({
         <Hint label={selectedText ? 'Ask an agent to revise the selected part' : 'Ask an agent to revise this document'}>
           <button type="button" onClick={() => setRevising(true)} className={iconBtn(revising)}>
             <Wand2 className="size-3.5" />
-            <span>{selectedText ? 'Revise selection' : 'Revise'}</span>
           </button>
         </Hint>
       )}
