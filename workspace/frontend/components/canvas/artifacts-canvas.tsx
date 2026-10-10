@@ -308,7 +308,7 @@ function OutputsList({
             <button
               type="button"
               onClick={onCloseList}
-              className="size-5 rounded hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors"
+              className="size-5 rounded hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
             >
               <PanelLeft className="size-3" />
             </button>
@@ -410,22 +410,19 @@ function PanelHeader({
   totalOutputs?: number;
 }) {
   const iconBtn =
-    'size-7 shrink-0 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors';
+    'size-7 shrink-0 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95';
   return (
     <div className="app-header justify-between gap-2 px-2 flex-nowrap min-w-0 overflow-hidden shrink-0 border-b border-border bg-surface1 select-none">
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <Hint label="Close Studio (Esc)">
-          <button type="button" onClick={onClose} aria-label="Close Studio" className={iconBtn}>
-            <X className="size-3.5" />
-          </button>
-        </Hint>
-        <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
         {totalOutputs > 1 && (
-          <Hint label={listOpen ? 'Hide outputs list' : `Show outputs list (${totalOutputs})`}>
-            <button type="button" onClick={onToggleList} aria-pressed={listOpen} className={iconBtn}>
-              <PanelLeft className="size-3.5" />
-            </button>
-          </Hint>
+          <>
+            <Hint label={listOpen ? 'Hide outputs list' : `Show outputs list (${totalOutputs})`}>
+              <button type="button" onClick={onToggleList} aria-pressed={listOpen} className={iconBtn}>
+                <PanelLeft className="size-3.5" />
+              </button>
+            </Hint>
+            <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
+          </>
         )}
         <span className="shrink-0 text-foreground-muted">{actions.icon}</span>
         <Hint label={actions.title}>
@@ -443,6 +440,12 @@ function PanelHeader({
         <Hint label={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>
           <button type="button" onClick={onFullscreen} className={iconBtn}>
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+          </button>
+        </Hint>
+        <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
+        <Hint label="Close Studio (Esc)">
+          <button type="button" onClick={onClose} aria-label="Close Studio" className={iconBtn}>
+            <X className="size-3.5" />
           </button>
         </Hint>
         <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />

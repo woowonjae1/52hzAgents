@@ -186,31 +186,6 @@ function WrapperInner() {
     }
   }, [activeRightTab, isCanvasOpen, closeCanvas]);
 
-  // Auto-fold the left sidebar on viewports < 1200px when studio panel opens,
-  // preventing extreme crushing of the center chat pane.
-  // Restores the sidebar when the studio panel closes if it was auto-folded.
-  const autoFoldedByStudioRef = React.useRef(false);
-  const prevStudioOpenRef = React.useRef(isStudioOpen);
-
-  React.useEffect(() => {
-    if (isMobile) return;
-    const wasOpen = prevStudioOpenRef.current;
-    prevStudioOpenRef.current = isStudioOpen;
-
-    if (!wasOpen && isStudioOpen) {
-      if (typeof window !== 'undefined' && window.innerWidth < 1200 && isSidebarOpen) {
-        autoFoldedByStudioRef.current = true;
-        setSidebarOpen(false);
-      }
-    } else if (wasOpen && !isStudioOpen) {
-      if (autoFoldedByStudioRef.current) {
-        autoFoldedByStudioRef.current = false;
-        if (!isSidebarOpen) {
-          setSidebarOpen(true);
-        }
-      }
-    }
-  }, [isStudioOpen, isMobile, isSidebarOpen, setSidebarOpen]);
 
   /*
     ── ShellFit ──
@@ -454,22 +429,11 @@ function WrapperInner() {
                     */
                     <div className="app-header justify-between px-3 shrink-0 flex-nowrap select-none">
                       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                        <Hint label="Close Studio (Esc)">
-                          <button
-                            type="button"
-                            aria-label="Close Studio"
-                            onClick={handleCloseStudio}
-                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors shrink-0"
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        </Hint>
-                        <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
                         {/* Always reachable: the thread's outputs exist whether or not one was just opened. */}
                         <button
                           type="button"
                           onClick={() => setActiveRightTab('canvas')}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2 cursor-pointer active:scale-95"
                         >
                           <FileText className="size-3.5" />
                           <span>Outputs</span>
@@ -478,7 +442,7 @@ function WrapperInner() {
                           type="button"
                           onClick={() => setActiveRightTab('preview')}
                           className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95",
                             effectiveStudioTab === 'preview'
                               ? "bg-surface3 text-foreground font-semibold border border-border"
                               : "text-foreground-muted hover:text-foreground hover:bg-surface2"
@@ -488,7 +452,19 @@ function WrapperInner() {
                           <span>Preview</span>
                         </button>
                       </div>
-                      <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Hint label="Close Studio (Esc)">
+                          <button
+                            type="button"
+                            aria-label="Close Studio"
+                            onClick={handleCloseStudio}
+                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors shrink-0 cursor-pointer active:scale-95"
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </Hint>
+                        <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
+                      </div>
                     </div>
                   )}
 

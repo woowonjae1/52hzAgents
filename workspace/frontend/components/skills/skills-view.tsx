@@ -255,9 +255,9 @@ function SkillCard({
                 e.stopPropagation();
                 onUseInChat(skill);
               }}
-              className="text-3xs font-medium text-primary hover:text-primary/80 flex items-center gap-1 px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 transition-colors"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-3xs font-semibold bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground transition-all duration-150 cursor-pointer shadow-2xs active:scale-95"
             >
-              <Terminal className="size-2.5" />
+              <Terminal className="size-3" />
               <span>Use in Chat</span>
             </button>
             <span className="text-3xs text-muted-foreground group-hover:text-foreground transition-colors flex items-center gap-0.5">
@@ -839,16 +839,16 @@ ${createPrompt}
           <DialogTitle>Add / Import Skill</DialogTitle>
         </DialogHeader>
 
-        {/* Tab Switcher */}
-        <div className="flex border-b border-border gap-4 text-xs font-medium">
+        {/* Tab Switcher - Segmented Control */}
+        <div className="grid grid-cols-3 p-1 rounded-xl bg-surface2 border border-border/60 text-xs font-medium">
           <button
             type="button"
             onClick={() => { setTab('create'); setError(null); }}
             className={cn(
-              'pb-2 border-b-2 transition-colors',
+              'py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center',
               tab === 'create'
-                ? 'border-primary text-primary font-semibold'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             Create Prompt
@@ -857,10 +857,10 @@ ${createPrompt}
             type="button"
             onClick={() => { setTab('upload'); setError(null); }}
             className={cn(
-              'pb-2 border-b-2 transition-colors',
+              'py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center',
               tab === 'upload'
-                ? 'border-primary text-primary font-semibold'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             Upload Package
@@ -869,13 +869,13 @@ ${createPrompt}
             type="button"
             onClick={() => { setTab('github'); setError(null); }}
             className={cn(
-              'pb-2 border-b-2 transition-colors',
+              'py-1.5 px-2 rounded-lg text-xs font-medium transition-all text-center truncate',
               tab === 'github'
-                ? 'border-primary text-primary font-semibold'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            Import from GitHub / URL
+            Import GitHub / URL
           </button>
         </div>
 

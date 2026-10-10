@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users, Sparkles } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -45,7 +45,7 @@ function folderId(dir: string | null | undefined) {
 
 /** Nav rows: the same height and radius as the thread rows below. */
 const NAV_ROW_CLASS =
-  'flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring';
+  'flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-[13px] text-muted-foreground outline-none transition-all hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-[0.99]';
 const NAV_ROW_ACTIVE = 'bg-muted font-medium text-foreground';
 
 /** Small uppercase group label, as in the reference shells' grouped nav. */
@@ -79,7 +79,7 @@ export function ThreadSidebar() {
     updateSession,
     moveSessionToFolder,
   } = useWorkspace();
-  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings } = useLayout();
+  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings, settingsTab } = useLayout();
   // Same rule as the wrapper: Home, or Threads with nothing open.
   const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
 
@@ -533,7 +533,7 @@ export function ThreadSidebar() {
           type="button"
           onClick={startNewSession}
           aria-current={isHome ? 'page' : undefined}
-          className="mb-1 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="mb-1 flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 text-[13px] font-medium text-primary-foreground outline-none transition-all hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background cursor-pointer active:scale-[0.98] shadow-xs"
         >
           <Plus className="size-4 shrink-0" />
           New session
@@ -578,9 +578,21 @@ export function ThreadSidebar() {
             <FileText className="size-4 shrink-0" />
             Files
           </button>
-          <button type="button" className={NAV_ROW_CLASS} onClick={() => openSettings('knowledge')}>
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, (viewMode === 'settings' && settingsTab === 'knowledge') && NAV_ROW_ACTIVE)}
+            onClick={() => openSettings('knowledge')}
+          >
             <BookOpen className="size-4 shrink-0" />
             Knowledge
+          </button>
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, (viewMode === 'skills' || (viewMode === 'settings' && settingsTab === 'skills')) && NAV_ROW_ACTIVE)}
+            onClick={() => openSettings('skills')}
+          >
+            <Sparkles className="size-4 shrink-0 text-primary" />
+            Skills
           </button>
           <button
             type="button"

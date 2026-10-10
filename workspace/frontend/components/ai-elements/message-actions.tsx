@@ -23,9 +23,9 @@ export interface MessageActionsProps {
 
 /** 统一的幽灵图标按钮样式 */
 const ghostButton = cn(
-  'grid size-7 place-items-center rounded-md',
+  'grid size-7 place-items-center rounded-md cursor-pointer active:scale-95',
   'text-muted-foreground hover:text-foreground hover:bg-muted',
-  'transition-colors duration-150',
+  'transition-all duration-150',
   'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/30'
 );
 

@@ -1216,6 +1216,56 @@ export function PromptComposer({
               </Hint>
             )}
 
+            <Hint label="Mention an agent (@)">
+              <button
+                type="button"
+                onClick={() => {
+                  if (showMentions && mentionTrigger === '@') {
+                    setShowMentions(false);
+                  } else {
+                    setMentionTrigger('@');
+                    setMentionFilter('');
+                    setShowMentions(true);
+                    setMentionIndex(0);
+                    textareaRef.current?.focus();
+                  }
+                }}
+                className={cn(
+                  pillButton,
+                  'size-7 px-0 justify-center font-mono font-bold text-xs text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
+                  showMentions && mentionTrigger === '@' && 'bg-surface3 text-primary font-bold border border-primary/30',
+                )}
+                aria-label="Mention agent"
+              >
+                @
+              </button>
+            </Hint>
+
+            <Hint label="Browse skills & slash commands (/)">
+              <button
+                type="button"
+                onClick={() => {
+                  if (showMentions && mentionTrigger === '/') {
+                    setShowMentions(false);
+                  } else {
+                    setMentionTrigger('/');
+                    setMentionFilter('');
+                    setShowMentions(true);
+                    setMentionIndex(0);
+                    textareaRef.current?.focus();
+                  }
+                }}
+                className={cn(
+                  pillButton,
+                  'size-7 px-0 justify-center font-mono font-bold text-xs text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
+                  showMentions && mentionTrigger === '/' && 'bg-surface3 text-primary font-bold border border-primary/30',
+                )}
+                aria-label="Slash commands"
+              >
+                /
+              </button>
+            </Hint>
+
             <Hint label="Attach files or images">
               <button
                 type="button"

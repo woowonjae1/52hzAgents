@@ -209,20 +209,7 @@ export function FilePreview({ onClose }: { onClose?: () => void } = {}) {
     <div className={cn("flex flex-col h-full bg-card", isFullscreen && "fixed inset-0 z-50 bg-background animate-in fade-in duration-150")}>
       {/* Header */}
       <div className="app-header gap-2 ps-2 lg:ps-4 shrink-0 bg-background/50">
-        {onClose && (
-          <>
-            <Hint label="Close Studio (Esc)">
-              <button
-                type="button"
-                onClick={onClose}
-                className="size-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0"
-              >
-                <X className="size-4" />
-              </button>
-            </Hint>
-            <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
-          </>
-        )}
+
         <Hint label="Back to files">
           <button
             onClick={() => {
@@ -277,11 +264,25 @@ export function FilePreview({ onClose }: { onClose?: () => void } = {}) {
         <Hint label="Delete">
           <button
             onClick={() => setShowDeleteConfirm(true)}
-            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors"
+            className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-status-danger transition-colors cursor-pointer active:scale-95"
           >
             <Trash2 className="size-4" />
           </button>
         </Hint>
+        {onClose && (
+          <>
+            <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
+            <Hint label="Close Studio (Esc)">
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer active:scale-95"
+              >
+                <X className="size-4" />
+              </button>
+            </Hint>
+          </>
+        )}
         <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
       </div>
 
