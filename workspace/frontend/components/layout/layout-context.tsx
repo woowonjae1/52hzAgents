@@ -43,34 +43,20 @@ export type TasksTab = 'tasks' | 'schedules' | 'runs';
 function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTab; tasksTab?: TasksTab } {
   // The Browser view was removed; a layout saved on it opens the threads.
   if ((mode as string) === 'browser') return { view: 'threads' };
-  if (mode === 'skills' || mode === 'knowledge') return { view: 'settings', settingsTab: mode };
+  if (mode === 'skills') return { view: 'skills' };
+  if (mode === 'knowledge') return { view: 'knowledge' };
   if (mode === 'routines' || mode === 'timers') return { view: 'tasks', tasksTab: 'schedules' };
   return { view: mode };
 }
 
 // The Studio holds what THIS thread produced, and nothing else:
 // 'preview' — a dev server on this machine; 'file' — the thread's files;
-// 'canvas' — the active markdown / code / artifact deliverable. ('radar', an
-// agent inspector, was here too; nothing ever opened it — no caller set the
-// tab — so it is gone, and agents live in the Agents view.)
-//
-// This comment used to describe 'browser' as a remote agent-browser session
-// that "shares nothing" with 'preview'. The renderer disagreed — both drew the
-// same <LocalPreview /> — so the comment had outlived the feature. The agents'
-// browser is the Browser view, not a Studio tab. 'trace' and 'tokens' are gone
-// too; see the RightPanelTab note below.
-/*
-  Four values removed: 'tasks', 'terminal', 'routines' and 'tokens'. None had a
-  renderer — the Studio pane dispatches on this and drew nothing for them — yet
-  seven buttons across the app set 'tokens' (a "token governance dashboard"
-  whose component no longer exists) and the command palette set 'terminal'. So
-  each opened the Studio panel onto an empty pane. Removing them from the type
-  is what made the compiler find every one of those callers.
-*/
-export type RightPanelTab = 'preview' | 'file' | 'canvas' | null;
+// 'canvas' — the active markdown / code / artifact deliverable;
+// 'knowledge' — workspace knowledge base and references.
+export type RightPanelTab = 'preview' | 'file' | 'canvas' | 'knowledge' | null;
 
 // 'canvas' is deliberately absent: it points at one message's artifact.
-const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file']);
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'knowledge']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';

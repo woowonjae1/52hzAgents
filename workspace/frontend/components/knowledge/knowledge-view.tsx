@@ -149,7 +149,7 @@ function extractToc(markdown: string): TocItem[] {
   return items;
 }
 
-export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }) {
+export function KnowledgeView({ sidebarOnly = false, embedded = false }: { sidebarOnly?: boolean; embedded?: boolean }) {
   const { loading, knowledge, refreshKnowledge, deleteKnowledge, agents } = useWorkspace();
   const { isMobile, setViewMode } = useLayout();
   const agentNames = useMemo(() => agents.map((a) => a.agentName), [agents]);
@@ -231,10 +231,10 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   // out of the dependency array with nothing to remind anyone. Moved so the
   // dependency can be listed honestly.
   useEffect(() => {
-    if (!isMobile && !selectedId && knowledge.length > 0 && viewLayout === 'split') {
+    if (!isMobile && !embedded && !selectedId && knowledge.length > 0 && viewLayout === 'split') {
       void handleSelect(knowledge[0]);
     }
-  }, [isMobile, selectedId, knowledge, viewLayout, handleSelect]);
+  }, [isMobile, embedded, selectedId, knowledge, viewLayout, handleSelect]);
 
 
   const handleEdit = useCallback(async (entry: KnowledgeEntry) => {
@@ -433,67 +433,97 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const EntryList = (
     <div className="h-full flex flex-col bg-background select-none">
       {/* Top Header */}
-      <div className="app-header ps-4">
-        <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Hint label="Back to conversation">
-              <button
-                type="button"
-                onClick={() => setViewMode('threads')}
-                className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors"
-              >
-                <ArrowLeft className="size-3.5" />
-                <span>Back</span>
-              </button>
-            </Hint>
-            <div className="h-3.5 w-px bg-border/80" />
-            <div className="flex items-center gap-2">
-              <ScreenMark icon={BookOpen} />
-              <ScreenTitle className="text-sm font-semibold tracking-tight text-foreground">
-                Knowledge
-              </ScreenTitle>
+      {!embedded ? (
+        <div className="app-header ps-4">
+          <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Hint label="Back to conversation">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('threads')}
+                  className="flex items-center gap-1 px-2 py-1 -ml-1 rounded-lg text-xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer active:scale-95"
+                >
+                  <ArrowLeft className="size-3.5" />
+                  <span>Back</span>
+                </button>
+              </Hint>
+              <div className="h-3.5 w-px bg-border/80" />
+              <div className="flex items-center gap-2">
+                <ScreenMark icon={BookOpen} />
+                <ScreenTitle className="text-sm font-semibold tracking-tight text-foreground">
+                  Knowledge
+                </ScreenTitle>
+              </div>
+              {knowledge.length > 0 && (
+                <span className="shrink-0 rounded-full bg-surface3 px-2 py-0.5 text-3xs font-semibold tabular-nums text-foreground">
+                  {knowledge.length}
+                </span>
+              )}
             </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" onClick={openNewEntry} className={iconButton}>
+                    <Plus className="size-4 text-primary" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">New entry</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => filePickerRef.current?.click()}
+                    className={iconButton}
+                  >
+                    <Upload className="size-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Import Markdown files</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button type="button" onClick={handleRefresh} className={iconButton}>
+                    <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Refresh</TooltipContent>
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-surface1/60 select-none shrink-0">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-foreground">Knowledge Base</span>
             {knowledge.length > 0 && (
-              <span className="shrink-0 rounded-full bg-surface3 px-2 py-0.5 text-3xs font-semibold tabular-nums text-foreground">
+              <span className="rounded-full bg-surface3 px-1.5 py-0.2 text-3xs font-mono font-medium text-foreground-muted">
                 {knowledge.length}
               </span>
             )}
           </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" onClick={openNewEntry} className={iconButton}>
-                  <Plus className="size-4 text-primary" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">New entry</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => filePickerRef.current?.click()}
-                  className={iconButton}
-                >
-                  <Upload className="size-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Import Markdown files</TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button type="button" onClick={handleRefresh} className={iconButton}>
-                  <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Refresh</TooltipContent>
-            </Tooltip>
+          <div className="flex items-center gap-0.5 shrink-0">
+            <Hint label="New entry">
+              <button type="button" onClick={openNewEntry} className={iconButton}>
+                <Plus className="size-3.5 text-primary" />
+              </button>
+            </Hint>
+            <Hint label="Import Markdown">
+              <button type="button" onClick={() => filePickerRef.current?.click()} className={iconButton}>
+                <Upload className="size-3.5 text-foreground-muted" />
+              </button>
+            </Hint>
+            <Hint label="Refresh">
+              <button type="button" onClick={handleRefresh} className={iconButton}>
+                <RefreshCw className={cn('size-3 text-foreground-muted', refreshing && 'animate-spin')} />
+              </button>
+            </Hint>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Toolbar band: broadcast notice, search and category pills. Kept out of
           `.app-header` so the header row stays one shared height. */}
@@ -716,41 +746,47 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   const EntryDetail = selectedEntry ? (
     <div className="h-full flex flex-col bg-background">
       {/* Detail Header Bar */}
-      <div className="app-header justify-between ps-6 gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          {isMobile && (
-            <button
-              type="button"
-              onClick={() => setMobileDetail(false)}
-              className="p-1.5 rounded-lg text-foreground-muted hover:bg-surface2 transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-            </button>
+      <div className={cn("app-header justify-between ps-6 pe-4 gap-4", embedded && "ps-3 pe-3 py-1.5 h-auto min-h-10 border-b border-border/60")}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          {(isMobile || embedded) && (
+            <Hint label="Back to list">
+              <button
+                type="button"
+                onClick={() => setMobileDetail(false)}
+                className="p-1 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors shrink-0 active:scale-95"
+              >
+                <ArrowLeft className="size-4" />
+              </button>
+            </Hint>
           )}
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold tracking-tight text-foreground truncate">
+              <h2 className={cn("text-base font-bold tracking-tight text-foreground truncate", embedded && "text-sm")}>
                 {selectedEntry.title}
               </h2>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-foreground-muted">
+            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-2xs text-foreground-muted">
               <Hint label="Copy the @ citation">
                 <button
                   type="button"
                   onClick={() => copySlugDirective(selectedEntry.slug)}
-                  className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors"
+                  className="inline-flex items-center gap-1 font-mono text-3xs px-1.5 py-0.5 rounded bg-surface2 border border-border/60 text-foreground hover:bg-surface3 transition-colors cursor-pointer active:scale-95"
                 >
                   <span>@knowledge:{selectedEntry.slug}</span>
                   {copiedSlug === selectedEntry.slug ? <Check className="size-2.5 text-status-success" /> : <Copy className="size-2.5 text-foreground-extra-muted" />}
                 </button>
               </Hint>
-              <MetaDot />
-              <span className="text-3xs text-foreground-muted font-medium flex items-center gap-1">
-                <Bot className="size-3" />
-                <span>Shared with all agents</span>
-              </span>
+              {!embedded && (
+                <>
+                  <MetaDot />
+                  <span className="text-3xs text-foreground-muted font-medium flex items-center gap-1">
+                    <Bot className="size-3" />
+                    <span>Shared with all agents</span>
+                  </span>
+                </>
+              )}
               {timeAgo(selectedEntry.updatedAt || selectedEntry.createdAt) && (
                 <>
                   <MetaDot />
@@ -768,16 +804,19 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
         </div>
 
         {/* Action Button Group */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 type="button"
                 onClick={copyFullContent}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 ui-transition"
+                className={cn(
+                  "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 ui-transition cursor-pointer active:scale-95",
+                  embedded && "px-2 py-1 rounded-lg text-2xs"
+                )}
               >
-                {copiedContent ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5 text-foreground-muted" />}
-                <span className="hidden sm:inline">Copy</span>
+                {copiedContent ? <Check className="size-3 text-status-success" /> : <Copy className="size-3 text-foreground-muted" />}
+                <span className={embedded ? "hidden md:inline" : "hidden sm:inline"}>Copy</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Copy the Markdown body</TooltipContent>
@@ -788,10 +827,13 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
               <button
                 type="button"
                 onClick={() => exportAsMarkdown(selectedEntry, selectedContent)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 ui-transition"
+                className={cn(
+                  "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-surface1 text-xs font-medium text-foreground hover:bg-surface2 ui-transition cursor-pointer active:scale-95",
+                  embedded && "px-2 py-1 rounded-lg text-2xs"
+                )}
               >
-                <Download className="size-3.5 text-foreground-muted" />
-                <span className="hidden sm:inline">Export</span>
+                <Download className="size-3 text-foreground-muted" />
+                <span className={embedded ? "hidden md:inline" : "hidden sm:inline"}>Export</span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Save as a local .md file</TooltipContent>
@@ -800,9 +842,12 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
           <button
             type="button"
             onClick={() => handleEdit(selectedEntry)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 ui-transition shadow-xs"
+            className={cn(
+              "inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 ui-transition shadow-xs cursor-pointer active:scale-95",
+              embedded && "px-2.5 py-1 rounded-lg text-2xs"
+            )}
           >
-            <Pencil className="size-3.5" />
+            <Pencil className="size-3" />
             <span>Edit</span>
           </button>
         </div>
@@ -811,7 +856,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
       {/* Reading Canvas with Optional Table of Contents */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Main Markdown Body */}
-        <div ref={contentContainerRef} className="flex-1 overflow-y-auto px-8 py-8">
+        <div ref={contentContainerRef} className={cn("flex-1 overflow-y-auto px-8 py-8", embedded && "px-4 py-4")}>
           {loadingContent ? (
             <div className="mx-auto w-full max-w-3xl space-y-4">
               <div className="h-6 w-1/3 rounded-lg bg-surface3 animate-pulse" />
@@ -835,7 +880,7 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
         </div>
 
         {/* Floating Table of Contents (TOC) */}
-        {tocItems.length > 1 && (
+        {!embedded && tocItems.length > 1 && (
           <div className="hidden lg:block w-56 shrink-0 border-l border-border/60 p-4 overflow-y-auto bg-surface1/30 select-none">
             <div className="flex items-center gap-1.5 text-3xs font-semibold uppercase tracking-wider text-foreground-extra-muted mb-3">
               <AlignLeft className="size-3" />
@@ -879,9 +924,10 @@ export function KnowledgeView({ sidebarOnly = false }: { sidebarOnly?: boolean }
   );
 
   // Layout Renderer
+  const isCompact = isMobile || embedded;
   const body = sidebarOnly ? (
     EntryList
-  ) : isMobile ? (
+  ) : isCompact ? (
     mobileDetail && selectedEntry ? EntryDetail : EntryList
   ) : (
     <div className="h-full flex w-full overflow-hidden">

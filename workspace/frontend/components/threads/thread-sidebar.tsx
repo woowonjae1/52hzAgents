@@ -79,9 +79,33 @@ export function ThreadSidebar() {
     updateSession,
     moveSessionToFolder,
   } = useWorkspace();
-  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings, settingsTab } = useLayout();
+  const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings, settingsTab, activeRightTab, setActiveRightTab } = useLayout();
   // Same rule as the wrapper: Home, or Threads with nothing open.
   const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
+
+  const isKnowledgeActive =
+    (viewMode === 'threads' && activeRightTab === 'knowledge') ||
+    viewMode === 'knowledge' ||
+    (viewMode === 'settings' && settingsTab === 'knowledge');
+
+  const handleToggleKnowledge = React.useCallback(() => {
+    if (currentSessionId) {
+      if (viewMode === 'threads' && activeRightTab === 'knowledge') {
+        setActiveRightTab(null);
+      } else {
+        setViewMode('threads');
+        setActiveRightTab('knowledge');
+      }
+    } else {
+      setViewMode(viewMode === 'knowledge' ? 'home' : 'knowledge');
+    }
+  }, [currentSessionId, viewMode, activeRightTab, setViewMode, setActiveRightTab]);
+
+  const isSkillsActive = viewMode === 'skills' || (viewMode === 'settings' && settingsTab === 'skills');
+
+  const handleToggleSkills = React.useCallback(() => {
+    setViewMode(viewMode === 'skills' ? (currentSessionId ? 'threads' : 'home') : 'skills');
+  }, [viewMode, currentSessionId, setViewMode]);
 
   /*
     "New session" opens Home's setup rather than an empty draft: picking the
@@ -577,16 +601,16 @@ export function ThreadSidebar() {
           </button>
           <button
             type="button"
-            className={cn(NAV_ROW_CLASS, (viewMode === 'settings' && settingsTab === 'knowledge') && NAV_ROW_ACTIVE)}
-            onClick={() => openSettings('knowledge')}
+            className={cn(NAV_ROW_CLASS, isKnowledgeActive && NAV_ROW_ACTIVE)}
+            onClick={handleToggleKnowledge}
           >
             <BookOpen className="size-4 shrink-0" />
             Knowledge
           </button>
           <button
             type="button"
-            className={cn(NAV_ROW_CLASS, (viewMode === 'skills' || (viewMode === 'settings' && settingsTab === 'skills')) && NAV_ROW_ACTIVE)}
-            onClick={() => openSettings('skills')}
+            className={cn(NAV_ROW_CLASS, isSkillsActive && NAV_ROW_ACTIVE)}
+            onClick={handleToggleSkills}
           >
             <Sparkles className="size-4 shrink-0 text-primary" />
             Skills

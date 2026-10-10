@@ -200,9 +200,16 @@ export function CommandPalette() {
         shortcut: ['G', 'K'],
         category: 'Navigation',
         title: 'Knowledge Base',
-        subtitle: 'Manage workspace memories and documents',
+        subtitle: 'Workspace documentation and technical guides',
         icon: <BookOpen className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('knowledge'),
+        action: () => {
+          if (currentSessionId) {
+            setViewMode('threads');
+            setActiveRightTab('knowledge');
+          } else {
+            setViewMode('knowledge');
+          }
+        },
       },
       {
         // One entry: routines and one-shot timers are the same thing on two
@@ -386,7 +393,12 @@ export function CommandPalette() {
         icon: <BookOpen className="size-4 text-foreground-muted" />,
         action: () => {
           requestKnowledgeIntent({ kind: 'open', id: k.id });
-          setViewMode('knowledge');
+          if (currentSessionId) {
+            setViewMode('threads');
+            setActiveRightTab('knowledge');
+          } else {
+            setViewMode('knowledge');
+          }
           if (isMobile) openMobileDetail();
         },
       }));

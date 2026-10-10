@@ -35,7 +35,9 @@ import { Hint } from '@/components/ui/hint';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { SignalMark } from '@/components/brand/signal-mark';
-import { Network, X, PanelLeft, FileText, Globe } from 'lucide-react';
+import { Network, X, PanelLeft, FileText, Globe, BookOpen } from 'lucide-react';
+import { KnowledgeView } from '@/components/knowledge/knowledge-view';
+import { SkillsView } from '@/components/skills/skills-view';
 
 /**
  * THE FIRST FRAME IS THE WINDOW, NOT A SPLASH.
@@ -165,6 +167,8 @@ function WrapperInner() {
     !isHome &&
     viewMode !== 'mission' &&
     viewMode !== 'connect' &&
+    viewMode !== 'knowledge' &&
+    viewMode !== 'skills' &&
     viewMode !== 'files';
 
   const effectiveStudioTab =
@@ -267,6 +271,14 @@ function WrapperInner() {
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <InboxView />
             </div>
+          ) : viewMode === 'knowledge' ? (
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
+              <KnowledgeView />
+            </div>
+          ) : viewMode === 'skills' ? (
+            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
+              <SkillsView />
+            </div>
           ) : viewMode === 'settings' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <SettingsView />
@@ -354,7 +366,8 @@ function WrapperInner() {
                 {viewMode === 'tasks' && <TasksView />}
 
                 {viewMode === 'inbox' && <InboxView />}
-
+                {viewMode === 'knowledge' && <KnowledgeView />}
+                {viewMode === 'skills' && <SkillsView />}
                 {viewMode === 'settings' && <SettingsView />}
                 {/* Agent profile slide-over panel */}
                 {isAgentPanelOpen && <AgentProfilePanel />}
@@ -423,6 +436,19 @@ function WrapperInner() {
                           <Globe className="size-3.5" />
                           <span>Preview</span>
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveRightTab('knowledge')}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95",
+                            effectiveStudioTab === 'knowledge'
+                              ? "bg-surface3 text-foreground font-semibold border border-border"
+                              : "text-foreground-muted hover:text-foreground hover:bg-surface2"
+                          )}
+                        >
+                          <BookOpen className="size-3.5" />
+                          <span>Knowledge</span>
+                        </button>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <Hint label="Close Studio (Esc)">
@@ -445,6 +471,7 @@ function WrapperInner() {
                     {/* Canvas and File are one panel now: the outputs list with its viewer. */}
                     {(effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file') && <ArtifactsCanvas embedded />}
                     {effectiveStudioTab === 'preview' && <LocalPreview />}
+                    {effectiveStudioTab === 'knowledge' && <KnowledgeView embedded />}
 
                     {/*
                       Trace is gone. It rendered the same messages as the chat

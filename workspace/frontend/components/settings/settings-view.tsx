@@ -55,7 +55,6 @@ import { SkillsView } from '@/components/skills/skills-view';
 import { RouterProviderSettings } from './router-provider-settings';
 import { WorkProfilesSettings } from './work-profiles-settings';
 import { SavedWorkflowsSettings } from './saved-workflows-settings';
-import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { eventToMessage } from '@/lib/types';
@@ -86,8 +85,6 @@ export function SettingsView() {
     { id: 'panels', label: 'Panels & Display', icon: PanelRight },
     { id: 'export', label: 'Export & Share', icon: Download },
     { id: 'skills', label: 'Skills Hub', icon: Sparkles },
-    { id: 'knowledge', label: 'Knowledge Base', icon: BookOpen },
-
   ];
 
   /*
@@ -268,10 +265,12 @@ export function SettingsView() {
       icon: FileText,
       desc: 'Browse and download the project code and Markdown the agents write.',
     },
-
-
-
-
+    {
+      id: 'knowledge',
+      name: 'Knowledge Base',
+      icon: BookOpen,
+      desc: 'Workspace documentation, technical guides, standards, and citations side-by-side with your conversations.',
+    },
   ];
 
   return (
@@ -368,7 +367,6 @@ export function SettingsView() {
         {/* Settings Content Area */}
         <div className="flex-1 min-w-0 h-full overflow-y-auto bg-surface0">
           {settingsTab === 'skills' && <SkillsView />}
-          {settingsTab === 'knowledge' && <KnowledgeView />}
           {/* "Scheduled Tasks" moved to Tasks › Schedules, which already listed
               every routine and timer — the same schedules were editable here
               too. Anything that asks for it lands there via resolveView. */}

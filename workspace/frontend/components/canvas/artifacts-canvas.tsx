@@ -21,6 +21,7 @@ import {
   ArrowRightLeft,
   FileDiff,
   Loader2,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -217,6 +218,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                   isFullscreen={isFullscreen}
                   onFullscreen={() => setIsFullscreen((v) => !v)}
                   onPreview={() => setActiveRightTab('preview')}
+                  onKnowledge={() => setActiveRightTab('knowledge')}
                   onClose={close}
                   actions={actions}
                   totalOutputs={totalOutputs}
@@ -235,6 +237,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                   isFullscreen={isFullscreen}
                   onFullscreen={() => setIsFullscreen((v) => !v)}
                   onPreview={() => setActiveRightTab('preview')}
+                  onKnowledge={() => setActiveRightTab('knowledge')}
                   onClose={close}
                   actions={{
                     title: change.path,
@@ -253,6 +256,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                 isFullscreen={isFullscreen}
                 onFullscreen={() => setIsFullscreen((v) => !v)}
                 onPreview={() => setActiveRightTab('preview')}
+                onKnowledge={() => setActiveRightTab('knowledge')}
                 onClose={close}
                 actions={{ title: 'Outputs', icon: <FileText className="size-3.5" /> }}
                 totalOutputs={totalOutputs}
@@ -396,6 +400,7 @@ function PanelHeader({
   isFullscreen,
   onFullscreen,
   onPreview,
+  onKnowledge,
   onClose,
   actions,
   totalOutputs = 0,
@@ -405,6 +410,7 @@ function PanelHeader({
   isFullscreen: boolean;
   onFullscreen: () => void;
   onPreview: () => void;
+  onKnowledge?: () => void;
   onClose: () => void;
   actions: HeaderActions;
   totalOutputs?: number;
@@ -437,6 +443,13 @@ function PanelHeader({
             <Globe className="size-3.5" />
           </button>
         </Hint>
+        {onKnowledge && (
+          <Hint label="Switch to Knowledge Base">
+            <button type="button" onClick={onKnowledge} className={iconBtn}>
+              <BookOpen className="size-3.5" />
+            </button>
+          </Hint>
+        )}
         <Hint label={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>
           <button type="button" onClick={onFullscreen} className={iconBtn}>
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
