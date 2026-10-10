@@ -1343,6 +1343,8 @@ class McpServer {
       case 'workspace_process_start': {
         const pName = String(args.name || '').trim();
         if (!pName) throw new Error('Missing process name');
+        const cmd = String(args.command || '').trim();
+        if (!cmd) throw new Error('Missing command');
         if (_activeProcesses[pName] && _activeProcesses[pName].running) {
           return text(`Process "${pName}" is already running (PID: ${_activeProcesses[pName].pid}). Use workspace_process_stop first if you want to restart it.`);
         }
@@ -1350,7 +1352,7 @@ class McpServer {
         const cwd = args.working_dir ? path.resolve(process.cwd(), args.working_dir) : process.cwd();
         const env = { ...process.env };
         if (args.port) env.PORT = String(args.port);
-        const child = spawnChild(args.command, {
+        const child = spawnChild(cmd, {
           shell: true,
           cwd,
           env,
@@ -1358,7 +1360,7 @@ class McpServer {
         });
         const record = {
           name: pName,
-          command: args.command,
+          command: cmd,
           pid: child.pid,
           port: args.port || null,
           startTime: Date.now(),
