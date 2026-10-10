@@ -52,6 +52,7 @@ func GetParallelBatch(c *gin.Context) {
 
 	view := buildParallelBatch(strings.ToLower(strings.TrimSpace(channel.OrchestrationMode)), todos)
 	view.Isolated = channel.WorkingDir != nil && gitRepoRoot(*channel.WorkingDir) != ""
+	view.ReviewAgent = strings.TrimSpace(valueOrEmpty(channel.ReviewAgent))
 	if view.Isolated && view.State == "blocked" {
 		// Worktrees make overlapping scopes harmless; the start is not blocked.
 		view.State = "running"

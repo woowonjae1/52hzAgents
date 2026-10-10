@@ -83,7 +83,11 @@ type Channel struct {
 	LastEventAt              *int64    `gorm:"type:bigint;index:idx_channels_status_last_event" json:"last_event_at"`
 	WorkingDir               *string   `gorm:"type:text" json:"working_dir"`
 	VerificationCmd          *string   `gorm:"type:text" json:"verification_cmd"`
-	CreatedAt                time.Time `gorm:"autoCreateTime" json:"created_at"`
+	// ReviewAgent turns on review before merge for parallel batches: who reads
+	// each lane's changes before the user merges them. Empty or nil = off.
+	// Today an agent name; see resolveReviewer for how it is resolved.
+	ReviewAgent *string   `gorm:"type:text" json:"review_agent"`
+	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 }
 
 func (Channel) TableName() string {
@@ -848,6 +852,22 @@ type ParallelLaneRecord struct {
 	Port         int        `gorm:"not null;default:0" json:"port"` // dev-server port reserved for this lane; 0 = none
 	StartedAt    time.Time  `json:"started_at"`
 	FinishedAt   *time.Time `json:"finished_at,omitempty"`
+
+	// Review before merge (Channel.ReviewAgent): another agent reads the lane's
+	// branch in a read-only copy and gives a verdict while the batch waits.
+	// ReviewStatus: "" (none) | running | approved | changes_requested |
+	// failed | skipped | timed_out | cancelled.
+	ReviewStatus string `gorm:"type:text;not null;default:''" json:"review_status"`
+	Reviewer     string `gorm:"type:text;not null;default:''" json:"reviewer"`
+	// ReviewNotes is what the reviewer wrote; ReviewInfo is the workspace's own
+	// remark -- why someone else reviewed, why there is no verdict.
+	ReviewNotes   string `gorm:"type:text;not null;default:''" json:"review_notes"`
+	ReviewInfo    string `gorm:"type:text;not null;default:''" json:"review_info"`
+	ReviewChannel string `gorm:"type:text;not null;default:''" json:"review_channel"`
+	// ReviewedCommit is the branch head the review looked at. A lane whose head
+	// moved since (it was sent back and finished again) is reviewed again.
+	ReviewedCommit  string     `gorm:"type:text;not null;default:''" json:"reviewed_commit"`
+	ReviewStartedAt *time.Time `json:"review_started_at,omitempty"`
 }
 
 func (ParallelLaneRecord) TableName() string { return "parallel_lanes" }

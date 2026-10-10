@@ -120,14 +120,15 @@ export class WorkspacesApi extends BaseWorkspaceApi {
     });
   }
 
-  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; masterAgent?: string; orchestrationMode?: string; orchestrationInstruction?: string | null; workingDir?: string | null; verificationCmd?: string | null }): Promise<unknown> {
-    const { masterAgent, orchestrationMode, orchestrationInstruction, workingDir, verificationCmd, ...rest } = updates;
+  async updateChannel(channelName: string, updates: { title?: string; status?: string; starred?: boolean; masterAgent?: string; orchestrationMode?: string; orchestrationInstruction?: string | null; workingDir?: string | null; verificationCmd?: string | null; reviewAgent?: string | null }): Promise<unknown> {
+    const { masterAgent, orchestrationMode, orchestrationInstruction, workingDir, verificationCmd, reviewAgent, ...rest } = updates;
     const body: Record<string, unknown> = { ...rest };
     if (masterAgent !== undefined) body.master_agent = masterAgent;
     if (orchestrationMode !== undefined) body.orchestration_mode = orchestrationMode;
     if (orchestrationInstruction !== undefined) body.orchestration_instruction = orchestrationInstruction;
     if (workingDir !== undefined) body.working_dir = workingDir ?? '';
     if (verificationCmd !== undefined) body.verification_cmd = verificationCmd ?? '';
+    if (reviewAgent !== undefined) body.review_agent = reviewAgent ?? '';
     return this.request(`/v1/workspaces/${this.workspaceId}/channels/${channelName}`, {
       method: 'PATCH',
       body: JSON.stringify(body),

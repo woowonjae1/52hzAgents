@@ -364,6 +364,15 @@ export function isUnusedSession(
   view calls materializeDraft() on the first send, which creates the real
   channel with those settings, swaps the id in, and only then posts the message.
 */
+/*
+  A parallel lane's review thread (`review:<batch>:<agent>`, see the backend's
+  parallel_review.go). It holds one reviewer's work on one lane and is opened
+  from the parallel panel, so thread lists leave it out.
+*/
+export function isReviewThreadId(id: string | null | undefined): boolean {
+  return !!id && id.startsWith('review:');
+}
+
 export const DRAFT_SESSION_PREFIX = 'draft:';
 export function isDraftSessionId(id: string | null | undefined): boolean {
   return !!id && id.startsWith(DRAFT_SESSION_PREFIX);

@@ -432,6 +432,12 @@ export interface Channel {
   last_event_at: number | null;
   working_dir: string | null;
   verification_cmd: string | null;
+  /**
+   * ReviewAgent turns on review before merge for parallel batches: who reads
+   * each lane's changes before the user merges them. Empty or nil = off.
+   * Today an agent name; see resolveReviewer for how it is resolved.
+   */
+  review_agent: string | null;
   created_at: string;
 }
 
@@ -653,6 +659,10 @@ export interface ParallelBatch {
    */
   isolated: boolean;
   /**
+   * ReviewAgent is the channel's review-before-merge setting, "" when off.
+   */
+  review_agent: string;
+  /**
    * Run is the latest batch actually started in the channel, with its lanes.
    */
   run?: ParallelRunView | null;
@@ -725,6 +735,27 @@ export interface ParallelLaneRecord {
   port: number;
   started_at: string;
   finished_at?: string | null;
+  /**
+   * Review before merge (Channel.ReviewAgent): another agent reads the lane's
+   * branch in a read-only copy and gives a verdict while the batch waits.
+   * ReviewStatus: "" (none) | running | approved | changes_requested |
+   * failed | skipped | timed_out | cancelled.
+   */
+  review_status: string;
+  reviewer: string;
+  /**
+   * ReviewNotes is what the reviewer wrote; ReviewInfo is the workspace's own
+   * remark -- why someone else reviewed, why there is no verdict.
+   */
+  review_notes: string;
+  review_info: string;
+  review_channel: string;
+  /**
+   * ReviewedCommit is the branch head the review looked at. A lane whose head
+   * moved since (it was sent back and finished again) is reviewed again.
+   */
+  reviewed_commit: string;
+  review_started_at?: string | null;
 }
 
 /**

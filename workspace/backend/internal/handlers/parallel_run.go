@@ -521,7 +521,9 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 			}
 			lane.ChangedFiles = strings.Join(files, "\n")
 		}
-		db.DB.Save(lane)
+		// Only these two columns: a whole-row Save could undo a review of this
+		// lane that finished meanwhile (see saveReviewLane).
+		db.DB.Model(lane).Updates(map[string]interface{}{"diffstat": lane.Diffstat, "changed_files": lane.ChangedFiles})
 	}
 	if pending == 0 {
 		return false
@@ -531,7 +533,13 @@ func enterReview(batch *models.ParallelBatchRecord) bool {
 	batch.Summary = reviewSummary(batch, lanes)
 	db.DB.Save(batch)
 	_ = PublishWorkspaceStateEvent(batch.WorkspaceID, "workspace.parallel.batch", "system:parallel", batch.ChannelName, gin.H{"batch_id": batch.ID, "status": batch.Status})
-	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", batch.Summary, nil, map[string]interface{}{
+	// With review before merge on, each changed lane goes to a reviewer now;
+	// the message says who reads what (parallel_review.go).
+	content := batch.Summary
+	if lines := startLaneReviews(batch); len(lines) > 0 {
+		content += "\n\n" + strings.Join(lines, "\n")
+	}
+	postChannelMessage(batch.WorkspaceID, batch.ChannelName, "system:parallel", content, nil, map[string]interface{}{
 		"parallel_summary": gin.H{"batch_id": batch.ID, "review": true},
 	})
 	return true
@@ -592,6 +600,7 @@ func MergeParallelBatch(c *gin.Context) {
 	if batch == nil {
 		return
 	}
+	cancelLaneReviews(batch, "merged before the review finished")
 	finalizeBatch(batch)
 	c.JSON(200, gin.H{"batch": batch})
 }
@@ -603,6 +612,7 @@ func DiscardParallelBatch(c *gin.Context) {
 	if batch == nil {
 		return
 	}
+	cancelLaneReviews(batch, "discarded before the review finished")
 	discardBatch(batch)
 	c.JSON(200, gin.H{"batch": batch})
 }
@@ -992,6 +1002,7 @@ func ExpireStaleParallelLanes() {
 		}
 		finishLane(&batch, &stale[i], true, fmt.Sprintf("timed out after %s without finishing", ParallelLaneTimeout()), "")
 	}
+	ExpireStaleLaneReviews()
 }
 
 // ParallelRunView is a batch that was actually started, with its lanes: the
