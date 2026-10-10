@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, CalendarClock, Inbox, BookOpen, CircleCheck, Users } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -78,7 +78,6 @@ export function ThreadSidebar() {
     renameSession,
     updateSession,
     moveSessionToFolder,
-    unreadNotificationCount,
   } = useWorkspace();
   const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings } = useLayout();
   // Same rule as the wrapper: Home, or Threads with nothing open.
@@ -563,34 +562,6 @@ export function ThreadSidebar() {
             <Users className="size-4 shrink-0" />
             Agents
           </button>
-          {/*
-            Was "Runs": Tasks' Runs page is where scheduled work and its
-            history live, so the row is named for what it holds.
-          */}
-          <button
-            type="button"
-            className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && tasksTab !== 'tasks' && NAV_ROW_ACTIVE)}
-            onClick={() => {
-              setTasksTab('runs');
-              setViewMode('tasks');
-            }}
-          >
-            <CalendarClock className="size-4 shrink-0" />
-            Automations
-          </button>
-          <button
-            type="button"
-            className={cn(NAV_ROW_CLASS, viewMode === 'inbox' && NAV_ROW_ACTIVE)}
-            onClick={() => setViewMode('inbox')}
-          >
-            <Inbox className="size-4 shrink-0" />
-            Inbox
-            {unreadNotificationCount > 0 && (
-              <span className="ms-auto text-2xs tabular-nums text-muted-foreground" aria-label={`${unreadNotificationCount} unread`}>
-                {unreadNotificationCount}
-              </span>
-            )}
-          </button>
         </NavSection>
 
         <NavSection label="Workspace">
@@ -613,14 +584,13 @@ export function ThreadSidebar() {
           </button>
           <button
             type="button"
-            className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && tasksTab === 'tasks' && NAV_ROW_ACTIVE)}
+            className={cn(NAV_ROW_CLASS, viewMode === 'tasks' && NAV_ROW_ACTIVE)}
             onClick={() => {
-              setTasksTab('tasks');
               setViewMode('tasks');
             }}
           >
             <CircleCheck className="size-4 shrink-0" />
-            Tasks
+            Tasks &amp; Automations
           </button>
         </NavSection>
       </nav>
@@ -650,10 +620,10 @@ export function ThreadSidebar() {
       {viewMode !== 'files' && (
       <div className="mt-3 mb-0.5 flex h-6 items-center justify-between pl-2.5 pr-1">
         <span className={SECTION_LABEL_CLASS}>Projects</span>
-        <Hint label={browsingFolder ? 'Opening folder…' : 'New project'}>
+        <Hint label={browsingFolder ? 'Opening folder…' : 'Open project folder…'}>
           <button
             type="button"
-            aria-label="New project"
+            aria-label="Open project folder"
             disabled={browsingFolder}
             onClick={() => void addProjectFolder()}
             className="grid size-6 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"

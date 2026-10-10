@@ -160,6 +160,7 @@ function WrapperInner() {
 
   const isStudioOpen =
     !isDetailExpanded &&
+    !isAgentPanelOpen &&
     (activeRightTab !== null || isCanvasOpen) &&
     !isHome &&
     viewMode !== 'mission' &&

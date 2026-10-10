@@ -313,11 +313,12 @@ export function ChatView() {
     isSidebarOpen,
     sidebarToggle,
     openNewThread,
+    selectedAgentName,
     setSelectedAgentName,
     openSettings,
   } = useLayout();
   const { isCanvasOpen, closeCanvas } = useArtifacts();
-  const isStudioOpen = activeRightTab !== null || isCanvasOpen;
+  const isStudioOpen = (activeRightTab !== null || isCanvasOpen) && !selectedAgentName;
 
   // Continuously refresh message caches for top recent sessions in the background.
   // This ensures clicking any recent thread shows messages instantly and up-to-date.
@@ -1391,6 +1392,7 @@ export function ChatView() {
                   setActiveRightTab(null);
                   closeCanvas();
                 } else {
+                  if (selectedAgentName) setSelectedAgentName(null);
                   setActiveRightTab('canvas');
                 }
               }}
