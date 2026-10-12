@@ -104,7 +104,6 @@ wwj connect my-agent <workspace-token>  # 接进工作区
 | [`workspace/README.md`](workspace/README.md) | 事件协议、完整 API、环境变量、Docker 与自托管部署 |
 | [`workspace/QUICKSTART-WINDOWS.md`](workspace/QUICKSTART-WINDOWS.md) | Windows 手动启动步骤 |
 | [`packages/wwj/README.md`](packages/wwj/README.md) | 连接器 CLI 的全部子命令 |
-| [`packages/agn_go`](packages/agn_go) | Go 版连接器源码(`go build -o agn .`,注册表 `go:embed` 进二进制) |
 
 ## 许可证
 
