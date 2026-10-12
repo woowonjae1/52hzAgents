@@ -51,14 +51,16 @@ function isPreviewable(contentType: string, filename: string): boolean {
 }
 
 function Attachments({ items }: { items: Attachment[] }) {
-  const { setViewMode } = useLayout();
+  const { setActiveRightTab } = useLayout();
   const { setSelectedFileId } = useWorkspace();
+  const { openOutput } = useArtifacts();
   const [lightboxImage, setLightboxImage] = useState<{ url: string; filename: string } | null>(null);
 
   const openPreview = useCallback((fileId: string) => {
     setSelectedFileId(fileId);
-    setViewMode('files');
-  }, [setSelectedFileId, setViewMode]);
+    openOutput({ kind: 'file' });
+    setActiveRightTab('canvas');
+  }, [setSelectedFileId, openOutput, setActiveRightTab]);
 
   const handleDownload = useCallback((url: string, filename: string) => {
     downloadUrl(url, filename);

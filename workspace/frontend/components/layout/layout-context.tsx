@@ -46,6 +46,7 @@ function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTa
   if (mode === 'skills') return { view: 'skills' };
   if (mode === 'knowledge') return { view: 'knowledge' };
   if (mode === 'routines' || mode === 'timers') return { view: 'tasks', tasksTab: 'schedules' };
+  if (mode === 'files') return { view: 'threads' };
   return { view: mode };
 }
 

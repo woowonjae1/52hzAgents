@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLayout, ViewMode } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useArtifacts } from '@/lib/artifacts-context';
 import { useTheme } from 'next-themes';
 import {
   Search,
@@ -71,6 +72,7 @@ export function CommandPalette() {
 
   const { setViewMode, openSettings, openNewThread, setActiveRightTab, isMobile, openMobileDetail, sidebarToggle } = useLayout();
   const { agents, currentSessionId, currentUser, sessions, files, todos, knowledge, setCurrentSessionId, setSelectedFileId, workspaceId, createSession } = useWorkspace();
+  const { openOutput } = useArtifacts();
   const { theme, setTheme } = useTheme();
 
   /*
@@ -193,7 +195,10 @@ export function CommandPalette() {
         title: 'Files & Workspace Artifacts',
         subtitle: 'Browse files and diffs',
         icon: <Folder className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('files'),
+        action: () => {
+          openOutput({ kind: 'file' });
+          setActiveRightTab('canvas');
+        },
       },
       {
         id: 'nav-knowledge',
@@ -359,7 +364,8 @@ export function CommandPalette() {
         icon: isCode ? <FileCode className="size-4 text-foreground-muted" /> : <FileText className="size-4 text-foreground-muted" />,
         action: () => {
           setSelectedFileId(f.id);
-          setViewMode('files');
+          openOutput({ kind: 'file' });
+          setActiveRightTab('canvas');
           if (isMobile) openMobileDetail();
         },
       };

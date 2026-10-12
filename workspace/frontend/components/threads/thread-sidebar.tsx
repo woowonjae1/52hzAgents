@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users, Sparkles, X } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, FolderTree, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users, Sparkles, X } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -16,7 +16,6 @@ import { useLayout } from '@/components/layout/layout-context';
 import { basename, browseForFolder } from '@/components/chat/project-folder-picker';
 import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
 import { formatCompactRelativeTime } from '@/lib/helpers';
-import { FileList } from '@/components/files/file-list';
 import { ProjectFileExplorer } from '@/components/files/project-file-explorer';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { copyWithToast } from '@/lib/desktop';
@@ -584,16 +583,20 @@ export function ThreadSidebar() {
             Agents
           </button>
           {/*
-            The workspace's shared files: what you uploaded and what agents
-            produced (adapters register files they write each turn). The tree
-            below swaps to the file list while this is on.
+            Project Files Explorer: toggles the project file tree in the sidebar
+            without leaving the active conversation view.
           */}
           <button
             type="button"
-            className={cn(NAV_ROW_CLASS, viewMode === 'files' && NAV_ROW_ACTIVE)}
-            onClick={() => setViewMode(viewMode === 'files' ? 'threads' : 'files')}
+            className={cn(NAV_ROW_CLASS, (sidebarTab === 'files' || viewMode === 'files') && NAV_ROW_ACTIVE)}
+            onClick={() => {
+              if (viewMode !== 'threads') {
+                setViewMode('threads');
+              }
+              setSidebarTab((tab) => (tab === 'files' ? 'threads' : 'files'));
+            }}
           >
-            <FileText className="size-4 shrink-0" />
+            <FolderTree className="size-4 shrink-0" />
             Files
           </button>
           <button
@@ -631,7 +634,6 @@ export function ThreadSidebar() {
         `workingDir` -- so the `+` here is the one way to open a directory the
         workspace has not seen before.
       */}
-      {viewMode !== 'files' && (
       <div className="mt-3 mb-1.5 flex h-7 items-center justify-between pl-2 pr-1 shrink-0">
         <div className="flex items-center gap-0.5 bg-surface2/70 p-0.5 rounded-lg border border-border/40">
           <button
@@ -695,7 +697,6 @@ export function ThreadSidebar() {
           </Hint>
         </div>
       </div>
-      )}
 
       {sidebarTab === 'threads' && showSearch && (
         <div className="relative mx-1 mb-1">
