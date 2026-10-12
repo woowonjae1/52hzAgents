@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users, Sparkles } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users, Sparkles, X } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -562,18 +562,6 @@ export function ThreadSidebar() {
           <Plus className="size-4 shrink-0" />
           New session
         </button>
-        <button
-          type="button"
-          className={cn(NAV_ROW_CLASS, showSearch && NAV_ROW_ACTIVE)}
-          onClick={() => {
-            setShowSearch((open) => !open);
-            requestAnimationFrame(() => searchRef.current?.focus());
-          }}
-        >
-          <Search className="size-4 shrink-0" />
-          Search
-        </button>
-
         <NavSection label="Workspace">
           <button
             type="button"
@@ -628,22 +616,6 @@ export function ThreadSidebar() {
         </NavSection>
       </nav>
 
-      {showSearch && (
-        <input
-          ref={searchRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setQuery('');
-              setShowSearch(false);
-            }
-          }}
-          placeholder="Filter threads..."
-          className="mx-1 h-7 min-w-0 rounded-md border border-border bg-background px-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
-      )}
-
       {/*
         A section label, not a divider line. A project folder in this tree is
         derived -- it exists only because some thread already has that
@@ -653,18 +625,68 @@ export function ThreadSidebar() {
       {viewMode !== 'files' && (
       <div className="mt-3 mb-0.5 flex h-6 items-center justify-between pl-2.5 pr-1">
         <span className={SECTION_LABEL_CLASS}>Projects</span>
-        <Hint label={browsingFolder ? 'Opening folder…' : 'Open project folder…'}>
-          <button
-            type="button"
-            aria-label="Open project folder"
-            disabled={browsingFolder}
-            onClick={() => void addProjectFolder()}
-            className="grid size-6 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
-          >
-            {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-          </button>
-        </Hint>
+        <div className="flex items-center gap-0.5">
+          <Hint label={showSearch ? 'Close search (Esc)' : 'Filter threads'}>
+            <button
+              type="button"
+              aria-label="Filter threads"
+              onClick={() => {
+                setShowSearch((open) => {
+                  const next = !open;
+                  if (next) requestAnimationFrame(() => searchRef.current?.focus());
+                  else setQuery('');
+                  return next;
+                });
+              }}
+              className={cn(
+                'grid size-6 place-items-center rounded-md outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
+                showSearch ? 'bg-surface2 text-primary font-semibold' : 'text-muted-foreground'
+              )}
+            >
+              <Search className="size-3.5" />
+            </button>
+          </Hint>
+          <Hint label={browsingFolder ? 'Opening folder…' : 'Open project folder…'}>
+            <button
+              type="button"
+              aria-label="Open project folder"
+              disabled={browsingFolder}
+              onClick={() => void addProjectFolder()}
+              className="grid size-6 place-items-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 cursor-pointer active:scale-95"
+            >
+              {browsingFolder ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+            </button>
+          </Hint>
+        </div>
       </div>
+      )}
+
+      {showSearch && (
+        <div className="relative mx-1 mb-1">
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-extra-muted" />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setQuery('');
+                setShowSearch(false);
+              }
+            }}
+            placeholder="Filter threads…"
+            className="h-7 w-full rounded-md border border-border bg-background pl-7 pr-6 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 text-foreground-extra-muted hover:text-foreground p-0.5"
+            >
+              <X className="size-3" />
+            </button>
+          )}
+        </div>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
