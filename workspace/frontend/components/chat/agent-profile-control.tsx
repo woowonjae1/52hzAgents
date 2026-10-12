@@ -68,72 +68,48 @@ export function AgentProfileControl({ session }: Props) {
     saveThreadProfile(sessionId, next);
   };
 
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    e.preventDefault();
-    const i = AGENT_PROFILES.findIndex((p) => p.id === profileId);
-    const next = AGENT_PROFILES[(i + (e.key === 'ArrowRight' ? 1 : AGENT_PROFILES.length - 1)) % AGENT_PROFILES.length];
-    select(next.id);
-    e.currentTarget.querySelector<HTMLButtonElement>(`[data-profile="${next.id}"]`)?.focus();
-  };
+  const isReview = profileId === 'review';
+  const toggle = () => select(isReview ? 'fix' : 'review');
+  const cur = getProfile(profileId);
+  const Icon = cur.icon;
 
   // For Review, say per agent whether read-only is a guard or a request.
   const enforced = targets.filter((a) => isReadOnlyEnforced(a.agentType, a.agentName)).map((a) => `@${a.agentName}`);
   const promptOnly = targets.filter((a) => !isReadOnlyEnforced(a.agentType, a.agentName)).map((a) => `@${a.agentName}`);
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Work mode"
-      onKeyDown={onKeyDown}
-      className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-surface1 p-0.5"
+    <Hint
+      side="top"
+      label={
+        <span className="block max-w-64">
+          <span className="font-medium">{cur.label} mode</span>
+          <span className="block text-foreground-muted">{cur.whenToUse}</span>
+          {cur.settings.agentMode === 'plan' && targets.length > 0 && (
+            <span className="mt-1 block text-foreground-muted">
+              {enforced.length > 0 && <>Blocked: {enforced.join(', ')}. </>}
+              {promptOnly.length > 0 && <>Asked only: {promptOnly.join(', ')}.</>}
+            </span>
+          )}
+          <span className="mt-1 block text-foreground-extra-muted">
+            Click to switch to {isReview ? 'Edit (Fix)' : 'Read-only (Review)'} mode.
+          </span>
+        </span>
+      }
     >
-      {AGENT_PROFILES.map((p) => {
-        const Icon = p.icon;
-        const isActive = p.id === profileId;
-        return (
-          <Hint
-            key={p.id}
-            side="top"
-            label={
-              <span className="block max-w-64">
-                <span className="font-medium">{p.label}</span>
-                <span className="block text-foreground-muted">{p.whenToUse}</span>
-                {p.settings.agentMode === 'plan' && targets.length > 0 && (
-                  <span className="mt-1 block text-foreground-muted">
-                    {enforced.length > 0 && <>Blocked: {enforced.join(', ')}. </>}
-                    {promptOnly.length > 0 && <>Asked only: {promptOnly.join(', ')}.</>}
-                  </span>
-                )}
-                <span className="mt-1 block text-foreground-extra-muted">
-                  This thread only. Applies from your next message; a reply already running keeps its mode.
-                </span>
-              </span>
-            }
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={isActive}
-              aria-label={`${p.label} mode`}
-              data-profile={p.id}
-              tabIndex={isActive ? 0 : -1}
-              onClick={() => select(p.id)}
-              className={cn(
-                'inline-flex h-5 items-center gap-1 rounded-[5px] px-1.5',
-                'text-3xs font-mono select-none transition-colors',
-                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
-                isActive
-                  ? 'bg-surface3 text-foreground shadow-xs'
-                  : 'text-foreground-extra-muted hover:text-foreground',
-              )}
-            >
-              <Icon className="size-3 shrink-0" />
-              {isActive && <span>{p.label}</span>}
-            </button>
-          </Hint>
-        );
-      })}
-    </div>
+      <button
+        type="button"
+        aria-label={`Work mode: ${cur.label}`}
+        onClick={toggle}
+        className={cn(
+          'inline-flex h-6 items-center gap-1.5 rounded-lg px-2 text-2xs font-medium select-none transition-all cursor-pointer active:scale-95 shrink-0',
+          isReview
+            ? 'bg-status-warning/15 text-status-warning border border-status-warning/30 font-semibold'
+            : 'bg-surface1 text-foreground-muted hover:text-foreground hover:bg-surface2 border border-border/60'
+        )}
+      >
+        <Icon className={cn('size-3 shrink-0', isReview ? 'text-status-warning' : 'text-foreground-extra-muted')} />
+        <span>{isReview ? 'Read-only' : 'Fix'}</span>
+      </button>
+    </Hint>
   );
 }
