@@ -17,7 +17,8 @@ export type { ArtifactItem, ArtifactKind, ArtifactGroup } from '@/lib/artifacts'
 export type OutputSelection =
   | { kind: 'document'; key: string; versionId?: string }
   | { kind: 'change'; path: string; turnId: string }
-  | { kind: 'file' };
+  | { kind: 'file' }
+  | { kind: 'local_file'; path: string };
 
 interface ArtifactsContextValue {
   selection: OutputSelection | null;

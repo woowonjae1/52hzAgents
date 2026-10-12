@@ -17,6 +17,9 @@ import { basename, browseForFolder } from '@/components/chat/project-folder-pick
 import { getSmartSessionTitle, extractSessionAgents } from './thread-list';
 import { formatCompactRelativeTime } from '@/lib/helpers';
 import { FileList } from '@/components/files/file-list';
+import { ProjectFileExplorer } from '@/components/files/project-file-explorer';
+import { useArtifacts } from '@/lib/artifacts-context';
+import { copyWithToast } from '@/lib/desktop';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Hint } from '@/components/ui/hint';
@@ -144,6 +147,12 @@ export function ThreadSidebar() {
     return map;
   }, [turnRows]);
 
+  const { openOutput, selection } = useArtifacts();
+  const [sidebarTab, setSidebarTab] = React.useState<'threads' | 'files'>('threads');
+  const currentSession = React.useMemo(
+    () => sessions.find((s) => s.sessionId === currentSessionId),
+    [sessions, currentSessionId]
+  );
   const [showSearch, setShowSearch] = React.useState(false);
   const [query, setQuery] = React.useState('');
   const searchRef = React.useRef<HTMLInputElement>(null);
@@ -623,29 +632,56 @@ export function ThreadSidebar() {
         workspace has not seen before.
       */}
       {viewMode !== 'files' && (
-      <div className="mt-3 mb-0.5 flex h-6 items-center justify-between pl-2.5 pr-1">
-        <span className={SECTION_LABEL_CLASS}>Projects</span>
+      <div className="mt-3 mb-1.5 flex h-7 items-center justify-between pl-2 pr-1 shrink-0">
+        <div className="flex items-center gap-0.5 bg-surface2/70 p-0.5 rounded-lg border border-border/40">
+          <button
+            type="button"
+            onClick={() => setSidebarTab('threads')}
+            className={cn(
+              'px-2 py-0.5 rounded-md text-2xs font-medium transition-all cursor-pointer',
+              sidebarTab === 'threads'
+                ? 'bg-surface0 text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Threads
+          </button>
+          <button
+            type="button"
+            onClick={() => setSidebarTab('files')}
+            className={cn(
+              'px-2 py-0.5 rounded-md text-2xs font-medium transition-all cursor-pointer flex items-center gap-1',
+              sidebarTab === 'files'
+                ? 'bg-surface0 text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Explorer
+          </button>
+        </div>
         <div className="flex items-center gap-0.5">
-          <Hint label={showSearch ? 'Close search (Esc)' : 'Filter threads'}>
-            <button
-              type="button"
-              aria-label="Filter threads"
-              onClick={() => {
-                setShowSearch((open) => {
-                  const next = !open;
-                  if (next) requestAnimationFrame(() => searchRef.current?.focus());
-                  else setQuery('');
-                  return next;
-                });
-              }}
-              className={cn(
-                'grid size-6 place-items-center rounded-md outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
-                showSearch ? 'bg-surface2 text-primary font-semibold' : 'text-muted-foreground'
-              )}
-            >
-              <Search className="size-3.5" />
-            </button>
-          </Hint>
+          {sidebarTab === 'threads' && (
+            <Hint label={showSearch ? 'Close search (Esc)' : 'Filter threads'}>
+              <button
+                type="button"
+                aria-label="Filter threads"
+                onClick={() => {
+                  setShowSearch((open) => {
+                    const next = !open;
+                    if (next) requestAnimationFrame(() => searchRef.current?.focus());
+                    else setQuery('');
+                    return next;
+                  });
+                }}
+                className={cn(
+                  'grid size-6 place-items-center rounded-md outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
+                  showSearch ? 'bg-surface2 text-primary font-semibold' : 'text-muted-foreground'
+                )}
+              >
+                <Search className="size-3.5" />
+              </button>
+            </Hint>
+          )}
           <Hint label={browsingFolder ? 'Opening folder…' : 'Open project folder…'}>
             <button
               type="button"
@@ -661,7 +697,7 @@ export function ThreadSidebar() {
       </div>
       )}
 
-      {showSearch && (
+      {sidebarTab === 'threads' && showSearch && (
         <div className="relative mx-1 mb-1">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-foreground-extra-muted" />
           <input
@@ -690,21 +726,32 @@ export function ThreadSidebar() {
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === 'files' ? (
-          <FileList />
+        {sidebarTab === 'files' ? (
+          <ProjectFileExplorer
+            channelId={currentSessionId || ''}
+            workingDir={currentSession?.workingDir ?? undefined}
+            selectedPath={selection?.kind === 'local_file' ? selection.path : null}
+            onSelectFile={(path) => {
+              openOutput({ kind: 'local_file', path });
+              setActiveRightTab('canvas');
+            }}
+            onInsertReference={(path) => {
+              copyWithToast(`@${path}`, `Copied @${path} reference`);
+            }}
+          />
         ) : (
-        <AISidebar
-          ariaLabel="Conversations"
-          items={items}
-          activeId={isHome ? null : currentSessionId}
-          onActiveChange={handleActiveChange}
-          defaultExpandedIds={defaultExpandedIds}
-          onMove={handleMove}
-          onRename={handleRename}
-          renderIcon={renderIcon}
-          renderMeta={renderMeta}
-          renderMenu={renderMenu}
-        />
+          <AISidebar
+            ariaLabel="Conversations"
+            items={items}
+            activeId={isHome ? null : currentSessionId}
+            onActiveChange={handleActiveChange}
+            defaultExpandedIds={defaultExpandedIds}
+            onMove={handleMove}
+            onRename={handleRename}
+            renderIcon={renderIcon}
+            renderMeta={renderMeta}
+            renderMenu={renderMenu}
+          />
         )}
       </div>
 

@@ -32,6 +32,7 @@ import { MarkdownContent } from '../chat/markdown-content';
 import { DiffBlock } from '../chat/diff-block';
 import { useSessionMessages } from '../chat/chat-view';
 import { FilePreview } from '../files/file-preview';
+import { LocalFileView } from './local-file-view';
 import { useArtifacts, type OutputSelection } from '@/lib/artifacts-context';
 import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -80,6 +81,7 @@ function sameSelection(a: OutputSelection | null, b: OutputSelection | null): bo
   if (a.kind !== b.kind) return false;
   if (a.kind === 'document' && b.kind === 'document') return a.key === b.key;
   if (a.kind === 'change' && b.kind === 'change') return a.path === b.path;
+  if (a.kind === 'local_file' && b.kind === 'local_file') return a.path === b.path;
   return true;
 }
 
@@ -87,6 +89,7 @@ function selectionKey(s: OutputSelection | null): string {
   if (!s) return 'none';
   if (s.kind === 'document') return `doc:${s.key}:${s.versionId ?? 'latest'}`;
   if (s.kind === 'change') return `change:${s.path}:${s.turnId}`;
+  if (s.kind === 'local_file') return `local:${s.path}`;
   return 'file';
 }
 
@@ -248,6 +251,26 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                 />
               }
             />
+          ) : effective?.kind === 'local_file' && currentSessionId ? (
+            <LocalFileView
+              key={selectionKey(effective)}
+              path={effective.path}
+              channelId={currentSessionId}
+              workingDir={workingDir}
+              header={(actions) => (
+                <PanelHeader
+                  listOpen={listOpen}
+                  onToggleList={toggleList}
+                  isFullscreen={isFullscreen}
+                  onFullscreen={() => setIsFullscreen((v) => !v)}
+                  onPreview={() => setActiveRightTab('preview')}
+                  onKnowledge={() => setActiveRightTab('knowledge')}
+                  onClose={close}
+                  actions={actions}
+                  totalOutputs={totalOutputs}
+                />
+              )}
+            />
           ) : (
             <>
               <PanelHeader
@@ -325,6 +348,15 @@ function OutputsList({
           <button type="button" className={row(active?.kind === 'file')} onClick={onSelectFile}>
             <FileText className="size-3.5 shrink-0" />
             <span className="truncate">{openFileName}</span>
+          </button>
+        </>
+      )}
+      {active?.kind === 'local_file' && (
+        <>
+          <div className={heading}>Project file</div>
+          <button type="button" className={row(true)}>
+            <FileCode className="size-3.5 shrink-0 text-blue-400" />
+            <span className="truncate">{basename(active.path)}</span>
           </button>
         </>
       )}
