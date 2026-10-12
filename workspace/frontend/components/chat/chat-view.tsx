@@ -1581,8 +1581,8 @@ export function ChatView() {
                 </p>
               </div>
 
-              {/* 4 Enterprise Interactive Prompt Inspiration Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full text-left pt-2">
+              {/* Compact Prompt Inspiration Pills */}
+              <div className="flex flex-wrap items-center justify-center gap-2 max-w-xl pt-1">
                 {PROMPT_SUGGESTIONS.map((item, idx) => {
                   const SuggestionIcon = item.icon;
                   return (
@@ -1594,62 +1594,16 @@ export function ChatView() {
                         setFocusKey((k) => k + 1);
                       }}
                       className={cn(
-                        'flex items-start gap-3.5 p-3.5 rounded-2xl text-left cursor-pointer select-none group',
-                        'bg-white/80 dark:bg-surface2/60 backdrop-blur-md hover:bg-white dark:hover:bg-[#202028]',
-                        'border border-black/[0.08] dark:border-white/[0.08] hover:border-black/[0.16] dark:hover:border-white/[0.18]',
-                        'shadow-xs hover:shadow-[0_4px_16px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] hover:-translate-y-0.5',
-                        'transition-all duration-200 active:scale-[0.99]'
+                        'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-left cursor-pointer select-none',
+                        'bg-surface1/80 hover:bg-surface2 border border-border/70 hover:border-border-accent',
+                        'transition-all duration-150 active:scale-[0.98]'
                       )}
                     >
-                      <div className="size-8 rounded-xl bg-surface1/80 dark:bg-white/[0.06] border border-black/[0.05] dark:border-white/[0.08] flex items-center justify-center shrink-0 group-hover:border-primary/30 group-hover:bg-primary/5 transition-colors">
-                        <SuggestionIcon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[13px] font-semibold text-foreground flex items-center justify-between">
-                          <span>{item.title}</span>
-                          <span className="text-3xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-mono">
-                            ↵
-                          </span>
-                        </div>
-                        <div className="text-2xs text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
-                          {item.desc}
-                        </div>
-                      </div>
+                      <SuggestionIcon className="size-3.5 text-foreground-muted shrink-0" />
+                      <span className="text-xs font-medium text-foreground">{item.title}</span>
                     </button>
                   );
                 })}
-              </div>
-
-              {/* Sleek Workspace Navigation Quick Bar */}
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-4 text-2xs text-foreground-extra-muted select-none">
-                <button
-                  type="button"
-                  onClick={() => setViewMode('tasks')}
-                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-                >
-                  <CheckCircle2 className="size-3.5" />
-                  <span>Tasks &amp; Issues</span>
-                </button>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-                  }}
-                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-                >
-                  <Search className="size-3.5" />
-                  <span>Command Palette (Ctrl+K)</span>
-                </button>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={() => openSettings('general')}
-                  className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-                >
-                  <Settings className="size-3.5" />
-                  <span>Settings</span>
-                </button>
               </div>
             </div>
           </div>
