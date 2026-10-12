@@ -329,6 +329,10 @@ func main() { // 服务程序运行主入口函数。
 		v1.POST("/workspaces/:workspace_id/claim", handlers.ClaimWorkspace)
 		v1.POST("/workspaces/:workspace_id/rotate-token", handlers.RotateWorkspaceToken)
 		v1.POST("/system/open-path", handlers.OpenLocalPath)
+
+		// Local Project Filesystem Explorer:
+		v1.GET("/fs/tree", handlers.GetFSTree)
+		v1.GET("/fs/content", handlers.GetFSFileContent)
 	} // 结束路由组作用域。
 
 	// Legacy /health endpoint matching the health checks
