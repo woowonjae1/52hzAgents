@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowUp, Cpu, Eye, Folder, GitBranch, Users, Waypoints, Wrench } from 'lucide-react';
+import { ArrowUp, Eye, Folder, GitBranch, Users, Waypoints, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/hint';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -33,9 +33,8 @@ import type { GitStatus } from '@/lib/use-git-status';
 import type { AgentCatalogEntry, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { FieldLabel, FieldValue, HomePanel } from './home-panel';
-import { NeedsAttentionPanel, RecentSessionsPanel, UpcomingPanel } from './home-sections';
+import { NeedsAttentionPanel, RecentSessionsPanel } from './home-sections';
 import { AgentGrid } from './agent-grid';
-import { OutputPanel } from './output-panel';
 import { AgentDetailPanel, type AgentState } from './agent-detail-panel';
 import { ConnectAgentModal } from '@/components/mission/connect-agent-modal';
 
@@ -321,9 +320,6 @@ export function HomeDashboard() {
         : isRepo === false
           ? 'Shared folder (not a git repo)'
           : 'Own worktree if a git repo';
-  const pickedModels = Object.entries(modelPicks)
-    .filter(([n]) => activeOnlineSelected.includes(n))
-    .map(([n, m]) => `@${n}: ${m.includes('/') ? m.slice(m.indexOf('/') + 1) : m}`);
 
   const headerCounts = [
     `${counts.online} of ${counts.total} ${counts.total === 1 ? 'agent' : 'agents'} online`,
@@ -434,20 +430,17 @@ export function HomeDashboard() {
                     <p className="text-2xs text-muted-foreground">{blockedHint}</p>
                   ) : (
                     <>
-                      <SetupChip icon={<Users />}>{activeOnlineSelected.map((n) => `@${n}`).join(', ')}</SetupChip>
-                      <SetupChip icon={<modeInfo.icon />}>
-                        {modeInfo.label}
-                        {effectiveLead && ` · lead @${effectiveLead}`}
-                      </SetupChip>
-                      <SetupChip icon={<profileInfo.icon />}>
-                        {profileInfo.label}
-                        {profile === 'review' && ' · read-only'}
+                      <SetupChip icon={<Users />}>
+                        {activeOnlineSelected.length > 0
+                          ? activeOnlineSelected.map((n) => `@${n}`).join(', ')
+                          : effectiveParticipants.length > 0
+                            ? effectiveParticipants.map((n) => `@${n}`).join(', ')
+                            : 'No agent'}
                       </SetupChip>
                       <SetupChip icon={<Folder />} warn={mode === 'parallel' && !dir}>
-                        {dir ? basename(dir) : mode === 'parallel' ? 'No folder, no worktrees' : 'No folder, plain chat'}
+                        {dir ? basename(dir) : mode === 'parallel' ? 'No folder' : 'Plain chat'}
                       </SetupChip>
                       {isolation && <SetupChip icon={<GitBranch />}>{isolation}</SetupChip>}
-                      {pickedModels.length > 0 && <SetupChip icon={<Cpu />}>{pickedModels.join(', ')}</SetupChip>}
                       <span className="hidden text-2xs text-foreground-extra-muted @lg:inline">Enter to start</span>
                     </>
                   )}
@@ -506,19 +499,11 @@ export function HomeDashboard() {
               />
             </HomePanel>
 
-            {/* ── What is going on: attention, recent sessions, upcoming ── */}
-            <div className="grid min-w-0 grid-cols-1 gap-4 @2xl:grid-cols-2 @4xl:grid-cols-3">
+            {/* ── What is going on: attention and recent sessions ── */}
+            <div className="grid min-w-0 grid-cols-1 gap-4 @2xl:grid-cols-2">
               <NeedsAttentionPanel onOpenThread={openThread} onOpenAutomations={openAutomations} onOpenInbox={() => setViewMode('inbox')} />
               <RecentSessionsPanel onOpenThread={openThread} onNewSession={() => taskRef.current?.focus()} />
-              <UpcomingPanel
-                className="@2xl:col-span-2 @4xl:col-span-1"
-                onOpenAutomations={openAutomations}
-                onOpenThread={openThread}
-              />
             </div>
-
-            {/* Retrospective, so it sits under what needs doing now; collapsed to a line by default. */}
-            <OutputPanel onOpenThread={openThread} />
           </div>
 
           {/* ── Rail: where, and how ── */}
