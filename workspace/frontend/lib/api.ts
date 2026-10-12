@@ -1,7 +1,7 @@
 import { BaseWorkspaceApi } from './api/base';
 import { WorkspacesApi, mapCustomSkill } from './api/workspaces';
 import { EventsApi } from './api/events';
-import { FilesApi, mapFileResponse } from './api/files';
+import { FilesApi, mapFileResponse, type FSEntry, type FSTreeResponse, type FSContentResponse } from './api/files';
 import { BrowserApi } from './api/browser';
 import { KnowledgeApi } from './api/knowledge';
 import { PlanningApi, parseScheduleDays } from './api/planning';
@@ -11,6 +11,7 @@ import { OrchestrationApi } from './api/orchestration';
 import { ActivityApi } from './api/activity';
 
 export { mapCustomSkill, parseScheduleDays, mapFileResponse };
+export type { FSEntry, FSTreeResponse, FSContentResponse };
 
 function applyMixins(derivedCtor: any, constructors: any[]) {
   constructors.forEach((baseCtor) => {

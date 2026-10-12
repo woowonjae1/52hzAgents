@@ -66,4 +66,50 @@ export class FilesApi extends BaseWorkspaceApi {
   async deleteFile(fileId: string): Promise<void> {
     await this.request<unknown>(`/v1/files/${fileId}`, { method: 'DELETE' });
   }
+
+  async getFSTree(channelId: string, subpath?: string, depth?: number): Promise<FSTreeResponse> {
+    const params = new URLSearchParams({ channel: channelId });
+    if (this.workspaceId) params.set('network', this.workspaceId);
+    if (subpath) params.set('subpath', subpath);
+    if (depth) params.set('depth', String(depth));
+    return this.request<FSTreeResponse>(`/v1/fs/tree?${params.toString()}`);
+  }
+
+  async getFSContent(channelId: string, path: string): Promise<FSContentResponse> {
+    const params = new URLSearchParams({ channel: channelId, path });
+    if (this.workspaceId) params.set('network', this.workspaceId);
+    return this.request<FSContentResponse>(`/v1/fs/content?${params.toString()}`);
+  }
+
+  async openLocalPath(path: string): Promise<void> {
+    await this.request<{ status?: string }>('/v1/system/open-path', {
+      method: 'POST',
+      body: JSON.stringify({ path }),
+    });
+  }
 }
+
+export interface FSEntry {
+  name: string;
+  path: string;
+  is_dir: boolean;
+  size: number;
+  mod_time: string;
+}
+
+export interface FSTreeResponse {
+  root: string;
+  path: string;
+  entries: FSEntry[];
+}
+
+export interface FSContentResponse {
+  path: string;
+  name: string;
+  size: number;
+  mod_time: string;
+  is_binary: boolean;
+  content: string;
+  mime_type: string;
+}
+
