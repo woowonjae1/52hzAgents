@@ -1,7 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowUp, Eye, Folder, GitBranch, Users, Waypoints, Wrench } from 'lucide-react';
+import {
+  ArrowUp,
+  Eye,
+  Folder,
+  FolderOpen,
+  FolderMinus,
+  GitBranch,
+  Users,
+  Waypoints,
+  Wrench,
+  ChevronDown,
+  Plus,
+  Image as ImageIcon,
+  SquareTerminal,
+  Sparkles,
+  Check,
+  AtSign,
+  BookOpen,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/hint';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -9,6 +27,7 @@ import {
   ProjectFolderPicker,
   basename,
   rememberWorkingDir,
+  browseForFolder,
 } from '@/components/chat/project-folder-picker';
 import { ORCHESTRATION_MODES, type OrchestrationMode } from '@/components/chat/orchestration-control';
 import { useLayout } from '@/components/layout/layout-context';
@@ -32,6 +51,21 @@ import { isComposing } from '@/lib/ime';
 import type { GitStatus } from '@/lib/use-git-status';
 import type { AgentCatalogEntry, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import { useAgentCatalog, catalogAsOfflineAgents } from '@/lib/agent-catalog';
+import { composerPillClass } from '@/components/ai-elements/composer-pill';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { AgentAvatar } from '@/components/agents/agent-avatar';
+import { CURATED_SKILLS } from '@/lib/curated-skills';
 import { FieldLabel, FieldValue, HomePanel } from './home-panel';
 import { NeedsAttentionPanel, RecentSessionsPanel } from './home-sections';
 import { AgentGrid } from './agent-grid';
@@ -370,6 +404,39 @@ export function HomeDashboard() {
     );
   };
 
+  const handlePickFolder = async () => {
+    const chosen = await browseForFolder(dir || undefined);
+    if (chosen) {
+      setWorkingDir(chosen);
+      toast.success(`Project folder set to ${basename(chosen)}`);
+    }
+  };
+
+  const handleDetachFolder = () => {
+    setWorkingDir('');
+    toast.success('Project folder detached');
+  };
+
+  const insertTextAtCursor = (textToInsert: string) => {
+    const ta = taskRef.current;
+    const val = task;
+    const start = ta?.selectionStart ?? val.length;
+    const end = ta?.selectionEnd ?? val.length;
+    let prefix = val.slice(0, start);
+    const after = val.slice(end);
+    if (textToInsert.startsWith('@') && prefix.endsWith('@')) prefix = prefix.slice(0, -1);
+    else if (textToInsert.startsWith('/') && prefix.endsWith('/')) prefix = prefix.slice(0, -1);
+    const updated = prefix + textToInsert + after;
+    setTask(updated);
+    requestAnimationFrame(() => {
+      if (ta) {
+        const nextPos = prefix.length + textToInsert.length;
+        ta.setSelectionRange(nextPos, nextPos);
+        ta.focus();
+      }
+    });
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface0">
       <div className={cn('app-header ps-6', !isSidebarOpen && !isMobile && 'ps-14')}>
@@ -383,74 +450,330 @@ export function HomeDashboard() {
         <div className="grid w-full grid-cols-1 items-start gap-4 p-4 sm:p-5 @5xl:grid-cols-[minmax(0,1fr)_320px] @7xl:grid-cols-[minmax(0,1fr)_360px]">
           {/* ── Main: what to do, and who does it ── */}
           <div className="@container flex min-w-0 flex-col gap-4">
-            <section
-              aria-label="New session"
-              className="rounded-xl border border-border bg-card p-3 focus-within:border-border-accent"
-            >
-              <textarea
-                ref={taskRef}
-                autoFocus={!isMobile}
-                value={task}
-                onChange={(e) => setTask(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey && !isComposing(e)) {
-                    e.preventDefault();
-                    void handleStart();
-                  }
-                }}
-                rows={2}
-                aria-label="What should the agents do?"
-                placeholder="What should the agents do?"
-                className="block max-h-48 min-h-[3rem] w-full resize-none bg-transparent px-1 text-sm text-foreground outline-none placeholder:text-muted-foreground"
-              />
-              <div role="group" aria-label="Start from a preset" className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="px-1 text-2xs text-foreground-extra-muted">Start from</span>
-                {PRESETS.map((p) => (
-                  <Hint key={p.id} label={p.hint}>
-                    <button
-                      type="button"
-                      aria-pressed={activePreset?.id === p.id}
-                      onClick={() => applyPreset(p)}
-                      className={cn(
-                        'inline-flex h-6 items-center gap-1 rounded-full border px-2 text-2xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
-                        activePreset?.id === p.id
-                          ? 'border-border-accent bg-surface2 text-foreground'
-                          : 'border-border text-foreground-muted hover:bg-surface2/60 hover:text-foreground',
-                      )}
-                    >
-                      <p.icon className="size-3" />
-                      {p.label}
-                    </button>
-                  </Hint>
-                ))}
+            {/* ── Unified Single-Entry Hero Composer (Claude/ChatGPT Mental Model) ── */}
+            <div className="flex flex-col gap-2">
+              {/* Quick suggestion presets (like Claude/ChatGPT prompt chips) */}
+              <div role="group" aria-label="Start from a preset" className="flex flex-wrap items-center gap-1.5 px-0.5">
+                <span className="text-2xs text-foreground-extra-muted font-medium">Quick presets:</span>
+                {PRESETS.map((p) => {
+                  const isCur = activePreset?.id === p.id;
+                  const Icon = p.icon;
+                  return (
+                    <Hint key={p.id} label={p.hint}>
+                      <button
+                        type="button"
+                        aria-pressed={isCur}
+                        onClick={() => applyPreset(p)}
+                        className={cn(
+                          'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-2xs outline-none transition-all cursor-pointer',
+                          isCur
+                            ? 'border-primary/40 bg-primary/10 text-primary font-medium'
+                            : 'border-border/60 bg-surface2/40 text-foreground-muted hover:bg-surface2 hover:text-foreground',
+                        )}
+                      >
+                        <Icon className="size-3" />
+                        <span>{p.label}</span>
+                      </button>
+                    </Hint>
+                  );
+                })}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 px-1" aria-live="polite">
-                  {blockedHint ? (
-                    <p className="text-2xs text-muted-foreground">{blockedHint}</p>
-                  ) : (
-                    <>
-                      <SetupChip icon={<Users />}>
-                        {activeOnlineSelected.length > 0
-                          ? activeOnlineSelected.map((n) => `@${n}`).join(', ')
-                          : effectiveParticipants.length > 0
-                            ? effectiveParticipants.map((n) => `@${n}`).join(', ')
-                            : 'No agent'}
-                      </SetupChip>
-                      <SetupChip icon={<Folder />} warn={mode === 'parallel' && !dir}>
-                        {dir ? basename(dir) : mode === 'parallel' ? 'No folder' : 'Plain chat'}
-                      </SetupChip>
-                      {isolation && <SetupChip icon={<GitBranch />}>{isolation}</SetupChip>}
-                      <span className="hidden text-2xs text-foreground-extra-muted @lg:inline">Enter to start</span>
-                    </>
-                  )}
+
+              {/* Main Composer Box */}
+              <section
+                aria-label="Composer"
+                className="rounded-2xl border border-border bg-card p-3 shadow-xs focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
+              >
+                <textarea
+                  ref={taskRef}
+                  autoFocus={!isMobile}
+                  value={task}
+                  onChange={(e) => setTask(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !isComposing(e)) {
+                      e.preventDefault();
+                      void handleStart();
+                    }
+                  }}
+                  rows={2}
+                  aria-label="Message 52hzAgents…"
+                  placeholder="Message 52hzAgents… (@ for agents, / for skills)"
+                  className="block max-h-48 min-h-[3.5rem] w-full resize-none bg-transparent px-2 pt-1 text-sm text-foreground leading-6 outline-none placeholder:text-muted-foreground/60 scrollbar-hide"
+                />
+
+                {/* Bottom Control Row - Identical structure & pills to chat-view composer */}
+                <div className="mt-2 flex min-h-8 items-center justify-between gap-1.5 border-t border-border/40 pt-2 flex-nowrap overflow-x-auto scrollbar-hide">
+                  <div className="flex items-center gap-1.5 min-w-0 shrink flex-nowrap overflow-x-auto scrollbar-hide">
+                    {/* 1. Lead / Participants Selector */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(composerPillClass, 'cursor-pointer gap-1.5')}
+                          title="Select lead or assigned agents"
+                        >
+                          <AgentAvatar
+                            name={effectiveLead || (effectiveParticipants[0] ?? 'claude')}
+                            size={14}
+                            className="rounded-full shrink-0"
+                          />
+                          <span className="font-medium truncate max-w-[110px]">
+                            {effectiveLead ? `@${effectiveLead}` : `${effectiveParticipants.length} agents`}
+                          </span>
+                          <ChevronDown className="size-3 opacity-60 shrink-0" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-1.5" align="start">
+                        <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          Assign Lead Agent
+                        </div>
+                        {allAvailableAgents.map((a) => {
+                          const isSel = effectiveLead === a.agentName || (!effectiveLead && effectiveParticipants.includes(a.agentName));
+                          return (
+                            <button
+                              key={a.agentName}
+                              type="button"
+                              onClick={() => {
+                                setLead(a.agentName);
+                                if (!selected.includes(a.agentName)) {
+                                  setAgentSelected(a.agentName, true);
+                                }
+                              }}
+                              className={cn(
+                                'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-left cursor-pointer transition-colors hover:bg-surface2',
+                                isSel && 'bg-surface2 font-medium text-primary',
+                              )}
+                            >
+                              <AgentAvatar name={a.agentName} size={14} className="rounded-full shrink-0" />
+                              <span className="truncate flex-1">{a.agentName}</span>
+                              {isSel && <Check className="size-3.5 text-primary shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </PopoverContent>
+                    </Popover>
+
+                    {/* 2. Collaboration Mode Pill */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(composerPillClass, 'cursor-pointer gap-1.5')}
+                          title="Collaboration Orchestration Mode"
+                        >
+                          <modeInfo.icon className="size-3 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{modeInfo.label}</span>
+                          <ChevronDown className="size-3 opacity-60 shrink-0" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-48 p-1" align="start">
+                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                          Collaboration Mode
+                        </DropdownMenuLabel>
+                        {ORCHESTRATION_MODES.map((m) => {
+                          const isCur = mode === m.value;
+                          const ModeIcon = m.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={m.value}
+                              onClick={() => setMode(m.value)}
+                              className="cursor-pointer gap-2 py-1.5 text-xs"
+                            >
+                              <ModeIcon className="size-3.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-foreground">{m.label}</div>
+                                <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                                  {m.description}
+                                </div>
+                              </div>
+                              {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* 3. Work Mode Pill (Fix / Review) */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className={cn(composerPillClass, 'cursor-pointer gap-1.5')}
+                          title="Agent Permissions / Work Mode"
+                        >
+                          <profileInfo.icon className="size-3 text-muted-foreground shrink-0" />
+                          <span className="font-medium">{profileInfo.label}</span>
+                          <ChevronDown className="size-3 opacity-60 shrink-0" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-52 p-1" align="start">
+                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                          Agent Permissions
+                        </DropdownMenuLabel>
+                        {AGENT_PROFILES.map((p) => {
+                          const isCur = profile === p.id;
+                          const ProfIcon = p.icon;
+                          return (
+                            <DropdownMenuItem
+                              key={p.id}
+                              onClick={() => setProfile(p.id)}
+                              className="cursor-pointer gap-2 py-1.5 text-xs"
+                            >
+                              <ProfIcon className="size-3.5 text-muted-foreground shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-foreground">{p.label}</div>
+                                <div className="text-[10px] text-muted-foreground leading-tight">
+                                  {p.whenToUse}
+                                </div>
+                              </div>
+                              {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                            </DropdownMenuItem>
+                          );
+                        })}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {/* 4. Directory Chip (if chosen) */}
+                    {dir && (
+                      <button
+                        type="button"
+                        onClick={handlePickFolder}
+                        className={cn(composerPillClass, 'cursor-pointer gap-1.5 font-mono text-2xs')}
+                        title={`Working directory: ${dir}`}
+                      >
+                        <Folder className="size-3 text-muted-foreground shrink-0" />
+                        <span className="truncate max-w-[120px]">{basename(dir)}</span>
+                      </button>
+                    )}
+
+                    <span className="h-3.5 w-px bg-border shrink-0 mx-0.5" aria-hidden />
+
+                    {/* 5. Unified + Menu (Identical to Chat Composer) */}
+                    <DropdownMenu>
+                      <Hint label="Add context & extensions (+)">
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              composerPillClass,
+                              'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
+                            )}
+                            aria-label="Add context"
+                          >
+                            <Plus className="size-3.5 shrink-0" />
+                          </button>
+                        </DropdownMenuTrigger>
+                      </Hint>
+                      <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-52 p-1">
+                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          Add Context
+                        </DropdownMenuLabel>
+
+                        {/* Folder */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                            <Folder className="size-4 text-muted-foreground shrink-0" />
+                            <span>Folder</span>
+                            {dir && (
+                              <span className="ms-auto me-1 max-w-[80px] truncate text-[10px] text-muted-foreground font-mono">
+                                {basename(dir)}
+                              </span>
+                            )}
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-56 p-1">
+                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                              Project Workspace
+                            </DropdownMenuLabel>
+                            {dir ? (
+                              <>
+                                <div className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono truncate border-b border-border/40 mb-1">
+                                  {dir}
+                                </div>
+                                <DropdownMenuItem onClick={handlePickFolder} className="cursor-pointer gap-2 text-xs">
+                                  <FolderOpen className="size-3.5 text-muted-foreground" />
+                                  <span>Change Folder…</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleDetachFolder} className="cursor-pointer gap-2 text-xs text-destructive">
+                                  <FolderMinus className="size-3.5" />
+                                  <span>Detach Folder</span>
+                                </DropdownMenuItem>
+                              </>
+                            ) : (
+                              <DropdownMenuItem onClick={handlePickFolder} className="cursor-pointer gap-2 text-xs">
+                                <FolderOpen className="size-3.5 text-muted-foreground" />
+                                <span>Select Working Directory…</span>
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        {/* Mentions */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                            <AtSign className="size-4 text-muted-foreground shrink-0" />
+                            <span>Mentions</span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-60 max-h-72 overflow-y-auto p-1">
+                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                              Agents
+                            </DropdownMenuLabel>
+                            {allAvailableAgents.map((a) => (
+                              <DropdownMenuItem
+                                key={a.agentName}
+                                onClick={() => insertTextAtCursor(`@${a.agentName} `)}
+                                className="cursor-pointer gap-2 py-1.5 text-xs"
+                              >
+                                <AgentAvatar name={a.agentName} size={14} className="rounded-full shrink-0" />
+                                <span className="truncate font-medium">{a.agentName}</span>
+                                {a.role && <span className="ms-auto text-[10px] text-muted-foreground capitalize">{a.role}</span>}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        {/* Actions */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                            <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
+                            <span>Actions</span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-64 max-h-72 overflow-y-auto p-1">
+                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                              Slash Commands & Skills
+                            </DropdownMenuLabel>
+                            {CURATED_SKILLS.map((skill) => (
+                              <DropdownMenuItem
+                                key={skill.trigger}
+                                onClick={() => insertTextAtCursor(`${skill.trigger} `)}
+                                className="cursor-pointer gap-2 py-1.5 text-xs"
+                              >
+                                <Sparkles className="size-3.5 text-primary shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-mono text-xs font-medium text-foreground">{skill.trigger}</div>
+                                  <div className="text-[10px] text-muted-foreground truncate">{skill.description}</div>
+                                </div>
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Right side: High-contrast primary Send / Start button */}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!canStart}
+                    onClick={handleStart}
+                    className="h-8 rounded-full px-3.5 text-xs font-medium gap-1.5 shadow-xs transition-all active:scale-95"
+                  >
+                    <span>{starting ? 'Starting…' : task.trim() ? 'Send' : 'Start'}</span>
+                    <ArrowUp className="size-3.5 stroke-[2.5]" />
+                  </Button>
                 </div>
-                <Button variant="primary" size="sm" disabled={!canStart} onClick={handleStart}>
-                  {starting ? 'Starting…' : task.trim() ? 'Start and send' : 'Start session'}
-                  <ArrowUp className="size-3.5" />
-                </Button>
-              </div>
-            </section>
+              </section>
+            </div>
 
             <HomePanel
               id="home-agents"
@@ -538,38 +861,6 @@ export function HomeDashboard() {
                   Plain chat mode. Agents converse without access to local files.
                 </p>
               )}
-            </HomePanel>
-
-            <HomePanel id="home-mode" title="Collaboration">
-              <SegmentedControl
-                size="sm"
-                className="w-full [&>button]:flex-1"
-                value={mode}
-                onValueChange={setMode}
-                options={ORCHESTRATION_MODES.map((m) => ({
-                  value: m.value,
-                  label: m.label,
-                  icon: m.icon as React.ComponentType<{ className?: string }>,
-                }))}
-              />
-              <p className="mt-2 text-2xs text-muted-foreground">
-                {modeInfo.description}
-                {mode === 'master' &&
-                  (effectiveLead
-                    ? ` Lead: @${effectiveLead}. Switch lead in any agent's panel.`
-                    : ' Tick an online agent below to act as lead.')}
-              </p>
-            </HomePanel>
-
-            <HomePanel id="home-profile" title="Work mode">
-              <SegmentedControl
-                size="sm"
-                className="w-full [&>button]:flex-1"
-                value={profile}
-                onValueChange={setProfile}
-                options={AGENT_PROFILES.map((p) => ({ value: p.id, label: p.label, icon: p.icon }))}
-              />
-              <p className="mt-2 text-2xs text-muted-foreground">{profileInfo.whenToUse}</p>
             </HomePanel>
 
             {/* Takes a neat scrollable height */}
