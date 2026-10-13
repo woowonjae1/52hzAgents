@@ -17,6 +17,17 @@ import {
   ChevronRight,
   FileEdit,
   Info,
+  Plus,
+  Image as ImageIcon,
+  Folder,
+  FolderOpen,
+  FolderMinus,
+  SquareTerminal,
+  Globe,
+  Settings,
+  Wrench,
+  Check,
+  Crown,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -29,11 +40,32 @@ import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catal
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
 import { composerPillClass } from './composer-pill';
-import { OrchestrationControl } from '@/components/chat/orchestration-control';
+import { OrchestrationControl, ORCHESTRATION_MODES } from '@/components/chat/orchestration-control';
 import { AgentProfileControl } from '@/components/chat/agent-profile-control';
 import { ContextHealthIndicator } from '@/components/chat/context-health-indicator';
 import { CURATED_SKILLS, type CuratedSkill } from '@/lib/curated-skills';
 import { workspaceApi } from '@/lib/api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useWorkspace } from '@/lib/workspace-context';
+import { useLayout } from '@/components/layout/layout-context';
+import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
+import {
+  loadThreadProfile,
+  saveThreadProfile,
+  THREAD_PROFILE_EVENT,
+  DEFAULT_PROFILE_ID,
+  type AgentProfileId,
+} from '@/lib/agent-profiles';
 
 export type OrchestrationMode = 'dynamic' | 'master' | 'parallel';
 
@@ -197,6 +229,53 @@ export function PromptComposer({
     agents[0]?.agentName ||
     'claude';
   const [masterDropdownOpen, setMasterDropdownOpen] = React.useState(false);
+
+  const { moveSessionToFolder } = useWorkspace();
+  const { showBrowserPreview, setShowBrowserPreview } = useLayout();
+  const currentFolder = workingDir || session?.workingDir || null;
+  const [browsingFolder, setBrowsingFolder] = React.useState(false);
+
+  const handlePickFolder = React.useCallback(async () => {
+    if (!session || browsingFolder) return;
+    setBrowsingFolder(true);
+    try {
+      const chosen = await browseForFolder(currentFolder ?? undefined);
+      if (chosen) {
+        await moveSessionToFolder(session.sessionId, chosen);
+        toast.success(`Project folder set to ${basename(chosen)}`);
+      }
+    } catch {
+      toast.error('Failed to select project folder');
+    } finally {
+      setBrowsingFolder(false);
+    }
+  }, [session, browsingFolder, currentFolder, moveSessionToFolder]);
+
+  const handleRemoveFolder = React.useCallback(async () => {
+    if (!session) return;
+    try {
+      await moveSessionToFolder(session.sessionId, null);
+      toast.success('Project folder detached');
+    } catch {
+      toast.error('Failed to detach project folder');
+    }
+  }, [session, moveSessionToFolder]);
+
+  const [profileId, setProfileId] = React.useState<AgentProfileId>(() =>
+    session ? loadThreadProfile(session.sessionId) ?? DEFAULT_PROFILE_ID : DEFAULT_PROFILE_ID
+  );
+  React.useEffect(() => {
+    if (!session) return;
+    setProfileId(loadThreadProfile(session.sessionId) ?? DEFAULT_PROFILE_ID);
+    const onProfileChange = (e: Event) => {
+      const detail = (e as CustomEvent<{ sessionId: string; id: AgentProfileId }>).detail;
+      if (detail?.sessionId === session.sessionId) {
+        setProfileId(detail.id);
+      }
+    };
+    window.addEventListener(THREAD_PROFILE_EVENT, onProfileChange);
+    return () => window.removeEventListener(THREAD_PROFILE_EVENT, onProfileChange);
+  }, [session]);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
@@ -497,6 +576,14 @@ export function PromptComposer({
     return list;
   }, [customSkills]);
 
+  const mentionAgentList = React.useMemo(() => {
+    return mentionItems.filter((item): item is AgentMentionItem => item.type === 'agent');
+  }, [mentionItems]);
+
+  const mentionKnowledgeList = React.useMemo(() => {
+    return mentionItems.filter((item): item is KnowledgeMentionItem => item.type === 'knowledge');
+  }, [mentionItems]);
+
   /*
     `/` offers skills and knowledge docs. `@` offers agents and knowledge docs.
   */
@@ -589,6 +676,40 @@ export function PromptComposer({
       }
     });
   };
+
+  const insertTextAtCursor = React.useCallback(
+    (textToInsert: string) => {
+      const ta = textareaRef.current;
+      const val = message;
+      const start = ta?.selectionStart ?? val.length;
+      const end = ta?.selectionEnd ?? val.length;
+
+      const before = val.slice(0, start);
+      const after = val.slice(end);
+      let prefix = before;
+      if (textToInsert.startsWith('@') && prefix.endsWith('@')) {
+        prefix = prefix.slice(0, -1);
+      } else if (textToInsert.startsWith('/') && prefix.endsWith('/')) {
+        prefix = prefix.slice(0, -1);
+      }
+
+      const updated = prefix + textToInsert + after;
+      setMessage(updated);
+      onDraftChange?.(updated);
+      setShowMentions(false);
+      setMentionFilter('');
+
+      requestAnimationFrame(() => {
+        if (ta) {
+          const nextPos = prefix.length + textToInsert.length;
+          ta.setSelectionRange(nextPos, nextPos);
+          ta.focus();
+          resizeTextarea();
+        }
+      });
+    },
+    [message, onDraftChange, resizeTextarea],
+  );
 
   const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -1205,69 +1326,292 @@ export function PromptComposer({
             */}
 
 
-            <Hint label="Mention an agent (@)">
-              <button
-                type="button"
-                onClick={() => {
-                  if (showMentions && mentionTrigger === '@') {
-                    setShowMentions(false);
-                  } else {
-                    setMentionTrigger('@');
-                    setMentionFilter('');
-                    setShowMentions(true);
-                    setMentionIndex(0);
-                    textareaRef.current?.focus();
-                  }
-                }}
-                className={cn(
-                  pillButton,
-                  'size-7 px-0 justify-center font-mono font-bold text-xs text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
-                  showMentions && mentionTrigger === '@' && 'bg-surface3 text-primary font-bold border border-primary/30',
-                )}
-                aria-label="Mention agent"
-              >
-                @
-              </button>
-            </Hint>
+            <DropdownMenu>
+              <Hint label="Add context & extensions (+)">
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      pillButton,
+                      'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95 data-[state=open]:bg-surface3 data-[state=open]:text-foreground',
+                      pendingFiles.length > 0 && 'bg-surface3 text-primary border border-primary/30',
+                    )}
+                    aria-label="Add context"
+                  >
+                    <Plus className="size-3.5 shrink-0" />
+                  </button>
+                </DropdownMenuTrigger>
+              </Hint>
+              <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-52 p-1">
+                <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Add Context
+                </DropdownMenuLabel>
 
-            <Hint label="Browse skills & slash commands (/)">
-              <button
-                type="button"
-                onClick={() => {
-                  if (showMentions && mentionTrigger === '/') {
-                    setShowMentions(false);
-                  } else {
-                    setMentionTrigger('/');
-                    setMentionFilter('');
-                    setShowMentions(true);
-                    setMentionIndex(0);
-                    textareaRef.current?.focus();
-                  }
-                }}
-                className={cn(
-                  pillButton,
-                  'size-7 px-0 justify-center font-mono font-bold text-xs text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
-                  showMentions && mentionTrigger === '/' && 'bg-surface3 text-primary font-bold border border-primary/30',
-                )}
-                aria-label="Slash commands"
-              >
-                /
-              </button>
-            </Hint>
+                {/* Media */}
+                <DropdownMenuItem
+                  onClick={() => fileInputRef.current?.click()}
+                  className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
+                >
+                  <ImageIcon className="size-4 text-muted-foreground shrink-0" />
+                  <span>Media</span>
+                  {pendingFiles.length > 0 && (
+                    <span className="ms-auto text-[10px] bg-primary/10 text-primary font-medium px-1.5 py-0.5 rounded-full">
+                      {pendingFiles.length}
+                    </span>
+                  )}
+                </DropdownMenuItem>
 
-            <Hint label="Attach files or images">
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className={cn(
-                  pillButton,
-                  'size-7 px-0 justify-center',
-                  pendingFiles.length > 0 && 'bg-surface3 text-foreground font-medium border border-border'
-                )}
-              >
-                <Paperclip className="size-3.5 shrink-0 text-foreground-extra-muted" />
-              </button>
-            </Hint>
+                {/* Folder */}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                    <Folder className="size-4 text-muted-foreground shrink-0" />
+                    <span>Folder</span>
+                    {currentFolder && (
+                      <span className="ms-auto me-1 max-w-[80px] truncate text-[10px] text-muted-foreground font-mono">
+                        {basename(currentFolder)}
+                      </span>
+                    )}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-56 p-1">
+                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                      Project Workspace
+                    </DropdownMenuLabel>
+                    {currentFolder ? (
+                      <>
+                        <div className="px-2 py-1.5 text-[11px] text-muted-foreground font-mono truncate border-b border-border/40 mb-1">
+                          {currentFolder}
+                        </div>
+                        <DropdownMenuItem
+                          onClick={handlePickFolder}
+                          className="cursor-pointer gap-2 text-xs"
+                        >
+                          <FolderOpen className="size-3.5 text-muted-foreground" />
+                          <span>Change Folder…</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleRemoveFolder}
+                          className="cursor-pointer gap-2 text-xs text-destructive focus:text-destructive"
+                        >
+                          <FolderMinus className="size-3.5" />
+                          <span>Detach Folder</span>
+                        </DropdownMenuItem>
+                      </>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={handlePickFolder}
+                        className="cursor-pointer gap-2 text-xs"
+                      >
+                        <FolderOpen className="size-3.5 text-muted-foreground" />
+                        <span>Select Working Directory…</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                {/* Mentions */}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                    <AtSign className="size-4 text-muted-foreground shrink-0" />
+                    <span>Mentions</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-60 max-h-72 overflow-y-auto p-1">
+                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                      Agents
+                    </DropdownMenuLabel>
+                    {mentionAgentList.length === 0 ? (
+                      <div className="px-2 py-2 text-xs text-muted-foreground text-center">
+                        No agents available
+                      </div>
+                    ) : (
+                      mentionAgentList.map((item) => (
+                        <DropdownMenuItem
+                          key={item.name}
+                          onClick={() => insertTextAtCursor(`@${item.name} `)}
+                          className="cursor-pointer gap-2 py-1.5 text-xs"
+                        >
+                          <div className="relative shrink-0">
+                            <AgentAvatar name={item.name} className="size-4" />
+                            <span
+                              className={cn(
+                                'absolute -bottom-0.5 -end-0.5 size-1.5 rounded-full ring-1 ring-surface',
+                                item.isOnline ? 'bg-emerald-500' : 'bg-muted-foreground/40',
+                              )}
+                            />
+                          </div>
+                          <span className="truncate font-medium">{item.name}</span>
+                          {item.agent.role && (
+                            <span className="ms-auto text-[10px] text-muted-foreground capitalize">
+                              {item.agent.role}
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                      ))
+                    )}
+
+                    {mentionKnowledgeList.length > 0 && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                          Knowledge
+                        </DropdownMenuLabel>
+                        {mentionKnowledgeList.map((k) => (
+                          <DropdownMenuItem
+                            key={k.name}
+                            onClick={() => insertTextAtCursor(`@${k.name} `)}
+                            className="cursor-pointer gap-2 py-1.5 text-xs"
+                          >
+                            <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate font-medium">{k.knowledge.title || k.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                {/* Actions */}
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                    <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
+                    <span>Actions</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-64 max-h-72 overflow-y-auto p-1">
+                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                      Slash Commands & Skills
+                    </DropdownMenuLabel>
+                    {skillList.map((skill) => (
+                      <DropdownMenuItem
+                        key={skill.trigger}
+                        onClick={() => insertTextAtCursor(`${skill.trigger} `)}
+                        className="cursor-pointer gap-2 py-1.5 text-xs"
+                      >
+                        <Sparkles className="size-3.5 text-primary shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-xs font-medium text-foreground">{skill.trigger}</div>
+                          <div className="text-[10px] text-muted-foreground truncate">{skill.description}</div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                {/* Browser */}
+                <DropdownMenuItem
+                  onClick={() => setShowBrowserPreview(!showBrowserPreview)}
+                  className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
+                >
+                  <Globe className="size-4 text-muted-foreground shrink-0" />
+                  <span>Browser</span>
+                  {showBrowserPreview && <Check className="ms-auto size-3.5 text-primary" />}
+                </DropdownMenuItem>
+
+                {/* Settings */}
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                    <Settings className="size-4 text-muted-foreground shrink-0" />
+                    <span>Settings</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-56 p-1">
+                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                      Thread Settings
+                    </DropdownMenuLabel>
+
+                    {session && onOrchestrationChange && (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="cursor-pointer gap-2 py-1.5 text-xs">
+                          <Waypoints className="size-3.5 text-muted-foreground shrink-0" />
+                          <span>Collaboration</span>
+                          <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
+                            {session.orchestrationMode ?? 'dynamic'}
+                          </span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-48 p-1">
+                          <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                            Orchestration Mode
+                          </DropdownMenuLabel>
+                          {ORCHESTRATION_MODES.map((m) => {
+                            const isCur = (session.orchestrationMode ?? 'dynamic') === m.value;
+                            const ModeIcon = m.icon;
+                            return (
+                              <DropdownMenuItem
+                                key={m.value}
+                                onClick={() => onOrchestrationChange({ mode: m.value })}
+                                className="cursor-pointer gap-2 py-1.5 text-xs"
+                              >
+                                <ModeIcon className="size-3.5 text-muted-foreground shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-foreground">{m.label}</div>
+                                  <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                                    {m.description}
+                                  </div>
+                                </div>
+                                {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    )}
+
+                    {session && (
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger className="cursor-pointer gap-2 py-1.5 text-xs">
+                          <Wrench className="size-3.5 text-muted-foreground shrink-0" />
+                          <span>Work Mode</span>
+                          <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
+                            {profileId === 'review' ? 'Review' : 'Fix'}
+                          </span>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-52 p-1">
+                          <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                            Agent Permissions
+                          </DropdownMenuLabel>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setProfileId('fix');
+                              saveThreadProfile(session.sessionId, 'fix');
+                            }}
+                            className="cursor-pointer gap-2 py-1.5 text-xs"
+                          >
+                            <Wrench className="size-3.5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-foreground">Edit (Fix)</div>
+                              <div className="text-[10px] text-muted-foreground">Agents can modify files</div>
+                            </div>
+                            {profileId !== 'review' && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setProfileId('review');
+                              saveThreadProfile(session.sessionId, 'review');
+                            }}
+                            className="cursor-pointer gap-2 py-1.5 text-xs"
+                          >
+                            <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-foreground">Read-only (Review)</div>
+                              <div className="text-[10px] text-muted-foreground">Agents cannot edit files</div>
+                            </div>
+                            {profileId === 'review' && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    )}
+
+                    {onCreateRoutine && (
+                      <DropdownMenuItem
+                        onClick={onCreateRoutine}
+                        className="cursor-pointer gap-2 py-1.5 text-xs"
+                      >
+                        <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
+                        <span>Create Routine…</span>
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <input
               ref={fileInputRef}
               type="file"
