@@ -44,7 +44,7 @@ function IdentityGate({ children }: { children: React.ReactNode }) {
 export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const { user, idToken, loading: authLoading, isOpenAgentsDomain, signIn } = useOpenAgentsAuth();
+  const { user, idToken, loading: authLoading, isOpenAgentsDomain, isAuthConfigured, signIn } = useOpenAgentsAuth();
 
   useEffect(() => {
     if (token) {
@@ -87,7 +87,7 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   }
 
   // No token — check if user is logged in via OpenAgents
-  if (isOpenAgentsDomain) {
+  if (isOpenAgentsDomain && isAuthConfigured) {
     if (authLoading) {
       return <WorkspaceLoadingSplash />;
     }

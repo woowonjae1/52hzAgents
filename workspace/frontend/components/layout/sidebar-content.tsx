@@ -13,18 +13,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useLayout } from './layout-context';
 import { cn } from '@/lib/utils';
 import { useOpenAgentsAuth } from '@/lib/openagents-auth-context';
+import { useIsDesktop } from '@/lib/desktop';
 import { ThreadSidebar } from '@/components/threads/thread-sidebar';
 
 export function SidebarContent() {
   const { viewMode, openSettings } = useLayout();
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const { user, isOpenAgentsDomain, signIn, signOut } = useOpenAgentsAuth();
+  const isDesktop = useIsDesktop();
+  const { user, isOpenAgentsDomain, isAuthConfigured, signIn, signOut } = useOpenAgentsAuth();
 
   useEffect(() => { setMounted(true); }, []);
 
   const isDark = mounted && resolvedTheme === 'dark';
-
+  const showAuthRow = !isDesktop && isOpenAgentsDomain && isAuthConfigured;
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-surface0">
@@ -33,8 +35,8 @@ export function SidebarContent() {
         <ThreadSidebar />
       </div>
 
-      {/* Account row if on openagents domain */}
-      {isOpenAgentsDomain && user && (
+      {/* Account row if on configured openagents domain in web mode */}
+      {showAuthRow && user && (
         <div className="shrink-0 px-3.5 py-1.5 bg-surface1/60 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <div className="size-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-3xs font-medium shrink-0">
@@ -42,7 +44,7 @@ export function SidebarContent() {
             </div>
             <span className="text-2xs text-muted-foreground truncate flex-1">{user.email}</span>
             <Hint label="Sign out">
-            <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors">
+              <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
                 <LogOut className="size-3" />
               </button>
             </Hint>
@@ -50,11 +52,11 @@ export function SidebarContent() {
         </div>
       )}
 
-      {isOpenAgentsDomain && !user && (
+      {showAuthRow && !user && (
         <div className="shrink-0 px-3.5 py-1.5 bg-surface1/60 backdrop-blur-md">
           <button
             onClick={signIn}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
             <LogIn className="size-3" />
             <span>Sign in</span>

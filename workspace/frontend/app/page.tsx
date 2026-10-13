@@ -734,9 +734,9 @@ export default function HomePage() {
     return <ShareClient params={Promise.resolve({ token: routeInfo.token })} />;
   }
 
-  // Bypass landing page and dashboard redirect chain on local/custom domains (desktop app, self-host).
+  // Bypass landing page and dashboard redirect chain on local/custom domains or when auth is unconfigured (desktop app, self-host).
   // Immediately render WorkspaceContent for instant 0-redirect load.
-  if (!openAgentsAuth.isOpenAgentsDomain) {
+  if (!openAgentsAuth.isOpenAgentsDomain || !openAgentsAuth.isAuthConfigured) {
     return (
       <Suspense fallback={<WorkspaceLoadingSplash />}>
         <WorkspaceContent workspaceId={routeInfo.slug} />

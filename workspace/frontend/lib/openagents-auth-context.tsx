@@ -14,11 +14,13 @@ interface OpenAgentsAuthContextValue {
   idToken: string | null;
   loading: boolean;
   isOpenAgentsDomain: boolean;
+  isAuthConfigured: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const OPENAGENTS_HOSTNAMES = ['workspace.openagents.org'];
+const isAuthConfigured = Boolean(process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
 
 const OpenAgentsAuthContext = createContext<OpenAgentsAuthContextValue | null>(null);
 
@@ -39,7 +41,7 @@ export function OpenAgentsAuthProvider({ children }: { children: React.ReactNode
     const isDomain = OPENAGENTS_HOSTNAMES.includes(hostname);
     setIsOpenAgentsDomain(isDomain);
 
-    if (!isDomain) {
+    if (!isDomain || !isAuthConfigured) {
       setLoading(false);
       return;
     }
@@ -93,7 +95,7 @@ export function OpenAgentsAuthProvider({ children }: { children: React.ReactNode
   }, []);
 
   return (
-    <OpenAgentsAuthContext.Provider value={{ user, idToken, loading, isOpenAgentsDomain, signIn, signOut }}>
+    <OpenAgentsAuthContext.Provider value={{ user, idToken, loading, isOpenAgentsDomain, isAuthConfigured, signIn, signOut }}>
       {children}
     </OpenAgentsAuthContext.Provider>
   );
