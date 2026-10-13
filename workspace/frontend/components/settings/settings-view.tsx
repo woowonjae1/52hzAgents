@@ -51,7 +51,6 @@ import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { useMarkColor } from '@/hooks/use-mark-color';
 import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
-import { SkillsView } from '@/components/skills/skills-view';
 import { RouterProviderSettings } from './router-provider-settings';
 import { WorkProfilesSettings } from './work-profiles-settings';
 import { SavedWorkflowsSettings } from './saved-workflows-settings';
@@ -84,7 +83,6 @@ export function SettingsView() {
     { id: 'agents', label: 'Manage Agents', icon: Users },
     { id: 'panels', label: 'Panels & Display', icon: PanelRight },
     { id: 'export', label: 'Export & Share', icon: Download },
-    { id: 'skills', label: 'Skills Hub', icon: Sparkles },
   ];
 
   /*
@@ -110,9 +108,6 @@ export function SettingsView() {
     agents: 'agent connect invite remove model provider api key online offline participant',
     panels: 'panel sidebar studio layout display split browser preview width',
     export: 'export markdown share download backup transcript',
-    skills: 'skill install uninstall marketplace package plugin',
-    knowledge: 'knowledge document note entry import citation',
-    routines: 'routine schedule cron timer recurring automation trigger',
   };
 
   const visibleNavItems = (() => {
@@ -366,7 +361,6 @@ export function SettingsView() {
 
         {/* Settings Content Area */}
         <div className="flex-1 min-w-0 h-full overflow-y-auto bg-surface0">
-          {settingsTab === 'skills' && <SkillsView />}
           {/* "Scheduled Tasks" moved to Tasks › Schedules, which already listed
               every routine and timer — the same schedules were editable here
               too. Anything that asks for it lands there via resolveView. */}

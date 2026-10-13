@@ -87,8 +87,7 @@ export function ThreadSidebar() {
 
   const isKnowledgeActive =
     (viewMode === 'threads' && activeRightTab === 'knowledge') ||
-    viewMode === 'knowledge' ||
-    (viewMode === 'settings' && settingsTab === 'knowledge');
+    viewMode === 'knowledge';
 
   const handleToggleKnowledge = React.useCallback(() => {
     if (currentSessionId) {
@@ -103,7 +102,7 @@ export function ThreadSidebar() {
     }
   }, [currentSessionId, viewMode, activeRightTab, setViewMode, setActiveRightTab]);
 
-  const isSkillsActive = viewMode === 'skills' || (viewMode === 'settings' && settingsTab === 'skills');
+  const isSkillsActive = viewMode === 'skills';
 
   const handleToggleSkills = React.useCallback(() => {
     setViewMode(viewMode === 'skills' ? (currentSessionId ? 'threads' : 'home') : 'skills');

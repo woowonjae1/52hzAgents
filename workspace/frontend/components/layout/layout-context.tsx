@@ -21,7 +21,7 @@ import {
 
 export type ViewMode = 'home' | 'mission' | 'threads' | 'files' | 'knowledge' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
 
-export type SettingsTab = 'general' | 'agents' | 'panels' | 'export' | 'skills' | 'knowledge';
+export type SettingsTab = 'general' | 'agents' | 'panels' | 'export';
 
 export type TasksTab = 'tasks' | 'schedules' | 'runs';
 
@@ -199,7 +199,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [settingsTab, setSettingsTabState] = useState<SettingsTab>(() => {
     const saved = readLayout().settingsTab as string | undefined;
     // 'routines' was a Settings section; it lives in Tasks › Schedules now.
-    return saved && saved !== 'routines' ? (saved as SettingsTab) : 'general';
+    return saved && saved !== 'routines' && saved !== 'skills' && saved !== 'knowledge' ? (saved as SettingsTab) : 'general';
   });
   const [tasksTab, setTasksTab] = useState<TasksTab>(
     () => resolveView(readLayout().viewMode ?? 'home').tasksTab ?? 'tasks',
