@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, FolderTree, Star, Archive, Trash2, MessageSquare, Loader2, Plus, FileText, BookOpen, CircleCheck, Users, Sparkles, X } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, BookOpen, CircleCheck, Sparkles, X, Home } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -579,25 +579,8 @@ export function ThreadSidebar() {
               setViewMode('home');
             }}
           >
-            <Users className="size-4 shrink-0" />
-            Agents
-          </button>
-          {/*
-            Project Files Explorer: toggles the project file tree in the sidebar
-            without leaving the active conversation view.
-          */}
-          <button
-            type="button"
-            className={cn(NAV_ROW_CLASS, (sidebarTab === 'files' || viewMode === 'files') && NAV_ROW_ACTIVE)}
-            onClick={() => {
-              if (viewMode !== 'threads') {
-                setViewMode('threads');
-              }
-              setSidebarTab((tab) => (tab === 'files' ? 'threads' : 'files'));
-            }}
-          >
-            <FolderTree className="size-4 shrink-0" />
-            Files
+            <Home className="size-4 shrink-0" />
+            Home
           </button>
           <button
             type="button"
@@ -650,7 +633,10 @@ export function ThreadSidebar() {
           </button>
           <button
             type="button"
-            onClick={() => setSidebarTab('files')}
+            onClick={() => {
+              if (viewMode !== 'threads') setViewMode('threads');
+              setSidebarTab('files');
+            }}
             className={cn(
               'px-2 py-0.5 rounded-md text-2xs font-medium transition-all cursor-pointer flex items-center gap-1',
               sidebarTab === 'files'
