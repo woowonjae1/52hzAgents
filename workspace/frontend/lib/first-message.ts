@@ -14,9 +14,22 @@ export interface FirstMessageRequest {
   text: string;
 }
 
+const pendingFirstMessages = new Map<string, string>();
+
 export function sendFirstMessage(sessionId: string, text: string): void {
   if (typeof window === 'undefined' || !text.trim()) return;
+  const trimmed = text.trim();
+  pendingFirstMessages.set(sessionId, trimmed);
   window.dispatchEvent(
-    new CustomEvent<FirstMessageRequest>(SEND_FIRST_MESSAGE_EVENT, { detail: { sessionId, text } }),
+    new CustomEvent<FirstMessageRequest>(SEND_FIRST_MESSAGE_EVENT, { detail: { sessionId, text: trimmed } }),
   );
+}
+
+export function consumePendingFirstMessage(sessionId: string): string | null {
+  const msg = pendingFirstMessages.get(sessionId);
+  if (msg) {
+    pendingFirstMessages.delete(sessionId);
+    return msg;
+  }
+  return null;
 }

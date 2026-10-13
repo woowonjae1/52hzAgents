@@ -299,8 +299,6 @@ export function HomeDashboard() {
     // The view switches in the same flush that opens the draft, so the chat is
     // visible when ChatView's "new session -> focus the composer" effect runs.
     // Home unmounts on that render; everything below is writes, not state.
-    setViewMode('threads');
-    if (isMobile) openMobileDetail();
     try {
       const session = await createSession({
         participants: effectiveParticipants,
@@ -327,6 +325,8 @@ export function HomeDashboard() {
       // Last, after the profile and models are stored under the draft id, so
       // the first message carries them.
       if (text) sendFirstMessage(id, text);
+      setViewMode('threads');
+      if (isMobile) openMobileDetail();
     } catch (e) {
       setViewMode('home');
       toast.error(e instanceof Error ? e.message : 'Could not start the session');

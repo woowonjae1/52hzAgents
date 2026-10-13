@@ -56,7 +56,7 @@ import {
 } from './transcript-filter';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
-import { SEND_FIRST_MESSAGE_EVENT, type FirstMessageRequest } from '@/lib/first-message';
+import { SEND_FIRST_MESSAGE_EVENT, consumePendingFirstMessage, type FirstMessageRequest } from '@/lib/first-message';
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 import { AgentQuotaCapsule } from './agent-quota-capsule';
@@ -893,14 +893,7 @@ export function ChatView() {
       // (with the agents, leader, mode and folder picked on the draft) and
       // send into that. Everything below uses the real id.
       let sessionId = currentSessionId;
-      if (isDraftSessionId(sessionId)) {
-        try {
-          sessionId = await materializeDraft(sessionId);
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : 'Could not start the conversation');
-          return;
-        }
-      }
+      const draftId = isDraftSessionId(sessionId) ? sessionId : null;
 
       // Create optimistic messages for instant feedback
       const timestamp = Date.now();
@@ -945,7 +938,7 @@ export function ChatView() {
         metadata: { _userContent: userContent },
       };
 
-      // Add optimistic messages immediately and scroll to bottom
+      // Add optimistic messages immediately and scroll to bottom so the UI transitions instantly without blank flash
       setOptimisticMessages((prev) => [
         ...prev.filter((m) => !(m.sessionId === sessionId && m.messageId.startsWith('optimistic-loading-'))),
         userOptimisticMsg,
@@ -955,6 +948,23 @@ export function ChatView() {
       recordUserMessageSent(sessionId);
       setSessionActive(sessionId, true);
       setScrollKey((k) => k + 1);
+
+      // Materialize draft channel in background while optimistic message is already shown
+      if (draftId) {
+        try {
+          sessionId = await materializeDraft(draftId);
+          setOptimisticMessages((prev) =>
+            prev.map((m) => (m.sessionId === draftId ? { ...m, sessionId } : m))
+          );
+          updateLastMessage(sessionId, currentUser.name, content || 'Sent an attachment', false);
+          recordUserMessageSent(sessionId);
+          setSessionActive(sessionId, true);
+        } catch (err) {
+          setOptimisticMessages((prev) => prev.filter((m) => m.sessionId !== draftId));
+          toast.error(err instanceof Error ? err.message : 'Could not start the conversation');
+          return;
+        }
+      }
 
       try {
         // Upload files first, then send message with attachment metadata
@@ -1104,11 +1114,24 @@ export function ChatView() {
   // Home's task box: "start the session and send this". See lib/first-message.
   const handleSendRef = useRef(handleSend);
   handleSendRef.current = handleSend;
+
+  // Consume any pending first message queued for this session immediately upon mount / session change
+  useEffect(() => {
+    if (!currentSessionId) return;
+    const pending = consumePendingFirstMessage(currentSessionId);
+    if (pending) {
+      void handleSendRef.current(pending);
+    }
+  }, [currentSessionId]);
+
   useEffect(() => {
     const onRequest = (e: Event) => {
       const detail = (e as CustomEvent<FirstMessageRequest>).detail;
-      if (!detail || detail.sessionId !== currentSessionIdRef.current) return;
-      void handleSendRef.current(detail.text.trim());
+      if (!detail) return;
+      if (detail.sessionId === currentSessionIdRef.current) {
+        consumePendingFirstMessage(detail.sessionId);
+        void handleSendRef.current(detail.text.trim());
+      }
     };
     window.addEventListener(SEND_FIRST_MESSAGE_EVENT, onRequest);
     return () => window.removeEventListener(SEND_FIRST_MESSAGE_EVENT, onRequest);
