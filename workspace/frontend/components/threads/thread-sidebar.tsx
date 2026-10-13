@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Hint } from '@/components/ui/hint';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { usePendingToolApprovals } from '@/components/home/use-home-attention';
+import { AllThreadsModal } from './all-threads-modal';
 
 /*
   THE SIDEBAR, AS beUI DRAWS IT.
@@ -216,6 +217,27 @@ export function ThreadSidebar() {
     [sessions, currentSessionId, lastMessageBySession]
   );
 
+  const [allThreadsModalOpen, setAllThreadsModalOpen] = React.useState(false);
+  const RECENT_LIMIT = 10;
+  const isSearchActive = Boolean(query.trim());
+
+  // Sorted by most recent update time
+  const sortedActive = React.useMemo(
+    () => [...active].sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0)),
+    [active]
+  );
+
+  // Visible in sidebar: up to RECENT_LIMIT recent sessions, plus currentSessionId if open, or all if searching
+  const visibleSessions = React.useMemo(() => {
+    if (isSearchActive) return sortedActive;
+    const recent = sortedActive.slice(0, RECENT_LIMIT);
+    if (currentSessionId && !recent.some((s) => s.sessionId === currentSessionId)) {
+      const cur = sortedActive.find((s) => s.sessionId === currentSessionId);
+      if (cur) recent.push(cur);
+    }
+    return recent;
+  }, [sortedActive, isSearchActive, currentSessionId]);
+
   // id -> session, so the callbacks below never scan the list again.
   const byId = React.useMemo(
     () => new Map(active.map((s) => [s.sessionId, s])),
@@ -226,7 +248,7 @@ export function ThreadSidebar() {
     const needle = query.trim().toLowerCase();
     const groups = new Map<string, { dir: string | null; children: SidebarResource[] }>();
 
-    for (const session of active) {
+    for (const session of visibleSessions) {
       const label = getSmartSessionTitle(session, lastMessageBySession[session.sessionId]);
       if (needle && !label.toLowerCase().includes(needle)) continue;
 
@@ -246,7 +268,7 @@ export function ThreadSidebar() {
       kind: 'folder' as const,
       children: group.children,
     }));
-  }, [active, lastMessageBySession, query]);
+  }, [visibleSessions, lastMessageBySession, query]);
 
   const defaultExpandedIds = React.useMemo(() => items.map((i) => i.id), [items]);
 
@@ -746,20 +768,45 @@ export function ThreadSidebar() {
             }}
           />
         ) : (
-          <AISidebar
-            ariaLabel="Conversations"
-            items={items}
-            activeId={isHome ? null : currentSessionId}
-            onActiveChange={handleActiveChange}
-            defaultExpandedIds={defaultExpandedIds}
-            onMove={handleMove}
-            onRename={handleRename}
-            renderIcon={renderIcon}
-            renderMeta={renderMeta}
-            renderMenu={renderMenu}
-          />
+          <>
+            <AISidebar
+              ariaLabel="Conversations"
+              items={items}
+              activeId={isHome ? null : currentSessionId}
+              onActiveChange={handleActiveChange}
+              defaultExpandedIds={defaultExpandedIds}
+              onMove={handleMove}
+              onRename={handleRename}
+              renderIcon={renderIcon}
+              renderMeta={renderMeta}
+              renderMenu={renderMenu}
+            />
+            {!isSearchActive && sortedActive.length > RECENT_LIMIT && (
+              <div className="p-2 border-t border-border/30">
+                <button
+                  type="button"
+                  onClick={() => setAllThreadsModalOpen(true)}
+                  className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                >
+                  <span className="font-medium">All conversations ({sortedActive.length})</span>
+                  <span className="text-2xs font-mono opacity-60">View all →</span>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      <AllThreadsModal
+        open={allThreadsModalOpen}
+        onOpenChange={setAllThreadsModalOpen}
+        sessions={sessions}
+        agents={agents}
+        lastMessageBySession={lastMessageBySession}
+        currentSessionId={currentSessionId}
+        onSelectSession={handleActiveChange}
+        onToggleStar={(id, starred) => void updateSession(id, { starred })}
+      />
 
       <ConfirmDialog
         open={Boolean(deleteTarget)}
