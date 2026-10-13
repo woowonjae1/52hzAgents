@@ -572,7 +572,7 @@ export function ThreadSidebar() {
         <NavSection label="Workspace">
           <button
             type="button"
-            className={cn(NAV_ROW_CLASS, (isHome || viewMode === 'mission') && NAV_ROW_ACTIVE)}
+            className={cn(NAV_ROW_CLASS, isHome && NAV_ROW_ACTIVE)}
             onClick={() => {
               setCurrentSessionId(null);
               setViewMode('home');

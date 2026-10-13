@@ -243,7 +243,7 @@ export function CommandPalette() {
         title: 'Connect Agents',
         subtitle: 'Add CLI agents (Claude Code, OpenClaw, Pi, etc.)',
         icon: <Radio className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('connect'),
+        action: () => openSettings('agents'),
       },
       {
         id: 'nav-settings',

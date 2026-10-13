@@ -29,7 +29,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, Filter, ListTree, ListChecks, MessageSquare, MessageSquarePlus, CalendarClock, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, CheckCircle2, Copy } from 'lucide-react';
+import { Download, Filter, ListTree, ListChecks, MessageSquare, MessageSquarePlus, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, CheckCircle2, Copy } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
 
 import { ParallelBatchPanel } from './parallel-batch-panel';
@@ -1147,78 +1147,64 @@ export function ChatView() {
   const hasStatusMessages = displayMessages.some((m) => m.messageType === 'status' || m.messageType === 'thinking');
 
   if (!currentSessionId) {
-    const isRoutinesView = viewMode === 'routines';
     return (
       <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
         {/* Empty state header providing window drag region and sidebar toggle */}
         <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
           <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
-
             <span className="text-xs font-medium text-foreground-extra-muted">
-              {isRoutinesView ? 'Routines' : 'Messages'}
+              Messages
             </span>
           </div>
         </div>
 
         <div className="flex flex-col flex-1 items-center justify-center text-center text-muted-foreground px-8">
-        {isRoutinesView ? (
-          <>
-            <div className="opacity-20 mb-3">
-              <CalendarClock className="size-10" />
-            </div>
-            <p className="text-sm font-medium">No routines yet</p>
-            <p className="text-xs mt-1">Create a routine to get started.</p>
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-center size-11 rounded-xl bg-surface2 border border-border mb-4">
-              <MessageSquare className="size-5 text-foreground-muted" />
-            </div>
-            <p className="text-sm font-semibold text-foreground">
-              {agents.length > 0 ? 'No channel selected' : 'No agents connected yet'}
-            </p>
-            <p className="text-xs mt-1 max-w-xs">
-              {agents.length > 0
-                ? 'Pick a channel from the sidebar, or create one and choose who joins.'
-                : 'Connect an agent first — a channel needs at least one participant.'}
-            </p>
-            {/*
-              There is always an action here. Previously the button was gated on
-              `agents.length > 0`, so the state a brand-new workspace actually
-              lands in — no agents — was the one with nothing to click.
-            */}
-            <Button
-              variant="outline"
-              className="mt-5 gap-1.5"
-              onClick={agents.length > 0 ? openNewThread : () => setViewMode('home')}
+          <div className="flex items-center justify-center size-11 rounded-xl bg-surface2 border border-border mb-4">
+            <MessageSquare className="size-5 text-foreground-muted" />
+          </div>
+          <p className="text-sm font-semibold text-foreground">
+            {agents.length > 0 ? 'No channel selected' : 'No agents connected yet'}
+          </p>
+          <p className="text-xs mt-1 max-w-xs">
+            {agents.length > 0
+              ? 'Pick a channel from the sidebar, or create one and choose who joins.'
+              : 'Connect an agent first — a channel needs at least one participant.'}
+          </p>
+          {/*
+            There is always an action here. Previously the button was gated on
+            `agents.length > 0`, so the state a brand-new workspace actually
+            lands in — no agents — was the one with nothing to click.
+          */}
+          <Button
+            variant="outline"
+            className="mt-5 gap-1.5"
+            onClick={agents.length > 0 ? openNewThread : () => setViewMode('home')}
+          >
+            <Plus className="size-4" />
+            {agents.length > 0 ? 'New channel' : 'Connect an agent'}
+          </Button>
+          {/* Desktop apps teach their shortcuts in the empty pane. Every
+              cap here is read from the keymap (lib/shortcuts.ts), so it
+              cannot go back to advertising a key nothing listens for —
+              which is what `Ctrl+N` was doing here. */}
+          <div className="mt-7 flex items-center gap-4 text-3xs text-foreground-extra-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <KeyCombo keys={shortcutKeys('new-chat')} />
+              new chat
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <KeyCombo keys={shortcutKeys('palette')} />
+              commands
+            </span>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event(SHORTCUTS_EVENT))}
+              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
             >
-              <Plus className="size-4" />
-              {agents.length > 0 ? 'New channel' : 'Connect an agent'}
-            </Button>
-            {/* Desktop apps teach their shortcuts in the empty pane. Every
-                cap here is read from the keymap (lib/shortcuts.ts), so it
-                cannot go back to advertising a key nothing listens for —
-                which is what `Ctrl+N` was doing here. */}
-            <div className="mt-7 flex items-center gap-4 text-3xs text-foreground-extra-muted">
-              <span className="inline-flex items-center gap-1.5">
-                <KeyCombo keys={shortcutKeys('new-chat')} />
-                new chat
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <KeyCombo keys={shortcutKeys('palette')} />
-                commands
-              </span>
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new Event(SHORTCUTS_EVENT))}
-                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-              >
-                <KeyCombo keys={shortcutKeys('help')} />
-                all shortcuts
-              </button>
-            </div>
-          </>
-        )}
+              <KeyCombo keys={shortcutKeys('help')} />
+              all shortcuts
+            </button>
+          </div>
         </div>
       </div>
     );

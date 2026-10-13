@@ -7,10 +7,7 @@ import { useLayout } from './layout-context';
 import { cn } from '@/lib/utils';
 import { ChatView, SessionMessagesProvider } from '@/components/chat/chat-view';
 import { ThreadList } from '@/components/threads/thread-list';
-import { FileList } from '@/components/files/file-list';
-import { FilePreview } from '@/components/files/file-preview';
 import { LocalPreview } from '@/components/preview/local-preview';
-import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { TasksView } from '@/components/tasks/tasks-view';
@@ -165,11 +162,8 @@ function WrapperInner() {
     !isAgentPanelOpen &&
     (activeRightTab !== null || isCanvasOpen) &&
     !isHome &&
-    viewMode !== 'mission' &&
-    viewMode !== 'connect' &&
     viewMode !== 'knowledge' &&
-    viewMode !== 'skills' &&
-    viewMode !== 'files';
+    viewMode !== 'skills';
 
   const effectiveStudioTab =
     activeRightTab !== null
@@ -255,13 +249,9 @@ function WrapperInner() {
         <MobileHeader />
         <div className="flex-1 min-h-0 pt-[var(--header-height-mobile)] pb-[env(safe-area-inset-bottom)]">
           {/* Full-screen views (no list/detail split) */}
-          {viewMode === 'mission' || viewMode === 'home' || (isHome && mobilePane === 'detail') ? (
+          {isHome || (isHome && mobilePane === 'detail') ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
               <HomeDashboard />
-            </div>
-          ) : viewMode === 'connect' ? (
-            <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <ConnectAgentView />
             </div>
           ) : viewMode === 'tasks' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
@@ -287,7 +277,6 @@ function WrapperInner() {
             /* List pane — full width */
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm flex flex-col">
               {viewMode === 'threads' && <ThreadList />}
-              {viewMode === 'files' && <FileList />}
             </div>
           ) : (
             /* Detail pane — full width, edge-to-edge on mobile */
@@ -297,7 +286,6 @@ function WrapperInner() {
                   <ChatView />
                 </main>
               )}
-              {viewMode === 'files' && <FilePreview />}
               {isAgentPanelOpen && <AgentProfilePanel />}
             </div>
           )}
@@ -360,9 +348,7 @@ function WrapperInner() {
                     <ChatView />
                   </main>
                 </div>
-                {(isHome || viewMode === 'mission') && <HomeDashboard />}
-                {viewMode === 'connect' && <ConnectAgentView />}
-                {viewMode === 'files' && <FilePreview />}
+                {isHome && <HomeDashboard />}
                 {viewMode === 'tasks' && <TasksView />}
 
                 {viewMode === 'inbox' && <InboxView />}

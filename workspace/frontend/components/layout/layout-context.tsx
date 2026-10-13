@@ -43,6 +43,8 @@ export type TasksTab = 'tasks' | 'schedules' | 'runs';
 function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTab; tasksTab?: TasksTab } {
   // The Browser view was removed; a layout saved on it opens the threads.
   if ((mode as string) === 'browser') return { view: 'threads' };
+  if (mode === 'mission') return { view: 'home' };
+  if (mode === 'connect') return { view: 'settings', settingsTab: 'agents' };
   if (mode === 'skills') return { view: 'skills' };
   if (mode === 'knowledge') return { view: 'knowledge' };
   if (mode === 'routines' || mode === 'timers') return { view: 'tasks', tasksTab: 'schedules' };
