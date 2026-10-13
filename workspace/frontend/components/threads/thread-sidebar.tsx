@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, BookOpen, CircleCheck, Sparkles, X, Home, Inbox } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, BookOpen, CircleCheck, Sparkles, X, Home, Inbox, Sliders } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -25,6 +25,7 @@ import { Hint } from '@/components/ui/hint';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { usePendingToolApprovals } from '@/components/home/use-home-attention';
 import { AllThreadsModal } from './all-threads-modal';
+import { ProjectWorkspaceDialog } from '@/components/project/project-workspace-dialog';
 
 /*
   THE SIDEBAR, AS beUI DRAWS IT.
@@ -218,6 +219,7 @@ export function ThreadSidebar() {
   );
 
   const [allThreadsModalOpen, setAllThreadsModalOpen] = React.useState(false);
+  const [projectWorkspaceDir, setProjectWorkspaceDir] = React.useState<string | null>(null);
   const RECENT_LIMIT = 10;
   const isSearchActive = Boolean(query.trim());
 
@@ -406,7 +408,23 @@ export function ThreadSidebar() {
   */
   const renderMeta = React.useCallback(
     (item: SidebarResource) => {
-      if (item.kind !== 'file') return null;
+      if (item.kind !== 'file') {
+        const dir = item.id === DIRECT_CHATS ? undefined : item.id.slice('dir:'.length);
+        if (!dir) return null;
+        return (
+          <button
+            type="button"
+            title="Project Workspace (Instructions, Memory, Tasks)"
+            onClick={(e) => {
+              e.stopPropagation();
+              setProjectWorkspaceDir(dir);
+            }}
+            className="p-1 rounded hover:bg-surface3 text-muted-foreground hover:text-foreground opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <Sliders className="size-3" />
+          </button>
+        );
+      }
       const session = byId.get(item.id);
       if (!session) return null;
       const reported = turnsByChannel.get(item.id);
@@ -456,19 +474,35 @@ export function ThreadSidebar() {
         */
         const dir = item.id === DIRECT_CHATS ? undefined : item.id.slice('dir:'.length);
         return (
-          <button
-            type="button"
-            className={ROW_CLASS}
-            onClick={(e) => {
-              e.stopPropagation();
-              setSidebarOpen(true);
-              void createSession({ workingDir: dir });
-              controls.close();
-            }}
-          >
-            <SquarePen className="size-3.5 shrink-0" />
-            New chat here
-          </button>
+          <>
+            <button
+              type="button"
+              className={ROW_CLASS}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSidebarOpen(true);
+                void createSession({ workingDir: dir });
+                controls.close();
+              }}
+            >
+              <SquarePen className="size-3.5 shrink-0" />
+              New chat here
+            </button>
+            {dir && (
+              <button
+                type="button"
+                className={ROW_CLASS}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setProjectWorkspaceDir(dir);
+                  controls.close();
+                }}
+              >
+                <Sliders className="size-3.5 shrink-0" />
+                Project Workspace…
+              </button>
+            )}
+          </>
         );
       }
       const session = byId.get(item.id);
@@ -806,6 +840,14 @@ export function ThreadSidebar() {
         currentSessionId={currentSessionId}
         onSelectSession={handleActiveChange}
         onToggleStar={(id, starred) => void updateSession(id, { starred })}
+      />
+
+      <ProjectWorkspaceDialog
+        open={Boolean(projectWorkspaceDir)}
+        onOpenChange={(open) => {
+          if (!open) setProjectWorkspaceDir(null);
+        }}
+        dir={projectWorkspaceDir || ''}
       />
 
       <ConfirmDialog

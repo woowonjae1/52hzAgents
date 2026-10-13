@@ -29,8 +29,9 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Download, Filter, ListTree, ListChecks, MessageSquare, MessageSquarePlus, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, CheckCircle2, Copy } from 'lucide-react';
+import { Download, Filter, ListTree, ListChecks, MessageSquare, MessageSquarePlus, Square, MoreHorizontal, X, Plus, Share2, Crown, AlertTriangle, Sparkles, PanelLeft, PanelRight, Terminal, Check, Code2, Search, Zap, Layers, ArrowRight, Radio, Plug, Settings, Loader2, CheckCircle2, Copy, FolderGit2 } from 'lucide-react';
 import { ShareDialog } from './share-dialog';
+import { ProjectWorkspaceDialog } from '@/components/project/project-workspace-dialog';
 
 import { ParallelBatchPanel } from './parallel-batch-panel';
 import { useLayout } from '@/components/layout/layout-context';
@@ -298,6 +299,7 @@ export function ChatView() {
   }, [currentSessionId]);
 
   const [showCreateRoutine, setShowCreateRoutine] = useState(false);
+  const [projectWorkspaceOpen, setProjectWorkspaceOpen] = useState(false);
   const {
     isMobile,
     openMobileList,
@@ -1347,6 +1349,20 @@ export function ChatView() {
           */}
           <div className="flex items-center gap-1.5">
             <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
+            {currentSessionWorkingDir && (
+              <Hint label="Project Workspace (Instructions, Memory, Tasks)">
+                <button
+                  type="button"
+                  onClick={() => setProjectWorkspaceOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md bg-surface2 hover:bg-surface3 border border-border/60 text-foreground transition-colors shrink-0"
+                >
+                  <FolderGit2 className="size-3 text-primary" />
+                  <span className="font-mono text-2xs hidden sm:inline max-w-[120px] truncate">
+                    {basename(currentSessionWorkingDir)}
+                  </span>
+                </button>
+              </Hint>
+            )}
           </div>
 
           <span className="h-4 w-px bg-border shrink-0 mx-0.5" aria-hidden />
@@ -1862,6 +1878,14 @@ export function ChatView() {
             open={shareDialogOpen}
             onOpenChange={setShareDialogOpen}
             sessionId={serverSessionId}
+          />
+        )}
+
+        {currentSessionWorkingDir && (
+          <ProjectWorkspaceDialog
+            open={projectWorkspaceOpen}
+            onOpenChange={setProjectWorkspaceOpen}
+            dir={currentSessionWorkingDir}
           />
         )}
       </div>

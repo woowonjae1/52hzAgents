@@ -16,6 +16,7 @@ import {
   X,
   ChevronRight,
   GitBranch,
+  Sliders,
 } from 'lucide-react';
 import { FileTree, FileTreeFolder, FileTreeFile } from '@/components/motion/file-tree';
 import { workspaceApi, type FSEntry, type FSTreeResponse } from '@/lib/api';
@@ -23,6 +24,7 @@ import type { GitStatus } from '@/lib/use-git-status';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
+import { ProjectWorkspaceDialog } from '@/components/project/project-workspace-dialog';
 
 export interface ProjectFileExplorerProps {
   channelId: string;
@@ -145,6 +147,7 @@ export function ProjectFileExplorer({
   const [search, setSearch] = React.useState('');
   const [gitStatus, setGitStatus] = React.useState<GitStatus | null>(null);
   const [expandedIds, setExpandedIds] = React.useState<string[]>([]);
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = React.useState(false);
 
   const fetchTree = React.useCallback(async () => {
     if (!channelId && !workingDir) return;
@@ -299,6 +302,17 @@ export function ProjectFileExplorer({
               </button>
             </Hint>
           )}
+          {workingDir && (
+            <Hint label="Project Workspace (Instructions, Memory, Tasks)">
+              <button
+                type="button"
+                onClick={() => setWorkspaceDialogOpen(true)}
+                className="grid size-6 place-items-center rounded hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Sliders className="size-3 text-primary" />
+              </button>
+            </Hint>
+          )}
         </div>
       </div>
 
@@ -375,6 +389,14 @@ export function ProjectFileExplorer({
             </button>
           )}
         </div>
+      )}
+
+      {workingDir && (
+        <ProjectWorkspaceDialog
+          open={workspaceDialogOpen}
+          onOpenChange={setWorkspaceDialogOpen}
+          dir={workingDir}
+        />
       )}
     </div>
   );
