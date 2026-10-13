@@ -7,7 +7,6 @@ import {
   Paperclip,
   X,
   FileIcon,
-  CalendarClock,
   Square,
   Sparkles,
   BookOpen,
@@ -23,8 +22,6 @@ import {
   FolderOpen,
   FolderMinus,
   SquareTerminal,
-  Globe,
-  Settings,
   Wrench,
   Check,
   Crown,
@@ -57,7 +54,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useWorkspace } from '@/lib/workspace-context';
-import { useLayout } from '@/components/layout/layout-context';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import {
   loadThreadProfile,
@@ -231,7 +227,6 @@ export function PromptComposer({
   const [masterDropdownOpen, setMasterDropdownOpen] = React.useState(false);
 
   const { moveSessionToFolder } = useWorkspace();
-  const { showBrowserPreview, setShowBrowserPreview } = useLayout();
   const currentFolder = workingDir || session?.workingDir || null;
   const [browsingFolder, setBrowsingFolder] = React.useState(false);
 
@@ -575,14 +570,6 @@ export function PromptComposer({
     }
     return list;
   }, [customSkills]);
-
-  const mentionAgentList = React.useMemo(() => {
-    return mentionItems.filter((item): item is AgentMentionItem => item.type === 'agent');
-  }, [mentionItems]);
-
-  const mentionKnowledgeList = React.useMemo(() => {
-    return mentionItems.filter((item): item is KnowledgeMentionItem => item.type === 'knowledge');
-  }, [mentionItems]);
 
   /*
     `/` offers skills and knowledge docs. `@` offers agents and knowledge docs.
@@ -1428,112 +1415,29 @@ export function PromptComposer({
 
                 <DropdownMenuSeparator />
 
-                {/* Mentions */}
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
-                    <AtSign className="size-4 text-muted-foreground shrink-0" />
-                    <span>Mentions</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-60 max-h-72 overflow-y-auto p-1">
-                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                      Agents
-                    </DropdownMenuLabel>
-                    {mentionAgentList.length === 0 ? (
-                      <div className="px-2 py-2 text-xs text-muted-foreground text-center">
-                        No agents available
-                      </div>
-                    ) : (
-                      mentionAgentList.map((item) => (
-                        <DropdownMenuItem
-                          key={item.name}
-                          onClick={() => insertTextAtCursor(`@${item.name} `)}
-                          className="cursor-pointer gap-2 py-1.5 text-xs"
-                        >
-                          <div className="relative shrink-0">
-                            <AgentAvatar name={item.name} className="size-4" />
-                            <span
-                              className={cn(
-                                'absolute -bottom-0.5 -end-0.5 size-1.5 rounded-full ring-1 ring-surface',
-                                item.isOnline ? 'bg-emerald-500' : 'bg-muted-foreground/40',
-                              )}
-                            />
-                          </div>
-                          <span className="truncate font-medium">{item.name}</span>
-                          {item.agent.role && (
-                            <span className="ms-auto text-[10px] text-muted-foreground capitalize">
-                              {item.agent.role}
-                            </span>
-                          )}
-                        </DropdownMenuItem>
-                      ))
-                    )}
-
-                    {mentionKnowledgeList.length > 0 && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                          Knowledge
-                        </DropdownMenuLabel>
-                        {mentionKnowledgeList.map((k) => (
-                          <DropdownMenuItem
-                            key={k.name}
-                            onClick={() => insertTextAtCursor(`@${k.name} `)}
-                            className="cursor-pointer gap-2 py-1.5 text-xs"
-                          >
-                            <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
-                            <span className="truncate font-medium">{k.knowledge.title || k.name}</span>
-                          </DropdownMenuItem>
-                        ))}
-                      </>
-                    )}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-
-                {/* Actions */}
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
-                    <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
-                    <span>Actions</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-64 max-h-72 overflow-y-auto p-1">
-                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                      Slash Commands & Skills
-                    </DropdownMenuLabel>
-                    {skillList.map((skill) => (
-                      <DropdownMenuItem
-                        key={skill.trigger}
-                        onClick={() => insertTextAtCursor(`${skill.trigger} `)}
-                        className="cursor-pointer gap-2 py-1.5 text-xs"
-                      >
-                        <Sparkles className="size-3.5 text-primary shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="font-mono text-xs font-medium text-foreground">{skill.trigger}</div>
-                          <div className="text-[10px] text-muted-foreground truncate">{skill.description}</div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-
-                {/* Browser */}
+                {/* Mention Agent */}
                 <DropdownMenuItem
-                  onClick={() => setShowBrowserPreview(!showBrowserPreview)}
+                  onClick={() => {
+                    textareaRef.current?.focus();
+                    insertTextAtCursor('@');
+                  }}
                   className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
                 >
-                  <Globe className="size-4 text-muted-foreground shrink-0" />
-                  <span>Browser</span>
-                  {showBrowserPreview && <Check className="ms-auto size-3.5 text-primary" />}
+                  <AtSign className="size-4 text-muted-foreground shrink-0" />
+                  <span>Mention Agent (@)</span>
                 </DropdownMenuItem>
 
-                {onCreateRoutine && (
-                  <DropdownMenuItem
-                    onClick={onCreateRoutine}
-                    className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
-                  >
-                    <CalendarClock className="size-4 text-muted-foreground shrink-0" />
-                    <span>Create Routine…</span>
-                  </DropdownMenuItem>
-                )}
+                {/* Skills & Commands */}
+                <DropdownMenuItem
+                  onClick={() => {
+                    textareaRef.current?.focus();
+                    insertTextAtCursor('/');
+                  }}
+                  className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
+                >
+                  <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
+                  <span>Skills & Commands (/)</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <input

@@ -686,55 +686,23 @@ export function HomeDashboard() {
 
                         <DropdownMenuSeparator />
 
-                        {/* Mentions */}
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
-                            <AtSign className="size-4 text-muted-foreground shrink-0" />
-                            <span>Mentions</span>
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-60 max-h-72 overflow-y-auto p-1">
-                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                              Agents
-                            </DropdownMenuLabel>
-                            {allAvailableAgents.map((a) => (
-                              <DropdownMenuItem
-                                key={a.agentName}
-                                onClick={() => insertTextAtCursor(`@${a.agentName} `)}
-                                className="cursor-pointer gap-2 py-1.5 text-xs"
-                              >
-                                <AgentAvatar name={a.agentName} size={14} className="rounded-full shrink-0" />
-                                <span className="truncate font-medium">{a.agentName}</span>
-                                {a.role && <span className="ms-auto text-[10px] text-muted-foreground capitalize">{a.role}</span>}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
+                        {/* Mention Agent */}
+                        <DropdownMenuItem
+                          onClick={() => insertTextAtCursor('@')}
+                          className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
+                        >
+                          <AtSign className="size-4 text-muted-foreground shrink-0" />
+                          <span>Mention Agent (@)</span>
+                        </DropdownMenuItem>
 
-                        {/* Actions */}
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
-                            <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
-                            <span>Actions</span>
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-64 max-h-72 overflow-y-auto p-1">
-                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                              Slash Commands & Skills
-                            </DropdownMenuLabel>
-                            {CURATED_SKILLS.map((skill) => (
-                              <DropdownMenuItem
-                                key={skill.trigger}
-                                onClick={() => insertTextAtCursor(`${skill.trigger} `)}
-                                className="cursor-pointer gap-2 py-1.5 text-xs"
-                              >
-                                <Sparkles className="size-3.5 text-primary shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-mono text-xs font-medium text-foreground">{skill.trigger}</div>
-                                  <div className="text-[10px] text-muted-foreground truncate">{skill.description}</div>
-                                </div>
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
+                        {/* Skills & Commands */}
+                        <DropdownMenuItem
+                          onClick={() => insertTextAtCursor('/')}
+                          className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
+                        >
+                          <SquareTerminal className="size-4 text-muted-foreground shrink-0" />
+                          <span>Skills & Commands (/)</span>
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
