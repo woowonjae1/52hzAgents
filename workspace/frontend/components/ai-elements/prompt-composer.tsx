@@ -1259,43 +1259,6 @@ export function PromptComposer({
               sessionId={session?.sessionId}
             />
 
-            {/*
-              THE MODE MOVED HERE, AND BECAME A CONTROL.
-
-              In a single-agent thread, switching orchestration modes is meaningless.
-              Only display OrchestrationControl when more than 1 agent is present.
-            */}
-            {session && onOrchestrationChange && agents.length > 1 && (
-              <OrchestrationControl
-                session={session}
-                agents={agents}
-                onChange={onOrchestrationChange}
-                onMasterChange={onMasterChange}
-              />
-            )}
-
-            {/* Fix / Review: the other "what happens when I send" setting —
-                whether the agents may edit. Profiles live in lib/agent-profiles. */}
-            {session && <AgentProfileControl session={session} />}
-
-            {/*
-              THE SAME TWO KINDS OF THING AS THE HEADER ROW, NOW SAID THE SAME WAY.
-
-              This row mixes state and actions with one flat gap: the model and
-              the mode REPORT how the next message will be handled, while
-              schedule and attach PERFORM something. The thread header
-              already solved exactly this — see its "row of assorted widgets"
-              note — with a hairline, so the same divider is reused here rather
-              than a second convention being invented for the same idea.
-            */}
-            <span className="h-3.5 w-px bg-border shrink-0 mx-0.5" aria-hidden />
-
-            {/*
-              No "@ Agent" button. Typing `@` opens the same picker, and the
-              placeholder says so; the button was a second door to it that
-              spent the widest pill in the row on a keystroke.
-            */}
-
 
             <DropdownMenu>
               <Hint label="Add context & extensions (+)">
@@ -1378,6 +1341,92 @@ export function PromptComposer({
                     )}
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
+
+                {/* Collaboration Mode */}
+                {session && onOrchestrationChange && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                      <Waypoints className="size-4 text-muted-foreground shrink-0" />
+                      <span>Collaboration</span>
+                      <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
+                        {session.orchestrationMode ?? 'dynamic'}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-52 p-1">
+                      <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                        Orchestration Mode
+                      </DropdownMenuLabel>
+                      {ORCHESTRATION_MODES.map((m) => {
+                        const isCur = (session.orchestrationMode ?? 'dynamic') === m.value;
+                        const ModeIcon = m.icon;
+                        return (
+                          <DropdownMenuItem
+                            key={m.value}
+                            onClick={() => onOrchestrationChange({ mode: m.value })}
+                            className="cursor-pointer gap-2 py-1.5 text-xs"
+                          >
+                            <ModeIcon className="size-3.5 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-foreground">{m.label}</div>
+                              <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                                {m.description}
+                              </div>
+                            </div>
+                            {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+
+                {/* Work Mode */}
+                {session && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                      <Wrench className="size-4 text-muted-foreground shrink-0" />
+                      <span>Work Mode</span>
+                      <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
+                        {profileId === 'review' ? 'Review' : 'Fix'}
+                      </span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-52 p-1">
+                      <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                        Agent Permissions
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setProfileId('fix');
+                          saveThreadProfile(session.sessionId, 'fix');
+                        }}
+                        className="cursor-pointer gap-2 py-1.5 text-xs"
+                      >
+                        <Wrench className="size-3.5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-foreground">Edit (Fix)</div>
+                          <div className="text-[10px] text-muted-foreground">Agents can modify files</div>
+                        </div>
+                        {profileId !== 'review' && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setProfileId('review');
+                          saveThreadProfile(session.sessionId, 'review');
+                        }}
+                        className="cursor-pointer gap-2 py-1.5 text-xs"
+                      >
+                        <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-foreground">Read-only (Review)</div>
+                          <div className="text-[10px] text-muted-foreground">Agents cannot edit files</div>
+                        </div>
+                        {profileId === 'review' && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                )}
+
+                <DropdownMenuSeparator />
 
                 {/* Mentions */}
                 <DropdownMenuSub>
@@ -1476,111 +1525,15 @@ export function PromptComposer({
                   {showBrowserPreview && <Check className="ms-auto size-3.5 text-primary" />}
                 </DropdownMenuItem>
 
-                {/* Settings */}
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
-                    <Settings className="size-4 text-muted-foreground shrink-0" />
-                    <span>Settings</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="w-56 p-1">
-                    <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                      Thread Settings
-                    </DropdownMenuLabel>
-
-                    {session && onOrchestrationChange && (
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="cursor-pointer gap-2 py-1.5 text-xs">
-                          <Waypoints className="size-3.5 text-muted-foreground shrink-0" />
-                          <span>Collaboration</span>
-                          <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
-                            {session.orchestrationMode ?? 'dynamic'}
-                          </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-48 p-1">
-                          <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                            Orchestration Mode
-                          </DropdownMenuLabel>
-                          {ORCHESTRATION_MODES.map((m) => {
-                            const isCur = (session.orchestrationMode ?? 'dynamic') === m.value;
-                            const ModeIcon = m.icon;
-                            return (
-                              <DropdownMenuItem
-                                key={m.value}
-                                onClick={() => onOrchestrationChange({ mode: m.value })}
-                                className="cursor-pointer gap-2 py-1.5 text-xs"
-                              >
-                                <ModeIcon className="size-3.5 text-muted-foreground shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-foreground">{m.label}</div>
-                                  <div className="text-[10px] text-muted-foreground leading-tight truncate">
-                                    {m.description}
-                                  </div>
-                                </div>
-                                {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    )}
-
-                    {session && (
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger className="cursor-pointer gap-2 py-1.5 text-xs">
-                          <Wrench className="size-3.5 text-muted-foreground shrink-0" />
-                          <span>Work Mode</span>
-                          <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
-                            {profileId === 'review' ? 'Review' : 'Fix'}
-                          </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="w-52 p-1">
-                          <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                            Agent Permissions
-                          </DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setProfileId('fix');
-                              saveThreadProfile(session.sessionId, 'fix');
-                            }}
-                            className="cursor-pointer gap-2 py-1.5 text-xs"
-                          >
-                            <Wrench className="size-3.5 text-muted-foreground shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-foreground">Edit (Fix)</div>
-                              <div className="text-[10px] text-muted-foreground">Agents can modify files</div>
-                            </div>
-                            {profileId !== 'review' && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setProfileId('review');
-                              saveThreadProfile(session.sessionId, 'review');
-                            }}
-                            className="cursor-pointer gap-2 py-1.5 text-xs"
-                          >
-                            <BookOpen className="size-3.5 text-muted-foreground shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-foreground">Read-only (Review)</div>
-                              <div className="text-[10px] text-muted-foreground">Agents cannot edit files</div>
-                            </div>
-                            {profileId === 'review' && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
-                          </DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    )}
-
-                    {onCreateRoutine && (
-                      <DropdownMenuItem
-                        onClick={onCreateRoutine}
-                        className="cursor-pointer gap-2 py-1.5 text-xs"
-                      >
-                        <CalendarClock className="size-3.5 text-muted-foreground shrink-0" />
-                        <span>Create Routine…</span>
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
+                {onCreateRoutine && (
+                  <DropdownMenuItem
+                    onClick={onCreateRoutine}
+                    className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
+                  >
+                    <CalendarClock className="size-4 text-muted-foreground shrink-0" />
+                    <span>Create Routine…</span>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
             <input

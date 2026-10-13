@@ -553,102 +553,7 @@ export function HomeDashboard() {
                       </PopoverContent>
                     </Popover>
 
-                    {/* 2. Collaboration Mode Pill */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className={cn(composerPillClass, 'cursor-pointer gap-1.5')}
-                          title="Collaboration Orchestration Mode"
-                        >
-                          <modeInfo.icon className="size-3 text-muted-foreground shrink-0" />
-                          <span className="font-medium">{modeInfo.label}</span>
-                          <ChevronDown className="size-3 opacity-60 shrink-0" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-48 p-1" align="start">
-                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                          Collaboration Mode
-                        </DropdownMenuLabel>
-                        {ORCHESTRATION_MODES.map((m) => {
-                          const isCur = mode === m.value;
-                          const ModeIcon = m.icon;
-                          return (
-                            <DropdownMenuItem
-                              key={m.value}
-                              onClick={() => setMode(m.value)}
-                              className="cursor-pointer gap-2 py-1.5 text-xs"
-                            >
-                              <ModeIcon className="size-3.5 text-muted-foreground shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-foreground">{m.label}</div>
-                                <div className="text-[10px] text-muted-foreground leading-tight truncate">
-                                  {m.description}
-                                </div>
-                              </div>
-                              {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    {/* 3. Work Mode Pill (Fix / Review) */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className={cn(composerPillClass, 'cursor-pointer gap-1.5')}
-                          title="Agent Permissions / Work Mode"
-                        >
-                          <profileInfo.icon className="size-3 text-muted-foreground shrink-0" />
-                          <span className="font-medium">{profileInfo.label}</span>
-                          <ChevronDown className="size-3 opacity-60 shrink-0" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-52 p-1" align="start">
-                        <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                          Agent Permissions
-                        </DropdownMenuLabel>
-                        {AGENT_PROFILES.map((p) => {
-                          const isCur = profile === p.id;
-                          const ProfIcon = p.icon;
-                          return (
-                            <DropdownMenuItem
-                              key={p.id}
-                              onClick={() => setProfile(p.id)}
-                              className="cursor-pointer gap-2 py-1.5 text-xs"
-                            >
-                              <ProfIcon className="size-3.5 text-muted-foreground shrink-0" />
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-foreground">{p.label}</div>
-                                <div className="text-[10px] text-muted-foreground leading-tight">
-                                  {p.whenToUse}
-                                </div>
-                              </div>
-                              {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    {/* 4. Directory Chip (if chosen) */}
-                    {dir && (
-                      <button
-                        type="button"
-                        onClick={handlePickFolder}
-                        className={cn(composerPillClass, 'cursor-pointer gap-1.5 font-mono text-2xs')}
-                        title={`Working directory: ${dir}`}
-                      >
-                        <Folder className="size-3 text-muted-foreground shrink-0" />
-                        <span className="truncate max-w-[120px]">{basename(dir)}</span>
-                      </button>
-                    )}
-
-                    <span className="h-3.5 w-px bg-border shrink-0 mx-0.5" aria-hidden />
-
-                    {/* 5. Unified + Menu (Identical to Chat Composer) */}
+                    {/* 2. Unified + Menu (Identical to Chat Composer) */}
                     <DropdownMenu>
                       <Hint label="Add context & extensions (+)">
                         <DropdownMenuTrigger asChild>
@@ -706,6 +611,80 @@ export function HomeDashboard() {
                             )}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
+
+                        {/* Collaboration Mode */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                            <Waypoints className="size-4 text-muted-foreground shrink-0" />
+                            <span>Collaboration</span>
+                            <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
+                              {modeInfo.label}
+                            </span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-52 p-1">
+                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                              Orchestration Mode
+                            </DropdownMenuLabel>
+                            {ORCHESTRATION_MODES.map((m) => {
+                              const isCur = mode === m.value;
+                              const ModeIcon = m.icon;
+                              return (
+                                <DropdownMenuItem
+                                  key={m.value}
+                                  onClick={() => setMode(m.value)}
+                                  className="cursor-pointer gap-2 py-1.5 text-xs"
+                                >
+                                  <ModeIcon className="size-3.5 text-muted-foreground shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-foreground">{m.label}</div>
+                                    <div className="text-[10px] text-muted-foreground leading-tight truncate">
+                                      {m.description}
+                                    </div>
+                                  </div>
+                                  {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        {/* Work Mode */}
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
+                            <Wrench className="size-4 text-muted-foreground shrink-0" />
+                            <span>Work Mode</span>
+                            <span className="ms-auto me-1 text-[10px] text-muted-foreground capitalize font-mono">
+                              {profileInfo.label}
+                            </span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-52 p-1">
+                            <DropdownMenuLabel className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                              Agent Permissions
+                            </DropdownMenuLabel>
+                            {AGENT_PROFILES.map((p) => {
+                              const isCur = profile === p.id;
+                              const ProfIcon = p.icon;
+                              return (
+                                <DropdownMenuItem
+                                  key={p.id}
+                                  onClick={() => setProfile(p.id)}
+                                  className="cursor-pointer gap-2 py-1.5 text-xs"
+                                >
+                                  <ProfIcon className="size-3.5 text-muted-foreground shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-foreground">{p.label}</div>
+                                    <div className="text-[10px] text-muted-foreground leading-tight">
+                                      {p.whenToUse}
+                                    </div>
+                                  </div>
+                                  {isCur && <Check className="ms-auto size-3.5 text-primary shrink-0" />}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+
+                        <DropdownMenuSeparator />
 
                         {/* Mentions */}
                         <DropdownMenuSub>
