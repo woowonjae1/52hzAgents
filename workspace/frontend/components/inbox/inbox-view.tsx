@@ -3,9 +3,9 @@
 import { Hint } from '@/components/ui/hint';
 import { useListKeyboardNav } from '@/hooks/use-list-keyboard-nav';
 import { useScrollRestore } from '@/hooks/use-scroll-restore';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn, mergeRefs } from '@/lib/utils';
-import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight, Check, Copy } from 'lucide-react';
+import { Inbox, CheckCheck, RefreshCw, X, ExternalLink, ArrowRight, Check, Copy, ShieldAlert } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
@@ -14,6 +14,8 @@ import { useLayout } from '@/components/layout/layout-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import type { NotificationItem } from '@/lib/types';
 import { stripAddressPrefix } from '@/lib/types';
+import { usePendingToolApprovals } from '@/components/home/use-home-attention';
+import { respondToToolApproval, type PendingActionItem } from '@/components/mission/action-required-banner';
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return '';
@@ -232,6 +234,23 @@ export function InboxView() {
     pageSize: 8,
   });
 
+  const approvals = usePendingToolApprovals(sessions);
+  const [busyApproval, setBusyApproval] = useState<string | null>(null);
+
+  const handleApprovalAnswer = async (item: PendingActionItem, granted: boolean) => {
+    setBusyApproval(item.id);
+    try {
+      await respondToToolApproval(item, granted);
+      if (granted) toast.success(`Approved @${item.agentName}`);
+      else toast.info(`Denied @${item.agentName}`);
+      void approvals.refresh();
+    } catch {
+      toast.error(granted ? 'Approval failed' : 'Could not submit denial');
+    } finally {
+      setBusyApproval(null);
+    }
+  };
+
   const handleNavigate = (notification: NotificationItem) => {
     if (!notification.isRead) {
       markNotificationRead(notification.id);
@@ -245,6 +264,8 @@ export function InboxView() {
     }
   };
 
+  const totalUnresolved = unreadNotificationCount + approvals.items.length;
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -252,9 +273,9 @@ export function InboxView() {
         <div className="flex items-center gap-2">
           <Inbox className="size-4 text-foreground-muted" />
           <ScreenTitle>Inbox</ScreenTitle>
-          {unreadNotificationCount > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {unreadNotificationCount} unread
+          {totalUnresolved > 0 && (
+            <span className="text-xs text-muted-foreground font-mono">
+              {totalUnresolved} pending
             </span>
           )}
         </div>
@@ -271,7 +292,10 @@ export function InboxView() {
           )}
           <Hint label="Refresh">
             <button
-              onClick={refreshNotifications}
+              onClick={() => {
+                refreshNotifications();
+                void approvals.refresh();
+              }}
               className="p-1.5 rounded-md hover:bg-surface2 text-muted-foreground transition-colors"
             >
               <RefreshCw className="size-3.5" />
@@ -286,11 +310,11 @@ export function InboxView() {
         ref={mergeRefs(listNavProps.ref, scrollRef)}
         className="flex-1 overflow-y-auto outline-none"
       >
-        {notifications.length === 0 ? (
+        {notifications.length === 0 && approvals.items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
             <Inbox className="size-8 opacity-30" />
-            <p className="text-sm">No notifications yet</p>
-            <p className="text-xs opacity-60">Agent notifications will appear here</p>
+            <p className="text-sm font-medium">No pending items</p>
+            <p className="text-xs opacity-60">Approvals and agent notifications will appear here</p>
             {unreadNotificationCount > 0 && (
               <button
                 type="button"
@@ -303,26 +327,89 @@ export function InboxView() {
           </div>
         ) : (
           <div className="p-4 space-y-6">
-            <NotificationSection
-              title="Unread"
-              items={unread}
-              indexOffset={0}
-              cursor={cursor}
-              rowProps={rowProps}
-              onRead={markNotificationRead}
-              onDismiss={dismissNotification}
-              onNavigate={handleNavigate}
-            />
-            <NotificationSection
-              title="Read"
-              items={read}
-              indexOffset={unread.length}
-              cursor={cursor}
-              rowProps={rowProps}
-              onRead={markNotificationRead}
-              onDismiss={dismissNotification}
-              onNavigate={handleNavigate}
-            />
+            {/* Action Required: Antigravity-style cross-agent approval inbox */}
+            {approvals.items.length > 0 && (
+              <section className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <ShieldAlert className="size-4 text-status-warning" />
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-status-warning">
+                    Action Required ({approvals.items.length})
+                  </h3>
+                </div>
+                <div className="space-y-2">
+                  {approvals.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-xl border border-status-warning/30 bg-status-warning/5 p-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                        <AgentAvatar name={item.agentName} size={20} className="rounded-full shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-semibold text-foreground">@{item.agentName}</span>
+                            <span className="text-muted-foreground">requested approval:</span>
+                            <span className="font-mono text-[11px] px-1.5 py-0.5 rounded-md bg-surface2 font-semibold">
+                              {item.toolName || 'tool action'}
+                            </span>
+                          </div>
+                          {item.command && (
+                            <div className="mt-1 font-mono text-xs text-foreground bg-surface0/60 p-2 rounded-lg border border-border/40 truncate">
+                              {item.command}
+                            </div>
+                          )}
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            Thread: {item.channelTitle || item.channelId}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          disabled={busyApproval === item.id}
+                          onClick={() => handleApprovalAnswer(item, false)}
+                          className="px-2.5 py-1 text-xs rounded-lg border border-border bg-surface2 hover:bg-surface3 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                        >
+                          Deny
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyApproval === item.id}
+                          onClick={() => handleApprovalAnswer(item, true)}
+                          className="px-2.5 py-1 text-xs rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground font-medium cursor-pointer transition-colors shadow-xs"
+                        >
+                          Approve
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {unread.length > 0 && (
+              <NotificationSection
+                title="Unread"
+                items={unread}
+                indexOffset={0}
+                cursor={cursor}
+                rowProps={rowProps}
+                onRead={markNotificationRead}
+                onDismiss={dismissNotification}
+                onNavigate={handleNavigate}
+              />
+            )}
+            {read.length > 0 && (
+              <NotificationSection
+                title="Read"
+                items={read}
+                indexOffset={unread.length}
+                cursor={cursor}
+                rowProps={rowProps}
+                onRead={markNotificationRead}
+                onDismiss={dismissNotification}
+                onNavigate={handleNavigate}
+              />
+            )}
           </div>
         )}
       </div>

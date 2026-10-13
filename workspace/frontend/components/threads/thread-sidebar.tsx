@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, BookOpen, CircleCheck, Sparkles, X, Home } from 'lucide-react';
+import { SquarePen, Search, Folder, FolderMinus, Star, Archive, Trash2, MessageSquare, Loader2, Plus, BookOpen, CircleCheck, Sparkles, X, Home, Inbox } from 'lucide-react';
 import {
   AISidebar,
   type SidebarResource,
@@ -23,6 +23,7 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { Hint } from '@/components/ui/hint';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { usePendingToolApprovals } from '@/components/home/use-home-attention';
 
 /*
   THE SIDEBAR, AS beUI DRAWS IT.
@@ -80,7 +81,10 @@ export function ThreadSidebar() {
     renameSession,
     updateSession,
     moveSessionToFolder,
+    unreadNotificationCount,
   } = useWorkspace();
+  const approvals = usePendingToolApprovals(sessions);
+  const totalPendingCount = (unreadNotificationCount || 0) + approvals.items.length;
   const { viewMode, setViewMode, isMobile, openMobileDetail, setSidebarOpen, tasksTab, setTasksTab, openSettings, settingsTab, activeRightTab, setActiveRightTab } = useLayout();
   // Same rule as the wrapper: Home, or Threads with nothing open.
   const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
@@ -580,6 +584,22 @@ export function ThreadSidebar() {
           >
             <Home className="size-4 shrink-0" />
             Home
+          </button>
+          <button
+            type="button"
+            className={cn(NAV_ROW_CLASS, viewMode === 'inbox' && NAV_ROW_ACTIVE)}
+            onClick={() => {
+              setCurrentSessionId(null);
+              setViewMode('inbox');
+            }}
+          >
+            <Inbox className="size-4 shrink-0" />
+            <span className="flex-1 text-left">Inbox</span>
+            {totalPendingCount > 0 && (
+              <span className="ms-auto inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-primary/20 text-primary text-[10px] font-mono font-bold">
+                {totalPendingCount}
+              </span>
+            )}
           </button>
           <button
             type="button"
