@@ -28,6 +28,7 @@ export interface FileDiffProps {
   rawDiff?: string;
   status?: 'complete' | 'in-progress' | 'pending';
   defaultOpen?: boolean;
+  onOpenStudio?: () => void;
   className?: string;
 }
 
@@ -64,7 +65,7 @@ function parseUnifiedDiff(raw: string): DiffLine[] {
   return result;
 }
 
-export function FileDiff({ file, lines, rawDiff, status, defaultOpen, className }: FileDiffProps) {
+export function FileDiff({ file, lines, rawDiff, status, defaultOpen, onOpenStudio, className }: FileDiffProps) {
   const resolved = React.useMemo<FileDiffLine[]>(() => {
     if (lines && lines.length > 0) return lines;
     if (rawDiff) return parseUnifiedDiff(rawDiff);
@@ -79,6 +80,7 @@ export function FileDiff({ file, lines, rawDiff, status, defaultOpen, className 
       status={status === 'complete' ? 'complete' : 'streaming'}
       defaultOpen={defaultOpen}
       copyText={rawDiff}
+      onOpenStudio={onOpenStudio}
       className={className}
     />
   );

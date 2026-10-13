@@ -2,12 +2,13 @@
 
 import { Hint } from '@/components/ui/hint';
 import { useState } from 'react';
-import { FileCode2, Undo2, FileDiff } from 'lucide-react';
+import { FileCode2, Undo2, FileDiff, PanelRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 import { EventLine } from '@/components/ai-elements/event-line';
 import { MultiDiffInspector } from '@/components/diff/multi-diff-inspector';
+import { useArtifacts } from '@/lib/artifacts-context';
 import type { TurnChangesMetadata } from '@/lib/types';
 
 interface TurnChangesCapsuleProps {
@@ -66,6 +67,7 @@ export function TurnChangesCapsule({
   turnChanges,
   className,
 }: TurnChangesCapsuleProps) {
+  const { openOutput } = useArtifacts();
   const [rollingBack, setRollingBack] = useState(false);
   const [rolledBack, setRolledBack] = useState(turnChanges?.status === 'rolled_back');
   const [showConfirm, setShowConfirm] = useState(false);
@@ -131,10 +133,25 @@ export function TurnChangesCapsule({
                     setInspectFilePath(files[0]?.path);
                     setInspectorOpen(true);
                   }}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground cursor-pointer"
                 >
                   <FileDiff className="size-2.5" />
                   <span>Inspect diff</span>
+                </button>
+              </Hint>
+
+              <Hint label="Open in right Studio panel">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (files[0]) {
+                      openOutput({ kind: 'change', path: files[0].path, turnId: turnChanges?.turn_id || '' });
+                    }
+                  }}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground cursor-pointer"
+                >
+                  <PanelRight className="size-2.5" />
+                  <span>Studio</span>
                 </button>
               </Hint>
 
@@ -156,7 +173,7 @@ export function TurnChangesCapsule({
                     type="button"
                     onClick={() => setShowConfirm(false)}
                     disabled={rollingBack}
-                    className="rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                    className="rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -166,7 +183,7 @@ export function TurnChangesCapsule({
                   <button
                     type="button"
                     onClick={() => setShowConfirm(true)}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-base px-1.5 py-0.5 text-3xs text-foreground-extra-muted transition-colors hover:bg-surface2 hover:text-foreground cursor-pointer"
                   >
                     <Undo2 className="size-2.5" />
                     <span>Roll back</span>
@@ -180,14 +197,13 @@ export function TurnChangesCapsule({
         {files.length > 0 && (
           <div className="max-h-48 overflow-y-auto py-0.5">
             {files.map((file) => (
-              <Hint key={file.path} label="Click to inspect diff">
+              <Hint key={file.path} label="Click to open diff in Studio">
                 <button
                   type="button"
                   onClick={() => {
-                    setInspectFilePath(file.path);
-                    setInspectorOpen(true);
+                    openOutput({ kind: 'change', path: file.path, turnId: turnChanges?.turn_id || '' });
                   }}
-                  className="-mx-1 w-[calc(100%+8px)] flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2 text-left group"
+                  className="-mx-1 w-[calc(100%+8px)] flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2 text-left group cursor-pointer"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
                     <ChangeMark status={file.status} />

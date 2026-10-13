@@ -71,6 +71,7 @@ import { TRANSCRIPT_REVEAL_EVENT } from './chat-messages';
 import { deduplicateAndSortMessages, eventToMessage, stripAddressPrefix } from '@/lib/types';
 import type { WorkspaceMessage } from '@/lib/types';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
+import { collectOutputs } from '@/lib/artifacts';
 import { toast } from '@/lib/toast';
 
 const PROMPT_SUGGESTIONS = [
@@ -725,6 +726,12 @@ export function ChatView() {
       }
     }
     return set;
+  }, [displayMessages]);
+
+  const outputsCount = useMemo(() => {
+    if (!displayMessages || displayMessages.length === 0) return 0;
+    const o = collectOutputs(displayMessages);
+    return o.documents.length + o.changedFiles.length;
   }, [displayMessages]);
 
   const answeredDecisionIds = useMemo(() => {
@@ -1391,7 +1398,7 @@ export function ChatView() {
           <span className="h-4 w-px bg-border shrink-0 mx-0.5" aria-hidden />
 
           {/* Unified Studio Panel Toggle */}
-          <Hint label={isStudioOpen ? 'Close Studio panel' : 'Open Studio panel'}>
+          <Hint label={isStudioOpen ? 'Close Studio panel' : outputsCount > 0 ? `Studio outputs (${outputsCount})` : 'Open Studio panel'}>
             <button
               onClick={() => {
                 if (isStudioOpen) {
@@ -1404,10 +1411,16 @@ export function ChatView() {
               }}
               className={cn(
                 headerIconButtonClass,
+                'relative',
                 isStudioOpen && 'bg-surface3 text-foreground border border-border',
               )}
             >
               <PanelRight className="size-4" />
+              {outputsCount > 0 && !isStudioOpen && (
+                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold flex items-center justify-center leading-none shadow-xs pointer-events-none">
+                  {outputsCount}
+                </span>
+              )}
             </button>
           </Hint>
 

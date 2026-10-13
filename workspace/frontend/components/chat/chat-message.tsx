@@ -577,7 +577,7 @@ export const ChatMessage = memo(function ChatMessage({
     return null;
   }, [message.metadata]);
 
-  const { openArtifact } = useArtifacts();
+  const { openArtifact, openOutput } = useArtifacts();
 
   // Extract or infer structured artifact for Canvas (code deliverables, standalone HTML/SVG, explicit artifact tags/metadata)
   // Conversational Q&A, markdown text answers, explanations, and lists are NEVER turned into artifacts.
@@ -1176,6 +1176,9 @@ export const ChatMessage = memo(function ChatMessage({
               lines={fileDiff.lines}
               rawDiff={fileDiff.rawDiff}
               status={fileDiff.status === 'streaming' ? 'in-progress' : 'complete'}
+              onOpenStudio={() => {
+                openOutput({ kind: 'local_file', path: fileDiff.file });
+              }}
             />
           ) : null}
 

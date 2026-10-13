@@ -2,6 +2,7 @@
 // beui.dev/components/agents/chat-app
 
 import {
+  ArrowUpRight,
   Check,
   ChevronDown,
   Copy,
@@ -50,6 +51,7 @@ export interface FileDiffProps {
   language?: AgentCodeLanguage;
   copyText?: string;
   onCopy?: () => void | Promise<void>;
+  onOpenStudio?: () => void;
   className?: string;
 }
 
@@ -107,6 +109,7 @@ export function FileDiff({
   language,
   copyText,
   onCopy,
+  onOpenStudio,
   className,
 }: FileDiffProps) {
   const resolvedLanguage = language || (typeof file === 'string' ? detectLanguageFromPath(file) : 'typescript');
@@ -189,44 +192,58 @@ export function FileDiff({
       aria-busy={streaming}
       className={cn("w-full text-sm", className)}
     >
-      <button
-        id={triggerId}
-        type="button"
-        aria-expanded={currentOpen}
-        aria-controls={contentId}
-        onClick={() => setOpen(!currentOpen)}
-        className="group flex min-h-9 w-full items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        <FileCode2
-          aria-hidden="true"
-          className="size-4 shrink-0 text-muted-foreground"
-        />
-        <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">
-          {file}
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          <ChangeCount value={additions} type="added" />
-          <ChangeCount value={deletions} type="removed" />
-        </span>
-        <span className="grid size-4 shrink-0 place-items-center text-muted-foreground/60">
-          {streaming ? (
-            <LoaderCircle
-              aria-label="Applying changes"
-              className={cn("size-3.5", !reduce && "animate-spin")}
-            />
-          ) : (
-            <Check aria-label="Changes applied" className="size-3.5" />
-          )}
-        </span>
-        <motion.span
-          aria-hidden="true"
-          animate={{ rotate: currentOpen ? 180 : 0 }}
-          transition={reduce ? { duration: 0 } : SPRING_SWAP}
-          className="shrink-0 text-muted-foreground/45 transition-colors group-hover:text-muted-foreground"
+      <div className="flex min-h-9 w-full items-center gap-1.5 rounded-md py-1">
+        <button
+          id={triggerId}
+          type="button"
+          aria-expanded={currentOpen}
+          aria-controls={contentId}
+          onClick={() => setOpen(!currentOpen)}
+          className="group flex flex-1 min-w-0 items-center gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <ChevronDown className="size-3.5" />
-        </motion.span>
-      </button>
+          <FileCode2
+            aria-hidden="true"
+            className="size-4 shrink-0 text-muted-foreground"
+          />
+          <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground/80">
+            {file}
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <ChangeCount value={additions} type="added" />
+            <ChangeCount value={deletions} type="removed" />
+          </span>
+          <span className="grid size-4 shrink-0 place-items-center text-muted-foreground/60">
+            {streaming ? (
+              <LoaderCircle
+                aria-label="Applying changes"
+                className={cn("size-3.5", !reduce && "animate-spin")}
+              />
+            ) : (
+              <Check aria-label="Changes applied" className="size-3.5" />
+            )}
+          </span>
+          <motion.span
+            aria-hidden="true"
+            animate={{ rotate: currentOpen ? 180 : 0 }}
+            transition={reduce ? { duration: 0 } : SPRING_SWAP}
+            className="shrink-0 text-muted-foreground/45 transition-colors group-hover:text-muted-foreground"
+          >
+            <ChevronDown className="size-3.5" />
+          </motion.span>
+        </button>
+
+        {onOpenStudio && (
+          <button
+            type="button"
+            onClick={onOpenStudio}
+            title="Open diff in Studio panel"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-3xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+          >
+            <span>Studio</span>
+            <ArrowUpRight className="size-3" />
+          </button>
+        )}
+      </div>
 
       <AgentDisclosure
         id={contentId}
