@@ -482,7 +482,7 @@ export function HomeDashboard() {
               {/* Main Composer Box */}
               <section
                 aria-label="Composer"
-                className="rounded-2xl border border-border bg-card p-3 shadow-xs focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all"
+                className="rounded-2xl border border-border/80 bg-card p-3 shadow-xs hover:shadow-sm focus-within:shadow-md focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/15 transition-all"
               >
                 <textarea
                   ref={taskRef}
@@ -766,7 +766,7 @@ export function HomeDashboard() {
                     size="sm"
                     disabled={!canStart}
                     onClick={handleStart}
-                    className="h-8 rounded-full px-3.5 text-xs font-medium gap-1.5 shadow-xs transition-all active:scale-95"
+                    className="h-8.5 rounded-full px-4 text-xs font-medium gap-1.5 transition-all active:scale-95 shadow-md shadow-brand/25 ring-1 ring-white/10"
                   >
                     <span>{starting ? 'Starting…' : task.trim() ? 'Send' : 'Start'}</span>
                     <ArrowUp className="size-3.5 stroke-[2.5]" />

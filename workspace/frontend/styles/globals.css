@@ -112,12 +112,12 @@
     It is deliberately desaturated: a 60%-saturation blue at these sizes reads
     as a web framework's default button.
   */
-  --brand: var(--primary);
-  --brand-hover: var(--primary);
-  --brand-foreground: var(--primary-foreground);
+  --brand: var(--signal-mark-body, #1c6ea4);
+  --brand-hover: color-mix(in oklab, var(--brand) 85%, white);
+  --brand-foreground: #ffffff;
   /* Fill behind a selected row — tinted, not saturated. */
-  --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
-  --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
+  --brand-subtle: color-mix(in oklab, var(--brand) 12%, transparent);
+  --brand-border: color-mix(in oklab, var(--brand) 45%, transparent);
 
   /*
     -- The user's own bubble --
@@ -199,7 +199,7 @@
   --card-foreground: #09090b;
   --popover: #ffffff;
   --popover-foreground: #09090b;
-  --primary: #09090b;
+  --primary: var(--brand);
   --primary-foreground: #ffffff;
   --secondary: #f4f4f6;
   --secondary-foreground: #09090b;
@@ -364,11 +364,11 @@
     subtle fill needs roughly half again the alpha for equivalent presence
     against a dark ground.
   */
-  --brand: var(--primary);
-  --brand-hover: var(--primary);
-  --brand-foreground: var(--primary-foreground);
-  --brand-subtle: color-mix(in oklab, var(--primary) 10%, transparent);
-  --brand-border: color-mix(in oklab, var(--primary) 45%, transparent);
+  --brand: var(--signal-mark-body, #1c6ea4);
+  --brand-hover: color-mix(in oklab, var(--brand) 85%, white);
+  --brand-foreground: #ffffff;
+  --brand-subtle: color-mix(in oklab, var(--brand) 15%, transparent);
+  --brand-border: color-mix(in oklab, var(--brand) 45%, transparent);
 
   /* Semantic */
   --destructive: #fb7185;
@@ -422,8 +422,8 @@
   --card-foreground: #f4f4f6;
   --popover: #18181e;
   --popover-foreground: #f4f4f6;
-  --primary: #f4f4f6;
-  --primary-foreground: #09090b;
+  --primary: var(--brand);
+  --primary-foreground: #ffffff;
   --secondary: #18181e;
   --secondary-foreground: #f4f4f6;
   --muted: #18181e;

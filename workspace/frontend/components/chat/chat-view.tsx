@@ -1689,7 +1689,7 @@ export function ChatView() {
 
         {/* Input — hidden for read-only DM views */}
         {!isDM && (
-          <div className="px-4 lg:px-8 pb-4 pt-1">
+          <div className="relative px-4 lg:px-8 pb-4 pt-3 bg-gradient-to-t from-background via-background/95 to-transparent">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
               {/*

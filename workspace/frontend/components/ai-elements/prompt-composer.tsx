@@ -1098,38 +1098,9 @@ export function PromptComposer({
             `focus-within:border-brand-border` were this app's own three
             mechanisms for the same edge; the replication drops all three.
           */
-          'relative w-full rounded-2xl overflow-hidden transition-colors',
-          'bg-background',
-          /*
-            One token, no `dark:` variant. This read `border-border/80
-            dark:border-white/[0.10]`, and that hardcoded white was simply
-            `--border`'s own dark value written out again (0.10 against 0.09) —
-            a variant that restated what the token already says, and one more
-            same-specificity rule competing with the focus colour below for no
-            gain. `--border` covers both themes on its own.
-          */
-          'border border-border/80',
-          /*
-            ── Flat in the page; elevation is reserved for what floats ──
-
-            This is the rule the window was missing, and it is the one Claude's
-            own client follows: a surface that is PART OF THE PAGE is separated
-            by a hairline and a fill, and elevation belongs to things that are
-            genuinely above it — popovers, dialogs, toasts, the mention picker
-            two hundred lines up. The composer does not float. It sits at the
-            bottom of the view, anchored, never overlapping anything.
-
-            `shadow-lg` (`--elevation-4`) claimed otherwise, and that claim was
-            the source of the "half flat, half layered" feel: with a drop
-            shadow AND a border AND a 14px radius, three mechanisms were each
-            announcing the same edge. `shadow-xs` is `--elevation-1`, which in
-            the light ramp is a 1px ring and a 1px drop — enough to lift the
-            control off the ground it shares a family with, not enough to
-            pretend it is over it.
-
-            The mention popover keeps `shadow-xl`. It really does float.
-          */
-          'focus-within:border-foreground/25',
+          'relative w-full rounded-2xl overflow-hidden transition-all duration-200',
+          'bg-background shadow-xs hover:shadow-sm focus-within:shadow-md',
+          'border border-border/80 focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/15',
           isDragging && 'border-primary ring-2 ring-primary/20'
         )}
       >
@@ -1689,11 +1660,11 @@ export function PromptComposer({
                     onClick={handleSend}
                     disabled={!canSend}
                     className={cn(
-                      'relative flex items-center justify-center size-8 rounded-full shrink-0',
-                      'transition-all duration-150 select-none active:scale-95',
+                      'relative flex items-center justify-center size-8.5 rounded-full shrink-0',
+                      'transition-all duration-150 select-none active:scale-95 shadow-xs',
                       canSend
-                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-md shadow-brand/25 cursor-pointer'
-                        : 'bg-surface1 dark:bg-white/[0.05] text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
+                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-md shadow-brand/35 cursor-pointer ring-1 ring-white/20'
+                        : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
                     )}
                     aria-label={isWorking ? 'Queue message' : 'Send message'}
                   >

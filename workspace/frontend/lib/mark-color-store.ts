@@ -66,7 +66,13 @@ export function readStoredMarkColor(): string {
 
 export function applyMarkColor(color: string) {
   if (typeof document === 'undefined') return;
-  document.documentElement.style.setProperty(MARK_COLOR_CSS_VAR, normalizeMarkColor(color));
+  const hex = normalizeMarkColor(color);
+  document.documentElement.style.setProperty(MARK_COLOR_CSS_VAR, hex);
+  document.documentElement.style.setProperty('--brand', hex);
+  document.documentElement.style.setProperty('--brand-hover', hex);
+  document.documentElement.style.setProperty('--primary', hex);
+  document.documentElement.style.setProperty('--ring', hex);
+  document.documentElement.style.setProperty('--border-accent', `color-mix(in oklab, ${hex} 40%, transparent)`);
 }
 
 const listeners = new Set<(color: string) => void>();
@@ -102,4 +108,4 @@ export function subscribeMarkColor(fn: (color: string) => void): () => void {
  * Kept as a string literal (not a function serialised with .toString()) because
  * minification would rename the constants it closes over.
  */
-export const MARK_COLOR_PREPAINT_SCRIPT = `(function(){try{var v=localStorage.getItem('${MARK_COLOR_STORAGE_KEY}');if(v&&/^#[0-9a-fA-F]{6}$/.test(v))document.documentElement.style.setProperty('${MARK_COLOR_CSS_VAR}',v);}catch(e){}})();`;
+export const MARK_COLOR_PREPAINT_SCRIPT = `(function(){try{var v=localStorage.getItem('${MARK_COLOR_STORAGE_KEY}');if(v&&/^#[0-9a-fA-F]{6}$/.test(v)){document.documentElement.style.setProperty('${MARK_COLOR_CSS_VAR}',v);document.documentElement.style.setProperty('--brand',v);document.documentElement.style.setProperty('--primary',v);document.documentElement.style.setProperty('--ring',v);}}catch(e){}})();`;
