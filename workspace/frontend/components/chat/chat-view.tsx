@@ -9,7 +9,6 @@ import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
 import { ThreadStatusBar } from './thread-status-bar';
-import { EmptyState } from './empty-state';
 import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { loadWorkspaceSnapshots, saveThreadSnapshot, SNAPSHOT_THREADS } from '@/lib/message-snapshot';

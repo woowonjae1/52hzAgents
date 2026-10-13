@@ -5,7 +5,6 @@ import { MoreHorizontal, Crown, UserMinus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { timeAgo } from '@/lib/helpers';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
-import { SectionHeader } from '@/components/sessions/section-header';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,7 +79,9 @@ export function AgentStatusCard({ agents }: AgentStatusCardProps) {
           setPendingRemoval(null);
         }}
       />
-      <SectionHeader label="Agents" />
+      <div className="flex items-center gap-1.5 px-0.5">
+        <span className="text-2xs font-medium text-muted-foreground">Agents</span>
+      </div>
       <div className="space-y-1.5">
         {agents.map((agent) => {
           const isOnline = agent.status === 'online';
