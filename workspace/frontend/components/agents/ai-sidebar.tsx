@@ -323,23 +323,29 @@ function MarqueeLabel({ active, children }: { active: boolean; children: string 
 
   return (
     <span ref={viewportRef} className="block min-w-0 flex-1 overflow-hidden">
-      <motion.span
-        className="flex w-max items-center gap-6 whitespace-nowrap"
-        animate={{ x: running ? [0, -distance] : 0 }}
-        transition={
-          running
-            ? {
-                duration: Math.max(2.4, distance / 34),
-                ease: "linear",
-                repeat: Number.POSITIVE_INFINITY,
-                repeatDelay: 2,
-              }
-            : ROW_REVEAL
-        }
-      >
-        <span ref={labelRef}>{children}</span>
-        {running ? <span aria-hidden="true">{children}</span> : null}
-      </motion.span>
+      {running ? (
+        <motion.span
+          className="flex w-max items-center gap-6 whitespace-nowrap"
+          animate={{ x: [0, -distance] }}
+          transition={{
+            duration: Math.max(2.4, distance / 34),
+            ease: "linear",
+            repeat: Number.POSITIVE_INFINITY,
+            repeatDelay: 2,
+          }}
+        >
+          <span ref={labelRef}>{children}</span>
+          <span aria-hidden="true">{children}</span>
+        </motion.span>
+      ) : (
+        <span
+          ref={labelRef}
+          className="block truncate"
+          title={typeof children === 'string' ? children : undefined}
+        >
+          {children}
+        </span>
+      )}
     </span>
   );
 }
@@ -554,7 +560,7 @@ function ResourceRow({
       )}
       style={{ paddingLeft: `${12 + row.depth * 16}px` }}
     >
-      <span aria-hidden="true" className="relative grid size-5 shrink-0 place-items-center">
+      <span aria-hidden="true" className="relative flex min-w-5 shrink-0 items-center justify-center">
         {renderIcon?.(row.item, expanded) ?? defaultIcon(row.item, expanded, reduce)}
       </span>
 

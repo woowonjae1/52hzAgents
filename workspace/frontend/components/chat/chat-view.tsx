@@ -1268,9 +1268,18 @@ export function ChatView() {
                 <span className="truncate text-[11px] leading-tight text-muted-foreground">
                   {[
                     currentSessionWorkingDir ? basename(currentSessionWorkingDir) : null,
-                    activeHeaderAgents.length > 0
-                      ? `${activeHeaderAgents.length} agent${activeHeaderAgents.length > 1 ? 's' : ''}`
-                      : 'no agents',
+                    (() => {
+                      const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
+                      if (activeHeaderAgents.length > 0) {
+                        return activeHeaderAgents.length === total
+                          ? `${total} agent${total > 1 ? 's' : ''}`
+                          : `${activeHeaderAgents.length}/${total} online`;
+                      }
+                      if (total > 0) {
+                        return `${total} agent${total > 1 ? 's' : ''} (offline)`;
+                      }
+                      return 'no agents configured';
+                    })(),
                   ]
                     .filter(Boolean)
                     .join(' · ')}
