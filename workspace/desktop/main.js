@@ -1793,20 +1793,6 @@ ipcMain.handle('shell-open-path', async (event, pathStr) => {
       cleanPath = cleanPath.replace(/\//g, '\\');
     }
     const fs = require('fs');
-    if (fs.existsSync(cleanPath)) {
-      const stat = fs.statSync(cleanPath);
-      if (stat.isDirectory()) {
-        if (process.platform === 'win32') {
-          const { exec } = require('child_process');
-          exec(`explorer.exe "${cleanPath}"`);
-          return true;
-        } else if (process.platform === 'darwin') {
-          const { exec } = require('child_process');
-          exec(`open "${cleanPath}"`);
-          return true;
-        }
-      }
-    }
     // Nothing exists at that path. Reporting `true` here is how a click on an
     // unresolvable path came to raise a "Opened locally" toast: `openPath` fails,
     // `showItemInFolder` silently does nothing for a path that is not there, and

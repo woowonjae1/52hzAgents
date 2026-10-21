@@ -22,10 +22,11 @@ func InitDB() {
 		if sqlitePath == "" {
 			sqlitePath = "gorm.db"
 		}
+		pragmaOpts := "_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)&_pragma=temp_store(MEMORY)&_pragma=foreign_keys(ON)"
 		if !strings.Contains(sqlitePath, "?") {
-			sqlitePath += "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)"
+			sqlitePath += "?" + pragmaOpts
 		} else if !strings.Contains(sqlitePath, "journal_mode") {
-			sqlitePath += "&_pragma=journal_mode(WAL)&_pragma=busy_timeout(10000)&_pragma=synchronous(NORMAL)"
+			sqlitePath += "&" + pragmaOpts
 		}
 		DB, err = gorm.Open(sqlite.Open(sqlitePath), &gorm.Config{
 			PrepareStmt: true,
