@@ -7,9 +7,7 @@
     "wwj": "bin/agent-connector.js"
   },
   "scripts": {
-    "test": "node --test test/*.test.js",
-    "build:registry": "node scripts/build-registry.js",
-    "lint": "eslint src/"
+    "test": "node --test test/*.test.js"
   },
   "keywords": [
     "wwj",

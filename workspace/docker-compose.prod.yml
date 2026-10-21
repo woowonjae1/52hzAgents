@@ -1,14 +1,15 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: openagents_workspace
-      POSTGRES_USER: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-52hz_workspace}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -17,11 +18,12 @@ services:
     build:
       context: ./backend
       dockerfile: backend.Dockerfile
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-changeme}@db:5432/openagents_workspace
-      AUTH_MODE: workspace_token
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${DB_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-52hz_workspace}
+      AUTH_MODE: ${AUTH_MODE:-workspace_token}
       IDENTITY_MODE: standalone
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://workspace.openagents.org}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       REQUESTS_PER_MINUTE: ${REQUESTS_PER_MINUTE:-600}
     depends_on:
       db:
@@ -36,13 +38,15 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${API_URL:-https://workspace-endpoint.openagents.org}
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:8000}
+    restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
 
   nginx:
     image: nginx:alpine
+    restart: unless-stopped
     ports:
       - "80:80"
     volumes:

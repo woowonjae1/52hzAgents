@@ -1,25 +1,30 @@
 $ErrorActionPreference = 'Stop'
-$runtimePath = Join-Path $PSScriptRoot '.dev'
-$statePath = Join-Path $runtimePath 'processes.json'
 
-if (-not (Test-Path $statePath)) {
-    Write-Host 'No native development processes are recorded.'
-    exit 0
-}
+$stoppedAny = $false
+foreach ($runtimeDir in @('.dev-sqlite', '.dev')) {
+    $runtimePath = Join-Path $PSScriptRoot $runtimeDir
+    $statePath = Join-Path $runtimePath 'processes.json'
 
-$state = Get-Content $statePath -Raw | ConvertFrom-Json
-foreach ($property in @('backendPid', 'frontendPid')) {
-    $processId = $state.$property
-    if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
+    if (Test-Path $statePath) {
         try {
-            $kill = Start-Process -FilePath taskkill.exe -ArgumentList @('/PID', "$processId", '/T', '/F') -WindowStyle Hidden -Wait -PassThru
-            if ($kill.ExitCode -ne 0) {
-                Write-Verbose "Could not terminate recorded process $processId (it may already be exiting)."
+            $state = Get-Content $statePath -Raw | ConvertFrom-Json
+            foreach ($property in @('backendPid', 'frontendPid', 'connectorPid')) {
+                $processId = $state.$property
+                if ($processId -and (Get-Process -Id $processId -ErrorAction SilentlyContinue)) {
+                    try {
+                        Start-Process -FilePath taskkill.exe -ArgumentList @('/PID', "$processId", '/T', '/F') -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue
+                    } catch {}
+                }
             }
-        } catch {
-            Write-Verbose "Could not terminate recorded process ${processId}: $($_.Exception.Message)"
+            $stoppedAny = $true
+        } finally {
+            Remove-Item $statePath -Force -ErrorAction SilentlyContinue
         }
     }
 }
-Remove-Item $statePath -Force
-Write-Host 'Native backend and frontend stopped. PostgreSQL is still running in Docker.'
+
+if ($stoppedAny) {
+    Write-Host 'Native dev stack processes stopped.' -ForegroundColor Yellow
+} else {
+    Write-Host 'No native development processes are recorded.' -ForegroundColor DarkGray
+}

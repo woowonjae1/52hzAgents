@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Agent E2E Smoke Test](https://github.com/woowonjae1/52hzAgents/actions/workflows/agent-e2e-smoke.yml/badge.svg)](https://github.com/woowonjae1/52hzAgents/actions/workflows/agent-e2e-smoke.yml)
-[![Test CLI Install](https://github.com/woowonjae1/52hzAgents/actions/workflows/test-cli.yml/badge.svg)](https://github.com/woowonjae1/52hzAgents/actions/workflows/test-cli.yml)
+[![WWJ Tests](https://github.com/woowonjae1/52hzAgents/actions/workflows/wwj-tests.yml/badge.svg)](https://github.com/woowonjae1/52hzAgents/actions/workflows/wwj-tests.yml)
 
 </div>
 
