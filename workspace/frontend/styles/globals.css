@@ -257,9 +257,9 @@
     has to hold for the message body, the user's own bubble and everything
     `.markdown-content` renders inside them. Three places had three answers.
   */
-  --reading-size: 14.5px;
-  --reading-leading: 1.62;
-  --reading-tracking: -0.005em;
+  --reading-size: 15px;
+  --reading-leading: 1.68;
+  --reading-tracking: -0.006em;
 
   /*
     ── Elevation ──
@@ -1750,6 +1750,30 @@ nextjs-portal,
     animation: none;
     background-image: none;
     -webkit-text-fill-color: currentColor;
+  }
+}
+
+/* ── 52Hz Sonic Resonance Waveform ── */
+@keyframes sonar-wave-pulse {
+  0%, 100% {
+    transform: scaleY(0.35);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.animate-sonar-bar {
+  transform-origin: center;
+  animation: sonar-wave-pulse 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sonar-bar {
+    animation: none;
+    transform: scaleY(0.65);
   }
 }
 
