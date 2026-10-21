@@ -44,7 +44,7 @@ function IdentityGate({ children }: { children: React.ReactNode }) {
 export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const { user, idToken, loading: authLoading, isOpenAgentsDomain, isAuthConfigured, signIn } = useOpenAgentsAuth();
+  const { idToken } = useOpenAgentsAuth();
 
   useEffect(() => {
     if (token) {
@@ -83,44 +83,6 @@ export function WorkspaceContent({ workspaceId }: { workspaceId: string }) {
           </ArtifactsProvider>
         </IdentityGate>
       </WorkspaceProvider>
-    );
-  }
-
-  // No token — check if user is logged in via OpenAgents
-  if (isOpenAgentsDomain && isAuthConfigured) {
-    if (authLoading) {
-      return <WorkspaceLoadingSplash />;
-    }
-
-    if (user && idToken) {
-      return (
-        <WorkspaceProvider workspaceId={workspaceId} token="" bearerToken={idToken}>
-          <IdentityGate>
-            <ArtifactsProvider>
-              <LayoutProvider>
-                <Wrapper />
-              </LayoutProvider>
-            </ArtifactsProvider>
-          </IdentityGate>
-        </WorkspaceProvider>
-      );
-    }
-
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-6 p-8 bg-background">
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-xl font-semibold">Sign in to access this workspace</h1>
-          <p className="text-muted-foreground text-sm text-center max-w-md">
-            Log in with your 52hzAgents account to access workspaces you own, or add a token to the URL.
-          </p>
-        </div>
-        <button
-          onClick={signIn}
-          className="flex items-center gap-3 px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 transition-colors cursor-pointer"
-        >
-          <span>Sign in with Google</span>
-        </button>
-      </div>
     );
   }
 

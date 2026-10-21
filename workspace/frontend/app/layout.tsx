@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { ThemeProvider } from 'next-themes';
 import { AnimatedToaster } from '@/components/ui/animated-toaster';
-import { AuthProvider } from '@/lib/auth-context';
 import { OpenAgentsAuthProvider } from '@/lib/openagents-auth-context';
 import { MARK_COLOR_PREPAINT_SCRIPT } from '@/lib/mark-color-store';
 import { DESKTOP_PREPAINT_SCRIPT } from '@/lib/desktop';
@@ -127,11 +126,9 @@ export default function RootLayout({
             toggle — pass `defaultTheme` alone to pick a default the user can
             still override. */}
         <ThemeProvider attribute="class" defaultTheme="dark">
-          <AuthProvider>
-            <OpenAgentsAuthProvider>
-              {children}
-            </OpenAgentsAuthProvider>
-          </AuthProvider>
+          <OpenAgentsAuthProvider>
+            {children}
+          </OpenAgentsAuthProvider>
           <AnimatedToaster />
         </ThemeProvider>
       </body>
