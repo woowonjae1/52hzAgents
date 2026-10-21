@@ -59,7 +59,6 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { SEND_FIRST_MESSAGE_EVENT, consumePendingFirstMessage, type FirstMessageRequest } from '@/lib/first-message';
 import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
-import { AgentQuotaCapsule } from './agent-quota-capsule';
 
 import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
