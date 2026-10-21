@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { cn, mergeRefs } from '@/lib/utils';
 import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
 import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
@@ -458,6 +459,7 @@ export function TasksView() {
           is the one element allowed to give up width. */}
       <div className="app-header justify-between ps-6">
         <div className="flex items-center gap-3 shrink-0">
+          <SidebarExpandButton className="-ml-3" />
           <Hint label="Back to Chats">
             <button
               type="button"

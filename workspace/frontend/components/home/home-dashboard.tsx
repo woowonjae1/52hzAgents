@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/hint';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import {
   ProjectFolderPicker,
@@ -439,8 +440,9 @@ export function HomeDashboard() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface0">
-      <div className={cn('app-header ps-6', !isSidebarOpen && !isMobile && 'ps-14')}>
-        <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
+      <div className="app-header px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <SidebarExpandButton />
           <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Agents</h1>
           {allAvailableAgents.length > 0 && <p className="truncate text-xs tabular-nums text-muted-foreground">{headerCounts}</p>}
         </div>

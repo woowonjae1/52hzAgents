@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { ScreenMark } from '@/components/headers/screen-mark';
 import { workspaceApi } from '@/lib/api';
 import { RowActions } from '@/components/ui/row-actions';
@@ -1166,6 +1167,7 @@ export function SkillsView() {
       {/* Title bar */}
       <div className="app-header ps-5">
         <div className="flex flex-1 items-center gap-2 min-w-0">
+          <SidebarExpandButton className="-ml-2" />
           <Hint label="Back to chats">
             <button
               type="button"

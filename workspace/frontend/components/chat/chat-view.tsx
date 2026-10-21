@@ -38,6 +38,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { cn } from '@/lib/utils';
 import { ChannelHeader } from './channel-header';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { getApiBaseUrl } from '@/lib/config';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { basename } from '@/components/chat/project-folder-picker';
@@ -927,6 +928,7 @@ export function ChatView() {
         {/* Empty state header providing window drag region and sidebar toggle */}
         <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
           <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
+            <SidebarExpandButton />
             <span className="text-xs font-medium text-foreground-extra-muted">
               Messages
             </span>

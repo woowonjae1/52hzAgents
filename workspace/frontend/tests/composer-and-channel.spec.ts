@@ -147,4 +147,41 @@ test.describe('Composer & Channel Header Regression Tests', () => {
 
     expect(errors, `Uncaught errors in PromptComposer: ${errors.join('\n')}`).toEqual([]);
   });
+
+  test('Sidebar can be collapsed and restored via mouse toggle and keyboard shortcut', async ({ page }) => {
+    const errors = attachErrorGuards(page);
+
+    await page.goto('/default/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+
+    const collapseBtn = page.locator('button[aria-label="Collapse sidebar"]');
+    await expect(collapseBtn).toBeVisible();
+
+    // 1. Click collapse button to close sidebar
+    await collapseBtn.click();
+    await page.waitForTimeout(300);
+
+    // Expand button should now appear in ChannelHeader
+    const expandBtn = page.locator('button[aria-label="Expand sidebar"]');
+    await expect(expandBtn).toBeVisible();
+
+    // 2. Click expand button to restore sidebar
+    await expandBtn.click();
+    await page.waitForTimeout(300);
+
+    // Collapse button in sidebar should be visible again
+    await expect(collapseBtn).toBeVisible();
+    await expect(expandBtn).not.toBeVisible();
+
+    // 3. Test keyboard shortcut (Control+b) to toggle
+    await page.keyboard.press('Control+b');
+    await page.waitForTimeout(300);
+    await expect(expandBtn).toBeVisible();
+
+    await page.keyboard.press('Control+b');
+    await page.waitForTimeout(300);
+    await expect(collapseBtn).toBeVisible();
+
+    expect(errors, `Uncaught errors in Sidebar toggle: ${errors.join('\n')}`).toEqual([]);
+  });
 });

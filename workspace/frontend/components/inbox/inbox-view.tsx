@@ -10,6 +10,7 @@ import { toast } from '@/lib/toast';
 import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { useLayout } from '@/components/layout/layout-context';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import type { NotificationItem } from '@/lib/types';
@@ -271,6 +272,7 @@ export function InboxView() {
       {/* Header */}
       <div className="app-header justify-between ps-4 shrink-0">
         <div className="flex items-center gap-2">
+          <SidebarExpandButton />
           <Inbox className="size-4 text-foreground-muted" />
           <ScreenTitle>Inbox</ScreenTitle>
           {totalUnresolved > 0 && (

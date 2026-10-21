@@ -43,6 +43,7 @@ import { cn, mergeRefs } from '@/lib/utils';
 import { RowActions } from '@/components/ui/row-actions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { ScreenTitle } from '@/components/headers/screen-title';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { ScreenMark } from '@/components/headers/screen-mark';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -437,6 +438,7 @@ export function KnowledgeView({ sidebarOnly = false, embedded = false }: { sideb
         <div className="app-header ps-4">
           <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
             <div className="flex items-center gap-2.5 min-w-0">
+              <SidebarExpandButton />
               <Hint label="Back to conversation">
                 <button
                   type="button"

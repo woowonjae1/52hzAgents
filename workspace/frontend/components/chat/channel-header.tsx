@@ -25,6 +25,7 @@ import { stripTitleMentions } from '@/lib/thread-title';
 import { stripAddressPrefix } from '@/lib/types';
 import { isComposing } from '@/lib/ime';
 import { cn } from '@/lib/utils';
+import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import type { WorkspaceMessage, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import type { GitStatus } from '@/lib/use-git-status';
 
@@ -107,6 +108,7 @@ export function ChannelHeader({
   return (
     <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
       <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
+        <SidebarExpandButton />
         {isDM ? (
           <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
             <MessageSquare className="size-4 text-muted-foreground" />
