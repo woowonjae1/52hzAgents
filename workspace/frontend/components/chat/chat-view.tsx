@@ -37,7 +37,7 @@ import { ParallelBatchPanel } from './parallel-batch-panel';
 import { useLayout } from '@/components/layout/layout-context';
 import { useArtifacts } from '@/lib/artifacts-context';
 import { cn } from '@/lib/utils';
-import { headerIconButtonClass } from '@/components/headers/header-chip';
+import { ChannelHeader } from './channel-header';
 import { getApiBaseUrl } from '@/lib/config';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { basename } from '@/components/chat/project-folder-picker';
@@ -45,7 +45,6 @@ import {
   deriveTitleFromMessages,
   rememberDerivedTitle,
   getDerivedTitle,
-  stripTitleMentions,
 } from '@/lib/thread-title';
 import {
   TranscriptFilterBar,
@@ -57,7 +56,6 @@ import {
 import { SignalMark } from '@/components/brand/signal-mark';
 import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog';
 import { SEND_FIRST_MESSAGE_EVENT, consumePendingFirstMessage, type FirstMessageRequest } from '@/lib/first-message';
-import { GitChip } from '@/components/git/git-chip';
 import { useGitStatus } from '@/lib/use-git-status';
 
 import { AgentModelSwitcher } from './agent-model-switcher';
@@ -390,9 +388,6 @@ export function ChatView() {
   const { notifyFocus, notifyBlur, notifyTyping } = useComposingSignal(currentSessionId);
   const [showAllSteps, setShowAllSteps] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
-  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Optimistic message state for instant feedback
   const [optimisticMessages, setOptimisticMessages] = useState<WorkspaceMessage[]>([]);
@@ -786,20 +781,6 @@ export function ChatView() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
-
-  const startEditingTitle = () => {
-    setTitleDraft(currentSession?.title || '');
-    setEditingTitle(true);
-    setTimeout(() => titleInputRef.current?.select(), 0);
-  };
-
-  const commitTitle = () => {
-    setEditingTitle(false);
-    const trimmed = titleDraft.trim();
-    if (trimmed && currentSessionId && trimmed !== currentSession?.title) {
-      renameSession(currentSessionId, trimmed);
-    }
-  };
 
   const isTerminalStatus = useCallback((content: string) => {
     return /stopped|stopping failed|execution stopped|idle|done|completed|finished|ready|success/i.test(content.trim());
@@ -1243,231 +1224,43 @@ export function ChatView() {
 
   return (
     <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
-        {/* Thread header */}
-      {/*
-        `.app-header` (globals.css) owns the height, border, fill and padding —
-        the same contract Tasks / Mission / Skills / Knowledge / Settings use, so
-        this bottom border and the sidebar's are one continuous line. It no
-        longer reserves space for the native window buttons either: those live
-        in AppTitlebar above, which is also the app's single drag region.
-      */}
-      <div className="app-header app-header-fade sticky top-0 z-10 px-3.5">
-        <div className="flex flex-1 items-center gap-2 lg:gap-3 min-w-0">
-
-          {isDM ? (
-            <h2 className="text-sm font-bold tracking-tight truncate flex items-center gap-2 text-foreground">
-              <MessageSquare className="size-4 text-muted-foreground" />
-              <span>{currentSessionId!.slice(3).split(',').map(stripAddressPrefix).join(' ↔ ')}</span>
-              <span className="text-3xs px-2 py-0.5 rounded-full bg-surface3/80 text-muted-foreground border border-border/60 font-mono">
-                read-only
-              </span>
-            </h2>
-          ) : editingTitle ? (
-            <input
-              ref={titleInputRef}
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={commitTitle}
-              onKeyDown={(e) => {
-                if (isComposing(e)) return;
-                if (e.key === 'Enter') commitTitle();
-                if (e.key === 'Escape') setEditingTitle(false);
-              }}
-              className="text-sm font-semibold tracking-tight bg-surface2/50 border-b-2 border-border-accent px-2 py-0.5 rounded-t min-w-0 max-w-[300px] text-foreground h-7"
-              autoFocus
-            />
-          ) : (
-            /*
-              beUI stacks a muted subtitle under the title ("Checkout release"
-              over "Agent workspace · focused patch"). The second line here is
-              the two facts this header already had scattered across it: which
-              folder the thread is bound to, and how many agents are in it.
-            */
-            <Hint label="Click to rename">
-              <div className="flex min-w-0 flex-col" onClick={startEditingTitle}>
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
-                    {currentSession?.title ? stripTitleMentions(currentSession.title) : 'Channel'}
-                  </h2>
-                  {currentSession?.master && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0" title={`Master agent: ${currentSession.master}`}>
-                      <Crown className="size-2.5" />
-                      <span>{currentSession.master}</span>
-                    </span>
-                  )}
-                </div>
-                <span className="truncate text-[11px] leading-tight text-muted-foreground">
-                  {[
-                    currentSessionWorkingDir ? basename(currentSessionWorkingDir) : null,
-                    (() => {
-                      const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
-                      if (activeHeaderAgents.length > 0) {
-                        return activeHeaderAgents.length === total
-                          ? `${total} agent${total > 1 ? 's' : ''}`
-                          : `${activeHeaderAgents.length}/${total} online`;
-                      }
-                      if (total > 0) {
-                        return `${total} agent${total > 1 ? 's' : ''} (offline)`;
-                      }
-                      return 'no agents configured';
-                    })(),
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </div>
-            </Hint>
-          )}
-
-          {/*
-            beUI's connection pill, top-right of the shell: `bg-emerald-500/10`
-            when live. It replaces nothing — this header never said, in one
-            place, whether the workspace was actually connected.
-          */}
-          {/*
-            The Connected / Offline pill is gone. It was computed from exactly
-            the same value as the subtitle under the title — `activeHeaderAgents
-            .length > 0` — so the header said "no agents" and "Offline" about one
-            fact, a line apart, and the composer banner said it a third time. It
-            was also the only green in the header. The subtitle keeps the fact;
-            this spacer keeps the right-hand group pushed right.
-          */}
-          <span className="ml-auto" aria-hidden />
-
-          {/*
-            Who is in this channel, and whether any of them is mid-task.
-            "Working" used to be an amber pill wrapping a three-bar audio
-            equalizer, each bar carrying its own amber glow — five moving parts
-            and a fourth accent hue to say one thing. It now says it the same way
-            a running tool call and a streaming reasoning block do: the shimmer
-            (`.event-running`), on the words themselves. One signal for "still
-            going", everywhere in the app.
-          */}
-          {!isDM && workingHere.length > 0 && (
-            <div className="hidden sm:flex items-baseline gap-2 shrink min-w-0 max-w-[45%]">
-              <span className="event-running inline-flex items-baseline gap-1.5 text-xs min-w-0 text-foreground-muted">
-                <span className="truncate text-foreground">{workingHere.join(', ')}</span>
-                <span className="shrink-0">working</span>
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/*
-            The mode control moved to the composer, next to the model select:
-            it governs what sending does, not what the thread is called. See
-            OrchestrationControl's `composer` variant.
-          */}
-
-          {/*
-            THE ROW HAS TWO KINDS OF THING IN IT, AND NOW SAYS SO.
-
-            Five controls sat in one undifferentiated 8px-gapped line: mode,
-            quota, context, branch, panel, overflow. Three of them REPORT
-            something you can open for detail; two PERFORM something. Nothing on
-            screen distinguished those, so the header read as a row of assorted
-            widgets — which is most of why it felt busy at a glance while
-            actually carrying very little.
-
-            Shape carries the distinction (pills report, squares act — see
-            headers/header-chip.ts) and a hairline carries the grouping. The
-            reporting chips also drop the `bg-surface2/60` tray they used to
-            share: a translucent ground behind two chips that already have their
-            own ground was a third fill for one idea, and with the chips now on
-            one recipe the grouping no longer needs a container to be legible.
-          */}
-          <div className="flex items-center gap-1.5">
-            <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
-            {currentSessionWorkingDir && (
-              <Hint label="Project Workspace (Instructions, Memory, Tasks)">
-                <button
-                  type="button"
-                  onClick={() => setProjectWorkspaceOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md bg-surface2 hover:bg-surface3 border border-border/60 text-foreground transition-colors shrink-0"
-                >
-                  <FolderGit2 className="size-3 text-primary" />
-                  <span className="font-mono text-2xs hidden sm:inline max-w-[120px] truncate">
-                    {basename(currentSessionWorkingDir)}
-                  </span>
-                </button>
-              </Hint>
-            )}
-          </div>
-
-          <span className="h-4 w-px bg-border shrink-0 mx-0.5" aria-hidden />
-
-          {/* Unified Studio Panel Toggle */}
-          <Hint label={isStudioOpen ? 'Close Studio panel' : outputsCount > 0 ? `Studio outputs (${outputsCount})` : 'Open Studio panel'}>
-            <button
-              onClick={() => {
-                if (isStudioOpen) {
-                  setActiveRightTab(null);
-                  closeCanvas();
-                } else {
-                  if (selectedAgentName) setSelectedAgentName(null);
-                  setActiveRightTab('canvas');
-                }
-              }}
-              className={cn(
-                headerIconButtonClass,
-                'relative',
-                isStudioOpen && 'bg-surface3 text-foreground border border-border',
-              )}
-            >
-              <PanelRight className="size-4" />
-              {outputsCount > 0 && !isStudioOpen && (
-                <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-semibold flex items-center justify-center leading-none shadow-xs pointer-events-none">
-                  {outputsCount}
-                </span>
-              )}
-            </button>
-          </Hint>
-
-          {/* More Actions Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Hint label="More actions">
-                <button className={headerIconButtonClass}>
-                  <MoreHorizontal className="size-4" />
-                </button>
-              </Hint>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => (filterOpen || filterActive ? closeFilter() : setFilterOpen(true))}>
-                <Filter className="size-4 mr-2 text-foreground-muted" />
-                <span>{filterOpen || filterActive ? 'Clear filter' : 'Filter this thread'}</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => void handleExportMarkdown()} disabled={exporting || !currentSessionId}>
-                <Download className="size-4 mr-2" />
-                <span>Export as Markdown</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/*
-            THE APP'S BUTTONS END HERE; THE OPERATING SYSTEM'S BEGIN.
-
-            `.app-header` reserves `--window-controls-inset` (138px) at its end
-            so nothing is drawn under the native minimise / maximise / close
-            glyphs — but reserving space is not the same as marking a boundary.
-            On screen the app's own 30px icon buttons ran straight into three
-            OS buttons of a different size, a different weight and a different
-            hit target, with nothing between them but empty chrome, so the six
-            read as one ragged row.
-
-            The rule above separates pills from squares — things that report
-            from things that act. This one separates ours from the system's,
-            which is the bigger jump of the two and was the only one unmarked.
-            It is drawn only on desktop, because in a browser tab the reserve
-            is 0 and there is nothing on the other side of it.
-          */}
-          <span
-            className="desktop-only h-4 w-px bg-border shrink-0 ms-1"
-            aria-hidden
-          />
-        </div>
-      </div>
+      <ChannelHeader
+        currentSession={currentSession}
+        currentSessionId={currentSessionId}
+        isDM={isDM}
+        agents={agents}
+        activeHeaderAgents={activeHeaderAgents}
+        sessionParticipants={sessionParticipants}
+        workingHere={workingHere}
+        currentSessionWorkingDir={currentSessionWorkingDir}
+        gitChannelId={gitChannelId}
+        gitStatus={gitStatus}
+        refreshGit={refreshGit}
+        outputsCount={outputsCount}
+        isStudioOpen={isStudioOpen}
+        filterOpen={filterOpen}
+        filterActive={filterActive}
+        exporting={exporting}
+        onRenameSession={async (title) => {
+          if (!currentSessionId) return;
+          await renameSession(currentSessionId, title);
+        }}
+        onToggleFilter={() => {
+          if (filterOpen || filterActive) closeFilter();
+          else setFilterOpen(true);
+        }}
+        onToggleStudio={() => {
+          if (isStudioOpen) {
+            setActiveRightTab(null);
+            closeCanvas();
+          } else {
+            if (selectedAgentName) setSelectedAgentName(null);
+            setActiveRightTab('canvas');
+          }
+        }}
+        onOpenProjectWorkspace={() => setProjectWorkspaceOpen(true)}
+        onExportMarkdown={handleExportMarkdown}
+      />
 
       {/* Missing-description warning — routing accuracy (dynamic/workflow router
           and the master's own delegation) depends on agent descriptions. Nudge
