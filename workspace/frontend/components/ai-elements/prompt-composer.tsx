@@ -1246,6 +1246,20 @@ export function PromptComposer({
               sessionId={session?.sessionId}
             />
 
+            <Hint label="Attach file or image">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  pillButton,
+                  'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
+                  pendingFiles.length > 0 && 'bg-surface3 text-primary border border-primary/30',
+                )}
+                aria-label="Attach file or image"
+              >
+                <Paperclip className="size-3.5 shrink-0" />
+              </button>
+            </Hint>
 
             <DropdownMenu>
               <Hint label="Add context & extensions (+)">
