@@ -30,9 +30,11 @@ function attachErrorGuards(page: import('@playwright/test').Page) {
 
 test.describe('Composer & Channel Header Regression Tests', () => {
   test.beforeEach(async ({ page }) => {
-    // Pre-seed active session in localStorage so ChatView mounts directly
+    // Pre-seed layout to 'threads' and active session so ChatView is the visible active view
     await page.addInitScript(() => {
       localStorage.setItem('current_session_default', 'general');
+      localStorage.setItem('persisted_layout', JSON.stringify({ viewMode: 'threads' }));
+      localStorage.setItem('layout:default', JSON.stringify({ viewMode: 'threads' }));
     });
 
     await page.route('**/v1/workspaces/*', async (route) => {
