@@ -1262,30 +1262,47 @@ export function PromptComposer({
               </button>
             </Hint>
 
-            <Hint label={message.startsWith('/rfc') ? 'Deliberation mode active (click to disable)' : 'Start RFC deliberation (Cross-agent debate)'}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (message.startsWith('/rfc')) {
-                    setMessage(message.replace(/^\/rfc\s*/, ''));
-                  } else {
-                    setMessage('/rfc ' + message.replace(/^\/rfc\s*/, ''));
-                    textareaRef.current?.focus();
+            {(() => {
+              const canRfc = !disabled && (agents?.length ?? 0) >= 2;
+              const isRfcActive = message.startsWith('/rfc');
+              return (
+                <Hint
+                  label={
+                    !canRfc && (agents?.length ?? 0) < 2
+                      ? 'RFC deliberation requires at least 2 configured agents (1 initiator + 1 challenger)'
+                      : isRfcActive
+                      ? 'Deliberation mode active (click to disable)'
+                      : 'Start RFC deliberation (Cross-agent debate)'
                   }
-                }}
-                className={cn(
-                  pillButton,
-                  'h-7 px-2 gap-1 text-xs transition-colors cursor-pointer active:scale-95',
-                  message.startsWith('/rfc')
-                    ? 'bg-brand/15 text-brand border border-brand/40 font-medium'
-                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2'
-                )}
-                aria-label="Toggle RFC deliberation"
-              >
-                <Scale className="size-3.5 shrink-0" />
-                <span className="text-2xs font-medium">RFC</span>
-              </button>
-            </Hint>
+                >
+                  <button
+                    type="button"
+                    disabled={!canRfc && !isRfcActive}
+                    onClick={() => {
+                      if (isRfcActive) {
+                        setMessage(message.replace(/^\/rfc\s*/, ''));
+                      } else if (canRfc) {
+                        setMessage('/rfc ' + message.replace(/^\/rfc\s*/, ''));
+                        textareaRef.current?.focus();
+                      }
+                    }}
+                    className={cn(
+                      pillButton,
+                      'h-7 px-2 gap-1 text-xs transition-colors active:scale-95',
+                      isRfcActive
+                        ? 'bg-brand/15 text-brand border border-brand/40 font-medium cursor-pointer'
+                        : canRfc
+                        ? 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2 cursor-pointer'
+                        : 'opacity-40 text-foreground-extra-muted cursor-not-allowed'
+                    )}
+                    aria-label="Toggle RFC deliberation"
+                  >
+                    <Scale className="size-3.5 shrink-0" />
+                    <span className="text-2xs font-medium">RFC</span>
+                  </button>
+                </Hint>
+              );
+            })()}
 
             <DropdownMenu>
               <Hint label="Add context & extensions (+)">

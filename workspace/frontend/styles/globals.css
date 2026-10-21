@@ -41,10 +41,10 @@
     ground stays neutral. The tonal difference is what sells it as another
     substance; lightness alone just reads as a dimmer copy of the same one.
   */
-  --surface-sidebar: var(--background);
-  --surface-sidebar-hover: var(--muted);
+  --surface-sidebar: #f4f6f8;
+  --surface-sidebar-hover: color-mix(in oklab, #f4f6f8 92%, var(--foreground) 8%);
   /* Pressed / selected-without-brand, one step beyond hover. */
-  --surface-sidebar-active: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface-sidebar-active: color-mix(in oklab, #f4f6f8 85%, var(--foreground) 15%);
   --surface-workspace: var(--background);
   /*
    * THE ONE GROUND FOR ANYTHING THAT FLOATS — dialog, sheet, dropdown, popover,
@@ -326,9 +326,9 @@
     row can no longer be told apart by `bg-surface2` alone — see the brand
     tint, which is what marks selection now.
   */
-  --surface-sidebar: var(--background);
-  --surface-sidebar-hover: var(--muted);
-  --surface-sidebar-active: color-mix(in oklab, var(--muted) 92%, var(--foreground) 8%);
+  --surface-sidebar: #141419;
+  --surface-sidebar-hover: #1c1c24;
+  --surface-sidebar-active: #22222c;
   --surface-workspace: var(--background);
   /* The value the five hardcoded overlay hexes were all groping for. */
   --surface-overlay: var(--popover);

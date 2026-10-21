@@ -97,10 +97,10 @@ test.describe('Frontend Smoke Tests (Browser Mount & Hydration)', () => {
     expect(errors, `Uncaught errors on /quickbar/: ${errors.join('\n')}`).toEqual([]);
   });
 
-  test('Agents Demo /agents-demo/ catalog mounts without missing provider crashes', async ({ page }) => {
+  test('Landing /landing mounts clean static landing without missing provider crashes', async ({ page }) => {
     const errors = attachErrorGuards(page);
 
-    const response = await page.goto('/agents-demo/', { waitUntil: 'domcontentloaded' });
+    const response = await page.goto('/landing', { waitUntil: 'domcontentloaded' });
     expect(response?.status()).toBe(200);
 
     await page.waitForTimeout(1000);
@@ -108,6 +108,6 @@ test.describe('Frontend Smoke Tests (Browser Mount & Hydration)', () => {
     const bodyContent = await page.locator('body').innerHTML();
     expect(bodyContent.trim().length).toBeGreaterThan(50);
 
-    expect(errors, `Uncaught errors on /agents-demo/: ${errors.join('\n')}`).toEqual([]);
+    expect(errors, `Uncaught errors on /landing: ${errors.join('\n')}`).toEqual([]);
   });
 });

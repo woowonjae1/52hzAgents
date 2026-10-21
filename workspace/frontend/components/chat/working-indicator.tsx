@@ -2,13 +2,17 @@
 
 import { cn } from '@/lib/utils';
 import { useElapsedFrom } from '@/lib/use-elapsed';
+import { useReducedMotion } from 'motion/react';
 
 /**
  * 52Hz Sonic Resonance Waveform:
  * 5 vertical harmonic bars that undulate with phase offsets, evoking
  * a deep-sea acoustic frequency pulse for 52hzAgents.
+ * Respects prefers-reduced-motion both via CSS and React motion hook.
  */
 function SonarWave({ className }: { className?: string }) {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <span
       aria-hidden
@@ -17,10 +21,13 @@ function SonarWave({ className }: { className?: string }) {
       {[0.4, 0.75, 1.0, 0.75, 0.4].map((height, i) => (
         <span
           key={i}
-          className="w-[2px] rounded-full bg-brand animate-sonar-bar"
+          className={cn(
+            'w-[2px] rounded-full bg-brand',
+            !shouldReduceMotion && 'animate-sonar-bar'
+          )}
           style={{
-            height: `${Math.round(height * 11)}px`,
-            animationDelay: `${i * 120}ms`,
+            height: shouldReduceMotion ? '8px' : `${Math.round(height * 11)}px`,
+            animationDelay: shouldReduceMotion ? undefined : `${i * 120}ms`,
           }}
         />
       ))}
