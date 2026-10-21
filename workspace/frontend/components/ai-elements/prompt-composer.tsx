@@ -25,6 +25,7 @@ import {
   Wrench,
   Check,
   Crown,
+  Scale,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
@@ -1258,6 +1259,31 @@ export function PromptComposer({
                 aria-label="Attach file or image"
               >
                 <Paperclip className="size-3.5 shrink-0" />
+              </button>
+            </Hint>
+
+            <Hint label={message.startsWith('/rfc') ? 'Deliberation mode active (click to disable)' : 'Start RFC deliberation (Cross-agent debate)'}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (message.startsWith('/rfc')) {
+                    setMessage(message.replace(/^\/rfc\s*/, ''));
+                  } else {
+                    setMessage('/rfc ' + message.replace(/^\/rfc\s*/, ''));
+                    textareaRef.current?.focus();
+                  }
+                }}
+                className={cn(
+                  pillButton,
+                  'h-7 px-2 gap-1 text-xs transition-colors cursor-pointer active:scale-95',
+                  message.startsWith('/rfc')
+                    ? 'bg-brand/15 text-brand border border-brand/40 font-medium'
+                    : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2'
+                )}
+                aria-label="Toggle RFC deliberation"
+              >
+                <Scale className="size-3.5 shrink-0" />
+                <span className="text-2xs font-medium">RFC</span>
               </button>
             </Hint>
 
