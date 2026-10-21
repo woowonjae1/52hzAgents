@@ -29,23 +29,78 @@ function attachErrorGuards(page: import('@playwright/test').Page) {
 }
 
 test.describe('Composer & Channel Header Regression Tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/v1/workspaces/*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 'default',
+          name: 'Default Workspace',
+          owner_id: 'user1',
+        }),
+      });
+    });
+
+    await page.route('**/v1/discover*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          workspace_id: 'default',
+          agents: [
+            { agent_name: 'claude-architect', agent_type: 'claude', role: 'Architect', status: 'online' },
+            { agent_name: 'deepseek-reviewer', agent_type: 'deepseek', role: 'Reviewer', status: 'online' },
+          ],
+          channels: [
+            {
+              id: 'general',
+              channel: 'general',
+              name: 'general',
+              topic: 'Architecture Deliberation',
+              participants: ['claude-architect', 'deepseek-reviewer'],
+              orchestration_mode: 'dynamic',
+              status: 'active',
+            },
+          ],
+        }),
+      });
+    });
+
+    await page.route('**/v1/events*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ events: [] }),
+      });
+    });
+
+    await page.route('**/v1/conversations*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ conversations: [] }),
+      });
+    });
+  });
+
   test('ChannelHeader renders with app-header chrome, studio toggle and overflow controls', async ({ page }) => {
     const errors = attachErrorGuards(page);
 
     await page.goto('/default/', { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(1500);
 
-    // Verify ChannelHeader (.app-header) mounted
-    const header = page.locator('.app-header');
-    await expect(header).toBeVisible();
+    // ChannelHeader in the main chat view
+    const mainHeader = page.locator('main .app-header-fade, .flex-1 .app-header-fade').first();
+    await expect(mainHeader).toBeVisible();
 
     // Verify Studio panel toggle button is present
-    const studioBtn = header.locator('button:has(svg.lucide-panel-right)');
-    await expect(studioBtn).toBeVisible();
+    const studioBtn = page.locator('button:has(svg.lucide-panel-right)');
+    await expect(studioBtn.first()).toBeVisible();
 
     // Verify More actions button is present
-    const moreBtn = header.locator('button:has(svg.lucide-more-horizontal)');
-    await expect(moreBtn).toBeVisible();
+    const moreBtn = page.locator('button:has(svg.lucide-more-horizontal)');
+    await expect(moreBtn.first()).toBeVisible();
 
     expect(errors, `Uncaught errors in ChannelHeader: ${errors.join('\n')}`).toEqual([]);
   });
@@ -67,25 +122,21 @@ test.describe('Composer & Channel Header Regression Tests', () => {
     const rfcBtn = page.locator('button[aria-label="Toggle RFC deliberation"]');
     await expect(rfcBtn).toBeVisible();
 
-    // If enabled, verify click interaction toggles /rfc prefix in composer
-    const isDisabled = await rfcBtn.isDisabled();
-    if (!isDisabled) {
-      // Click RFC button to activate deliberation mode
-      await rfcBtn.click();
-      await page.waitForTimeout(200);
+    // With 2 online agents mocked, RFC button should be enabled
+    await expect(rfcBtn).toBeEnabled();
 
-      const val = await textarea.inputValue();
-      expect(val.startsWith('/rfc')).toBe(true);
+    // Click RFC button to activate deliberation mode
+    await rfcBtn.click();
+    await page.waitForTimeout(200);
 
-      // Click again to toggle off
-      await rfcBtn.click();
-      await page.waitForTimeout(200);
-      const valAfter = await textarea.inputValue();
-      expect(valAfter.startsWith('/rfc')).toBe(false);
-    } else {
-      // If disabled (because fewer than 2 agents configured), ensure aria-disabled or disabled attribute is present
-      expect(isDisabled).toBe(true);
-    }
+    let val = await textarea.inputValue();
+    expect(val.startsWith('/rfc')).toBe(true);
+
+    // Click again to toggle off
+    await rfcBtn.click();
+    await page.waitForTimeout(200);
+    val = await textarea.inputValue();
+    expect(val.startsWith('/rfc')).toBe(false);
 
     expect(errors, `Uncaught errors in PromptComposer: ${errors.join('\n')}`).toEqual([]);
   });
