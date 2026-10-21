@@ -32,9 +32,9 @@ test.describe('Composer & Channel Header Regression Tests', () => {
   test.beforeEach(async ({ page }) => {
     // Pre-seed layout to 'threads' and active session so ChatView is the visible active view
     await page.addInitScript(() => {
-      localStorage.setItem('current_session_default', 'general');
-      localStorage.setItem('persisted_layout', JSON.stringify({ viewMode: 'threads' }));
-      localStorage.setItem('layout:default', JSON.stringify({ viewMode: 'threads' }));
+      localStorage.setItem('workspace_layout_v1', JSON.stringify({ viewMode: 'threads' }));
+      localStorage.setItem('last_session_id_default', 'general');
+      localStorage.setItem('last_session_id', 'general');
     });
 
     await page.route('**/v1/workspaces/*', async (route) => {
@@ -106,7 +106,7 @@ test.describe('Composer & Channel Header Regression Tests', () => {
     await expect(studioBtn).toBeVisible();
 
     // Verify More actions button is present
-    const moreBtn = page.locator('button:has(svg.lucide-more-horizontal)').first();
+    const moreBtn = page.getByRole('button', { name: 'More actions' });
     await expect(moreBtn).toBeVisible();
 
     expect(errors, `Uncaught errors in ChannelHeader: ${errors.join('\n')}`).toEqual([]);
