@@ -1208,7 +1208,7 @@ function createMainWindow() {
         },
         {
           label: 'Documentation & GitHub',
-          click: () => shell.openExternal('https://github.com/openagents/openagents'),
+          click: () => shell.openExternal('https://github.com/woowonjae1/52hzAgents'),
         },
       ],
     },
