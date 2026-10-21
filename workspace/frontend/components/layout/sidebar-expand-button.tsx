@@ -16,9 +16,9 @@ interface SidebarExpandButtonProps {
  * with one click or via keyboard shortcut (Mod+B).
  */
 export function SidebarExpandButton({ className }: SidebarExpandButtonProps) {
-  const { isSidebarOpen, sidebarToggle, isMobile } = useLayout();
+  const { isSidebarOpen, sidebarToggle } = useLayout();
 
-  if (isSidebarOpen || isMobile) return null;
+  if (isSidebarOpen) return null;
 
   return (
     <Hint label="Expand sidebar (Ctrl+B)">
@@ -26,6 +26,7 @@ export function SidebarExpandButton({ className }: SidebarExpandButtonProps) {
         type="button"
         onClick={sidebarToggle}
         aria-label="Expand sidebar"
+        data-no-drag
         className={cn(
           'size-7 flex items-center justify-center rounded-md border border-border/80 bg-surface2/70 text-foreground hover:bg-surface3 hover:text-foreground transition-all shrink-0 cursor-pointer shadow-xs active:scale-95 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
           className
