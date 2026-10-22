@@ -277,11 +277,18 @@ class AmpAdapter extends BaseAdapter {
     return this._channelEfforts['*'] || '';
   }
 
-  async fetchAndReportUsage() {
+  async fetchAndReportUsage(force = false) {
+    if (force) {
+      this._modelsCache = null;
+      this._effortCache = null;
+    }
     try {
       const env = this.agentEnv || process.env;
-      const current = this._resolveModel() || env.AMP_MODEL || null;
+      let current = this._resolveModel() || env.AMP_MODEL || null;
       const models = await this._listModels();
+      if (current && models.length > 0 && !models.some((m) => m.id.toLowerCase() === current.toLowerCase())) {
+        current = models[0].id;
+      }
       const efforts = await this._listEffortLevels();
       const effort = this._currentEffort() || null;
       await this.client.reportAgentUsage(

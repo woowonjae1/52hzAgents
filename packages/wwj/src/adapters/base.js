@@ -431,6 +431,10 @@ class BaseAdapter {
       // A rejoin mid-turn: say the turns are still ours, or the backend reads
       // the new session as a restart and marks them failed.
       for (const channel of this._runningTurns || []) this._reportTurnState(channel, 'running');
+      // Real-time model catalog refresh on connect / reconnect
+      if (typeof this.fetchAndReportUsage === 'function') {
+        this.fetchAndReportUsage(true).catch(() => {});
+      }
       return true;
     } catch (e) {
       const { reason, message } = classifyJoinError(e);

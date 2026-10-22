@@ -156,15 +156,21 @@ class LlmDirectAdapter extends BaseAdapter {
     });
   }
 
-  async fetchAndReportUsage() {
+  async fetchAndReportUsage(force = false) {
+    if (force) {
+      this._modelsCache = null;
+    }
     try {
       // `this.model` is also seeded from the vendor default by some subclasses,
       // so "resolved" alone cannot mean "the user overrode this" - only a value
       // that differs from the configured/default model is a real override.
       const resolved = this._resolveModel();
       const override = (resolved && resolved !== this._model) ? resolved : '';
-      const current = resolved || this._model || null;
+      let current = resolved || this._model || null;
       const models = await this._listModels();
+      if (current && models.length > 0 && !models.some((m) => m.id.toLowerCase() === current.toLowerCase())) {
+        current = models[0].id;
+      }
       const source = !this._directMode ? 'unconfigured'
         : override ? 'workspace-override'
         : this._modelIsVendorDefault ? 'vendor-default'

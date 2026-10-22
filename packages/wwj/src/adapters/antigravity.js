@@ -519,8 +519,12 @@ class AntigravityAdapter extends BaseAdapter {
     return this._channelEfforts['*'] || '';
   }
 
-  async fetchAndReportUsage() {
+  async fetchAndReportUsage(force = false) {
     try {
+      if (force) {
+        this._modelsCache = null;
+        this._effortCache = null;
+      }
       const fromSettings = this._modelFromAntigravitySettings();
       const current = this.getCurrentModel() || null;
       const source = !current ? 'unconfigured'
@@ -542,6 +546,10 @@ class AntigravityAdapter extends BaseAdapter {
       let reportedCurrent = canonical ? canonical.id : current;
       if (reportedCurrent && /gemini\s*3\.5/i.test(reportedCurrent)) {
         reportedCurrent = models.length ? models[0].id : null;
+      }
+      // If the current model was delisted upstream, fall back to first available model
+      if (reportedCurrent && models.length > 0 && !models.some((m) => m.id.toLowerCase() === reportedCurrent.toLowerCase())) {
+        reportedCurrent = models[0].id;
       }
       await this.client.reportAgentUsage(
         this.workspaceId,

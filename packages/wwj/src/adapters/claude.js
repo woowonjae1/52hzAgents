@@ -714,7 +714,15 @@ class ClaudeAdapter extends BaseAdapter {
       // returns the model's own error text when the configured model is
       // unreachable, so the regexes below it silently produced null.
       const models = await this._listModels();
-      const currentModel = this._resolveModel() || this._currentModelFromConfig() || null;
+      let currentModel = this._resolveModel() || this._currentModelFromConfig() || null;
+      // If the current model is delisted/absent from available models, fall back to the first available model
+      if (currentModel && models.length > 0) {
+        const lower = currentModel.toLowerCase();
+        const exists = models.some((m) => m.id.toLowerCase() === lower || (m.label && m.label.toLowerCase() === lower));
+        if (!exists) {
+          currentModel = models[0].id;
+        }
+      }
       const availableModels = models.length ? JSON.stringify(models) : null;
 
       const efforts = await this._listEffortLevels();

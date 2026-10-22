@@ -508,15 +508,18 @@ class CodexAdapter extends BaseAdapter {
    * omitted entirely  —not padded with the current model  —when Codex has no
    * model cache to read, so the UI shows "not configured" instead of a guess.
    */
-  async fetchAndReportUsage() {
+  async fetchAndReportUsage(force = false) {
     try {
       const fromConfig = this._configFromCodexToml();
-      const current = this._resolveModel() || null;
+      let current = this._resolveModel() || null;
       const source = !current ? 'unconfigured'
         : (current !== fromConfig.model && current !== this._directModel) ? 'workspace-override'
         : current === fromConfig.model ? 'codex-config'
         : 'agent-env';
       const models = this._listModels();
+      if (current && models.length > 0 && !models.some((m) => m.id.toLowerCase() === current.toLowerCase())) {
+        current = models[0].id;
+      }
       const efforts = this._listEffortLevels();
       await this.client.reportAgentUsage(
         this.workspaceId,

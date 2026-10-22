@@ -139,11 +139,21 @@ export function currentModelFor(snapshot: AgentModelState, agentName: string): s
       }
     }
   }
-  if (!raw) return undefined;
+  const opts = modelsFor(snapshot, agentName);
+  if (!raw) return opts[0]?.id || undefined;
   const isAntigravity = agentName.toLowerCase() === 'antigravity' || agentName.toLowerCase() === 'agy';
   if (isAntigravity && /3\.5/i.test(raw)) {
-    const opts = modelsFor(snapshot, agentName);
     return opts[0]?.id || undefined;
+  }
+  // Validate against live upstream options: if the model was delisted, fall back to first available
+  if (opts.length > 0) {
+    const lower = raw.toLowerCase();
+    const exists = opts.some(
+      (o) => o.id.toLowerCase() === lower || o.name.toLowerCase() === lower || o.shortName.toLowerCase() === lower,
+    );
+    if (!exists) {
+      return opts[0]?.id || undefined;
+    }
   }
   return raw;
 }
@@ -185,6 +195,17 @@ export function hydrateAgentModels(
   let nextCurrent = candidateCurrent ?? reported.current ?? undefined;
   if (nextCurrent && isAntigravity && /3\.5/i.test(nextCurrent)) {
     nextCurrent = nextOptions[0]?.id;
+  }
+  // If the reported/selected model is not present in live options (e.g. delisted upstream),
+  // fall back immediately to the first valid option.
+  if (nextCurrent && nextOptions.length > 0) {
+    const lower = nextCurrent.toLowerCase();
+    const exists = nextOptions.some(
+      (o) => o.id.toLowerCase() === lower || o.name.toLowerCase() === lower || o.shortName.toLowerCase() === lower,
+    );
+    if (!exists) {
+      nextCurrent = nextOptions[0]?.id;
+    }
   }
 
   const optionsUnchanged =
@@ -239,6 +260,20 @@ export function restoreForSession(sessionId: string, agentNames: string[]): void
           localStorage.removeItem(sKey);
           localStorage.removeItem(dKey);
           continue;
+        }
+        // If options are already known, validate that saved choice is not a delisted model
+        const opts = state[name]?.options;
+        if (opts && opts.length > 0) {
+          const lower = saved.toLowerCase();
+          const exists = opts.some(
+            (o) => o.id.toLowerCase() === lower || o.name.toLowerCase() === lower || o.shortName.toLowerCase() === lower,
+          );
+          if (!exists) {
+            localStorage.removeItem(sKey);
+            localStorage.removeItem(dKey);
+            setCurrentModel(name, opts[0]?.id);
+            continue;
+          }
         }
         setCurrentModel(name, saved);
       }

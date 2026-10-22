@@ -927,11 +927,14 @@ class OpenCodeAdapter extends BaseAdapter {
    * value as configuration truth, and omits the model list entirely rather than
    * inventing one when the probe came back empty.
    */
-  async fetchAndReportUsage() {
+  async fetchAndReportUsage(force = false) {
+    if (force) {
+      this._modelsCache = null;
+    }
     try {
       const override = (this._channelModels && this._channelModels['*']) || this.model || '';
       const fromConfig = this._modelFromCliConfig();
-      const currentId = override || fromConfig || this._resolveModel();
+      let currentId = override || fromConfig || this._resolveModel();
       const source = override ? 'workspace-override'
         : fromConfig ? 'cli-config'
         : currentId ? 'agent-env'
@@ -946,6 +949,8 @@ class OpenCodeAdapter extends BaseAdapter {
             label: slash > 0 ? currentId.slice(slash + 1) : currentId,
           }];
         }
+      } else if (currentId && !models.some((m) => m.id.toLowerCase() === currentId.toLowerCase())) {
+        currentId = models[0].id;
       }
       await this.client.reportAgentUsage(
         this.workspaceId,

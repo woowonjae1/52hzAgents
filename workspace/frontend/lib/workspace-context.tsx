@@ -12,6 +12,7 @@ import type { TodoPatch, TodoWritePayload } from './api/planning';
 import type { BrowserPersistentContext, BrowserTab, DMConversation, KnowledgeEntry, NotificationItem, OnlineUser, RoutineItem, TimerItem, TodoItem, Workspace, WorkspaceAgent, WorkspaceFile, WorkspaceIdentity, WorkspaceSession } from './types';
 import { stripAddressPrefix, isAgentAddress } from '@/lib/types';
 import { moveThreadProfile } from './agent-profiles';
+import { hydrateAgentModels, parseReportedModels } from '@/lib/agent-model-store';
 
 // ---------------------------------------------------------------------------
 // Reference stability for polled collections
@@ -1777,6 +1778,22 @@ export function WorkspaceProvider({
                   }
                   return next;
                 });
+                break;
+              }
+
+              case 'workspace.agent.usage.updated': {
+                const usage = (event.payload as any)?.usage;
+                const source = (event.source as string) || '';
+                const agentName =
+                  (event.payload as any)?.agent_name ||
+                  (source.includes(':') ? source.slice(source.indexOf(':') + 1) : source) ||
+                  usage?.agent_name;
+                if (agentName && usage) {
+                  hydrateAgentModels(agentName, {
+                    options: parseReportedModels(usage.available_models),
+                    current: usage.current_model,
+                  });
+                }
                 break;
               }
 
