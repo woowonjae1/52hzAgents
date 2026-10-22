@@ -442,7 +442,7 @@ export function HomeDashboard() {
     <div className="flex h-full min-h-0 flex-col bg-surface0">
       <div className="app-header px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
-          <SidebarExpandButton />
+          <SidebarExpandButton className="-ml-1" />
           <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Agents</h1>
           {allAvailableAgents.length > 0 && <p className="truncate text-xs tabular-nums text-muted-foreground">{headerCounts}</p>}
         </div>

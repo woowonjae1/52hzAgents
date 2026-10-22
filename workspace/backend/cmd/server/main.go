@@ -376,6 +376,11 @@ func main() { // 服务程序运行主入口函数。
 		fromDisk := func(c *gin.Context, name string) bool {
 			full := filepath.Join(staticDir, filepath.FromSlash(name))
 			if stat, err := os.Stat(full); err == nil && !stat.IsDir() {
+				if strings.HasSuffix(name, ".html") || name == "index.html" {
+					c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+					c.Header("Pragma", "no-cache")
+					c.Header("Expires", "0")
+				}
 				c.File(full)
 				return true
 			}
@@ -385,6 +390,11 @@ func main() { // 服务程序运行主入口函数。
 			data, err := fs.ReadFile(embeddedUI, name)
 			if err != nil {
 				return false
+			}
+			if strings.HasSuffix(name, ".html") || name == "index.html" {
+				c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+				c.Header("Pragma", "no-cache")
+				c.Header("Expires", "0")
 			}
 			// ServeContent, not c.Data: it sets Content-Type from the
 			// extension and answers Range requests, which matters for the

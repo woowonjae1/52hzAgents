@@ -37,7 +37,8 @@ export function SidebarHeader() {
           <button
             onClick={sidebarToggle}
             aria-label="Collapse sidebar"
-            className="size-7 -ml-1 shrink-0 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
+            data-no-drag
+            className="size-7 -ml-1 shrink-0 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           >
             <PanelLeft className="size-4" />
           </button>

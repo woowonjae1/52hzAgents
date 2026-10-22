@@ -1308,7 +1308,9 @@ function createMainWindow() {
       if (isAppLoaded) return;
       if (ready) {
         isAppLoaded = true;
-        mainWindow.loadURL(TARGET_URL);
+        mainWindow.webContents.session.clearCache().catch(() => {}).finally(() => {
+          mainWindow.loadURL(TARGET_URL);
+        });
       } else if (retryCount < maxRetries) {
         retryCount++;
         setTimeout(loadAppUrl, 600);
