@@ -33,7 +33,6 @@ import {
   MonitorPlay,
   Power,
   Palette,
-  Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,9 +100,6 @@ export function SettingsView() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [collaborators, setCollaborators] = useState<Array<{ email: string; role: string }>>([]);
-  const [newCollabEmail, setNewCollabEmail] = useState('');
-  const [loadingCollabs, setLoadingCollabs] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [showConnectAgent, setShowConnectAgent] = useState(false);
   const [markColor, setMarkColor] = useMarkColor();
@@ -118,44 +114,6 @@ export function SettingsView() {
     { id: 'export', label: 'Export & Share', icon: Download },
   ];
 
-  /*
-    NINE HUNDRED LINES OF SETTINGS AND NO WAY TO SEARCH THEM.
-
-    Seven sections, each several screens deep, and the only way to find the
-    autostart toggle or the export format was to remember which section it was
-    filed under and then scroll. Every settings surface of this size has a
-    search box — it is the difference between "where is that" and "type three
-    letters".
-
-    Matching is over KEYWORDS, not the rendered DOM. Searching real controls
-    would mean either rendering every section at once (expensive, and the
-    sections mount live panels) or maintaining a parallel index that drifts.
-    Keywords per section are a small, honest index: they say what a section
-    can answer, and a miss sends the user to the section rather than to
-    nothing.
-  */
-  const [navQuery, setNavQuery] = useState('');
-
-  const SECTION_KEYWORDS: Record<string, string> = {
-    general: 'workspace name token autostart start at login theme dark light appearance language desktop',
-    agents: 'agent connect invite remove model provider api key online offline participant',
-    panels: 'panel sidebar studio layout display split browser preview width',
-    export: 'export markdown share download backup transcript',
-  };
-
-  const visibleNavItems = (() => {
-    const q = navQuery.trim().toLowerCase();
-    if (!q) return SETTINGS_NAV_ITEMS;
-    const hit = SETTINGS_NAV_ITEMS.filter(
-      (item) =>
-        item.label.toLowerCase().includes(q) ||
-        (SECTION_KEYWORDS[item.id] || '').includes(q),
-    );
-    // Never strand the user on an empty nav: a query that matches nothing
-    // leaves every section reachable rather than hiding the whole app.
-    return hit.length > 0 ? hit : SETTINGS_NAV_ITEMS;
-  })();
-
   useEffect(() => {
     if (workspace?.name) setName(workspace.name);
   }, [workspace?.name]);
@@ -169,21 +127,6 @@ export function SettingsView() {
     }
   }, []);
 
-  // Load collaborators
-  useEffect(() => {
-    if (workspace?.workspaceId) {
-      setLoadingCollabs(true);
-      workspaceApi.listCollaborators()
-        .then((res) => {
-          if (res && res.collaborators) {
-            setCollaborators(res.collaborators);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoadingCollabs(false));
-    }
-  }, [workspace?.workspaceId]);
-
   const handleToggleAutostart = async () => {
     const bridge = getBridge();
     if (bridge) {
@@ -191,29 +134,6 @@ export function SettingsView() {
       const res = await bridge.setAutostart(next);
       setAutostart(res);
       toast.success(res ? 'Autostart on login enabled' : 'Autostart on login disabled');
-    }
-  };
-
-  const handleAddCollaborator = async () => {
-    if (!newCollabEmail.trim() || !workspace?.workspaceId) return;
-    try {
-      await workspaceApi.addCollaborator(newCollabEmail.trim(), 'editor');
-      setCollaborators([...collaborators, { email: newCollabEmail.trim(), role: 'editor' }]);
-      setNewCollabEmail('');
-      toast.success('Collaborator added');
-    } catch {
-      toast.error('Failed to add collaborator');
-    }
-  };
-
-  const handleRemoveCollaborator = async (email: string) => {
-    if (!workspace?.workspaceId) return;
-    try {
-      await workspaceApi.removeCollaborator(email);
-      setCollaborators(collaborators.filter((c) => c.email !== email));
-      toast.success('Collaborator removed');
-    } catch {
-      toast.error('Failed to remove collaborator');
     }
   };
 
@@ -316,23 +236,11 @@ export function SettingsView() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Settings Navigation Sidebar */}
         <div className="w-56 lg:w-60 shrink-0 border-r border-border/60 bg-surface1/30 p-3 flex flex-col gap-1 select-none overflow-y-auto">
-          <div className="px-2.5 py-1.5 text-2xs font-medium text-foreground-extra-muted uppercase tracking-wider">
+          <div className="px-2.5 py-1.5 text-2xs font-semibold text-foreground-extra-muted uppercase tracking-wider">
             Settings
           </div>
 
-          <div className="relative flex items-center mb-1">
-            <Search className="absolute left-2.5 size-3 text-foreground-extra-muted pointer-events-none" />
-            <input
-              type="text"
-              value={navQuery}
-              onChange={(e) => setNavQuery(e.target.value)}
-              placeholder="Search settings…"
-              data-view-search
-              className="w-full bg-surface2/80 border border-border rounded-lg pl-7 pr-2 py-1 text-xs text-foreground placeholder:text-foreground-extra-muted focus:outline-hidden focus:border-border-accent"
-            />
-          </div>
-
-          {visibleNavItems.map((item) => {
+          {SETTINGS_NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             const active = settingsTab === item.id;
             return (
@@ -356,9 +264,6 @@ export function SettingsView() {
                   <Icon className="size-3.5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  {/* One line. `sublabel` used to hold the English half of a
-                      bilingual pair; with the label itself in English the second
-                      line only restated the first. */}
                   <div className="text-xs truncate">{item.label}</div>
                 </div>
               </button>
@@ -605,64 +510,6 @@ export function SettingsView() {
                     )}>
                       Alt + Space
                     </kbd>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 4: Team Collaborators */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                    <Users className="size-4 text-primary" />
-                    Members
-                  </h2>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="email"
-                      value={newCollabEmail}
-                      onChange={(e) => setNewCollabEmail(e.target.value)}
-                      placeholder="colleague@example.com"
-                      className="bg-surface0 border-border/60 text-sm h-9"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleAddCollaborator}
-                      disabled={!newCollabEmail.trim()}
-                      className="h-9 px-4 text-xs shrink-0"
-                    >
-                      Add member
-                    </Button>
-                  </div>
-
-                  <div className="divide-y divide-border/60 rounded-xl bg-surface0 border border-border/60 overflow-hidden">
-                    {collaborators.length === 0 ? (
-                      <div className="p-4 text-center text-xs text-foreground-muted">
-                        No other members yet
-                      </div>
-                    ) : (
-                      collaborators.map((c) => (
-                        <div key={c.email} className="flex items-center justify-between px-4 py-2.5">
-                          <div className="flex items-center gap-2.5">
-                            <div className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold">
-                              {c.email[0].toUpperCase()}
-                            </div>
-                            <span className="text-xs font-medium text-foreground">{c.email}</span>
-                            <span className="text-3xs px-2 py-0.5 rounded bg-surface2 text-foreground-muted uppercase font-mono">
-                              {c.role}
-                            </span>
-                          </div>
-                          <button
-                            onClick={() => handleRemoveCollaborator(c.email)}
-                            className="text-xs text-status-danger hover:text-status-danger transition-colors"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))
-                    )}
                   </div>
                 </div>
               </div>
