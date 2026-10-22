@@ -187,7 +187,14 @@ func GenerateMemberDescription(c *gin.Context) {
 
 	agentName := member.AgentName
 	var recent []models.EventRecord
-	db.DB.Where("network_id = ? AND source = ? AND type = ?", workspace.ID, "openagents:"+agentName, "workspace.message.posted").
+	sources := []string{
+		agentName,
+		"52hz:" + agentName,
+		"52hzAgents:" + agentName,
+		"agent:" + agentName,
+		"openagents:" + agentName,
+	}
+	db.DB.Where("network_id = ? AND source IN ? AND type = ?", workspace.ID, sources, "workspace.message.posted").
 		Order("timestamp desc").Limit(15).Find(&recent)
 	snippets := make([]string, 0, len(recent))
 	for i := len(recent) - 1; i >= 0; i-- {

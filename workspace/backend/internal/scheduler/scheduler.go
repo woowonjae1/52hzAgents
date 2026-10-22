@@ -310,9 +310,16 @@ func fireDueRoutines() {
 // step falls back to the step's start time.
 func lastAgentActivityMs(workspaceID, target, agentName string, since int64) int64 {
 	var rows []models.EventRecord
+	sources := []string{
+		agentName,
+		"52hz:" + agentName,
+		"52hzAgents:" + agentName,
+		"agent:" + agentName,
+		"openagents:" + agentName,
+	}
 	if err := db.DB.
 		Where("network_id = ? AND target = ? AND timestamp > ? AND source IN ?",
-			workspaceID, target, since, []string{agentName, "openagents:" + agentName}).
+			workspaceID, target, since, sources).
 		Order("timestamp desc").Limit(1).Find(&rows).Error; err != nil || len(rows) == 0 {
 		return since
 	}

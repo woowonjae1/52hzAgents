@@ -833,6 +833,41 @@ func ResetAllDanglingTurns() {
 	} else if len(openRows) > 0 {
 		log.Printf("turn-changes: cleared %d dangling turn(s) on startup", len(openRows))
 	}
+
+	// Also reset dangling agent turn states so an agent is not perceived as permanently running mid-turn
+	nowUTC := time.Now().UTC()
+	var runningTurns []models.AgentTurnState
+	_ = db.DB.Where("state = ?", models.AgentTurnRunning).Find(&runningTurns).Error
+	if len(runningTurns) > 0 {
+		if err := db.DB.Model(&models.AgentTurnState{}).
+			Where("state = ?", models.AgentTurnRunning).
+			Updates(map[string]interface{}{
+				"state":      models.AgentTurnError,
+				"error":      "daemon restarted; previous turn settled",
+				"ended_at":   &nowUTC,
+				"updated_at": nowUTC,
+			}).Error; err != nil {
+			log.Printf("turn-changes: failed to reset dangling agent turn states on startup: %v", err)
+		} else {
+			log.Printf("turn-changes: cleared %d dangling agent turn state(s) on startup", len(runningTurns))
+		}
+	}
+
+	// Also reset running/retrying channel pipelines so they do not block subsequent turns/messages on startup
+	var runningPipelines []models.ChannelPipeline
+	_ = db.DB.Where("status IN ?", []string{"running", "retrying"}).Find(&runningPipelines).Error
+	if len(runningPipelines) > 0 {
+		if err := db.DB.Model(&models.ChannelPipeline{}).
+			Where("status IN ?", []string{"running", "retrying"}).
+			Updates(map[string]interface{}{
+				"status":     "halted",
+				"updated_at": nowUTC,
+			}).Error; err != nil {
+			log.Printf("turn-changes: failed to reset dangling pipelines on startup: %v", err)
+		} else {
+			log.Printf("turn-changes: halted %d dangling channel pipeline(s) on startup", len(runningPipelines))
+		}
+	}
 }
 
 // CancelChannelTurns cancels all currently open or queued turns in a channel/workspace,
@@ -875,6 +910,28 @@ func CancelChannelTurns(workspaceID, channelID string) {
 		}
 	}
 	log.Printf("turn-changes: cancelled %d active/queued turn(s) for channel %s", len(turns), channelID)
+
+	// Also cancel any in-flight agent turn states and pipelines in this channel
+	if channelID != "" {
+		var ch models.Channel
+		if err := db.DB.Where("id = ?", channelID).First(&ch).Error; err == nil {
+			nowUTC := time.Now().UTC()
+			db.DB.Model(&models.AgentTurnState{}).
+				Where("workspace_id = ? AND channel_name = ? AND state = ?", workspaceID, ch.Name, models.AgentTurnRunning).
+				Updates(map[string]interface{}{
+					"state":      models.AgentTurnError,
+					"error":      "turn cancelled by user",
+					"ended_at":   &nowUTC,
+					"updated_at": nowUTC,
+				})
+			db.DB.Model(&models.ChannelPipeline{}).
+				Where("channel_id = ? AND status IN ?", channelID, []string{"running", "retrying"}).
+				Updates(map[string]interface{}{
+					"status":     "halted_user",
+					"updated_at": nowUTC,
+				})
+		}
+	}
 }
 
 // recordTurnChanges is the single hook from the event path. One agent chat

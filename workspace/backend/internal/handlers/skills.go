@@ -298,7 +298,7 @@ func ReportSkillStatus(c *gin.Context) {
 	}
 
 	// Publish a lightweight status event so connected UIs update instantly.
-	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.skill.status", "openagents:"+member.AgentName, "", gin.H{
+	_ = PublishWorkspaceStateEvent(workspace.ID, "workspace.skill.status", "52hz:"+member.AgentName, "", gin.H{
 		"skill_id": req.SkillID, "state": req.State, "error": req.Error,
 	})
 

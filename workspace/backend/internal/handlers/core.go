@@ -223,7 +223,20 @@ func ListEvents(c *gin.Context) {
 		query = query.Where("target = ?", "channel/"+strings.TrimPrefix(channel, "channel/"))
 	}
 	if target := c.Query("target"); target != "" {
-		query = query.Where("target = ?", target)
+		if strings.HasPrefix(target, "channel/") {
+			query = query.Where("target = ?", target)
+		} else {
+			rawName := agentNameFromSource(target)
+			targets := []string{
+				target,
+				rawName,
+				"52hz:" + rawName,
+				"52hzAgents:" + rawName,
+				"agent:" + rawName,
+				"openagents:" + rawName,
+			}
+			query = query.Where("target IN ?", targets)
+		}
 	}
 	if conv := strings.TrimSpace(c.Query("conversation")); conv != "" {
 		parts := strings.Split(conv, ",")

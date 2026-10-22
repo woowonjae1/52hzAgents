@@ -332,8 +332,16 @@ class WorkspaceClient {
       const targetAgents = meta.target_agents;
       const hasTargetList = Array.isArray(targetAgents);
 
-      // Skip own messages
-      if (source === `52hz:${agentName}`) continue;
+      // Skip own messages across all agent prefixes
+      if (
+        source === `52hz:${agentName}` ||
+        source === `52hzAgents:${agentName}` ||
+        source === `agent:${agentName}` ||
+        source === `openagents:${agentName}` ||
+        source === agentName
+      ) {
+        continue;
+      }
 
       if (source.startsWith('human:')) {
         if (hasTargetList) {
@@ -349,7 +357,12 @@ class WorkspaceClient {
         if (hasTargetList && targetAgents.includes(agentName)) {
           messages.push(this._eventToMessage(e));
         }
-      } else if (source.startsWith('52hz:')) {
+      } else if (
+        source.startsWith('52hz:') ||
+        source.startsWith('52hzAgents:') ||
+        source.startsWith('agent:') ||
+        source.startsWith('openagents:')
+      ) {
         // Agent messages: only pick up if explicitly listed
         if (hasTargetList && targetAgents.includes(agentName)) {
           messages.push(this._eventToMessage(e));
