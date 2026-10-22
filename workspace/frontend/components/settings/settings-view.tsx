@@ -1,7 +1,7 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Settings,
   Copy,
@@ -62,9 +62,42 @@ import type { RightPanelTab } from '@/components/layout/layout-context';
 export function SettingsView() {
   const { workspace, token, refreshWorkspace, agents, currentSessionId, setSessionMaster, addParticipant, removeParticipant, sessions } = useWorkspace();
   const currentSession = sessions.find((s) => s.sessionId === currentSessionId);
-  const { setViewMode, settingsTab, setSettingsTab, activeRightTab, setActiveRightTab, splitBrowser, setSplitBrowser, setSelectedAgentName } = useLayout();
+  const { setViewMode, canGoBack, goBack, settingsTab, setSettingsTab, activeRightTab, setActiveRightTab, splitBrowser, setSplitBrowser, setSelectedAgentName } = useLayout();
   const [name, setName] = useState(workspace?.name || '52hz');
-  const [saving, setSaving] = useState(false);
+  const [nameSaveState, setNameSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  const handleBack = useCallback(() => {
+    if (canGoBack) {
+      goBack();
+    } else {
+      setViewMode('home');
+    }
+  }, [canGoBack, goBack, setViewMode]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) {
+        handleBack();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleBack]);
+
+  const handleAutoSaveName = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === (workspace?.name || '52hz')) return;
+    setNameSaveState('saving');
+    try {
+      await workspaceApi.updateWorkspace({ name: trimmed });
+      await refreshWorkspace();
+      setNameSaveState('saved');
+      setTimeout(() => setNameSaveState('idle'), 2500);
+    } catch {
+      setNameSaveState('idle');
+      toast.error('Failed to update workspace name');
+    }
+  };
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -158,21 +191,6 @@ export function SettingsView() {
       const res = await bridge.setAutostart(next);
       setAutostart(res);
       toast.success(res ? 'Autostart on login enabled' : 'Autostart on login disabled');
-    }
-  };
-
-  const handleSave = async () => {
-    if (!name.trim()) return;
-    setSaving(true);
-    try {
-      const updates: Record<string, unknown> = { name: name.trim() };
-      await workspaceApi.updateWorkspace(updates);
-      await refreshWorkspace();
-      toast.success('Workspace settings updated successfully');
-    } catch {
-      toast.error('Failed to save workspace settings');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -271,15 +289,17 @@ export function SettingsView() {
   return (
     <div className="flex flex-col h-full bg-surface0 text-foreground overflow-hidden">
       {/* Header Bar */}
-      <div className="app-header justify-between ps-6">
+      <div className="app-header justify-between ps-4 sm:ps-6">
         <div className="flex items-center gap-3">
-          <Hint label="Back to chat">
+          <Hint label="Back (Esc)">
             <button
-              onClick={() => setViewMode('threads')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-xs font-medium transition-colors shadow-xs"
+              type="button"
+              onClick={handleBack}
+              data-no-drag
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border/80 bg-surface2/70 hover:bg-surface3 text-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
             >
               <ArrowLeft className="size-3.5" />
-              <span>Back to chat</span>
+              <span>Back</span>
             </button>
           </Hint>
           <div className="h-4 w-px bg-border/50" />
@@ -290,19 +310,6 @@ export function SettingsView() {
             </h1>
           </div>
         </div>
-
-        {settingsTab === 'general' && (
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs px-3.5 h-8 shadow-xs"
-            >
-              {saving ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <Save className="size-3.5 mr-1.5" />}
-              Save changes
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Main Split: Settings Sidebar + Content Panel */}
@@ -379,14 +386,34 @@ export function SettingsView() {
 
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-foreground-muted">Workspace name</Label>
+                    <div className="flex items-center justify-between max-w-lg">
+                      <Label className="text-xs font-medium text-foreground-muted">Workspace name</Label>
+                      {nameSaveState === 'saving' && (
+                        <span className="flex items-center gap-1 text-2xs text-foreground-muted">
+                          <Loader2 className="size-3 animate-spin text-primary" />
+                          Saving…
+                        </span>
+                      )}
+                      {nameSaveState === 'saved' && (
+                        <span className="flex items-center gap-1 text-2xs text-status-success">
+                          <Check className="size-3" />
+                          Saved
+                        </span>
+                      )}
+                    </div>
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      onBlur={handleAutoSaveName}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
                       placeholder="52hz"
                       className="bg-surface0 border-border/60 text-sm h-9 max-w-lg"
                     />
-                    <p className="text-2xs text-foreground-extra-muted">The name shown in the interface and at the top of the sidebar.</p>
+                    <p className="text-2xs text-foreground-extra-muted">The name shown in the interface and at the top of the sidebar. Automatically saved on blur.</p>
                   </div>
 
                   {/* Collapsible Advanced / Developer Options for Workspace ID & Token */}
