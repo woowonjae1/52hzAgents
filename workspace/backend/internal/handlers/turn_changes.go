@@ -50,7 +50,7 @@ const (
 
 	// A turn whose agent never reports back would otherwise stay open forever
 	// and make every later turn on that directory look contended.
-	turnStaleAfter = 3 * time.Minute
+	turnStaleAfter = 15 * time.Minute
 
 	// checkpointRetention bounds how long a pre-turn snapshot stays restorable.
 	// Every dispatch pins one commit, so without a window the refs -- and the
@@ -788,27 +788,55 @@ func drainDirQueue(workspaceID, dir string) {
 // Their change set is unknowable after the fact, so they are marked rather than
 // diffed -- a stale baseline would attribute unrelated later edits to them.
 func expireStaleTurns(workspaceID string) {
-	cutoff := time.Now().Add(-turnStaleAfter).UnixMilli()
-	nowMs := time.Now().UnixMilli()
-	var staleRows []models.AgentTurnChange
-	_ = db.DB.Where("workspace_id = ? AND status = ? AND started_at < ?", workspaceID, "open", cutoff).Find(&staleRows).Error
+	now := time.Now()
+	cutoff := now.Add(-turnStaleAfter).UnixMilli()
+	nowMs := now.UnixMilli()
 
-	if err := db.DB.Model(&models.AgentTurnChange{}).
-		Where("workspace_id = ? AND status = ? AND started_at < ?", workspaceID, "open", cutoff).
-		Updates(map[string]interface{}{
-			"status":      "unavailable",
-			"reason":      staleTurnReason,
-			"finished_at": nowMs,
-		}).Error; err != nil {
-		log.Printf("turn-changes: failed to expire stale turns: %v", err)
+	var openRows []models.AgentTurnChange
+	_ = db.DB.Where("workspace_id = ? AND status = ?", workspaceID, "open").Find(&openRows).Error
+	if len(openRows) == 0 {
+		return
 	}
 
-	// Drain any queues waiting on directories that just freed up
+	var staleIDs []string
 	seenDirs := map[string]bool{}
-	for _, row := range staleRows {
-		if row.WorkingDir != "" && !seenDirs[row.WorkingDir] {
-			seenDirs[row.WorkingDir] = true
-			drainDirQueue(workspaceID, row.WorkingDir)
+	for _, row := range openRows {
+		isStale := false
+		if row.StartedAt < cutoff {
+			isStale = true
+		} else {
+			// Check if agent is offline/crashed
+			var member models.WorkspaceMember
+			if db.DB.Where("workspace_id = ? AND agent_name = ?", workspaceID, row.AgentName).First(&member).Error == nil {
+				if member.Status == "offline" || member.Status == "crashed" {
+					if member.LastHeartbeat != nil && now.Sub(*member.LastHeartbeat) > 2*time.Minute {
+						isStale = true
+					}
+				}
+			}
+		}
+		if isStale {
+			staleIDs = append(staleIDs, row.ID)
+			if row.WorkingDir != "" {
+				seenDirs[row.WorkingDir] = true
+			}
+		}
+	}
+
+	if len(staleIDs) > 0 {
+		if err := db.DB.Model(&models.AgentTurnChange{}).
+			Where("id IN ?", staleIDs).
+			Updates(map[string]interface{}{
+				"status":      "unavailable",
+				"reason":      staleTurnReason,
+				"finished_at": nowMs,
+			}).Error; err != nil {
+			log.Printf("turn-changes: failed to expire stale turns: %v", err)
+		}
+
+		// Drain any queues waiting on directories that just freed up
+		for dir := range seenDirs {
+			drainDirQueue(workspaceID, dir)
 		}
 	}
 }

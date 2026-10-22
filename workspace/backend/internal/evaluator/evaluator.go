@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -201,6 +202,14 @@ func RunVerificationCommand(dir, command string, timeout time.Duration) (*Verifi
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
+		cmd.Cancel = func() error {
+			if cmd.Process != nil && cmd.Process.Pid > 0 {
+				killCmd := exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid))
+				setWindowsHidden(killCmd)
+				return killCmd.Run()
+			}
+			return nil
+		}
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", command)
 	}
