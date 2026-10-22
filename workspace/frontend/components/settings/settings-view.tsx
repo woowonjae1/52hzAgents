@@ -279,143 +279,157 @@ export function SettingsView() {
 
           {/* Tab 1: General Settings */}
           {settingsTab === 'general' && (
-            <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-8 animate-[fadeIn_0.15s_ease-out]">
+            <div className="max-w-3xl w-full mx-auto px-6 py-8 space-y-8 animate-[fadeIn_0.15s_ease-out]">
               {/* Section 1: General Workspace Profile */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                    <Folder className="size-4 text-primary" />
-                    Workspace
-                  </h2>
+              <section className="space-y-2.5">
+                <div className="px-1 text-2xs font-semibold uppercase tracking-wider text-foreground-extra-muted flex items-center gap-1.5">
+                  <Folder className="size-3.5 text-primary" />
+                  <span>Workspace Profile</span>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between max-w-lg">
-                      <Label className="text-xs font-medium text-foreground-muted">Workspace name</Label>
-                      {nameSaveState === 'saving' && (
-                        <span className="flex items-center gap-1 text-2xs text-foreground-muted">
-                          <Loader2 className="size-3 animate-spin text-primary" />
-                          Saving…
-                        </span>
-                      )}
-                      {nameSaveState === 'saved' && (
-                        <span className="flex items-center gap-1 text-2xs text-status-success">
-                          <Check className="size-3" />
-                          Saved
-                        </span>
-                      )}
+                <div className="rounded-xl bg-surface1 border border-border/60 divide-y divide-border/40 overflow-hidden shadow-xs">
+                  {/* Workspace name row */}
+                  <div className="px-4 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="min-w-0 pr-4">
+                      <div className="text-xs sm:text-sm font-medium text-foreground">Workspace Name</div>
+                      <p className="text-2xs text-foreground-muted mt-0.5">
+                        The display name shown in the sidebar header and application window.
+                      </p>
                     </div>
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onBlur={handleAutoSaveName}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.currentTarget.blur();
-                        }
-                      }}
-                      placeholder="52hz"
-                      className="bg-surface0 border-border/60 text-sm h-9 max-w-lg"
-                    />
-                    <p className="text-2xs text-foreground-extra-muted">The name shown in the interface and at the top of the sidebar. Automatically saved on blur.</p>
+                    <div className="flex items-center gap-2 shrink-0 sm:w-64">
+                      <div className="relative w-full">
+                        <Input
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          onBlur={handleAutoSaveName}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') e.currentTarget.blur();
+                          }}
+                          placeholder="52hz"
+                          className="bg-surface0 border-border/60 text-xs sm:text-sm h-8 pr-16"
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                          {nameSaveState === 'saving' && (
+                            <span className="flex items-center gap-1 text-3xs text-foreground-muted">
+                              <Loader2 className="size-3 animate-spin text-primary" />
+                              Saving…
+                            </span>
+                          )}
+                          {nameSaveState === 'saved' && (
+                            <span className="flex items-center gap-0.5 text-3xs text-status-success font-medium">
+                              <Check className="size-3" />
+                              Saved
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Collapsible Advanced / Developer Options for Workspace ID & Token */}
-                  <div className="pt-2">
+                  {/* Developer options accordion row */}
+                  <div className="px-4 py-2.5 bg-surface1/60">
                     <button
                       type="button"
                       onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium transition-colors select-none py-1"
+                      className="flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium transition-colors select-none py-0.5"
                     >
                       <ChevronRight className={cn('size-3.5 transition-transform duration-200', showAdvanced && 'rotate-90 text-primary')} />
-                      <span>Developer options (workspace ID and token)</span>
+                      <span>Developer credentials (Workspace ID & Admin Token)</span>
                     </button>
+                  </div>
 
-                    {showAdvanced && (
-                      <div className="mt-3 p-4 rounded-xl bg-surface0/70 border border-border/60 grid grid-cols-1 md:grid-cols-2 gap-4 animate-[fadeIn_0.15s_ease-out]">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-foreground-muted">Workspace ID</Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              readOnly
-                              value={workspace?.workspaceId || '52hz'}
-                              className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => copyUrl(workspace?.workspaceId || '52hz')}
-                              className="h-9 px-3 shrink-0"
-                            >
-                              {urlCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
-                            </Button>
-                          </div>
-                          <p className="text-3xs text-foreground-extra-muted">The routing identifier a CLI, the API, or an external agent connects with.</p>
+                  {showAdvanced && (
+                    <>
+                      <div className="px-4 py-3 bg-surface0/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-[fadeIn_0.15s_ease-out]">
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-foreground">Workspace ID</div>
+                          <p className="text-3xs text-foreground-muted mt-0.5">Unique identifier used by CLI tools and external agent bridges.</p>
                         </div>
-
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium text-foreground-muted">Admin token</Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              readOnly
-                              type="password"
-                              value={token || ''}
-                              className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
-                            />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                if (token) {
-                                  copyToken(token);
-                                  toast.success('Token copied');
-                                }
-                              }}
-                              className="h-9 px-3 shrink-0"
-                            >
-                              {tokenCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
-                            </Button>
-                          </div>
-                          <p className="text-3xs text-foreground-extra-muted">A high-privilege key that guards workspace administration. Treat it like a password.</p>
+                        <div className="flex items-center gap-1.5 sm:w-64 shrink-0">
+                          <Input
+                            readOnly
+                            value={workspace?.workspaceId || '52hz'}
+                            className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-8 select-all"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyUrl(workspace?.workspaceId || '52hz')}
+                            className="h-8 px-2.5 shrink-0"
+                            title="Copy Workspace ID"
+                          >
+                            {urlCopied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      <div className="px-4 py-3 bg-surface0/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-[fadeIn_0.15s_ease-out]">
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-foreground">Admin Token</div>
+                          <p className="text-3xs text-foreground-muted mt-0.5">High-privilege security token. Keep strictly confidential.</p>
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:w-64 shrink-0">
+                          <Input
+                            readOnly
+                            type="password"
+                            value={token || ''}
+                            className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-8 select-all"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (token) {
+                                copyToken(token);
+                                toast.success('Token copied');
+                              }
+                            }}
+                            className="h-8 px-2.5 shrink-0"
+                            title="Copy Admin Token"
+                          >
+                            {tokenCopied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </div>
+              </section>
 
               {/* Section 2: Brand Mark Colour */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                    <Palette className="size-4 text-primary" />
-                    Brand mark
-                  </h2>
+              <section className="space-y-2.5">
+                <div className="px-1 text-2xs font-semibold uppercase tracking-wider text-foreground-extra-muted flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Palette className="size-3.5 text-primary" />
+                    <span>Appearance & Brand Accent</span>
+                  </div>
                   {markColor !== DEFAULT_MARK_COLOR && (
                     <button
                       type="button"
                       onClick={() => setMarkColor(DEFAULT_MARK_COLOR)}
-                      className="text-2xs text-foreground-muted hover:text-foreground transition-colors flex items-center gap-1"
+                      className="text-2xs text-foreground-muted hover:text-foreground transition-colors flex items-center gap-1 font-normal normal-case"
                     >
                       <RefreshCw className="size-3" />
-                      Reset
+                      Reset to default
                     </button>
                   )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-                  {/* Live preview. The mark reads the same CSS variable the
-                      swatches write, so this needs no props to stay in sync. */}
-                  <div className="shrink-0 size-24 rounded-xl bg-surface0 border border-border/60 flex items-center justify-center">
-                    <SignalMark size={56} title="Mark preview" />
-                  </div>
+                <div className="rounded-xl bg-surface1 border border-border/60 divide-y divide-border/40 overflow-hidden shadow-xs">
+                  <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="shrink-0 size-14 rounded-xl bg-surface0 border border-border/60 flex items-center justify-center shadow-2xs">
+                        <SignalMark size={36} title="Mark preview" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-medium text-foreground">Signal Mark & Tone</div>
+                        <p className="text-2xs text-foreground-muted mt-0.5 max-w-sm">
+                          Accent tone applied to whale signal marks, message avatars, and workspace brand elements.
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="min-w-0 flex-1 space-y-3">
-                    <p className="text-xs text-foreground-muted">
-                      The mark's body colour. The sidebar, empty states, share pages, and message avatars all follow it; the face stays a fixed near-black so it reads on every choice.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       {MARK_COLOR_PRESETS.map((preset) => {
                         const active = markColor === preset.value;
                         return (
@@ -426,62 +440,45 @@ export function SettingsView() {
                               aria-label={preset.label}
                               aria-pressed={active}
                               className={cn(
-                                'relative size-9 rounded-full ui-transition duration-150',
-                                // The ring sits OUTSIDE the swatch so selecting one
-                                // does not change its apparent colour area — with
-                                // an inset ring the active chip reads as a
-                                // different shade than the colour it applies.
-                                'ring-offset-2 ring-offset-surface1',
-                                active
-                                  ? 'ring-2 ring-foreground scale-105'
-                                    : 'ring-1 ring-border/60 hover:ring-foreground-muted',
+                                'relative size-7 rounded-full ui-transition duration-150 ring-offset-2 ring-offset-surface1',
+                                active ? 'ring-2 ring-foreground scale-105' : 'ring-1 ring-border/60 hover:ring-foreground-muted'
                               )}
                               style={{ backgroundColor: preset.value }}
                             >
                               {active && (
-                                <Check className="absolute inset-0 m-auto size-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
+                                <Check className="absolute inset-0 m-auto size-3 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" />
                               )}
                             </button>
                           </Hint>
                         );
                       })}
                     </div>
-                    <p className="text-3xs text-foreground-extra-muted font-mono">
-                      {MARK_COLOR_PRESETS.find((p) => p.value === markColor)?.label ?? 'Custom'} · {markColor.toUpperCase()}
-                    </p>
                   </div>
                 </div>
-              </div>
+              </section>
 
               {/* Section 3: Desktop & System Integration */}
-              <div className="p-6 rounded-2xl bg-surface1 border border-border/60 space-y-5 shadow-sm">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                  <h2 className="text-sm font-semibold tracking-tight text-foreground flex items-center gap-2">
-                    <Monitor className="size-4 text-primary" />
-                    Desktop & shortcuts
-                  </h2>
-                  <span className="text-2xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                    {isDesktop ? 'Desktop app' : 'Browser'}
-                  </span>
+              <section className="space-y-2.5">
+                <div className="px-1 text-2xs font-semibold uppercase tracking-wider text-foreground-extra-muted flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Monitor className="size-3.5 text-primary" />
+                    <span>Desktop Integration</span>
+                  </div>
+                  {!isDesktop && (
+                    <span className="text-3xs text-foreground-extra-muted font-normal lowercase">web browser mode</span>
+                  )}
                 </div>
 
-                {/*
-                  Both rows in this card need the desktop app to do anything —
-                  autostart is an OS login item and the Quick Bar is a global
-                  hotkey, neither of which a web page can register. They used to
-                  render identically in the browser, the toggle simply dead at
-                  30% opacity and the shortcut printed as if it worked; the only
-                  clue was the pill above. Now each says so on its own line,
-                  because that is where the user is looking when they click it.
-                */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl bg-surface0 border border-border/60">
+                <div className="rounded-xl bg-surface1 border border-border/60 divide-y divide-border/40 overflow-hidden shadow-xs">
+                  <div className="px-4 py-3.5 flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">Launch at login</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">Start 52hzAgents in the system tray when the computer boots.</p>
+                      <div className="text-xs sm:text-sm font-medium text-foreground">Launch at login</div>
+                      <p className="text-2xs text-foreground-muted mt-0.5">
+                        Start 52hzAgents silently in the background when your computer turns on.
+                      </p>
                       {!isDesktop && (
-                        <p className="text-2xs text-foreground-extra-muted mt-1">
-                          Only available in the desktop app.
+                        <p className="text-3xs text-foreground-extra-muted mt-0.5">
+                          Only available when running the desktop app.
                         </p>
                       )}
                     </div>
@@ -494,25 +491,27 @@ export function SettingsView() {
                     />
                   </div>
 
-                  <div className="p-3.5 rounded-xl bg-surface0 border border-border/60 flex items-center justify-between gap-4">
+                  <div className="px-4 py-3.5 flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">Quick Bar shortcut</p>
-                      <p className="text-xs text-foreground-muted mt-0.5">Summon the command bar from anywhere in the system.</p>
+                      <div className="text-xs sm:text-sm font-medium text-foreground">Quick Bar shortcut</div>
+                      <p className="text-2xs text-foreground-muted mt-0.5">
+                        Global system hotkey to summon the quick prompt bar anywhere.
+                      </p>
                       {!isDesktop && (
-                        <p className="text-2xs text-foreground-extra-muted mt-1">
-                          Only available in the desktop app.
+                        <p className="text-3xs text-foreground-extra-muted mt-0.5">
+                          Only available when running the desktop app.
                         </p>
                       )}
                     </div>
                     <kbd className={cn(
-                      'px-2.5 py-1 rounded bg-surface2 border border-border text-xs font-mono font-medium shrink-0',
+                      'px-2.5 py-1 rounded-md bg-surface2 border border-border/80 text-xs font-mono font-medium shrink-0 shadow-2xs',
                       isDesktop ? 'text-foreground' : 'text-foreground-extra-muted',
                     )}>
                       Alt + Space
                     </kbd>
                   </div>
                 </div>
-              </div>
+              </section>
             </div>
           )}
 
