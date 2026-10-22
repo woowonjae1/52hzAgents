@@ -161,7 +161,7 @@ func runGit(dir string, args ...string) (string, error) {
 func runGitTimeout(dir string, timeout time.Duration, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd := exec.CommandContext(ctx, resolveGitBinary(), args...)
 	setWindowsHidden(cmd)
 	cmd.Dir = dir
 

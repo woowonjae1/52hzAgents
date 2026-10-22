@@ -372,6 +372,7 @@ async function startProductionStack() {
         env: {
           ...process.env,
           PARENT_PID: `${process.pid}`,
+          ELECTRON_EXE: process.execPath,
           CGO_ENABLED: '0',
           PORT: `${serverPort}`,
           DATABASE_URL: `sqlite://${dbPath.replace(/\\/g, '/')}`,

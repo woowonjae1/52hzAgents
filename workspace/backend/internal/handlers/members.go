@@ -85,13 +85,13 @@ func syncAgentAutostart(agentName, action string) {
 	if _, err := exec.LookPath("wwj"); err == nil {
 		cmd = exec.Command("wwj", "autostart", agentName, action)
 	} else if _, statErr := os.Stat(wwjPkgBin); statErr == nil {
-		cmd = exec.Command("node", wwjPkgBin, "autostart", agentName, action)
+		cmd = resolveNodeCommand(wwjPkgBin, "autostart", agentName, action)
 	} else {
 		localBin := filepath.Join("..", "..", "packages", "wwj", "bin", "agent-connector.js")
 		if _, statErr := os.Stat(localBin); statErr == nil {
-			cmd = exec.Command("node", localBin, "autostart", agentName, action)
+			cmd = resolveNodeCommand(localBin, "autostart", agentName, action)
 		} else {
-			cmd = exec.Command("node", "packages/wwj/bin/agent-connector.js", "autostart", agentName, action)
+			cmd = resolveNodeCommand("packages/wwj/bin/agent-connector.js", "autostart", agentName, action)
 		}
 	}
 	if cmd != nil {

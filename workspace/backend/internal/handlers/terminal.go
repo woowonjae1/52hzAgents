@@ -249,7 +249,15 @@ func ExecuteTerminalCommand(c *gin.Context) {
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "powershell", "-NoProfile", "-NonInteractive", "-Command", cmdStr)
+		cmd = exec.CommandContext(ctx, resolvePowerShellBinary(), "-NoProfile", "-NonInteractive", "-Command", cmdStr)
+		cmd.Cancel = func() error {
+			if cmd.Process != nil && cmd.Process.Pid > 0 {
+				killCmd := exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(cmd.Process.Pid))
+				setWindowsHidden(killCmd)
+				return killCmd.Run()
+			}
+			return nil
+		}
 	} else {
 		cmd = exec.CommandContext(ctx, "sh", "-c", cmdStr)
 	}

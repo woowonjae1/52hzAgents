@@ -650,7 +650,7 @@ func CreateAgent(c *gin.Context) {
 	if cliPath == "wwj" {
 		runCmd = exec.Command("wwj", args...)
 	} else {
-		runCmd = exec.Command("node", append([]string{cliPath}, args...)...)
+		runCmd = resolveNodeCommand(cliPath, args...)
 	}
 	setWindowsHidden(runCmd)
 	output, execErr := runCmd.CombinedOutput()
@@ -745,10 +745,14 @@ func LaunchAgent(c *gin.Context) {
 	var runCmd *exec.Cmd
 	if cliPath == "wwj" {
 		runCmd = exec.Command("wwj", connectArgs...)
+		runCmd.Env = os.Environ()
 	} else {
-		runCmd = exec.Command("node", append([]string{cliPath}, connectArgs...)...)
+		runCmd = resolveNodeCommand(cliPath, connectArgs...)
+		if len(runCmd.Env) == 0 {
+			runCmd.Env = os.Environ()
+		}
 	}
-	runCmd.Env = append(os.Environ(),
+	runCmd.Env = append(runCmd.Env,
 		"WWJ_WORKSPACE_TOKEN="+reqToken,
 		"WWJ_WORKSPACE_ENDPOINT="+endpoint,
 	)
