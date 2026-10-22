@@ -484,19 +484,49 @@ func StreamEventsWS(c *gin.Context) {
 
 	// 声明连接清理的 Defer 方法。
 	defer func() {
-		wsConn.Close()                     // 断开 WebSocket 底层连接。
+		_ = wsConn.Close()                 // 断开 WebSocket 底层连接。
 		hub.GlobalHub.Unregister(wsClient) // 从在线总线中剔除该客户端。
 	}()
 
+	const (
+		writeWait  = 10 * time.Second
+		pongWait   = 60 * time.Second
+		pingPeriod = 20 * time.Second
+	)
+
+	_ = wsConn.SetReadDeadline(time.Now().Add(pongWait))
+	wsConn.SetPongHandler(func(string) error {
+		_ = wsConn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
+	pingTicker := time.NewTicker(pingPeriod)
+	defer pingTicker.Stop()
+
 	// 开启独立的 Goroutine 用于处理服务器向该客户端的写入（推送）任务。
 	go func() {
-		// 监听该客户端独立的 Send 通道：
-		for msg := range clientChan {
-			// 将接收到的消息作为 Text 帧发送给客户端。
-			err := wsConn.WriteMessage(websocket.TextMessage, []byte(msg))
-			if err != nil {
-				log.Printf("Failed to write message to WebSocket client: %v", err)
-				return // 发生写入错误，停止写协程（外部 Close 会自动回收连接）。
+		defer func() {
+			pingTicker.Stop()
+			_ = wsConn.Close() // 关闭连接以解除主读协程的阻塞
+		}()
+
+		for {
+			select {
+			case msg, ok := <-clientChan:
+				_ = wsConn.SetWriteDeadline(time.Now().Add(writeWait))
+				if !ok {
+					_ = wsConn.WriteMessage(websocket.CloseMessage, []byte{})
+					return
+				}
+				if err := wsConn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
+					log.Printf("Failed to write message to WebSocket client: %v", err)
+					return
+				}
+			case <-pingTicker.C:
+				_ = wsConn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := wsConn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					return
+				}
 			}
 		}
 	}()
