@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { SignalMark } from '@/components/brand/signal-mark';
-import { Zap, Search, Terminal, Layers, type LucideIcon } from 'lucide-react';
+import { FileDiff, Search, Terminal, Layers, type LucideIcon } from 'lucide-react';
 
 export interface PromptSuggestion {
   icon: LucideIcon;
@@ -14,32 +14,32 @@ export interface PromptSuggestion {
 
 export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   {
-    icon: Zap,
-    title: 'Refactor & review',
-    desc: 'Review the code in this workspace, flag risks, suggest refactors',
+    icon: FileDiff,
+    title: 'Proofread & review diffs',
+    desc: 'Inspect git changes, flag logic/type regressions, and review diffs',
     prompt:
-      'Review the core architecture and implementation of this workspace. Point out logic or performance risks and suggest concrete improvements.',
+      'Review the code changes and core files in this workspace. Inspect logic, types, and potential regressions, and provide proofreading recommendations.',
+  },
+  {
+    icon: Terminal,
+    title: 'Run diagnostics & tests',
+    desc: 'Verify test suites, background processes, runtimes, and active ports',
+    prompt:
+      'Diagnose the local environment: check Node, Python, and Go runtimes, background tasks, active ports, and run test suites.',
+  },
+  {
+    icon: Layers,
+    title: 'Architecture & refactor',
+    desc: 'Draft modular boundaries, clean up dead code, and decouple modules',
+    prompt:
+      'Draft an architectural plan for this workspace, proposing clear module boundaries, data flow, and a scalable file layout.',
   },
   {
     icon: Search,
     title: 'Research & compare',
-    desc: 'Search the web for approaches and write a comparison',
+    desc: 'Search documentation and best practices, then compare trade-offs',
     prompt:
       'Research current approaches and best practices for local multi-agent orchestration, then compare their trade-offs.',
-  },
-  {
-    icon: Terminal,
-    title: 'Diagnose environment',
-    desc: 'Check installed runtimes, tools, and local servers',
-    prompt:
-      'Diagnose the local environment: check Node, Python, and Go runtimes, running background tasks, and active ports.',
-  },
-  {
-    icon: Layers,
-    title: 'Design architecture',
-    desc: 'Propose module boundaries, data flow, and file layout',
-    prompt:
-      'Draft an architectural plan for this workspace, proposing clear module boundaries, data flow, and a scalable file layout.',
   },
 ];
 

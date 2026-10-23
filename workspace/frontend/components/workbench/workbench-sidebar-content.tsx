@@ -18,9 +18,11 @@ import {
   Blocks,
   Clock3,
   Activity,
+  FileDiff,
 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
+import { useGitStatus } from '@/lib/use-git-status';
 import { getSmartSessionTitle } from '@/components/threads/thread-list';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -53,7 +55,18 @@ export function WorkbenchSidebarContent() {
     updateSession,
   } = useWorkspace();
 
-  const { viewMode, setViewMode, isMobile, openMobileDetail, openSettings } = useLayout();
+  const {
+    viewMode,
+    setViewMode,
+    isMobile,
+    openMobileDetail,
+    openSettings,
+    settingsTab,
+    activeRightTab,
+    setActiveRightTab,
+  } = useLayout();
+  const { status: gitStatus } = useGitStatus(currentSessionId);
+  const gitDiffCount = gitStatus?.files?.length || 0;
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -302,11 +315,12 @@ export function WorkbenchSidebarContent() {
             type="button"
             onClick={() => {
               setViewMode('threads');
+              if (activeRightTab === 'diff') setActiveRightTab(null);
               if (isMobile) openMobileDetail();
             }}
             className={cn(
               'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
-              viewMode === 'threads'
+              viewMode === 'threads' && activeRightTab !== 'diff'
                 ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
             )}
@@ -323,19 +337,48 @@ export function WorkbenchSidebarContent() {
           <button
             type="button"
             onClick={() => {
-              setViewMode('home');
+              setViewMode('threads');
+              setActiveRightTab('diff');
               if (isMobile) openMobileDetail();
             }}
             className={cn(
               'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
-              viewMode === 'home'
+              viewMode === 'threads' && activeRightTab === 'diff'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <FileDiff className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
+              <span className="truncate">Review & Diff</span>
+            </div>
+            {gitDiffCount > 0 ? (
+              <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/25 font-mono">
+                <span>{gitDiffCount} {gitDiffCount === 1 ? 'file' : 'files'}</span>
+              </span>
+            ) : (
+              <span className="text-3xs font-mono px-1.5 py-0.2 rounded-full bg-surface3/70 text-foreground-extra-muted">
+                clean
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              openSettings('agents');
+              if (isMobile) openMobileDetail();
+            }}
+            className={cn(
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
+              viewMode === 'settings' && settingsTab === 'agents'
                 ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
               <Bot className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Agent Team</span>
+              <span className="truncate">Agents</span>
             </div>
             <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-surface3 text-foreground-muted border border-border/40 font-mono">
               <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />

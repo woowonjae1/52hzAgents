@@ -57,12 +57,35 @@ export function DiffStudioPanel() {
   const [discarding, setDiscarding] = useState<string | null>(null);
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [confirmDiscardAll, setConfirmDiscardAll] = useState(false);
+  const [filterType, setFilterType] = useState<'all' | 'M' | 'A' | 'D'>('all');
+  const [filterQuery, setFilterQuery] = useState('');
+
+  const modifiedCount = useMemo(() => files.filter((f) => f.status !== 'A' && f.status !== '?' && f.status !== 'D').length, [files]);
+  const addedCount = useMemo(() => files.filter((f) => f.status === 'A' || f.status === '?').length, [files]);
+  const deletedCount = useMemo(() => files.filter((f) => f.status === 'D').length, [files]);
+
+  const filteredFiles = useMemo(() => {
+    return files.filter((f) => {
+      if (filterType !== 'all') {
+        const isAdded = f.status === 'A' || f.status === '?';
+        const isDeleted = f.status === 'D';
+        const isMod = !isAdded && !isDeleted;
+        if (filterType === 'A' && !isAdded) return false;
+        if (filterType === 'D' && !isDeleted) return false;
+        if (filterType === 'M' && !isMod) return false;
+      }
+      if (filterQuery.trim()) {
+        return f.path.toLowerCase().includes(filterQuery.trim().toLowerCase());
+      }
+      return true;
+    });
+  }, [files, filterType, filterQuery]);
 
   useEffect(() => {
-    if (files.length > 0 && (!selectedPath || !files.some((f) => f.path === selectedPath))) {
-      setSelectedPath(files[0].path);
+    if (filteredFiles.length > 0 && (!selectedPath || !filteredFiles.some((f) => f.path === selectedPath))) {
+      setSelectedPath(filteredFiles[0].path);
     }
-  }, [files, selectedPath]);
+  }, [filteredFiles, selectedPath]);
 
   const fetchDiff = useCallback(
     async (filePath: string) => {
@@ -242,9 +265,79 @@ export function DiffStudioPanel() {
         </div>
       </div>
 
+      {/* Proofreading Filter Bar (Visible when files exist) */}
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border/60 bg-surface1/40 text-3xs select-none shrink-0">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setFilterType('all')}
+            className={cn(
+              'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
+              filterType === 'all'
+                ? 'bg-surface3 text-foreground font-semibold shadow-2xs'
+                : 'text-foreground-muted hover:text-foreground'
+            )}
+          >
+            All ({files.length})
+          </button>
+          {modifiedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterType('M')}
+              className={cn(
+                'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
+                filterType === 'M'
+                  ? 'bg-surface3 text-foreground font-semibold shadow-2xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              Modified ({modifiedCount})
+            </button>
+          )}
+          {addedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterType('A')}
+              className={cn(
+                'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
+                filterType === 'A'
+                  ? 'bg-surface3 text-diff-addition font-semibold shadow-2xs'
+                  : 'text-foreground-muted hover:text-diff-addition'
+              )}
+            >
+              Added ({addedCount})
+            </button>
+          )}
+          {deletedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterType('D')}
+              className={cn(
+                'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
+                filterType === 'D'
+                  ? 'bg-surface3 text-diff-deletion font-semibold shadow-2xs'
+                  : 'text-foreground-muted hover:text-diff-deletion'
+              )}
+            >
+              Deleted ({deletedCount})
+            </button>
+          )}
+        </div>
+
+        {files.length > 5 && (
+          <input
+            type="text"
+            placeholder="Filter file…"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            className="w-24 px-1.5 py-0.5 rounded bg-surface2/60 text-3xs text-foreground placeholder:text-foreground-extra-muted border border-border/50 outline-hidden focus:w-36 transition-all"
+          />
+        )}
+      </div>
+
       {/* File List Rail (Horizontal Scrollable Tabs or Compact List) */}
       <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-surface0 overflow-x-auto no-scrollbar shrink-0 select-none">
-        {files.map((file) => {
+        {filteredFiles.map((file) => {
           const isSelected = file.path === selectedPath;
           const fileName = file.path.split(/[/\\]/).pop() || file.path;
           return (

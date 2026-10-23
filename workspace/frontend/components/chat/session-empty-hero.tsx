@@ -8,7 +8,7 @@ import {
   DescriptiveButtonTitle,
   DescriptiveButtonDescription,
 } from '@/components/ui/descriptive-button';
-import { Zap, Search, Terminal, Layers, type LucideIcon } from 'lucide-react';
+import { FileDiff, Search, Terminal, Layers, type LucideIcon } from 'lucide-react';
 
 export interface EmptyHeroSuggestion {
   icon: LucideIcon;
@@ -19,32 +19,32 @@ export interface EmptyHeroSuggestion {
 
 export const HERO_SUGGESTIONS: EmptyHeroSuggestion[] = [
   {
-    icon: Zap,
-    title: 'Refactor & review',
-    description: 'Review the code in this workspace, flag risks, and suggest refactors.',
+    icon: FileDiff,
+    title: 'Proofread & review diffs',
+    description: 'Inspect git changes, flag logic/type regressions, and review diffs.',
     prompt:
-      'Review the core architecture and implementation of this workspace. Point out logic or performance risks and suggest concrete improvements.',
+      'Review the code changes and core files in this workspace. Inspect logic, types, and potential regressions, and provide proofreading recommendations.',
+  },
+  {
+    icon: Terminal,
+    title: 'Run diagnostics & tests',
+    description: 'Verify test suites, background processes, runtimes, and active ports.',
+    prompt:
+      'Diagnose the local environment: check Node, Python, and Go runtimes, background tasks, active ports, and run test suites.',
+  },
+  {
+    icon: Layers,
+    title: 'Architecture & refactor',
+    description: 'Draft modular boundaries, clean up dead code, and decouple modules.',
+    prompt:
+      'Draft an architectural plan for this workspace, proposing clear module boundaries, data flow, and a scalable file layout.',
   },
   {
     icon: Search,
     title: 'Research & compare',
-    description: 'Search the web for approaches and write an objective comparison.',
+    description: 'Search documentation and best practices, then compare trade-offs.',
     prompt:
       'Research current approaches and best practices for local multi-agent orchestration, then compare their trade-offs.',
-  },
-  {
-    icon: Terminal,
-    title: 'Diagnose environment',
-    description: 'Check installed runtimes, tools, background daemons, and ports.',
-    prompt:
-      'Diagnose the local environment: check Node, Python, and Go runtimes, running background tasks, and active ports.',
-  },
-  {
-    icon: Layers,
-    title: 'Design architecture',
-    description: 'Draft an architectural plan for modular boundaries and file layout.',
-    prompt:
-      'Draft an architectural plan for this workspace, proposing clear module boundaries, data flow, and a scalable file layout.',
   },
 ];
 

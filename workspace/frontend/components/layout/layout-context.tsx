@@ -19,7 +19,7 @@ import {
   storeSidebarWidth,
 } from '@/lib/panel-store';
 
-export type ViewMode = 'home' | 'mission' | 'threads' | 'files' | 'knowledge' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings';
+export type ViewMode = 'home' | 'mission' | 'threads' | 'files' | 'knowledge' | 'tasks' | 'timers' | 'routines' | 'inbox' | 'connect' | 'skills' | 'settings' | 'agents';
 
 export type SettingsTab = 'general' | 'agents' | 'panels' | 'export';
 
@@ -44,7 +44,7 @@ function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTa
   // The Browser view was removed; a layout saved on it opens the threads.
   if ((mode as string) === 'browser') return { view: 'threads' };
   if (mode === 'mission') return { view: 'home' };
-  if (mode === 'connect') return { view: 'settings', settingsTab: 'agents' };
+  if (mode === 'connect' || mode === 'agents') return { view: 'settings', settingsTab: 'agents' };
   if (mode === 'skills') return { view: 'skills' };
   if (mode === 'knowledge') return { view: 'knowledge' };
   if (mode === 'routines' || mode === 'timers') return { view: 'tasks', tasksTab: 'schedules' };

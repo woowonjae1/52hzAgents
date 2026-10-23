@@ -87,7 +87,7 @@ export function ChannelHeader({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const { activeRightTab, setActiveRightTab, setViewMode } = useLayout();
+  const { activeRightTab, setActiveRightTab, setViewMode, openSettings } = useLayout();
 
   const startEditingTitle = () => {
     if (isDM) return;
@@ -165,10 +165,10 @@ export function ChannelHeader({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setViewMode('home');
+                    openSettings('agents');
                   }}
                   className="inline-flex items-center gap-1 hover:text-foreground hover:underline transition-colors cursor-pointer select-none"
-                  title="Open Agent Team Management"
+                  title="Open Agents Management"
                 >
                   <span className="size-1.5 rounded-full bg-status-success animate-pulse shrink-0" />
                   <span>
