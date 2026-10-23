@@ -148,11 +148,22 @@ export function ToolApproval({
       data-state={status}
       aria-busy={busy}
       className={cn(
-        "w-full overflow-hidden rounded-2xl border border-border/60 bg-muted/20 text-sm",
+        "w-full overflow-hidden rounded-lg border text-sm transition-colors",
+        status === "pending"
+          ? "border-brand/60 bg-brand/[0.06]"
+          : status === "denied" || status === "error"
+            ? "border-status-danger/60 bg-status-danger/[0.06]"
+            : "border-border/60 bg-muted/20",
         className,
       )}
     >
-      <div className="flex items-start gap-3 p-4">
+      <div
+        className={cn(
+          "flex items-start gap-3 p-3.5",
+          status === "pending" && "bg-brand/10",
+          (status === "denied" || status === "error") && "bg-status-danger/10"
+        )}
+      >
         <span
           aria-hidden="true"
           className={cn(

@@ -621,19 +621,19 @@ export function WorkbenchSidebarContent() {
           <button
             type="button"
             onClick={() => {
-              openSettings('agents');
+              setViewMode('home');
               if (isMobile) openMobileDetail();
             }}
             className={cn(
               'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
-              viewMode === 'settings' && settingsTab === 'agents'
+              viewMode === 'home' || (viewMode === 'settings' && settingsTab === 'agents')
                 ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
               <Bot className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Agents</span>
+              <span className="truncate">Agent Team</span>
             </div>
             <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-surface3 text-foreground-muted border border-border/40 font-mono">
               <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />

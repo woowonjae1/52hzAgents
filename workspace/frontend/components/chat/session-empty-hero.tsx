@@ -20,10 +20,10 @@ export interface EmptyHeroSuggestion {
 export const HERO_SUGGESTIONS: EmptyHeroSuggestion[] = [
   {
     icon: FileDiff,
-    title: 'Proofread & review diffs',
+    title: 'Refactor & review',
     description: 'Inspect git changes, flag logic/type regressions, and review diffs.',
     prompt:
-      'Review the code changes and core files in this workspace. Inspect logic, types, and potential regressions, and provide proofreading recommendations.',
+      'Review the core architecture and code changes in this workspace. Inspect logic, types, and potential regressions, and provide proofreading recommendations.',
   },
   {
     icon: Terminal,

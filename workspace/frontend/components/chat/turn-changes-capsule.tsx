@@ -8,6 +8,7 @@ import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
 import { EventLine } from '@/components/ai-elements/event-line';
 import { MultiDiffInspector } from '@/components/diff/multi-diff-inspector';
+import { ChatAggregatedDiffEntryRow } from '@/components/chat/chat-entry-container';
 import { useArtifacts } from '@/lib/artifacts-context';
 import type { TurnChangesMetadata } from '@/lib/types';
 
@@ -15,51 +16,6 @@ interface TurnChangesCapsuleProps {
   channelId: string;
   turnChanges: TurnChangesMetadata;
   className?: string;
-}
-
-/**
- * Everything one agent turn changed on disk, and the way to undo it.
- *
- * This was its own card — `rounded-xl` + border + `shadow-xs` + a tinted header
- * bar + its own chevron — sitting directly beneath a transcript whose every
- * other event had by then become a plain line. It now draws through `EventLine`
- * like the rest, so the summary of a turn's edits reads as one more event in the
- * same column rather than as a widget bolted underneath.
- *
- * The rollback flow is untouched. The reference design this borrows its summary
- * shape from has nothing equivalent, and the expanded list is kept as a list
- * rather than reduced to file chips: it carries a change status, a path, a
- * `pre-existing` warning and two counts per row, and chips would drop three of
- * those four.
- */
-
-/**
- * The letter git uses for what happened to a file: A added, D deleted, M
- * modified, ? untracked.
- *
- * Was three filled, bordered badges in success-green / danger-red /
- * warning-amber. Now it is the bare letter in the diff palette — the same two
- * tokens the `+`/`−` counts beside it use, and the same two `FileDiff` paints
- * its rows with. Amber is gone entirely: "modified" is the ordinary case here,
- * not a caution.
- */
-function ChangeMark({ status }: { status: string }) {
-  const added = status === 'A' || status === '?';
-  const deleted = status === 'D';
-  return (
-    <Hint label={added ? 'added' : deleted ? 'deleted' : 'modified'}>
-      <span
-        className={cn(
-          'w-3 shrink-0 text-center font-mono text-3xs font-medium',
-          added && 'text-diff-addition',
-          deleted && 'text-diff-deletion',
-          !added && !deleted && 'text-foreground-extra-muted'
-        )}
-      >
-        {status === '?' ? 'U' : status}
-      </span>
-    </Hint>
-  );
 }
 
 export function TurnChangesCapsule({
@@ -110,8 +66,6 @@ export function TurnChangesCapsule({
     <>
       {additions > 0 && <span className="text-diff-addition">+{additions}</span>}
       {additions > 0 && deletions > 0 && ' '}
-      {/* U+2212 MINUS, not a hyphen: in a mono face the two are different widths,
-          so mixing them makes a column of +/− counts fail to line up. */}
       {deletions > 0 && <span className="text-diff-deletion">−{deletions}</span>}
     </>
   );
@@ -195,36 +149,17 @@ export function TurnChangesCapsule({
         }
       >
         {files.length > 0 && (
-          <div className="max-h-48 overflow-y-auto py-0.5">
+          <div className="space-y-1.5 py-1">
             {files.map((file) => (
-              <Hint key={file.path} label="Click to open diff in Studio">
-                <button
-                  type="button"
-                  onClick={() => {
-                    openOutput({ kind: 'change', path: file.path, turnId: turnChanges?.turn_id || '' });
-                  }}
-                  className="-mx-1 w-[calc(100%+8px)] flex items-baseline justify-between gap-2 rounded-base px-1 py-0.5 font-mono text-2xs transition-colors hover:bg-surface2 text-left group cursor-pointer"
-                >
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <ChangeMark status={file.status} />
-                    <Hint label={file.path}>
-                      <span className="truncate text-foreground-muted group-hover:text-foreground group-hover:underline decoration-foreground-extra-muted" >
-                        {file.path}
-                      </span>
-                    </Hint>
-                    {file.pre_existing && (
-                      <span className="shrink-0 text-3xs text-foreground-extra-muted">
-                        pre-existing
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-3xs">
-                    {file.additions > 0 && <span className="text-diff-addition">+{file.additions}</span>}
-                    {file.additions > 0 && file.deletions > 0 && ' '}
-                    {file.deletions > 0 && <span className="text-diff-deletion">−{file.deletions}</span>}
-                  </span>
-                </button>
-              </Hint>
+              <ChatAggregatedDiffEntryRow
+                key={file.path}
+                channelId={channelId}
+                turnId={turnChanges?.turn_id}
+                file={file}
+                onOpenInChanges={() => {
+                  openOutput({ kind: 'change', path: file.path, turnId: turnChanges?.turn_id || '' });
+                }}
+              />
             ))}
           </div>
         )}
