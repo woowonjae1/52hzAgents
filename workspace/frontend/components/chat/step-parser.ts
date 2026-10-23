@@ -58,9 +58,33 @@ export const SUMMARY_ARG_KEYS = [
 
 export function extractToolSummary(tool: string, args: string): string {
   const trimmedArgs = args.trim();
+  const toolLower = tool.toLowerCase();
+  
   if (trimmedArgs.startsWith('{')) {
     try {
       const parsed = JSON.parse(trimmedArgs) as Record<string, unknown>;
+      const filePath = (parsed.filePath || parsed.file_path || parsed.path || '') as string;
+      const command = (parsed.command || parsed.cmd || '') as string;
+      const description = (parsed.description || '') as string;
+      const pattern = (parsed.pattern || parsed.query || '') as string;
+      
+      const filename = filePath ? filePath.replace(/\\/g, '/').split('/').filter(Boolean).pop() || filePath : '';
+      if ((toolLower === 'read' || toolLower === 'view' || toolLower === 'cat') && filename) {
+        return `Read ${filename}`;
+      }
+      if ((toolLower === 'edit' || toolLower === 'modify' || toolLower === 'update') && filename) {
+        return `Updated ${filename}`;
+      }
+      if ((toolLower === 'write' || toolLower === 'create') && filename) {
+        return `Created ${filename}`;
+      }
+      if ((toolLower === 'bash' || toolLower === 'terminal' || toolLower === 'run_command' || toolLower === 'sh') && (description || command)) {
+        return description || `$ ${command.replace(/\s+/g, ' ').slice(0, 70)}`;
+      }
+      if ((toolLower.includes('search') || toolLower === 'grep' || toolLower === 'glob') && pattern) {
+        return `Searched for "${pattern.slice(0, 40)}"`;
+      }
+
       for (const key of SUMMARY_ARG_KEYS) {
         const value = parsed[key];
         if (typeof value === 'string' && value.trim())
@@ -71,14 +95,18 @@ export function extractToolSummary(tool: string, args: string): string {
     }
   }
 
-  const fileMatch = args.match(/'file_path':\s*'([^']+)'/);
-  if (fileMatch && ['Write', 'Read', 'Edit'].includes(tool)) {
-    return fileMatch[1];
+  const fileMatch = args.match(/['"]?(?:file_path|filePath|path)['"]?:\s*['"]([^'"]+)['"]/);
+  if (fileMatch) {
+    const filename = fileMatch[1].replace(/\\/g, '/').split('/').filter(Boolean).pop() || fileMatch[1];
+    if (['Write', 'write'].includes(tool)) return `Created ${filename}`;
+    if (['Read', 'read'].includes(tool)) return `Read ${filename}`;
+    if (['Edit', 'edit'].includes(tool)) return `Updated ${filename}`;
+    return filename;
   }
 
-  const commandMatch = args.match(/'command':\s*'([^']+)'/);
-  if (commandMatch && tool === 'Bash') {
-    return commandMatch[1].slice(0, 80);
+  const commandMatch = args.match(/['"]?(?:command|cmd)['"]?:\s*['"]([^'"]+)['"]/);
+  if (commandMatch && (toolLower === 'bash' || toolLower === 'run_command')) {
+    return `$ ${commandMatch[1].slice(0, 80)}`;
   }
 
   const statusMatch = args.match(/'status':\s*'([^']+)'/);
