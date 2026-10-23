@@ -140,7 +140,7 @@ export function ChannelHeader({
             <div className="flex min-w-0 flex-col cursor-pointer" onClick={startEditingTitle}>
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
-                  {currentSession?.title ? stripTitleMentions(currentSession.title) : 'Channel'}
+                  {currentSession?.title ? stripTitleMentions(currentSession.title) : (currentSessionId ? 'Channel' : 'New Session')}
                 </h2>
                 {currentSession?.master && (
                   <span

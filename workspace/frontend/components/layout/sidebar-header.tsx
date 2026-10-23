@@ -10,11 +10,12 @@ import { toast } from '@/lib/toast';
 
 export function SidebarHeader() {
   const { sidebarToggle, setViewMode } = useLayout();
-  const { workspace, createSession } = useWorkspace();
+  const { workspace, createSession, setCurrentSessionId } = useWorkspace();
 
   const handleNewSession = async () => {
     try {
-      await createSession();
+      const s = await createSession();
+      setCurrentSessionId(s.sessionId);
       setViewMode('threads');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not create new session');

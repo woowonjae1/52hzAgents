@@ -134,10 +134,9 @@ function WrapperInner() {
     Either asked for ('home': the sidebar's Home / New session, G H) or
     implied: the Threads view with nothing selected -- first launch, a
     restored layout whose thread is gone, closing or deleting the open
-    thread. The implied case is what replaced the "No channel selected" pane,
-    so there is no longer a state where the main area is empty.
+    thread.
   */
-  const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
+  const isHome = viewMode === 'home';
   const desktopContainerRef = React.useRef<HTMLDivElement>(null);
   const narrowStateRef = React.useRef<boolean | null>(null);
 

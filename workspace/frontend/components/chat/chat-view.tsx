@@ -637,13 +637,25 @@ export function ChatView() {
       files: PendingFile[] = [],
       segments?: MentionSegment[]
     ) => {
-      if (!currentSessionId) return;
       if (!currentUser.id || !currentUser.name.trim()) return;
+
+      let sessionId: string;
+      if (!currentSessionId) {
+        try {
+          const s = await createSession({ workingDir: currentSessionWorkingDir || undefined });
+          sessionId = s.sessionId;
+          setCurrentSessionId(sessionId);
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Could not create new session');
+          return;
+        }
+      } else {
+        sessionId = currentSessionId;
+      }
 
       // A new chat exists only as a draft until now: create the real channel
       // (with the agents, leader, mode and folder picked on the draft) and
       // send into that. Everything below uses the real id.
-      let sessionId = currentSessionId;
       const draftId = isDraftSessionId(sessionId) ? sessionId : null;
 
       // Create optimistic messages for instant feedback
@@ -800,7 +812,7 @@ export function ChatView() {
         setSessionActive(sessionId, false);
       }
     },
-    [currentSessionId, materializeDraft, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive, updateLastMessage, recordUserMessageSent]
+    [currentSessionId, currentSessionWorkingDir, createSession, setCurrentSessionId, materializeDraft, currentUser.id, currentUser.name, forceRefresh, agents, setSessionActive, updateLastMessage, recordUserMessageSent]
   );
 
   const handleRegenerateMessage = useCallback(async (msg: WorkspaceMessage) => {
@@ -1330,7 +1342,7 @@ export function ChatView() {
                     </button>
                   </div>
                 </div>
-              ) : currentSession && (currentSession.participants?.length ?? 0) === 0 && (
+              ) : currentSession && (currentSession.participants?.length ?? 0) === 0 && displayMessages.length === 0 && onlineAgents.length > 1 && (
                 <div className="mb-2.5 flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-surface1/90 border border-border/60 text-xs">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Sparkles className="size-3.5 text-primary" />

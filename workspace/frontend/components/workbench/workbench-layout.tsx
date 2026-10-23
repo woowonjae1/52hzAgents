@@ -59,7 +59,7 @@ export function WorkbenchLayout({
   } = useLayout();
 
   const { currentSessionId } = useWorkspace();
-  const isHome = viewMode === 'home' || (viewMode === 'threads' && !currentSessionId);
+  const isHome = viewMode === 'home';
   const monitorMode = false;
   const isSettings = viewMode === 'settings';
   const shouldShowSidebar = !isDetailExpanded && !isSettings;
