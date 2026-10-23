@@ -28,7 +28,7 @@ export function SidebarExpandButton({ className }: SidebarExpandButtonProps) {
         aria-label="Expand sidebar"
         data-no-drag
         className={cn(
-          'size-7 flex items-center justify-center rounded-md border border-border/80 bg-surface2/70 text-foreground hover:bg-surface3 hover:text-foreground transition-all shrink-0 cursor-pointer shadow-xs active:scale-95 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
+          'size-7 flex items-center justify-center rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors shrink-0 cursor-pointer',
           className
         )}
       >

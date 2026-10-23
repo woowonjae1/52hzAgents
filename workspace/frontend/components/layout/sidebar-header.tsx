@@ -1,37 +1,33 @@
 'use client';
 
 import { Hint } from '@/components/ui/hint';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeft, SquarePen } from 'lucide-react';
 import { useLayout } from './layout-context';
 import { SignalMark } from '@/components/brand/signal-mark';
 import { useWorkspace } from '@/lib/workspace-context';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { toast } from '@/lib/toast';
 
 export function SidebarHeader() {
-  const { sidebarToggle } = useLayout();
-  const { workspace } = useWorkspace();
+  const { sidebarToggle, setViewMode } = useLayout();
+  const { workspace, createSession } = useWorkspace();
+
+  const handleNewSession = async () => {
+    try {
+      await createSession();
+      setViewMode('threads');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not create new session');
+    }
+  };
 
   return (
     <div
       className="app-header justify-between px-4"
       style={{
-        // 0.875rem, the chat header's own inline padding — so the toggle below
-        // lands on the same x as the expand button that replaces it.
         paddingInlineStart: 'max(0.875rem, var(--traffic-lights-inset, 0px))',
       }}
     >
-      {/*
-        THE TOGGLE NO LONGER JUMPS.
-
-        Collapse lived at the RIGHT edge of this header, ~280px in. Collapsing
-        the sidebar removed it, and the button that brings the sidebar back
-        appeared at the LEFT edge of the chat header instead — so the control
-        was never where your pointer had just been, and "close" and "open" were
-        two different buttons in two different places.
-
-        It now opens the row, at the same x, size and icon size as the expand
-        button in the chat header. Toggling changes the state, not the target.
-      */}
       <div className="flex items-center gap-2.5 min-w-0">
         <Hint label="Collapse sidebar">
           <button
@@ -57,6 +53,17 @@ export function SidebarHeader() {
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
+        <Hint label="New session (Ctrl+N)">
+          <button
+            type="button"
+            onClick={handleNewSession}
+            aria-label="New session"
+            data-no-drag
+            className="size-7 rounded-lg hover:bg-surface2 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <SquarePen className="size-4" />
+          </button>
+        </Hint>
         <NotificationBell />
       </div>
     </div>
