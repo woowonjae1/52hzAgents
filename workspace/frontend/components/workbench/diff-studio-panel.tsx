@@ -14,6 +14,9 @@ import {
   GitBranch,
   MessageSquare,
   MessageSquarePlus,
+  FolderTree,
+  GitPullRequest,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { DiffBlock } from '@/components/chat/diff-block';
@@ -25,6 +28,8 @@ import { copyWithToast } from '@/lib/desktop';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { FileTree } from './file-tree';
+import { GitPanel } from './git-panel';
 
 function StatusBadge({ status }: { status: string }) {
   const isAdded = status === 'A' || status === '?';
@@ -54,6 +59,8 @@ export function DiffStudioPanel() {
   const totalReviewComments = review?.comments.length ?? 0;
 
   const files = gitStatus?.files || [];
+  const [panelMode, setPanelMode] = useState<'diff' | 'git'>('diff');
+  const [showFileTree, setShowFileTree] = useState(true);
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [diffCache, setDiffCache] = useState<Record<string, string>>({});
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
@@ -194,42 +201,45 @@ export function DiffStudioPanel() {
     );
   }
 
-  if (files.length === 0) {
-    return (
-      <div className="flex flex-col h-full bg-surface0">
-        <div className="flex items-center justify-between px-3.5 py-2 border-b border-border-chrome bg-surface1/60 select-none">
-          <div className="flex items-center gap-2 min-w-0">
-            <GitBranch className="size-3.5 text-primary shrink-0" />
-            <span className="text-xs font-mono font-medium truncate">{gitStatus.branch || 'HEAD'}</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            disabled={refreshing}
-            className="p-1 rounded-md hover:bg-surface2 text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
-          >
-            <RefreshCw className={cn('size-3.5', refreshing && 'animate-spin')} />
-          </button>
-        </div>
-        <div className="flex flex-col items-center justify-center flex-1 p-6 text-center text-muted-foreground select-none">
-          <CheckCircle2 className="size-8 text-status-success mb-2.5 opacity-80" />
-          <p className="text-xs font-semibold text-foreground">Working Tree Clean</p>
-          <p className="text-3xs mt-1 max-w-xs text-foreground-extra-muted">
-            All agent changes have been committed or no pending modifications exist.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full bg-surface0 select-text overflow-hidden">
-      {/* Top Meta Bar */}
+      {/* Top Meta Bar with View Switcher */}
       <div className="flex items-center justify-between px-3.5 py-2 border-b border-border-chrome bg-surface1/70 select-none shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <GitBranch className="size-3.5 text-primary shrink-0" />
-          <span className="text-xs font-mono font-medium truncate">{gitStatus.branch || 'HEAD'}</span>
-          <span className="text-3xs px-1.5 py-0.5 rounded-full bg-surface2 font-mono text-foreground-muted border border-border/60">
+          {/* Segmented View Switcher: Diff vs Git */}
+          <div className="flex items-center p-0.5 rounded-lg bg-surface2 border border-border/60">
+            <button
+              type="button"
+              onClick={() => setPanelMode('diff')}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                panelMode === 'diff'
+                  ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <FileDiff className="size-3" />
+              <span>Diff ({files.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPanelMode('git')}
+              className={cn(
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
+                panelMode === 'git'
+                  ? 'bg-surface1 text-foreground shadow-xs font-semibold'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <GitBranch className="size-3" />
+              <span>Git & Sync</span>
+            </button>
+          </div>
+
+          <span className="hidden sm:inline-block text-xs font-mono font-medium truncate max-w-[120px]">
+            {gitStatus.branch || 'HEAD'}
+          </span>
+          <span className="hidden md:inline-block text-3xs px-1.5 py-0.5 rounded-full bg-surface2 font-mono text-foreground-muted border border-border/60">
             +{gitStatus.additions} -{gitStatus.deletions}
           </span>
           {totalReviewComments > 0 && (
@@ -239,7 +249,22 @@ export function DiffStudioPanel() {
             </span>
           )}
         </div>
+
         <div className="flex items-center gap-1.5">
+          {panelMode === 'diff' && files.length > 0 && (
+            <Hint label={showFileTree ? 'Hide File Tree' : 'Show File Tree'}>
+              <button
+                type="button"
+                onClick={() => setShowFileTree((prev) => !prev)}
+                className={cn(
+                  'p-1 rounded-md transition-colors cursor-pointer',
+                  showFileTree ? 'bg-surface2 text-foreground' : 'text-foreground-muted hover:text-foreground'
+                )}
+              >
+                <FolderTree className="size-3.5" />
+              </button>
+            </Hint>
+          )}
           {totalReviewComments > 0 && review && (
             <Hint label="Clear all inline review comments">
               <button
@@ -251,7 +276,7 @@ export function DiffStudioPanel() {
               </button>
             </Hint>
           )}
-          {files.length > 0 && (
+          {panelMode === 'diff' && files.length > 0 && (
             <Hint label="Discard all modified files">
               <button
                 type="button"
@@ -263,7 +288,7 @@ export function DiffStudioPanel() {
               </button>
             </Hint>
           )}
-          {selectedPath && (
+          {panelMode === 'diff' && selectedPath && (
             <Hint label={copied ? 'Copied' : 'Copy diff'}>
               <button
                 type="button"
@@ -287,152 +312,96 @@ export function DiffStudioPanel() {
         </div>
       </div>
 
-      {/* Proofreading Filter Bar (Visible when files exist) */}
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-border/60 bg-surface1/40 text-3xs select-none shrink-0">
-        <div className="flex items-center gap-1">
+      {/* Main Panel Content: Git Mode vs Diff Mode */}
+      {panelMode === 'git' ? (
+        <GitPanel
+          channelId={serverSessionId || undefined}
+          gitStatus={gitStatus}
+          onRefresh={refreshGit}
+          onSelectFile={(path) => {
+            setSelectedPath(path);
+            setPanelMode('diff');
+          }}
+        />
+      ) : files.length === 0 ? (
+        <div className="flex flex-col items-center justify-center flex-1 p-6 text-center text-muted-foreground select-none">
+          <CheckCircle2 className="size-8 text-status-success mb-2.5 opacity-80" />
+          <p className="text-xs font-semibold text-foreground">Working Tree Clean</p>
+          <p className="text-3xs mt-1 max-w-xs text-foreground-extra-muted">
+            All agent changes have been committed or no pending modifications exist.
+          </p>
           <button
             type="button"
-            onClick={() => setFilterType('all')}
-            className={cn(
-              'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
-              filterType === 'all'
-                ? 'bg-surface3 text-foreground font-semibold shadow-2xs'
-                : 'text-foreground-muted hover:text-foreground'
-            )}
+            onClick={() => setPanelMode('git')}
+            className="mt-3 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-2xs font-medium border border-border/80 transition-colors cursor-pointer"
           >
-            All ({files.length})
+            Open Git & Sync Panel
           </button>
-          {modifiedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setFilterType('M')}
-              className={cn(
-                'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
-                filterType === 'M'
-                  ? 'bg-surface3 text-foreground font-semibold shadow-2xs'
-                  : 'text-foreground-muted hover:text-foreground'
-              )}
-            >
-              Modified ({modifiedCount})
-            </button>
-          )}
-          {addedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setFilterType('A')}
-              className={cn(
-                'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
-                filterType === 'A'
-                  ? 'bg-surface3 text-diff-addition font-semibold shadow-2xs'
-                  : 'text-foreground-muted hover:text-diff-addition'
-              )}
-            >
-              Added ({addedCount})
-            </button>
-          )}
-          {deletedCount > 0 && (
-            <button
-              type="button"
-              onClick={() => setFilterType('D')}
-              className={cn(
-                'px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
-                filterType === 'D'
-                  ? 'bg-surface3 text-diff-deletion font-semibold shadow-2xs'
-                  : 'text-foreground-muted hover:text-diff-deletion'
-              )}
-            >
-              Deleted ({deletedCount})
-            </button>
-          )}
         </div>
+      ) : (
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Left File Tree Sidebar */}
+          {showFileTree && (
+            <div className="w-56 md:w-64 shrink-0 h-full border-r border-border">
+              <FileTree
+                files={files}
+                selectedPath={selectedPath}
+                onSelectFile={setSelectedPath}
+                reviewComments={review?.comments}
+              />
+            </div>
+          )}
 
-        {files.length > 5 && (
-          <input
-            type="text"
-            placeholder="Filter file…"
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            className="w-24 px-1.5 py-0.5 rounded bg-surface2/60 text-3xs text-foreground placeholder:text-foreground-extra-muted border border-border/50 outline-hidden focus:w-36 transition-all"
-          />
-        )}
-      </div>
+          {/* Right Diff Workspace */}
+          <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-surface0">
+            {/* Active File Review Bar */}
+            {selectedPath && (
+              <div className="flex items-center justify-between px-3.5 py-1.5 bg-surface1/50 border-b border-border/50 text-2xs select-none shrink-0">
+                <div className="flex items-center gap-1.5 font-mono text-foreground-muted truncate min-w-0">
+                  <FileCode2 className="size-3.5 text-foreground-extra-muted shrink-0" />
+                  <span className="truncate">{selectedPath}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="hidden sm:inline-flex items-center gap-1 text-3xs text-foreground-extra-muted">
+                    <MessageSquarePlus className="size-3 text-primary/80" />
+                    <span>Click any line to comment</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDiscardPath(selectedPath)}
+                    disabled={Boolean(discarding)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-3xs font-medium disabled:opacity-50"
+                  >
+                    <Undo2 className="size-3" />
+                    <span>Discard File</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
-      {/* File List Rail (Horizontal Scrollable Tabs or Compact List) */}
-      <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-surface0 overflow-x-auto no-scrollbar shrink-0 select-none">
-        {filteredFiles.map((file) => {
-          const isSelected = file.path === selectedPath;
-          const fileName = file.path.split(/[/\\]/).pop() || file.path;
-          const fileCommentCount = review?.comments.filter((c) => c.filePath === file.path).length ?? 0;
-          return (
-            <button
-              key={file.path}
-              type="button"
-              onClick={() => setSelectedPath(file.path)}
-              className={cn(
-                'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-mono transition-all shrink-0 cursor-pointer border',
-                isSelected
-                  ? 'bg-surface2 text-foreground font-semibold border-border shadow-xs'
-                  : 'bg-transparent text-foreground-muted hover:text-foreground hover:bg-surface2/60 border-transparent'
+            {/* Diff Content View */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-3">
+              {isFileLoading ? (
+                <div className="flex items-center justify-center h-48 gap-2 text-xs text-foreground-muted">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span>Loading diff for {selectedPath}...</span>
+                </div>
+              ) : currentDiff ? (
+                <DiffBlock
+                  code={currentDiff}
+                  filePath={selectedPath}
+                  interactiveReview
+                  embedded
+                />
+              ) : (
+                <div className="flex items-center justify-center h-48 text-xs text-foreground-muted">
+                  Select a file from the tree to inspect diffs
+                </div>
               )}
-            >
-              <StatusBadge status={file.status} />
-              <span className="truncate max-w-[140px]">{fileName}</span>
-              {fileCommentCount > 0 && (
-                <span className="inline-flex items-center gap-0.5 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
-                  <MessageSquare className="size-2.5" />
-                  <span>{fileCommentCount}</span>
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active File Review Bar */}
-      {selectedPath && (
-        <div className="flex items-center justify-between px-3.5 py-1.5 bg-surface1/50 border-b border-border/50 text-2xs select-none shrink-0">
-          <div className="flex items-center gap-1.5 font-mono text-foreground-muted truncate min-w-0">
-            <FileCode2 className="size-3.5 text-foreground-extra-muted shrink-0" />
-            <span className="truncate">{selectedPath}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="hidden sm:inline-flex items-center gap-1 text-3xs text-foreground-extra-muted">
-              <MessageSquarePlus className="size-3 text-primary/80" />
-              <span>Click any line to comment</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setConfirmDiscardPath(selectedPath)}
-              disabled={Boolean(discarding)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-3xs font-medium disabled:opacity-50"
-            >
-              <Undo2 className="size-3" />
-              <span>Discard File</span>
-            </button>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Diff Inspector Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-3">
-        {isFileLoading ? (
-          <div className="flex items-center justify-center h-48 gap-2 text-xs text-foreground-muted">
-            <Loader2 className="size-4 animate-spin" />
-            <span>Loading diff for {selectedPath}...</span>
-          </div>
-        ) : currentDiff ? (
-          <DiffBlock
-            code={currentDiff}
-            filePath={selectedPath}
-            interactiveReview
-            embedded
-          />
-        ) : (
-          <div className="flex items-center justify-center h-48 text-xs text-foreground-muted">
-            Select a file to inspect diffs
-          </div>
-        )}
-      </div>
 
       {/* Confirm Discard Single File */}
       <ConfirmDialog
