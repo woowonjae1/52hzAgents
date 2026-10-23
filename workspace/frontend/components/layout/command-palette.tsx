@@ -268,8 +268,8 @@ export function CommandPalette() {
       {
         id: 'act-new-chat',
         category: 'Actions',
-        title: 'New Chat',
-        subtitle: 'Create an empty channel right away',
+        title: 'New Session',
+        subtitle: 'Start a fresh session right away',
         icon: <Plus className="size-4 text-foreground-muted" />,
         shortcut: ['C'],
         action: async () => {

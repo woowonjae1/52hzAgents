@@ -132,7 +132,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
           }
         }}
       >
-        <DialogTitle>New Channel</DialogTitle>
+        <DialogTitle>New Session</DialogTitle>
         <DialogDescription className="text-sm text-muted-foreground">
           {multipleAgents
             ? 'Pick which agents join this conversation.'
@@ -272,7 +272,7 @@ export function NewThreadDialog({ open, onOpenChange, agents, sessions, defaultP
             disabled={!canCreate}
             className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
           >
-            {resumeFrom ? 'Resume Channel' : 'Start Channel'}
+            {resumeFrom ? 'Resume Session' : 'Start Session'}
           </Button>
         </div>
       </DialogContent>

@@ -1549,7 +1549,7 @@ export function ThreadList() {
                           e.stopPropagation();
                           startChannel(item.dir);
                         }}
-                        title={item.dir ? `New channel in ${basename(item.dir)}` : 'New direct chat'}
+                        title={item.dir ? `New session in ${basename(item.dir)}` : 'New session'}
                         className="opacity-0 group-hover:opacity-100 transition-opacity size-5 flex items-center justify-center rounded hover:bg-surface2 text-foreground-extra-muted hover:text-foreground transition-colors shrink-0"
                       >
                         <Plus className="size-3" />

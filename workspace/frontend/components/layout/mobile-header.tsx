@@ -91,8 +91,8 @@ export function MobileHeader() {
             </span>
           </div>
 
-          {/* Right: new thread button */}
-          <Hint label="New Channel">
+          {/* Right: new session button */}
+          <Hint label="New Session">
             <button
               onClick={handleNewThread}
               className="size-8 flex items-center justify-center rounded-lg bg-primary text-primary-foreground shrink-0"

@@ -953,12 +953,12 @@ export function ChatView() {
             <MessageSquare className="size-5 text-foreground-muted" />
           </div>
           <p className="text-sm font-semibold text-foreground">
-            {agents.length > 0 ? 'No channel selected' : 'No agents connected yet'}
+            {agents.length > 0 ? 'No session selected' : 'No agents connected yet'}
           </p>
           <p className="text-xs mt-1 max-w-xs">
             {agents.length > 0
-              ? 'Pick a channel from the sidebar, or create one and choose who joins.'
-              : 'Connect an agent first — a channel needs at least one participant.'}
+              ? 'Pick a session from the sidebar, or start a new one.'
+              : 'Connect an agent first — a session needs at least one participant.'}
           </p>
           {/*
             There is always an action here. Previously the button was gated on
@@ -971,7 +971,7 @@ export function ChatView() {
             onClick={agents.length > 0 ? openNewThread : () => setViewMode('home')}
           >
             <Plus className="size-4" />
-            {agents.length > 0 ? 'New channel' : 'Connect an agent'}
+            {agents.length > 0 ? 'New session' : 'Connect an agent'}
           </Button>
           {/* Desktop apps teach their shortcuts in the empty pane. Every
               cap here is read from the keymap (lib/shortcuts.ts), so it
