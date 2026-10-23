@@ -259,13 +259,16 @@ export function getSmartSessionTitle(
   folderOrdinal?: number,
 ): string {
   const rawTitle = (session.title || '').trim();
+  const lowerTitle = rawTitle.toLowerCase();
   const isGeneric =
     !rawTitle ||
     rawTitle === '新频道' ||
-    rawTitle === 'New Channel' ||
-    rawTitle === 'Untitled Channel' ||
-    rawTitle === 'Untitled' ||
-    rawTitle === 'New Chat';
+    lowerTitle === 'new channel' ||
+    lowerTitle === 'untitled channel' ||
+    lowerTitle === 'untitled' ||
+    lowerTitle === 'new chat' ||
+    lowerTitle === 'thread' ||
+    lowerTitle === 'new session';
 
   // Explicit titles are mostly the first message, stored at creation — which
   // is why they still carried their @mentions after derived ones stopped.
@@ -298,7 +301,7 @@ export function getSmartSessionTitle(
     }
   }
 
-  return 'New chat';
+  return 'New Session';
 }
 
 /*

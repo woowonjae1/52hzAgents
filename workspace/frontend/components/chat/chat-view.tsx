@@ -1040,15 +1040,12 @@ export function ChatView() {
         onExportMarkdown={handleExportMarkdown}
       />
 
-      {/* Missing-description warning — routing accuracy (dynamic/workflow router
-          and the master's own delegation) depends on agent descriptions. Nudge
-          the user to fill any that are blank; each chip opens that agent's
-          profile, where a one-click auto-generate button drafts one. */}
-      {!isDM && !dismissedRoutingWarning && (() => {
+      {/* Missing-description warning — only shown in active threads with completely unconfigured agents */}
+      {!isDM && !dismissedRoutingWarning && displayMessages.length > 0 && (() => {
         const participants = currentSession?.participants || [];
         const sessionAgents = agents.filter((a) => participants.includes(a.agentName));
         if (sessionAgents.length <= 1) return null;
-        const missing = sessionAgents.filter((a) => !a.description || !a.description.trim());
+        const missing = sessionAgents.filter((a) => (!a.description || !a.description.trim()) && (!a.role || !a.role.trim()));
         if (missing.length === 0) return null;
         return (
           <div className="flex items-center gap-2 px-3 py-1.5 shrink-0 overflow-x-auto bg-surface2 text-status-warning">

@@ -33,7 +33,7 @@ export class EventsApi extends BaseWorkspaceApi {
       sessionId: channelName,
       workspaceId: this.workspaceId,
       createdBy: 'human:user',
-      title: opts.title || 'New Channel',
+      title: opts.title || 'New Session',
       status: 'active',
       starred: false,
       participants: opts.participants || [],
