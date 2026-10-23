@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { Hint } from '@/components/ui/hint';
-import { Check, ChevronDown, Search, Sparkles, X } from 'lucide-react';
+import { Check, ChevronDown, RefreshCw, Search, Sparkles, X } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
@@ -111,6 +111,7 @@ export function AgentModelSwitcher({
   const [selectedAgentName, setSelectedAgentName] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeCategory, setActiveCategory] = React.useState<string>('all');
+  const [refreshing, setRefreshing] = React.useState(false);
 
   const onlineAgents = React.useMemo(
     () => agents.filter((a) => a.status === 'online'),
@@ -152,21 +153,26 @@ export function AgentModelSwitcher({
 
   const load = React.useCallback(async () => {
     if (!agentNamesKey) return;
+    setRefreshing(true);
     const names = agentNamesKey.split(',');
     if (workspaceId) workspaceApi.setWorkspaceId(workspaceId);
-    await Promise.all(
-      names.map(async (name) => {
-        try {
-          const usage = await workspaceApi.getAgentUsage(name);
-          hydrateAgentModels(name, {
-            options: parseReportedModels(usage?.available_models),
-            current: usage?.current_model,
-          });
-        } catch {
-          // An agent that does not answer keeps whatever the store holds.
-        }
-      }),
-    );
+    try {
+      await Promise.all(
+        names.map(async (name) => {
+          try {
+            const usage = await workspaceApi.getAgentUsage(name);
+            hydrateAgentModels(name, {
+              options: parseReportedModels(usage?.available_models),
+              current: usage?.current_model,
+            });
+          } catch {
+            // An agent that does not answer keeps whatever the store holds.
+          }
+        }),
+      );
+    } finally {
+      setRefreshing(false);
+    }
   }, [agentNamesKey, workspaceId]);
 
   // Heartbeat: fold each agent's reported model list into the shared store.
@@ -509,15 +515,28 @@ export function AgentModelSwitcher({
                 {/* Whose model this is. The count and the "Current:" chip are
                     gone — the list is right below, and the selected row has
                     its own checkmark. */}
-                <div className="px-3 pt-2.5 pb-1 flex items-center gap-1.5 shrink-0">
-                  <AgentAvatar
-                    name={activeAgent.agentName}
-                    agentType={activeAgent.agentType}
-                    size={16}
-                  />
-                  <span className="text-2xs font-medium text-foreground-muted truncate">
-                    Model for @{activeAgent.agentName}
-                  </span>
+                <div className="px-3 pt-2.5 pb-1 flex items-center justify-between gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <AgentAvatar
+                      name={activeAgent.agentName}
+                      agentType={activeAgent.agentType}
+                      size={16}
+                    />
+                    <span className="text-2xs font-medium text-foreground-muted truncate">
+                      Model for @{activeAgent.agentName}
+                    </span>
+                  </div>
+                  <Hint label="Refresh live models from upstream agent">
+                    <button
+                      type="button"
+                      disabled={refreshing}
+                      onClick={() => void load()}
+                      aria-label="Refresh models"
+                      className="size-6 rounded flex items-center justify-center text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer active:scale-95 disabled:opacity-50"
+                    >
+                      <RefreshCw className={cn('size-3', refreshing && 'animate-spin text-primary')} />
+                    </button>
+                  </Hint>
                 </div>
 
                 {/* Search & Category Chips — only once there is a list to search */}
