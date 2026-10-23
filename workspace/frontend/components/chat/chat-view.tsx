@@ -8,6 +8,7 @@ import * as React from 'react';
 import { useCallback, useRef, useState, useEffect, useMemo } from 'react';
 import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
+import { ComposerHeaderBar, type TurnNavigationItem, type TeamPillMember } from './composer-header-bar';
 import { ThreadStatusBar } from './thread-status-bar';
 import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
@@ -95,7 +96,7 @@ export {
 };
 
 export function ChatView() {
-  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, routines, routinesLoaded, knowledge, recordUserMessageSent, workspaceId, draftSession, materializeDraft } = useWorkspace();
+  const { agents, currentUser, currentSessionId, setCurrentSessionId, sessions, createSession, updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, activeSessionIds, workingAgentNames, stoppingSessionIds, renameSession, addParticipant, removeParticipant, setSessionMaster, setSessionOrchestration, consumeSkipFocus, createRoutine, routines, routinesLoaded, knowledge, recordUserMessageSent, workspaceId, draftSession, materializeDraft, todos } = useWorkspace();
   
   useEffect(() => {
     console.log('[52hzAgents Monitor] [ChatView] Active session:', currentSessionId, 'at', new Date().toISOString());
@@ -487,11 +488,17 @@ export function ChatView() {
     return set;
   }, [displayMessages]);
 
-  const outputsCount = useMemo(() => {
-    if (!displayMessages || displayMessages.length === 0) return 0;
-    const o = collectOutputs(displayMessages);
-    return o.documents.length + o.changedFiles.length;
+  const collectedOutputs = useMemo(() => {
+    if (!displayMessages || displayMessages.length === 0) {
+      return { documents: [], changedFiles: [] };
+    }
+    return collectOutputs(displayMessages);
   }, [displayMessages]);
+
+  const outputsCount = useMemo(
+    () => collectedOutputs.documents.length + collectedOutputs.changedFiles.length,
+    [collectedOutputs]
+  );
 
   const answeredDecisionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -531,6 +538,90 @@ export function ChatView() {
     }
     return list;
   }, [displayMessages, approvalResponses, answeredDecisionIds, routines, routinesLoaded, parallelReviewNeeded]);
+
+  // cdesktop-style ComposerHeaderBar derived props
+  const userMessageTurns = useMemo<TurnNavigationItem[]>(() => {
+    const turns: TurnNavigationItem[] = [];
+    let turnNum = 1;
+    for (const m of displayMessages) {
+      const isHuman =
+        m.senderType === 'human' ||
+        m.senderType === 'user' ||
+        m.senderName === 'User' ||
+        (Boolean(currentUser?.name) && m.senderName === currentUser.name);
+      if (isHuman && m.content.trim()) {
+        turns.push({
+          patchKey: m.messageId,
+          content: m.content.trim().split('\n')[0] || m.content.trim(),
+          turnNumber: turnNum++,
+        });
+      }
+    }
+    return turns;
+  }, [displayMessages, currentUser?.name]);
+
+  const sessionTodoItems = useMemo(() => {
+    if (!currentSessionId) return [];
+    return (todos || [])
+      .filter((t) => t.channelName === currentSessionId)
+      .map((t) => ({ content: t.content, status: t.status }));
+  }, [todos, currentSessionId]);
+
+  const inProgressTodoItem = useMemo(
+    () =>
+      sessionTodoItems.find(
+        (t) => t.status === 'in_progress'
+      ) ?? null,
+    [sessionTodoItems]
+  );
+
+  const teamMembers = useMemo<TeamPillMember[]>(() => {
+    const names =
+      sessionParticipants.length > 0
+        ? sessionParticipants
+        : activeHeaderAgents;
+    const hasPendingApproval = pendingActions.length > 0;
+    return names.map((name, idx) => {
+      const agentObj = agents.find(
+        (a) => a.agentName.toLowerCase() === name.toLowerCase()
+      );
+      const isLead =
+        (currentSession?.master &&
+          currentSession.master.toLowerCase() === name.toLowerCase()) ||
+        (!currentSession?.master && idx === 0);
+      const isRunning = runningAgentsInChannel.has(name.toLowerCase());
+      const status: TeamPillMember['status'] = isRunning
+        ? 'running'
+        : hasPendingApproval && isLead
+          ? 'awaiting_approval'
+          : agentObj?.status === 'offline'
+            ? 'errored'
+            : 'idle';
+      return {
+        agentName: name,
+        agentType: agentObj?.agentType,
+        isLead: Boolean(isLead),
+        status,
+      };
+    });
+  }, [
+    sessionParticipants,
+    activeHeaderAgents,
+    agents,
+    currentSession?.master,
+    runningAgentsInChannel,
+    pendingActions.length,
+  ]);
+
+  const composerFilesChanged = gitStatus?.available
+    ? gitStatus.files.length
+    : collectedOutputs.changedFiles.length;
+  const composerLinesAdded = gitStatus?.available
+    ? gitStatus.additions
+    : undefined;
+  const composerLinesRemoved = gitStatus?.available
+    ? gitStatus.deletions
+    : undefined;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -1414,6 +1505,36 @@ export function ChatView() {
                 isWorking={!!currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId))}
                 stopping={!!currentSessionId && stoppingSessionIds.has(currentSessionId)}
                 onStop={() => currentSessionId && stopAllAgents(currentSessionId)}
+                headerBar={
+                  <ComposerHeaderBar
+                    filesChanged={composerFilesChanged}
+                    linesAdded={composerLinesAdded}
+                    linesRemoved={composerLinesRemoved}
+                    onViewCode={() => {
+                      if (selectedAgentName) setSelectedAgentName(null);
+                      setActiveRightTab('diff');
+                    }}
+                    inProgressTodo={inProgressTodoItem}
+                    isRunning={!!currentSessionId && activeSessionIds.has(currentSessionId)}
+                    todos={sessionTodoItems}
+                    userMessageTurns={userMessageTurns}
+                    onScrollToUserMessage={(messageId) => {
+                      window.dispatchEvent(
+                        new CustomEvent(TRANSCRIPT_REVEAL_EVENT, { detail: { messageId } })
+                      );
+                    }}
+                    teamMembers={teamMembers}
+                    availableAgents={agents}
+                    activeAgentName={activeModelAgentName}
+                    onSelectTeamAgent={(agentName) => {
+                      if (currentSessionId) setSessionMaster(currentSessionId, agentName);
+                    }}
+                    onAddTeammate={(agentName) => {
+                      if (currentSessionId) addParticipant(currentSessionId, agentName);
+                    }}
+                    onOpenAgentsHub={() => setViewMode('home')}
+                  />
+                }
                 disabled={!currentUser.name.trim()}
                 disabledReason={!currentUser.name.trim() ? 'Set your username in settings to start chatting' : undefined}
                 // Offline agents block SENDING only: the box stays editable so a

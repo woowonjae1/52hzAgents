@@ -28,6 +28,8 @@ import {
   Scale,
   MessageSquare,
   Trash2,
+  CornerDownLeft,
+  Loader2,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { useReviewOptional, buildAgentPromptWithReview } from '@/lib/review-context';
@@ -165,6 +167,8 @@ export interface PromptComposerProps {
   isWorking?: boolean;
   stopping?: boolean;
   onStop?: () => void;
+  /** Optional cdesktop-style top header bar (stats pill, TeamPillRow, TurnNavigationPopup, TodoProgressPopup) */
+  headerBar?: React.ReactNode;
 }
 
 function isImageFile(file: File): boolean {
@@ -195,6 +199,7 @@ export function PromptComposer({
   isWorking = false,
   stopping = false,
   onStop,
+  headerBar,
 }: PromptComposerProps) {
   const [message, setMessage] = React.useState(draft ?? '');
   const [showMentions, setShowMentions] = React.useState(false);
@@ -1042,116 +1047,60 @@ export function PromptComposer({
         )}
       </AnimatePresence>
 
-      {/* Main Composer Box */}
+      {/* cdesktop ChatBoxBase Unboxed Composer Layout:
+          - Outer container has no border/background.
+          - Banners, headerBar, and footer float unbordered above/below.
+          - Only the textarea card sits in a rounded-[10px] bordered card with bottom-right overlay. */}
       <div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className={cn(
-          /*
-           * The composer is the control the user looks at longest, so it is
-           * the one element in the window that is allowed to be the visual
-           * centre of gravity. Two things were stopping it.
-           *
-           * IT WAS DARKER THAN THE PAGE. `bg-surface1/90` is #f4f4f6 over a
-           * #fafafa ground: a recessed well, not a floating island, and the
-           * comment this replaces claimed the opposite. Raised means brighter
-           * on a light ground, so it is `--surface2` — and opaque, because a
-           * translucent input that shows the transcript scrolling underneath
-           * it is a novelty the hundredth time you use it.
-           *
-           * THE SHADOWS WERE HAND-WRITTEN. Six literals across resting and
-           * focus, none of them on the ramp in globals.css, and the light pair
-           * had no ring while the dark pair had an inset highlight the light
-           * one could not express. `shadow-lg`/`shadow-xl` are `--elevation-4`
-           * and `-5`, the app's top two steps, which is the correct claim: the
-           * composer floats over the whole transcript.
-           *
-           * `backdrop-blur-2xl` goes with the translucency. It was compositing
-           * a full-width layer every frame to blur something now painted over.
-           *
-           * Focus borrows the brand accent's ring rather than inventing a
-           * grey. It is the same colour the keyboard ring uses, which is the
-           * point — focus should look like one idea across the app.
-           */
-          /*
-            `rounded-2xl` (14px), NOT an arbitrary 24.
-
-            globals.css defines the radius ramp — 2 / 4 / 6 / 8 / 10 / 14 — and
-            explains that 8px is the base because 12 "read soft rather than
-            dense, which is most of the gap against a desktop-native tool".
-            This element then ignored all of it and wrote 24: nearly double the
-            top of the scale, on the single largest control in the window. The
-            user bubble did the same with 22. Two arbitrary values, both larger
-            than anything the ramp can express, on the two surfaces the eye
-            spends the most time on — so the scale was correct everywhere
-            except where it mattered.
-
-            14px on an 88px-tall composer still reads as a rounded island; it
-            just reads as one belonging to the same family as the banner above
-            it and the sidebar rows beside it.
-          */
-          /*
-            beUI `PromptInput`, value for value:
-            `relative w-full rounded-2xl border border-border/80 bg-background
-            p-2 transition-colors focus-within:border-foreground/25`.
-
-            The reference puts the composer on the PAGE ground, not on a
-            lifted surface, and separates it with a hairline alone — no
-            shadow, no brand focus colour. `bg-surface2` + `shadow-xs` +
-            `focus-within:border-brand-border` were this app's own three
-            mechanisms for the same edge; the replication drops all three.
-          */
-          'relative w-full rounded-2xl overflow-hidden transition-all duration-200',
-          'bg-surface1/85 dark:bg-surface1/60 backdrop-blur-md shadow-xs hover:shadow-sm focus-within:shadow-md',
-          'border border-border/70 dark:border-white/[0.08] focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10',
-          isDragging && 'border-primary ring-2 ring-primary/20'
-        )}
+        className="relative flex w-full flex-col gap-1.5"
       >
+        {isDragging && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center rounded-[10px] border-2 border-dashed border-brand bg-background/85 backdrop-blur-xs pointer-events-none animate-in fade-in-0 duration-150">
+            <div className="text-center">
+              <div className="mx-auto mb-1.5 size-9 rounded-full bg-brand/10 flex items-center justify-center">
+                <ImageIcon className="size-4 text-brand" />
+              </div>
+              <p className="text-xs font-medium text-foreground">Drop files or images here</p>
+            </div>
+          </div>
+        )}
 
-        {/* Pending Files Previews */}
-        <AnimatePresence>
-          {pendingFiles.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="px-3.5 pt-2.5 pb-1 flex flex-wrap gap-2"
+        {/* Notice Banner */}
+        {notice && (
+          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-status-warning bg-status-warning/10 border border-status-warning/25 rounded-md select-none">
+            <Info className="size-3.5 shrink-0" />
+            <span>{notice}</span>
+          </div>
+        )}
+
+        {/* cdesktop-style Review Comments Banner */}
+        {reviewCommentCount > 0 && review && (
+          <div
+            data-review-banner="true"
+            className="bg-brand/[0.06] border border-brand/25 rounded-md px-3 py-1.5 flex items-center gap-2.5 text-xs select-none"
+          >
+            <MessageSquare className="size-3.5 text-brand shrink-0" />
+            <span className="text-foreground font-medium flex-1 truncate">
+              {reviewCommentCount} {reviewCommentCount === 1 ? 'review comment' : 'review comments'} attached
+            </span>
+            <span className="text-3xs text-foreground-muted font-mono hidden sm:inline">
+              Enter to send review
+            </span>
+            <button
+              type="button"
+              onClick={review.clearComments}
+              className="text-foreground-muted hover:text-destructive transition-colors p-1 -m-1 cursor-pointer"
+              title="Clear review comments"
+              aria-label="Clear review comments"
             >
-              {pendingFiles.map((pf, idx) => (
-                <div
-                  key={idx}
-                  // Inset into the composer like the pills are, and no blur —
-                  // there is nothing translucent left in here to blur through.
-                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-xl bg-surface1 border border-border/60"
-                >
-                  {pf.preview ? (
-                    <img
-                      src={pf.preview}
-                      alt={pf.file.name}
-                      className="size-7 rounded-lg object-cover border border-border/60 shrink-0"
-                    />
-                  ) : (
-                    <span className="size-7 rounded-lg bg-surface3 border border-border/60 flex items-center justify-center shrink-0 text-muted-foreground">
-                      <FileIcon className="size-3.5" />
-                    </span>
-                  )}
-                  <span className="max-w-[120px] truncate text-2xs font-medium text-foreground">
-                    {pf.file.name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(idx)}
-                    className="size-4 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 shadow-xs"
-                  >
-                    <X className="size-2.5" />
-                  </button>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Deterministic Multi-Agent Pipeline Live Preview */}
         <AnimatePresence>
@@ -1160,11 +1109,11 @@ export function PromptComposer({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="px-3.5 pt-2 pb-1 overflow-hidden"
+              className="overflow-hidden"
             >
               <div
                 className={cn(
-                  'flex gap-2 p-2 rounded-xl bg-primary/8 border border-primary/25 text-2xs text-foreground backdrop-blur-xs',
+                  'flex gap-2 p-2 rounded-md bg-primary/8 border border-primary/25 text-2xs text-foreground',
                   previewIsParallel ? 'flex-col items-start' : 'items-center',
                 )}
               >
@@ -1187,31 +1136,30 @@ export function PromptComposer({
                         />
                       )}
                       <Hint label={seg.instruction ? `@${seg.agent}: ${seg.instruction}` : `@${seg.agent}`}>
-                      <div
-                        className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground',
-                          previewIsParallel ? 'max-w-full' : 'max-w-[220px]',
-                        )}
-                      >
-                        {/* A step number implies an order; parallel lanes have none. */}
-                        {!previewIsParallel && (
-                          <span className="size-3.5 rounded-full bg-primary text-primary-foreground text-3xs font-bold flex items-center justify-center shrink-0">
-                            {idx + 1}
-                          </span>
-                        )}
-                        <AgentAvatar name={seg.agent} size={13} />
-                        <span className="font-semibold truncate">@{seg.agent}</span>
-                        {seg.instruction && (
-                          <span
-                            className={cn(
-                              'text-3xs text-muted-foreground truncate',
-                              previewIsParallel ? 'min-w-0' : 'max-w-[100px]',
-                            )}
-                          >
-                            {seg.instruction}
-                          </span>
-                        )}
-                      </div>
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface1 border border-primary/20 shrink-0 font-medium text-foreground',
+                            previewIsParallel ? 'max-w-full' : 'max-w-[220px]',
+                          )}
+                        >
+                          {!previewIsParallel && (
+                            <span className="size-3.5 rounded-full bg-primary text-primary-foreground text-3xs font-bold flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                          )}
+                          <AgentAvatar name={seg.agent} size={13} />
+                          <span className="font-semibold truncate">@{seg.agent}</span>
+                          {seg.instruction && (
+                            <span
+                              className={cn(
+                                'text-3xs text-muted-foreground truncate',
+                                previewIsParallel ? 'min-w-0' : 'max-w-[100px]',
+                              )}
+                            >
+                              {seg.instruction}
+                            </span>
+                          )}
+                        </div>
                       </Hint>
                     </React.Fragment>
                   ))}
@@ -1221,68 +1169,125 @@ export function PromptComposer({
           )}
         </AnimatePresence>
 
-        {notice && (
-          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-status-warning bg-status-warning/10 border-b border-status-warning/20 rounded-t-xl select-none">
-            <Info className="size-3.5 shrink-0" />
-            <span>{notice}</span>
-          </div>
-        )}
+        {/* Top Header Bar (cdesktop SessionChatBox headerLeft + headerRight) */}
+        {headerBar}
 
-        {/* cdesktop-style Review Comments Banner */}
-        {reviewCommentCount > 0 && review && (
-          <div
-            data-review-banner="true"
-            className="bg-primary/[0.06] border-b border-primary/20 px-3.5 py-2 flex items-center gap-2.5 text-xs select-none"
-          >
-            <MessageSquare className="size-3.5 text-primary shrink-0" />
-            <span className="text-foreground font-medium flex-1 truncate">
-              {reviewCommentCount} {reviewCommentCount === 1 ? 'review comment' : 'review comments'} attached
-            </span>
-            <span className="text-3xs text-foreground-muted font-mono hidden sm:inline">
-              Enter to send review
-            </span>
-            <button
-              type="button"
-              onClick={review.clearComments}
-              className="text-foreground-muted hover:text-destructive transition-colors p-1 -m-1 cursor-pointer"
-              title="Clear review comments"
-              aria-label="Clear review comments"
+        {/* Pending Files Previews */}
+        <AnimatePresence>
+          {pendingFiles.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="flex flex-wrap gap-2 py-0.5"
             >
-              <Trash2 className="size-3.5" />
-            </button>
+              {pendingFiles.map((pf, idx) => (
+                <div
+                  key={idx}
+                  className="group/file relative flex items-center gap-2 p-1.5 pr-2 rounded-lg bg-surface1 border border-border/60"
+                >
+                  {pf.preview ? (
+                    <img
+                      src={pf.preview}
+                      alt={pf.file.name}
+                      className="size-6 rounded object-cover border border-border/60 shrink-0"
+                    />
+                  ) : (
+                    <span className="size-6 rounded bg-surface3 border border-border/60 flex items-center justify-center shrink-0 text-muted-foreground">
+                      <FileIcon className="size-3.5" />
+                    </span>
+                  )}
+                  <span className="max-w-[120px] truncate text-2xs font-medium text-foreground">
+                    {pf.file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(idx)}
+                    className="size-4 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-80 shadow-xs"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Textarea Card — the ONLY bordered element (cdesktop ChatBoxBase) */}
+        <div
+          className={cn(
+            'relative rounded-[10px] border bg-white pl-3.5 pr-9 py-2.5 dark:bg-surface1 transition-colors',
+            reviewCommentCount > 0
+              ? 'border-brand bg-brand/[0.04]'
+              : 'border-border focus-within:border-foreground/30',
+            isWorking && 'border-brand/50 ring-1 ring-brand/15'
+          )}
+        >
+          <textarea
+            ref={textareaRef}
+            data-chat-input="true"
+            value={message}
+            onChange={handleInput}
+            onSelect={handleSelect}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onFocus={() => {
+              setIsFocused(true);
+              onFocusChange?.(true);
+            }}
+            onBlur={() => {
+              setIsFocused(false);
+              onFocusChange?.(false);
+            }}
+            placeholder={
+              disabled
+                ? (disabledReason || 'Connect an agent to start chatting…')
+                : reviewCommentCount > 0
+                  ? 'Add an optional summary or press Enter to send review comments…'
+                  : 'Message 52hzAgents… (@ for agents, / for skills)'
+            }
+            disabled={disabled}
+            rows={1}
+            className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-hidden disabled:opacity-50 min-h-[28px]"
+          />
+
+          {/* Bottom-right overlay inside textarea card (cdesktop editorOverlay) */}
+          <div className="absolute right-2.5 bottom-2.5 flex items-center">
+            {stopping ? (
+              <Loader2
+                className="size-3.5 text-foreground-muted animate-spin"
+                aria-hidden="true"
+              />
+            ) : isWorking ? (
+              <Hint label="Stop response">
+                <button
+                  type="button"
+                  onClick={handleStopClick}
+                  aria-label="Stop response"
+                  title="Stop response"
+                  className="p-1 rounded text-foreground-muted hover:text-status-danger transition-colors cursor-pointer"
+                >
+                  <Square className="size-3.5 fill-current" aria-hidden="true" />
+                </button>
+              </Hint>
+            ) : (
+              <CornerDownLeft
+                className="pointer-events-none size-3.5 text-foreground-extra-muted/60"
+                aria-hidden="true"
+              />
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Text Area */}
-        <textarea
-          ref={textareaRef}
-          data-chat-input="true"
-          value={message}
-          onChange={handleInput}
-          onSelect={handleSelect}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onFocus={() => {
-            setIsFocused(true);
-            onFocusChange?.(true);
-          }}
-          onBlur={() => {
-            setIsFocused(false);
-            onFocusChange?.(false);
-          }}
-          placeholder={
-            disabled
-              ? (disabledReason || 'Connect an agent to start chatting…')
-              : 'Message 52hzAgents… (@ for agents, / for skills)'
-          }
-          disabled={disabled}
-          rows={1}
-          className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent px-3 pt-2.5 pb-1 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-hidden disabled:opacity-50 min-h-[40px]"
-        />
-
-        {/* Bottom Control Row */}
-        <div className="mt-0.5 flex min-h-8 items-center justify-between gap-1.5 px-2.5 pb-2 overflow-x-auto scrollbar-hide flex-nowrap">
-          <div className="flex items-center gap-1.5 min-w-0 shrink flex-nowrap overflow-x-auto scrollbar-hide">
+        {/* Footer — floats unbordered below the textarea (cdesktop ChatBoxBase ghost toolbar) */}
+        <div className="flex items-center justify-between gap-2 py-0.5 px-0.5 overflow-x-auto scrollbar-hide flex-nowrap">
+          <div
+            className={cn(
+              'flex items-center gap-1 min-w-0 shrink flex-nowrap overflow-x-auto scrollbar-hide',
+              '[&_button]:bg-transparent [&_button]:border-transparent',
+              '[&_button:hover]:bg-surface2'
+            )}
+          >
             <AgentModelSwitcher
               agentName={masterAgentName}
               participants={session?.participants}
@@ -1296,7 +1301,7 @@ export function PromptComposer({
                 className={cn(
                   pillButton,
                   'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
-                  pendingFiles.length > 0 && 'bg-surface3 text-primary border border-primary/30',
+                  pendingFiles.length > 0 && '!bg-surface3 !text-primary !border-primary/30',
                 )}
                 aria-label="Attach file or image"
               >
@@ -1332,9 +1337,9 @@ export function PromptComposer({
                       pillButton,
                       'h-7 px-2 gap-1 text-xs transition-colors active:scale-95',
                       isRfcActive
-                        ? 'bg-brand/15 text-brand border border-brand/40 font-medium cursor-pointer'
+                        ? '!bg-brand/15 !text-brand !border-brand/40 font-medium cursor-pointer'
                         : canRfc
-                        ? 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2 cursor-pointer'
+                        ? 'text-foreground-extra-muted hover:text-foreground cursor-pointer'
                         : 'opacity-40 text-foreground-extra-muted cursor-not-allowed'
                     )}
                     aria-label="Toggle RFC deliberation"
@@ -1353,8 +1358,8 @@ export function PromptComposer({
                     type="button"
                     className={cn(
                       pillButton,
-                      'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95 data-[state=open]:bg-surface3 data-[state=open]:text-foreground',
-                      pendingFiles.length > 0 && 'bg-surface3 text-primary border border-primary/30',
+                      'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95 data-[state=open]:!bg-surface3 data-[state=open]:text-foreground',
+                      pendingFiles.length > 0 && '!bg-surface3 !text-primary !border-primary/30',
                     )}
                     aria-label="Add context"
                   >
@@ -1539,60 +1544,8 @@ export function PromptComposer({
             />
           </div>
 
-          {/*
-            THE KEYBOARD HINT IS GONE, NOT WIDENED.
-
-            It was a line of text competing with the pill row for the same
-            strip, and it lost that fight as soon as the column narrowed to
-            beUI's 48rem — it rendered straight over the attach button.
-
-            It is also not in the reference: beUI's composer carries only the
-            model select, the add button and send. And the hint said three
-            things every chat client does the same way, to a reader who has
-            already typed into the box — the shortcut list (`?`) still has
-            all three for anyone who wants them.
-          */}
-          <div className="flex min-w-0 items-center gap-2.5">
-            {/*
-              The context ring sits with send, not in the thread header.
-
-              It measures what the next message will cost, so it belongs beside
-              the control that sends it — and next to send it needs no label to
-              explain what it is about, which is what the header version had to
-              spend a word on.
-            */}
+          <div className="flex min-w-0 items-center gap-2 shrink-0">
             {session && <ContextHealthIndicator channelName={session.sessionId} />}
-
-            {/*
-              `Magnetic` WRAPS the hint, and the hint still wraps the button.
-
-              Two things forced this order. beUI's own `MagneticButton`
-              bundles its `Button` and that button's variant classes, which
-              would overwrite the three states this control already draws
-              (working / can-send / inert) — so only the pull is taken, not
-              the button. And `Magnetic` renders its own `motion.div` without
-              forwarding a ref or spreading props, so putting it INSIDE
-              `Hint` would hand the tooltip that div instead of the button
-              and quietly drop the ref and `aria-describedby`.
-
-              `Magnetic` is a no-op under `prefers-reduced-motion` and on
-              touch, so nothing below changes on either.
-            */}
-            {isWorking && (
-              <Magnetic strength={0.2}>
-                <Hint label="Stop response">
-                  <button
-                    type="button"
-                    onClick={handleStopClick}
-                    disabled={stopping}
-                    className="relative flex items-center justify-center size-8 rounded-full shrink-0 bg-destructive text-destructive-foreground hover:opacity-90 shadow-md shadow-destructive/25 cursor-pointer transition-all duration-150 select-none active:scale-95"
-                    aria-label="Stop response"
-                  >
-                    <Square className="size-3 fill-current" />
-                  </button>
-                </Hint>
-              </Magnetic>
-            )}
 
             {(!isWorking || canSend) && (
               <Magnetic strength={0.2}>
@@ -1602,15 +1555,15 @@ export function PromptComposer({
                     onClick={handleSend}
                     disabled={!canSend}
                     className={cn(
-                      'relative flex items-center justify-center size-8.5 rounded-full shrink-0',
-                      'transition-all duration-150 select-none active:scale-95 shadow-xs',
+                      'relative flex items-center justify-center size-7 rounded-md shrink-0',
+                      'transition-all duration-150 select-none active:scale-95',
                       canSend
-                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-md shadow-brand/35 cursor-pointer ring-1 ring-white/20'
-                        : 'bg-surface2 text-foreground-extra-muted/40 cursor-not-allowed border border-border/40'
+                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-xs cursor-pointer'
+                        : 'bg-transparent text-foreground-extra-muted/40 cursor-not-allowed'
                     )}
                     aria-label={isWorking ? 'Queue message' : 'Send message'}
                   >
-                    <ArrowUp className="size-4 stroke-[2.5]" />
+                    <ArrowUp className="size-3.5 stroke-[2.5]" />
                   </button>
                 </Hint>
               </Magnetic>
