@@ -481,56 +481,22 @@ export const ChatMessage = memo(function ChatMessage({
             'group/agentmsg relative',
             'select-text selectable',
             hideHeader ? 'pb-3.5' : 'py-3.5',
-            /*
-              A reply should arrive, not blink into existence. 160ms and a 2px
-              rise — under the shell's own 150ms budget for anything the user
-              did not ask for, and small enough that it reads as the text
-              settling rather than as a card animating in.
-
-              ONLY THE NEWEST MESSAGE. This list is virtualised: rows mount and
-              unmount as they cross the viewport, so animating every mount
-              would make the whole transcript twinkle while you scroll through
-              it — which is the opposite of the calm this is for. `isLast` is
-              the one row that mounts because something actually happened.
-
-              `motion-safe:` because a rise is motion, and the file already
-              respects `prefers-reduced-motion` for the working indicator.
-            */
             isLast && 'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-150',
           )}
         >
-      <div className="flex w-full items-start gap-2">
-        {hideHeader ? (
-          <div className="size-7 shrink-0" aria-hidden />
-        ) : (
-          <div className="relative mt-0.5 shrink-0">
-            <AgentAvatar
-              name={message.senderName}
-              agentType={agent?.agentType}
-              size={28}
-              className="rounded-full"
-            />
-          </div>
-        )}
-
-        <div className="flex-1 min-w-0 space-y-1.5">
-          {/*
-            A reply that continues its own Thought group hides the header (the
-            name is already on the group above), and the time went with it --
-            so agent replies showed no time while the user's did. Keep the
-            time, right-aligned where the header would have put it.
-          */}
-          {hideHeader && timestamp && (
-            <div className="flex justify-end px-1 text-[11px] leading-none text-muted-foreground tabular-nums select-none">
-              {timestamp}
+      <div className="w-full space-y-2">
+        {/* Identity Header */}
+        {!hideHeader && (
+          <div className="flex items-center gap-2 px-1 text-2xs leading-none text-muted-foreground select-none mb-1">
+            <div className="flex items-center gap-1.5 font-medium text-foreground">
+              <AgentAvatar
+                name={message.senderName}
+                agentType={agent?.agentType}
+                size={18}
+                className="rounded-full"
+              />
+              <span>{message.senderName}</span>
             </div>
-          )}
-          {/* Identity Header */}
-          {!hideHeader && (
-          <div className="flex items-center gap-1.5 px-1 text-[11px] leading-none text-muted-foreground select-none">
-            <span className="font-medium text-foreground">
-              {message.senderName}
-            </span>
             {(() => {
               const handoffFrom = (message.metadata?.handoff_from || message.metadata?.previous_agent || message.metadata?.delegated_from || message.metadata?.handed_off_by) as string | undefined;
               if (!handoffFrom) return null;
@@ -544,7 +510,15 @@ export const ChatMessage = memo(function ChatMessage({
               <span className="ml-auto tabular-nums">{timestamp}</span>
             )}
           </div>
-          )}
+        )}
+
+        {hideHeader && timestamp && (
+          <div className="flex justify-end px-1 text-[11px] leading-none text-muted-foreground tabular-nums select-none">
+            {timestamp}
+          </div>
+        )}
+
+        <div className="w-full min-w-0 space-y-2">
 
           {/* 1. Collapsible Reasoning (o1 / o3 style - Top of message body) */}
           {activeThinking ? (
@@ -777,7 +751,7 @@ export const ChatMessage = memo(function ChatMessage({
                   // It tracks the wrapper's horizontal padding, so it went to 13
                   // while the hover plate added `px-3` and back to 10 now that
                   // the plate is gone.
-                  : 'absolute start-10 end-0 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                  : 'absolute start-0 end-0 bottom-0 opacity-0 pointer-events-none group-hover/agentmsg:opacity-100 group-hover/agentmsg:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
               )}
             >
               <MessageActions

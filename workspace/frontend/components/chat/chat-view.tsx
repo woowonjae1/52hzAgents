@@ -73,7 +73,8 @@ import { collectOutputs } from '@/lib/artifacts';
 import { toast } from '@/lib/toast';
 
 import { ChatWelcomeScreen, PROMPT_SUGGESTIONS } from './chat-welcome-screen';
-export { PROMPT_SUGGESTIONS };
+import { SessionEmptyHero, HERO_SUGGESTIONS } from './session-empty-hero';
+export { PROMPT_SUGGESTIONS, HERO_SUGGESTIONS };
 
 
 
@@ -1149,7 +1150,7 @@ export function ChatView() {
               </button>
             </div>
           ) : (
-            <ChatWelcomeScreen
+            <SessionEmptyHero
               hasOnlineAgents={hasOnlineAgents}
               onlineAgentCount={onlineAgents.length}
               onConnectAgent={() => setViewMode('home')}
@@ -1158,7 +1159,38 @@ export function ChatView() {
                 handleDraftChange(prompt);
                 setFocusKey((k) => k + 1);
               }}
-            />
+            >
+              {!isDM && (
+                <ChatInput
+                  key={currentSessionId || 'empty-hero'}
+                  onSend={handleSend}
+                  agents={agents}
+                  knowledge={knowledge}
+                  session={currentSession || undefined}
+                  onOrchestrationChange={(updates) => currentSessionId && setSessionOrchestration(currentSessionId, updates)}
+                  onMasterChange={(agentName) => currentSessionId && setSessionMaster(currentSessionId, agentName)}
+                  draft={injectedDraft}
+                  onDraftChange={handleDraftChange}
+                  onFocusChange={(focused) => (focused ? notifyFocus() : notifyBlur())}
+                  focusKey={focusKey}
+                  onCreateRoutine={() => setShowCreateRoutine(true)}
+                  workingDir={currentSessionWorkingDir}
+                  isWorking={!!currentSessionId && (activeSessionIds.has(currentSessionId) || stoppingSessionIds.has(currentSessionId))}
+                  stopping={!!currentSessionId && stoppingSessionIds.has(currentSessionId)}
+                  onStop={() => currentSessionId && stopAllAgents(currentSessionId)}
+                  disabled={!currentUser.name.trim()}
+                  disabledReason={!currentUser.name.trim() ? 'Set your username in settings to start chatting' : undefined}
+                  sendBlockedReason={
+                    !canChatInCurrentSession
+                      ? (hasSpecificParticipants
+                          ? 'All participant agents in this thread are offline. Connect one to send.'
+                          : 'No agents are online in this workspace. Connect one to send.')
+                      : undefined
+                  }
+                  suppressSendBlockedNotice={isMissingParticipant}
+                />
+              )}
+            </SessionEmptyHero>
           )
         ) : (
           <>
@@ -1230,8 +1262,8 @@ export function ChatView() {
           </>
         )}
 
-        {/* Input — hidden for read-only DM views */}
-        {!isDM && (
+        {/* Input — hidden for read-only DM views or when empty hero has its own centered composer */}
+        {!isDM && displayMessages.length > 0 && (
           <div className="relative px-4 lg:px-8 pb-4 pt-3 bg-gradient-to-t from-background via-background/95 to-transparent">
             {/* Shares `--chat-column` with the message list above it. */}
             <div className="mx-auto w-full max-w-(--chat-column)">
