@@ -11,7 +11,9 @@ import {
   Filter,
   Download,
   FileDiff,
+  Columns2,
 } from 'lucide-react';
+import { useSessionGridOptional } from '@/lib/session-grid-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { Hint } from '@/components/ui/hint';
 import { GitChip } from '@/components/git/git-chip';
@@ -88,6 +90,7 @@ export function ChannelHeader({
   const [titleDraft, setTitleDraft] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
   const { activeRightTab, setActiveRightTab, setViewMode, openSettings } = useLayout();
+  const grid = useSessionGridOptional();
 
   const startEditingTitle = () => {
     if (isDM) return;
@@ -242,6 +245,23 @@ export function ChannelHeader({
         )}
 
         <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
+
+        {/* Dual Split Screen Toggle (ported from cdesktop SessionGrid) */}
+        {grid && (
+          <Hint label={grid.isSplit ? 'Exit dual split view' : 'Split screen with another session'}>
+            <button
+              type="button"
+              onClick={() => grid.toggleSplit()}
+              className={cn(
+                headerIconButtonClass,
+                'relative cursor-pointer',
+                grid.isSplit && 'bg-surface3 text-foreground border border-border'
+              )}
+            >
+              <Columns2 className="size-4" />
+            </button>
+          </Hint>
+        )}
 
         {/* Studio Panel Toggle */}
         <Hint

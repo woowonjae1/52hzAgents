@@ -7,6 +7,7 @@ import { useLayout } from './layout-context';
 import { cn } from '@/lib/utils';
 import { ChatView } from '@/components/chat/chat-view';
 import { SessionMessagesProvider } from '@/components/chat/session-messages-context';
+import { SessionGridProvider } from '@/lib/session-grid-context';
 import { ThreadList } from '@/components/threads/thread-list';
 import { LocalPreview } from '@/components/preview/local-preview';
 import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
@@ -104,7 +105,9 @@ const MIN_DOCKED_WIDTH = 680;
 export function Wrapper() {
   return (
     <SessionMessagesProvider>
-      <WrapperInner />
+      <SessionGridProvider>
+        <WrapperInner />
+      </SessionGridProvider>
     </SessionMessagesProvider>
   );
 }

@@ -17,6 +17,7 @@ import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { LocalPreview } from '@/components/preview/local-preview';
 import { DiffStudioPanel } from './diff-studio-panel';
+import { SessionGrid } from './session-grid';
 import { ReviewProvider } from '@/lib/review-context';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
@@ -105,7 +106,9 @@ export function WorkbenchLayout({
                 {/* ChatView kept mounted to preserve real-time WebSocket connection and active turns */}
                 <div className={cn('h-full w-full', (viewMode !== 'threads' || isHome) && 'hidden')}>
                   <main className="h-full">
-                    <ChatView />
+                    <SessionGrid>
+                      <ChatView />
+                    </SessionGrid>
                   </main>
                 </div>
 
