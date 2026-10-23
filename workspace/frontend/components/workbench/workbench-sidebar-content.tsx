@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Plus,
   Search,
@@ -9,20 +9,22 @@ import {
   SquarePen,
   Trash2,
   FolderGit2,
-  Sliders,
   X,
   Settings,
-  Folder,
-  Loader2,
   Bot,
   Blocks,
   Clock3,
-  Activity,
   FileDiff,
+  Pin,
+  Hand,
+  FileText,
+  Circle,
+  ChevronDown,
 } from 'lucide-react';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
 import { useGitStatus } from '@/lib/use-git-status';
+import { useReviewOptional } from '@/lib/review-context';
 import { getSmartSessionTitle } from '@/components/threads/thread-list';
 import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -35,7 +37,69 @@ import { useTheme } from 'next-themes';
 import { isToday, isYesterday, subDays, isAfter } from 'date-fns';
 import type { WorkspaceSession } from '@/lib/types';
 
+/* -------------------------------------------------------------------------- */
+/* RunningDots (ported from cdesktop RunningDots.tsx)                         */
+/* -------------------------------------------------------------------------- */
+
+export function RunningDots({
+  sizeClass = 'size-1',
+  colorClass = 'bg-brand',
+}: {
+  sizeClass?: string;
+  colorClass?: string;
+} = {}) {
+  const dot = cn('rounded-full animate-pulse', sizeClass, colorClass);
+  return (
+    <div className="flex items-center gap-[2px] shrink-0" aria-label="Agent running">
+      <span className={dot} style={{ animationDelay: '0ms' }} />
+      <span className={dot} style={{ animationDelay: '180ms' }} />
+      <span className={dot} style={{ animationDelay: '360ms' }} />
+    </div>
+  );
+}
+
+const formatRelativeElapsed = (timestamp?: number | string | null): string => {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSecs < 60) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  return `${diffDays}d ago`;
+};
+
+const PINNED_STORAGE_KEY = '52hz_pinned_sessions_v1';
+
+function loadPinnedSessionIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(PINNED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function savePinnedSessionIds(ids: Set<string>): void {
+  try {
+    localStorage.setItem(PINNED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    // ignore storage errors
+  }
+}
+
 interface GroupedSessions {
+  needsAttention: WorkspaceSession[];
+  running: WorkspaceSession[];
+  pinned: WorkspaceSession[];
   today: WorkspaceSession[];
   yesterday: WorkspaceSession[];
   lastWeek: WorkspaceSession[];
@@ -53,6 +117,7 @@ export function WorkbenchSidebarContent() {
     createSession,
     renameSession,
     updateSession,
+    routines,
   } = useWorkspace();
 
   const {
@@ -66,7 +131,13 @@ export function WorkbenchSidebarContent() {
     setActiveRightTab,
   } = useLayout();
   const { status: gitStatus } = useGitStatus(currentSessionId);
+  const review = useReviewOptional();
+  const reviewCommentCount = review?.comments.length ?? 0;
+
   const gitDiffCount = gitStatus?.files?.length || 0;
+  const gitAdditions = gitStatus?.additions;
+  const gitDeletions = gitStatus?.deletions;
+
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -74,14 +145,35 @@ export function WorkbenchSidebarContent() {
   const [editingTitle, setEditingTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [browsingFolder, setBrowsingFolder] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => loadPinnedSessionIds());
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
   const onlineAgentsCount = useMemo(() => agents.filter((a) => a.status === 'online').length, [agents]);
 
   React.useEffect(() => {
     setMounted(true);
+    setPinnedIds(loadPinnedSessionIds());
   }, []);
 
   const isDark = mounted && resolvedTheme === 'dark';
+
+  const togglePinSession = useCallback((sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinnedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      savePinnedSessionIds(next);
+      return next;
+    });
+  }, []);
+
+  const toggleSection = useCallback((key: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
 
   // Active sessions sorted by most recent activity
   const validSessions = useMemo(() => {
@@ -96,7 +188,27 @@ export function WorkbenchSidebarContent() {
     return active?.workingDir || sessions.find((s) => s.workingDir)?.workingDir || null;
   }, [sessions, currentSessionId]);
 
-  // Grouped chronologically like Claude Desktop
+  const hasPendingRoutineApproval = useMemo(
+    () => (routines || []).some((r) => r.status === 'pending_approval'),
+    [routines]
+  );
+
+  // Detect whether a session needs review / approval ("Raised Hand" in cdesktop)
+  const sessionNeedsAttention = useCallback(
+    (session: WorkspaceSession): boolean => {
+      const isActiveSession = session.sessionId === currentSessionId;
+      if (isActiveSession && reviewCommentCount > 0) return true;
+      if (isActiveSession && hasPendingRoutineApproval) return true;
+      const lastMsg = lastMessageBySession[session.sessionId];
+      if (lastMsg?.content && /approval|permission|review needed|waiting for your review/i.test(lastMsg.content)) {
+        return true;
+      }
+      return false;
+    },
+    [currentSessionId, reviewCommentCount, hasPendingRoutineApproval, lastMessageBySession]
+  );
+
+  // Grouped into cdesktop's smart status buckets + chronological buckets
   const grouped = useMemo<GroupedSessions>(() => {
     const query = searchQuery.trim().toLowerCase();
     const filtered = validSessions.filter((s) => {
@@ -109,6 +221,9 @@ export function WorkbenchSidebarContent() {
     const sevenDaysAgo = subDays(now, 7);
 
     const res: GroupedSessions = {
+      needsAttention: [],
+      running: [],
+      pinned: [],
       today: [],
       yesterday: [],
       lastWeek: [],
@@ -116,6 +231,23 @@ export function WorkbenchSidebarContent() {
     };
 
     for (const session of filtered) {
+      const isRunning = activeSessionIds.has(session.sessionId);
+      const needsHand = sessionNeedsAttention(session);
+      const isPinned = pinnedIds.has(session.sessionId);
+
+      if (needsHand) {
+        res.needsAttention.push(session);
+        continue;
+      }
+      if (isRunning) {
+        res.running.push(session);
+        continue;
+      }
+      if (isPinned) {
+        res.pinned.push(session);
+        continue;
+      }
+
       const time = session.lastEventAt
         ? new Date(session.lastEventAt)
         : session.createdAt
@@ -134,7 +266,7 @@ export function WorkbenchSidebarContent() {
     }
 
     return res;
-  }, [validSessions, searchQuery, lastMessageBySession]);
+  }, [validSessions, searchQuery, lastMessageBySession, activeSessionIds, sessionNeedsAttention, pinnedIds]);
 
   const handleStartNewSession = useCallback(async () => {
     try {
@@ -157,7 +289,7 @@ export function WorkbenchSidebarContent() {
         setViewMode('threads');
         toast.success(`Switched project workspace to ${basename(dir)}`);
       }
-    } catch (e) {
+    } catch {
       toast.error('Could not switch project directory');
     } finally {
       setBrowsingFolder(false);
@@ -170,7 +302,7 @@ export function WorkbenchSidebarContent() {
     if (!trimmed) return;
     try {
       await renameSession(sessionId, trimmed);
-    } catch (e) {
+    } catch {
       toast.error('Failed to rename session');
     }
   }, [editingTitle, renameSession]);
@@ -183,22 +315,36 @@ export function WorkbenchSidebarContent() {
         setCurrentSessionId(null);
       }
       toast.success('Session deleted');
-    } catch (e) {
+    } catch {
       toast.error('Failed to delete session');
     } finally {
       setDeleteTarget(null);
     }
   }, [deleteTarget, updateSession, currentSessionId, setCurrentSessionId]);
 
+  // Ported from cdesktop WorkspaceSummary.tsx
   const renderSessionItem = (session: WorkspaceSession) => {
     const isSelected = session.sessionId === currentSessionId && viewMode === 'threads';
     const isRunning = activeSessionIds.has(session.sessionId);
+    const hasPendingApproval = sessionNeedsAttention(session);
+    const isPinned = pinnedIds.has(session.sessionId);
+    const isDraft = isDraftSessionId(session.sessionId);
     const title = getSmartSessionTitle(session, lastMessageBySession[session.sessionId]);
     const isEditing = editingSessionId === session.sessionId;
+
+    // Show live git diff stats on the active session (like cdesktop WorkspaceSummary)
+    const isCurrentSession = session.sessionId === currentSessionId;
+    const filesChanged = isCurrentSession && gitDiffCount > 0 ? gitDiffCount : undefined;
+    const linesAdded = isCurrentSession && gitDiffCount > 0 ? gitAdditions : undefined;
+    const linesRemoved = isCurrentSession && gitDiffCount > 0 ? gitDeletions : undefined;
+    const hasChanges = filesChanged !== undefined && filesChanged > 0;
+    const elapsed = formatRelativeElapsed(session.lastEventAt || session.createdAt);
+    const showSecondRow = hasChanges || isPinned || Boolean(session.workingDir);
 
     return (
       <div
         key={session.sessionId}
+        data-session-summary={session.sessionId}
         onClick={() => {
           if (isEditing) return;
           setCurrentSessionId(session.sessionId);
@@ -206,41 +352,119 @@ export function WorkbenchSidebarContent() {
           if (isMobile) openMobileDetail();
         }}
         className={cn(
-          'group relative flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer select-none transition-colors transition-transform duration-75',
+          'group relative rounded-[8px] transition-all duration-100 overflow-hidden cursor-pointer select-none',
           isSelected
-            ? 'bg-surface2 text-foreground font-semibold shadow-xs border border-border/60'
+            ? 'bg-surface2 text-foreground shadow-2xs border border-border/60'
             : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
         )}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {isRunning ? (
-            <span className="size-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent is working" />
-          ) : (
-            <MessageSquare className="size-3.5 shrink-0 text-foreground-extra-muted" />
-          )}
+        <div className="flex w-full flex-col text-left px-2.5 py-1.5">
+          {/* Primary Row: Status Indicator + Title */}
+          <div
+            className="flex items-center gap-2 overflow-hidden whitespace-nowrap pr-12"
+            style={
+              !isEditing
+                ? {
+                    maskImage:
+                      'linear-gradient(to right, black calc(100% - 18px), transparent 100%)',
+                    WebkitMaskImage:
+                      'linear-gradient(to right, black calc(100% - 18px), transparent 100%)',
+                  }
+                : undefined
+            }
+          >
+            <span className="inline-flex size-3.5 items-center justify-center shrink-0">
+              {hasPendingApproval ? (
+                <Hand className="size-3.5 text-brand fill-brand/20" />
+              ) : isRunning ? (
+                <RunningDots sizeClass="size-[3px]" colorClass="bg-brand" />
+              ) : isPinned ? (
+                <Pin className="size-3 text-brand rotate-45" />
+              ) : (
+                <Circle
+                  className={cn(
+                    'size-2',
+                    isSelected
+                      ? 'text-brand fill-brand'
+                      : 'text-foreground-extra-muted opacity-45'
+                  )}
+                />
+              )}
+            </span>
 
-          {isEditing ? (
-            <input
-              type="text"
-              value={editingTitle}
-              autoFocus
-              onChange={(e) => setEditingTitle(e.target.value)}
-              onBlur={() => handleCommitRename(session.sessionId)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCommitRename(session.sessionId);
-                if (e.key === 'Escape') setEditingSessionId(null);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full bg-surface3 px-1.5 py-0.5 rounded text-xs text-foreground outline-hidden border border-primary/40 font-normal"
-            />
-          ) : (
-            <span className="truncate flex-1 tracking-tight">{title}</span>
+            {isEditing ? (
+              <input
+                type="text"
+                value={editingTitle}
+                autoFocus
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={() => handleCommitRename(session.sessionId)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCommitRename(session.sessionId);
+                  if (e.key === 'Escape') setEditingSessionId(null);
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full bg-surface3 px-1.5 py-0.5 rounded text-xs text-foreground outline-hidden border border-primary/40 font-normal"
+              />
+            ) : (
+              <span
+                className={cn(
+                  'min-w-0 flex-1 text-xs tracking-tight truncate',
+                  isSelected ? 'font-semibold text-foreground' : 'font-normal'
+                )}
+              >
+                {title}
+              </span>
+            )}
+          </div>
+
+          {/* Secondary Metadata Row (cdesktop WorkspaceSummary stats + elapsed + folder) */}
+          {!isEditing && showSecondRow && (
+            <div className="flex w-full items-center gap-1.5 text-[10px] h-4 mt-0.5 pl-5 text-foreground-extra-muted">
+              {session.workingDir && (
+                <span className="truncate max-w-[90px] font-mono opacity-80">
+                  {basename(session.workingDir)}
+                </span>
+              )}
+              {!isRunning && (
+                <span className="min-w-0 flex-1 truncate opacity-75">
+                  {isDraft ? 'Draft' : elapsed}
+                </span>
+              )}
+              {isRunning && <span className="flex-1" />}
+
+              {hasChanges && (
+                <span className="shrink-0 text-right flex items-center gap-1 font-mono">
+                  <FileText className="size-2.5" />
+                  <span>{filesChanged}</span>
+                  {linesAdded !== undefined && (
+                    <span className="text-status-success font-medium">+{linesAdded}</span>
+                  )}
+                  {linesRemoved !== undefined && (
+                    <span className="text-status-danger font-medium">-{linesRemoved}</span>
+                  )}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
-        {/* Hover Action Buttons */}
+        {/* Right-side hover action buttons (Pin, Rename, Delete) */}
         {!isEditing && (
-          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
+          <div className="opacity-0 group-hover:opacity-100 absolute right-1 top-1.5 flex items-center gap-0.5 shrink-0 transition-opacity bg-surface2/95 backdrop-blur-xs px-1 py-0.5 rounded-md shadow-2xs">
+            <Hint label={isPinned ? 'Unpin session' : 'Pin session'}>
+              <button
+                type="button"
+                onClick={(e) => togglePinSession(session.sessionId, e)}
+                className={cn(
+                  'p-1 rounded hover:bg-surface3 transition-colors cursor-pointer',
+                  isPinned ? 'text-brand' : 'text-foreground-extra-muted hover:text-foreground'
+                )}
+                aria-label={isPinned ? 'Unpin session' : 'Pin session'}
+              >
+                <Pin className="size-3" />
+              </button>
+            </Hint>
             <Hint label="Rename">
               <button
                 type="button"
@@ -272,6 +496,37 @@ export function WorkbenchSidebarContent() {
     );
   };
 
+  const renderSection = (
+    key: string,
+    label: string,
+    items: WorkspaceSession[],
+    badge?: React.ReactNode
+  ) => {
+    if (items.length === 0) return null;
+    const isCollapsed = Boolean(collapsedSections[key]);
+    return (
+      <div className="space-y-0.5">
+        <button
+          type="button"
+          onClick={() => toggleSection(key)}
+          className="group w-full flex items-center justify-between px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer"
+        >
+          <span className="flex items-center gap-1.5">
+            <span>{label}</span>
+            {badge}
+          </span>
+          <ChevronDown
+            className={cn(
+              'size-3 opacity-0 group-hover:opacity-100 transition-transform',
+              isCollapsed && '-rotate-90 opacity-70'
+            )}
+          />
+        </button>
+        {!isCollapsed && items.map(renderSessionItem)}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 bg-surface-sidebar select-none">
       {/* ── Top Controls: Project Folder & New Task ── */}
@@ -294,7 +549,7 @@ export function WorkbenchSidebarContent() {
           </Hint>
         )}
 
-        {/* Claude Desktop-style Big "+ New Task" Button */}
+        {/* Claude Desktop / cdesktop "+ New Session" Button */}
         <button
           type="button"
           onClick={handleStartNewSession}
@@ -447,49 +702,33 @@ export function WorkbenchSidebarContent() {
         </div>
       </div>
 
-      {/* ── Scrollable Chronological Sessions Feed ── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-4 no-scrollbar">
+      {/* ── Scrollable cdesktop-style Sessions Feed ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-3.5 no-scrollbar">
         {validSessions.length === 0 ? (
           <div className="py-8 text-center text-xs text-foreground-extra-muted">
             No active sessions yet.
           </div>
         ) : (
           <>
-            {grouped.today.length > 0 && (
-              <div className="space-y-0.5">
-                <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted">
-                  Today
-                </div>
-                {grouped.today.map(renderSessionItem)}
-              </div>
+            {renderSection(
+              'needsAttention',
+              'Needs Review',
+              grouped.needsAttention,
+              <span className="px-1.5 py-0.2 rounded-full bg-brand/15 text-brand font-mono text-[9px]">
+                {grouped.needsAttention.length}
+              </span>
             )}
-
-            {grouped.yesterday.length > 0 && (
-              <div className="space-y-0.5">
-                <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted">
-                  Yesterday
-                </div>
-                {grouped.yesterday.map(renderSessionItem)}
-              </div>
+            {renderSection(
+              'running',
+              'Running',
+              grouped.running,
+              <RunningDots sizeClass="size-[3px]" colorClass="bg-brand" />
             )}
-
-            {grouped.lastWeek.length > 0 && (
-              <div className="space-y-0.5">
-                <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted">
-                  Previous 7 Days
-                </div>
-                {grouped.lastWeek.map(renderSessionItem)}
-              </div>
-            )}
-
-            {grouped.older.length > 0 && (
-              <div className="space-y-0.5">
-                <div className="px-2 text-[10px] font-semibold uppercase tracking-wider text-foreground-extra-muted">
-                  Older
-                </div>
-                {grouped.older.map(renderSessionItem)}
-              </div>
-            )}
+            {renderSection('pinned', 'Pinned', grouped.pinned)}
+            {renderSection('today', 'Today', grouped.today)}
+            {renderSection('yesterday', 'Yesterday', grouped.yesterday)}
+            {renderSection('lastWeek', 'Previous 7 Days', grouped.lastWeek)}
+            {renderSection('older', 'Older', grouped.older)}
           </>
         )}
       </div>
