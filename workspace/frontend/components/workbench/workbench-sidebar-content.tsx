@@ -14,6 +14,10 @@ import {
   Settings,
   Folder,
   Loader2,
+  Bot,
+  Blocks,
+  Clock3,
+  Activity,
 } from 'lucide-react';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useLayout } from '@/components/layout/layout-context';
@@ -39,6 +43,7 @@ interface GroupedSessions {
 export function WorkbenchSidebarContent() {
   const {
     sessions,
+    agents,
     currentSessionId,
     setCurrentSessionId,
     lastMessageBySession,
@@ -56,6 +61,8 @@ export function WorkbenchSidebarContent() {
   const [editingTitle, setEditingTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [browsingFolder, setBrowsingFolder] = useState(false);
+
+  const onlineAgentsCount = useMemo(() => agents.filter((a) => a.status === 'online').length, [agents]);
 
   React.useEffect(() => {
     setMounted(true);
@@ -289,6 +296,92 @@ export function WorkbenchSidebarContent() {
           </span>
         </button>
 
+        {/* Primary Workbench Destinations */}
+        <nav aria-label="Workbench destinations" className="space-y-0.5 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('threads');
+              if (isMobile) openMobileDetail();
+            }}
+            className={cn(
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              viewMode === 'threads'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <MessageSquare className="size-3.5 text-primary shrink-0" />
+              <span className="truncate">Sessions</span>
+            </div>
+            <span className="text-3xs font-mono px-1.5 py-0.2 rounded-full bg-surface3/70 text-foreground-extra-muted">
+              {validSessions.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('home');
+              if (isMobile) openMobileDetail();
+            }}
+            className={cn(
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              viewMode === 'home'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Bot className="size-3.5 text-blue-500 shrink-0" />
+              <span className="truncate">Agent Team</span>
+            </div>
+            <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-status-success/15 text-status-success border border-status-success/20">
+              <span className="size-1.5 rounded-full bg-status-success animate-pulse" />
+              <span>{onlineAgentsCount} online</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('skills');
+              if (isMobile) openMobileDetail();
+            }}
+            className={cn(
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              viewMode === 'skills'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Blocks className="size-3.5 text-amber-500 shrink-0" />
+              <span className="truncate">Skills & MCP</span>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setViewMode('tasks');
+              if (isMobile) openMobileDetail();
+            }}
+            className={cn(
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              viewMode === 'tasks'
+                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
+            )}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <Clock3 className="size-3.5 text-purple-500 shrink-0" />
+              <span className="truncate">Tasks & Automations</span>
+            </div>
+          </button>
+        </nav>
+
         {/* Search Input Box */}
         <div className="relative flex items-center">
           <Search className="size-3.5 absolute left-2.5 text-foreground-extra-muted pointer-events-none" />
@@ -364,7 +457,7 @@ export function WorkbenchSidebarContent() {
           type="button"
           onClick={() => openSettings('general')}
           className={cn(
-            'flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+            'flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer',
             viewMode === 'settings'
               ? 'bg-surface2 text-foreground font-semibold'
               : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60'
@@ -374,7 +467,14 @@ export function WorkbenchSidebarContent() {
           <span>Settings</span>
         </button>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <Hint label="Workspace agent runtime status">
+            <div className="flex items-center gap-1.5 text-3xs font-medium text-foreground-extra-muted px-1.5 py-0.5 rounded-full bg-surface2/50 border border-border/40 select-none">
+              <span className="size-1.5 rounded-full bg-status-success animate-pulse" />
+              <span>Ready</span>
+            </div>
+          </Hint>
+
           <Tooltip>
             <TooltipTrigger asChild>
               <ThemeToggle

@@ -19,6 +19,7 @@ import {
   Check,
   AtSign,
   BookOpen,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/hint';
@@ -440,11 +441,33 @@ export function HomeDashboard() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface0">
-      <div className="app-header px-4">
+      <div className="app-header px-4 justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <SidebarExpandButton className="-ml-1" />
-          <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Agents</h1>
+          <h1 className="shrink-0 text-sm font-semibold tracking-tight text-foreground">Agent Team</h1>
           {allAvailableAgents.length > 0 && <p className="truncate text-xs tabular-nums text-muted-foreground">{headerCounts}</p>}
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setConnectOpen(true)}
+            className="gap-1.5 h-7 px-2.5 text-xs font-medium cursor-pointer"
+          >
+            <Plus className="size-3.5 text-primary" />
+            <span>Connect Agent</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => setViewMode('threads')}
+            className="gap-1.5 h-7 px-2.5 text-xs font-medium cursor-pointer shadow-xs"
+          >
+            <MessageSquare className="size-3.5" />
+            <span>Open Chat</span>
+          </Button>
         </div>
       </div>
 

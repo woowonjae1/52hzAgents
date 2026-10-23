@@ -173,4 +173,12 @@ test('Capture workbench screenshots', async ({ page }) => {
 
   // Capture active conversation state
   await page.screenshot({ path: path.join(artifactDir, 'workbench_active_chat.png'), fullPage: true });
+
+  // 4. Click "Agent Team" in sidebar and capture Agent Team dashboard
+  const agentTeamNav = page.locator('nav[aria-label="Workbench destinations"] button:has-text("Agent Team")');
+  if (await agentTeamNav.isVisible()) {
+    await agentTeamNav.click();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: path.join(artifactDir, 'workbench_agent_team.png'), fullPage: true });
+  }
 });

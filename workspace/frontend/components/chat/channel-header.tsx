@@ -88,7 +88,7 @@ export function ChannelHeader({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const { activeRightTab, setActiveRightTab } = useLayout();
+  const { activeRightTab, setActiveRightTab, setViewMode } = useLayout();
 
   const startEditingTitle = () => {
     if (isDM) return;
@@ -155,25 +155,39 @@ export function ChannelHeader({
                   </span>
                 )}
               </div>
-              <span className="truncate text-[11px] leading-tight text-muted-foreground">
-                {[
-                  currentSessionWorkingDir ? basename(currentSessionWorkingDir) : null,
-                  (() => {
-                    const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
-                    if (activeHeaderAgents.length > 0) {
-                      return activeHeaderAgents.length === total
-                        ? `${total} agent${total > 1 ? 's' : ''}`
-                        : `${activeHeaderAgents.length}/${total} online`;
-                    }
-                    if (total > 0) {
-                      return `${total} agent${total > 1 ? 's' : ''} (offline)`;
-                    }
-                    return 'no agents configured';
-                  })(),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
+              <div className="flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground">
+                {currentSessionWorkingDir && (
+                  <>
+                    <span className="truncate">{basename(currentSessionWorkingDir)}</span>
+                    <span className="text-foreground-extra-muted">·</span>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewMode('home');
+                  }}
+                  className="inline-flex items-center gap-1 hover:text-foreground hover:underline transition-colors cursor-pointer select-none"
+                  title="Open Agent Team Management"
+                >
+                  <span className="size-1.5 rounded-full bg-status-success animate-pulse shrink-0" />
+                  <span>
+                    {(() => {
+                      const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
+                      if (activeHeaderAgents.length > 0) {
+                        return activeHeaderAgents.length === total
+                          ? `${total} agent${total > 1 ? 's' : ''}`
+                          : `${activeHeaderAgents.length}/${total} online`;
+                      }
+                      if (total > 0) {
+                        return `${total} agent${total > 1 ? 's' : ''} (offline)`;
+                      }
+                      return 'no agents configured';
+                    })()}
+                  </span>
+                </button>
+              </div>
             </div>
           </Hint>
         )}

@@ -83,29 +83,27 @@ export function SessionEmptyHero({
     >
       {/* Top Header */}
       <div className="flex flex-col items-center text-center space-y-3">
-        {/* Subtle status pill */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] text-2xs font-medium text-muted-foreground shadow-xs">
+        {/* Subtle status pill with quick link to agent team */}
+        <button
+          type="button"
+          onClick={onConnectAgent}
+          className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] hover:bg-surface2 text-2xs font-medium text-muted-foreground hover:text-foreground shadow-xs transition-all cursor-pointer select-none active:scale-95"
+          title="Click to view and configure agent team"
+        >
           <span
             className={cn(
               'size-1.5 rounded-full shrink-0',
-              hasOnlineAgents ? 'bg-emerald-500' : 'bg-muted-foreground/40'
+              hasOnlineAgents ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'
             )}
           />
           <span>
             {hasOnlineAgents
               ? `${onlineAgentCount} ${onlineAgentCount === 1 ? 'agent' : 'agents'} online`
-              : 'Autonomous Workspace Ready'}
+              : 'Connect an agent'}
           </span>
-          {!hasOnlineAgents && onConnectAgent && (
-            <button
-              type="button"
-              onClick={onConnectAgent}
-              className="text-foreground-extra-muted hover:text-foreground transition-colors ml-0.5 underline underline-offset-2 cursor-pointer"
-            >
-              Connect agent
-            </button>
-          )}
-        </div>
+          <span className="text-foreground-extra-muted">/</span>
+          <span className="text-foreground-muted">Manage Agent Team</span>
+        </button>
 
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
           {greeting}, what can I help you build?
