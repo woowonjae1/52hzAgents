@@ -36,6 +36,7 @@ import { SignalMark } from '@/components/brand/signal-mark';
 import { Network, X, PanelLeft, FileText, Globe, BookOpen } from 'lucide-react';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
 import { SkillsView } from '@/components/skills/skills-view';
+import { WorkbenchLayout } from '@/components/workbench/workbench-layout';
 
 /**
  * THE FIRST FRAME IS THE WINDOW, NOT A SPLASH.
@@ -304,175 +305,18 @@ function WrapperInner() {
   const isSettings = viewMode === 'settings';
   const shouldShowSidebar = !isDetailExpanded && !isSettings;
 
-  // ── Desktop layout: sidebar + center chat + collapsible right preview ──
+  // ── Desktop layout: modern Claude Desktop 3-pane workbench ──
   return (
-    <div
-      ref={desktopContainerRef}
-      className="app-root-container flex h-screen h-dvh w-full bg-surface0 [&_.container-fluid]:px-5"
-    >
-      {shouldShowSidebar && <Sidebar />}
-
-      <div
-        className="flex flex-col flex-grow min-w-0 w-full"
-        data-studio-open={isStudioOpen ? 'true' : 'false'}
-      >
-        <div className="flex grow min-h-0 overflow-hidden">
-          {/* Invisible spacer standing in for the fixed sidebar. Reads the same
-              resizable width the sidebar itself does, so dragging the handle moves
-              the main pane with it. */}
-          {shouldShowSidebar && (
-            <div
-              data-sidebar-sized
-              /* `transition-[width]`, not `ui-transition`: the only property
-                 that ever changes here is the width, and `all` puts every
-                 animatable property of a flex sibling on a 300ms clock. */
-              className={cn('shrink-0', !isSidebarResizing && 'transition-[width] duration-[var(--shell-duration)] ease-[var(--shell-ease)]')}
-              style={{ width: isSidebarOpen ? 'var(--sidebar-width)' : '0px' }}
-            />
-          )}
-
-          {/* Dynamic multi-pane grid based on viewMode and activeRightTab */}
-          {viewMode === 'threads' && monitorMode ? (
-            /* Monitor mode: replace both panes with 2x3 grid */
-            <div className="relative flex-1 min-w-0">
-              <MonitorGrid />
-              {isAgentPanelOpen && <AgentProfilePanel />}
-            </div>
-          ) : (
-            <>
-              {/* Column 2: Center Main Workspace (Seamless Edge-to-Edge Canvas) */}
-              <div className={cn("relative flex-grow flex-1 min-w-0 bg-surface0 overflow-hidden flex flex-col", undefined)}>
-
-                {/* Keep ChatView alive in DOM to prevent SSE disconnection, dropped messages, and re-fetch flicker */}
-                <div className={cn("h-full w-full", (viewMode !== 'threads' || isHome) && "hidden")}>
-                  <main className="h-full">
-                    <ChatView />
-                  </main>
-                </div>
-                {isHome && <HomeDashboard />}
-                {viewMode === 'tasks' && <TasksView />}
-
-                {viewMode === 'inbox' && <InboxView />}
-                {viewMode === 'knowledge' && <KnowledgeView />}
-                {viewMode === 'skills' && <SkillsView />}
-                {viewMode === 'settings' && <SettingsView />}
-                {/* Agent profile slide-over panel */}
-                {isAgentPanelOpen && <AgentProfilePanel />}
-              </div>
-
-              {/* Column 3: Unified Right Studio */}
-              {isStudioOpen && (
-                <aside
-                  aria-label="Studio Panel"
-                  style={{ width: `${studioWidth}px` }}
-                  className={cn(
-                    // `--border-chrome`: this edge is content against panel, which is
-                    // the same seam the sidebar draws on the other side, not an
-                    // internal rule.
-                    "shrink-0 h-full border-l border-border-chrome bg-surface1 flex flex-col z-20 relative select-text",
-                    isStudioResizing ? "select-none transition-none" : "transition-[width] duration-75"
-                  )}
-                >
-                  {/* Left Drag-to-Resize Handle */}
-                  <Hint label="Drag to resize · double-click to reset" side="left">
-                    <div
-                      {...studioSeparatorProps}
-                      className="absolute -left-1.5 top-0 bottom-0 w-3 cursor-col-resize group z-30 flex items-center justify-center select-none focus-visible:outline-none focus-visible:bg-primary/40"
-                    >
-                      <div className="w-[3px] h-full bg-transparent group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
-                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 left-1/2 py-2 px-0.5 rounded-full bg-surface2/90 border border-border shadow-xs opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-0.5">
-                        <div className="size-1 rounded-full bg-foreground-extra-muted" />
-                        <div className="size-1 rounded-full bg-foreground-extra-muted" />
-                        <div className="size-1 rounded-full bg-foreground-extra-muted" />
-                      </div>
-                    </div>
-                  </Hint>
-
-                  {/* Studio Header Bar (Rendered when not in canvas mode; Canvas provides its own unified 38px header) */}
-                  {effectiveStudioTab !== 'canvas' && effectiveStudioTab !== 'file' && (
-                    /*
-                      `.app-header` already owns the fill and the underline for
-                      every top-level header in the app — that is the whole
-                      point of the contract in globals.css. This one overrode
-                      both with `bg-surface1` and a plain `--border`, so the
-                      Studio panel's header was the only band in the window
-                      that was neither the chrome colour nor separated by the
-                      chrome seam. Dropping the two overrides is the fix.
-                    */
-                    <div className="app-header justify-between px-3 shrink-0 flex-nowrap select-none">
-                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                        {/* Always reachable: the thread's outputs exist whether or not one was just opened. */}
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab('canvas')}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2 cursor-pointer active:scale-95"
-                        >
-                          <FileText className="size-3.5" />
-                          <span>Outputs</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab('preview')}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95",
-                            effectiveStudioTab === 'preview'
-                              ? "bg-surface3 text-foreground font-semibold border border-border"
-                              : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                          )}
-                        >
-                          <Globe className="size-3.5" />
-                          <span>Preview</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveRightTab('knowledge')}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95",
-                            effectiveStudioTab === 'knowledge'
-                              ? "bg-surface3 text-foreground font-semibold border border-border"
-                              : "text-foreground-muted hover:text-foreground hover:bg-surface2"
-                          )}
-                        >
-                          <BookOpen className="size-3.5" />
-                          <span>Knowledge</span>
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Hint label="Close Studio (Esc)">
-                          <button
-                            type="button"
-                            aria-label="Close Studio"
-                            onClick={handleCloseStudio}
-                            className="size-7 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors shrink-0 cursor-pointer active:scale-95"
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        </Hint>
-                        <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Studio Content Pane */}
-                  <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
-                    {/* Canvas and File are one panel now: the outputs list with its viewer. */}
-                    {(effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file') && <ArtifactsCanvas embedded />}
-                    {effectiveStudioTab === 'preview' && <LocalPreview />}
-                    {effectiveStudioTab === 'knowledge' && <KnowledgeView embedded />}
-
-                    {/*
-                      Trace is gone. It rendered the same messages as the chat
-                      a second time, filtered to steps; the filter moved onto
-                      the transcript (see transcript-filter.tsx) and the second
-                      copy went with the panel.
-                    */}
-                  </div>
-                </aside>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+    <>
+      <WorkbenchLayout
+        desktopContainerRef={desktopContainerRef}
+        isStudioOpen={isStudioOpen}
+        studioWidth={studioWidth}
+        isStudioResizing={isStudioResizing}
+        effectiveStudioTab={effectiveStudioTab}
+        studioSeparatorProps={studioSeparatorProps}
+        handleCloseStudio={handleCloseStudio}
+      />
       <GlobalShortcuts />
       <DesktopIntegration />
       <RealtimeStatus />
@@ -481,6 +325,6 @@ function WrapperInner() {
       <NewThreadDialogHost />
       <DropzoneOverlay />
       <CommandPalette />
-    </div>
+    </>
   );
 }
