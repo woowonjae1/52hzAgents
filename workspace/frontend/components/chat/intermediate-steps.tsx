@@ -53,6 +53,12 @@ import {
   toolAction,
   prettyToolArgs,
 } from './step-parser';
+import {
+  ChatAggregatedToolEntries,
+  ChatToolSummary,
+  ToolStatusDot,
+  type AggregatedToolEntry,
+} from './chat-tool-entries';
 
 export {
   type SubagentInfo,
@@ -60,6 +66,10 @@ export {
   describeStep,
   cleanToolName,
   extractToolSummary,
+  ChatAggregatedToolEntries,
+  ChatToolSummary,
+  ToolStatusDot,
+  type AggregatedToolEntry,
 };
 
 function SubagentTree({ subagents }: { subagents: SubagentInfo[] }) {
@@ -925,9 +935,36 @@ function runsToActivity(
     if (run.kind === 'thinking' || run.kind === 'reply') {
       pushText(`${prefix}-${run.kind}-${run.messages[0]?.messageId || i}`, joinThoughts(run.messages));
     } else if (run.kind === 'tools') {
-      run.messages.forEach((m, j) =>
-        pushStep(m, `${prefix}-${m.messageId || 'tool'}-${i}-${j}`, live && isEdge && j === run.messages.length - 1)
-      );
+      const toolEntries: AggregatedToolEntry[] = run.messages.map((m, j) => {
+        const parsed = parseMessageStep(m);
+        const status = String(m.metadata?.tool_status || 'ok');
+        return {
+          summary: (parsed.summary || parsed.toolDisplay || 'Tool').replace(/ · failed$/, ''),
+          status,
+          expansionKey: `${m.messageId || 'tool'}-${i}-${j}`,
+          toolName: parsed.toolDisplay || parsed.tool,
+          actionType: toolAction(parsed.toolDisplay || 'Tool'),
+          detail: parsed.args ? <EventLinePre>{prettyToolArgs(parsed.args)}</EventLinePre> : undefined,
+        };
+      });
+
+      const firstParsed = parseMessageStep(run.messages[0]);
+      const toolLabel = firstParsed.toolDisplay || 'Action';
+      const count = run.messages.length;
+
+      items.push({
+        id: `${prefix}-batch-${i}`,
+        type: 'custom',
+        node: (
+          <div className="py-1">
+            <ChatAggregatedToolEntries
+              entries={toolEntries}
+              label={toolLabel}
+              unitLabel={`${count} operation${count > 1 ? 's' : ''}`}
+            />
+          </div>
+        ),
+      });
     } else {
       pushStep(run.message, `${prefix}-${run.message.messageId || 'step'}-${i}`, live && isEdge);
     }
