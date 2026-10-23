@@ -12,10 +12,13 @@ import {
   CheckCircle2,
   Loader2,
   GitBranch,
+  MessageSquare,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { DiffBlock } from '@/components/chat/diff-block';
 import { useWorkspace } from '@/lib/workspace-context';
+import { useReviewOptional } from '@/lib/review-context';
 import { workspaceApi } from '@/lib/api';
 import { useGitStatus, type GitFileChange } from '@/lib/use-git-status';
 import { copyWithToast } from '@/lib/desktop';
@@ -47,6 +50,8 @@ export function DiffStudioPanel() {
   const { currentSessionId, sessions } = useWorkspace();
   const serverSessionId = currentSessionId;
   const { status: gitStatus, refresh: refreshGit } = useGitStatus(serverSessionId);
+  const review = useReviewOptional();
+  const totalReviewComments = review?.comments.length ?? 0;
 
   const files = gitStatus?.files || [];
   const [selectedPath, setSelectedPath] = useState<string>('');
@@ -227,8 +232,25 @@ export function DiffStudioPanel() {
           <span className="text-3xs px-1.5 py-0.5 rounded-full bg-surface2 font-mono text-foreground-muted border border-border/60">
             +{gitStatus.additions} -{gitStatus.deletions}
           </span>
+          {totalReviewComments > 0 && (
+            <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded-full bg-primary/15 font-mono text-primary font-semibold border border-primary/30">
+              <MessageSquare className="size-2.5" />
+              <span>{totalReviewComments}</span>
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
+          {totalReviewComments > 0 && review && (
+            <Hint label="Clear all inline review comments">
+              <button
+                type="button"
+                onClick={review.clearComments}
+                className="px-2 py-1 rounded-md text-3xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+              >
+                Clear Comments
+              </button>
+            </Hint>
+          )}
           {files.length > 0 && (
             <Hint label="Discard all modified files">
               <button
@@ -340,6 +362,7 @@ export function DiffStudioPanel() {
         {filteredFiles.map((file) => {
           const isSelected = file.path === selectedPath;
           const fileName = file.path.split(/[/\\]/).pop() || file.path;
+          const fileCommentCount = review?.comments.filter((c) => c.filePath === file.path).length ?? 0;
           return (
             <button
               key={file.path}
@@ -354,6 +377,12 @@ export function DiffStudioPanel() {
             >
               <StatusBadge status={file.status} />
               <span className="truncate max-w-[140px]">{fileName}</span>
+              {fileCommentCount > 0 && (
+                <span className="inline-flex items-center gap-0.5 px-1 rounded-full bg-primary/15 text-primary text-[9px] font-semibold">
+                  <MessageSquare className="size-2.5" />
+                  <span>{fileCommentCount}</span>
+                </span>
+              )}
             </button>
           );
         })}
@@ -367,6 +396,10 @@ export function DiffStudioPanel() {
             <span className="truncate">{selectedPath}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <span className="hidden sm:inline-flex items-center gap-1 text-3xs text-foreground-extra-muted">
+              <MessageSquarePlus className="size-3 text-primary/80" />
+              <span>Click any line to comment</span>
+            </span>
             <button
               type="button"
               onClick={() => setConfirmDiscardPath(selectedPath)}
@@ -390,6 +423,8 @@ export function DiffStudioPanel() {
         ) : currentDiff ? (
           <DiffBlock
             code={currentDiff}
+            filePath={selectedPath}
+            interactiveReview
             embedded
           />
         ) : (

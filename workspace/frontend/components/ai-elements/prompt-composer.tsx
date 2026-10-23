@@ -26,8 +26,11 @@ import {
   Check,
   Crown,
   Scale,
+  MessageSquare,
+  Trash2,
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { useReviewOptional, buildAgentPromptWithReview } from '@/lib/review-context';
 import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { ActionSwapRollIcon } from '@/components/motion/action-swap-roll';
 import { Magnetic } from '@/components/motion/magnetic';
@@ -726,6 +729,13 @@ export function PromptComposer({
   // The preview must not draw numbered steps and arrows for that.
   const previewIsParallel = session?.orchestrationMode === 'parallel';
 
+  const review = useReviewOptional();
+  const reviewCommentCount = review?.comments.length ?? 0;
+  const reviewMarkdown = React.useMemo(
+    () => review?.generateReviewMarkdown() ?? '',
+    [review]
+  );
+
   const lastSendTimeRef = React.useRef(0);
 
   const handleStopClick = (e?: React.MouseEvent) => {
@@ -737,7 +747,10 @@ export function PromptComposer({
   };
 
   const handleSend = () => {
-    const trimmed = message.trim();
+    const { prompt: finalPrompt, isSlashCommand } = buildAgentPromptWithReview(message, [
+      reviewMarkdown,
+    ]);
+    const trimmed = finalPrompt.trim();
     if ((!trimmed && pendingFiles.length === 0) || disabled) return;
     if (sendBlockedReason) {
       // The draft is kept; say why it did not go rather than swallowing Enter.
@@ -752,6 +765,10 @@ export function PromptComposer({
     const mentions = segments.length > 0 ? segments.map((s) => s.agent) : filteredMatches;
 
     onSend(trimmed, mentions, pendingFiles, segments.length >= 2 ? segments : undefined);
+
+    if (!isSlashCommand && reviewCommentCount > 0) {
+      review?.clearComments();
+    }
 
     if (trimmed) {
       const updatedHistory = [trimmed, ...historyRef.current.filter((h) => h !== trimmed)].slice(0, 50);
@@ -853,7 +870,7 @@ export function PromptComposer({
     }
   };
 
-  const canSend = (message.trim().length > 0 || pendingFiles.length > 0) && !disabled && !sendBlockedReason;
+  const canSend = (message.trim().length > 0 || pendingFiles.length > 0 || reviewCommentCount > 0) && !disabled && !sendBlockedReason;
   const notice = disabled ? disabledReason : !suppressSendBlockedNotice ? sendBlockedReason : undefined;
   const showHint = isFocused && !message.trim() && pendingFiles.length === 0 && !isWorking;
 
@@ -1208,6 +1225,31 @@ export function PromptComposer({
           <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-status-warning bg-status-warning/10 border-b border-status-warning/20 rounded-t-xl select-none">
             <Info className="size-3.5 shrink-0" />
             <span>{notice}</span>
+          </div>
+        )}
+
+        {/* cdesktop-style Review Comments Banner */}
+        {reviewCommentCount > 0 && review && (
+          <div
+            data-review-banner="true"
+            className="bg-primary/[0.06] border-b border-primary/20 px-3.5 py-2 flex items-center gap-2.5 text-xs select-none"
+          >
+            <MessageSquare className="size-3.5 text-primary shrink-0" />
+            <span className="text-foreground font-medium flex-1 truncate">
+              {reviewCommentCount} {reviewCommentCount === 1 ? 'review comment' : 'review comments'} attached
+            </span>
+            <span className="text-3xs text-foreground-muted font-mono hidden sm:inline">
+              Enter to send review
+            </span>
+            <button
+              type="button"
+              onClick={review.clearComments}
+              className="text-foreground-muted hover:text-destructive transition-colors p-1 -m-1 cursor-pointer"
+              title="Clear review comments"
+              aria-label="Clear review comments"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
           </div>
         )}
 

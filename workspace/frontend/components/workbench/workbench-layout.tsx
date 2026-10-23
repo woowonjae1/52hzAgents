@@ -17,6 +17,7 @@ import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { LocalPreview } from '@/components/preview/local-preview';
 import { DiffStudioPanel } from './diff-studio-panel';
+import { ReviewProvider } from '@/lib/review-context';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { X, FileText, Globe, BookOpen, PanelLeft, FileDiff } from 'lucide-react';
@@ -65,10 +66,11 @@ export function WorkbenchLayout({
   const shouldShowSidebar = !isDetailExpanded && !isSettings;
 
   return (
-    <div
-      ref={desktopContainerRef}
-      className="app-root-container workbench-root flex h-screen h-dvh w-full bg-surface0 overflow-hidden select-none [&_.container-fluid]:px-5"
-    >
+    <ReviewProvider workspaceId={currentSessionId}>
+      <div
+        ref={desktopContainerRef}
+        className="app-root-container workbench-root flex h-screen h-dvh w-full bg-surface0 overflow-hidden select-none [&_.container-fluid]:px-5"
+      >
       {/* ── Left Pane: Collapsible Workbench Sidebar ── */}
       {shouldShowSidebar && <Sidebar />}
 
@@ -230,5 +232,6 @@ export function WorkbenchLayout({
         </div>
       </div>
     </div>
+    </ReviewProvider>
   );
 }
