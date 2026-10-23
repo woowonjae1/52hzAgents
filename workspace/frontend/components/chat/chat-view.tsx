@@ -1154,6 +1154,7 @@ export function ChatView() {
               onlineAgentCount={onlineAgents.length}
               onConnectAgent={() => setViewMode('home')}
               onSelectPrompt={(prompt) => {
+                setInjectedDraft(prompt);
                 handleDraftChange(prompt);
                 setFocusKey((k) => k + 1);
               }}

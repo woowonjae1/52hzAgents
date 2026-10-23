@@ -184,4 +184,40 @@ test.describe('Composer & Channel Header Regression Tests', () => {
 
     expect(errors, `Uncaught errors in Sidebar toggle: ${errors.join('\n')}`).toEqual([]);
   });
+
+  test('Fresh workbench session displays Claude Desktop welcome canvas and populates prompt suggestions', async ({ page }) => {
+    const errors = attachErrorGuards(page);
+
+    await page.goto('/default/', { waitUntil: 'domcontentloaded' });
+    await page.waitForTimeout(1500);
+
+    // 1. Click New Session button in sidebar header to open a fresh workbench session
+    const newSessionBtn = page.locator('button[aria-label="New session"]');
+    await expect(newSessionBtn).toBeVisible();
+    await newSessionBtn.click();
+    await page.waitForTimeout(400);
+
+    // 2. Verify ChannelHeader shows "New Session"
+    const headerTitle = page.locator('main .app-header-fade h2:has-text("New Session")');
+    await expect(headerTitle).toBeVisible();
+
+    // 3. Verify Claude Desktop welcome screen greeting
+    const greeting = page.locator('text=/what can I help you build/i');
+    await expect(greeting).toBeVisible();
+
+    // 4. Verify prompt inspiration pills
+    const refactorPill = page.locator('button:has-text("Refactor & review")');
+    await expect(refactorPill).toBeVisible();
+
+    // 5. Click prompt suggestion
+    await refactorPill.click();
+    await page.waitForTimeout(200);
+
+    // 6. Verify PromptComposer textarea has the prompt populated
+    const textarea = page.locator('textarea[data-chat-input="true"]');
+    const val = await textarea.inputValue();
+    expect(val).toContain('Review the core architecture');
+
+    expect(errors, `Uncaught errors in fresh session journey: ${errors.join('\n')}`).toEqual([]);
+  });
 });

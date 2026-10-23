@@ -29,6 +29,7 @@ import { isComposing } from '@/lib/ime';
 import { cn } from '@/lib/utils';
 import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { AgentModelSwitcher } from './agent-model-switcher';
+import { isDraftSessionId } from '@/lib/workspace-context';
 import type { WorkspaceMessage, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import type { GitStatus } from '@/lib/use-git-status';
 
@@ -140,7 +141,7 @@ export function ChannelHeader({
             <div className="flex min-w-0 flex-col cursor-pointer" onClick={startEditingTitle}>
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
-                  {currentSession?.title ? stripTitleMentions(currentSession.title) : (currentSessionId ? 'Channel' : 'New Session')}
+                  {currentSession?.title ? stripTitleMentions(currentSession.title) : (currentSessionId && !isDraftSessionId(currentSessionId) ? 'Channel' : 'New Session')}
                 </h2>
                 {currentSession?.master && (
                   <span
