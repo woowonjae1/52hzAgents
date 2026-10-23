@@ -220,6 +220,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                   onToggleList={toggleList}
                   isFullscreen={isFullscreen}
                   onFullscreen={() => setIsFullscreen((v) => !v)}
+                  onDiff={() => setActiveRightTab('diff')}
                   onPreview={() => setActiveRightTab('preview')}
                   onKnowledge={() => setActiveRightTab('knowledge')}
                   onClose={close}
@@ -239,6 +240,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                   onToggleList={toggleList}
                   isFullscreen={isFullscreen}
                   onFullscreen={() => setIsFullscreen((v) => !v)}
+                  onDiff={() => setActiveRightTab('diff')}
                   onPreview={() => setActiveRightTab('preview')}
                   onKnowledge={() => setActiveRightTab('knowledge')}
                   onClose={close}
@@ -263,6 +265,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                   onToggleList={toggleList}
                   isFullscreen={isFullscreen}
                   onFullscreen={() => setIsFullscreen((v) => !v)}
+                  onDiff={() => setActiveRightTab('diff')}
                   onPreview={() => setActiveRightTab('preview')}
                   onKnowledge={() => setActiveRightTab('knowledge')}
                   onClose={close}
@@ -278,6 +281,7 @@ export function ArtifactsCanvas({ className }: { className?: string; embedded?: 
                 onToggleList={toggleList}
                 isFullscreen={isFullscreen}
                 onFullscreen={() => setIsFullscreen((v) => !v)}
+                onDiff={() => setActiveRightTab('diff')}
                 onPreview={() => setActiveRightTab('preview')}
                 onKnowledge={() => setActiveRightTab('knowledge')}
                 onClose={close}
@@ -431,6 +435,7 @@ function PanelHeader({
   onToggleList,
   isFullscreen,
   onFullscreen,
+  onDiff,
   onPreview,
   onKnowledge,
   onClose,
@@ -441,6 +446,7 @@ function PanelHeader({
   onToggleList: () => void;
   isFullscreen: boolean;
   onFullscreen: () => void;
+  onDiff?: () => void;
   onPreview: () => void;
   onKnowledge?: () => void;
   onClose: () => void;
@@ -470,6 +476,13 @@ function PanelHeader({
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
         {actions.controls}
+        {onDiff && (
+          <Hint label="Switch to Code Diff">
+            <button type="button" onClick={onDiff} className={iconBtn}>
+              <FileDiff className="size-3.5" />
+            </button>
+          </Hint>
+        )}
         <Hint label="Switch to Live Preview">
           <button type="button" onClick={onPreview} className={iconBtn}>
             <Globe className="size-3.5" />

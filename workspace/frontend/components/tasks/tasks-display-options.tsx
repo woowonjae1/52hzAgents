@@ -104,7 +104,7 @@ export function TasksDisplayOptions({
             {[
               { id: 'status', label: 'Status' },
               { id: 'assignee', label: 'Assignee' },
-              { id: 'channel', label: 'Channel' },
+              { id: 'channel', label: 'Session' },
               { id: 'none', label: 'None' },
             ].map((g) => (
               <button

@@ -835,7 +835,7 @@ export function TasksView() {
                                     </Hint>
                                   )}
                                   {todo.channelName && (
-                                    <Hint label={`Channel: ${todo.channelName}`}>
+                                    <Hint label={`Session: ${todo.channelName}`}>
                                       <span
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface2 border border-border/60 text-3xs font-medium text-foreground-muted truncate max-w-[120px]"
                                       >
@@ -1047,7 +1047,7 @@ export function TasksView() {
               {/* The channel a task belongs to is fixed once it exists — moving
                   it would detach it from its author's ordered list. */}
               <div className="space-y-1">
-                <label className="font-medium text-foreground-muted">Channel / Session</label>
+                <label className="font-medium text-foreground-muted">Session</label>
                 {editing ? (
                   <p className="h-8 flex items-center px-2 rounded-lg border border-border/60 bg-surface2/30 text-xs text-foreground-muted">
                     {channel || 'general'}

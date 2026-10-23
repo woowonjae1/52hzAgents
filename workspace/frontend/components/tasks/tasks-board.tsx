@@ -278,7 +278,7 @@ export function TasksBoard({
                           </Hint>
                         )}
                         {task.channelName && (
-                          <Hint label={`Channel: ${task.channelName}`}>
+                          <Hint label={`Session: ${task.channelName}`}>
                             <span
                               className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface3 border border-border/60 font-medium text-foreground-muted truncate max-w-[100px]"
                             >

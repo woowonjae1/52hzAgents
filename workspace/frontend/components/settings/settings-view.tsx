@@ -28,6 +28,7 @@ import {
   Plus,
   Crown,
   FileText,
+  FileDiff,
   Layers,
   Plug,
   MonitorPlay,
@@ -197,6 +198,12 @@ export function SettingsView() {
       name: 'File Artifacts & Preview',
       icon: FileText,
       desc: 'Browse and download the project code and Markdown the agents write.',
+    },
+    {
+      id: 'diff',
+      name: 'Code Diff Inspector',
+      icon: FileDiff,
+      desc: 'Review git modifications, additions, and deletions with unified diff viewer and instant file switcher.',
     },
     {
       id: 'knowledge',
