@@ -16,9 +16,10 @@ import { AgentProfilePanel } from '@/components/agents/agent-profile-panel';
 import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { LocalPreview } from '@/components/preview/local-preview';
+import { DiffStudioPanel } from './diff-studio-panel';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
-import { X, FileText, Globe, BookOpen, PanelLeft } from 'lucide-react';
+import { X, FileText, Globe, BookOpen, PanelLeft, FileDiff } from 'lucide-react';
 
 interface WorkbenchLayoutProps {
   desktopContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -151,10 +152,28 @@ export function WorkbenchLayout({
                     <button
                       type="button"
                       onClick={() => setActiveRightTab('canvas')}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 text-foreground-muted hover:text-foreground hover:bg-surface2 cursor-pointer active:scale-95"
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
+                        effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file'
+                          ? 'bg-surface3 text-foreground font-semibold border border-border'
+                          : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
+                      )}
                     >
                       <FileText className="size-3.5" />
                       <span>Outputs</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveRightTab('diff')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
+                        effectiveStudioTab === 'diff'
+                          ? 'bg-surface3 text-foreground font-semibold border border-border'
+                          : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
+                      )}
+                    >
+                      <FileDiff className="size-3.5" />
+                      <span>Diff</span>
                     </button>
                     <button
                       type="button"
@@ -202,6 +221,7 @@ export function WorkbenchLayout({
               {/* Studio Content Pane */}
               <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
                 {(effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file') && <ArtifactsCanvas embedded />}
+                {effectiveStudioTab === 'diff' && <DiffStudioPanel />}
                 {effectiveStudioTab === 'preview' && <LocalPreview />}
                 {effectiveStudioTab === 'knowledge' && <KnowledgeView embedded />}
               </div>

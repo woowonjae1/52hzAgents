@@ -10,7 +10,9 @@ import {
   MoreHorizontal,
   Filter,
   Download,
+  FileDiff,
 } from 'lucide-react';
+import { useLayout } from '@/components/layout/layout-context';
 import { Hint } from '@/components/ui/hint';
 import { GitChip } from '@/components/git/git-chip';
 import {
@@ -85,6 +87,7 @@ export function ChannelHeader({
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const { activeRightTab, setActiveRightTab } = useLayout();
 
   const startEditingTitle = () => {
     if (isDM) return;
@@ -187,6 +190,26 @@ export function ChannelHeader({
 
       <div className="flex items-center gap-2 shrink-0">
         <GitChip channelId={gitChannelId} status={gitStatus} refresh={refreshGit} />
+        {gitStatus?.files && gitStatus.files.length > 0 && (
+          <Hint label={`Review ${gitStatus.files.length} modified file${gitStatus.files.length > 1 ? 's' : ''} in Studio`}>
+            <button
+              type="button"
+              onClick={() => {
+                if (!isStudioOpen) onToggleStudio();
+                setActiveRightTab('diff');
+              }}
+              className={cn(
+                'inline-flex items-center gap-1 text-xs font-mono px-2 py-1 rounded-md transition-colors cursor-pointer shrink-0 border',
+                activeRightTab === 'diff' && isStudioOpen
+                  ? 'bg-primary/15 text-primary border-primary/30 font-semibold'
+                  : 'bg-surface2 hover:bg-surface3 text-foreground-muted hover:text-foreground border-border/60'
+              )}
+            >
+              <FileDiff className="size-3 text-primary" />
+              <span className="text-2xs font-semibold">Diff ({gitStatus.files.length})</span>
+            </button>
+          </Hint>
+        )}
         {currentSessionWorkingDir && (
           <Hint label={`Project workspace: ${currentSessionWorkingDir}`}>
             <button

@@ -55,11 +55,12 @@ function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTa
 // The Studio holds what THIS thread produced, and nothing else:
 // 'preview' — a dev server on this machine; 'file' — the thread's files;
 // 'canvas' — the active markdown / code / artifact deliverable;
-// 'knowledge' — workspace knowledge base and references.
-export type RightPanelTab = 'preview' | 'file' | 'canvas' | 'knowledge' | null;
+// 'knowledge' — workspace knowledge base and references;
+// 'diff' — git changes and file diff inspector.
+export type RightPanelTab = 'preview' | 'file' | 'canvas' | 'knowledge' | 'diff' | null;
 
 // 'canvas' is deliberately absent: it points at one message's artifact.
-const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'knowledge']);
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'knowledge', 'diff']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';
