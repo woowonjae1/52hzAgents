@@ -28,7 +28,6 @@ import { stripAddressPrefix } from '@/lib/types';
 import { isComposing } from '@/lib/ime';
 import { cn } from '@/lib/utils';
 import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
-import { AgentModelSwitcher } from './agent-model-switcher';
 import { isDraftSessionId } from '@/lib/workspace-context';
 import type { WorkspaceMessage, WorkspaceAgent, WorkspaceSession } from '@/lib/types';
 import type { GitStatus } from '@/lib/use-git-status';
@@ -241,16 +240,6 @@ export function ChannelHeader({
             </button>
           </Hint>
         )}
-
-        <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
-
-        {/* Real-time Agent & Model Switcher (Claude Desktop Control Bar) */}
-        <AgentModelSwitcher
-          agentName={currentSession?.master || activeHeaderAgents[0] || (agents[0]?.agentName ?? 'default')}
-          participants={sessionParticipants.length > 0 ? sessionParticipants : undefined}
-          sessionId={currentSessionId}
-          className="h-7 text-xs px-2.5 bg-surface2/80 hover:bg-surface3 border-border/70 max-w-[190px] sm:max-w-[240px]"
-        />
 
         <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
 

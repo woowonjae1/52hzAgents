@@ -21,6 +21,7 @@ import { useGitStatus, type GitFileChange } from '@/lib/use-git-status';
 import { copyWithToast } from '@/lib/desktop';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 function StatusBadge({ status }: { status: string }) {
   const isAdded = status === 'A' || status === '?';
@@ -53,6 +54,9 @@ export function DiffStudioPanel() {
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [discarding, setDiscarding] = useState<string | null>(null);
+  const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
+  const [confirmDiscardAll, setConfirmDiscardAll] = useState(false);
 
   useEffect(() => {
     if (files.length > 0 && (!selectedPath || !files.some((f) => f.path === selectedPath))) {
@@ -110,6 +114,43 @@ export function DiffStudioPanel() {
     }
   };
 
+  const handleDiscardFile = async (path: string) => {
+    if (!serverSessionId || !path || discarding) return;
+    setDiscarding(path);
+    try {
+      await workspaceApi.discardGitChanges(serverSessionId, [path]);
+      const name = path.split(/[/\\]/).pop() || path;
+      toast.success(`Discarded changes to ${name}`);
+      setDiffCache((prev) => {
+        const next = { ...prev };
+        delete next[path];
+        return next;
+      });
+      await refreshGit();
+    } catch (err) {
+      toast.error(`Failed to discard changes: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDiscarding(null);
+      setConfirmDiscardPath(null);
+    }
+  };
+
+  const handleDiscardAll = async () => {
+    if (!serverSessionId || files.length === 0 || discarding) return;
+    setDiscarding('all');
+    try {
+      await workspaceApi.discardGitChanges(serverSessionId, files.map((f) => f.path));
+      toast.success(`Discarded all changes across ${files.length} file(s)`);
+      setDiffCache({});
+      await refreshGit();
+    } catch (err) {
+      toast.error(`Failed to discard changes: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDiscarding(null);
+      setConfirmDiscardAll(false);
+    }
+  };
+
   const currentDiff = diffCache[selectedPath] || '';
   const isFileLoading = loadingFile === selectedPath;
 
@@ -164,7 +205,19 @@ export function DiffStudioPanel() {
             +{gitStatus.additions} -{gitStatus.deletions}
           </span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {files.length > 0 && (
+            <Hint label="Discard all modified files">
+              <button
+                type="button"
+                onClick={() => setConfirmDiscardAll(true)}
+                disabled={Boolean(discarding)}
+                className="px-2 py-1 rounded-md text-3xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Discard All
+              </button>
+            </Hint>
+          )}
           {selectedPath && (
             <Hint label={copied ? 'Copied' : 'Copy diff'}>
               <button
@@ -213,6 +266,27 @@ export function DiffStudioPanel() {
         })}
       </div>
 
+      {/* Active File Review Bar */}
+      {selectedPath && (
+        <div className="flex items-center justify-between px-3.5 py-1.5 bg-surface1/50 border-b border-border/50 text-2xs select-none shrink-0">
+          <div className="flex items-center gap-1.5 font-mono text-foreground-muted truncate min-w-0">
+            <FileCode2 className="size-3.5 text-foreground-extra-muted shrink-0" />
+            <span className="truncate">{selectedPath}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setConfirmDiscardPath(selectedPath)}
+              disabled={Boolean(discarding)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-3xs font-medium disabled:opacity-50"
+            >
+              <Undo2 className="size-3" />
+              <span>Discard File</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Diff Inspector Content */}
       <div className="flex-1 min-h-0 overflow-y-auto p-3">
         {isFileLoading ? (
@@ -231,6 +305,32 @@ export function DiffStudioPanel() {
           </div>
         )}
       </div>
+
+      {/* Confirm Discard Single File */}
+      <ConfirmDialog
+        open={Boolean(confirmDiscardPath)}
+        onOpenChange={(v) => { if (!v) setConfirmDiscardPath(null); }}
+        title="Discard File Changes?"
+        description={`This will permanently revert all pending modifications in "${confirmDiscardPath ? confirmDiscardPath.split(/[/\\]/).pop() : ''}" back to the repository baseline.`}
+        confirmLabel="Discard File"
+        variant="destructive"
+        isLoading={discarding === confirmDiscardPath}
+        onConfirm={() => {
+          if (confirmDiscardPath) return handleDiscardFile(confirmDiscardPath);
+        }}
+      />
+
+      {/* Confirm Discard All Files */}
+      <ConfirmDialog
+        open={confirmDiscardAll}
+        onOpenChange={setConfirmDiscardAll}
+        title="Discard All Changes?"
+        description={`This will permanently revert all ${files.length} modified file(s) in this workspace back to the repository baseline. This action cannot be undone.`}
+        confirmLabel="Discard All Changes"
+        variant="destructive"
+        isLoading={discarding === 'all'}
+        onConfirm={handleDiscardAll}
+      />
     </div>
   );
 }

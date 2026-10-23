@@ -1325,20 +1325,6 @@ export function PromptComposer({
                   Add Context
                 </DropdownMenuLabel>
 
-                {/* Media */}
-                <DropdownMenuItem
-                  onClick={() => fileInputRef.current?.click()}
-                  className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium"
-                >
-                  <ImageIcon className="size-4 text-muted-foreground shrink-0" />
-                  <span>Media</span>
-                  {pendingFiles.length > 0 && (
-                    <span className="ms-auto text-[10px] bg-primary/10 text-primary font-medium px-1.5 py-0.5 rounded-full">
-                      {pendingFiles.length}
-                    </span>
-                  )}
-                </DropdownMenuItem>
-
                 {/* Folder */}
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">

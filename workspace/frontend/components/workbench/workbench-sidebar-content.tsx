@@ -327,18 +327,18 @@ export function WorkbenchSidebarContent() {
               if (isMobile) openMobileDetail();
             }}
             className={cn(
-              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
               viewMode === 'home'
                 ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <Bot className="size-3.5 text-blue-500 shrink-0" />
+              <Bot className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
               <span className="truncate">Agent Team</span>
             </div>
-            <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-status-success/15 text-status-success border border-status-success/20">
-              <span className="size-1.5 rounded-full bg-status-success animate-pulse" />
+            <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-surface3 text-foreground-muted border border-border/40 font-mono">
+              <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
               <span>{onlineAgentsCount} online</span>
             </span>
           </button>
@@ -350,14 +350,14 @@ export function WorkbenchSidebarContent() {
               if (isMobile) openMobileDetail();
             }}
             className={cn(
-              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
               viewMode === 'skills'
                 ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <Blocks className="size-3.5 text-amber-500 shrink-0" />
+              <Blocks className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
               <span className="truncate">Skills & MCP</span>
             </div>
           </button>
@@ -369,14 +369,14 @@ export function WorkbenchSidebarContent() {
               if (isMobile) openMobileDetail();
             }}
             className={cn(
-              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer',
+              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
               viewMode === 'tasks'
                 ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
                 : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
             )}
           >
             <div className="flex items-center gap-2 min-w-0">
-              <Clock3 className="size-3.5 text-purple-500 shrink-0" />
+              <Clock3 className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
               <span className="truncate">Tasks & Automations</span>
             </div>
           </button>
