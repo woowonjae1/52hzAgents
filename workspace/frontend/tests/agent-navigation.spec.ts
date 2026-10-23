@@ -88,4 +88,25 @@ test('Workbench Navigation: Seamless round-trip between Chat Sessions and Agent 
     await page.waitForTimeout(500);
     await expect(agentTeamHeading).toBeVisible();
   }
+
+  // 5. Navigate to Skills & MCP
+  const skillsBtn = page.locator('nav[aria-label="Workbench destinations"] button:has-text("Skills & MCP")');
+  await expect(skillsBtn).toBeVisible();
+  await skillsBtn.click();
+  await page.waitForTimeout(500);
+  await expect(page.locator('text=Skill Hub')).toBeVisible();
+
+  // 6. Navigate to Tasks & Automations
+  const tasksBtn = page.locator('nav[aria-label="Workbench destinations"] button:has-text("Tasks & Automations")');
+  await expect(tasksBtn).toBeVisible();
+  await tasksBtn.click();
+  await page.waitForTimeout(500);
+  await expect(page.locator('text=Tasks & Automations')).toBeVisible();
+
+  // 7. Return to Sessions
+  const sessionsBtn = page.locator('nav[aria-label="Workbench destinations"] button:has-text("Sessions")');
+  await expect(sessionsBtn).toBeVisible();
+  await sessionsBtn.click();
+  await page.waitForTimeout(500);
+  await expect(page.locator('textarea[placeholder*="Message 52hzAgents"]')).toBeVisible();
 });
