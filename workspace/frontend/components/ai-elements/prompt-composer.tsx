@@ -1087,8 +1087,8 @@ export function PromptComposer({
             mechanisms for the same edge; the replication drops all three.
           */
           'relative w-full rounded-2xl overflow-hidden transition-all duration-200',
-          'bg-background shadow-xs hover:shadow-sm focus-within:shadow-md',
-          'border border-border/80 focus-within:border-brand/70 focus-within:ring-2 focus-within:ring-brand/15',
+          'bg-surface1/85 dark:bg-surface1/60 backdrop-blur-md shadow-xs hover:shadow-sm focus-within:shadow-md',
+          'border border-border/70 dark:border-white/[0.08] focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10',
           isDragging && 'border-primary ring-2 ring-primary/20'
         )}
       >
@@ -1235,11 +1235,11 @@ export function PromptComposer({
           }
           disabled={disabled}
           rows={1}
-          className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent px-2 pt-1.5 pb-1 text-sm leading-6 text-foreground placeholder:text-muted-foreground/55 focus:outline-hidden disabled:opacity-50 min-h-[38px]"
+          className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent px-3 pt-2.5 pb-1 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-hidden disabled:opacity-50 min-h-[40px]"
         />
 
         {/* Bottom Control Row */}
-        <div className="mt-1 flex min-h-8 items-center justify-between gap-1.5 px-2 pb-1 overflow-x-auto scrollbar-hide flex-nowrap">
+        <div className="mt-0.5 flex min-h-8 items-center justify-between gap-1.5 px-2.5 pb-2 overflow-x-auto scrollbar-hide flex-nowrap">
           <div className="flex items-center gap-1.5 min-w-0 shrink flex-nowrap overflow-x-auto scrollbar-hide">
             <AgentModelSwitcher
               agentName={masterAgentName}
