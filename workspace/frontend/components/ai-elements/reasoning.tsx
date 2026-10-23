@@ -72,11 +72,15 @@ export function Reasoning({
           <ThinkingShimmer duration={1.8} className="text-foreground font-medium tracking-tight">
             Thinking…
           </ThinkingShimmer>
+        ) : durationText ? (
+          <span>
+            Thought for <span className="tabular-nums font-mono text-xs text-foreground-muted">{durationText}</span>
+          </span>
         ) : (
           'Thought'
         )
       }
-      meta={!isStreaming && notablyLong ? durationText ?? undefined : undefined}
+      meta={undefined}
       startTime={startTime}
       state={isStreaming ? 'running' : 'idle'}
       defaultOpen={defaultExpanded}
