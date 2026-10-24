@@ -1216,11 +1216,13 @@ export function PromptComposer({
         {/* Textarea Card — the ONLY bordered element (cdesktop ChatBoxBase) */}
         <div
           className={cn(
-            'relative rounded-[10px] border bg-white pl-3.5 pr-9 py-2.5 dark:bg-surface1 transition-colors',
+            'relative rounded-lg border pl-3.5 pr-9 py-2.5 transition-all duration-150',
+            'bg-surface1/90 backdrop-blur-md shadow-xs',
+            'dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_1px_3px_0_rgba(0,0,0,0.35)]',
             reviewCommentCount > 0
-              ? 'border-brand bg-brand/[0.04]'
-              : 'border-border focus-within:border-foreground/30',
-            isWorking && 'border-brand/50 ring-1 ring-brand/15'
+              ? 'border-brand bg-brand/[0.05] ring-1 ring-brand/20'
+              : 'border-border/80 focus-within:border-brand/60 focus-within:ring-1 focus-within:ring-brand/20',
+            isWorking && 'border-brand/50 ring-1 ring-brand/25'
           )}
         >
           <textarea
@@ -1248,7 +1250,7 @@ export function PromptComposer({
             }
             disabled={disabled}
             rows={1}
-            className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-hidden disabled:opacity-50 min-h-[28px]"
+            className="scrollbar-hide block w-full resize-none overflow-y-auto bg-transparent text-xs sm:text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-hidden disabled:opacity-50 min-h-[28px]"
           />
 
           {/* Bottom-right overlay inside textarea card (cdesktop editorOverlay) */}
@@ -1556,9 +1558,9 @@ export function PromptComposer({
                     disabled={!canSend}
                     className={cn(
                       'relative flex items-center justify-center size-7 rounded-md shrink-0',
-                      'transition-all duration-150 select-none active:scale-95',
+                      'transition-all duration-150 select-none active:scale-95 desktop-tactile',
                       canSend
-                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-xs cursor-pointer'
+                        ? 'bg-brand text-brand-foreground hover:bg-brand-hover shadow-xs cursor-pointer dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.25)]'
                         : 'bg-transparent text-foreground-extra-muted/40 cursor-not-allowed'
                     )}
                     aria-label={isWorking ? 'Queue message' : 'Send message'}
