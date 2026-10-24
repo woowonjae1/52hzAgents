@@ -243,7 +243,7 @@ export function DiffBlock({
   }
 
   return (
-    <div className="my-3 overflow-hidden rounded-xl border border-border bg-surface0 font-mono text-xs shadow-xs">
+    <div className="my-2.5 overflow-hidden rounded-lg border border-border/80 bg-surface0 font-mono text-xs shadow-xs dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_1px_3px_0_rgba(0,0,0,0.35)]">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 h-9 bg-surface1/60 border-b border-border select-none">
         <button

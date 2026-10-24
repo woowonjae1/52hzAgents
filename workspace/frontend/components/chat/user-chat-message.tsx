@@ -87,8 +87,8 @@ export const UserChatMessage = memo(function UserChatMessage({
             <div className="max-w-[82%] flex flex-col items-end">
               <div
                 className={cn(
-                  'relative rounded-2xl px-3.5 py-2.5 text-sm leading-6',
-                  'bg-bubble-user text-bubble-user-foreground',
+                  'relative rounded-xl px-3.5 py-2 text-xs sm:text-[13px] leading-relaxed shadow-xs',
+                  'bg-bubble-user text-bubble-user-foreground dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.15)]',
                   '[&_p]:text-bubble-user-foreground [&_li]:text-bubble-user-foreground',
                   '[&_ul]:text-bubble-user-foreground [&_ol]:text-bubble-user-foreground',
                   '[&_h1]:text-bubble-user-foreground [&_h2]:text-bubble-user-foreground [&_h3]:text-bubble-user-foreground [&_h4]:text-bubble-user-foreground',

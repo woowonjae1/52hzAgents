@@ -262,8 +262,8 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
   };
 
   return (
-    <div className="not-prose my-3 overflow-hidden rounded-lg border border-border/70 bg-surface3 text-foreground font-mono">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-surface4/70 text-3xs font-medium text-foreground-muted select-none border-b border-border/50">
+    <div className="not-prose my-2.5 overflow-hidden rounded-md border border-border/80 bg-surface1 text-foreground font-mono shadow-xs dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_1px_3px_0_rgba(0,0,0,0.4)]">
+      <div className="flex items-center justify-between px-3 py-1 bg-surface2/70 text-3xs font-medium text-foreground-muted select-none border-b border-border/60">
         <div className="flex items-center gap-2 min-w-0">
           {filename ? (
             <div className="flex items-center gap-1.5 text-foreground font-medium truncate">
@@ -271,17 +271,17 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
               <span className="truncate">{filename}</span>
             </div>
           ) : (
-            <span className="font-mono uppercase tracking-wider font-semibold text-foreground/80">{language}</span>
+            <span className="font-mono uppercase tracking-wider font-semibold text-foreground/85 text-[11px]">{language}</span>
           )}
-          <span className="text-muted-foreground/60 text-3xs">({lineCount} line{lineCount === 1 ? '' : 's'})</span>
+          <span className="text-muted-foreground/60 text-3xs tabular-nums">({lineCount} line{lineCount === 1 ? '' : 's'})</span>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => setWrapLines((w) => !w)}
             className={cn(
-              "px-1.5 py-0.5 rounded text-3xs font-sans font-medium transition-colors cursor-pointer",
-              wrapLines ? "bg-primary/10 text-primary" : "hover:bg-surface3 text-foreground-muted hover:text-foreground"
+              "px-1.5 py-0.5 rounded text-3xs font-sans font-medium transition-colors desktop-tactile cursor-pointer border",
+              wrapLines ? "bg-primary/10 text-primary border-primary/30" : "bg-transparent border-transparent text-foreground-muted hover:text-foreground hover:bg-surface3"
             )}
             title={wrapLines ? "Disable line wrap" : "Enable line wrap"}
           >
@@ -290,7 +290,7 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
           <button
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-surface3 dark:hover:bg-white/10 hover:text-foreground transition-colors text-3xs font-sans font-medium cursor-pointer"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-border/50 bg-surface2/60 hover:bg-surface3 hover:text-foreground transition-all desktop-tactile text-3xs font-sans font-medium cursor-pointer"
           >
             {copied ? <Check className="size-3 text-status-success" /> : <Copy className="size-3" />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
@@ -303,21 +303,21 @@ function IdeCodeBlock({ children, language, filename, rawCodeText }: IdeCodeBloc
           expanded ? "max-h-none overflow-y-auto" : "max-h-[350px] overflow-hidden"
         )}
       >
-        <pre className={cn("p-3.5 text-[12.5px] leading-[1.6] font-mono bg-transparent selection:bg-primary/20", wrapLines ? "whitespace-pre-wrap break-all" : "whitespace-pre")}>
+        <pre className={cn("p-3.5 text-xs leading-[1.55] font-mono bg-transparent selection:bg-primary/20", wrapLines ? "whitespace-pre-wrap break-all" : "whitespace-pre")}>
           {children}
         </pre>
         {isLong && !expanded && (
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface3 to-transparent pointer-events-none flex items-end justify-center pb-2" />
+          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-surface1 to-transparent pointer-events-none flex items-end justify-center pb-2" />
         )}
       </div>
       {isLong && (
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-sans font-medium text-foreground-muted hover:text-foreground bg-surface4/40 hover:bg-surface4/70 border-t border-border/40 transition-colors cursor-pointer"
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-sans font-medium text-foreground-muted hover:text-foreground bg-surface2/40 hover:bg-surface2/70 border-t border-border/40 transition-colors desktop-tactile cursor-pointer"
         >
           {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-          <span>{expanded ? 'Collapse code' : `Show all ${lineCount} lines`}</span>
+          <span className="tabular-nums">{expanded ? 'Collapse code' : `Show all ${lineCount} lines`}</span>
         </button>
       )}
     </div>
