@@ -26,19 +26,16 @@ import { cn } from '@/lib/utils';
  */
 export const headerChipClass = cn(
   'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-2xs font-medium select-none',
-  'border border-border text-foreground bg-surface2/80 hover:bg-surface3/90',
-  'ui-transition duration-200',
+  'border border-border/80 text-foreground bg-surface2/70 hover:bg-surface3/90',
+  'ui-transition duration-150 desktop-tactile',
   'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
 );
 
 /**
- * The two icon buttons at the end of the same row. Square, so they read as
- * actions against the pills that report. Both were already `size-7.5
- * rounded-lg`; this is here so the pair cannot drift apart the way the chips
- * did, and so the active state is written once.
+ * The icon buttons at the end of the header row. Precision corners, tactile press.
  */
 export const headerIconButtonClass = cn(
-  'size-7.5 rounded-lg flex items-center justify-center transition-colors',
-  'text-foreground-muted hover:text-foreground hover:bg-surface2',
+  'size-7.5 rounded-md flex items-center justify-center transition-all duration-150 desktop-tactile',
+  'text-foreground-muted hover:text-foreground hover:bg-surface2/80 active:bg-surface3',
   'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring',
 );

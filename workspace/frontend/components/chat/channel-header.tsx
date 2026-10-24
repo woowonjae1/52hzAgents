@@ -140,56 +140,51 @@ export function ChannelHeader({
           />
         ) : (
           <Hint label="Click to rename">
-            <div className="flex min-w-0 flex-col cursor-pointer" onClick={startEditingTitle}>
-              <div className="flex items-center gap-1.5 min-w-0">
-                <h2 className="truncate text-sm font-semibold tracking-tight text-foreground transition-colors hover:text-foreground-muted">
-                  {currentSession?.title && !['new channel', 'new session', 'untitled', 'new chat', 'untitled channel', '新频道'].includes(currentSession.title.trim().toLowerCase())
-                    ? stripTitleMentions(currentSession.title)
-                    : (currentSessionId && !isDraftSessionId(currentSessionId) ? 'Session' : 'New Session')}
-                </h2>
-                {currentSession?.master && (
-                  <span
-                    className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0"
-                    title={`Master agent: ${currentSession.master}`}
-                  >
-                    <Crown className="size-2.5" />
-                    <span>{currentSession.master}</span>
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground">
-                {currentSessionWorkingDir && (
-                  <>
-                    <span className="truncate">{basename(currentSessionWorkingDir)}</span>
-                    <span className="text-foreground-extra-muted">·</span>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openSettings('agents');
-                  }}
-                  className="inline-flex items-center gap-1 hover:text-foreground hover:underline transition-colors cursor-pointer select-none"
-                  title="Open Agents Management"
+            <div className="flex min-w-0 items-center gap-2 cursor-pointer group" onClick={startEditingTitle}>
+              <h2 className="truncate text-xs font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
+                {currentSession?.title && !['new channel', 'new session', 'untitled', 'new chat', 'untitled channel', '新频道'].includes(currentSession.title.trim().toLowerCase())
+                  ? stripTitleMentions(currentSession.title)
+                  : (currentSessionId && !isDraftSessionId(currentSessionId) ? 'Session' : 'New Session')}
+              </h2>
+              {currentSession?.master && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0"
+                  title={`Master agent: ${currentSession.master}`}
                 >
-                  <span className="size-1.5 rounded-full bg-status-success animate-pulse shrink-0" />
-                  <span>
-                    {(() => {
-                      const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
-                      if (activeHeaderAgents.length > 0) {
-                        return activeHeaderAgents.length === total
-                          ? `${total} agent${total > 1 ? 's' : ''}`
-                          : `${activeHeaderAgents.length}/${total} online`;
-                      }
-                      if (total > 0) {
-                        return `${total} agent${total > 1 ? 's' : ''} (offline)`;
-                      }
-                      return 'no agents configured';
-                    })()}
-                  </span>
-                </button>
-              </div>
+                  <Crown className="size-2.5" />
+                  <span>{currentSession.master}</span>
+                </span>
+              )}
+              {currentSessionWorkingDir && (
+                <span className="hidden lg:inline-flex text-[11px] font-mono text-foreground-extra-muted truncate max-w-[120px]">
+                  · {basename(currentSessionWorkingDir)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openSettings('agents');
+                }}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface2/60 hover:bg-surface3 border border-border/60 text-[10.5px] font-medium text-foreground-muted hover:text-foreground transition-all desktop-tactile cursor-pointer select-none shrink-0"
+                title="Open Agents Management"
+              >
+                <span className="size-1.5 rounded-full bg-status-success animate-pulse shrink-0" />
+                <span>
+                  {(() => {
+                    const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
+                    if (activeHeaderAgents.length > 0) {
+                      return activeHeaderAgents.length === total
+                        ? `${total} agent${total > 1 ? 's' : ''}`
+                        : `${activeHeaderAgents.length}/${total} online`;
+                    }
+                    if (total > 0) {
+                      return `${total} agent${total > 1 ? 's' : ''} (offline)`;
+                    }
+                    return 'no agents configured';
+                  })()}
+                </span>
+              </button>
             </div>
           </Hint>
         )}
