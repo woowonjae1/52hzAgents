@@ -3,14 +3,48 @@
 import { Hint } from '@/components/ui/hint';
 import React, { useState } from 'react';
 import type { RoutineItem, TodoItem, TodoPriority, TodoStatus } from '@/lib/types';
+import { useWorkspace } from '@/lib/workspace-context';
+import { useLayout } from '@/components/layout/layout-context';
 import { PrioritySelector } from './priority-selector';
 import { RowActions } from '@/components/ui/row-actions';
 import { StatusSelector, StatusGlyph } from './status-selector';
 import { formatAbsolute, timeAgo } from '@/lib/schedule-format';
 import { cn } from '@/lib/utils';
-import { Plus, Pencil, Trash2, User, Hash, Clock, CalendarClock, TriangleAlert, Copy } from 'lucide-react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  User,
+  Hash,
+  Clock,
+  CalendarClock,
+  TriangleAlert,
+  Copy,
+  MessageSquare,
+  CheckSquare,
+  Sparkles,
+  Search,
+} from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { getTaskFailureReason } from './tasks-view';
+
+interface SubTaskItem {
+  done: boolean;
+  text: string;
+}
+
+function parseSubTasks(content: string): SubTaskItem[] {
+  if (!content) return [];
+  const lines = content.split('\n');
+  const items: SubTaskItem[] = [];
+  for (const l of lines) {
+    const m = l.match(/^[-*]\s*\[([ xX])\]\s*(.+)$/);
+    if (m) {
+      items.push({ done: m[1].toLowerCase() === 'x', text: m[2].trim() });
+    }
+  }
+  return items;
+}
 
 interface TasksBoardProps {
   tasks: TodoItem[];
@@ -56,6 +90,9 @@ export function TasksBoard({
   onQuickCreate,
   now,
 }: TasksBoardProps) {
+  const { setCurrentSessionId } = useWorkspace();
+  const { setViewMode } = useLayout();
+
   // Build columns based on grouping
   const columns: BoardColumn[] = React.useMemo(() => {
     if (grouping === 'status' || grouping === 'none') {
@@ -64,13 +101,19 @@ export function TasksBoard({
           id: 'pending',
           title: 'Todo',
           glyph: <StatusGlyph status="pending" className="size-3.5" />,
-          tasks: tasks.filter((t) => t.status === 'pending'),
+          tasks: tasks.filter((t) => t.status === 'pending' && !(t.labels || []).includes('review')),
         },
         {
           id: 'in_progress',
           title: 'In Progress',
           glyph: <StatusGlyph status="in_progress" className="size-3.5" />,
-          tasks: tasks.filter((t) => t.status === 'in_progress'),
+          tasks: tasks.filter((t) => t.status === 'in_progress' && !(t.labels || []).includes('review')),
+        },
+        {
+          id: 'in_review',
+          title: 'In Review',
+          glyph: <CheckSquare className="size-3.5 text-indigo-400" />,
+          tasks: tasks.filter((t) => (t.labels || []).includes('review') || (t.labels || []).includes('verify')),
         },
         {
           id: 'completed',
@@ -150,6 +193,8 @@ export function TasksBoard({
     if (grouping === 'status' || grouping === 'none') {
       if (['pending', 'in_progress', 'completed', 'cancelled'].includes(targetColumnId)) {
         onUpdateStatus(task, targetColumnId as TodoStatus);
+      } else if (targetColumnId === 'in_review') {
+        onUpdateStatus(task, 'in_progress');
       }
     }
   };
@@ -259,6 +304,34 @@ export function TasksBoard({
                       </Hint>
                     )}
 
+                    {/* Subtasks Progress Bar */}
+                    {(() => {
+                      const subtasks = parseSubTasks(task.content);
+                      if (subtasks.length === 0) return null;
+                      const doneCount = subtasks.filter((s) => s.done).length;
+                      const percent = Math.round((doneCount / subtasks.length) * 100);
+                      return (
+                        <div className="mt-2.5 pt-2 border-t border-border/40 space-y-1.5">
+                          <div className="flex items-center justify-between text-3xs text-foreground-extra-muted">
+                            <span className="flex items-center gap-1 font-mono">
+                              <CheckSquare className="size-2.5 text-primary" />
+                              {doneCount}/{subtasks.length} subtasks
+                            </span>
+                            <span className="font-mono text-3xs font-medium text-foreground-muted">{percent}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-surface3 rounded-full overflow-hidden">
+                            <div
+                              className={cn(
+                                'h-full rounded-full transition-all duration-300',
+                                percent === 100 ? 'bg-emerald-500' : 'bg-primary'
+                              )}
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Bottom Row: Stacked Badges with Hover Fan-Out */}
                     <div className="mt-3 pt-2 border-t border-border/60 flex items-center justify-between text-3xs text-foreground-extra-muted">
                       <div className="flex items-center -space-x-3 hover:space-x-1.5 ui-transition duration-200">
@@ -278,13 +351,19 @@ export function TasksBoard({
                           </Hint>
                         )}
                         {task.channelName && (
-                          <Hint label={`Session: ${task.channelName}`}>
-                            <span
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface3 border border-border/60 font-medium text-foreground-muted truncate max-w-[100px]"
+                          <Hint label={`Jump to session: ${task.channelName}`}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setCurrentSessionId(task.channelName!);
+                                setViewMode('threads');
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-surface3 hover:bg-surface3/80 hover:text-primary border border-border/60 font-medium text-foreground-muted truncate max-w-[110px] transition-colors"
                             >
                               <Hash className="size-2.5 text-foreground-extra-muted shrink-0" />
-                              {task.channelName}
-                            </span>
+                              <span className="truncate">{task.channelName}</span>
+                            </button>
                           </Hint>
                         )}
                         {task.assignee && (
