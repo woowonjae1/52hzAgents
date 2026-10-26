@@ -75,6 +75,10 @@ export function WorkspaceLoadingScreen() {
       aria-label="Opening workspace"
     >
       <div
+        className="hidden md:flex shrink-0 flex-col bg-surface-sidebar dark:bg-[#0c0d12] border-e border-border-chrome"
+        style={{ width: 'var(--dock-width, 48px)' }}
+      />
+      <div
         className="hidden md:flex shrink-0 flex-col bg-surface-sidebar border-e border-border-chrome"
         style={{ width: 'var(--sidebar-width)' }}
       >

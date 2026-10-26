@@ -19,6 +19,7 @@ import { LocalPreview } from '@/components/preview/local-preview';
 import { DiffStudioPanel } from './diff-studio-panel';
 import { SessionGrid } from './session-grid';
 import { ReviewProvider } from '@/lib/review-context';
+import { DesktopAppBar } from '@/components/layout/desktop-app-bar';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
 import { X, FileText, Globe, BookOpen, PanelLeft, FileDiff } from 'lucide-react';
@@ -72,6 +73,9 @@ export function WorkbenchLayout({
         ref={desktopContainerRef}
         className="app-root-container workbench-root flex h-screen h-dvh w-full bg-surface0 overflow-hidden select-none [&_.container-fluid]:px-5"
       >
+      {/* ── Far-Left Project & System Dock (cdesktop AppBar) ── */}
+      <DesktopAppBar />
+
       {/* ── Left Pane: Collapsible Workbench Sidebar ── */}
       {shouldShowSidebar && <Sidebar />}
 
@@ -81,6 +85,13 @@ export function WorkbenchLayout({
         data-studio-open={isStudioOpen ? 'true' : 'false'}
       >
         <div className="flex grow min-h-0 h-full overflow-hidden relative">
+          {/* Dock spacer standing in for the fixed 48px DesktopAppBar */}
+          <div
+            className="hidden md:block shrink-0"
+            style={{ width: 'var(--dock-width, 48px)' }}
+            aria-hidden="true"
+          />
+
           {/* Invisible spacer standing in for the fixed sidebar to ensure smooth layout shifts */}
           {shouldShowSidebar && (
             <div

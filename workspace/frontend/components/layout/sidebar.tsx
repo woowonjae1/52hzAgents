@@ -87,12 +87,14 @@ export function Sidebar() {
     };
     const onMove = (event: PointerEvent) => {
       hasMoved = true;
-      // The sidebar is pinned to the start edge, so clientX *is* the width.
+      const dockOffset =
+        parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dock-width') || '0', 10) || 0;
+      const effectiveX = event.clientX - dockOffset;
       // If dragged past collapse threshold (< 140px), snap to 0 to signal collapse
-      if (event.clientX < 140) {
+      if (effectiveX < 140) {
         pending = 0;
       } else {
-        pending = clampSidebarWidth(event.clientX);
+        pending = clampSidebarWidth(effectiveX);
       }
       if (!frame) frame = requestAnimationFrame(flush);
     };
@@ -214,7 +216,7 @@ export function Sidebar() {
           it that rides alongside the header is not a visible seam the way a
           hairline is.
         */
-        'fixed overflow-hidden bg-surface-sidebar shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_10px_-2px_rgba(0,0,0,0.55)] top-[var(--titlebar-height)] bottom-0 start-0 z-20 flex flex-col shrink-0',
+        'fixed overflow-hidden bg-surface-sidebar shadow-[2px_0_4px_-1px_rgba(0,0,0,0.05)] dark:shadow-[3px_0_10px_-2px_rgba(0,0,0,0.55)] top-[var(--titlebar-height)] bottom-0 start-0 md:start-[var(--dock-width,48px)] z-20 flex flex-col shrink-0',
         "after:absolute after:end-0 after:bottom-0 after:w-px after:bg-border-chrome after:content-[''] after:top-[var(--header-height)]",
         !isSidebarOpen && 'after:hidden',
         // No width transition mid-drag, or the edge visibly lags the cursor.

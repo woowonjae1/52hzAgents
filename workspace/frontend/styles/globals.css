@@ -871,6 +871,7 @@ html {
    same markup serves both without a single `isDesktop &&` in a className.
 */
 :root {
+  --dock-width: 48px;
   --sidebar-width: 320px;
   --sidebar-width-collapsed: 52px;
   --titlebar-height: 0px;
@@ -882,6 +883,12 @@ html {
      the shell settles in ~150ms and individual controls faster still. */
   --shell-duration: 150ms;
   --shell-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (max-width: 767px) {
+  :root {
+    --dock-width: 0px;
+  }
 }
 
 :root[data-desktop] {
