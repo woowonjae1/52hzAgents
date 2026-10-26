@@ -56,11 +56,12 @@ function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTa
 // 'preview' — a dev server on this machine; 'file' — the thread's files;
 // 'canvas' — the active markdown / code / artifact deliverable;
 // 'knowledge' — workspace knowledge base and references;
-// 'diff' — git changes and file diff inspector.
-export type RightPanelTab = 'preview' | 'file' | 'canvas' | 'knowledge' | 'diff' | null;
+// 'diff' — git changes and file diff inspector;
+// 'terminal' — interactive multi-tab terminal drawer.
+export type RightPanelTab = 'preview' | 'file' | 'canvas' | 'knowledge' | 'diff' | 'terminal' | null;
 
 // 'canvas' is deliberately absent: it points at one message's artifact.
-const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'knowledge', 'diff']);
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'knowledge', 'diff', 'terminal']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';

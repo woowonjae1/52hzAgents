@@ -388,6 +388,30 @@ export function DesktopAppBar() {
           </TooltipContent>
         </Tooltip>
 
+        {/* Terminal Panel Toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              data-no-drag
+              onClick={() => setActiveRightTab(activeRightTab === 'terminal' ? null : 'terminal')}
+              aria-label="Toggle Terminal Panel"
+              className={cn(
+                'size-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer active:scale-95',
+                activeRightTab === 'terminal'
+                  ? 'bg-primary/20 text-primary border border-primary/40 font-semibold'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
+              )}
+            >
+              <Terminal className="size-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" sideOffset={8}>
+            <div className="font-semibold text-xs">Terminal Panel</div>
+            <div className="text-3xs text-foreground-muted">Interactive multi-tab shell drawer</div>
+          </TooltipContent>
+        </Tooltip>
+
         {/* Local Dev Preview Toggle */}
         <Tooltip>
           <TooltipTrigger asChild>

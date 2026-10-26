@@ -17,12 +17,13 @@ import { MonitorGrid } from '@/components/monitor/monitor-grid';
 import { ArtifactsCanvas } from '@/components/canvas/artifacts-canvas';
 import { LocalPreview } from '@/components/preview/local-preview';
 import { DiffStudioPanel } from './diff-studio-panel';
+import { TerminalPanel } from './terminal-panel';
 import { SessionGrid } from './session-grid';
 import { ReviewProvider } from '@/lib/review-context';
 import { DesktopAppBar } from '@/components/layout/desktop-app-bar';
 import { Hint } from '@/components/ui/hint';
 import { cn } from '@/lib/utils';
-import { X, FileText, Globe, BookOpen, PanelLeft, FileDiff } from 'lucide-react';
+import { X, FileText, Globe, BookOpen, PanelLeft, FileDiff, Terminal } from 'lucide-react';
 
 interface WorkbenchLayoutProps {
   desktopContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -193,6 +194,19 @@ export function WorkbenchLayout({
                     </button>
                     <button
                       type="button"
+                      onClick={() => setActiveRightTab('terminal')}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
+                        effectiveStudioTab === 'terminal'
+                          ? 'bg-surface3 text-foreground font-semibold border border-border'
+                          : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
+                      )}
+                    >
+                      <Terminal className="size-3.5" />
+                      <span>Terminal</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveRightTab('preview')}
                       className={cn(
                         'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
@@ -238,6 +252,7 @@ export function WorkbenchLayout({
               <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
                 {(effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file') && <ArtifactsCanvas embedded />}
                 {effectiveStudioTab === 'diff' && <DiffStudioPanel />}
+                {effectiveStudioTab === 'terminal' && <TerminalPanel />}
                 {effectiveStudioTab === 'preview' && <LocalPreview />}
                 {effectiveStudioTab === 'knowledge' && <KnowledgeView embedded />}
               </div>
