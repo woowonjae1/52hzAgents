@@ -118,6 +118,8 @@ export function WorkbenchSidebarContent() {
     renameSession,
     updateSession,
     routines,
+    activeProjectDir,
+    setActiveProjectDir,
   } = useWorkspace();
 
   const {
@@ -175,12 +177,17 @@ export function WorkbenchSidebarContent() {
     setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  // Active sessions sorted by most recent activity
+  // Active sessions sorted by most recent activity, optionally scoped to activeProjectDir
   const validSessions = useMemo(() => {
-    return sessions
+    const unarchived = sessions
       .filter((s) => s.status !== 'deleted' && s.status !== 'archived')
       .sort((a, b) => (b.lastEventAt || 0) - (a.lastEventAt || 0));
-  }, [sessions]);
+
+    if (!activeProjectDir) {
+      return unarchived;
+    }
+    return unarchived.filter((s) => s.workingDir === activeProjectDir);
+  }, [sessions, activeProjectDir]);
 
   // Current working directory from open session or first available session
   const activeWorkingDir = useMemo(() => {
@@ -270,21 +277,23 @@ export function WorkbenchSidebarContent() {
 
   const handleStartNewSession = useCallback(async () => {
     try {
-      const s = await createSession({ workingDir: activeWorkingDir || undefined });
+      const targetDir = activeProjectDir || activeWorkingDir || undefined;
+      const s = await createSession({ workingDir: targetDir });
       setCurrentSessionId(s.sessionId);
       setViewMode('threads');
       if (isMobile) openMobileDetail();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not create new session');
     }
-  }, [createSession, activeWorkingDir, setCurrentSessionId, setViewMode, isMobile, openMobileDetail]);
+  }, [createSession, activeProjectDir, activeWorkingDir, setCurrentSessionId, setViewMode, isMobile, openMobileDetail]);
 
   const handlePickFolder = useCallback(async () => {
     if (browsingFolder) return;
     setBrowsingFolder(true);
     try {
-      const dir = await browseForFolder(activeWorkingDir || undefined);
+      const dir = await browseForFolder(activeProjectDir || activeWorkingDir || undefined);
       if (dir) {
+        setActiveProjectDir(dir);
         await createSession({ workingDir: dir });
         setViewMode('threads');
         toast.success(`Switched project workspace to ${basename(dir)}`);
@@ -704,6 +713,29 @@ export function WorkbenchSidebarContent() {
 
       {/* ── Scrollable cdesktop-style Sessions Feed ── */}
       <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-3.5 no-scrollbar">
+        {/* Active Project Scope Pill */}
+        {activeProjectDir && (
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface2/80 border border-border/60 text-2xs select-none">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <FolderGit2 className="size-3 text-primary shrink-0" />
+              <span className="font-semibold text-foreground truncate max-w-[130px]">
+                {basename(activeProjectDir)}
+              </span>
+              <span className="text-3xs font-mono text-muted-foreground">({validSessions.length})</span>
+            </div>
+            <Hint label="Clear project filter (show all sessions)">
+              <button
+                type="button"
+                onClick={() => setActiveProjectDir(null)}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-foreground-extra-muted hover:text-foreground hover:bg-surface3 transition-colors cursor-pointer"
+              >
+                <span className="text-3xs font-mono">All</span>
+                <X className="size-2.5" />
+              </button>
+            </Hint>
+          </div>
+        )}
+
         {validSessions.length === 0 ? (
           <div className="py-8 text-center text-xs text-foreground-extra-muted">
             No active sessions yet.

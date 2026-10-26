@@ -209,6 +209,9 @@ interface WorkspaceContextValue {
   updateAgentMode: (agentName: string, mode: string) => void;
   stopAllAgents: (sessionId?: string) => Promise<void>;
   setCurrentSessionId: (id: string | null, options?: { skipFocus?: boolean }) => void;
+  /** Active project folder filter for sessions in sidebar/workbench (null means universal / all projects) */
+  activeProjectDir: string | null;
+  setActiveProjectDir: (dir: string | null) => void;
   /** Read-and-clear: was the most recent setCurrentSessionId asked to skip auto-focus? */
   consumeSkipFocus: () => boolean;
   setSelectedFileId: (id: string | null) => void;
@@ -412,6 +415,17 @@ export function WorkspaceProvider({
   currentUserRef.current = currentUser;
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sessions, setSessions] = useState<WorkspaceSession[]>([]);
+  const sessionsRef = useRef<WorkspaceSession[]>(sessions);
+  sessionsRef.current = sessions;
+
+  const [activeProjectDir, _setActiveProjectDir] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return localStorage.getItem('active_project_dir') || null;
+      } catch {}
+    }
+    return null;
+  });
   const [draftSession, setDraftSession] = useState<WorkspaceSession | null>(null);
   const draftSessionRef = useRef<WorkspaceSession | null>(null);
   draftSessionRef.current = draftSession;
@@ -440,6 +454,10 @@ export function WorkspaceProvider({
         if (id && !isDraftSessionId(id)) {
           localStorage.setItem(`last_session_id_${workspaceId}`, id);
           localStorage.setItem('last_session_id', id);
+          const matched = sessionsRef.current.find((s) => s.sessionId === id);
+          if (matched?.workingDir) {
+            localStorage.setItem(`last_session_for_${matched.workingDir}`, id);
+          }
         }
       } catch {}
     }
@@ -456,6 +474,34 @@ export function WorkspaceProvider({
       document.dispatchEvent(new CustomEvent('session-selected', { detail: { sessionId: id } }));
     }
   }, [workspaceId]);
+
+  const setActiveProjectDir = useCallback((dir: string | null) => {
+    _setActiveProjectDir(dir);
+    if (typeof window !== 'undefined') {
+      try {
+        if (dir) {
+          localStorage.setItem('active_project_dir', dir);
+        } else {
+          localStorage.removeItem('active_project_dir');
+        }
+      } catch {}
+    }
+    if (dir) {
+      // Find the last active session for this project directory
+      let targetSessionId: string | null = null;
+      if (typeof window !== 'undefined') {
+        try {
+          targetSessionId = localStorage.getItem(`last_session_for_${dir}`);
+        } catch {}
+      }
+      const existingInDir = sessionsRef.current.filter((s) => s.workingDir === dir && s.status !== 'deleted' && s.status !== 'archived');
+      if (targetSessionId && existingInDir.some((s) => s.sessionId === targetSessionId)) {
+        setCurrentSessionId(targetSessionId);
+      } else if (existingInDir.length > 0) {
+        setCurrentSessionId(existingInDir[0].sessionId);
+      }
+    }
+  }, [setCurrentSessionId]);
   const consumeSkipFocus = useCallback(() => {
     const v = skipFocusRef.current;
     skipFocusRef.current = false;
@@ -2365,9 +2411,11 @@ export function WorkspaceProvider({
     setNotificationSound,
     realtimeStatus,
     reconnectRealtime,
+    activeProjectDir,
+    setActiveProjectDir,
   }), [
     workspace, workspaceId, effectiveToken, agents, setAgents, currentUser, setUserName, onlineUsers, sessions, files,
-    selectedFileId, currentSessionId, loading, error, lastMessageBySession, activeSessionIds, workingAgentNames,
+    selectedFileId, currentSessionId, activeProjectDir, setActiveProjectDir, loading, error, lastMessageBySession, activeSessionIds, workingAgentNames,
     stoppingSessionIds, completedSessionIds, monitorMode, acknowledgeCompletion, agentModes,
     updateLastMessage, setSessionActive, updateAgentMode, stopAllAgents, setCurrentSessionId,
     consumeSkipFocus, setSelectedFileId, currentFilePath, setCurrentFilePath, createSession, draftSession, materializeDraft,

@@ -147,6 +147,7 @@ export function CommandPalette() {
     setSelectedFileId,
     workspaceId,
     createSession,
+    setActiveProjectDir,
   } = useWorkspace();
 
   const activeSession = useMemo(
@@ -288,9 +289,13 @@ export function CommandPalette() {
           ),
           badge: isCurrent ? 'Active Project' : undefined,
           action: async () => {
+            setActiveProjectDir(path);
             const match = sessions.find((s) => s.workingDir === path);
             if (match) {
-              setCurrentSessionId(match.sessionId);
+              const stored = typeof window !== 'undefined' ? localStorage.getItem(`last_session_for_${path}`) : null;
+              if (!stored) {
+                setCurrentSessionId(match.sessionId);
+              }
             } else {
               const s = await createSession({ workingDir: path, title: `Workspace in ${name}` });
               setCurrentSessionId(s.sessionId);

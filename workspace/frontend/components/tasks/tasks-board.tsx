@@ -261,8 +261,8 @@ export function TasksBoard({
                     )}
                   >
                     {/* Top Row: Priority & Status Controls */}
-                    <div className="flex items-center justify-between gap-1 mb-2">
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-between gap-1 mb-2 pr-7">
+                      <div className="flex items-center gap-1.5 min-w-0">
                         <PrioritySelector
                           priority={task.priority}
                           size="sm"
@@ -425,7 +425,7 @@ export function TasksBoard({
                         a right-click into this card's own menu. */}
                     <RowActions
                       label={`Actions for ${taskRef(task)}`}
-                      className="absolute top-1 right-1"
+                      className="absolute top-2.5 right-2"
                       items={[
                         { label: 'Edit task', icon: Pencil, onSelect: () => onEdit(task) },
                         {

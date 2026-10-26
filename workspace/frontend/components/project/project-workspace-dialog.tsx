@@ -248,7 +248,7 @@ export function ProjectWorkspaceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] p-0 flex flex-col overflow-hidden bg-surface0 border-border/80 shadow-2xl rounded-2xl">
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-border/60 bg-surface1/60 shrink-0">
+        <div className="px-6 pr-14 pt-5 pb-4 border-b border-border/60 bg-surface1/60 shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0 shadow-xs">

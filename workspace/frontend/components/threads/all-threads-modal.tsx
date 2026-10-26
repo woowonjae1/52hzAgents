@@ -100,7 +100,7 @@ export function AllThreadsModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-4 pb-2 border-b border-border/60">
+        <DialogHeader className="p-4 pr-12 pb-2 border-b border-border/60">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base font-semibold">
               All Conversations ({sessions.length})

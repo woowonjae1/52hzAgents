@@ -81,6 +81,8 @@ export function DesktopAppBar() {
     createSession,
     realtimeStatus,
     reconnectRealtime,
+    activeProjectDir,
+    setActiveProjectDir,
   } = useWorkspace();
 
   const {
@@ -152,11 +154,17 @@ export function DesktopAppBar() {
   // Click on a project
   const handleSelectProject = useCallback(
     async (project: ProjectEntry) => {
-      // Find an existing session in this project
+      setActiveProjectDir(project.path);
+      setViewMode('threads');
+
+      // Check if session exists in this project
       const match = sessions.find((s) => s.workingDir === project.path);
       if (match) {
-        setCurrentSessionId(match.sessionId);
-        setViewMode('threads');
+        // Will be switched automatically by setActiveProjectDir if recorded, or switch here
+        const stored = typeof window !== 'undefined' ? localStorage.getItem(`last_session_for_${project.path}`) : null;
+        if (!stored) {
+          setCurrentSessionId(match.sessionId);
+        }
         toast.info(`Switched to project: ${project.name}`);
       } else {
         try {
@@ -165,14 +173,13 @@ export function DesktopAppBar() {
             title: `Workspace in ${project.name}`,
           });
           setCurrentSessionId(s.sessionId);
-          setViewMode('threads');
           toast.success(`Started new session in ${project.name}`);
         } catch {
           toast.error(`Could not start session in ${project.name}`);
         }
       }
     },
-    [sessions, setCurrentSessionId, setViewMode, createSession]
+    [sessions, setActiveProjectDir, setCurrentSessionId, setViewMode, createSession]
   );
 
   // Add a new project / folder
@@ -187,19 +194,22 @@ export function DesktopAppBar() {
         workingDir: dir,
         title: `Workspace in ${basename(dir)}`,
       });
+      setActiveProjectDir(dir);
       setCurrentSessionId(s.sessionId);
       setViewMode('threads');
       toast.success(`Opened project: ${basename(dir)}`);
     } catch {
       toast.error('Failed to open project folder');
     }
-  }, [activeWorkingDir, createSession, setCurrentSessionId, setViewMode]);
+  }, [activeWorkingDir, createSession, setActiveProjectDir, setCurrentSessionId, setViewMode]);
 
   // All Workspaces / Root Home click
-  const isAllWorkspacesActive = !activeWorkingDir && viewMode === 'threads';
+  const isAllWorkspacesActive = !activeProjectDir && viewMode === 'threads';
   const handleAllWorkspacesClick = useCallback(() => {
+    setActiveProjectDir(null);
     setViewMode('threads');
-  }, [setViewMode]);
+    toast.info('Viewing all sessions across all workspaces');
+  }, [setActiveProjectDir, setViewMode]);
 
   // Open Command Palette
   const handleOpenCommandPalette = useCallback(() => {
@@ -258,7 +268,7 @@ export function DesktopAppBar() {
         {/* Project Initial Squircles List */}
         <div className="flex flex-col items-center gap-1.5 w-full max-h-[36vh] overflow-y-auto no-scrollbar">
           {projects.map((p) => {
-            const isActive = activeWorkingDir === p.path;
+            const isActive = (activeProjectDir ? activeProjectDir === p.path : activeWorkingDir === p.path) && viewMode === 'threads';
             return (
               <Tooltip key={p.id}>
                 <TooltipTrigger asChild>

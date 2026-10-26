@@ -295,12 +295,14 @@ export function AgentProfilePanel() {
         'absolute top-0 right-0 bottom-0 bg-background border-l shadow-xl z-20 flex flex-col animate-in slide-in-from-right duration-200',
         isMobile ? 'left-0 w-full' : 'w-[320px]'
       )}>
-        {/* Close button */}
-        <div className="flex items-center justify-end px-3 pt-3">
-          <Hint label="Close">
+        {/* Close button with window controls inset clearance */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2 border-b border-border/40 pe-[max(1rem,var(--window-controls-inset,0px))]">
+          <span className="text-3xs font-mono font-medium text-foreground-extra-muted uppercase tracking-wider">Agent Profile</span>
+          <Hint label="Close (Esc)">
             <button
+              type="button"
               onClick={() => setSelectedAgentName(null)}
-              className="size-7 flex items-center justify-center rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors"
+              className="size-7 flex items-center justify-center rounded-md hover:bg-surface2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               <X className="size-4" />
             </button>
