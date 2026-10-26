@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useLayout, ViewMode } from './layout-context';
 import { useWorkspace } from '@/lib/workspace-context';
 import { useArtifacts } from '@/lib/artifacts-context';
+import { useGitStatus } from '@/lib/use-git-status';
 import { useTheme } from 'next-themes';
 import {
   Search,
@@ -33,8 +34,19 @@ import {
   PanelLeft,
   Users,
   House,
+  ChevronLeft,
+  GitBranch,
+  FolderGit2,
+  Columns2,
+  FileDiff,
+  Download,
+  Upload,
+  RefreshCw,
+  ArrowRight,
+  Layers,
 } from 'lucide-react';
 import { requestKnowledgeIntent } from '@/lib/knowledge-intent';
+import { browseForFolder, recentWorkingDirs, rememberWorkingDir } from '@/components/chat/project-folder-picker';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { workspaceApi } from '@/lib/api';
@@ -46,20 +58,59 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { VisuallyHidden } from 'radix-ui';
 import { isComposing } from '@/lib/ime';
 
-interface CommandItem {
+export type CommandCategory =
+  | 'All'
+  | 'Projects'
+  | 'Git'
+  | 'Navigation'
+  | 'Actions'
+  | 'Sessions'
+  | 'Files'
+  | 'Tasks'
+  | 'Knowledge';
+
+export type CommandBarPageId = 'root' | 'projects' | 'git' | 'sessions' | 'actions';
+
+export interface CommandItem {
   id: string;
-  category: 'Navigation' | 'Actions' | 'Agents' | 'Threads' | 'Files' | 'Tasks' | 'Knowledge';
+  category: CommandCategory;
   title: string;
   subtitle?: string;
   icon: React.ReactNode;
   shortcut?: string[];
-  action: () => void;
+  pageTarget?: CommandBarPageId;
+  action?: () => void;
+  badge?: string;
+}
+
+function basename(pathStr: string): string {
+  if (!pathStr) return '';
+  const parts = pathStr.replace(/\\/g, '/').split('/').filter(Boolean);
+  return parts[parts.length - 1] || pathStr;
+}
+
+function getProjectInitials(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return 'PR';
+  const clean = trimmed.replace(/^[^a-zA-Z0-9]+/, '');
+  const words = clean.split(/[\s\-_.]+/).filter(Boolean);
+  if (words.length >= 2) {
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+  }
+  return clean.slice(0, 2).toUpperCase() || 'PR';
+}
+
+function getDeterministicHsl(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 65%, 52%)`;
 }
 
 /**
- * Custom event any surface can fire to open the palette — the desktop menu
- * bar's "Command Palette…" item does, because a menu item that only works by
- * telling you the keystroke is not a menu item.
+ * Custom event any surface can fire to open the palette
  */
 export const COMMAND_PALETTE_EVENT = 'app:command-palette';
 
@@ -67,21 +118,53 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<CommandCategory>('All');
+  const [pageStack, setPageStack] = useState<CommandBarPageId[]>(['root']);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const { setViewMode, openSettings, openNewThread, setActiveRightTab, isMobile, openMobileDetail, sidebarToggle } = useLayout();
-  const { agents, currentSessionId, currentUser, sessions, files, todos, knowledge, setCurrentSessionId, setSelectedFileId, workspaceId, createSession } = useWorkspace();
+  const {
+    setViewMode,
+    openSettings,
+    openNewThread,
+    activeRightTab,
+    setActiveRightTab,
+    isMobile,
+    openMobileDetail,
+    sidebarToggle,
+  } = useLayout();
+
+  const {
+    agents,
+    currentSessionId,
+    currentUser,
+    sessions,
+    files,
+    todos,
+    knowledge,
+    setCurrentSessionId,
+    setSelectedFileId,
+    workspaceId,
+    createSession,
+  } = useWorkspace();
+
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.sessionId === currentSessionId) || null,
+    [sessions, currentSessionId]
+  );
+  const { status: gitStatus, refresh: refreshGit } = useGitStatus(
+    activeSession?.sessionId && !activeSession.sessionId.startsWith('draft-')
+      ? activeSession.sessionId
+      : null
+  );
+
   const { openOutput } = useArtifacts();
   const { theme, setTheme } = useTheme();
 
-  /*
-   * Only the open shortcut lives here now. Escape, the click-outside, the
-   * focus trap, the scroll lock and returning focus to whatever was focused
-   * before are all Radix Dialog's — see the render. This used to be a bare
-   * `fixed inset-0` div, which meant Tab walked straight out of the palette
-   * into the page behind it and the page kept scrolling under the backdrop.
-   */
+  const currentPage = pageStack[pageStack.length - 1];
+
+  // Open / Close listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -98,53 +181,203 @@ export function CommandPalette() {
     };
   }, []);
 
-  // Focus input when opened
+  // Reset state on open
   useEffect(() => {
     if (open) {
       setQuery('');
       setSelectedIndex(0);
+      setActiveCategory('All');
+      setPageStack(['root']);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
 
-  // Keep the cursor visible. Without this the list scrolled only by mouse and
-  // arrowing down past the fold moved a selection nobody could see.
+  // Keep selected row visible
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
     const row = list.querySelector<HTMLElement>('[data-palette-row][data-selected="true"]');
     row?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex, query, open]);
+  }, [selectedIndex, query, open, currentPage, activeCategory]);
 
-  const execute = useCallback((item: CommandItem) => {
-    setOpen(false);
-    item.action();
+  const pushPage = useCallback((page: CommandBarPageId) => {
+    setPageStack((prev) => [...prev, page]);
+    setQuery('');
+    setSelectedIndex(0);
   }, []);
 
-  // Build command list
-  const { allCommands, defaultCommands } = useMemo(() => {
-    /*
-     * EVERY ICON IN HERE IS `text-foreground-muted`. Do not tint them again.
-     *
-     * The palette used to hand each row its own hue — emerald Tasks, blue
-     * Mission Control, yellow Skills, amber Files, purple Knowledge, cyan
-     * Browser, rose Routines, orange Timers, indigo Inbox — thirteen colours
-     * down one column. None of them encoded anything: the destination is named
-     * in the title beside it, and the icon already distinguishes the rows by
-     * SHAPE. What the colours actually did was make a list the user scans by
-     * reading into a list the user has to look past.
-     *
-     * Four of them (`-400` steps with no light counterpart) were also authored
-     * against the dark theme only. And `text-primary`, on the three rows that
-     * used it, is not an accent at all in the light theme — `--primary` is
-     * #09090b there, the same near-black as the label next to it.
-     */
-    const nav: CommandItem[] = [
+  const popPage = useCallback(() => {
+    setPageStack((prev) => (prev.length > 1 ? prev.slice(0, prev.length - 1) : prev));
+    setQuery('');
+    setSelectedIndex(0);
+  }, []);
+
+  const execute = useCallback(
+    (item: CommandItem) => {
+      if (item.pageTarget) {
+        pushPage(item.pageTarget);
+        return;
+      }
+      if (item.action) {
+        setOpen(false);
+        item.action();
+      }
+    },
+    [pushPage]
+  );
+
+  // Recent working directories for project switching
+  const [recentDirs, setRecentDirs] = useState<string[]>([]);
+  useEffect(() => {
+    if (open) setRecentDirs(recentWorkingDirs());
+  }, [open]);
+
+  // Build complete command registry across pages
+  const { allCommands, pageCommands } = useMemo(() => {
+    // 1. Projects Items
+    const projectMap = new Map<string, { path: string; count: number }>();
+    for (const s of sessions) {
+      if (s.workingDir) {
+        const norm = s.workingDir.trim();
+        const prev = projectMap.get(norm);
+        if (prev) prev.count += 1;
+        else projectMap.set(norm, { path: norm, count: 1 });
+      }
+    }
+    for (const d of recentDirs) {
+      const norm = d.trim();
+      if (!projectMap.has(norm)) projectMap.set(norm, { path: norm, count: 0 });
+    }
+
+    const projectItems: CommandItem[] = [
+      {
+        id: 'project-open-folder',
+        category: 'Projects',
+        title: 'Open Local Folder / Repository...',
+        subtitle: 'Browse machine directories via native file picker',
+        icon: <Plus className="size-4 text-primary" />,
+        action: async () => {
+          const dir = await browseForFolder();
+          if (dir) {
+            rememberWorkingDir(dir);
+            const s = await createSession({ workingDir: dir, title: `Workspace in ${basename(dir)}` });
+            setCurrentSessionId(s.sessionId);
+            setViewMode('threads');
+            toast.success(`Opened repository: ${basename(dir)}`);
+          }
+        },
+      },
+      ...Array.from(projectMap.values()).map(({ path, count }) => {
+        const name = basename(path);
+        const isCurrent = activeSession?.workingDir === path;
+        return {
+          id: `project-${path}`,
+          category: 'Projects' as CommandCategory,
+          title: name,
+          subtitle: `${path}${count > 0 ? ` • ${count} sessions` : ''}`,
+          icon: (
+            <div
+              className="size-4 rounded-md flex items-center justify-center font-mono text-3xs font-bold"
+              style={{
+                color: getDeterministicHsl(name),
+                backgroundColor: `color-mix(in srgb, ${getDeterministicHsl(name)} 20%, transparent)`,
+              }}
+            >
+              {getProjectInitials(name)}
+            </div>
+          ),
+          badge: isCurrent ? 'Active Project' : undefined,
+          action: async () => {
+            const match = sessions.find((s) => s.workingDir === path);
+            if (match) {
+              setCurrentSessionId(match.sessionId);
+            } else {
+              const s = await createSession({ workingDir: path, title: `Workspace in ${name}` });
+              setCurrentSessionId(s.sessionId);
+            }
+            setViewMode('threads');
+            toast.info(`Switched to project: ${name}`);
+          },
+        };
+      }),
+    ];
+
+    // 2. Git Items
+    const stagedCount = gitStatus?.files?.filter((f) => f.staged).length ?? 0;
+    const unstagedCount = gitStatus?.files?.filter((f) => !f.staged).length ?? 0;
+    const gitItems: CommandItem[] = [
+      {
+        id: 'git-status-branch',
+        category: 'Git',
+        title: gitStatus?.branch ? `Current Branch: ${gitStatus.branch}` : 'Git: Check Status',
+        subtitle: gitStatus
+          ? `${stagedCount} staged, ${unstagedCount} unstaged (+${gitStatus.additions} -${gitStatus.deletions})`
+          : 'Inspect repository status in active thread',
+        icon: <GitBranch className="size-4 text-emerald-500" />,
+        action: () => {
+          setActiveRightTab('diff');
+          refreshGit();
+        },
+      },
+      {
+        id: 'git-pull',
+        category: 'Git',
+        title: 'Git: Pull Latest Changes',
+        subtitle: 'Fetch and integrate remote changes (git pull)',
+        icon: <Download className="size-4 text-foreground-muted" />,
+        action: async () => {
+          if (!activeSession) {
+            toast.error('No active session for Git operation');
+            return;
+          }
+          try {
+            toast.info('Pulling changes from remote...');
+            const res = await workspaceApi.pullGitRemote(activeSession.sessionId);
+            toast.success(res.output || 'Git pull completed');
+            refreshGit();
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Git pull failed');
+          }
+        },
+      },
+      {
+        id: 'git-push',
+        category: 'Git',
+        title: 'Git: Push Local Commits',
+        subtitle: 'Push local branch commits to remote repository (git push)',
+        icon: <Upload className="size-4 text-foreground-muted" />,
+        action: async () => {
+          if (!activeSession) {
+            toast.error('No active session for Git operation');
+            return;
+          }
+          try {
+            toast.info('Pushing commits to remote...');
+            const res = await workspaceApi.pushGitRemote(activeSession.sessionId);
+            toast.success(res.output || 'Git push completed');
+            refreshGit();
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : 'Git push failed');
+          }
+        },
+      },
+      {
+        id: 'git-diff-studio',
+        category: 'Git',
+        title: 'Git: Open Diff & Review Studio',
+        subtitle: 'Review staged/unstaged changes and inspect line-by-line diffs',
+        icon: <FileDiff className="size-4 text-foreground-muted" />,
+        action: () => setActiveRightTab('diff'),
+      },
+    ];
+
+    // 3. Navigation Items
+    const navItems: CommandItem[] = [
       {
         id: 'nav-home',
         category: 'Navigation',
-        title: 'Home',
-        subtitle: 'Set up a new session, and see what needs you',
+        title: 'Home Dashboard',
+        subtitle: 'Overview, recent activity and agent monitoring',
         icon: <House className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'H'],
         action: () => {
@@ -165,48 +398,27 @@ export function CommandPalette() {
         id: 'nav-tasks',
         category: 'Navigation',
         title: 'Tasks & Issues',
-        subtitle: 'Linear-style task tracking, as a list or a board',
+        subtitle: 'Linear-style task tracking and issue list',
         icon: <CheckSquare className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'A'],
         action: () => setViewMode('tasks'),
       },
       {
-        id: 'nav-mission',
-        category: 'Navigation',
-        title: 'Agents',
-        subtitle: 'Configure agents, check activity and start sessions',
-        icon: <Compass className="size-4 text-foreground-muted" />,
-        shortcut: ['G', 'M'],
-        action: () => setViewMode('home'),
-      },
-      {
         id: 'nav-skills',
-        shortcut: ['G', 'E'],
         category: 'Navigation',
         title: 'Skills & Capabilities',
-        subtitle: 'Manage agent tools and capabilities',
+        subtitle: 'Manage MCP tools and agent custom skills',
         icon: <Sparkles className="size-4 text-foreground-muted" />,
+        shortcut: ['G', 'E'],
         action: () => setViewMode('skills'),
       },
       {
-        id: 'nav-files',
-        shortcut: ['G', 'F'],
-        category: 'Navigation',
-        title: 'Files & Workspace Artifacts',
-        subtitle: 'Browse files and diffs',
-        icon: <Folder className="size-4 text-foreground-muted" />,
-        action: () => {
-          openOutput({ kind: 'file' });
-          setActiveRightTab('canvas');
-        },
-      },
-      {
         id: 'nav-knowledge',
-        shortcut: ['G', 'K'],
         category: 'Navigation',
         title: 'Knowledge Base',
-        subtitle: 'Workspace documentation and technical guides',
+        subtitle: 'Documentation, design guides and RFC specifications',
         icon: <BookOpen className="size-4 text-foreground-muted" />,
+        shortcut: ['G', 'K'],
         action: () => {
           if (currentSessionId) {
             setViewMode('threads');
@@ -217,132 +429,91 @@ export function CommandPalette() {
         },
       },
       {
-        // One entry: routines and one-shot timers are the same thing on two
-        // clocks, and both live in Tasks › Schedules. 'routines' resolves there.
-        id: 'nav-schedules',
-        shortcut: ['G', 'R'],
-        category: 'Navigation',
-        title: 'Automations',
-        subtitle: 'Recurring routines and one-shot timers',
-        icon: <Repeat className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('routines'),
-      },
-      {
         id: 'nav-inbox',
-        shortcut: ['G', 'I'],
         category: 'Navigation',
-        title: 'Inbox & Approvals',
-        subtitle: 'Review agent notifications and approvals',
+        title: 'Notifications & Inbox',
+        subtitle: 'Unread activity and agent status alerts',
         icon: <Inbox className="size-4 text-foreground-muted" />,
         action: () => setViewMode('inbox'),
       },
-      {
-        id: 'nav-connect',
-        shortcut: ['G', 'N'],
-        category: 'Navigation',
-        title: 'Connect Agents',
-        subtitle: 'Add CLI agents (Claude Code, OpenClaw, Pi, etc.)',
-        icon: <Radio className="size-4 text-foreground-muted" />,
-        action: () => openSettings('agents'),
-      },
-      {
-        id: 'nav-settings',
-        category: 'Navigation',
-        title: 'Settings',
-        subtitle: 'Workspace preferences and agent configs',
-        icon: <Settings className="size-4 text-foreground-muted" />,
-        shortcut: ['G', 'S'],
-        action: () => openSettings('general'),
-      },
     ];
 
-    const actions: CommandItem[] = [
-      /*
-       * TWO WAYS TO START, AND THEY ARE NOT THE SAME COMMAND.
-       *
-       * `C` (here, in the sidebar's New-chat row, and in the thread list's key
-       * handler) creates a channel immediately. The picker below asks who
-       * joins first. They used to share one palette row wearing a `C` cap, so
-       * the cap described a dialog the key never opened.
-       */
+    // 4. Quick Actions
+    const actionItems: CommandItem[] = [
       {
         id: 'act-new-chat',
         category: 'Actions',
-        title: 'New Session',
-        subtitle: 'Start a fresh session right away',
+        title: 'New Chat Session',
+        subtitle: 'Create a fresh thread in current project',
         icon: <Plus className="size-4 text-foreground-muted" />,
-        shortcut: ['C'],
-        action: async () => {
-          try {
-            await createSession({});
-            setViewMode('threads');
-            if (isMobile) openMobileDetail();
-          } catch (e: any) {
-            toast.error(e?.message || 'Could not create the channel');
-          }
-        },
-      },
-      {
-        id: 'act-new-thread',
-        category: 'Actions',
-        title: 'New Thread with Agents…',
-        subtitle: 'Pick participants, then start the conversation',
-        icon: <Users className="size-4 text-foreground-muted" />,
+        shortcut: ['Ctrl', 'N'],
         action: () => openNewThread(),
       },
       {
-        id: 'act-new-task',
+        id: 'act-split-view',
         category: 'Actions',
-        title: 'Create Task',
-        subtitle: 'Add a new deliverable to Tasks & Issues',
-        icon: <CheckSquare className="size-4 text-foreground-muted" />,
-        action: () => setViewMode('tasks'),
+        title: 'Toggle Dual Split View',
+        subtitle: 'Split workspace into side-by-side session grid',
+        icon: <Columns2 className="size-4 text-foreground-muted" />,
+        shortcut: ['Ctrl', '\\'],
+        action: () => {
+          const splitBtn = document.querySelector<HTMLButtonElement>('[aria-label*="Split"]');
+          splitBtn?.click();
+        },
       },
       {
-        id: 'act-toggle-theme',
+        id: 'act-diff-studio',
         category: 'Actions',
-        title: `Switch Theme to ${theme === 'dark' ? 'Light' : 'Dark'}`,
-        subtitle: 'Toggle workspace appearance',
+        title: 'Toggle Diff Studio Panel',
+        subtitle: 'Inspect file trees, diff reviews and git synchronization',
+        icon: <FileDiff className="size-4 text-foreground-muted" />,
+        action: () => setActiveRightTab(activeRightTab === 'diff' ? null : 'diff'),
+      },
+      {
+        id: 'act-preview',
+        category: 'Actions',
+        title: 'Toggle Web Preview Browser',
+        subtitle: 'Open built-in localhost dev-server browser sandbox',
+        icon: <Globe className="size-4 text-foreground-muted" />,
+        action: () => setActiveRightTab(activeRightTab === 'preview' ? null : 'preview'),
+      },
+      {
+        id: 'act-theme',
+        category: 'Actions',
+        title: `Switch Theme to ${theme === 'dark' ? 'Light' : 'Obsidian Dark'}`,
+        subtitle: 'Toggle between clean porcelain and obsidian physical materials',
         icon: theme === 'dark' ? <Sun className="size-4 text-foreground-muted" /> : <Moon className="size-4 text-foreground-muted" />,
         action: () => setTheme(theme === 'dark' ? 'light' : 'dark'),
       },
-
       {
         id: 'act-sidebar',
         category: 'Actions',
-        title: 'Toggle Sidebar',
-        subtitle: 'Collapse or restore the left column',
+        title: 'Toggle Left Sidebar',
+        subtitle: 'Collapse or restore project session navigation',
         icon: <PanelLeft className="size-4 text-foreground-muted" />,
-        shortcut: shortcutKeys('sidebar'),
+        shortcut: ['Ctrl', 'B'],
         action: () => sidebarToggle(),
       },
       {
-        id: 'act-error-log',
+        id: 'act-settings',
         category: 'Actions',
-        title: 'Recent Errors',
-        subtitle: 'Read back failures the toast already dismissed',
-        icon: <AlertCircle className="size-4 text-foreground-muted" />,
-        action: () => window.dispatchEvent(new Event(ERROR_LOG_EVENT)),
-      },
-      {
-        id: 'act-shortcuts',
-        category: 'Actions',
-        title: 'Keyboard Shortcuts',
-        subtitle: 'Every binding the app listens for',
-        icon: <Keyboard className="size-4 text-foreground-muted" />,
-        shortcut: shortcutKeys('help'),
-        action: () => window.dispatchEvent(new Event(SHORTCUTS_EVENT)),
+        title: 'Open Settings',
+        subtitle: 'Configure LLM API keys, model parameters and defaults',
+        icon: <Settings className="size-4 text-foreground-muted" />,
+        action: () => openSettings(),
       },
     ];
 
-    const threadItems: CommandItem[] = (sessions || []).map((s) => {
+    // 5. Session items
+    const sessionItems: CommandItem[] = (sessions || []).map((s) => {
       const channelTag = s.sessionId.replace(/^channel\//, '');
-      const participantsStr = s.participants?.length ? ` • ${s.participants.map((p) => `@${p}`).join(', ')}` : '';
+      const parts = s.participants?.length ? ` • ${s.participants.map((p) => `@${p}`).join(', ')}` : '';
+      const dirTag = s.workingDir ? ` [${basename(s.workingDir)}]` : '';
       return {
-        id: `thread-${s.sessionId}`,
-        category: 'Threads',
+        id: `session-${s.sessionId}`,
+        category: 'Sessions',
         title: s.title || `Thread #${channelTag}`,
-        subtitle: `#${channelTag}${participantsStr}`,
+        subtitle: `#${channelTag}${dirTag}${parts}`,
         icon: <MessageSquare className="size-4 text-foreground-muted" />,
         action: () => {
           setCurrentSessionId(s.sessionId);
@@ -352,123 +523,101 @@ export function CommandPalette() {
       };
     });
 
-    const fileItems: CommandItem[] = (files || []).map((f) => {
-      const isCode = /\.(js|ts|tsx|jsx|py|go|rs|json|yaml|yml|sh|css|html|md)$/i.test(f.filename);
-      const sizeKb = f.size > 0 ? `${(f.size / 1024).toFixed(1)} KB` : '';
-      const channelInfo = f.channelName ? ` in #${f.channelName}` : '';
-      return {
-        id: `file-${f.id}`,
-        category: 'Files',
-        title: f.filename,
-        subtitle: `${sizeKb || 'Workspace file'}${channelInfo}`,
-        icon: isCode ? <FileCode className="size-4 text-foreground-muted" /> : <FileText className="size-4 text-foreground-muted" />,
-        action: () => {
-          setSelectedFileId(f.id);
-          openOutput({ kind: 'file' });
-          setActiveRightTab('canvas');
-          if (isMobile) openMobileDetail();
-        },
-      };
-    });
-
-    const taskItems: CommandItem[] = (todos || []).map((t) => {
-      const statusLabel = t.status.replace('_', ' ');
-      const priorityLabel = t.priority ? ` • ${t.priority}` : '';
-      const channelInfo = t.channelName ? ` in #${t.channelName}` : '';
-      return {
-        id: `task-${t.id}`,
-        category: 'Tasks',
-        title: t.content,
-        subtitle: `${t.id} • ${statusLabel}${priorityLabel}${channelInfo}`,
-        icon: <CheckSquare className="size-4 text-foreground-muted" />,
-        action: () => {
-          setViewMode('tasks');
-          if (isMobile) openMobileDetail();
-        },
-      };
-    });
-
-    // Titles, slugs and summaries only: entry bodies are not loaded here.
-    const knowledgeItems: CommandItem[] = (knowledge || [])
-      .filter((k) => k.status !== 'deleted')
-      .map((k) => ({
-        id: `knowledge-${k.id}`,
-        category: 'Knowledge',
-        title: k.title,
-        subtitle: `@knowledge:${k.slug}${k.description ? ` • ${k.description}` : ''}`,
-        icon: <BookOpen className="size-4 text-foreground-muted" />,
-        action: () => {
-          requestKnowledgeIntent({ kind: 'open', id: k.id });
-          if (currentSessionId) {
-            setViewMode('threads');
-            setActiveRightTab('knowledge');
-          } else {
-            setViewMode('knowledge');
-          }
-          if (isMobile) openMobileDetail();
-        },
-      }));
-
-    const sortedAgents = [...agents].sort((a, b) => {
-      if (a.status !== b.status) {
-        return a.status === 'online' ? -1 : 1;
-      }
-      return a.agentName.localeCompare(b.agentName);
-    });
-
-    const agentItems: CommandItem[] = sortedAgents.map((agent) => ({
-      id: `agent-${agent.agentName}`,
-      category: 'Agents',
-      title: `@${agent.agentName}`,
-      subtitle: `${agent.status === 'online' ? '● Online' : '○ Offline'} — ${agent.description || 'AI Agent'}`,
-      icon: <Bot className="size-4 text-foreground-muted" />,
-      action: () => {
-        openNewThread();
+    // 6. Subpage Navigator Shortcuts on Root
+    const pageTriggers: CommandItem[] = [
+      {
+        id: 'page-trigger-projects',
+        category: 'Projects',
+        title: 'Switch Project / Repository...',
+        subtitle: `Browse ${projectItems.length - 1} open repositories and project folders`,
+        icon: <FolderGit2 className="size-4 text-indigo-400" />,
+        pageTarget: 'projects',
       },
-    }));
+      {
+        id: 'page-trigger-git',
+        category: 'Git',
+        title: 'Git Commands & Remote Synchronization...',
+        subtitle: 'Pull, push, branch inspection and code rollback',
+        icon: <GitBranch className="size-4 text-emerald-400" />,
+        pageTarget: 'git',
+      },
+      {
+        id: 'page-trigger-sessions',
+        category: 'Sessions',
+        title: 'Browse All Sessions & Channels...',
+        subtitle: `Search through ${sessions.length} historical and active sessions`,
+        icon: <MessageSquare className="size-4 text-cyan-400" />,
+        pageTarget: 'sessions',
+      },
+    ];
+
+    // Compose page-specific lists
+    const mapByPage: Record<CommandBarPageId, CommandItem[]> = {
+      root: [...pageTriggers, ...actionItems, ...navItems, ...sessionItems.slice(0, 5)],
+      projects: projectItems,
+      git: gitItems,
+      sessions: sessionItems,
+      actions: actionItems,
+    };
+
+    const all = [
+      ...pageTriggers,
+      ...projectItems,
+      ...gitItems,
+      ...actionItems,
+      ...navItems,
+      ...sessionItems,
+    ];
 
     return {
-      allCommands: [...actions, ...threadItems, ...fileItems, ...taskItems, ...knowledgeItems, ...nav, ...agentItems],
-      defaultCommands: [...actions, ...threadItems.slice(0, 4), ...fileItems.slice(0, 4), ...taskItems.slice(0, 4), ...knowledgeItems.slice(0, 3), ...nav, ...agentItems],
+      allCommands: all,
+      pageCommands: mapByPage[currentPage] || mapByPage.root,
     };
   }, [
-    setViewMode,
-    openSettings,
-    openNewThread,
+    sessions,
+    recentDirs,
+    activeSession,
+    gitStatus,
+    refreshGit,
     setActiveRightTab,
+    setCurrentSessionId,
+    setViewMode,
+    openNewThread,
+    openSettings,
+    sidebarToggle,
+    createSession,
     theme,
     setTheme,
-    agents,
-    sessions,
-    files,
-    todos,
-    knowledge,
-    currentSessionId,
-    workspaceId,
-    setCurrentSessionId,
-    setSelectedFileId,
     isMobile,
     openMobileDetail,
-    createSession,
-    sidebarToggle,
+    currentPage,
   ]);
 
-  // Filter commands by query
+  // Filter commands by Category tab + search Query
   const filtered = useMemo(() => {
-    if (!query.trim()) return defaultCommands;
-    const q = query.toLowerCase();
-    return allCommands.filter(
-      (item) =>
+    let base = pageCommands;
+
+    // Category filtering
+    if (activeCategory !== 'All') {
+      base = base.filter((c) => c.category === activeCategory);
+    }
+
+    if (!query.trim()) return base;
+
+    const q = query.toLowerCase().trim();
+    return base.filter((item) => {
+      return (
         item.title.toLowerCase().includes(q) ||
         (item.subtitle && item.subtitle.toLowerCase().includes(q)) ||
         item.category.toLowerCase().includes(q)
-    );
-  }, [allCommands, defaultCommands, query]);
+      );
+    });
+  }, [pageCommands, activeCategory, query]);
 
-  // Handle arrow keys and enter
+  // Keyboard navigation & Enter execution
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // ↑/↓/Enter belong to the IME's candidate list while one is open.
     if (isComposing(e)) return;
+
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex((prev) => (prev + 1) % Math.max(1, filtered.length));
@@ -480,28 +629,83 @@ export function CommandPalette() {
       if (filtered[selectedIndex]) {
         execute(filtered[selectedIndex]);
       }
+    } else if (e.key === 'Backspace' && query === '' && pageStack.length > 1) {
+      e.preventDefault();
+      popPage();
+    } else if (e.key === 'Tab') {
+      e.preventDefault();
+      // Cycle category
+      const categories: CommandCategory[] = [
+        'All',
+        'Projects',
+        'Git',
+        'Navigation',
+        'Actions',
+        'Sessions',
+      ];
+      const nextIdx = (categories.indexOf(activeCategory) + 1) % categories.length;
+      setActiveCategory(categories[nextIdx]);
+      setSelectedIndex(0);
     }
   };
+
+  const pageTitle = useMemo(() => {
+    switch (currentPage) {
+      case 'projects':
+        return 'Projects';
+      case 'git':
+        return 'Git';
+      case 'sessions':
+        return 'Sessions';
+      case 'actions':
+        return 'Actions';
+      default:
+        return 'Omni Command';
+    }
+  }, [currentPage]);
+
+  const categories: CommandCategory[] = [
+    'All',
+    'Projects',
+    'Git',
+    'Navigation',
+    'Actions',
+    'Sessions',
+  ];
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         showCloseButton={false}
-        /* Top-anchored rather than centred: a palette is a launcher, and the
-           eye is already at the top of the window when it opens. */
-        className="p-0 gap-0 max-w-xl top-[14%] translate-y-0 bg-surface1 overflow-hidden"
+        className={cn(
+          'p-0 gap-0 max-w-2xl top-[12%] translate-y-0 overflow-hidden',
+          'bg-surface1/95 dark:bg-[#111318]/95 backdrop-blur-2xl border border-border shadow-2xl rounded-2xl'
+        )}
         onOpenAutoFocus={(e) => {
-          // Radix would focus the content box; the query field is the point.
           e.preventDefault();
           inputRef.current?.focus();
         }}
       >
         <VisuallyHidden.Root asChild>
-          <DialogTitle>Command palette</DialogTitle>
+          <DialogTitle>Command Palette</DialogTitle>
         </VisuallyHidden.Root>
-        {/* Search Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-surface1/95">
-          <Search className="size-4 text-foreground-extra-muted shrink-0" />
+
+        {/* ── Search Input Row ── */}
+        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-chrome bg-surface1/60 dark:bg-[#111318]/60">
+          {pageStack.length > 1 ? (
+            <button
+              type="button"
+              onClick={popPage}
+              aria-label="Back to previous page"
+              className="flex items-center gap-1 px-2 py-1 rounded-md bg-surface3 border border-border/80 text-2xs font-semibold text-foreground hover:bg-surface4 transition-colors shrink-0 cursor-pointer active:scale-95"
+            >
+              <ChevronLeft className="size-3.5" />
+              <span>{pageTitle}</span>
+            </button>
+          ) : (
+            <Search className="size-4 text-foreground-extra-muted shrink-0" />
+          )}
+
           <input
             ref={inputRef}
             type="text"
@@ -511,13 +715,18 @@ export function CommandPalette() {
               setSelectedIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search..."
+            placeholder={
+              pageStack.length > 1
+                ? `Search in ${pageTitle.toLowerCase()}... (Backspace to go back)`
+                : 'Type a command, project, branch or session...'
+            }
             role="combobox"
             aria-expanded
             aria-controls="command-palette-list"
             aria-autocomplete="list"
             className="flex-1 text-sm bg-transparent text-foreground placeholder:text-foreground-extra-muted focus:outline-none"
           />
+
           {query && (
             <button
               type="button"
@@ -527,26 +736,56 @@ export function CommandPalette() {
               <X className="size-3.5" />
             </button>
           )}
-          <div className="flex items-center gap-1.5 shrink-0 pl-3">
+
+          <div className="flex items-center gap-1.5 shrink-0 pl-2">
             <Kbd>ESC</Kbd>
           </div>
         </div>
 
-        {/* Command List */}
+        {/* ── Category Filter Tabs ── */}
+        {pageStack.length === 1 && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border/40 bg-surface2/30 overflow-x-auto no-scrollbar">
+            {categories.map((cat) => {
+              const isActive = activeCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => {
+                    setActiveCategory(cat);
+                    setSelectedIndex(0);
+                  }}
+                  className={cn(
+                    'px-2.5 py-0.5 rounded-md text-3xs font-medium transition-all shrink-0 cursor-pointer select-none',
+                    isActive
+                      ? 'bg-primary/20 text-primary border border-primary/40 font-semibold shadow-2xs'
+                      : 'text-foreground-muted hover:text-foreground hover:bg-surface3/60'
+                  )}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Filtered Command List ── */}
         <div
           ref={listRef}
           id="command-palette-list"
           role="listbox"
           aria-label="Commands"
-          className="max-h-96 overflow-y-auto p-2 space-y-1"
+          className="max-h-[380px] overflow-y-auto p-2 space-y-1 select-none"
         >
           {filtered.length === 0 ? (
             <div className="py-12 text-center text-xs text-foreground-extra-muted">
-              No matching commands found.
+              No matching commands or actions found.
             </div>
           ) : (
             filtered.map((item, idx) => {
               const isSelected = idx === selectedIndex;
+              const isNavPage = Boolean(item.pageTarget);
+
               return (
                 <div
                   key={item.id}
@@ -557,8 +796,10 @@ export function CommandPalette() {
                   onClick={() => execute(item)}
                   onMouseEnter={() => setSelectedIndex(idx)}
                   className={cn(
-                    'group flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors select-none',
-                    isSelected ? 'bg-surface2 text-foreground' : 'text-foreground-muted hover:bg-surface2/60'
+                    'group flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer select-none',
+                    isSelected
+                      ? 'bg-surface2 dark:bg-[#1b1f2b] text-foreground border border-border/80 shadow-xs'
+                      : 'text-foreground-muted hover:bg-surface2/60'
                   )}
                 >
                   <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -566,9 +807,21 @@ export function CommandPalette() {
                       {item.icon}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className={cn('font-medium truncate', isSelected ? 'text-foreground' : 'text-foreground-muted')}>
-                        {item.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p
+                          className={cn(
+                            'font-medium truncate',
+                            isSelected ? 'text-foreground font-semibold' : 'text-foreground-muted'
+                          )}
+                        >
+                          {item.title}
+                        </p>
+                        {item.badge && (
+                          <span className="text-3xs px-1.5 py-0.2 rounded-full font-mono bg-primary/20 text-primary border border-primary/30">
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
                       {item.subtitle && (
                         <p className="text-3xs text-foreground-extra-muted truncate mt-0.5">
                           {item.subtitle}
@@ -577,7 +830,7 @@ export function CommandPalette() {
                     </div>
                   </div>
 
-                  {/* Shortcuts or Category */}
+                  {/* Right side: Shortcut, Page Arrow or Category Tag */}
                   <div className="flex items-center gap-2 shrink-0 ml-3">
                     {item.shortcut ? (
                       <div className="flex items-center gap-1">
@@ -585,11 +838,17 @@ export function CommandPalette() {
                           <Kbd key={i}>{k}</Kbd>
                         ))}
                       </div>
+                    ) : isNavPage ? (
+                      <div className="flex items-center gap-1 text-foreground-muted text-3xs font-medium">
+                        <span>Browse</span>
+                        <ArrowRight className="size-3" />
+                      </div>
                     ) : (
                       <span className="text-3xs text-foreground-extra-muted px-1.5 py-0.5 rounded bg-surface3 border border-border/60">
                         {item.category}
                       </span>
                     )}
+
                     {isSelected && <CornerDownLeft className="size-3 text-foreground-extra-muted" />}
                   </div>
                 </div>
@@ -598,8 +857,8 @@ export function CommandPalette() {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-2 bg-surface2/60 border-t border-border/60 text-3xs text-foreground-extra-muted font-medium">
+        {/* ── Footer ── */}
+        <div className="flex items-center justify-between px-4 py-2 bg-surface2/60 border-t border-border-chrome text-3xs text-foreground-extra-muted font-medium">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <Kbd>↑</Kbd>
@@ -610,10 +869,20 @@ export function CommandPalette() {
               <Kbd>↵</Kbd>
               Select
             </span>
+            <span className="flex items-center gap-1">
+              <Kbd>Tab</Kbd>
+              Switch Tab
+            </span>
+            {pageStack.length > 1 && (
+              <span className="flex items-center gap-1">
+                <Kbd>⌫</Kbd>
+                Back
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Sparkles className="size-3 text-primary" />
-            <span>52hzAgents Palette</span>
+            <span className="font-mono">52hz Omni CommandBar</span>
           </div>
         </div>
       </DialogContent>
