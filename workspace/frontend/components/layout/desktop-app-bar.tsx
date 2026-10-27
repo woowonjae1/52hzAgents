@@ -22,6 +22,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { useSessionGridOptional } from '@/lib/session-grid-context';
 import { useTheme } from 'next-themes';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ThemeToggle } from '@/components/motion/theme-toggle';
 import { browseForFolder, recentWorkingDirs, rememberWorkingDir } from '@/components/chat/project-folder-picker';
 import { COMMAND_PALETTE_EVENT } from '@/components/layout/command-palette';
 import { toast } from '@/lib/toast';
@@ -510,15 +511,12 @@ export function DesktopAppBar() {
         {/* Theme Switcher Toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              type="button"
-              data-no-drag
-              onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-              aria-label="Toggle Theme"
+            <ThemeToggle
+              variant="circle"
+              start="bottom-left"
               className="size-8 rounded-lg flex items-center justify-center hover:bg-surface2 text-foreground-muted hover:text-foreground transition-colors cursor-pointer active:scale-95"
-            >
-              {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </button>
+              iconClassName="size-4"
+            />
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
             <div className="font-semibold text-xs">Toggle Theme</div>

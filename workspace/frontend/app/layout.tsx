@@ -125,7 +125,7 @@ export default function RootLayout({
             `setTheme()` into a no-op, which is what broke the light/dark
             toggle — pass `defaultTheme` alone to pick a default the user can
             still override. */}
-        <ThemeProvider attribute="class" defaultTheme="dark">
+        <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
           <OpenAgentsAuthProvider>
             {children}
           </OpenAgentsAuthProvider>

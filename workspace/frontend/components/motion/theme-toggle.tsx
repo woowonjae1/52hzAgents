@@ -50,11 +50,11 @@ html[data-beui-vt="circle-blur"]::view-transition-old(root) {
 }
 html[data-beui-vt="circle"]::view-transition-new(root) {
   mix-blend-mode: normal;
-  animation: beui-circle-reveal 700ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: beui-circle-reveal 350ms cubic-bezier(0.2, 0, 0, 1);
 }
 html[data-beui-vt="circle-blur"]::view-transition-new(root) {
   mix-blend-mode: normal;
-  animation: beui-circle-blur-reveal 700ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: beui-circle-reveal 350ms cubic-bezier(0.2, 0, 0, 1);
 }
 html[data-beui-vt="blinds"]::view-transition-old(root) {
   animation: none;
@@ -95,8 +95,8 @@ html[data-beui-vt="blinds"]::view-transition-new(root) {
   to   { clip-path: circle(150% at var(--beui-vt-origin, 50% 100%)); }
 }
 @keyframes beui-circle-blur-reveal {
-  from { clip-path: circle(0% at var(--beui-vt-origin, 50% 100%)); filter: blur(8px); }
-  to   { clip-path: circle(150% at var(--beui-vt-origin, 50% 100%)); filter: blur(0px); }
+  from { clip-path: circle(0% at var(--beui-vt-origin, 50% 100%)); }
+  to   { clip-path: circle(150% at var(--beui-vt-origin, 50% 100%)); }
 }
 @keyframes beui-blinds-reveal {
   from { --beui-vt-slat: -20px; }

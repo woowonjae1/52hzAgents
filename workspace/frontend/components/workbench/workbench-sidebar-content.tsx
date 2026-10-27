@@ -755,7 +755,7 @@ export function WorkbenchSidebarContent() {
           <Tooltip>
             <TooltipTrigger asChild>
               <ThemeToggle
-                variant="circle-blur"
+                variant="circle"
                 start="bottom-right"
                 className="size-7 rounded-lg text-foreground-extra-muted hover:text-foreground hover:bg-surface2/60 transition-colors"
                 iconClassName="size-3.5"
