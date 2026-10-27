@@ -456,7 +456,12 @@ function PanelHeader({
   const iconBtn =
     'size-7 shrink-0 rounded-lg hover:bg-surface2 text-foreground-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95';
   return (
-    <div className="app-header justify-between gap-2 px-2 flex-nowrap min-w-0 overflow-hidden shrink-0 border-b border-border bg-surface1 select-none">
+    <div
+      className={cn(
+        'flex items-center justify-between gap-2 px-3 py-1.5 flex-nowrap min-w-0 overflow-hidden shrink-0 border-b border-border/50 bg-surface1/60 select-none text-2xs',
+        isFullscreen && 'app-header bg-surface1 border-border'
+      )}
+    >
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
         {totalOutputs > 1 && (
           <>
@@ -474,32 +479,24 @@ function PanelHeader({
         </Hint>
         {actions.meta && <span className="shrink-0 text-3xs text-foreground-extra-muted">{actions.meta}</span>}
       </div>
-      <div className="flex shrink-0 items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-1">
         {actions.controls}
-        {onDiff && (
-          <Hint label="Switch to Code Diff">
-            <button type="button" onClick={onDiff} className={iconBtn}>
-              <FileDiff className="size-3.5" />
-            </button>
-          </Hint>
-        )}
-        <Hint label="Switch to Live Preview">
-          <button type="button" onClick={onPreview} className={iconBtn}>
-            <Globe className="size-3.5" />
-          </button>
-        </Hint>
         <Hint label={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>
           <button type="button" onClick={onFullscreen} className={iconBtn}>
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
           </button>
         </Hint>
-        <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
-        <Hint label="Close Studio (Esc)">
-          <button type="button" onClick={onClose} aria-label="Close Studio" className={iconBtn}>
-            <X className="size-3.5" />
-          </button>
-        </Hint>
-        <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
+        {isFullscreen && (
+          <>
+            <span className="h-3.5 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
+            <Hint label="Close Studio (Esc)">
+              <button type="button" onClick={onClose} aria-label="Close Studio" className={iconBtn}>
+                <X className="size-3.5" />
+              </button>
+            </Hint>
+            <span className="desktop-only h-4 w-px bg-border/60 shrink-0 ms-1 me-0.5" aria-hidden />
+          </>
+        )}
       </div>
     </div>
   );
