@@ -869,6 +869,36 @@ export function ChatView() {
         // runs this turn in that mode, whatever the agent does in other threads.
         msgMetadata.agent_mode = threadAgentMode(sessionId);
 
+        // Blocking Prevention: Auto-decline any lingering pending tool approvals in this thread
+        // before posting the new instruction, unlocking the channel turn worker queue immediately.
+        for (const m of displayMessages) {
+          const req = m.metadata?.tool_approval_request;
+          if (req?.approval_id && !approvalResponses.has(req.approval_id)) {
+            try {
+              await workspaceApi.sendEvent({
+                type: 'workspace.message.posted',
+                source: `human:${currentUser.id || 'user'}`,
+                target: `channel/${sessionId}`,
+                payload: {
+                  content: 'Declined prior tool execution to proceed with new instructions.',
+                  sender_type: 'human',
+                  sender_name: currentUser.name || 'user',
+                },
+                metadata: {
+                  target_agents: m.senderName ? [m.senderName] : undefined,
+                  tool_approval_response: {
+                    approval_id: req.approval_id,
+                    granted: false,
+                  },
+                },
+                visibility: 'channel',
+              });
+            } catch {
+              // Best-effort unblock
+            }
+          }
+        }
+
         const confirmation = await workspaceApi.sendMessage(
           sessionId,
           content || (attachments ? attachments.map((a) => a.filename).join(', ') : ''),
