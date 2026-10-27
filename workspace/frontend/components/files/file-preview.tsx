@@ -269,7 +269,7 @@ export function FilePreview({ onClose }: { onClose?: () => void } = {}) {
             <Trash2 className="size-4" />
           </button>
         </Hint>
-        {onClose && (
+        {isFullscreen && onClose && (
           <>
             <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
             <Hint label="Close Studio (Esc)">

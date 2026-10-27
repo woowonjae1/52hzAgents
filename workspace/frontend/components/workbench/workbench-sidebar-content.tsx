@@ -26,7 +26,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { useGitStatus } from '@/lib/use-git-status';
 import { useReviewOptional } from '@/lib/review-context';
 import { getSmartSessionTitle } from '@/components/threads/thread-list';
-import { browseForFolder, basename } from '@/components/chat/project-folder-picker';
+import { basename } from '@/components/chat/project-folder-picker';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ThemeToggle } from '@/components/motion/theme-toggle';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -146,7 +146,6 @@ export function WorkbenchSidebarContent() {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
-  const [browsingFolder, setBrowsingFolder] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => loadPinnedSessionIds());
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
@@ -286,24 +285,6 @@ export function WorkbenchSidebarContent() {
       toast.error(e instanceof Error ? e.message : 'Could not create new session');
     }
   }, [createSession, activeProjectDir, activeWorkingDir, setCurrentSessionId, setViewMode, isMobile, openMobileDetail]);
-
-  const handlePickFolder = useCallback(async () => {
-    if (browsingFolder) return;
-    setBrowsingFolder(true);
-    try {
-      const dir = await browseForFolder(activeProjectDir || activeWorkingDir || undefined);
-      if (dir) {
-        setActiveProjectDir(dir);
-        await createSession({ workingDir: dir });
-        setViewMode('threads');
-        toast.success(`Switched project workspace to ${basename(dir)}`);
-      }
-    } catch {
-      toast.error('Could not switch project directory');
-    } finally {
-      setBrowsingFolder(false);
-    }
-  }, [browsingFolder, activeWorkingDir, createSession, setViewMode]);
 
   const handleCommitRename = useCallback(async (sessionId: string) => {
     const trimmed = editingTitle.trim();
@@ -538,26 +519,8 @@ export function WorkbenchSidebarContent() {
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-surface-sidebar select-none">
-      {/* ── Top Controls: Project Folder & New Task ── */}
+      {/* ── Top Controls: New Task & Primary Destinations ── */}
       <div className="p-2.5 pb-1 space-y-2 shrink-0">
-        {/* Project Folder Pill */}
-        {activeWorkingDir && (
-          <Hint label={`Working directory: ${activeWorkingDir}. Click to switch project folder.`}>
-            <button
-              type="button"
-              onClick={handlePickFolder}
-              disabled={browsingFolder}
-              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-surface2/70 hover:bg-surface3 border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer group"
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <FolderGit2 className="size-3.5 text-primary shrink-0" />
-                <span className="font-mono text-2xs truncate">{basename(activeWorkingDir)}</span>
-              </div>
-              <span className="text-3xs text-foreground-extra-muted group-hover:text-foreground">Switch</span>
-            </button>
-          </Hint>
-        )}
-
         {/* Claude Desktop / cdesktop "+ New Session" Button */}
         <button
           type="button"
@@ -765,8 +728,8 @@ export function WorkbenchSidebarContent() {
         )}
       </div>
 
-      {/* ── Bottom Status & Settings Bar ── */}
-      <div className="shrink-0 px-3 py-2 bg-transparent flex items-center justify-between border-t border-border/60">
+      {/* ── Bottom Status & Settings Bar (Mobile only: on desktop, DesktopAppBar is authoritative system dock) ── */}
+      <div className="md:hidden shrink-0 px-3 py-2 bg-transparent flex items-center justify-between border-t border-border/60">
         <button
           type="button"
           onClick={() => openSettings('general')}
