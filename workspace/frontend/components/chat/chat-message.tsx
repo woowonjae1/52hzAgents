@@ -43,6 +43,7 @@ interface ChatMessageProps {
   agents?: WorkspaceAgent[];
   isApproved?: boolean;
   isRejected?: boolean;
+  isExpired?: boolean;
   /** Tool calls / status this sender emitted before this message, if any. */
   steps?: WorkspaceMessage[];
   /**
@@ -81,6 +82,7 @@ export const ChatMessage = memo(function ChatMessage({
   agents = [],
   isApproved,
   isRejected,
+  isExpired = false,
   steps,
   hideHeader = false,
   isDecisionAnswered = false,
@@ -127,7 +129,8 @@ export const ChatMessage = memo(function ChatMessage({
   const approvalRequest = message.metadata?.tool_approval_request;
   const currentApproved = isApproved || localStatus === 'approved';
   const currentRejected = isRejected || localStatus === 'rejected';
-  const hasStatus = currentApproved || currentRejected;
+  const currentExpired = !currentApproved && !currentRejected && Boolean(isExpired);
+  const hasStatus = currentApproved || currentRejected || currentExpired;
 
   const handleApprove = async () => {
     if (!approvalRequest) return;
@@ -682,7 +685,7 @@ export const ChatMessage = memo(function ChatMessage({
               toolName={approvalRequest.tool || 'command'}
               args={approvalRequest.args}
               approvalId={approvalRequest.approval_id}
-              status={currentApproved ? 'approved' : currentRejected ? 'denied' : 'pending'}
+              status={currentApproved ? 'approved' : currentRejected ? 'denied' : currentExpired ? 'expired' : 'pending'}
               onApprove={handleApprove}
               onDeny={handleReject}
             />

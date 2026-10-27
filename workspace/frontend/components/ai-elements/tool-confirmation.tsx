@@ -23,7 +23,7 @@ export interface ToolConfirmationProps {
   toolName?: string;
   args?: Record<string, unknown> | string;
   approvalId?: string;
-  status?: 'pending' | 'approved' | 'denied';
+  status?: 'pending' | 'approved' | 'denied' | 'expired';
   onApprove: () => Promise<void> | void;
   onDeny: () => Promise<void> | void;
   className?: string;

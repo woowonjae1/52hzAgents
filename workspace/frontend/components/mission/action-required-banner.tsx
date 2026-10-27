@@ -68,6 +68,10 @@ export function pendingApprovalsFromMessages(
   for (const m of msgs) {
     const appReq = m.metadata?.tool_approval_request;
     if (!appReq || responded.has(appReq.approval_id)) continue;
+    const isTimedOut = m.createdAt ? Date.now() - new Date(m.createdAt).getTime() > 10 * 60 * 1000 : false;
+    const idx = msgs.indexOf(m);
+    const hasSubsequent = idx >= 0 && msgs.slice(idx + 1).some((other) => other.senderType === 'human' || other.senderType === 'user' || other.senderName === m.senderName);
+    if (isTimedOut || hasSubsequent) continue;
     out.push({
       id: `app-${m.messageId || appReq.approval_id}`,
       type: 'approval',

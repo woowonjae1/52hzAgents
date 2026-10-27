@@ -33,7 +33,8 @@ export type ToolApprovalStatus =
   | "denied"
   | "running"
   | "complete"
-  | "error";
+  | "error"
+  | "expired";
 
 export interface ToolApprovalParameter {
   id: string;
@@ -69,10 +70,14 @@ function getStatusCopy(status: ToolApprovalStatus) {
   if (status === "running") return "Running";
   if (status === "complete") return "Completed";
   if (status === "error") return "Failed";
+  if (status === "expired") return "Expired";
   return "Approval required";
 }
 
 function getStatusBadgeClass(status: ToolApprovalStatus) {
+  if (status === "expired") {
+    return "border-border/60 bg-surface3/50 text-foreground-extra-muted";
+  }
   if (status === "pending") {
     return "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400";
   }
@@ -151,9 +156,11 @@ export function ToolApproval({
         "w-full overflow-hidden rounded-lg border text-sm transition-colors",
         status === "pending"
           ? "border-brand/60 bg-brand/[0.06]"
-          : status === "denied" || status === "error"
-            ? "border-status-danger/60 bg-status-danger/[0.06]"
-            : "border-border/60 bg-muted/20",
+          : status === "expired"
+            ? "border-border/40 bg-surface2/30 opacity-60"
+            : status === "denied" || status === "error"
+              ? "border-status-danger/60 bg-status-danger/[0.06]"
+              : "border-border/60 bg-muted/20",
         className,
       )}
     >
@@ -161,6 +168,7 @@ export function ToolApproval({
         className={cn(
           "flex items-start gap-3 p-3.5",
           status === "pending" && "bg-brand/10",
+          status === "expired" && "bg-surface2/40",
           (status === "denied" || status === "error") && "bg-status-danger/10"
         )}
       >
@@ -179,6 +187,8 @@ export function ToolApproval({
             <X className="size-4" />
           ) : status === "approved" || status === "complete" ? (
             <Check className="size-4" />
+          ) : status === "expired" ? (
+            <CircleAlert className="size-4 opacity-50" />
           ) : (
             <ShieldCheck className="size-4" />
           )}

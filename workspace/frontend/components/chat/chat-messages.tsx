@@ -903,6 +903,16 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                     const approvalId = approvalRequest?.approval_id;
                     const isApproved = approvalId ? approvalResponses.get(approvalId) === true : false;
                     const isRejected = approvalId ? approvalResponses.get(approvalId) === false : false;
+                    const isAnswered = isApproved || isRejected;
+
+                    const isSubsequentInteraction = index !== groups.length - 1 && messages.slice(messages.indexOf(group.message) + 1).some(
+                      (m) => m.senderType === 'human' || m.senderType === 'user' || m.senderName === group.message.senderName
+                    );
+                    const isTimedOut = Boolean(
+                      group.message.createdAt &&
+                      Date.now() - new Date(group.message.createdAt).getTime() > 10 * 60 * 1000
+                    );
+                    const isExpired = Boolean(approvalRequest && !isAnswered && (isSubsequentInteraction || isTimedOut));
 
                     const meta = group.message.metadata;
                     const hasCard =
@@ -920,6 +930,7 @@ export function ChatMessages({ messages, agents, showAllSteps, className, scroll
                         agents={agents}
                         isApproved={isApproved}
                         isRejected={isRejected}
+                        isExpired={isExpired}
                         steps={group.steps}
                         hideHeader={group.continuesFrom}
                         isDecisionAnswered={isDecisionAnswered}
