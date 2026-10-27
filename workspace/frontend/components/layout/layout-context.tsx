@@ -61,7 +61,7 @@ function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTa
 export type RightPanelTab = 'preview' | 'file' | 'canvas' | 'knowledge' | 'diff' | 'terminal' | null;
 
 // 'canvas' is deliberately absent: it points at one message's artifact.
-const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'knowledge', 'diff', 'terminal']);
+const RESTORABLE_RIGHT_TABS = new Set<string>(['preview', 'file', 'diff', 'terminal']);
 
 /** On mobile, which pane is showing: the list or the detail */
 export type MobilePane = 'list' | 'detail';

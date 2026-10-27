@@ -218,19 +218,6 @@ export function WorkbenchLayout({
                       <Globe className="size-3.5" />
                       <span>Preview</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveRightTab('knowledge')}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-colors shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer active:scale-95',
-                        effectiveStudioTab === 'knowledge'
-                          ? 'bg-surface3 text-foreground font-semibold border border-border'
-                          : 'text-foreground-muted hover:text-foreground hover:bg-surface2'
-                      )}
-                    >
-                      <BookOpen className="size-3.5" />
-                      <span>Knowledge</span>
-                    </button>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Hint label="Close Studio (Esc)">

@@ -488,13 +488,6 @@ function PanelHeader({
             <Globe className="size-3.5" />
           </button>
         </Hint>
-        {onKnowledge && (
-          <Hint label="Switch to Knowledge Base">
-            <button type="button" onClick={onKnowledge} className={iconBtn}>
-              <BookOpen className="size-3.5" />
-            </button>
-          </Hint>
-        )}
         <Hint label={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}>
           <button type="button" onClick={onFullscreen} className={iconBtn}>
             {isFullscreen ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
