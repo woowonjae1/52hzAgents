@@ -224,21 +224,6 @@ export function ChannelHeader({
             </button>
           </Hint>
         )}
-        {currentSessionWorkingDir && (
-          <Hint label={`Project workspace: ${currentSessionWorkingDir}`}>
-            <button
-              type="button"
-              onClick={onOpenProjectWorkspace}
-              className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-md bg-surface2 hover:bg-surface3 border border-border/60 text-foreground transition-colors shrink-0 cursor-pointer"
-            >
-              <FolderGit2 className="size-3 text-primary" />
-              <span className="font-mono text-2xs hidden sm:inline max-w-[120px] truncate">
-                {basename(currentSessionWorkingDir)}
-              </span>
-            </button>
-          </Hint>
-        )}
-
         <span className="h-4 w-px bg-border/60 shrink-0 mx-0.5" aria-hidden />
 
         {/* Dual Split Screen Toggle (ported from cdesktop SessionGrid) */}
@@ -294,7 +279,16 @@ export function ChannelHeader({
               </button>
             </Hint>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-52">
+            {currentSessionWorkingDir && (
+              <>
+                <DropdownMenuItem onClick={onOpenProjectWorkspace}>
+                  <FolderGit2 className="size-4 mr-2 text-primary" />
+                  <span className="truncate">Project: {basename(currentSessionWorkingDir)}</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={onToggleFilter}>
               <Filter className="size-4 mr-2 text-foreground-muted" />
               <span>{filterOpen || filterActive ? 'Clear filter' : 'Filter this thread'}</span>
