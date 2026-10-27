@@ -17,6 +17,7 @@ import {
   FolderTree,
   GitPullRequest,
   SlidersHorizontal,
+  GitCommit,
 } from 'lucide-react';
 import { Hint } from '@/components/ui/hint';
 import { DiffBlock } from '@/components/chat/diff-block';
@@ -203,54 +204,42 @@ export function DiffStudioPanel() {
 
   return (
     <div className="flex flex-col h-full bg-surface0 select-text overflow-hidden">
-      {/* Top Meta Bar with View Switcher */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-border-chrome bg-surface1/70 select-none shrink-0">
+      {/* Top Meta Sub-Bar */}
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-surface1/60 select-none shrink-0 text-2xs">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Segmented View Switcher: Diff vs Git */}
-          <div className="flex items-center p-0.5 rounded-lg bg-surface2 border border-border/60">
-            <button
-              type="button"
-              onClick={() => setPanelMode('diff')}
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
-                panelMode === 'diff'
-                  ? 'bg-surface1 text-foreground shadow-xs font-semibold'
-                  : 'text-foreground-muted hover:text-foreground'
-              )}
-            >
-              <FileDiff className="size-3" />
-              <span>Diff ({files.length})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setPanelMode('git')}
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-2xs font-medium transition-all cursor-pointer',
-                panelMode === 'git'
-                  ? 'bg-surface1 text-foreground shadow-xs font-semibold'
-                  : 'text-foreground-muted hover:text-foreground'
-              )}
-            >
-              <GitBranch className="size-3" />
-              <span>Git & Sync</span>
-            </button>
+          <div className="flex items-center gap-1.5 font-mono text-2xs text-foreground font-semibold">
+            <GitBranch className="size-3 text-primary shrink-0" />
+            <span className="truncate max-w-[120px]">{gitStatus.branch || 'HEAD'}</span>
           </div>
 
-          <span className="hidden sm:inline-block text-xs font-mono font-medium truncate max-w-[120px]">
-            {gitStatus.branch || 'HEAD'}
-          </span>
-          <span className="hidden md:inline-block text-3xs px-1.5 py-0.5 rounded-full bg-surface2 font-mono text-foreground-muted border border-border/60">
+          <span className="text-3xs px-1.5 py-0.2 rounded-full bg-surface2 font-mono text-foreground-muted border border-border/60">
             +{gitStatus.additions} -{gitStatus.deletions}
           </span>
+
           {totalReviewComments > 0 && (
-            <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded-full bg-primary/15 font-mono text-primary font-semibold border border-primary/30">
+            <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.2 rounded-full bg-primary/15 font-mono text-primary font-semibold border border-primary/30">
               <MessageSquare className="size-2.5" />
               <span>{totalReviewComments}</span>
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
+          {/* Toggle between Diff view and Git commit view */}
+          <button
+            type="button"
+            onClick={() => setPanelMode((m) => (m === 'diff' ? 'git' : 'diff'))}
+            className={cn(
+              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-3xs font-medium transition-colors cursor-pointer border',
+              panelMode === 'git'
+                ? 'bg-primary/15 text-primary border-primary/30 font-semibold'
+                : 'bg-surface2 text-foreground-muted hover:text-foreground border-border/60'
+            )}
+          >
+            <GitCommit className="size-3" />
+            <span>{panelMode === 'git' ? 'View Diff' : 'Git Commit'}</span>
+          </button>
+
           {panelMode === 'diff' && files.length > 0 && (
             <Hint label={showFileTree ? 'Hide File Tree' : 'Show File Tree'}>
               <button
@@ -265,29 +254,7 @@ export function DiffStudioPanel() {
               </button>
             </Hint>
           )}
-          {totalReviewComments > 0 && review && (
-            <Hint label="Clear all inline review comments">
-              <button
-                type="button"
-                onClick={review.clearComments}
-                className="px-2 py-1 rounded-md text-3xs font-medium text-foreground-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
-              >
-                Clear Comments
-              </button>
-            </Hint>
-          )}
-          {panelMode === 'diff' && files.length > 0 && (
-            <Hint label="Discard all modified files">
-              <button
-                type="button"
-                onClick={() => setConfirmDiscardAll(true)}
-                disabled={Boolean(discarding)}
-                className="px-2 py-1 rounded-md text-3xs font-medium text-destructive hover:bg-destructive/10 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Discard All
-              </button>
-            </Hint>
-          )}
+
           {panelMode === 'diff' && selectedPath && (
             <Hint label={copied ? 'Copied' : 'Copy diff'}>
               <button
@@ -299,6 +266,7 @@ export function DiffStudioPanel() {
               </button>
             </Hint>
           )}
+
           <Hint label="Refresh diffs">
             <button
               type="button"
