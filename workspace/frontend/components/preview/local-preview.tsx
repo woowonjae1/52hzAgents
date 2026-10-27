@@ -55,7 +55,7 @@ interface WebviewElement extends HTMLElement {
   isDevToolsOpened(): boolean;
 }
 
-export type ViewportMode = 'desktop' | 'mobile' | 'responsive';
+export type ViewportMode = 'responsive' | 'mobile';
 
 const DEFAULT_URL = 'http://localhost:3000';
 const QUICK_PORTS = [3000, 5173, 8080, 8000];
@@ -125,7 +125,7 @@ export function LocalPreview() {
 
   const [url, setUrl] = React.useState(previewUrl || DEFAULT_URL);
   const [draft, setDraft] = React.useState(previewUrl || DEFAULT_URL);
-  const [viewport, setViewport] = React.useState<ViewportMode>('desktop');
+  const [viewport, setViewport] = React.useState<ViewportMode>('responsive');
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [consoleErrors, setConsoleErrors] = React.useState<string[]>([]);
@@ -338,7 +338,7 @@ export function LocalPreview() {
         </form>
 
         {/* Quick Port Badges */}
-        <div className="hidden lg:flex items-center gap-1 shrink-0">
+        <div className="hidden xl:flex items-center gap-1 shrink-0">
           {[
             ...lanePorts.map((l) => ({
               key: `lane-${l.agent}`,
@@ -384,21 +384,21 @@ export function LocalPreview() {
           })}
         </div>
 
-        {/* Viewport Mode Switcher (Desktop / Mobile Phone Frame / Responsive) */}
+        {/* Viewport Mode Switcher (Fluid Responsive vs Mobile Phone Frame) */}
         <div className="flex items-center gap-1 shrink-0">
           <div className="flex items-center gap-0.5 rounded-lg bg-surface2/70 p-0.5 border border-border/40">
-            <Hint label="Desktop Viewport (100%)">
+            <Hint label="Fluid Responsive View">
               <button
                 type="button"
-                onClick={() => setViewport('desktop')}
+                onClick={() => setViewport('responsive')}
                 className={cn(
                   'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
-                  viewport === 'desktop'
+                  viewport !== 'mobile'
                     ? 'bg-surface0 text-foreground shadow-xs font-semibold'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <Monitor className="size-3" />
+                <Maximize2 className="size-3" />
               </button>
             </Hint>
             <Hint label="Mobile Phone Frame (390×844)">
@@ -413,20 +413,6 @@ export function LocalPreview() {
                 )}
               >
                 <Smartphone className="size-3" />
-              </button>
-            </Hint>
-            <Hint label="Responsive Viewport">
-              <button
-                type="button"
-                onClick={() => setViewport('responsive')}
-                className={cn(
-                  'size-6 rounded flex items-center justify-center transition-colors cursor-pointer',
-                  viewport === 'responsive'
-                    ? 'bg-surface0 text-foreground shadow-xs font-semibold'
-                    : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Maximize2 className="size-3" />
               </button>
             </Hint>
           </div>
