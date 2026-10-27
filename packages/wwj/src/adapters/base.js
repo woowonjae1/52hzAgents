@@ -2475,6 +2475,7 @@ class BaseAdapter {
       */
       const failed = Boolean(this._turnFailed && this._turnFailed.has(channelName));
       const closedStatus = failed ? 'cancelled' : 'completed';
+      const pendingMine = mine.filter((t) => t.status === 'pending');
       const next = mine.map((t) => ({
         content: t.content,
         status: t.status === 'in_progress' && !t.scope ? closedStatus : t.status,
@@ -2490,9 +2491,17 @@ class BaseAdapter {
         scope: t.scope,
         due_date: t.dueDate || t.due_date,
       }));
-      if (!next.some((t, i) => t.status !== mine[i].status)) return;
-      await this.client.putTodos(this.workspaceId, channelName, this.token, next, { source });
-      this._log(`Released stale in_progress to-dos after turn ended: ${reason}`);
+      if (next.some((t, i) => t.status !== mine[i].status)) {
+        await this.client.putTodos(this.workspaceId, channelName, this.token, next, { source });
+        this._log(`Released stale in_progress to-dos after turn ended: ${reason}`);
+      }
+      if (failed && pendingMine.length > 0) {
+        try {
+          await this.sendStatus(channelName,
+            `@${this.agentName}'s turn ended with an error; ${pendingMine.length} pending task(s) remain unstarted. You can re-prompt an agent to resume or archive them from Tasks.`
+          );
+        } catch {}
+      }
     } catch (e) {
       this._log(`Could not release stale to-dos: ${e.message}`);
     }

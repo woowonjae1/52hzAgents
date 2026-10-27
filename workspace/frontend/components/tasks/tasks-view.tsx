@@ -343,6 +343,33 @@ export function TasksView() {
     }
   };
 
+  const [cancelPendingArmed, setCancelPendingArmed] = useState(false);
+  const [cancellingPending, setCancellingPending] = useState(false);
+  useEffect(() => {
+    if (!cancelPendingArmed) return;
+    const t = setTimeout(() => setCancelPendingArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [cancelPendingArmed]);
+
+  const cancelPendingTasks = async (items: TodoItem[]) => {
+    if (!cancelPendingArmed) {
+      setCancelPendingArmed(true);
+      return;
+    }
+    setCancelPendingArmed(false);
+    setCancellingPending(true);
+    try {
+      await mutate('Some pending tasks could not be archived', async () => {
+        for (const todo of items) {
+          await updateTodo(todo.id, { status: 'cancelled' });
+        }
+      });
+      toast.success(`Archived ${items.length} unstarted task(s)`);
+    } finally {
+      setCancellingPending(false);
+    }
+  };
+
   const removeTask = (todo: TodoItem) => {
     setTaskToDelete(todo);
   };
@@ -670,6 +697,7 @@ export function TasksView() {
               onUpdatePriority={(todo, newPriority) => void updatePriority(todo, newPriority)}
               onEdit={openEdit}
               onDelete={(todo) => void removeTask(todo)}
+              onArchivePending={(items) => void cancelPendingTasks(items)}
               onQuickCreate={(groupVal) =>
                 openCreate(
                   displaySettings.grouping === 'channel' ? groupVal : undefined,
@@ -735,21 +763,51 @@ export function TasksView() {
                           >
                             {clearing ? 'Clearing…' : clearArmed ? `Clear ${group.items.length}?` : 'Clear'}
                           </button>
+                        ) : group.id === 'pending' && group.items.length > 0 ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => cancelPendingTasks(group.items)}
+                              disabled={cancellingPending}
+                              className={cn(
+                                'px-2 py-0.5 rounded-md text-2xs font-medium transition-colors disabled:opacity-50',
+                                cancelPendingArmed
+                                  ? 'bg-status-danger/10 text-status-danger hover:bg-status-danger/15'
+                                  : 'text-foreground-extra-muted hover:text-foreground hover:bg-surface2'
+                              )}
+                            >
+                              {cancellingPending ? 'Archiving…' : cancelPendingArmed ? `Archive ${group.items.length}?` : 'Archive unstarted'}
+                            </button>
+                            <Hint label={`Add task to ${group.title}`}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openCreate(
+                                    displaySettings.grouping === 'channel' ? group.id : undefined,
+                                    displaySettings.grouping === 'status' ? (group.id as TodoStatus) : undefined
+                                  )
+                                }
+                                className="p-1 text-foreground-extra-muted hover:text-foreground hover:bg-surface2 rounded transition-colors"
+                              >
+                                <Plus className="size-3.5" />
+                              </button>
+                            </Hint>
+                          </div>
                         ) : (
-                        <Hint label={`Add task to ${group.title}`}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              openCreate(
-                                displaySettings.grouping === 'channel' ? group.id : undefined,
-                                displaySettings.grouping === 'status' ? (group.id as TodoStatus) : undefined
-                              )
-                            }
-                            className="p-1 text-foreground-extra-muted hover:text-foreground hover:bg-surface2 rounded transition-colors"
-                          >
-                            <Plus className="size-3.5" />
-                          </button>
-                        </Hint>
+                          <Hint label={`Add task to ${group.title}`}>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openCreate(
+                                  displaySettings.grouping === 'channel' ? group.id : undefined,
+                                  displaySettings.grouping === 'status' ? (group.id as TodoStatus) : undefined
+                                )
+                              }
+                              className="p-1 text-foreground-extra-muted hover:text-foreground hover:bg-surface2 rounded transition-colors"
+                            >
+                              <Plus className="size-3.5" />
+                            </button>
+                          </Hint>
                         )}
                       </div>
 

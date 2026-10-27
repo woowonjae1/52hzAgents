@@ -54,6 +54,7 @@ interface TasksBoardProps {
   onUpdatePriority: (todo: TodoItem, newPriority: TodoPriority) => void;
   onEdit: (todo: TodoItem) => void;
   onDelete: (todo: TodoItem) => void;
+  onArchivePending?: (items: TodoItem[]) => void;
   onQuickCreate: (groupValue: string) => void;
   /** Shared clock, so every card's relative time comes from one tick. */
   now: number;
@@ -87,6 +88,7 @@ export function TasksBoard({
   onUpdatePriority,
   onEdit,
   onDelete,
+  onArchivePending,
   onQuickCreate,
   now,
 }: TasksBoardProps) {
@@ -228,15 +230,27 @@ export function TasksBoard({
                 {col.tasks.length}
               </span>
             </div>
-            <Hint label={`Add task to ${col.title}`}>
-              <button
-                type="button"
-                onClick={() => onQuickCreate(col.id)}
-                className="p-1 text-foreground-muted hover:text-foreground hover:bg-surface2 rounded-md transition-colors"
-              >
-                <Plus className="size-3.5" />
-              </button>
-            </Hint>
+            <div className="flex items-center gap-1">
+              {col.id === 'pending' && col.tasks.length > 0 && onArchivePending && (
+                <button
+                  type="button"
+                  onClick={() => onArchivePending(col.tasks)}
+                  className="px-1.5 py-0.5 rounded text-3xs font-medium text-foreground-extra-muted hover:text-foreground hover:bg-surface2 transition-colors cursor-pointer"
+                  title="Archive all unstarted tasks"
+                >
+                  Archive
+                </button>
+              )}
+              <Hint label={`Add task to ${col.title}`}>
+                <button
+                  type="button"
+                  onClick={() => onQuickCreate(col.id)}
+                  className="p-1 text-foreground-muted hover:text-foreground hover:bg-surface2 rounded-md transition-colors"
+                >
+                  <Plus className="size-3.5" />
+                </button>
+              </Hint>
+            </div>
           </div>
 
           {/* Cards List */}
