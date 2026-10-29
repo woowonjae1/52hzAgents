@@ -6,7 +6,7 @@ import { useWorkspace } from '@/lib/workspace-context';
 import { Sidebar } from '@/components/layout/sidebar';
 import { SidebarExpandButton } from '@/components/layout/sidebar-expand-button';
 import { ChatView } from '@/components/chat/chat-view';
-import { HomeDashboard } from '@/components/home/home-dashboard';
+import { ProjectHome } from '@/components/home/project-home';
 import { TasksView } from '@/components/tasks/tasks-view';
 import { InboxView } from '@/components/inbox/inbox-view';
 import { KnowledgeView } from '@/components/knowledge/knowledge-view';
@@ -124,7 +124,7 @@ export function WorkbenchLayout({
                   </main>
                 </div>
 
-                {isHome && <HomeDashboard />}
+                {isHome && <ProjectHome />}
                 {viewMode === 'tasks' && <TasksView />}
                 {viewMode === 'inbox' && <InboxView />}
                 {viewMode === 'knowledge' && <KnowledgeView />}
@@ -236,7 +236,7 @@ export function WorkbenchLayout({
               {/* Studio Content Pane */}
               <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
                 {(effectiveStudioTab === 'canvas' || effectiveStudioTab === 'file') && <ArtifactsCanvas embedded />}
-                {effectiveStudioTab === 'diff' && <DiffStudioPanel />}
+                {effectiveStudioTab === 'diff' && <DiffStudioPanel key={currentSessionId} />}
                 {effectiveStudioTab === 'terminal' && <TerminalPanel />}
                 {effectiveStudioTab === 'preview' && <LocalPreview />}
                 {effectiveStudioTab === 'knowledge' && <KnowledgeView embedded />}

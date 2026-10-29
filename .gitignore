@@ -158,6 +158,8 @@ package-lock.json.bak
 .mcp.json
 .next/
 .playwright-mcp/
+.playwright-cli/
+output/playwright/
 .dev/
 tsconfig.tsbuildinfo
 deploy/

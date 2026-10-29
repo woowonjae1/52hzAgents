@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { workspaceApi } from './api';
 import { useWorkspace } from './workspace-context';
 import { useVisibilityPolling } from './use-visibility-polling';
@@ -15,6 +15,7 @@ export interface GitFileChange {
 
 export interface GitStatus {
   available: boolean;
+  read_only?: boolean;
   reason?: string;
   dir: string;
   dir_name: string;
@@ -70,6 +71,8 @@ export function useGitStatus(channelId: string | null | undefined) {
     ? sessions.find((s) => s.sessionId === channelId)?.workingDir ?? null
     : null;
   const boundChannelId = channelId && workingDir ? channelId : null;
+  const activeBinding = useRef(boundChannelId);
+  activeBinding.current = boundChannelId;
 
   const refresh = useCallback(async () => {
     if (!boundChannelId) {
@@ -78,9 +81,12 @@ export function useGitStatus(channelId: string | null | undefined) {
       return;
     }
     try {
-      setStatus(await workspaceApi.getGitStatus(boundChannelId));
+      const next = await workspaceApi.getGitStatus(boundChannelId);
+      if (activeBinding.current !== boundChannelId) return;
+      setStatus(next);
       setError(null);
     } catch (e) {
+      if (activeBinding.current !== boundChannelId) return;
       // A backend without the git routes, or a directory that has gone away, is
       // an ordinary state here — the chip simply does not render. Not worth a
       // toast on every poll.
@@ -99,6 +105,11 @@ export function useGitStatus(channelId: string | null | undefined) {
   }, [boundChannelId, channelId, refresh]);
 
   useVisibilityPolling(refresh, POLL_MS, { enabled: !!boundChannelId });
+  useEffect(() => {
+    const changed = (event: Event) => { if ((event as CustomEvent).detail?.channel === boundChannelId) void refresh(); };
+    window.addEventListener('52hz:project-files-changed', changed);
+    return () => window.removeEventListener('52hz:project-files-changed', changed);
+  }, [boundChannelId, refresh]);
 
   // `channelId` is echoed back so write calls (stage, commit) go to the same
   // channel the status came from, and are skipped entirely when there is none.

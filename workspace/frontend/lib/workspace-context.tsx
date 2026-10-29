@@ -836,6 +836,13 @@ export function WorkspaceProvider({
       sessionIds.map((sid) => workspaceApi.haltChannelPipeline(sid))
     );
 
+    const directStops = await Promise.allSettled(sessionIds.map(channel => workspaceApi.request('/v1/runtime/stop', {
+      method: 'POST', body: JSON.stringify({ channel }),
+    })));
+    if (directStops.every(result => result.status === 'fulfilled')) {
+      window.setTimeout(() => setStoppingSessionIds(prev => { const next = new Set(prev); sessionIds.forEach(id => next.delete(id)); return next; }), 2000);
+      return;
+    }
     await Promise.allSettled([sendStop(), haltPipelines()]);
 
     window.setTimeout(() => {
@@ -1843,12 +1850,21 @@ export function WorkspaceProvider({
                 break;
               }
 
+              case 'workspace.runtime.tool.updated': {
+                window.dispatchEvent(new CustomEvent('52hz:runtime-tool-updated', { detail: event.payload }));
+                if ((event.payload as { status?: string }).status === 'completed' || (event.payload as { status?: string }).status === 'failed') window.dispatchEvent(new CustomEvent('52hz:project-files-changed', { detail: { channel: event.target?.replace(/^channel\//, '') } }));
+                break;
+              }
+              case 'workspace.project.files.changed': {
+                window.dispatchEvent(new CustomEvent('52hz:project-files-changed', { detail: { ...event.payload, channel: event.target?.replace(/^channel\//, '') } }));
+                break;
+              }
               case 'workspace.agent.turn.updated': {
                 // Relayed, not stored here: lib/use-agent-turns owns the rows
                 // (and imports this module, so it cannot be imported back).
                 // Tagged with the route key: the row's workspace_id is a UUID
                 // the store (keyed by the route slug) cannot compare against.
-                window.dispatchEvent(new CustomEvent('wwj:agent-turn-updated', { detail: { ...event.payload, workspace: workspaceId } }));
+                window.dispatchEvent(new CustomEvent('wwj:agent-turn-updated', { detail: { turn: event.payload.turn || event.payload, workspace: workspaceId } }));
                 break;
               }
 
@@ -1995,11 +2011,14 @@ export function WorkspaceProvider({
       return Promise.reject(new Error('This new chat is no longer open'));
     }
     const promise = (async () => {
+      let runtimeConfig: Record<string, unknown> | undefined;
+      try { runtimeConfig = JSON.parse(localStorage.getItem(`52hz_runtime_${draftId}`) || 'null') || undefined; } catch {}
       let session = await workspaceApi.createChannel({
         title: draft.title || undefined,
         master: draft.master || undefined,
         participants: draft.participants,
         resumeFrom: draftCreateOptsRef.current.resumeFrom,
+        runtimeConfig,
       });
 
       // The folder binding and a non-default mode ride a separate PATCH --

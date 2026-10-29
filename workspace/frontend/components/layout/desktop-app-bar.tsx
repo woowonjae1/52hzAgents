@@ -205,11 +205,10 @@ export function DesktopAppBar() {
   }, [activeWorkingDir, createSession, setActiveProjectDir, setCurrentSessionId, setViewMode]);
 
   // All Workspaces / Root Home click
-  const isAllWorkspacesActive = !activeProjectDir && viewMode === 'threads';
+  const isAllWorkspacesActive = !activeProjectDir && viewMode === 'home';
   const handleAllWorkspacesClick = useCallback(() => {
     setActiveProjectDir(null);
-    setViewMode('threads');
-    toast.info('Viewing all sessions across all workspaces');
+    setViewMode('home');
   }, [setActiveProjectDir, setViewMode]);
 
   // Open Command Palette

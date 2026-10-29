@@ -2,14 +2,17 @@
   "name": "52hzagents-desktop",
   "version": "1.0.0",
   "description": "52hzAgent Studio Local-First Multi-Agent Orchestration Desktop Client",
+  "author": "52hzAgents Team",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "test:server": "node --test server/workspace.test.js server/runtime.test.js server/project-reader.test.js server/pi-engine.test.mjs server/config.test.js server/round4.test.mjs",
+    "clean-running": "node clean-processes.js",
     "prepack": "npm run sync-all",
-    "pack": "electron-builder --dir",
+    "pack": "node build-desktop.cjs --dir",
     "predist": "npm run sync-all",
-    "dist": "electron-builder --win",
+    "dist": "node build-desktop.cjs --win",
     "build-icons": "node build-icons.js",
     "build-frontend": "npm --prefix ../frontend run build",
     "sync-public": "node -e \"const fs=require('fs'),path=require('path');const src='../frontend/out',dest='resources/public';if(!fs.existsSync(src)){console.error('frontend/out missing - run build-frontend first');process.exit(1);}if(fs.existsSync(dest))fs.rmSync(dest,{recursive:true,force:true,maxRetries:3});fs.cpSync(src,dest,{recursive:true});console.log('Frontend export cleanly synced to resources/public');\"",
@@ -17,7 +20,7 @@
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "electron": "^31.7.7",
+    "electron": "45.1.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
@@ -35,6 +38,7 @@
       "main.js",
       "preload.js",
       "server/**",
+      "!server/*.test.*",
       "icon.png",
       "icon.ico",
       "tray-icon.png"
@@ -48,6 +52,10 @@
       {
         "from": "resources",
         "to": "."
+      },
+      {
+        "from": "PI-LICENSE.txt",
+        "to": "PI-LICENSE.txt"
       }
     ],
     "win": {
@@ -64,5 +72,15 @@
       "createStartMenuShortcut": true,
       "shortcutName": "52hzAgents"
     }
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "ignore": "7.0.8",
+    "minimatch": "10.2.6"
+  },
+  "overrides": {
+    "undici": "8.12.3"
   }
 }

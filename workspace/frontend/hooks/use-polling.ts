@@ -394,6 +394,12 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
           if (sessionId !== currentSessionRef.current) return;
           try {
             const event = JSON.parse(ev.data);
+            if (event.type === 'workspace.message.streaming') {
+              const preview = scopeMessageToSession(eventToMessage(event), sessionId, null);
+              if (!preview) return;
+              setMessages(prev => deduplicateAndSortMessages([...prev.filter(m => m.messageId !== preview.messageId), preview]));
+              return;
+            }
             // The SSE stream carries every event for the channel, not just
             // chat messages. Only render posted messages — otherwise control
             // events like network.channel.join/leave (emitted when adding or
@@ -403,7 +409,7 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
             if (!msg) return;
             newestIdRef.current = msg.messageId;
             setMessages((prev) => {
-              return deduplicateAndSortMessages([...prev, msg]);
+              return deduplicateAndSortMessages([...prev.filter(m => !(m.messageId === msg.messageId && m.metadata?.streaming)), msg]);
             });
             // Successful receipt confirms live channel
             sseRetryCountRef.current = 0;

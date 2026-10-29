@@ -42,6 +42,7 @@ import type { WorkspaceAgent, KnowledgeEntry, WorkspaceSession, WorkspaceCustomS
 import { DEFAULT_AGENT_CATALOG, catalogAsOfflineAgents } from '@/lib/agent-catalog';
 import { AgentAvatar } from '@/components/agents/agent-avatar';
 import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
+import { SessionRuntimeControls } from '@/components/chat/session-runtime-controls';
 import { composerPillClass } from './composer-pill';
 import { OrchestrationControl, ORCHESTRATION_MODES } from '@/components/chat/orchestration-control';
 import { AgentProfileControl } from '@/components/chat/agent-profile-control';
@@ -202,6 +203,7 @@ export function PromptComposer({
   headerBar,
 }: PromptComposerProps) {
   const [message, setMessage] = React.useState(draft ?? '');
+  const [hasSessionRuntime, setHasSessionRuntime] = React.useState(false);
   const [showMentions, setShowMentions] = React.useState(false);
 
   // Sync draft prop changes into local message state without requiring full ChatView re-renders
@@ -485,6 +487,7 @@ export function PromptComposer({
 
     if (files.length === 0) return;
     e.preventDefault();
+    if (hasSessionRuntime) { toast.info('Image attachments are not connected yet. Paste text into your message.'); return; }
     addFiles(files);
   };
 
@@ -494,6 +497,7 @@ export function PromptComposer({
     e.stopPropagation();
     setIsDragging(false);
     dragCountRef.current = 0;
+    if (hasSessionRuntime) { toast.info('Attachments are not connected to this model session yet. Paste text into your message.'); return; }
     // A disabled composer cannot send, so it must not collect attachments either.
     if (disabled) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -1056,7 +1060,7 @@ export function PromptComposer({
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="relative flex w-full flex-col gap-1.5"
+        className={cn('relative flex w-full flex-col gap-1.5', hasSessionRuntime && '[&_[data-team-controls]]:hidden')}
       >
         {isDragging && (
           <div className="absolute inset-0 z-50 flex items-center justify-center rounded-[10px] border-2 border-dashed border-brand bg-background/85 backdrop-blur-xs pointer-events-none animate-in fade-in-0 duration-150">
@@ -1290,16 +1294,17 @@ export function PromptComposer({
               '[&_button:hover]:bg-surface2'
             )}
           >
-            <AgentModelSwitcher
+            <SessionRuntimeControls sessionId={session?.sessionId} running={isWorking} onAvailabilityChange={setHasSessionRuntime} fallback={<AgentModelSwitcher
               agentName={masterAgentName}
               participants={session?.participants}
               sessionId={session?.sessionId}
-            />
+            />} />
 
-            <Hint label="Attach file or image">
+            <Hint label={hasSessionRuntime ? 'Attachments are not connected yet; paste text into your message' : 'Attach file or image'}>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={hasSessionRuntime}
                 className={cn(
                   pillButton,
                   'size-7 px-0 justify-center text-foreground-extra-muted hover:text-foreground transition-colors cursor-pointer active:scale-95',
@@ -1311,7 +1316,7 @@ export function PromptComposer({
               </button>
             </Hint>
 
-            {(() => {
+            {!hasSessionRuntime && (() => {
               const canRfc = !disabled && (agents?.length ?? 0) >= 2;
               const isRfcActive = message.startsWith('/rfc');
               return (
@@ -1422,7 +1427,7 @@ export function PromptComposer({
                 </DropdownMenuSub>
 
                 {/* Collaboration Mode */}
-                {session && onOrchestrationChange && (
+                {!hasSessionRuntime && session && onOrchestrationChange && (
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
                       <Waypoints className="size-4 text-muted-foreground shrink-0" />

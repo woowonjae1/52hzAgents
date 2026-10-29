@@ -52,6 +52,11 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
       try {
         const next = await workspaceApi.getParallelBatch(channelName);
         if (!cancelled) {
+          if ((next as ParallelBatch & { supported?: boolean })?.supported === false) {
+            setBatch(null);
+            setError(null);
+            return;
+          }
           const isLiveOrReview = next?.run?.batch.status === 'running' || next?.run?.batch.status === 'review';
           if (active || isLiveOrReview) {
             setBatch(next);

@@ -26,7 +26,7 @@ import { useLayout } from '@/components/layout/layout-context';
 import { useGitStatus } from '@/lib/use-git-status';
 import { useReviewOptional } from '@/lib/review-context';
 import { getSmartSessionTitle } from '@/components/threads/thread-list';
-import { basename } from '@/components/chat/project-folder-picker';
+import { basename, recentWorkingDirs } from '@/components/chat/project-folder-picker';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ThemeToggle } from '@/components/motion/theme-toggle';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -148,6 +148,9 @@ export function WorkbenchSidebarContent() {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(() => loadPinnedSessionIds());
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [recentDirs, setRecentDirs] = useState<string[]>([]);
+  React.useEffect(() => setRecentDirs(recentWorkingDirs()), [currentSessionId, activeProjectDir]);
+  const projectDirs = useMemo(() => [...new Set([...recentDirs, ...sessions.flatMap(s => s.workingDir ? [s.workingDir] : [])])], [recentDirs, sessions]);
 
   const onlineAgentsCount = useMemo(() => agents.filter((a) => a.status === 'online').length, [agents]);
 
@@ -585,7 +588,7 @@ export function WorkbenchSidebarContent() {
               </span>
             ) : (
               <span className="text-3xs font-mono px-1.5 py-0.2 rounded-full bg-surface3/70 text-foreground-extra-muted">
-                clean
+                —
               </span>
             )}
           </button>
@@ -605,11 +608,10 @@ export function WorkbenchSidebarContent() {
           >
             <div className="flex items-center gap-2 min-w-0">
               <Bot className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Agent Team</span>
+              <span className="truncate">Workspace</span>
             </div>
             <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-surface3 text-foreground-muted border border-border/40 font-mono">
-              <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-              <span>{onlineAgentsCount} online</span>
+              <span>{projectDirs.length} projects</span>
             </span>
           </button>
 
@@ -628,7 +630,7 @@ export function WorkbenchSidebarContent() {
           >
             <div className="flex items-center gap-2 min-w-0">
               <Blocks className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Skills & MCP</span>
+              <span className="truncate">Skills</span>
             </div>
           </button>
 
@@ -651,6 +653,14 @@ export function WorkbenchSidebarContent() {
             </div>
           </button>
         </nav>
+
+        <div className="border-t border-border/60 pt-3 pb-1 space-y-1">
+          <div className="flex items-center justify-between px-2.5 mb-1 text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted"><span>Projects</span><button type="button" aria-label="Open project workspace" onClick={() => setViewMode('home')} className="rounded p-1 hover:bg-surface2"><Plus className="size-3" /></button></div>
+          <select aria-label="Filter sessions by project" value={activeProjectDir || ''} onChange={e => setActiveProjectDir(e.target.value || null)} className="w-full rounded-lg border border-border/60 bg-surface1 px-2.5 py-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <option value="">All projects</option>
+            {projectDirs.map(dir => <option key={dir} value={dir}>{basename(dir)}</option>)}
+          </select>
+        </div>
 
         {/* Search Input Box */}
         <div className="relative flex items-center">

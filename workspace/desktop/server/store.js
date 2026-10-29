@@ -137,6 +137,8 @@ class Store {
     }
 
     this.data.events.push(normalized);
+    const channel = this.getChannel(normalized.target.replace(/^channel\//, ''));
+    if (channel && normalized.type === 'workspace.message.posted') channel.last_event_at = normalized.timestamp;
     // Keep max 5000 recent events
     if (this.data.events.length > 5000) {
       this.data.events.splice(0, this.data.events.length - 5000);
@@ -154,11 +156,16 @@ class Store {
     if (opts.type) {
       result = result.filter((e) => e.type.startsWith(opts.type));
     }
+    if (opts.target) result = result.filter(e => e.target === opts.target);
     if (opts.after) {
-      result = result.filter((e) => e.id > opts.after || String(e.timestamp) > opts.after);
+      const cursor = this.data.events.find(e => e.id === opts.after);
+      if (cursor) { const later = new Set(this.data.events.slice(this.data.events.indexOf(cursor) + 1)); result = result.filter(e => later.has(e)); }
+      else if (Number.isFinite(Number(opts.after))) result = result.filter(e => e.timestamp > Number(opts.after));
     }
     if (opts.before) {
-      result = result.filter((e) => e.id < opts.before || String(e.timestamp) < opts.before);
+      const cursor = this.data.events.find(e => e.id === opts.before);
+      if (cursor) { const earlier = new Set(this.data.events.slice(0, this.data.events.indexOf(cursor))); result = result.filter(e => earlier.has(e)); }
+      else if (Number.isFinite(Number(opts.before))) result = result.filter(e => e.timestamp < Number(opts.before));
     }
     if (opts.search) {
       const q = opts.search.toLowerCase();

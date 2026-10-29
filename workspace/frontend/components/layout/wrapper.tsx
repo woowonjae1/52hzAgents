@@ -16,7 +16,7 @@ import { TasksView } from '@/components/tasks/tasks-view';
 import { InboxView } from '@/components/inbox/inbox-view';
 import { useWorkspace } from '@/lib/workspace-context';
 import { SettingsView } from '@/components/settings/settings-view';
-import { HomeDashboard } from '@/components/home/home-dashboard';
+import { ProjectHome } from '@/components/home/project-home';
 
 import { NewThreadDialogHost } from '@/components/threads/new-thread-dialog-host';
 import { DropzoneOverlay } from '@/components/files/dropzone-overlay';
@@ -259,7 +259,7 @@ function WrapperInner() {
           {/* Full-screen views (no list/detail split) */}
           {isHome || (isHome && mobilePane === 'detail') ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">
-              <HomeDashboard />
+              <ProjectHome />
             </div>
           ) : viewMode === 'tasks' ? (
             <div className="h-full mx-2 my-1.5 bg-card overflow-hidden border border-border dark:border-border rounded-xl shadow-sm">

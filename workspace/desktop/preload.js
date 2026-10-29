@@ -19,6 +19,7 @@ function subscribe(channel, handler) {
 
 contextBridge.exposeInMainWorld('electronBridge', {
   isDesktop: true,
+  importPiConnections: () => ipcRenderer.invoke('model-connections-import-pi'),
   platform: process.platform,
   isWindows11,
   minimizeWindow: () => ipcRenderer.send('window-minimize'),

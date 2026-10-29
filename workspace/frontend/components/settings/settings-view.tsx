@@ -104,13 +104,22 @@ export function SettingsView() {
   const [exporting, setExporting] = useState(false);
   const [showConnectAgent, setShowConnectAgent] = useState(false);
   const [markColor, setMarkColor] = useMarkColor();
+  const [localRuntime,setLocalRuntime] = useState<boolean|null>(null);
+  const embeddedRuntime = localRuntime === true || agents.some(agent => agent.agentType === 'embedded');
+  useEffect(()=>{
+    const controller=new AbortController();
+    void workspaceApi.request<{config?:unknown}>('/v1/runtime/session',{signal:controller.signal})
+      .then(result=>{if(!controller.signal.aborted)setLocalRuntime(Boolean(result.config));})
+      .catch(()=>{if(!controller.signal.aborted)setLocalRuntime(false);});
+    return ()=>controller.abort();
+  },[]);
 
   const { isCopied: urlCopied, copyToClipboard: copyUrl } = useCopyToClipboard();
   const { isCopied: tokenCopied, copyToClipboard: copyToken } = useCopyToClipboard();
 
   const SETTINGS_NAV_ITEMS: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
     { id: 'general', label: 'General & Desktop', icon: Settings },
-    { id: 'agents', label: 'Manage Agents', icon: Users },
+    { id: 'agents', label: embeddedRuntime ? 'Models & Connections' : 'Manage Agents', icon: Users },
     { id: 'panels', label: 'Panels & Display', icon: PanelRight },
     { id: 'export', label: 'Export & Share', icon: Download },
   ];
@@ -525,6 +534,7 @@ export function SettingsView() {
           {/* Tab 2: Manage Agents & Runtimes */}
           {settingsTab === 'agents' && (
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
+              {localRuntime === null ? <p className="text-xs text-foreground-muted">Loading model settings…</p> : embeddedRuntime ? <RouterProviderSettings /> : <>
               {/* How agents get chosen belongs beside who the agents are. */}
               {!showConnectAgent && <RouterProviderSettings />}
               {/* Who delegated work goes to, and how: agents pick from these. */}
@@ -702,6 +712,7 @@ export function SettingsView() {
                   </div>
                 </>
               )}
+              </>}
             </div>
           )}
 

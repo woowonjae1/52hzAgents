@@ -2,10 +2,10 @@
 
 import * as React from 'react';
 import { useLayout } from './layout-context';
-import { useWorkspace } from '@/lib/workspace-context';
+import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 
 const VIEW_LABEL: Record<string, string> = {
-  home: 'Agents',
+  home: 'Workspace',
   mission: 'Agents',
   files: 'Files',
   browser: 'Browser',
@@ -46,7 +46,7 @@ export function WindowTitle() {
     let subject: string | null = null;
     if (viewMode === 'threads') {
       const s = sessions.find((x) => x.sessionId === currentSessionId);
-      subject = s?.title || (currentSessionId ? `#${currentSessionId.replace(/^channel\//, '')}` : 'Home');
+      subject = s?.title || (currentSessionId && isDraftSessionId(currentSessionId) ? 'New session' : currentSessionId ? `#${currentSessionId.replace(/^channel\//, '')}` : 'Workspace');
     } else if (viewMode === 'settings') {
       const tab = settingsTab === 'general' ? 'Settings' : VIEW_LABEL[settingsTab] || 'Settings';
       subject = tab;

@@ -37,6 +37,8 @@ import { ArtifactInlineCard } from '../canvas/artifact-inline-card';
 import { MessageAttachments, type Attachment } from './message-attachments';
 import { SystemNotice } from './system-notice';
 import { UserChatMessage } from './user-chat-message';
+import { RuntimeToolCard, type RuntimeTool } from './runtime-tool-card';
+import { ExecutionEvidenceCard } from './execution-evidence-card';
 
 interface ChatMessageProps {
   message: WorkspaceMessage;
@@ -444,6 +446,8 @@ export const ChatMessage = memo(function ChatMessage({
 
   // An agent's proposed routine: decided in place (Approve / Reject).
   const routineProposal = message.metadata?.routine_proposal;
+  if (message.metadata?.runtime_tool) return <RuntimeToolCard initial={message.metadata.runtime_tool as RuntimeTool} />;
+
   if (routineProposal && typeof routineProposal === 'object' && routineProposal.routine_id) {
     return (
       <div className="py-1">
@@ -453,7 +457,7 @@ export const ChatMessage = memo(function ChatMessage({
   }
 
   if (isSystem) {
-    return <SystemNotice message={message} agentNames={agentNames} workingDir={workingDir} />;
+    return <><SystemNotice message={message} agentNames={agentNames} workingDir={workingDir} />{Boolean(message.metadata?.execution_evidence) && <ExecutionEvidenceCard evidence={message.metadata.execution_evidence as import('./execution-evidence-card').ExecutionEvidence} usage={message.metadata?.usage} />}</>;
   }
 
   // ── User Messages (Modularized Memoized Component) ──
@@ -696,6 +700,14 @@ export const ChatMessage = memo(function ChatMessage({
             <TurnChangesCapsule
               channelId={message.sessionId}
               turnChanges={message.metadata.turn_changes}
+            />
+          )}
+
+          {/* Objective Execution Evidence (Facts separated from Model text) */}
+          {Boolean(message.metadata?.execution_evidence) && (
+            <ExecutionEvidenceCard
+              evidence={message.metadata.execution_evidence as any}
+              usage={message.metadata.usage}
             />
           )}
 

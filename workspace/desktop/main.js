@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog, clipboard, powerMonitor, nativeTheme } = require('electron');
+const { app, BrowserWindow, Menu, Tray, shell, globalShortcut, ipcMain, Notification, dialog, clipboard, powerMonitor, nativeTheme, safeStorage } = require('electron');
 const path = require('path');
 const http = require('http');
 const net = require('net');
@@ -14,7 +14,7 @@ app.disableHardwareAcceleration();
 
 // 1. Isolate userData folder
 try {
-  const customUserData = path.join(app.getPath('appData'), '52hzAgents-Desktop');
+  const customUserData = process.env.OPENAGENTS_USER_DATA_DIR || path.join(app.getPath('appData'), '52hzAgents-Desktop');
   app.setPath('userData', customUserData);
 } catch (e) {}
 
@@ -176,6 +176,9 @@ async function startEmbeddedBackend() {
     port: serverPort,
     userDataPath: userData,
     staticDir,
+    runtimeOptions: {
+      safeStorage,
+    },
   });
   embeddedServer = server;
 
@@ -868,6 +871,11 @@ ipcMain.on('get-api-url-sync', (event) => {
   event.returnValue = `http://127.0.0.1:${serverPort || DEFAULT_PORT}`;
 });
 ipcMain.handle('get-api-url', () => `http://127.0.0.1:${serverPort || DEFAULT_PORT}`);
+ipcMain.handle('model-connections-import-pi', event => {
+  if(event.senderFrame!==event.sender.mainFrame || !event.senderFrame?.url?.startsWith(`http://127.0.0.1:${serverPort}/`)) throw new Error('Trusted desktop window required.');
+  if(!embeddedServer) throw new Error('Desktop service is not ready.');
+  return embeddedServer.importPiConnections();
+});
 ipcMain.on('window-close', () => {
   if (tray) {
     mainWindow?.hide();
@@ -1102,14 +1110,21 @@ app.whenReady().then(async () => {
   });
 });
 
+let shutdownStarted = false;
+let shutdownFinished = false;
 app.on('before-quit', (e) => {
+  if (!shutdownFinished && embeddedServer) {
+    e.preventDefault();
+    if (shutdownStarted) return;
+    shutdownStarted = true;
+    void embeddedServer.shutdown().catch(error => logToFile('ERROR', 'Shutdown:', error.message)).finally(() => {
+      shutdownFinished = true; app.quit();
+    });
+  }
   logToFile('INFO', 'app before-quit triggered');
   isQuitting = true;
   if (sseReq) {
     try { sseReq.destroy(); } catch (_) {}
-  }
-  if (embeddedServer) {
-    try { embeddedServer.close(); } catch (_) {}
   }
 });
 

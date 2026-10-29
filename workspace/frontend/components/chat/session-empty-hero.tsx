@@ -21,16 +21,16 @@ export const HERO_SUGGESTIONS: EmptyHeroSuggestion[] = [
   {
     icon: FileDiff,
     title: 'Refactor & review',
-    description: 'Inspect git changes, flag logic/type regressions, and review diffs.',
+    description: 'Discuss a code snippet or diff and identify possible regressions.',
     prompt:
       'Review the core architecture and code changes in this workspace. Inspect logic, types, and potential regressions, and provide proofreading recommendations.',
   },
   {
     icon: Terminal,
-    title: 'Run diagnostics & tests',
-    description: 'Verify test suites, background processes, runtimes, and active ports.',
+    title: 'Plan tests & checks',
+    description: 'Identify edge cases, useful checks, and commands to run.',
     prompt:
-      'Diagnose the local environment: check Node, Python, and Go runtimes, background tasks, active ports, and run test suites.',
+      'Help me plan the tests and diagnostics for this project. Explain the edge cases and suggest commands I can run.',
   },
   {
     icon: Layers,
@@ -42,7 +42,7 @@ export const HERO_SUGGESTIONS: EmptyHeroSuggestion[] = [
   {
     icon: Search,
     title: 'Research & compare',
-    description: 'Search documentation and best practices, then compare trade-offs.',
+    description: 'Compare approaches and trade-offs using the context you provide.',
     prompt:
       'Research current approaches and best practices for local multi-agent orchestration, then compare their trade-offs.',
   },
@@ -98,11 +98,11 @@ export function SessionEmptyHero({
           />
           <span>
             {hasOnlineAgents
-              ? `${onlineAgentCount} ${onlineAgentCount === 1 ? 'agent' : 'agents'} online`
+              ? `${onlineAgentCount} endpoints configured`
               : 'Connect an agent'}
           </span>
           <span className="text-foreground-extra-muted">/</span>
-          <span className="text-foreground-muted">Manage Agent Team</span>
+          <span className="text-foreground-muted">Workspace</span>
         </button>
 
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">

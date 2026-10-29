@@ -61,9 +61,14 @@ export function DiffStudioPanel() {
 
   const files = gitStatus?.files || [];
   const [panelMode, setPanelMode] = useState<'diff' | 'git'>('diff');
-  const [showFileTree, setShowFileTree] = useState(true);
+  const [showFileTree, setShowFileTree] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string>('');
   const [diffCache, setDiffCache] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const changed = (event: Event) => { if ((event as CustomEvent).detail?.channel === serverSessionId) setDiffCache({}); };
+    window.addEventListener('52hz:project-files-changed', changed);
+    return () => window.removeEventListener('52hz:project-files-changed', changed);
+  }, [serverSessionId]);
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,6 +98,10 @@ export function DiffStudioPanel() {
       return true;
     });
   }, [files, filterType, filterQuery]);
+
+  useEffect(() => {
+    setSelectedPath(''); setDiffCache({}); setLoadingFile(null);
+  }, [serverSessionId]);
 
   useEffect(() => {
     if (filteredFiles.length > 0 && (!selectedPath || !filteredFiles.some((f) => f.path === selectedPath))) {
@@ -229,6 +238,7 @@ export function DiffStudioPanel() {
           <button
             type="button"
             onClick={() => setPanelMode((m) => (m === 'diff' ? 'git' : 'diff'))}
+            disabled={gitStatus.read_only}
             className={cn(
               'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-3xs font-medium transition-colors cursor-pointer border',
               panelMode === 'git'
@@ -237,7 +247,7 @@ export function DiffStudioPanel() {
             )}
           >
             <GitCommit className="size-3" />
-            <span>{panelMode === 'git' ? 'View Diff' : 'Git Commit'}</span>
+            <span>{gitStatus.read_only ? 'Read only' : panelMode === 'git' ? 'View Diff' : 'Git Commit'}</span>
           </button>
 
           {panelMode === 'diff' && files.length > 0 && (
@@ -296,21 +306,24 @@ export function DiffStudioPanel() {
           <CheckCircle2 className="size-8 text-status-success mb-2.5 opacity-80" />
           <p className="text-xs font-semibold text-foreground">Working Tree Clean</p>
           <p className="text-3xs mt-1 max-w-xs text-foreground-extra-muted">
-            All agent changes have been committed or no pending modifications exist.
+            No uncommitted changes in this repository.
           </p>
           <button
             type="button"
             onClick={() => setPanelMode('git')}
+            disabled={gitStatus.read_only}
             className="mt-3 px-3 py-1.5 rounded-lg bg-surface2 hover:bg-surface3 text-foreground text-2xs font-medium border border-border/80 transition-colors cursor-pointer"
           >
-            Open Git & Sync Panel
+            {gitStatus.read_only ? 'Repository is read only' : 'Open Git & Sync Panel'}
           </button>
         </div>
       ) : (
-        <div className="flex flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-1 min-h-0 overflow-hidden flex-col">
+          {!showFileTree && <div className="shrink-0 border-b border-border px-3 py-2"><select aria-label="Changed file" value={selectedPath} onChange={e => setSelectedPath(e.target.value)} className="w-full rounded-md border border-border bg-surface1 px-2 py-1.5 text-xs text-foreground">{filteredFiles.map(file => <option key={file.path} value={file.path}>{file.status} · {file.path}</option>)}</select></div>}
+          <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Left File Tree Sidebar */}
           {showFileTree && (
-            <div className="w-56 md:w-64 shrink-0 h-full border-r border-border">
+            <div className="w-[34%] min-w-32 max-w-48 shrink-0 h-full border-r border-border">
               <FileTree
                 files={files}
                 selectedPath={selectedPath}
@@ -337,7 +350,7 @@ export function DiffStudioPanel() {
                   <button
                     type="button"
                     onClick={() => setConfirmDiscardPath(selectedPath)}
-                    disabled={Boolean(discarding)}
+                    disabled={Boolean(discarding) || gitStatus.read_only}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-destructive hover:bg-destructive/10 transition-colors cursor-pointer text-3xs font-medium disabled:opacity-50"
                   >
                     <Undo2 className="size-3" />
@@ -367,6 +380,7 @@ export function DiffStudioPanel() {
                 </div>
               )}
             </div>
+          </div>
           </div>
         </div>
       )}

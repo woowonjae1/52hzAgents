@@ -1,0 +1,8 @@
+{
+  "name": "calc-fixture",
+  "version": "1.0.0",
+  "description": "52hzAgents Verification Target Fixture",
+  "scripts": {
+    "test": "node --test test.js"
+  }
+}

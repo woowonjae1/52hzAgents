@@ -620,14 +620,14 @@ export function ComposerHeaderBar({
           </button>
         ) : null}
 
-        <TeamPillRow
+        <span data-team-controls><TeamPillRow
           members={teamMembers}
           availableAgents={availableAgents}
           activeAgentName={activeAgentName}
           onSelectAgent={onSelectTeamAgent}
           onAddTeammate={onAddTeammate}
           onOpenAgentsHub={onOpenAgentsHub}
-        />
+        /></span>
       </div>
 
       {/* Right side: TurnNavigationPopup + TodoProgressPopup */}

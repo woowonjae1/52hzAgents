@@ -112,6 +112,7 @@ export function useIsDesktop(): boolean {
  * preload.js and called from nowhere. Nobody knew they were there.
  */
 export interface ElectronBridge {
+  importPiConnections?: () => Promise<{ imported: { id:string; name:string; model:string }[]; skipped:string[] }>;
   isDesktop: true;
   platform: string;
   isWindows11?: boolean;

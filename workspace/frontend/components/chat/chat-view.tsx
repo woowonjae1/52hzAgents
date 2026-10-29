@@ -10,6 +10,7 @@ import { ChatMessages } from './chat-messages';
 import { ChatInput, type PendingFile, type MentionSegment } from './chat-input';
 import { ComposerHeaderBar, type TurnNavigationItem, type TeamPillMember } from './composer-header-bar';
 import { ThreadStatusBar } from './thread-status-bar';
+import { SessionUsageBar } from './session-usage-bar';
 import { useWorkspace, isDraftSessionId } from '@/lib/workspace-context';
 import { useMessagePolling } from '@/hooks/use-polling';
 import { loadWorkspaceSnapshots, saveThreadSnapshot, SNAPSHOT_THREADS } from '@/lib/message-snapshot';
@@ -1308,6 +1309,7 @@ export function ChatView() {
                   suppressSendBlockedNotice={isMissingParticipant}
                 />
               )}
+              <SessionUsageBar channelName={serverSessionId || null} messages={displayMessages} running={!!currentSessionId && activeSessionIds.has(currentSessionId)} />
             </SessionEmptyHero>
           )
         ) : (
@@ -1579,6 +1581,7 @@ export function ChatView() {
                 // The offline banner right above already says this.
                 suppressSendBlockedNotice={isMissingParticipant}
               />
+              <SessionUsageBar channelName={serverSessionId || null} messages={displayMessages} running={!!currentSessionId && activeSessionIds.has(currentSessionId)} />
             </div>
           </div>
         )}

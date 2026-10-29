@@ -681,6 +681,8 @@ export function deduplicateMessages(messages: WorkspaceMessage[]): WorkspaceMess
 
     // 1. Check exact messageId match
     if (m.messageId && seenIds.has(m.messageId)) {
+      const index = result.findIndex(existing => existing.messageId === m.messageId && existing.metadata?.streaming);
+      if (index >= 0 && !m.metadata?.streaming) result[index] = m;
       continue;
     }
 
