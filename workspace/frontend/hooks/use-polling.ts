@@ -419,6 +419,11 @@ export function useMessagePolling({ sessionId, enabled = true, initialMessages }
           }
         };
 
+        es.addEventListener('sync_required', () => {
+          newestIdRef.current = null;
+          void loadHistory();
+        });
+
         es.onerror = () => {
           sseFailedRef.current = true;
           es.close();

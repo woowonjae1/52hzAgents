@@ -208,9 +208,9 @@ class ConfigManager {
 
     // Versioned secret references make the configuration rename the commit point.
     // A failed URL/config write must never send a new key to the old endpoint.
-    const previous=this.userConnections;
-    const priorReference=old.credentialRef || `conn:${cleanId}`;
-    const reference=credentialAction==='replace'?`conn:${cleanId}:${crypto.randomUUID()}`:priorReference;
+    const previous = this.userConnections;
+    const priorReference = old.credentialRef || `conn:${cleanId}`;
+    const reference = credentialAction === 'replace' ? `conn:${cleanId}:${crypto.randomUUID()}` : priorReference;
     const existingIdx = this.userConnections.findIndex((c) => c.id === cleanId);
     const newRecord = {
       id: cleanId,
@@ -224,25 +224,48 @@ class ConfigManager {
       credentialDeleted: credentialAction === 'delete' ? true : credentialAction === 'replace' ? false : Boolean(old.credentialDeleted),
       credentialRef: reference,
     };
-    if(credentialAction==='replace')this.vault.set(reference,credentialValue.trim());
-    this.userConnections=existingIdx>=0?previous.map((record,index)=>index===existingIdx?{...record,...newRecord}:record):[...previous,newRecord];
-    try{this.saveUserConnections();}catch(error){
-      this.userConnections=previous;
-      if(credentialAction==='replace')try{this.vault.delete(reference);}catch{}
-      throw error;
+
+    const commitConfig = () => {
+      this.userConnections = existingIdx >= 0 ? previous.map((record, index) => index === existingIdx ? { ...record, ...newRecord } : record) : [...previous, newRecord];
+      try {
+        this.saveUserConnections();
+      } catch (error) {
+        this.userConnections = previous;
+        if (credentialAction === 'replace') try { this.vault.delete(reference); } catch {}
+        throw error;
+      }
+      if (credentialAction !== 'keep') {
+        try { this.vault.delete(priorReference); } catch { console.warn('[ConfigManager] Deferred cleanup of an unused encrypted credential.'); }
+      }
+      return this.getConnection(cleanId);
+    };
+
+    if (credentialAction === 'replace') {
+      const setResult = this.vault.set(reference, credentialValue.trim());
+      if (setResult && typeof setResult.then === 'function') {
+        return setResult.then(() => commitConfig());
+      }
     }
-    if(credentialAction!=='keep')try{this.vault.delete(priorReference);}catch{console.warn('[ConfigManager] Deferred cleanup of an unused encrypted credential.');}
-    return this.getConnection(cleanId);
+    return commitConfig();
   }
 
   deleteConnection(id) {
     const idx = this.userConnections.findIndex((c) => c.id === id);
-    const previous=this.userConnections,reference=previous[idx]?.credentialRef || `conn:${id}`;
+    const previous = this.userConnections;
+    const reference = previous[idx]?.credentialRef || `conn:${id}`;
     if (idx >= 0) {
-      this.userConnections=this.userConnections.filter(c=>c.id!==id);
-      try{this.saveUserConnections();}catch(error){this.userConnections=previous;throw error;}
+      this.userConnections = this.userConnections.filter((c) => c.id !== id);
+      try {
+        this.saveUserConnections();
+      } catch (error) {
+        this.userConnections = previous;
+        throw error;
+      }
     }
-    this.vault.delete(reference);
+    const delResult = this.vault.delete(reference);
+    if (delResult && typeof delResult.then === 'function') {
+      return delResult.then(() => ({ ok: true }));
+    }
     return { ok: true };
   }
 }

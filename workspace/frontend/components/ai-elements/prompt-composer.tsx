@@ -596,6 +596,7 @@ export function PromptComposer({
   );
 
   const filteredMentions = React.useMemo(() => {
+    if (hasSessionRuntime) return [];
     if (!mentionFilter) return scopedMentionItems;
     const q = mentionFilter.toLowerCase();
     return scopedMentionItems.filter((item) => {
@@ -616,7 +617,7 @@ export function PromptComposer({
         item.knowledge.slug?.toLowerCase().includes(q)
       );
     });
-  }, [scopedMentionItems, mentionFilter]);
+  }, [scopedMentionItems, mentionFilter, hasSessionRuntime]);
 
   const mentionGroups = React.useMemo(() => {
     const agentMatches: AgentMentionItem[] = [];
@@ -879,15 +880,15 @@ export function PromptComposer({
     }
   };
 
-  const canSend = (message.trim().length > 0 || pendingFiles.length > 0 || reviewCommentCount > 0) && !disabled && !sendBlockedReason;
-  const notice = disabled ? disabledReason : !suppressSendBlockedNotice ? sendBlockedReason : undefined;
+  const canSend = (message.trim().length > 0 || pendingFiles.length > 0 || reviewCommentCount > 0) && !disabled && (hasSessionRuntime || !sendBlockedReason);
+  const notice = disabled ? disabledReason : !hasSessionRuntime && !suppressSendBlockedNotice ? sendBlockedReason : undefined;
   const showHint = isFocused && !message.trim() && pendingFiles.length === 0 && !isWorking;
 
   return (
     <div className={cn('relative w-full', className)}>
       {/* Mention Auto-complete Popup */}
       <AnimatePresence>
-        {showMentions && filteredMentions.length > 0 && (
+        {!hasSessionRuntime && showMentions && filteredMentions.length > 0 && (
           <motion.div
             ref={mentionListRef}
             initial={reduceMotion ? false : { opacity: 0, y: 6 }}
@@ -1250,7 +1251,7 @@ export function PromptComposer({
                 ? (disabledReason || 'Connect an agent to start chatting…')
                 : reviewCommentCount > 0
                   ? 'Add an optional summary or press Enter to send review comments…'
-                  : 'Message 52hzAgents… (@ for agents, / for skills)'
+                  : hasSessionRuntime ? '描述任务；Plan 分析项目，Agent 实施修改…' : 'Message 52hzAgents… (@ for agents, / for skills)'
             }
             disabled={disabled}
             rows={1}
@@ -1465,7 +1466,7 @@ export function PromptComposer({
                 )}
 
                 {/* Work Mode */}
-                {session && (
+                {!hasSessionRuntime && session && (
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer gap-2.5 py-1.5 text-xs font-medium">
                       <Wrench className="size-4 text-muted-foreground shrink-0" />

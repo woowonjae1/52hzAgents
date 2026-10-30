@@ -8,9 +8,10 @@ const crypto = require('crypto');
  * and AES-256-GCM fallback when safeStorage is unavailable (e.g. in headless unit tests).
  */
 class CredentialVault {
-  constructor(userDataPath, safeStorageEngine = null) {
+  constructor(userDataPath, safeStorageEngine = null, initialCache = null) {
     this.filePath = path.join(userDataPath, 'credentials.json');
     this.safeStorage = safeStorageEngine;
+    this.cache = initialCache && typeof initialCache === 'object' ? { ...initialCache } : {};
     if (!this.safeStorage) {
       try {
         const electron = require('electron');
@@ -79,36 +80,108 @@ class CredentialVault {
   }
 
   has(id) {
+    if (this.cache[id]) return true;
     return Boolean(this.get(id));
   }
 
   get(id) {
+    if (this.cache[id]) return this.cache[id];
     if (!this.data[id]) return null;
     const value = this.decrypt(this.data[id]);
-    if (value && this.data[id].startsWith('gcm:')) { this.data[id] = this.encrypt(value); this.save(); }
+    if (value) {
+      this.cache[id] = value;
+      if (this.data[id].startsWith('gcm:')) {
+        this.data[id] = this.encrypt(value);
+        this.save();
+      }
+    }
     return value;
   }
 
   set(id, secret) {
-    const previous = { ...this.data };
+    const previousData = { ...this.data };
+    const previousCache = this.cache[id];
     if (!secret) {
+      if (this.safeStorage?.isBridge) {
+        delete this.cache[id];
+        delete this.data[id];
+        if (typeof this.safeStorage?.onDelete === 'function') {
+          return Promise.resolve(this.safeStorage.onDelete(id)).catch(err => {
+            if (previousCache !== undefined) this.cache[id] = previousCache;
+            this.data = previousData;
+            throw err;
+          });
+        }
+        return Promise.resolve();
+      }
+      delete this.cache[id];
       delete this.data[id];
-    } else {
-      this.data[id] = this.encrypt(secret);
+      this.save();
+      return;
     }
-    try { this.save(); } catch (error) { this.data = previous; throw error; }
+
+    if (this.safeStorage?.isBridge) {
+      if (typeof this.safeStorage?.onSet === 'function') {
+        return Promise.resolve(this.safeStorage.onSet(id, secret)).then(
+          res => {
+            this.cache[id] = secret;
+            return res;
+          },
+          err => {
+            if (previousCache !== undefined) this.cache[id] = previousCache;
+            else delete this.cache[id];
+            throw err;
+          }
+        );
+      }
+      this.cache[id] = secret;
+      return Promise.resolve();
+    }
+
+    const encrypted = this.encrypt(secret);
+    this.data[id] = encrypted;
+    this.cache[id] = secret;
+    try {
+      this.save();
+    } catch (error) {
+      this.data = previousData;
+      if (previousCache !== undefined) this.cache[id] = previousCache;
+      else delete this.cache[id];
+      throw error;
+    }
   }
 
   delete(id) {
-    if (this.data[id]) {
-      const previous=this.data[id];
+    const previousCache = this.cache[id];
+    const previousData = { ...this.data };
+    if (this.safeStorage?.isBridge) {
+      delete this.cache[id];
       delete this.data[id];
-      try{this.save();}catch(error){this.data[id]=previous;throw error;}
+      if (typeof this.safeStorage?.onDelete === 'function') {
+        return Promise.resolve(this.safeStorage.onDelete(id)).catch(err => {
+          if (previousCache !== undefined) this.cache[id] = previousCache;
+          this.data = previousData;
+          throw err;
+        });
+      }
+      return Promise.resolve();
+    }
+    delete this.cache[id];
+    if (this.data[id]) {
+      const previous = this.data[id];
+      delete this.data[id];
+      try {
+        this.save();
+      } catch (error) {
+        this.data[id] = previous;
+        if (previousCache !== undefined) this.cache[id] = previousCache;
+        throw error;
+      }
     }
   }
 
   list() {
-    return Object.keys(this.data);
+    return Array.from(new Set([...Object.keys(this.data), ...Object.keys(this.cache)]));
   }
 }
 

@@ -7,6 +7,7 @@ const { Store } = require("./store");
 const { AgentRunner } = require("./agent-runner");
 const { normalizeUsage, sessionUsage } = require("./usage");
 const { startServer } = require("./index");
+const { closeDatabasesUnder } = require("./storage/database");
 
 test("provider token measurements include cache exactly once and retain unknown usage", () => {
   assert.equal(normalizeUsage({}, "openai"), null);
@@ -50,6 +51,7 @@ test("session creation, replay, discovery, usage and history survive restart wit
     path.join(os.tmpdir(), "52hz-workspace-test-"),
   );
   t.after(() => {
+    closeDatabasesUnder(directory);
     assert.ok(
       directory.startsWith(path.join(os.tmpdir(), "52hz-workspace-test-")),
     );

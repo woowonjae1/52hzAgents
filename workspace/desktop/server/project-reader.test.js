@@ -5,12 +5,14 @@ const path = require("node:path");
 const os = require("node:os");
 const { execFileSync } = require("node:child_process");
 const { Store } = require("./store");
+const { closeDatabasesUnder } = require("./storage/database");
 const { gitStatus, gitDiff, tree, contained } = require("./project-reader");
 const { startServer } = require("./index");
 
 test("project readers report real tracked/untracked diffs and reject escaping paths", async (t) => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "52hz-git-test-"));
   t.after(async () => {
+    closeDatabasesUnder(directory);
     assert.ok(directory.startsWith(path.join(os.tmpdir(), "52hz-git-test-")));
     await fs.rm(directory, { recursive: true, force: true });
   });

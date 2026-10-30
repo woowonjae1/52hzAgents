@@ -44,7 +44,7 @@ export const HERO_SUGGESTIONS: EmptyHeroSuggestion[] = [
     title: 'Research & compare',
     description: 'Compare approaches and trade-offs using the context you provide.',
     prompt:
-      'Research current approaches and best practices for local multi-agent orchestration, then compare their trade-offs.',
+      'Compare approaches using the project files and context I provide. State what you can verify and what remains uncertain.',
   },
 ];
 
@@ -88,21 +88,19 @@ export function SessionEmptyHero({
           type="button"
           onClick={onConnectAgent}
           className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border/70 dark:border-white/[0.08] bg-surface1/80 dark:bg-white/[0.03] hover:bg-surface2 text-2xs font-medium text-muted-foreground hover:text-foreground shadow-xs transition-all cursor-pointer select-none active:scale-95"
-          title="Click to view and configure agent team"
+          title="配置模型连接"
         >
           <span
             className={cn(
               'size-1.5 rounded-full shrink-0',
-              hasOnlineAgents ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground/40'
+              'bg-muted-foreground/40'
             )}
           />
           <span>
-            {hasOnlineAgents
-              ? `${onlineAgentCount} endpoints configured`
-              : 'Connect an agent'}
+            模型连接与会话模式
           </span>
           <span className="text-foreground-extra-muted">/</span>
-          <span className="text-foreground-muted">Workspace</span>
+          <span className="text-foreground-muted">设置</span>
         </button>
 
         <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">

@@ -324,48 +324,8 @@ export function CommandPalette() {
           refreshGit();
         },
       },
-      {
-        id: 'git-pull',
-        category: 'Git',
-        title: 'Git: Pull Latest Changes',
-        subtitle: 'Fetch and integrate remote changes (git pull)',
-        icon: <Download className="size-4 text-foreground-muted" />,
-        action: async () => {
-          if (!activeSession) {
-            toast.error('No active session for Git operation');
-            return;
-          }
-          try {
-            toast.info('Pulling changes from remote...');
-            const res = await workspaceApi.pullGitRemote(activeSession.sessionId);
-            toast.success(res.output || 'Git pull completed');
-            refreshGit();
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Git pull failed');
-          }
-        },
-      },
-      {
-        id: 'git-push',
-        category: 'Git',
-        title: 'Git: Push Local Commits',
-        subtitle: 'Push local branch commits to remote repository (git push)',
-        icon: <Upload className="size-4 text-foreground-muted" />,
-        action: async () => {
-          if (!activeSession) {
-            toast.error('No active session for Git operation');
-            return;
-          }
-          try {
-            toast.info('Pushing commits to remote...');
-            const res = await workspaceApi.pushGitRemote(activeSession.sessionId);
-            toast.success(res.output || 'Git push completed');
-            refreshGit();
-          } catch (e) {
-            toast.error(e instanceof Error ? e.message : 'Git push failed');
-          }
-        },
-      },
+
+
       {
         id: 'git-diff-studio',
         category: 'Git',
@@ -394,45 +354,14 @@ export function CommandPalette() {
         id: 'nav-threads',
         category: 'Navigation',
         title: 'Threads & Conversations',
-        subtitle: 'Switch to chat and multi-agent channels',
+        subtitle: '打开项目会话',
         icon: <MessageSquare className="size-4 text-foreground-muted" />,
         shortcut: ['G', 'T'],
         action: () => setViewMode('threads'),
       },
-      {
-        id: 'nav-tasks',
-        category: 'Navigation',
-        title: 'Tasks & Issues',
-        subtitle: 'Linear-style task tracking and issue list',
-        icon: <CheckSquare className="size-4 text-foreground-muted" />,
-        shortcut: ['G', 'A'],
-        action: () => setViewMode('tasks'),
-      },
-      {
-        id: 'nav-skills',
-        category: 'Navigation',
-        title: 'Skills & Capabilities',
-        subtitle: 'Manage MCP tools and agent custom skills',
-        icon: <Sparkles className="size-4 text-foreground-muted" />,
-        shortcut: ['G', 'E'],
-        action: () => setViewMode('skills'),
-      },
-      {
-        id: 'nav-knowledge',
-        category: 'Navigation',
-        title: 'Knowledge Base',
-        subtitle: 'Documentation, design guides and RFC specifications',
-        icon: <BookOpen className="size-4 text-foreground-muted" />,
-        shortcut: ['G', 'K'],
-        action: () => {
-          if (currentSessionId) {
-            setViewMode('threads');
-            setActiveRightTab('knowledge');
-          } else {
-            setViewMode('knowledge');
-          }
-        },
-      },
+
+
+
       {
         id: 'nav-inbox',
         category: 'Navigation',
@@ -470,7 +399,7 @@ export function CommandPalette() {
         id: 'act-diff-studio',
         category: 'Actions',
         title: 'Toggle Diff Studio Panel',
-        subtitle: 'Inspect file trees, diff reviews and git synchronization',
+        subtitle: '查看项目文件与 Git Diff',
         icon: <FileDiff className="size-4 text-foreground-muted" />,
         action: () => setActiveRightTab(activeRightTab === 'diff' ? null : 'diff'),
       },
@@ -478,7 +407,7 @@ export function CommandPalette() {
         id: 'act-preview',
         category: 'Actions',
         title: 'Toggle Web Preview Browser',
-        subtitle: 'Open built-in localhost dev-server browser sandbox',
+        subtitle: '预览本地开发服务',
         icon: <Globe className="size-4 text-foreground-muted" />,
         action: () => setActiveRightTab(activeRightTab === 'preview' ? null : 'preview'),
       },
@@ -541,8 +470,8 @@ export function CommandPalette() {
       {
         id: 'page-trigger-git',
         category: 'Git',
-        title: 'Git Commands & Remote Synchronization...',
-        subtitle: 'Pull, push, branch inspection and code rollback',
+        title: 'Git 状态与修改...',
+        subtitle: '查看分支、文件状态与 Diff',
         icon: <GitBranch className="size-4 text-emerald-400" />,
         pageTarget: 'git',
       },

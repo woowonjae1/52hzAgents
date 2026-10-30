@@ -134,6 +134,14 @@ export function ChatView() {
     useSessionMessages();
 
   const [parallelReviewNeeded, setParallelReviewNeeded] = useState(false);
+  const [embeddedRuntime, setEmbeddedRuntime] = useState(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    void workspaceApi.request<{config?:unknown}>('/v1/runtime/session', {signal:controller.signal}).then(value => {
+      if (!controller.signal.aborted) setEmbeddedRuntime(Boolean(value.config));
+    }).catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   // Persisted (not just component state): dismissing this once shouldn't mean
   // seeing it again on every reload — that's what made it feel like a
@@ -322,8 +330,8 @@ export function ChatView() {
     () => hasSpecificParticipants ? onlineAgents.filter((a) => sessionParticipants.includes(a.agentName)) : onlineAgents,
     [hasSpecificParticipants, onlineAgents, sessionParticipants]
   );
-  const canChatInCurrentSession = hasSpecificParticipants ? sessionOnlineAgents.length > 0 : hasOnlineAgents;
-  const isMissingParticipant = hasSpecificParticipants && sessionOnlineAgents.length === 0;
+  const canChatInCurrentSession = embeddedRuntime || (hasSpecificParticipants ? sessionOnlineAgents.length > 0 : hasOnlineAgents);
+  const isMissingParticipant = !embeddedRuntime && hasSpecificParticipants && sessionOnlineAgents.length === 0;
 
   // Only display agents who are currently connected / online or actively working in this session,
   // rather than cluttering with offline historical agents from the database roster.
@@ -1125,6 +1133,7 @@ export function ChatView() {
   return (
     <div className="flex flex-col flex-1 min-w-0 h-full bg-surface0 overflow-hidden">
       <ChannelHeader
+        embeddedRuntime={embeddedRuntime}
         currentSession={currentSession}
         currentSessionId={currentSessionId}
         isDM={isDM}
@@ -1272,7 +1281,7 @@ export function ChatView() {
             <SessionEmptyHero
               hasOnlineAgents={hasOnlineAgents}
               onlineAgentCount={onlineAgents.length}
-              onConnectAgent={() => setViewMode('home')}
+              onConnectAgent={() => openSettings('agents')}
               onSelectPrompt={(prompt) => {
                 setInjectedDraft(prompt);
                 handleDraftChange(prompt);

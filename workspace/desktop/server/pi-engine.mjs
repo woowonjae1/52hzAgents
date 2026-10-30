@@ -17,7 +17,7 @@ process.env.PI_OFFLINE = '1';
 const models = createModels();
 models.setProvider(openaiProvider()); models.setProvider(anthropicProvider());
 const zeroUsage = () => ({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } });
-const textOf = message => typeof message?.content === 'string' ? message.content : (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n');
+const textOf = message => typeof message === 'string' ? message : typeof message?.content === 'string' ? message.content : (message?.content || []).filter(block => block.type === 'text').map(block => block.text).join('\n');
 
 /** Uses Pi's Agent loop, built-in file/shell tools, provider adapters and JSONL sessions. */
 export async function runPiAgent(options) {
@@ -43,8 +43,25 @@ export async function runPiAgent(options) {
   if (contextWindow) model.contextWindow = contextWindow;
   if (options.maxOutputTokens) model.maxTokens = options.maxOutputTokens;
   let denied = false, limited = false, toolCount = 0, turnCount = 0;
-  const availableTools = root ? await createProjectTools({ root, mode: config.mode, signal, onMutation,
-    requestApproval: async (request, toolSignal) => { const allowed = await onApproval(request, toolSignal); if (!allowed) denied = true; return allowed; } }) : [];
+  const handleApproval = async (request, toolSignal) => {
+    const allowed = await onApproval(request, toolSignal);
+    if (!allowed) denied = true;
+    return allowed;
+  };
+  const projectTools = root ? await createProjectTools({ root, mode: config.mode, signal, onMutation, beforeMutation: options.beforeMutation, beforeCommand: options.beforeCommand, afterCommand: options.afterCommand,
+    requestApproval: handleApproval }) : [];
+  let extraTools = typeof options.extraTools === 'function' ? options.extraTools(handleApproval) : (options.extraTools || []);
+  for (const tool of extraTools) {
+    if (typeof tool.bindApproval === 'function') {
+      tool.bindApproval(handleApproval);
+    }
+  }
+  if (config.mode === 'chat') {
+    extraTools = [];
+  } else if (config.mode === 'plan') {
+    extraTools = extraTools.filter(tool => tool.isReadOnly === true);
+  }
+  const availableTools = config.mode === 'chat' ? [] : [...projectTools, ...extraTools];
   const tools = options.allowedTools ? availableTools.filter(tool=>options.allowedTools.includes(tool.name)) : availableTools;
   let guidance = '';
   if (root) {
@@ -81,7 +98,7 @@ export async function runPiAgent(options) {
   const usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cache_read_tokens: null, cache_write_tokens: null };
   let lastPrompt = 0, measured = 0, lastAssistant = null;
   let reported={read:false,write:false};
-  const account = value => {
+  const account = (value, purpose = 'generate') => {
     if(!value || !Number.isFinite(value.totalTokens) || value.totalTokens<=0) return;
     const input=value.input+value.cacheRead+value.cacheWrite;
     usage.prompt_tokens+=input;usage.completion_tokens+=value.output;
@@ -89,6 +106,21 @@ export async function runPiAgent(options) {
     if(reported.write || value.cacheWrite>0)usage.cache_write_tokens=(usage.cache_write_tokens || 0)+value.cacheWrite;
     usage.total_tokens+=input+value.output;measured++;
     options.onUsage?.({...usage});
+    options.onRequestUsage?.({
+      purpose,
+      promptTokens: input,
+      completionTokens: value.output,
+      cacheReadTokens: value.cacheRead || 0,
+      cacheWriteTokens: value.cacheWrite || 0,
+      totalTokens: input + value.output,
+      rawUsage: value,
+    });
+    if (typeof options.checkBudget === 'function') {
+      const budgetResult = options.checkBudget({ total_tokens: usage.total_tokens });
+      if (!budgetResult.allowed) {
+        limited = true;
+      }
+    }
   };
   const adapter = options.streamFn || ((selected, context, streamOptions) => (isAnthropic ? anthropic : completions)(selected, context, { ...streamOptions, apiKey: options.apiKey || 'ollama', maxTokens: model.maxTokens, maxRetries:0, identity: { attribution: null } }));
   const streamFn=(selected,context,streamOptions)=>{
@@ -100,21 +132,63 @@ export async function runPiAgent(options) {
       if(raw.cache_creation_input_tokens!=null)flags.write=true;
     }});
   };
+  let agent = null, preflightError = null;
+  const enforcePreflightBudget = state => {
+    if (denied || limited) {
+      agent?.abort();
+      throw preflightError || new Error('This run has stopped. Do not initiate more model requests.');
+    }
+    if (typeof options.checkBudget === 'function') {
+      const promptTokens = Math.max(state?.estimated_tokens || budget.last?.estimated_tokens || 500, 1);
+      const outputTokens = Math.max(0, model?.maxTokens || 4096);
+      const estimatedTokens = Math.max(promptTokens + outputTokens, 100);
+      const budgetResult = options.checkBudget({
+        total_tokens: usage.total_tokens,
+        reservedTokens: estimatedTokens,
+        reservedPromptTokens: promptTokens,
+        reservedCompletionTokens: outputTokens,
+      });
+      if (!budgetResult.allowed) {
+        limited = true;
+        preflightError = new Error(`Budget exceeded before request: ${budgetResult.message}`);
+        agent?.abort();
+        throw preflightError;
+      }
+    }
+  };
   const budget=contextController({session,model,capacity:contextWindow,tools,signal,streamFn,apiKey:options.apiKey,
-    onUsage:account,onState:options.onContext,autoCompact:config.autoCompact!==false,keepRecentTokens:options.keepRecentTokens});
+    onUsage: val => account(val, 'compaction'),onState:options.onContext,beforeRequest:enforcePreflightBudget,autoCompact:config.autoCompact!==false,keepRecentTokens:options.keepRecentTokens});
   if(options.compactOnly) {
     await budget.compress(session.buildSessionContext().messages,true);
     return {content:'Conversation compacted. Original history is preserved.',model:config.model,usage:measured?usage:null,context_window:contextWindow,context:budget.last,sdk:'pi-1.4.0'};
   }
-  const agent = new Agent({
+  agent = new Agent({
     initialState: { systemPrompt: instruction, model, tools, messages: session.buildSessionContext().messages.filter(message => message.role !== 'system') },
     streamFn, convertToLlm,
-    prepareRequest: context => budget.prepare(context.context),
+    prepareRequest: async context => {
+      if (denied || limited) {
+        agent.abort();
+        throw preflightError || new Error('This run has stopped. Do not initiate more model requests.');
+      }
+      const prepared = await budget.prepare(context.context);
+      if (denied || limited) {
+        agent.abort();
+        throw preflightError || new Error('This run has stopped. Do not initiate more model requests.');
+      }
+      return prepared;
+    },
     getApiKey: () => options.apiKey || 'ollama', toolExecution: 'sequential', identity: { attribution: null },
     beforeToolCall: async ({ toolCall }) => {
       if (denied || limited) return { block: true, reason: 'This run has stopped. Do not execute later tools in the batch.', terminate: true };
       if (++toolCount > (options.maxToolCalls || 30)) { limited = true; return { block: true, reason: 'Tool limit reached. Ask the user to continue.', terminate: true }; }
       if (!tools.some(tool => tool.name === toolCall.name)) return { block: true, reason: 'This tool is not allowed in the current mode.', terminate: true };
+      if (typeof options.checkBudget === 'function') {
+        const budgetResult = options.checkBudget({ total_tokens: usage.total_tokens });
+        if (!budgetResult.allowed) {
+          limited = true;
+          return { block: true, reason: `Budget exceeded: ${budgetResult.message}`, terminate: true };
+        }
+      }
     },
     finishTurn: () => {
       if (++turnCount >= (options.maxTurns || 15)) limited = true;
@@ -141,11 +215,15 @@ export async function runPiAgent(options) {
     }
     if (event.type === 'tool_execution_start') onTool({ phase: 'start', toolCallId: event.toolCallId, tool: event.toolName, args: event.args });
     if (event.type === 'tool_execution_update') onTool({ phase: 'update', toolCallId: event.toolCallId, output: textOf(event.partialResult) });
-    if (event.type === 'tool_execution_end') onTool({ phase: 'end', tool: event.toolName, toolCallId: event.toolCallId, output: textOf(event.result), details: event.result.details, structuredContent: event.result.structuredContent, isError: event.isError, durationMs: event.durationMs });
+    if (event.type === 'tool_execution_end') {
+      if (event.result?.details?.denied || event.result?.terminate) denied = true;
+      onTool({ phase: 'end', tool: event.toolName, toolCallId: event.toolCallId, output: textOf(event.result), details: event.result?.details, structuredContent: event.result?.structuredContent, isError: event.isError, durationMs: event.durationMs });
+    }
   });
   try {
     if (signal.aborted) throw new Error('Operation stopped.');
     await agent.prompt(prompt);
+    if (preflightError) throw preflightError;
     if (signal.aborted || lastAssistant?.stopReason === 'aborted') throw new Error('Response stopped.');
     if (lastAssistant?.stopReason === 'error') {
       let error = lastAssistant.errorMessage || 'The model request failed.';

@@ -35,7 +35,7 @@ export async function projectPath(root, input, { create = false } = {}) {
   }
 }
 
-export async function createProjectTools({ root, mode, signal, requestApproval, onMutation = () => {} }) {
+export async function createProjectTools({ root, mode, signal, requestApproval, beforeMutation = async () => {}, onMutation = () => {}, beforeCommand = async () => {}, afterCommand = async () => {} }) {
   if (mode === 'chat') return [];
   root = await fs.realpath(root);
   const aborted = () => { if (signal?.aborted) throw new Error('Operation stopped.'); };
@@ -47,16 +47,26 @@ export async function createProjectTools({ root, mode, signal, requestApproval, 
     if (content.includes(0)) throw new Error('This tool reads text files. Binary files are not supported.');
     return content;
   };
-  const mutate = async (input, content) => {
+  let mutationQueue = Promise.resolve();
+  const mutate = (input, content) => {
+    const operation = mutationQueue.then(async () => {
     if (mode !== 'agent') throw new Error('Plan mode cannot modify files.');
     if (Buffer.byteLength(content) > MAX_FILE) throw new Error('Writes are limited to 4 MiB.');
     const target = await checked(input, true);
-    const before = await fs.readFile(target, 'utf8').catch(error => { if (error.code === 'ENOENT') return ''; throw error; });
+    const original = await fs.readFile(target).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    const before = original?.toString('utf8') || '';
+    await beforeMutation({ path: path.relative(root, target).replace(/\\/g, '/'), before: original, after: content });
     aborted();
     // Re-resolve after awaits so an existing symlink cannot bypass the project boundary.
     const safe = await checked(input, true);
+    const latest = await fs.readFile(safe).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
+    if (original === null ? latest !== null : latest === null || !original.equals(latest)) throw new Error('File changed while preparing its checkpoint. Read it again before editing.');
+    aborted();
     await fs.writeFile(safe, content, { encoding: 'utf8', flag: constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | (constants.O_NOFOLLOW || 0) });
-    onMutation({ path: path.relative(root, target).replace(/\\/g, '/'), patch: generateUnifiedPatch(path.relative(root, target).replace(/\\/g, '/'), before, content) });
+    await onMutation({ path: path.relative(root, target).replace(/\\/g, '/'), patch: generateUnifiedPatch(path.relative(root, target).replace(/\\/g, '/'), before, content) });
+    });
+    mutationQueue = operation.catch(() => {});
+    return operation;
   };
   const rules = ignore();
   try { const text = await read(path.join(root, '.gitignore')); rules.add(text.toString('utf8')); } catch { /* Optional project ignore file. */ }
@@ -118,6 +128,21 @@ export async function createProjectTools({ root, mode, signal, requestApproval, 
   const local = process.platform === 'win32' ? createLocalPowerShellOperations() : createLocalBashOperations();
   const options = { exposeSessionEnvironment: false, operations: {
     exec: async (command, _cwd, execution) => {
+      const lower = String(command || '').toLowerCase();
+      const dangerousPatterns = [
+        /\bformat\s+[a-z]:/i,
+        /\bformat-volume\b/i,
+        /\bdiskpart\b/i,
+        /\b(shutdown|restart-computer)\b/i,
+        /\brm\s+-rf\s+(\/|~|\/\*)/i,
+        /\bmkfs\b/i,
+        /\bdd\s+if=/i,
+      ];
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(lower)) {
+          throw new Error('System-level destructive command blocked by execution boundary.');
+        }
+      }
       const env = { ...process.env };
       for (const name of Object.keys(env)) if (/API_KEY|ACCESS_TOKEN|AUTH_TOKEN|SECRET|PASSWORD/i.test(name)) delete env[name];
       return local.exec(command, root, { ...execution, timeout: Math.min(120, Math.max(1, execution.timeout || 120)), env });
@@ -131,7 +156,14 @@ export async function createProjectTools({ root, mode, signal, requestApproval, 
     if (!await requestApproval({ toolCallId: id, tool: shell.name, args: structuredClone(args), cwd: root }, executionSignal)) {
       return { content: [{ type: 'text', text: 'Command denied by the user. Stop this run; do not try another command.' }], details: { denied: true }, isError: true, terminate: true };
     }
-    aborted(); return execute(id, { ...args, timeout: Math.min(120, Math.max(1, args.timeout || 120)) }, executionSignal, update);
+    // Serialize with file mutations: command snapshots must not race tool writes.
+    const operation = mutationQueue.then(async () => {
+      aborted(); await beforeCommand();
+      try { aborted(); return await execute(id, { ...args, timeout: Math.min(120, Math.max(1, args.timeout || 120)) }, executionSignal, update); }
+      finally { await afterCommand(); }
+    });
+    mutationQueue = operation.catch(() => {});
+    return operation;
   };
   tools.push(shell); return tools;
 }

@@ -198,3 +198,5 @@ workspace/backend/secrets/
 # Re-exclude build artifacts that the src/ safety net above would pull back in
 **/src/**/__pycache__/
 **/src/**/*.pyc
+.tmp/
+**/.tmp/

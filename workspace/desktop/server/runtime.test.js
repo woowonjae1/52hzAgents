@@ -7,6 +7,7 @@ const path = require("node:path");
 const { streamModel } = require("./model-stream");
 const { AgentRunner } = require("./agent-runner");
 const { Store } = require("./store");
+const { closeDatabasesUnder } = require("./storage/database");
 const { startServer } = require("./index");
 
 async function fixture(t, handler) {
@@ -24,6 +25,7 @@ async function fixture(t, handler) {
 function storeFor(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "52hz-runtime-test-"));
   t.after(() => {
+    closeDatabasesUnder(root);
     assert.ok(root.startsWith(path.join(os.tmpdir(), "52hz-runtime-test-")));
     fs.rmSync(root, { recursive: true, force: true });
   });

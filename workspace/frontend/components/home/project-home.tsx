@@ -19,7 +19,7 @@ import {
   rememberWorkingDir,
 } from "@/components/chat/project-folder-picker";
 import { SidebarExpandButton } from "@/components/layout/sidebar-expand-button";
-import { HomeDashboard } from "./home-dashboard";
+
 import { getSmartSessionTitle } from "@/components/threads/thread-list";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -35,8 +35,7 @@ export function ProjectHome() {
     lastMessageBySession,
     activeSessionIds,
   } = useWorkspace();
-  const { setViewMode, isMobile, openMobileDetail } = useLayout();
-  const [tab, setTab] = React.useState<"projects" | "agents">("projects");
+  const { setViewMode, isMobile, openMobileDetail, openSettings } = useLayout();
   const [folder, setFolder] = React.useState(activeProjectDir || "");
   const [recents, setRecents] = React.useState<string[]>([]);
   const [query, setQuery] = React.useState("");
@@ -96,50 +95,16 @@ export function ProjectHome() {
     >
       <header className="app-header px-4 gap-3">
         <SidebarExpandButton />
-        <div
-          className="flex items-center gap-1"
-          role="tablist"
-          aria-label="Workspace views"
-        >
-          {(["projects", "agents"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={tab === value}
-              aria-controls={`workspace-${value}`}
-              id={`workspace-tab-${value}`}
-              onClick={() => setTab(value)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs transition-colors",
-                tab === value
-                  ? "bg-surface2 text-foreground font-medium"
-                  : "text-foreground-muted hover:text-foreground",
-              )}
-            >
-              {value === "projects" ? "Workspace" : "Agent team"}
-            </button>
-          ))}
-        </div>
+        <span className="text-sm font-medium">项目</span>
         <span className="ml-auto hidden sm:flex items-center gap-1.5 text-[10px] text-foreground-extra-muted">
           <span className="size-1.5 rounded-full bg-status-success" />
           Local workspace
         </span>
       </header>
-      {tab === "agents" ? (
-        <div
-          id="workspace-agents"
-          role="tabpanel"
-          aria-labelledby="workspace-tab-agents"
-          className="min-h-0 flex-1"
-        >
-          <HomeDashboard />
-        </div>
-      ) : (
         <div
           id="workspace-projects"
           role="tabpanel"
-          aria-labelledby="workspace-tab-projects"
+          aria-label="项目与会话"
           className="min-h-0 flex-1 overflow-y-auto"
         >
           <div className="mx-auto max-w-5xl px-6 py-10 lg:px-12 lg:py-14 space-y-10">
@@ -150,7 +115,7 @@ export function ProjectHome() {
               </div>
               <div>
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-                  Your project. Your next session.
+                  选择项目，开始任务。
                 </h1>
                 <p className="mt-3 text-sm leading-6 text-foreground-muted">
                   Open a local project, continue a conversation, and keep your
@@ -173,11 +138,11 @@ export function ProjectHome() {
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
                   <button
                     type="button"
-                    onClick={() => setTab("agents")}
+                    onClick={() => openSettings("agents")}
                     className="inline-flex items-center gap-2 text-xs text-foreground-muted hover:text-foreground"
                   >
                     <Bot className="size-3.5" />
-                    Configure agents
+                    配置模型连接
                     <ArrowRight className="size-3" />
                   </button>
                   <button
@@ -306,7 +271,6 @@ export function ProjectHome() {
             </section>
           </div>
         </div>
-      )}
     </div>
   );
 }

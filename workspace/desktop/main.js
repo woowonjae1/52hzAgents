@@ -4,8 +4,11 @@ const http = require('http');
 const net = require('net');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const { spawn, execSync } = require('child_process');
-const { startServer } = require('./server');
+const { BackendSupervisor } = require('./server/supervisor');
+
+const desktopApiToken = process.env.OPENAGENTS_API_TOKEN || crypto.randomBytes(32).toString('hex');
 
 const isWindows11 = process.platform === 'win32' && parseInt((os.release() || '').split('.')[2], 10) >= 22000;
 
@@ -18,13 +21,16 @@ try {
   app.setPath('userData', customUserData);
 } catch (e) {}
 
+const { redactSecrets } = require('./server/privacy');
+
 // Diagnostic File Logger
 const LOGS_DIR = path.join(app.getPath('userData'), 'logs');
 const LOG_FILE = path.join(LOGS_DIR, 'app.log');
 function logToFile(level, ...args) {
   try {
     if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
-    const line = `[${new Date().toISOString()}] [${level}] ${args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')}\n`;
+    const rawLine = `[${new Date().toISOString()}] [${level}] ${args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')}\n`;
+    const line = redactSecrets(rawLine);
     fs.appendFileSync(LOG_FILE, line, 'utf8');
   } catch (e) {}
 }
@@ -64,7 +70,7 @@ let mainWindow = null;
 let quickBarWindow = null;
 let tray = null;
 let isQuitting = false;
-let embeddedServer = null;
+let backendSupervisor = null;
 let sseReq = null;
 
 // Production / Development Configuration
@@ -172,15 +178,35 @@ async function startEmbeddedBackend() {
   TARGET_URL = `http://127.0.0.1:${serverPort}/`;
   console.log(`[52hzAgents Desktop] Selected port: ${serverPort}`);
 
-  const { server } = await startServer({
-    port: serverPort,
+  backendSupervisor = new BackendSupervisor({
     userDataPath: userData,
     staticDir,
-    runtimeOptions: {
-      safeStorage,
-    },
+    port: serverPort,
+    safeStorage,
+    apiToken: desktopApiToken,
+    mode: 'auto',
   });
-  embeddedServer = server;
+
+  backendSupervisor.on('crashed', ({ code }) => {
+    logToFile('WARN', `Backend supervisor detected daemon crash with code ${code}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('backend:status', { state: 'crashed', code });
+    }
+  });
+
+  backendSupervisor.on('state:changed', (state) => {
+    logToFile('INFO', `Backend supervisor state changed: ${state}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('backend:status', { state });
+    }
+    if (state === 'running') {
+      setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort}`), 400);
+    }
+  });
+
+  const { port } = await backendSupervisor.start();
+  serverPort = port;
+  TARGET_URL = `http://127.0.0.1:${serverPort}/`;
 
   // Subscribe to live SSE events for workspace notifications and approvals
   setTimeout(() => subscribeWorkspaceEvents(`http://127.0.0.1:${serverPort}`), 400);
@@ -193,7 +219,12 @@ async function subscribeWorkspaceEvents(baseUrl) {
       sseReq = null;
     }
     const sseUrl = `${baseUrl}/v1/events/stream`;
-    sseReq = http.get(sseUrl, (res) => {
+    sseReq = http.get(sseUrl, {
+      headers: {
+        'Authorization': `Bearer ${desktopApiToken}`,
+        'X-Workspace-Token': desktopApiToken,
+      },
+    }, (res) => {
       if (res.statusCode !== 200) {
         setTimeout(() => subscribeWorkspaceEvents(baseUrl), 5000);
         return;
@@ -454,7 +485,7 @@ function createMainWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       webSecurity: true,
       webviewTag: true,
     },
@@ -706,6 +737,16 @@ function createMainWindow() {
     return { action: 'deny' };
   });
 
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    const isLocalApp = targetUrl.startsWith(`http://127.0.0.1:${serverPort}/`) || targetUrl.startsWith(`http://localhost:${serverPort}/`);
+    if (!isLocalApp) {
+      event.preventDefault();
+      if (targetUrl.startsWith('https:') || targetUrl.startsWith('http:')) {
+        shell.openExternal(targetUrl);
+      }
+    }
+  });
+
   mainWindow.on('close', (event) => {
     logToFile('INFO', 'mainWindow on close event, isQuitting:', isQuitting, 'hasTray:', Boolean(tray));
     if (!isQuitting) {
@@ -739,7 +780,7 @@ function createQuickBarWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
     },
   });
 
@@ -871,11 +912,20 @@ ipcMain.on('get-api-url-sync', (event) => {
   event.returnValue = `http://127.0.0.1:${serverPort || DEFAULT_PORT}`;
 });
 ipcMain.handle('get-api-url', () => `http://127.0.0.1:${serverPort || DEFAULT_PORT}`);
-ipcMain.handle('model-connections-import-pi', event => {
-  if(event.senderFrame!==event.sender.mainFrame || !event.senderFrame?.url?.startsWith(`http://127.0.0.1:${serverPort}/`)) throw new Error('Trusted desktop window required.');
-  if(!embeddedServer) throw new Error('Desktop service is not ready.');
-  return embeddedServer.importPiConnections();
+ipcMain.on('get-workspace-token-sync', (event) => {
+  event.returnValue = desktopApiToken;
 });
+ipcMain.handle('desktop:get-workspace-token', async () => desktopApiToken);
+  ipcMain.handle('app:get-version', () => {
+    const { getVersionInfo } = require('./server/version');
+    return getVersionInfo({ userDataPath: app.getPath('userData') });
+  });
+ipcMain.handle('model-connections-import-pi', async event => {
+  if(event.senderFrame!==event.sender.mainFrame || !event.senderFrame?.url?.startsWith(`http://127.0.0.1:${serverPort}/`)) throw new Error('Trusted desktop window required.');
+  if(!backendSupervisor) throw new Error('Desktop service is not ready.');
+  return backendSupervisor.importPiConnections();
+});
+ipcMain.handle('desktop:get-backend-status', async () => backendSupervisor?.getStatus() || { state: 'stopped' });
 ipcMain.on('window-close', () => {
   if (tray) {
     mainWindow?.hide();
@@ -1113,11 +1163,11 @@ app.whenReady().then(async () => {
 let shutdownStarted = false;
 let shutdownFinished = false;
 app.on('before-quit', (e) => {
-  if (!shutdownFinished && embeddedServer) {
+  if (!shutdownFinished && backendSupervisor) {
     e.preventDefault();
     if (shutdownStarted) return;
     shutdownStarted = true;
-    void embeddedServer.shutdown().catch(error => logToFile('ERROR', 'Shutdown:', error.message)).finally(() => {
+    void backendSupervisor.stop().catch(error => logToFile('ERROR', 'Shutdown:', error.message)).finally(() => {
       shutdownFinished = true; app.quit();
     });
   }

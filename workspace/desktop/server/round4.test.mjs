@@ -15,11 +15,12 @@ import {Store} from './store.js';
 import {AgentRunner} from './agent-runner.js';
 import {contextController} from './pi-context.mjs';
 import {importPiConnections} from './pi-config-import.js';
+import {closeDatabasesUnder} from './storage/database.js';
 
 const storage={isEncryptionAvailable:()=>true,encryptString:text=>Buffer.from(text).reverse(),decryptString:value=>Buffer.from(value).reverse().toString()};
 async function fixture(t){
   const root=await fs.mkdtemp(path.join(os.tmpdir(),'52hz-round4-test-'));const project=path.join(root,'project');await fs.mkdir(project);
-  t.after(async()=>{assert.ok(root.startsWith(path.join(os.tmpdir(),'52hz-round4-test-')));await fs.rm(root,{recursive:true,force:true});});
+  t.after(async()=>{closeDatabasesUnder(root);assert.ok(root.startsWith(path.join(os.tmpdir(),'52hz-round4-test-')));await fs.rm(root,{recursive:true,force:true});});
   const faux=createFauxCore({models:[{id:'fixture'}],tokensPerSecond:1e9});
   const options={config:{provider:'ollama',model:'fixture',mode:'chat'},channel:'general',userDataPath:root,projectDir:project,prompt:'Hello',signal:new AbortController().signal,model:faux.getModel(),streamFn:faux.streamSimple,onDelta(){},onTool(){},onApproval:async()=>false};
   return {root,project,faux,options};

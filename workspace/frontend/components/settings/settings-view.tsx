@@ -54,6 +54,7 @@ import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { RouterProviderSettings } from './router-provider-settings';
 import { WorkProfilesSettings } from './work-profiles-settings';
 import { SavedWorkflowsSettings } from './saved-workflows-settings';
+import { BackupRecoverySettings } from './backup-recovery-settings';
 import { ConnectAgentView } from '@/components/connect/connect-agent-view';
 import { conversationFilename, downloadTextFile, messagesToMarkdown } from '@/lib/export-markdown';
 import { eventToMessage } from '@/lib/types';
@@ -121,7 +122,7 @@ export function SettingsView() {
     { id: 'general', label: 'General & Desktop', icon: Settings },
     { id: 'agents', label: embeddedRuntime ? 'Models & Connections' : 'Manage Agents', icon: Users },
     { id: 'panels', label: 'Panels & Display', icon: PanelRight },
-    { id: 'export', label: 'Export & Share', icon: Download },
+    { id: 'export', label: '导出', icon: Download },
   ];
 
   useEffect(() => {
@@ -214,12 +215,7 @@ export function SettingsView() {
       icon: FileDiff,
       desc: 'Review git modifications, additions, and deletions with unified diff viewer and instant file switcher.',
     },
-    {
-      id: 'knowledge',
-      name: 'Knowledge Base',
-      icon: BookOpen,
-      desc: 'Workspace documentation, technical guides, standards, and citations side-by-side with your conversations.',
-    },
+
   ];
 
   return (
@@ -818,10 +814,10 @@ export function SettingsView() {
               <div className="p-6 rounded-2xl bg-surface1 border border-border/60 shadow-sm space-y-2">
                 <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
                   <Download className="size-5 text-primary" />
-                  Export & share
+                  导出会话
                 </h2>
                 <p className="text-xs text-foreground-muted leading-relaxed">
-                  Export the thread — discussion, code, and results — as Markdown, or create a read-only share link.
+                  将会话中的讨论、代码与结果导出为 Markdown。当前版本不提供公开分享链接。
                 </p>
               </div>
 
@@ -848,58 +844,11 @@ export function SettingsView() {
                   </Button>
                 </div>
 
-                {/* Public Share Link */}
-                <div className="p-5 rounded-2xl bg-surface1 border border-border/60 space-y-4 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="size-10 rounded-xl bg-surface2 text-foreground-muted flex items-center justify-center">
-                      <Share2 className="size-5" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">Read-only share link</h3>
-                    <p className="text-xs text-foreground-muted leading-relaxed">
-                      Creates a link that shows this workspace’s live threads and artifacts without a login. Read-only.
-                    </p>
-                  </div>
 
-                  {/*
-                    `workspaceShareUrl` is '' until the workspace loads (and
-                    stays '' if it never does). The field then rendered as an
-                    empty box beside a live Copy button that put nothing on the
-                    clipboard and still said "Share link copied" — a success
-                    message for a no-op. Both the field and the button now wait
-                    for a real URL.
-                  */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Input
-                        readOnly
-                        aria-label="Read-only share link"
-                        value={workspaceShareUrl}
-                        placeholder="Link appears once the workspace loads"
-                        className="bg-surface0 border-border/60 font-mono text-xs text-foreground-muted h-9 select-all"
-                      />
-                      {/* Static label: `disabled:pointer-events-none` on Button
-                          means a hover hint can never fire while disabled, so
-                          the "why" lives in the field's placeholder, which is
-                          on screen rather than behind a hover. */}
-                      <Hint label="Copy share link">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!workspaceShareUrl}
-                          aria-label="Copy share link"
-                          onClick={() => {
-                            copyShare(workspaceShareUrl);
-                            toast.success('Share link copied');
-                          }}
-                          className="h-9 px-3 shrink-0"
-                        >
-                          {shareCopied ? <Check className="size-3.5 text-status-success" /> : <Copy className="size-3.5" />}
-                        </Button>
-                      </Hint>
-                    </div>
-                  </div>
-                </div>
               </div>
+
+              {/* Database Backup & Disaster Recovery */}
+              <BackupRecoverySettings />
             </div>
           )}
         </div>

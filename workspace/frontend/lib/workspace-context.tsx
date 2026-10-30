@@ -71,6 +71,7 @@ function sameSession(a: WorkspaceSession, b: WorkspaceSession): boolean {
     a.master === b.master &&
     a.orchestrationMode === b.orchestrationMode &&
     a.orchestrationInstruction === b.orchestrationInstruction &&
+    a.workingDir === b.workingDir &&
     a.createdAt === b.createdAt &&
     a.lastEventAt === b.lastEventAt &&
     sameStringList(a.participants, b.participants)
@@ -1856,6 +1857,7 @@ export function WorkspaceProvider({
                 break;
               }
               case 'workspace.project.files.changed': {
+                if (event.payload?.workspace_changed) void refreshDiscovery();
                 window.dispatchEvent(new CustomEvent('52hz:project-files-changed', { detail: { ...event.payload, channel: event.target?.replace(/^channel\//, '') } }));
                 break;
               }
@@ -1907,6 +1909,12 @@ export function WorkspaceProvider({
             // Ignore malformed event frame
           }
         };
+
+        eventSource.addEventListener('sync_required', () => {
+          if (!isMounted) return;
+          void refreshDiscovery();
+          void refreshWorkspace();
+        });
 
         eventSource.onerror = () => {
           if (eventSource) {

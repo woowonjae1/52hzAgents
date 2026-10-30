@@ -608,56 +608,19 @@ export function WorkbenchSidebarContent() {
           >
             <div className="flex items-center gap-2 min-w-0">
               <Bot className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Workspace</span>
+              <span className="truncate">项目</span>
             </div>
             <span className="inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.2 rounded-full bg-surface3 text-foreground-muted border border-border/40 font-mono">
-              <span>{projectDirs.length} projects</span>
+              <span>{projectDirs.length} 个项目</span>
             </span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setViewMode('skills');
-              if (isMobile) openMobileDetail();
-            }}
-            className={cn(
-              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
-              viewMode === 'skills'
-                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
-            )}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Blocks className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Skills</span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setViewMode('tasks');
-              if (isMobile) openMobileDetail();
-            }}
-            className={cn(
-              'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer group',
-              viewMode === 'tasks'
-                ? 'bg-surface2 text-foreground font-semibold shadow-2xs border border-border/60'
-                : 'text-foreground-muted hover:text-foreground hover:bg-surface2/60 border border-transparent'
-            )}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <Clock3 className="size-3.5 text-foreground-muted group-hover:text-foreground shrink-0 transition-colors" />
-              <span className="truncate">Tasks & Automations</span>
-            </div>
-          </button>
         </nav>
 
         <div className="border-t border-border/60 pt-3 pb-1 space-y-1">
-          <div className="flex items-center justify-between px-2.5 mb-1 text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted"><span>Projects</span><button type="button" aria-label="Open project workspace" onClick={() => setViewMode('home')} className="rounded p-1 hover:bg-surface2"><Plus className="size-3" /></button></div>
+          <div className="flex items-center justify-between px-2.5 mb-1 text-[10px] font-medium uppercase tracking-wider text-foreground-extra-muted"><span>项目</span><button type="button" aria-label="Open project workspace" onClick={() => setViewMode('home')} className="rounded p-1 hover:bg-surface2"><Plus className="size-3" /></button></div>
           <select aria-label="Filter sessions by project" value={activeProjectDir || ''} onChange={e => setActiveProjectDir(e.target.value || null)} className="w-full rounded-lg border border-border/60 bg-surface1 px-2.5 py-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <option value="">All projects</option>
+            <option value="">全部项目</option>
             {projectDirs.map(dir => <option key={dir} value={dir}>{basename(dir)}</option>)}
           </select>
         </div>
@@ -667,7 +630,7 @@ export function WorkbenchSidebarContent() {
           <Search className="size-3.5 absolute left-2.5 text-foreground-extra-muted pointer-events-none" />
           <input
             type="text"
-            placeholder="Search sessions…"
+            placeholder="搜索会话…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-8 pr-7 py-1 rounded-lg bg-surface1/60 hover:bg-surface1 focus:bg-surface2 text-xs text-foreground placeholder:text-foreground-extra-muted border border-border/50 outline-hidden transition-colors"

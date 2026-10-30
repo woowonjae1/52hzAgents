@@ -42,6 +42,19 @@ class RuntimeTools {
       this.broadcaster.broadcast(this.store.addEvent({ type: 'workspace.message.posted', source: `52hz:${run.agent}`,
         target: `channel/${channel}`, payload: { content: value.tool, sender_name: run.agent, sender_type: 'agent' },
         metadata: { runtime_tool: structuredClone(row) } }));
+      if (this.store.storage) {
+        try {
+          this.store.storage.tools.recordStart({
+            id: row.id,
+            runId: run.runId,
+            sessionId: channel,
+            toolName: value.tool,
+            args: value.args,
+            status: 'running',
+            startedAt: row.started_at,
+          });
+        } catch (_) {}
+      }
     }
     if (!row) return;
     if (value.output !== undefined) { row.output = tail(value.output); row.output_truncated = value.output.length > 64 * 1024; }
@@ -51,6 +64,22 @@ class RuntimeTools {
       if (Number.isFinite(value.structuredContent?.wall_time_seconds)) row.duration_ms = value.structuredContent.wall_time_seconds * 1000;
       if (value.structuredContent) row.result = { exit_code: value.structuredContent.exit_code, wall_time_seconds: value.structuredContent.wall_time_seconds };
       row.ended_at = Date.now();
+      if (this.store.storage) {
+        try {
+          this.store.storage.tools.recordEnd({
+            id: row.id,
+            status: row.status,
+            output: row.output,
+            outputTruncated: Boolean(row.output_truncated),
+            patch: row.patch,
+            patchTruncated: Boolean(row.patch_truncated),
+            path: row.path,
+            exitCode: row.result?.exit_code,
+            durationMs: row.duration_ms,
+            endedAt: row.ended_at,
+          });
+        } catch (_) {}
+      }
     }
     // Stream output in memory; durable snapshots are written at boundaries only.
     if (value.phase !== 'update' || Date.now() - (row.last_publish || 0) > 200) {
@@ -83,7 +112,17 @@ class RuntimeTools {
     const pending = this.pending.get(id);
     if (!pending || pending.channel !== channel || pending.row.status !== 'pending') throw fail('Approval expired or does not belong to this session.');
     if (typeof granted !== 'boolean') throw fail('Choose approve or deny.', 400);
-    pending.finish(granted, granted ? 'running' : 'denied'); return pending.row;
+    pending.finish(granted, granted ? 'running' : 'denied');
+    if (this.store.storage) {
+      try {
+        this.store.storage.tools.recordApproval({
+          toolCallId: pending.row.id,
+          sessionId: channel,
+          decision: granted ? 'approved' : 'denied',
+        });
+      } catch (_) {}
+    }
+    return pending.row;
   }
   cancel(run) {
     for (const row of run.tools?.values() || []) if (['running', 'pending'].includes(row.status)) { row.status = 'cancelled'; this.publish(row); }

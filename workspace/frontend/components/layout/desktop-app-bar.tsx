@@ -369,7 +369,7 @@ export function DesktopAppBar() {
               <div className="font-semibold text-xs">
                 {grid.isSplit ? 'Collapse Split View' : 'Split Dual Sessions View'}
               </div>
-              <div className="text-3xs text-foreground-muted">Multi-agent side-by-side split grid</div>
+              <div className="text-3xs text-foreground-muted">并排查看两个会话；项目修改任务串行执行</div>
             </TooltipContent>
           </Tooltip>
         )}
@@ -394,7 +394,7 @@ export function DesktopAppBar() {
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
             <div className="font-semibold text-xs">Diff Studio</div>
-            <div className="text-3xs text-foreground-muted">Code review & Git synchronization</div>
+            <div className="text-3xs text-foreground-muted">查看 Git 状态与文件修改</div>
           </TooltipContent>
         </Tooltip>
 
@@ -418,7 +418,7 @@ export function DesktopAppBar() {
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
             <div className="font-semibold text-xs">Terminal Panel</div>
-            <div className="text-3xs text-foreground-muted">Interactive multi-tab shell drawer</div>
+            <div className="text-3xs text-foreground-muted">查看命令记录；执行命令需在会话中审批</div>
           </TooltipContent>
         </Tooltip>
 
@@ -484,7 +484,7 @@ export function DesktopAppBar() {
                 ? 'Reconnecting to Workspace...'
                 : 'Workspace Stream Offline (Click to retry)'}
             </div>
-            <div className="text-3xs text-foreground-muted">Live WebSocket & event bus status</div>
+            <div className="text-3xs text-foreground-muted">本地事件流连接状态</div>
           </TooltipContent>
         </Tooltip>
 
@@ -538,7 +538,7 @@ export function DesktopAppBar() {
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8}>
             <div className="font-semibold text-xs">Settings & Configuration</div>
-            <div className="text-3xs text-foreground-muted">Models, MCP tools & preferences</div>
+            <div className="text-3xs text-foreground-muted">模型连接与应用设置</div>
           </TooltipContent>
         </Tooltip>
       </div>

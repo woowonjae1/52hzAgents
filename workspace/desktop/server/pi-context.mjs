@@ -3,7 +3,7 @@ import { compact, estimateTokens } from '@earendil-works/pi-coding-agent';
 // Keep this pinned-version bridge in one place and exercise it in integration tests.
 const { prepareCompaction, estimateProjectedContextTokens } = await import(new URL('./core/compaction/compaction.js', import.meta.resolve('@earendil-works/pi-coding-agent')));
 
-export function contextController({session,model,capacity,tools,signal,streamFn,apiKey,onUsage,onState=()=>{},autoCompact=true,keepRecentTokens}) {
+export function contextController({session,model,capacity,tools,signal,streamFn,apiKey,onUsage,onState=()=>{},beforeRequest,autoCompact=true,keepRecentTokens}) {
   let last = null, compactions = 0;
   const overhead = Math.ceil(JSON.stringify(tools.map(tool=>({name:tool.name,description:tool.description,parameters:tool.parameters}))).length / 3) + 256;
   const reserve = model.maxTokens + Math.max(1024, Math.ceil((capacity || 0) * .05));
@@ -17,6 +17,10 @@ export function contextController({session,model,capacity,tools,signal,streamFn,
   };
   const compress = async (messages,manual=false) => {
     if(signal.aborted) throw new Error('Compaction stopped.');
+    const beforeCompact = status(messages);
+    if (typeof beforeRequest === 'function') {
+      await beforeRequest(beforeCompact, 'compaction');
+    }
     const settings={enabled:true,reserveTokens:reserve,keepRecentTokens:keepRecentTokens ?? Math.min(12000,Math.max(512,Math.floor((capacity || 20000)*.2)))};
     const preparation=prepareCompaction(session.getBranch(),settings);
     if(!preparation) {
@@ -53,6 +57,9 @@ export function contextController({session,model,capacity,tools,signal,streamFn,
         if(!autoCompact) throw new Error('Context budget reached. Compact this session before continuing.');
         messages=await compress(messages);
         if(estimate(messages)+reserve>=capacity) throw new Error('Context still exceeds the model budget after compaction. Reduce the request or start a new session.');
+      }
+      if (typeof beforeRequest === 'function') {
+        await beforeRequest(last || before, 'generate');
       }
       return {context:{...context,messages}};
     },

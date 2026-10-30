@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { createStorage } = require('./storage');
+const { migrateLegacyStore } = require('./storage/legacy-import');
 
 class Store {
   constructor(userDataPath) {
@@ -13,26 +15,91 @@ class Store {
     }
 
     this.data = this.load();
+    this.committed = JSON.stringify(this.data);
+
+    // Initialize SQLite storage layer (Package A)
+    try {
+      const sqlitePath = this.userDataPath === ':memory:' ? ':memory:' : path.join(this.userDataPath, 'database.sqlite');
+      this.storage = createStorage({ dbPath: sqlitePath });
+      migrateLegacyStore({
+        storeJsonPath: this.dbFile,
+        storage: this.storage,
+      });
+
+      if (this.data?.workspace?.channels) {
+        for (const ch of this.data.workspace.channels) {
+          const existing = this.storage.sessions.get(ch.name);
+          if (!existing) {
+            this.storage.sessions.create({
+              id: ch.name,
+              title: ch.title || ch.name,
+              mode: ch.orchestration_mode || 'chat',
+              status: ch.status || 'active',
+              workingDir: ch.working_dir || null,
+              master: ch.master_agent || null,
+              runtimeConfig: ch.runtime_config || null,
+            });
+          } else if (this.recovery?.recovered) {
+            this.storage.sessions.update(ch.name, {
+              title: ch.title,
+              mode: ch.orchestration_mode,
+              status: ch.status,
+              working_dir: ch.working_dir,
+              master: ch.master_agent,
+              runtime_config: ch.runtime_config,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      // Non-fatal warning if SQLite initialization fails in edge environments
+      console.error('[Store] SQLite storage initialization warning:', err.message);
+    }
   }
 
   load() {
-    try {
-      if (fs.existsSync(this.dbFile)) {
-        const raw = fs.readFileSync(this.dbFile, 'utf8');
-        return JSON.parse(raw);
+    const candidates = [this.dbFile, `${this.dbFile}.bak`];
+    for (const file of candidates) {
+      if (!fs.existsSync(file)) continue;
+      try {
+        const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (!data?.workspace || !Array.isArray(data.workspace.channels) || !Array.isArray(data.events)) throw new Error('Invalid workspace data');
+        const defaults = this.getDefaultData();
+        if (file !== this.dbFile) this.recovery = { recovered: true, source: 'backup', timestamp: Date.now() };
+        return { ...defaults, ...data };
+      } catch (error) {
+        // Keep corrupt bytes for recovery rather than silently replacing user data.
+        fs.copyFileSync(file, `${file}.corrupt-${Date.now()}-${crypto.randomUUID()}`);
       }
-    } catch (e) {
-      console.warn('[Store] Failed to load store file, initializing default:', e.message);
     }
-
+    if (candidates.some(file => fs.existsSync(file))) throw new Error('工作区数据及备份无法读取，已保留损坏文件。请恢复备份后重试。');
     return this.getDefaultData();
   }
 
   save() {
+    const temp = `${this.dbFile}.${crypto.randomUUID()}.tmp`;
     try {
-      fs.writeFileSync(this.dbFile, JSON.stringify(this.data, null, 2), 'utf8');
-    } catch (e) {
-      console.error('[Store] Save failed:', e.message);
+      const serialized = JSON.stringify(this.data);
+      const fd = fs.openSync(temp, 'wx', 0o600);
+      try { fs.writeFileSync(fd, serialized); fs.fsyncSync(fd); }
+      finally { fs.closeSync(fd); }
+      // Only a validated last version can become the backup.
+      if (fs.existsSync(this.dbFile)) {
+        try {
+          const previous = JSON.parse(fs.readFileSync(this.dbFile, 'utf8'));
+          if (previous?.workspace && Array.isArray(previous.events)) {
+            const backupTemp = `${temp}.bak`;
+            fs.copyFileSync(this.dbFile, backupTemp);
+            fs.renameSync(backupTemp, `${this.dbFile}.bak`);
+          }
+        } catch (error) { if (error.code) throw error; }
+      }
+      fs.renameSync(temp, this.dbFile);
+      this.committed = serialized;
+    } catch (error) {
+      this.data = JSON.parse(this.committed);
+      fs.rmSync(temp, { force: true });
+      throw Object.assign(new Error('工作区保存失败，请检查磁盘空间与目录权限。'), { cause: error, status: 507 });
     }
   }
 
@@ -55,12 +122,7 @@ class Store {
             working_dir: process.cwd(),
           },
         ],
-        members: [
-          { name: 'deepseek', role: 'master', status: 'online', description: 'DeepSeek Reasoner & Coder (V3 / R1)' },
-          { name: 'claude', role: 'collaborator', status: 'online', description: 'Anthropic Claude 3.7 Sonnet' },
-          { name: 'gemini', role: 'collaborator', status: 'online', description: 'Google Gemini 2.5 Flash / Pro' },
-          { name: 'ollama', role: 'collaborator', status: 'online', description: 'Local Ollama Instance' },
-        ],
+        members: [],
         settings: {
           theme: 'dark',
           defaultModel: 'deepseek-v3',
@@ -75,7 +137,7 @@ class Store {
           source: 'openagents:system',
           target: 'channel/general',
           payload: {
-            content: '👋 **欢迎使用 52hzAgents Studio**\n\n本地工作台已无缝启动。支持多模型编排 (DeepSeek, Claude, Gemini, Ollama) 与本地 Git、文件管理。',
+            content: '欢迎使用 **52hzAgents Studio**。先配置模型连接，再选择本地项目。Chat 用于对话，Plan 只读分析，Agent 可以修改文件并在审批后执行命令。',
             sender_name: 'System',
             sender_type: 'agent',
           },
@@ -93,15 +155,63 @@ class Store {
   }
 
   getWorkspace() {
-    return this.data.workspace;
+    const ws = { ...this.data.workspace };
+    if (this.storage?.sessions) {
+      try {
+        const dbSessions = this.storage.sessions.list({ status: 'all', limit: 1000 });
+        if (dbSessions && dbSessions.length > 0) {
+          const map = new Map();
+          for (const c of ws.channels || []) map.set(c.name, c);
+          ws.channels = dbSessions.map((s) => {
+            const cached = map.get(s.id) || {};
+            return {
+              ...cached,
+              name: s.id,
+              channel_name: s.id,
+              title: s.title,
+              status: s.status,
+              master_agent: s.master,
+              orchestration_mode: s.mode,
+              working_dir: s.workingDir,
+              runtime_config: s.runtimeConfig,
+              last_event_at: s.lastEventAt,
+            };
+          });
+        }
+      } catch (err) {
+        console.error('[Store] SQLite getWorkspace failed:', err.message);
+      }
+    }
+    return ws;
   }
 
   getChannel(name) {
+    if (this.storage?.sessions) {
+      try {
+        const s = this.storage.sessions.get(name);
+        if (s) {
+          const inMem = this.data?.workspace?.channels?.find((c) => c.name === name) || {};
+          return {
+            ...inMem,
+            name: s.id,
+            title: s.title,
+            status: s.status,
+            master_agent: s.master,
+            orchestration_mode: s.mode,
+            working_dir: s.workingDir,
+            runtime_config: s.runtimeConfig,
+            last_event_at: s.lastEventAt,
+          };
+        }
+      } catch (err) {
+        console.error('[Store] SQLite getChannel failed:', err.message);
+      }
+    }
     return this.data.workspace.channels.find((c) => c.name === name) || null;
   }
 
   updateChannel(name, updates) {
-    let ch = this.getChannel(name);
+    let ch = this.data.workspace.channels.find((c) => c.name === name);
     if (!ch) {
       ch = { name, title: name, status: 'active', ...updates };
       this.data.workspace.channels.push(ch);
@@ -109,6 +219,36 @@ class Store {
       Object.assign(ch, updates);
     }
     this.save();
+
+    if (this.storage) {
+      try {
+        const existing = this.storage.sessions.get(name);
+        if (!existing) {
+          this.storage.sessions.create({
+            id: name,
+            title: ch.title || name,
+            mode: ch.orchestration_mode || 'chat',
+            status: ch.status || 'active',
+            workingDir: ch.working_dir || null,
+            master: ch.master_agent || null,
+            runtimeConfig: ch.runtime_config || null,
+          });
+        } else {
+          this.storage.sessions.update(name, {
+            title: ch.title,
+            mode: ch.orchestration_mode,
+            status: ch.status,
+            working_dir: ch.working_dir,
+            master: ch.master_agent,
+            runtime_config: ch.runtime_config,
+          });
+        }
+      } catch (err) {
+        console.error('[Store] SQLite updateChannel failed:', err);
+        throw err;
+      }
+    }
+
     return ch;
   }
 
@@ -139,15 +279,109 @@ class Store {
     this.data.events.push(normalized);
     const channel = this.getChannel(normalized.target.replace(/^channel\//, ''));
     if (channel && normalized.type === 'workspace.message.posted') channel.last_event_at = normalized.timestamp;
-    // Keep max 5000 recent events
+    // Keep max 5000 recent events in memory cache
     if (this.data.events.length > 5000) {
       this.data.events.splice(0, this.data.events.length - 5000);
     }
     this.save();
+
+    if (this.storage) {
+      try {
+        const appended = this.syncEventToStorage(normalized);
+        if (appended && appended.seq) {
+          normalized.seq = appended.seq;
+        }
+      } catch (err) {
+        console.error('[Store] SQLite addEvent sync failed:', err);
+        throw err;
+      }
+    }
+
     return normalized;
   }
 
+  syncEventToStorage(event) {
+    if (!this.storage) return null;
+    let sessionId = null;
+    const target = event.target || 'channel/general';
+    if (typeof target === 'string' && target.startsWith('channel/')) {
+      sessionId = target.slice('channel/'.length);
+    } else if (typeof target === 'string') {
+      sessionId = target;
+    }
+
+    const appended = this.storage.events.append({
+      eventId: event.id || event.event_id,
+      sessionId,
+      type: event.type,
+      source: event.source,
+      target: event.target,
+      payload: event.payload,
+      metadata: event.metadata,
+      timestamp: event.timestamp,
+    });
+
+    if (event.type === 'workspace.message.posted' && sessionId) {
+      const payload = event.payload || {};
+      const content = typeof payload.content === 'string' ? payload.content : (payload.text || '');
+      const senderType = payload.sender_type || 'user';
+      const senderName = payload.sender_name || (senderType === 'human' ? 'User' : 'Agent');
+
+      let role = 'user';
+      if (senderType === 'agent' || senderType === 'bot' || senderType === 'assistant') {
+        role = 'assistant';
+      } else if (senderType === 'system') {
+        role = 'system';
+      } else if (senderType === 'tool') {
+        role = 'tool';
+      }
+
+      this.storage.messages.append({
+        id: event.id || event.event_id,
+        sessionId,
+        role,
+        senderName,
+        senderType,
+        content,
+        metadata: event.metadata,
+        timestamp: event.timestamp,
+      });
+    }
+
+    return appended;
+  }
+
   getEvents(opts = {}) {
+    if (this.storage?.events) {
+      try {
+        let sessionId = undefined;
+        let target = opts.target;
+        if (opts.channel) {
+          target = opts.channel.startsWith('channel/') ? opts.channel : `channel/${opts.channel}`;
+          sessionId = opts.channel.replace(/^channel\//, '');
+        }
+        let list = this.storage.events.list({
+          sessionId,
+          target,
+          type: opts.type,
+          after: opts.after,
+          before: opts.before,
+          afterSeq: opts.afterSeq,
+          limit: opts.limit ? parseInt(opts.limit, 10) : 100,
+        });
+        if (opts.search) {
+          const q = opts.search.toLowerCase();
+          list = list.filter((e) => JSON.stringify(e.payload || {}).toLowerCase().includes(q));
+        }
+        if (opts.sort === 'desc') {
+          list.reverse();
+        }
+        return list;
+      } catch (err) {
+        console.error('[Store] SQLite getEvents failed, falling back to cache:', err.message);
+      }
+    }
+
     let result = [...this.data.events];
     if (opts.channel) {
       const target = opts.channel.startsWith('channel/') ? opts.channel : `channel/${opts.channel}`;
@@ -179,6 +413,22 @@ class Store {
   }
 
   getLatestPerChannel() {
+    if (this.storage?.events) {
+      try {
+        const events = this.storage.events.getLatestPerChannel();
+        const map = {};
+        for (const e of events) {
+          if (e.target && e.target.startsWith('channel/')) {
+            const ch = e.target.replace(/^channel\//, '');
+            map[ch] = e;
+          }
+        }
+        return map;
+      } catch (err) {
+        console.error('[Store] SQLite getLatestPerChannel failed, falling back to cache:', err.message);
+      }
+    }
+
     const map = {};
     for (const ch of this.data.workspace.channels) {
       const target = `channel/${ch.name}`;
@@ -215,10 +465,19 @@ class Store {
   }
 
   getTimers() {
+    if (this.storage?.timers) {
+      return this.storage.timers.list();
+    }
     return this.data.timers;
   }
 
   addTimer(timer) {
+    if (this.storage?.timers) {
+      const added = this.storage.timers.create(timer);
+      this.data.timers = this.data.timers.filter((t) => t.id !== added.id).concat(added);
+      this.save();
+      return added;
+    }
     const id = timer.id || `timer-${Date.now()}`;
     const t = { ...timer, id };
     this.data.timers.push(t);
@@ -227,16 +486,28 @@ class Store {
   }
 
   deleteTimer(id) {
+    if (this.storage?.timers) {
+      this.storage.timers.delete(id);
+    }
     this.data.timers = this.data.timers.filter((t) => t.id !== id);
     this.save();
     return true;
   }
 
   getRoutines() {
+    if (this.storage?.routines) {
+      return this.storage.routines.list();
+    }
     return this.data.routines;
   }
 
   addRoutine(routine) {
+    if (this.storage?.routines) {
+      const added = this.storage.routines.create(routine);
+      this.data.routines = this.data.routines.filter((r) => r.id !== added.id).concat(added);
+      this.save();
+      return added;
+    }
     const id = routine.id || `routine-${Date.now()}`;
     const r = { ...routine, id };
     this.data.routines.push(r);
@@ -245,6 +516,9 @@ class Store {
   }
 
   deleteRoutine(id) {
+    if (this.storage?.routines) {
+      this.storage.routines.delete(id);
+    }
     this.data.routines = this.data.routines.filter((r) => r.id !== id);
     this.save();
     return true;
@@ -290,8 +564,15 @@ class Store {
   }
 
   addApproval(approval) {
-    const id = approval.id || `appr-${Date.now()}`;
-    const a = { ...approval, id, status: 'pending', created_at: new Date().toISOString() };
+    const id = approval?.id || `appr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const a = {
+      ...approval,
+      id,
+      status: 'pending',
+      decision: 'pending',
+      used: false,
+      created_at: new Date().toISOString(),
+    };
     this.data.approvals.push(a);
     this.save();
     return a;
@@ -300,11 +581,30 @@ class Store {
   updateApproval(id, status) {
     const a = this.data.approvals.find((x) => x.id === id);
     if (a) {
+      if (a.used && (status === 'approved' || status === 'granted')) {
+        throw new Error('Cannot approve an already used approval');
+      }
       a.status = status;
+      a.decision = status;
       a.resolved_at = new Date().toISOString();
       this.save();
     }
     return a;
+  }
+
+  searchMessages(query, opts = {}) {
+    if (!this.storage) return [];
+    try {
+      return this.storage.search.searchMessages(query, opts);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  close() {
+    if (this.storage) {
+      try { this.storage.close(); } catch (_) {}
+    }
   }
 }
 

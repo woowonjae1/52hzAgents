@@ -308,7 +308,7 @@ export function GlobalShortcuts() {
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-lg border border-border bg-surface-overlay/95 backdrop-blur-xl px-3 py-1.5 shadow-xl pointer-events-none">
           <Kbd>{pendingPrefix.toUpperCase()}</Kbd>
           <span className="text-2xs text-foreground-muted">
-            go to — t threads · a tasks · m mission · f files · k knowledge · s settings
+            跳转 — t 会话 · m 项目 · f 文件 · s 设置
           </span>
         </div>
       )}

@@ -182,4 +182,27 @@ export class WorkspacesApi extends BaseWorkspaceApi {
       method: 'POST',
     });
   }
+
+  async listBackups(): Promise<Array<{ path: string; name: string; sizeBytes: number; createdAt: string; metadata?: any }>> {
+    const res = await this.request<{ backups: any[] }>('/v1/backups');
+    return res.backups || [];
+  }
+
+  async createBackup(options?: { label?: string; maxRotations?: number }): Promise<any> {
+    return this.request('/v1/backups', {
+      method: 'POST',
+      body: JSON.stringify(options || {}),
+    });
+  }
+
+  async checkIntegrity(): Promise<{ ok: boolean; integrity: string[]; foreignKeyViolations: any[] }> {
+    return this.request('/v1/backups/integrity');
+  }
+
+  async restoreBackup(backupPath: string): Promise<any> {
+    return this.request('/v1/backups/restore', {
+      method: 'POST',
+      body: JSON.stringify({ backupPath }),
+    });
+  }
 }

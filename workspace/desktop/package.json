@@ -7,7 +7,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "test:server": "node --test server/workspace.test.js server/runtime.test.js server/project-reader.test.js server/pi-engine.test.mjs server/config.test.js server/round4.test.mjs",
+    "test:server": "node --test server/storage/storage.test.js server/storage/task-state.test.js server/storage/daemon-supervisor.test.js server/storage/security-isolation.test.js server/storage/budget-pricing.test.js server/storage/distribution-packaging.test.js server/storage/mcp-knowledge-artifacts.test.js server/storage/scheduler-pipelines.test.js server/storage/orchestration.test.js server/storage/audit-gap-verification.test.js server/workspace.test.js server/runtime.test.js server/project-reader.test.js server/pi-engine.test.mjs server/config.test.js server/round4.test.mjs server/recovery.test.mjs server/isolation.test.mjs",
     "clean-running": "node clean-processes.js",
     "prepack": "npm run sync-all",
     "pack": "node build-desktop.cjs --dir",
@@ -70,7 +70,13 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "52hzAgents"
+      "shortcutName": "52hzAgents",
+      "deleteAppDataOnUninstall": false,
+      "differentialPackage": false,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
     }
   },
   "dependencies": {

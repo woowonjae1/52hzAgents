@@ -41,6 +41,8 @@ export type TasksTab = 'tasks' | 'schedules' | 'runs';
     the third, and is gone.
 */
 function resolveView(mode: ViewMode): { view: ViewMode; settingsTab?: SettingsTab; tasksTab?: TasksTab } {
+  // Old shortcuts and restored layouts must not reopen placeholder modules.
+  if (['skills', 'knowledge', 'tasks', 'timers', 'routines'].includes(mode)) return { view: 'home' };
   // The Browser view was removed; a layout saved on it opens the threads.
   if ((mode as string) === 'browser') return { view: 'threads' };
   if (mode === 'mission') return { view: 'home' };
@@ -318,6 +320,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     },
   );
   const setActiveRightTab = useCallback((tab: RightPanelTab) => {
+    if (tab === 'knowledge') return;
     setActiveRightTabState(tab);
     // 'canvas' is not restorable — it points at an artifact that belongs to a
     // particular message, so a restart would reopen an empty panel.

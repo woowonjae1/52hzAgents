@@ -11,13 +11,18 @@ import { Store } from './store.js';
 import { AgentRunner } from './agent-runner.js';
 import { sessionUsage } from './usage.js';
 import { startServer } from './index.js';
+import { closeDatabasesUnder } from './storage/database.js';
 
 const commandTool = process.platform === 'win32' ? 'powershell' : 'bash';
 const tool = (name, args) => fauxAssistantMessage(fauxToolCall(name, args), { stopReason: 'toolUse' });
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), '52hz-pi-test-'));
   const project = path.join(root, 'project'); await fs.mkdir(project);
-  t.after(async () => { assert.ok(root.startsWith(path.join(os.tmpdir(), '52hz-pi-test-'))); await fs.rm(root, { recursive: true, force: true }); });
+  t.after(async () => {
+    closeDatabasesUnder(root);
+    assert.ok(root.startsWith(path.join(os.tmpdir(), '52hz-pi-test-')));
+    await fs.rm(root, { recursive: true, force: true });
+  });
   const faux = createFauxCore({ models: [{ id: 'fixture', contextWindow: 32000 }], tokensPerSecond: 1e9 });
   const controller = new AbortController();
   const events = [], patches = [], approvals = [];

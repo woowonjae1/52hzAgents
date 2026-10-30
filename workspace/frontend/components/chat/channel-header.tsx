@@ -40,6 +40,7 @@ function basename(pathStr: string): string {
 }
 
 export interface ChannelHeaderProps {
+  embeddedRuntime?: boolean;
   currentSession: WorkspaceSession | null | undefined;
   currentSessionId: string | null;
   isDM: boolean;
@@ -64,6 +65,7 @@ export interface ChannelHeaderProps {
 }
 
 export function ChannelHeader({
+  embeddedRuntime = false,
   currentSession,
   currentSessionId,
   isDM,
@@ -146,7 +148,7 @@ export function ChannelHeader({
                   ? stripTitleMentions(currentSession.title)
                   : (currentSessionId && !isDraftSessionId(currentSessionId) ? 'Session' : 'New Session')}
               </h2>
-              {currentSession?.master && (
+              {!embeddedRuntime && currentSession?.master && (
                 <span
                   className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0"
                   title={`Master agent: ${currentSession.master}`}
@@ -169,9 +171,10 @@ export function ChannelHeader({
                 className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-surface2/60 hover:bg-surface3 border border-border/60 text-[10.5px] font-medium text-foreground-muted hover:text-foreground transition-all desktop-tactile cursor-pointer select-none shrink-0"
                 title="Open Agents Management"
               >
-                <span className="size-1.5 rounded-full bg-status-success animate-pulse shrink-0" />
+                <span className="size-1.5 rounded-full bg-foreground-muted shrink-0" />
                 <span>
                   {(() => {
+                    if (embeddedRuntime) return '模型连接';
                     const total = sessionParticipants.length > 0 ? sessionParticipants.length : agents.length;
                     if (activeHeaderAgents.length > 0) {
                       return activeHeaderAgents.length === total

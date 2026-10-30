@@ -49,12 +49,15 @@ contextBridge.exposeInMainWorld('electronBridge', {
   hideQuickBar: () => ipcRenderer.send('quickbar-hide'),
   openMainWindow: (route) => ipcRenderer.send('main-window-open', route),
   getAutostart: () => ipcRenderer.invoke('app-get-autostart'),
+  getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   setAutostart: (enabled) => ipcRenderer.invoke('app-set-autostart', enabled),
   getApiUrl: () => {
     if (cachedDesktopApiUrl) return cachedDesktopApiUrl;
     cachedDesktopApiUrl = ipcRenderer.sendSync('get-api-url-sync');
     return cachedDesktopApiUrl;
   },
+  getWorkspaceToken: (slug) => ipcRenderer.invoke('desktop:get-workspace-token', slug),
+  getWorkspaceTokenSync: () => ipcRenderer.sendSync('get-workspace-token-sync'),
   browseFolder: (defaultPath) => ipcRenderer.invoke('dialog-open-folder', defaultPath),
   openPath: (pathStr) => ipcRenderer.invoke('shell-open-path', pathStr),
   showItemInFolder: (pathStr) => ipcRenderer.invoke('shell-show-item', pathStr),
