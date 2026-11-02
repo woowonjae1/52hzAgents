@@ -40,8 +40,8 @@ class RuntimeTools {
         if (index >= 0) this.store.data.runtime_tools.splice(index, 1);
       }
       this.broadcaster.broadcast(this.store.addEvent({ type: 'workspace.message.posted', source: `52hz:${run.agent}`,
-        target: `channel/${channel}`, payload: { content: value.tool, sender_name: run.agent, sender_type: 'agent' },
-        metadata: { runtime_tool: structuredClone(row) } }));
+        target: `channel/${channel}`, payload: { content: value.tool, sender_name: run.agentIdentity?.name || run.agent, sender_type: 'agent' },
+        metadata: { runtime_tool: structuredClone(row), ...(run.agentIdentity ? { agent_identity: run.agentIdentity } : {}) } }));
       if (this.store.storage) {
         try {
           this.store.storage.tools.recordStart({

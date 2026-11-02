@@ -25,6 +25,7 @@ const { TimersRepository } = require('./repositories/timers');
 const { PipelinesRepository } = require('./repositories/pipelines');
 const { OrchestrationRepository } = require('./repositories/orchestration');
 const { BackupManager } = require('./backup');
+const { AgentDefinitionsRepository } = require('./repositories/agent-definitions');
 
 class Storage {
   /**
@@ -49,6 +50,7 @@ class Storage {
     this.db = this.manager.db;
 
     this.sessions = new SessionsRepository(this.manager);
+    this.agentDefinitions = new AgentDefinitionsRepository(this.manager);
     this.messages = new MessagesRepository(this.manager);
     this.events = new EventsRepository(this.manager);
     this.runs = new RunsRepository(this.manager);

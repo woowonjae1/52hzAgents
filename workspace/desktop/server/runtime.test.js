@@ -259,8 +259,8 @@ test("timeout and app restart produce terminal states instead of perpetual runni
       payload: { content: "Timeout" },
     }),
   );
-  assert.equal(runner.turns.get("general/openai").state, "error");
-  assert.match(runner.turns.get("general/openai").error, /timed out/);
+  assert.equal(runner.turns.get("general/agent-local").state, "error");
+  assert.match(runner.turns.get("general/agent-local").error, /timed out/);
   runner.updateTurn("general", "openai", "running");
   const restarted = new AgentRunner(new Store(store.userDataPath), {
     broadcast() {},

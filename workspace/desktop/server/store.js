@@ -38,6 +38,7 @@ class Store {
               workingDir: ch.working_dir || null,
               master: ch.master_agent || null,
               runtimeConfig: ch.runtime_config || null,
+              agentId: ch.agent_id || 'agent-local',
             });
           } else if (this.recovery?.recovered) {
             this.storage.sessions.update(ch.name, {
@@ -174,6 +175,7 @@ class Store {
               orchestration_mode: s.mode,
               working_dir: s.workingDir,
               runtime_config: s.runtimeConfig,
+              agent_id: s.agentId,
               last_event_at: s.lastEventAt,
             };
           });
@@ -200,6 +202,7 @@ class Store {
             orchestration_mode: s.mode,
             working_dir: s.workingDir,
             runtime_config: s.runtimeConfig,
+            agent_id: s.agentId,
             last_event_at: s.lastEventAt,
           };
         }
@@ -211,6 +214,10 @@ class Store {
   }
 
   updateChannel(name, updates) {
+    if (updates.agent_id !== undefined) {
+      if (!this.storage?.agentDefinitions) throw Object.assign(new Error('Agent storage unavailable.'), { status: 503 });
+      this.storage.agentDefinitions.requireActive(updates.agent_id);
+    }
     let ch = this.data.workspace.channels.find((c) => c.name === name);
     if (!ch) {
       ch = { name, title: name, status: 'active', ...updates };
@@ -232,6 +239,7 @@ class Store {
             workingDir: ch.working_dir || null,
             master: ch.master_agent || null,
             runtimeConfig: ch.runtime_config || null,
+            agentId: ch.agent_id || 'agent-local',
           });
         } else {
           this.storage.sessions.update(name, {
@@ -241,6 +249,7 @@ class Store {
             working_dir: ch.working_dir,
             master: ch.master_agent,
             runtime_config: ch.runtime_config,
+            agent_id: updates.agent_id,
           });
         }
       } catch (err) {

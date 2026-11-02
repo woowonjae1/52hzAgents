@@ -5,6 +5,8 @@ const {projectSnapshot,changesSince} = require('./project-evidence');
 const {normalizeUrl} = require('./config-manager');
 const { Checkpoints } = require('./checkpoints');
 const { categorizeError } = require('./connection-tester');
+const { DEFAULT_AGENT_ID } = require('./storage/repositories/agent-definitions');
+const { policyOf, restrictMode, toolAllowed, checkAgentBudget } = require('./agent-policy');
 const fs = require('node:fs');
 const path = require('node:path');
 const projectKey = value => {
@@ -88,7 +90,7 @@ class AgentRunner {
     for (const event of store.data.events)
       if (event.type === "workspace.agent.turn.updated")
         this.turns.set(
-          `${event.payload.channel_name}/${event.payload.agent_name}`,
+          `${event.payload.execution_key || event.payload.channel_name}/${event.payload.agent_name}`,
           event.payload,
         );
     for (const row of [...this.turns.values()])
@@ -98,6 +100,8 @@ class AgentRunner {
           row.agent_name,
           "error",
           "The previous response was interrupted by an app restart.",
+          null,
+          row.execution_key || row.channel_name,
         );
   }
   providers() {
@@ -122,17 +126,45 @@ class AgentRunner {
         p.model,
     }));
   }
-  config(channel) {
+  config(channel, identity = this.identity(channel)) {
+    const policy = policyOf(identity);
     const saved = this.store.getChannel(channel)?.runtime_config;
-    if (saved) return saved;
     const provider =
       this.providers().find((p) => p.configured && p.id !== "ollama")?.id ||
       "ollama";
-    return {
-      provider,
-      model: this.providers().find((p) => p.id === provider)?.model || "deepseek-chat",
-      mode: "chat",
+    const defaults = {
+      provider: policy.modelResource?.connectionId || provider,
+      model: policy.modelResource?.modelId || this.providers().find((p) => p.id === provider)?.model || 'deepseek-chat',
+      mode: policy.defaultMode,
     };
+    const effective = saved?.inheritAgent ? { ...defaults, ...(saved.mode ? { mode: saved.mode } : {}), autoCompact: saved.autoCompact !== false }
+      : saved ? { ...saved } : defaults;
+    effective.mode = restrictMode(effective.mode, policy.maxMode);
+    return effective;
+  }
+  validateSessionConfig(input) {
+    if (input?.inheritAgent === true) {
+      if (Object.keys(input).some(key => !['inheritAgent', 'mode', 'autoCompact'].includes(key)) ||
+          (input.mode !== undefined && !['chat', 'plan', 'agent'].includes(input.mode))) {
+        throw Object.assign(new Error('Agent inheritance accepts only mode and autoCompact overrides.'), { status: 400 });
+      }
+      return { inheritAgent: true, ...(input.mode ? { mode: input.mode } : {}), autoCompact: input.autoCompact !== false };
+    }
+    return this.validateConfig(input);
+  }
+  validateDefinitionResource(input) {
+    if (!input?.modelResource) return;
+    const id = input.modelResource.connectionId;
+    const known = this.configManager ? Boolean(this.configManager.getConnection(id)) : Object.hasOwn(PROVIDERS, id || '');
+    if (!known) throw Object.assign(new Error('Choose an existing model connection for this Agent.'), { status: 400 });
+  }
+  identity(channel, { requireActive = false } = {}) {
+    const repository = this.store.storage?.agentDefinitions;
+    if (!repository) throw Object.assign(new Error('Agent storage unavailable.'), { status: 503 });
+    const id = this.store.getChannel(channel)?.agent_id || DEFAULT_AGENT_ID;
+    const agent = requireActive ? repository.requireActive(id) : repository.get(id);
+    if (!agent) throw Object.assign(new Error('The session Agent no longer exists.'), { status: 409 });
+    return agent;
   }
   validateConfig(config) {
     const providerId = config?.provider || config?.connectionId;
@@ -203,25 +235,27 @@ class AgentRunner {
       type: "workspace.message.posted",
       source: `52hz:${agent}`,
       target: `channel/${channel}`,
-      payload: { content, sender_name: agent, sender_type: "agent" },
+      payload: { content, sender_name: metadata.agent_identity?.name || agent, sender_type: "agent" },
       metadata,
     });
     this.broadcaster.broadcast(event);
     return event;
   }
-  updateTurn(channel, agent, state, error = "") {
-    const previous = this.turns.get(`${channel}/${agent}`),
+  updateTurn(channel, agent, state, error = "", identity = null, executionKey = channel) {
+    const previous = this.turns.get(`${executionKey}/${agent}`),
       now = new Date().toISOString();
     const row = {
       channel_name: channel,
       agent_name: agent,
+      execution_key: executionKey,
+      ...(identity ? { agent_id: identity.id, display_name: identity.name, agent_revision: identity.revision } : {}),
       state,
       error,
       updated_at: now,
       started_at: state === "running" ? now : previous?.started_at || now,
       ended_at: state === "running" ? null : now,
     };
-    this.turns.set(`${channel}/${agent}`, row);
+    this.turns.set(`${executionKey}/${agent}`, row);
     this.broadcaster.broadcast(
       this.store.addEvent({
         type: "workspace.agent.turn.updated",
@@ -231,8 +265,8 @@ class AgentRunner {
       }),
     );
   }
-  snapshot(channel) {
-    const run = this.active.get(channel);
+  snapshot(channel, executionKey = channel) {
+    const run = this.active.get(executionKey) || [...this.active.values()].find(run => run.snapshot.channel === channel);
     return run?.content
       ? {
           event_id: run.id,
@@ -242,10 +276,10 @@ class AgentRunner {
           timestamp: run.timestamp,
           payload: {
             content: run.content,
-            sender_name: run.agent,
+            sender_name: run.agentIdentity.name,
             sender_type: "agent",
           },
-          metadata: { streaming: true, model: run.model },
+          metadata: { streaming: true, model: run.model, agent_identity: run.agentIdentity },
         }
       : null;
   }
@@ -254,12 +288,12 @@ class AgentRunner {
     for (const activeRun of this.active.values()) {
       if (activeRun.runId !== excludeRunId) {
         let turnReservation = activeRun.reservedCost;
-        if (typeof turnReservation !== 'number' && this.store.storage?.pricing) {
+        if (typeof turnReservation !== 'number' && activeRun.reservedTokens > 0 && this.store.storage?.pricing) {
           const pricing = this.store.storage.pricing.calculateCost({
-            provider: activeRun.protocol || activeRun.config?.provider || 'ollama',
+            provider: activeRun.pricingProvider || activeRun.snapshot?.connectionId || activeRun.protocol || activeRun.config?.provider || 'ollama',
             modelId: activeRun.model || activeRun.config?.model || 'default',
-            promptTokens: activeRun.reservedPromptTokens ?? (activeRun.reservedTokens || 1000),
-            completionTokens: activeRun.reservedCompletionTokens ?? 500,
+            promptTokens: activeRun.reservedPromptTokens ?? activeRun.reservedTokens,
+            completionTokens: activeRun.reservedCompletionTokens ?? 0,
           });
           if (typeof pricing?.estimatedCost === 'number') {
             turnReservation = pricing.estimatedCost;
@@ -283,9 +317,9 @@ class AgentRunner {
       return;
     const channel = event.target.replace(/^channel\//, "");
     if (!this.store.getChannel(channel)) return;
-    const executionKey = event.metadata?.lane_id
-      ? `${channel}:lane:${event.metadata.lane_id}`
-      : channel;
+    const execution = this.resolveExecution(event, channel);
+    if (execution === false) return;
+    const executionKey = execution?.executionKey || channel;
 
     if (this.active.has(executionKey)) {
       const queue = this.queues.get(executionKey) || [];
@@ -322,12 +356,26 @@ class AgentRunner {
       this.queues.set(executionKey, queue);
       return;
     }
-    return this.run(channel, event, { executionKey });
+    return this.run(channel, event, { executionKey, execution });
   }
-  async run(channel, event, {compactOnly=false, executionKey=channel}={}) {
-    const config = this.validateConfig(this.config(channel)),
-      agent = config.provider;
-    const laneWorktree = event.metadata?.worktree_path;
+  resolveExecution(event, channel) {
+    if (!event.metadata?.lane_id && !event.metadata?.pipeline_id) return null;
+    if (!this.collaboration) {
+      if (event.metadata?.lane_id && !fs.existsSync(event.metadata.worktree_path || '')) return null;
+      throw Object.assign(new Error('Collaboration dispatch is not bound to a saved Agent.'), { status: 409 });
+    }
+    return this.collaboration.resolve(event, channel) || false;
+  }
+  async run(channel, event, {compactOnly=false, executionKey=channel, execution}={}) {
+    execution = execution === undefined ? this.resolveExecution(event, channel) : execution;
+    if (execution === false) return;
+    executionKey = execution?.executionKey || executionKey;
+    const agentIdentity = execution?.actor || this.identity(channel, { requireActive: true });
+    const executionPolicy = policyOf(agentIdentity);
+    const config = this.validateConfig(execution?.config || this.config(channel, agentIdentity));
+    config.mode = restrictMode(config.mode, executionPolicy.maxMode);
+    const agent = agentIdentity.id;
+    const laneWorktree = execution?.projectDir || event.metadata?.worktree_path;
     const isParallelLane = Boolean(event.metadata?.lane_id || event.metadata?.batch_id);
     const channelWorkingDir = this.store.getChannel(channel)?.working_dir || null;
 
@@ -347,14 +395,12 @@ class AgentRunner {
         return;
       }
     }
-    const workingDir = isParallelLane ? laneWorktree : (channelWorkingDir || null);
+    const workingDir = execution?.projectDir || (isParallelLane ? laneWorktree : (channelWorkingDir || null));
     const key = projectKey(workingDir);
     if (this.workspaceOperations.has(channel) || key && ([...this.restoring].some(other => overlaps(other,key)) || [...this.active.values()].some(other => {
-      if (other.snapshot?.executionKey && other.snapshot.executionKey !== executionKey && other.snapshot.workingDir !== workingDir) {
-        return false;
-      }
       return overlaps(projectKey(other.snapshot.workingDir), key) && (other.snapshot.mode === 'agent' || config.mode === 'agent');
     }))) {
+      if (execution) throw Object.assign(new Error('Project is busy or restoring; collaboration task was not started.'), { status: 409 });
       this.post(channel, 'system', '此项目有任务正在执行或撤销。为避免文件冲突，请等待结束后重新发送。', { runtime_status: true });
       if (this.store.storage && event.metadata?.routine_run_id) {
         try {
@@ -375,11 +421,14 @@ class AgentRunner {
       return;
     }
     if (event.metadata?.runtime_queued) { delete event.metadata.runtime_queued; this.store.save(); }
+    const identitySnapshot = { id: agentIdentity.id, name: agentIdentity.name, role: agentIdentity.role,
+      revision: agentIdentity.revision, runtimeKind: agentIdentity.runtimeKind };
     const run = {
       runId: crypto.randomUUID(),
       controller: new AbortController(),
       id: `reply-${crypto.randomUUID()}`,
       agent,
+      agentIdentity: identitySnapshot,
       model: config.model,
       content: "",
       timestamp: Date.now(),
@@ -390,12 +439,19 @@ class AgentRunner {
         mode: config.mode,
         connectionId: config.provider,
         model: config.model,
+        agent: structuredClone(identitySnapshot),
+        executionPolicy: structuredClone(executionPolicy),
+        allowedTools: agentIdentity.profileTools || null,
+        ...(execution ? { collaboration: { kind: execution.kind, batchId: execution.batchId, laneId: execution.laneId, pipelineId: execution.pipelineId, contextKey: execution.contextKey } } : {}),
       },
       evidence: {
         filesModified: new Set(),
         commands: [],
       },
     };
+    if (execution && !this.collaboration?.begin(execution, run.runId)) return;
+    const observationStore = Object.create(this.store);
+    observationStore.getChannel = name => name === channel ? { ...this.store.getChannel(name), working_dir: workingDir } : this.store.getChannel(name);
     const record={id:run.runId,channel,prompt_id:event.id,snapshot:run.snapshot,phase:compactOnly?'compacting':'preparing',outcome:null,started_at:Date.now(),context:null};
     this.store.data.runtime_runs.push(record);
     if(this.store.data.runtime_runs.length>200) {const index=this.store.data.runtime_runs.findIndex(row=>row.outcome);if(index>=0)this.store.data.runtime_runs.splice(index,1);}
@@ -404,15 +460,16 @@ class AgentRunner {
         this.store.storage.runs.create({
           id: run.runId,
           sessionId: channel,
-          agentName: agent,
+          agentName: agentIdentity.name,
           modelId: config.model,
           mode: config.mode,
           clientMessageId: event.client_message_id || event.id,
           configSnapshot: run.snapshot,
           phase: compactOnly ? 'compacting' : 'preparing',
         });
-      } catch (_) {}
+      } catch (error) { if (execution) throw error; }
     }
+    if (execution) this.collaboration.attach(execution, run.runId);
     const phase = value => {
       record.phase = value;
       this.store.save();
@@ -429,7 +486,7 @@ class AgentRunner {
       this.broadcaster.broadcast({type:'workspace.runtime.run.updated',target:`channel/${channel}`,payload:record});
     };
     const evidence = async outcome => {
-      const after=run.baseline?.available ? await projectSnapshot(this.store,channel).catch(()=>({available:false})) : {available:false};
+      const after=run.baseline?.available ? await projectSnapshot(observationStore,channel).catch(()=>({available:false})) : {available:false};
       for(const name of changesSince(run.baseline,after)) run.evidence.filesModified.add(name);
       return {run_id:run.runId,files_modified:[...run.evidence.filesModified],commands:run.evidence.commands,outcome,
         checkpoint:await this.checkpoints.describe(run.runId,channel),
@@ -438,19 +495,24 @@ class AgentRunner {
     };
     run.done = new Promise(resolve => { run.resolve = resolve; });
     this.active.set(executionKey, run);
+    const effectiveTimeout = Math.min(this.timeoutMs, (executionPolicy.limits.maxDurationSeconds || Infinity) * 1000);
+    run.snapshot.timeoutMs = effectiveTimeout;
     const timer = setTimeout(() => {
       run.timedOut = true;
       run.controller.abort();
-    }, this.timeoutMs);
+    }, effectiveTimeout);
     let lastPublish = 0;
     try {
-      this.updateTurn(channel, agent, "running");
+      this.updateTurn(channel, agent, "running", "", agentIdentity, executionKey);
       this.broadcaster.broadcastComposing(channel, agent);
       const conn = this.configManager ? this.configManager.getConnection(config.provider) : null;
       const provider = PROVIDERS[config.provider];
       const protocol = conn?.protocol || (config.provider === 'claude' ? 'anthropic' : config.provider === 'ollama' ? 'ollama' : 'openai');
       const isAnthropic = protocol === 'anthropic';
       const isOllama = protocol === 'ollama';
+      const pricingProvider = this.store.storage?.pricing?.get?.(config.provider, config.model) ? config.provider : (conn?.protocol || config.provider);
+      run.protocol = protocol;
+      run.pricingProvider = pricingProvider;
 
       const key = this.configManager
         ? this.configManager.getConnectionSecret(config.provider)
@@ -468,14 +530,15 @@ class AgentRunner {
         provider?.base ||
         ''
       ).replace(/\/+$/, ''),protocol);
-      Object.assign(run.snapshot,{baseUrl:base,protocol,connectionVersion:conn?.version || 0});
-      run.baseline=config.mode==='agent' ? await projectSnapshot(this.store,channel).catch(()=>({available:false})) : {available:false};
-      const messages = this.conversation(`channel/${channel}`, event.id);
-      const instruction = "You are a coding assistant. You can discuss code but have no filesystem or shell tools in this session. Never claim to have read local files, executed commands or applied edits.";
+      Object.assign(run.snapshot,{baseUrl:base,protocol,pricingProvider,connectionVersion:conn?.version || 0});
+      run.baseline=config.mode==='agent' ? await projectSnapshot(observationStore,channel).catch(()=>({available:false})) : {available:false};
+      const messages = execution ? [] : this.conversation(`channel/${channel}`, event.id);
+      const instruction = ['You are a coding assistant. You can discuss code but have no filesystem or shell tools in this session. Never claim to have read local files, executed commands or applied edits.',
+        `Agent: ${agentIdentity.name}. Role: ${agentIdentity.role}.`, executionPolicy.instructions].filter(Boolean).join('\n\n');
       const onDelta = content => {
         run.content = content;
         if (Date.now() - lastPublish >= 50) {
-          lastPublish = Date.now(); const snapshot = this.snapshot(channel); if (snapshot) this.broadcaster.broadcast(snapshot);
+          lastPublish = Date.now(); const snapshot = this.snapshot(channel, executionKey); if (snapshot) this.broadcaster.broadcast(snapshot);
         }
       };
       if(run.controller.signal.aborted) throw new Error('Response stopped.');
@@ -497,12 +560,12 @@ class AgentRunner {
         }
       }
       const extraTools = [];
-      if (this.mcpManager && config.mode !== 'chat') {
+      if (this.mcpManager && config.mode !== 'chat' && executionPolicy.permissions.mcp) {
         extraTools.push(...this.mcpManager.getPiTools({
           requestApproval: async (req, sig) => this.tools.approve(channel, run, req, sig),
         }));
       }
-      if (this.store.storage && config.mode !== 'chat') {
+      if (this.store.storage && config.mode !== 'chat' && executionPolicy.permissions.knowledge) {
         extraTools.push({
           name: 'search_knowledge',
           description: 'Search the local project knowledge base and memory for documentation, conventions, or past decisions.',
@@ -526,7 +589,7 @@ class AgentRunner {
           },
         });
       }
-      if (this.store.storage?.orchestration && config.mode !== 'chat') {
+      if (this.store.storage?.orchestration && config.mode !== 'chat' && executionPolicy.permissions.delegate) {
         extraTools.push({
           name: 'workspace_list_profiles',
           description: 'List saved agent profiles with their roles, models, and capabilities.',
@@ -537,8 +600,8 @@ class AgentRunner {
           },
           execute: async (...params) => {
             const toolCallId = params.length >= 2 && typeof params[0] === 'string' ? params[0] : null;
-            const profiles = this.store.storage.orchestration.listProfiles();
-            const text = !profiles.length ? 'No specialized profiles configured. Available embedded agents: pi-agent.' : JSON.stringify(profiles.map(p => ({ id: p.id, name: p.name, agent: p.agent, role: p.role, description: p.description, mode: p.mode })));
+            const actors = this.store.storage.agentDefinitions.list();
+            const text = JSON.stringify(actors.map(actor => ({ id: actor.id, name: actor.name, role: actor.role, description: actor.description, configured: Boolean(actor.modelResource) })));
             if (toolCallId) return { content: [{ type: 'text', text }] };
             return text;
           },
@@ -558,11 +621,11 @@ class AgentRunner {
                   items: {
                     type: 'object',
                     properties: {
-                      agent: { type: 'string', description: 'Agent or profile name to assign' },
+                      agent: { type: 'string', description: 'Saved Agent ID from workspace_list_profiles' },
                       task: { type: 'string', description: 'Specific task instruction' },
                       scope: { type: 'string', description: 'Directory or file scope the agent owns' },
                     },
-                    required: ['task'],
+                    required: ['agent', 'task'],
                   },
                 },
               },
@@ -577,18 +640,8 @@ class AgentRunner {
                 if (toolCallId) return { content: [{ type: 'text', text: errText }], isError: true };
                 return errText;
               }
-              const batch = this.store.storage.orchestration.createBatch({
-                channel_name: channel,
-                origin: 'agent',
-                delegated_by: run.agent || 'pi-agent',
-                parent_run_id: run.id,
-                workers: tasks.map(t => ({
-                  agent: t.agent || 'worker',
-                  task: t.task,
-                  scope: t.scope || '',
-                })),
-              });
-              this.dispatchBatchLanes(channel, batch);
+              if (!this.collaboration) throw new Error('Collaboration is unavailable.');
+              const batch = this.collaboration.start(channel, { workers: tasks }, run);
               const text = `Delegated ${tasks.length} sub-tasks into parallel batch ${batch.run?.batch?.id || ''}. Current status: ${batch.state}.`;
               if (toolCallId) return { content: [{ type: 'text', text }] };
               return text;
@@ -596,8 +649,20 @@ class AgentRunner {
           });
         }
       }
-        const result = (compactOnly || config.mode !== 'chat' || !this.stream) ? await this.piRuntime({
+      const usesPi = compactOnly || config.mode !== 'chat' || !this.stream || !agentIdentity.builtIn
+        || Boolean(executionPolicy.instructions || executionPolicy.modelResource || Object.keys(executionPolicy.limits).length);
+      const resource = executionPolicy.modelResource;
+      const maxOutputTokens = resource?.connectionId === config.provider && resource.modelId === config.model ? resource.maxOutputTokens : undefined;
+      run.snapshot.maxOutputTokens = maxOutputTokens || null;
+      const result = usesPi ? await this.piRuntime({
         config: { ...config, protocol },
+        contextKey: execution?.contextKey,
+        allowedTools: agentIdentity.profileTools || undefined,
+        agentPolicy: structuredClone(executionPolicy),
+        agentName: agentIdentity.name,
+        agentRole: agentIdentity.role,
+        maxOutputTokens,
+        maxToolCalls: executionPolicy.limits.maxStepsPerRun,
         channel,
         userDataPath: this.store.userDataPath,
         projectDir: run.snapshot.workingDir,
@@ -621,9 +686,10 @@ class AgentRunner {
           const reservedCompletionTokens = currentTurnUsage?.reservedCompletionTokens ?? 0;
           const reservedTokens = currentTurnUsage?.reservedTokens ?? (reservedPromptTokens + reservedCompletionTokens);
           let reservedCost = currentTurnUsage?.reservedCost || 0;
+          let reservationCostKnown = true;
           if (!reservedCost && (reservedPromptTokens > 0 || reservedCompletionTokens > 0)) {
             const pricing = this.store.storage.pricing.calculateCost({
-              provider: conn?.protocol || config.provider,
+              provider: pricingProvider,
               modelId: config.model,
               promptTokens: reservedPromptTokens,
               completionTokens: reservedCompletionTokens,
@@ -631,6 +697,7 @@ class AgentRunner {
             if (typeof pricing?.estimatedCost === 'number') {
               reservedCost = pricing.estimatedCost;
             }
+            reservationCostKnown = typeof pricing?.estimatedCost === 'number' && pricing.currency === 'USD';
           }
 
           run.reservedPromptTokens = reservedPromptTokens;
@@ -639,11 +706,23 @@ class AgentRunner {
           run.reservedCost = reservedCost;
 
           const concurrentCost = this.getConcurrentReservedCost(run.runId);
+          const stepCount = Math.max(0, (run.tools?.size || 0) - (currentTurnUsage?.beforeToolCall && run.tools?.has(currentTurnUsage.toolCallId) ? 1 : 0));
+          const agentBudget = checkAgentBudget(executionPolicy.limits, {
+            tokens: currentTokens + reservedTokens, steps: stepCount,
+            elapsedMs: Date.now() - run.timestamp,
+            cost: (run.accumulatedCost || 0) + reservedCost,
+            costKnown: reservationCostKnown && !run.hasUnknownCost,
+          });
+          if (!agentBudget.allowed) return agentBudget;
+          if (execution && execution.kind !== 'pipeline') {
+            const batchBudget = this.collaboration.reserve(execution, run, reservedTokens);
+            if (!batchBudget.allowed) return batchBudget;
+          }
 
           return this.store.storage.budgets.checkPreflight({
             sessionId: channel,
             runId: run.runId,
-            currentStepCount: run.tools?.size || 0,
+            currentStepCount: stepCount,
             elapsedMs: Date.now() - (run.timestamp || Date.now()),
             runTokens: currentTokens,
             sessionCost: currentSessionCost,
@@ -656,26 +735,27 @@ class AgentRunner {
           if (!this.store.storage) return;
           try {
             const pricingInfo = this.store.storage.pricing.calculateCost({
-              provider: conn?.protocol || config.provider,
+              provider: pricingProvider,
               modelId: config.model,
               promptTokens: reqUsage.promptTokens,
               completionTokens: reqUsage.completionTokens,
               cacheReadTokens: reqUsage.cacheReadTokens || 0,
             });
-            const cost = typeof pricingInfo?.estimatedCost === 'number' ? pricingInfo.estimatedCost : null;
+            const cost = reqUsage.usageKnown !== false && typeof pricingInfo?.estimatedCost === 'number' ? pricingInfo.estimatedCost : null;
             if (cost !== null) {
               run.accumulatedCost = (run.accumulatedCost || 0) + cost;
-              run.reservedCost = 0;
-              run.reservedTokens = 0;
-              run.reservedPromptTokens = 0;
-              run.reservedCompletionTokens = 0;
-            } else {
+            }
+            run.reservedCost = 0;
+            run.reservedTokens = 0;
+            run.reservedPromptTokens = 0;
+            run.reservedCompletionTokens = 0;
+            if (cost === null || pricingInfo.currency !== 'USD') {
               run.hasUnknownCost = true;
             }
             this.store.storage.usage.recordModelRequest({
               runId: run.runId,
               sessionId: channel,
-              provider: conn?.protocol || config.provider,
+              provider: pricingProvider,
               modelId: config.model,
               purpose: reqUsage.purpose || 'generate',
               promptTokens: reqUsage.promptTokens,
@@ -688,8 +768,9 @@ class AgentRunner {
               currency: pricingInfo?.currency || 'USD',
               pricingVersion: pricingInfo?.pricingVersion || null,
               rawUsageJson: reqUsage.rawUsage || null,
-              status: 'completed',
+              status: reqUsage.status || 'completed',
             });
+            run.requestUsageCount = (run.requestUsageCount || 0) + 1;
           } catch (err) {
             console.error('[AgentRunner] Error recording model request:', err.message);
           }
@@ -707,16 +788,16 @@ class AgentRunner {
             });
           }
         },
-        onApproval: async (request, signal) => {phase('waiting_approval');const allowed=await this.tools.approve(channel,run,request,signal);phase('executing');return allowed;},
-        beforeMutation: change => this.checkpoints.prepare(run.runId,channel,workingDir,change),
-        beforeCommand: () => this.checkpoints.beginCommand(run.runId,channel,workingDir),
+        onApproval: async (request, signal) => {if (!toolAllowed(request.tool || '', executionPolicy.permissions)) return false;phase('waiting_approval');const allowed=await this.tools.approve(channel,run,request,signal);phase('executing');return allowed;},
+        beforeMutation: change => {if(config.mode !== 'agent' || !executionPolicy.permissions.writeFiles) throw new Error('Agent cannot modify files.');return this.checkpoints.prepare(run.runId,channel,workingDir,change);},
+        beforeCommand: () => {if(config.mode !== 'agent' || !executionPolicy.permissions.executeCommands) throw new Error('Agent cannot execute commands.');return this.checkpoints.beginCommand(run.runId,channel,workingDir);},
         afterCommand: () => this.checkpoints.endCommand(run.runId,channel),
         onMutation: change => {
           this.tools.mutation(channel, run, change);
           run.evidence.filesModified.add(change.path);
         },
         onAssistant: content => {
-          this.post(channel, agent, content, { model: config.model, mode: config.mode, in_reply_to: event.id, runtime_intermediate: true }, run.id);
+          this.post(channel, agent, content, { model: config.model, mode: config.mode, in_reply_to: event.id, runtime_intermediate: true, agent_identity: run.agentIdentity }, run.id);
           run.id = `reply-${crypto.randomUUID()}`; run.content = ''; run.timestamp = Date.now(); lastPublish = 0;
         },
       }) : await this.stream({
@@ -746,10 +827,11 @@ class AgentRunner {
         onDelta,
       });
       if (run.controller.signal.aborted) throw new Error("Aborted");
+      if (result?.usage) run.usage = result.usage;
       if (this.store.storage && result?.usage) {
         try {
           const pricingInfo = this.store.storage.pricing.calculateCost({
-            provider: conn?.protocol || config.provider,
+            provider: pricingProvider,
             modelId: result.model || config.model,
             promptTokens: result.usage.prompt_tokens,
             completionTokens: result.usage.completion_tokens,
@@ -769,10 +851,10 @@ class AgentRunner {
             currency: pricingInfo.currency || 'USD',
           });
 
-          this.store.storage.usage.recordModelRequest({
+          if (!run.requestUsageCount) this.store.storage.usage.recordModelRequest({
             runId: run.runId,
             sessionId: channel,
-            provider: conn?.protocol || config.provider,
+            provider: pricingProvider,
             modelId: result.model || config.model,
             purpose: compactOnly ? 'compaction' : 'generate',
             promptTokens: result.usage.prompt_tokens,
@@ -790,6 +872,7 @@ class AgentRunner {
         } catch (_) {}
       }
       record.outcome=result.denied ? ([...run.tools?.values()||[]].some(row=>row.status==='expired')?'expired':'denied') : result.limited?'limited':'finished';
+      if (execution) { this.collaboration.finish(execution, run, record, result); run.collaborationFinished = true; }
       if(record.outcome==='expired') result.content='Command approval expired. No pending command was executed.';
       const facts=await evidence(record.outcome);record.evidence=facts;
       this.post(
@@ -806,6 +889,7 @@ class AgentRunner {
           in_reply_to: event.id,
           execution_evidence: facts,
           run_id:run.runId,
+          agent_identity: run.agentIdentity,
         },
         run.id,
       );
@@ -819,7 +903,7 @@ class AgentRunner {
           });
         } catch (_) {}
       }
-      if (this.store.storage && event.metadata?.pipeline_id) {
+      if (!execution && this.store.storage && event.metadata?.pipeline_id) {
         try {
           if (record.outcome === 'finished' && !result.isError) {
             const advanced = this.store.storage.pipelines.advance(channel, result.content);
@@ -831,7 +915,7 @@ class AgentRunner {
           }
         } catch (_) {}
       }
-      if (this.store.storage && event.metadata?.batch_id && event.metadata?.agent) {
+      if (!execution && this.store.storage && event.metadata?.batch_id && event.metadata?.agent) {
         try {
           const isSuccess = record.outcome === 'finished' && !result.isError;
           this.store.storage.orchestration.completeLane(event.metadata.batch_id, event.metadata.agent, {
@@ -842,7 +926,7 @@ class AgentRunner {
           });
         } catch (_) {}
       }
-      this.updateTurn(channel, agent, "idle");
+      this.updateTurn(channel, agent, "idle", "", agentIdentity, executionKey);
       return {
         outcome: record.outcome,
         content: result ? result.content : run.content,
@@ -851,14 +935,15 @@ class AgentRunner {
       };
     } catch (error) {
       const stopped = run.controller.signal.aborted && !run.timedOut;
+      const budgetExceeded = error.code === 'BUDGET_EXCEEDED';
       const classified = categorizeError(error.status,error.message);
-      const message = stopped
+      const message = budgetExceeded ? error.message : stopped
         ? "Response stopped by user."
         : run.timedOut
           ? "The run timed out. Completed changes are preserved."
           : classified.code !== 'PROTOCOL_ERROR' ? classified.message : error.message;
-      record.error = { code: run.timedOut ? 'TIMEOUT' : stopped ? 'CANCELLED' : classified.code, message };
-      record.outcome=run.timedOut?'timed_out':stopped?(run.shutdown?'interrupted':'cancelled'):'failed';
+      record.error = { code: budgetExceeded ? 'BUDGET_EXCEEDED' : run.timedOut ? 'TIMEOUT' : stopped ? 'CANCELLED' : classified.code, message };
+      record.outcome=budgetExceeded?'limited':run.timedOut?'timed_out':stopped?(run.shutdown?'interrupted':'cancelled'):'failed';
       const facts=await evidence(record.outcome);record.evidence=facts;
       this.post(
         channel,
@@ -872,6 +957,7 @@ class AgentRunner {
           usage:run.usage,
           execution_evidence:facts,
           run_id:run.runId,
+          agent_identity: run.agentIdentity,
         },
         run.id,
       );
@@ -884,12 +970,12 @@ class AgentRunner {
           });
         } catch (_) {}
       }
-      if (this.store.storage && event.metadata?.pipeline_id) {
+      if (!execution && this.store.storage && event.metadata?.pipeline_id) {
         try {
           this.store.storage.pipelines.failStep(channel, message);
         } catch (_) {}
       }
-      if (this.store.storage && event.metadata?.batch_id && event.metadata?.agent) {
+      if (!execution && this.store.storage && event.metadata?.batch_id && event.metadata?.agent) {
         try {
           this.store.storage.orchestration.completeLane(event.metadata.batch_id, event.metadata.agent, {
             status: 'failed',
@@ -902,16 +988,20 @@ class AgentRunner {
         agent,
         stopped ? "idle" : "error",
         stopped ? "" : message,
+        agentIdentity,
+        executionKey,
       );
     } finally {
       clearTimeout(timer);
       try {
+        if (execution && !run.collaborationFinished) this.collaboration.finish(execution, run, record, null);
         this.tools.cancel(run);
         record.ended_at=Date.now();phase('finished');
       } finally {
         this.active.delete(executionKey);
         run.resolve();
       }
+      if (execution) this.collaboration.afterRun(execution);
       const queue = this.queues.get(executionKey) || [],
         next = queue.shift();
       if (!queue.length) this.queues.delete(executionKey);
@@ -919,6 +1009,7 @@ class AgentRunner {
     }
   }
   stop(channel) {
+    this.collaboration?.cancelSession(channel);
     const queued = this.queues.get(channel)?.length || 0;
     for (const event of this.queues.get(channel) || []) {
       event.metadata = { ...event.metadata, interrupted: true };
@@ -941,6 +1032,10 @@ class AgentRunner {
     }
     if (queued) this.store.save();
     this.queues.delete(channel);
+    for (const [key, events] of this.queues) if (key.startsWith(`${channel}:lane:`)) {
+      for (const event of events) event.metadata = { ...event.metadata, interrupted: true };
+      this.queues.delete(key);
+    }
     const run = this.active.get(channel);
     run?.controller.abort();
     let laneRunsStopped = 0;
@@ -953,21 +1048,42 @@ class AgentRunner {
     if (this.store.storage?.orchestration) {
       try {
         const batch = this.store.storage.orchestration.getParallelBatch(channel);
-        if (batch?.run?.batch?.id && batch.run.batch.status === 'running') {
+        if (!this.collaboration && batch?.run?.batch?.id && batch.run.batch.status === 'running') {
           this.store.storage.orchestration.stopParallelBatch(batch.run.batch.id);
         }
       } catch (_) {}
     }
     return { stopped: Boolean(run) || laneRunsStopped > 0, cancelled_queued: queued };
   }
+  restoreRoot(channel, run) {
+    const saved = this.store.storage?.runs.get(run.id);
+    if ((saved?.configSnapshot || run.snapshot)?.collaboration?.kind === 'lane') {
+      if (!this.collaboration) throw Object.assign(new Error('Collaboration is unavailable.'), { status: 409 });
+      return { ...this.collaboration.restoreTarget(channel, run.id), worktree: true };
+    }
+    return { root: this.store.getChannel(channel)?.working_dir, worktree: false };
+  }
+  async recoveryCheckpoint(channel, run) {
+    const checkpoint = await this.checkpoints.describe(run.id, channel);
+    if (!checkpoint) return null;
+    try {
+      const target = this.restoreRoot(channel, run), root = fs.realpathSync.native(target.root);
+      const same = (a, b) => process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+      return { ...checkpoint, worktree: target.worktree, root_matches: same(root, checkpoint.root) };
+    } catch (error) {
+      const snapshot = this.store.storage?.runs.get(run.id)?.configSnapshot || run.snapshot;
+      return { ...checkpoint, worktree: snapshot?.collaboration?.kind === 'lane', root_matches: false, restore_error: error.message };
+    }
+  }
   async restore(channel, id) {
     const run=this.store.data.runtime_runs.find(row=>row.id===id && row.channel===channel);
     if(!run || !run.outcome) throw Object.assign(new Error('只能撤销此会话已经结束的任务。'),{status:409});
-    const root=this.store.getChannel(channel)?.working_dir, key=projectKey(root);
+    const target = this.restoreRoot(channel, run), root = target.root, key=projectKey(root);
     if(!key || [...this.restoring].some(other=>overlaps(other,key)) || [...this.active.values()].some(item=>overlaps(projectKey(item.snapshot.workingDir),key))) throw Object.assign(new Error('请先停止此项目的全部任务再撤销。'),{status:409});
     this.restoring.add(key);
     try {
       const checkpoint=await this.checkpoints.restore(id,channel,root);
+      if (target.worktree) this.collaboration.invalidateRestoredDelivery(channel, id);
       run.checkpoint=checkpoint;
       if(run.evidence) run.evidence.checkpoint=checkpoint;
       this.store.save();
@@ -983,93 +1099,20 @@ class AgentRunner {
   }
   async close() {
     const runs = [...this.active.values()];
-    for (const [channel,run] of this.active) {run.shutdown=true;this.stop(channel);}
+    for (const run of runs) run.shutdown = true;
+    for (const channel of new Set(runs.map(run => run.snapshot.channel))) this.stop(channel);
     await Promise.all(runs.map(run => run.done));
   }
 
-  dispatchPipelineStep(channel, pipeline) {
-    if (!pipeline || !pipeline.active || pipeline.status !== 'running') return;
-    const step = pipeline.steps?.[pipeline.current_index];
-    if (!step) return;
-
-    const priorDeliverables = (pipeline.steps || [])
-      .slice(0, pipeline.current_index)
-      .map((s, idx) => 'Step ' + (idx + 1) + ' (' + s.agent + '):\n' + (s.deliverable || '(no deliverable)'))
-      .join('\n\n');
-
-    const prompt = priorDeliverables
-      ? 'Prior step deliverables:\n' + priorDeliverables + '\n\nYour task for Step ' + (pipeline.current_index + 1) + ':\n' + step.instruction
-      : step.instruction;
-
-    const event = {
-      type: 'workspace.message.posted',
-      source: 'pipeline:' + pipeline.id,
-      target: 'channel/' + channel,
-      payload: {
-        content: prompt,
-        sender_name: step.agent || 'Pipeline',
-        sender_type: 'pipeline',
-      },
-      metadata: {
-        pipeline_id: pipeline.id,
-        step_index: pipeline.current_index,
-        agent: step.agent,
-      },
-    };
-
-    const saved = this.store.addEvent(event);
-    this.broadcaster.broadcast(saved);
-    this.handleUserMessage(saved).catch(err => {
-      console.error('[AgentRunner] Error executing pipeline step ' + pipeline.current_index + ':', err);
-    });
+  dispatchPipelineStep(channel) {
+    if (!this.collaboration) throw new Error('Collaboration is unavailable.');
+    return this.collaboration.dispatchPipeline(channel);
   }
-
   dispatchBatchLanes(channel, batch) {
-    if (!batch) return;
-    const batchId = batch.run?.batch?.id || batch.id;
-    const lanes = batch.run?.lanes || batch.lanes || [];
-    if (!batchId || !lanes.length) return;
-
-    for (const lane of lanes) {
-      if (lane.status !== 'running') continue;
-      const laneId = lane.id || lane.agent;
-      const prompt = `[Multi-Agent Task: ${lane.agent} (${lane.role || 'implementer'})]\nTask: ${lane.task}${lane.scope ? `\nScope: ${lane.scope}` : ''}`;
-
-      const event = {
-        type: 'workspace.message.posted',
-        source: `orchestration:lane:${laneId}`,
-        target: `channel/${channel}`,
-        payload: {
-          content: prompt,
-          sender_name: lane.agent || 'Worker',
-          sender_type: 'agent',
-        },
-        metadata: {
-          batch_id: batchId,
-          lane_id: laneId,
-          agent: lane.agent,
-          worktree_path: lane.worktree_path || null,
-          branch: lane.branch || null,
-        },
-      };
-
-      const saved = this.store.addEvent(event);
-      this.broadcaster.broadcast(saved);
-
-      queueMicrotask(async () => {
-        try {
-          await this.handleUserMessage(saved);
-        } catch (err) {
-          if (this.store.storage?.orchestration) {
-            this.store.storage.orchestration.completeLane(batchId, lane.agent, {
-              status: 'failed',
-              error: err.message,
-            });
-          }
-        }
-      });
-    }
+    if (!this.collaboration) throw new Error('Collaboration is unavailable.');
+    return this.collaboration.dispatch(batch.run?.batch?.id || batch.id);
   }
+
 }
 
 module.exports = { AgentRunner, PROVIDERS };

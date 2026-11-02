@@ -405,51 +405,15 @@ test('Audit Gap Verification: P0/P1 Closed-Loop Controls', async (t) => {
     await server.shutdown();
   });
 
-  await t.test('P1 Pipeline Auto-Dispatch Step Progression and Deliverables Passing', async () => {
-    const dbPath = path.join(tmpDir, 'pipeline-test.sqlite');
-    const mgr = new DatabaseManager(dbPath, {
-      migrationsDir: path.join(__dirname, 'migrations'),
-    });
-    const storage = new Storage(mgr, { baseDir: tmpDir });
-
-    const channel = 'pipe-chan';
-    const pipeline = storage.pipelines.save(channel, {
-      steps: [
-        { agent: 'step1-agent', instruction: 'Generate specification' },
-        { agent: 'step2-agent', instruction: 'Implement code' },
-      ],
-      started_by: 'human:user',
-    });
-
-    const dispatched = [];
+  await t.test('P1 Pipeline dispatch delegates to the Agent-bound collaboration service', async () => {
     const { AgentRunner } = require('../agent-runner');
     const runner = Object.create(AgentRunner.prototype);
-    runner.store = {
-      addEvent: (e) => ({ ...e, id: 'evt-1' }),
-    };
-    runner.broadcaster = { broadcast: () => {} };
-    runner.handleUserMessage = async (evt) => {
-      dispatched.push(evt);
-    };
-
-    // Dispatch step 0
-    runner.dispatchPipelineStep(channel, pipeline);
-    assert.strictEqual(dispatched.length, 1);
-    assert.strictEqual(dispatched[0].metadata.pipeline_id, pipeline.id);
-    assert.strictEqual(dispatched[0].metadata.step_index, 0);
-    assert.strictEqual(dispatched[0].payload.content, 'Generate specification');
-
-    // Advance to step 1
-    const advanced = storage.pipelines.advance(channel, 'Spec document ready');
-    runner.dispatchPipelineStep(channel, advanced);
-
-    assert.strictEqual(dispatched.length, 2);
-    assert.strictEqual(dispatched[1].metadata.step_index, 1);
-    assert.match(dispatched[1].payload.content, /Prior step deliverables/);
-    assert.match(dispatched[1].payload.content, /Spec document ready/);
-    assert.match(dispatched[1].payload.content, /Implement code/);
-
-    storage.close();
+    assert.throws(() => runner.dispatchPipelineStep('pipe-chan'), /unavailable/);
+    const calls = [];
+    runner.collaboration = { dispatchPipeline: channel => calls.push(channel) };
+    runner.dispatchPipelineStep('pipe-chan');
+    assert.deepEqual(calls, ['pipe-chan']);
+    // Actor identities, real terminal results and handoffs are exercised by collaboration.test.mjs.
   });
 
   await t.test('P0: Authentication Guard allows static assets and root HTML without 401, while enforcing token on /v1/ API', async () => {
@@ -851,6 +815,10 @@ test('Audit Gap Verification: P0/P1 Closed-Loop Controls', async (t) => {
 
     runner.validateConfig = () => ({ provider: 'ollama', model: 'llama3:latest', mode: 'agent' });
     runner.config = () => ({ provider: 'ollama', model: 'llama3:latest', mode: 'agent' });
+    runner.identity = () => ({ id: 'fixture-agent', name: 'Fixture Agent', revision: 1, status: 'active' });
+    runner.resolveExecution = (event, channel) => ({ kind: 'lane', actor: runner.identity(), config: runner.config(), projectDir: event.metadata.worktree_path,
+      contextKey: event.metadata.lane_id, executionKey: `${channel}:lane:${event.metadata.lane_id}` });
+    runner.collaboration = { begin: () => true, attach() {}, finish() {}, afterRun() {}, reserve: () => ({ allowed: true }) };
     runner.tools = { cancel: () => {} };
     runner.checkpoints = { describe: async () => ({}) };
     runner.updateTurn = () => {};

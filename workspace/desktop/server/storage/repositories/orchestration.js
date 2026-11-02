@@ -141,15 +141,16 @@ class OrchestrationRepository {
   /**
    * Get active parallel batch view for channel matching frontend ParallelBatch shape.
    */
-  getParallelBatch(channelName, workspaceId = '52hz') {
+  getParallelBatch(channelName, workspaceId = '52hz', batchId = null) {
     // 1. Fetch latest batch for this channel
     const stmt = this.db.prepare(`
       SELECT * FROM parallel_batches
       WHERE channel_name = ? AND workspace_id = ?
+      ${batchId ? 'AND id = ?' : ''}
       ORDER BY created_at DESC
       LIMIT 1
     `);
-    const batchRow = stmt.get(channelName, workspaceId);
+    const batchRow = stmt.get(...[channelName, workspaceId, ...(batchId ? [batchId] : [])]);
 
     if (!batchRow) {
       return {
@@ -200,6 +201,8 @@ class OrchestrationRepository {
       state = 'done';
     } else if (batch.status === 'failed') {
       state = 'failed';
+    } else if (batch.status === 'cancelled') {
+      state = 'cancelled';
     } else if (batch.status === 'blocked' || conflicts.length > 0) {
       state = 'blocked';
     } else if (batch.status === 'review') {
@@ -438,7 +441,7 @@ class OrchestrationRepository {
   _execGitSync(root, args) {
     const { execFileSync } = require('child_process');
     try {
-      return execFileSync('git', ['--no-pager', '--no-optional-locks', '-C', root, ...args], {
+      return execFileSync('git', ['--no-pager', '--no-optional-locks', '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-C', root, ...args], {
         windowsHide: true,
         timeout: 15000,
         stdio: 'pipe',
@@ -705,6 +708,8 @@ class OrchestrationRepository {
 
   _normalizeBatch(row) {
     return {
+      runtime_version: row.runtime_version || 0,
+      base_commit: row.base_commit || '',
       id: row.id,
       workspace_id: row.workspace_id,
       workspaceId: row.workspace_id,
@@ -728,6 +733,11 @@ class OrchestrationRepository {
 
   _normalizeLane(row) {
     return {
+      agent_id: row.agent_id || null,
+      agent_name: row.agent_snapshot_json ? JSON.parse(row.agent_snapshot_json).name : row.agent,
+      context_key: row.context_key || null,
+      delivery: row.delivery_json ? JSON.parse(row.delivery_json) : null,
+      used_tokens: row.used_tokens || 0,
       id: row.id,
       batch_id: row.batch_id,
       agent: row.agent,

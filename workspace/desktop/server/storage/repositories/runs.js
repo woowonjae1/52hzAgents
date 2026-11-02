@@ -364,6 +364,7 @@ class RunsRepository {
       runId: row.id,
       sessionId: row.session_id,
       agentName: row.agent_name,
+      agentId: configSnapshot?.agent?.id || null,
       modelId: row.model_id,
       mode: row.mode,
       status: row.status,

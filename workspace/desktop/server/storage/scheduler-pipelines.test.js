@@ -392,34 +392,18 @@ describe('Milestone M6: Scheduler & Pipelines (Package M)', () => {
       assert.equal(delRes.data.success, true);
     });
 
-    test('REST API: channel pipeline lifecycle and halt/resume endpoints', async () => {
-      const channel = 'ch-api-pipeline';
-
-      // 1. Initial state (none)
-      const initRes = await requestJson('GET', `/v1/channels/${channel}/pipeline`);
-      assert.equal(initRes.status, 200);
-      assert.equal(initRes.data.active, false);
-
-      // 2. Start pipeline
-      const startRes = await requestJson('POST', `/v1/channels/${channel}/pipeline`, {
-        steps: [
-          { agent: 'step1-agent', instruction: 'Collect specs' },
-          { agent: 'step2-agent', instruction: 'Run verification' },
-        ],
+    test('REST API requires existing sessions and saved Agent IDs for pipelines', async () => {
+      const missing = await requestJson('POST', '/v1/channels/missing-session/pipeline', {
+        steps: [{ agent: 'step1-agent', instruction: 'Collect specs' }],
       });
-      assert.equal(startRes.status, 200);
-      assert.equal(startRes.data.active, true);
-      assert.equal(startRes.data.steps.length, 2);
-
-      // 3. Halt pipeline
-      const haltRes = await requestJson('POST', `/v1/channels/${channel}/pipeline/halt`);
-      assert.equal(haltRes.status, 200);
-      assert.equal(haltRes.data.status, 'paused');
-
-      // 4. Resume pipeline
-      const resumeRes = await requestJson('POST', `/v1/channels/${channel}/pipeline/resume`);
-      assert.equal(resumeRes.status, 200);
-      assert.equal(resumeRes.data.status, 'running');
+      assert.equal(missing.status, 404);
+      serverInstance.store.updateChannel('legacy-pipeline-validation', { title: 'Validation' });
+      const legacy = await requestJson('POST', '/v1/channels/legacy-pipeline-validation/pipeline', {
+        steps: [{ agent: 'step1-agent', instruction: 'Collect specs' }],
+      });
+      assert.equal(legacy.status, 404);
+      const state = await requestJson('GET', '/v1/channels/legacy-pipeline-validation/pipeline');
+      assert.equal(state.data.active, false);
     });
   });
 });

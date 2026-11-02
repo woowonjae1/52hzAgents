@@ -350,54 +350,17 @@ describe('Milestone M7: Multi-Agent Orchestration & Work Profiles (Package N)', 
       assert.equal(delRes.data.success, true);
     });
 
-    test('REST API: Parallel batch complete lifecycle via HTTP', async () => {
-      const channel = 'api-parallel-channel';
-
-      // 1. GET parallel batch (idle)
-      const initRes = await requestJson('GET', `/v1/parallel-batch?channel=${channel}`);
-      assert.equal(initRes.status, 200);
-      assert.equal(initRes.data.state, 'idle');
-
-      // 2. Start batch
-      const startRes = await requestJson('POST', '/v1/parallel-batch/start', {
-        channel_name: channel,
-        isolation: 'worktree',
-        workers: [
-          { agent: 'dev-1', task: 'Implement login' },
-          { agent: 'dev-2', task: 'Implement logout' },
-        ],
+    test('REST API rejects missing sessions, legacy actor labels and forged lane completion', async () => {
+      const missing = await requestJson('POST', '/v1/parallel-batch/start', {
+        channel_name: 'missing-session', workers: [{ agent: 'dev-1', task: 'Implement login' }],
       });
-      assert.equal(startRes.status, 200);
-      assert.equal(startRes.data.state, 'running');
-      const bId = startRes.data.run.batch.id;
-      assert.ok(bId);
-
-      // 3. Complete lane 1
-      const c1Res = await requestJson('POST', `/v1/workspaces/52hz/parallel-batches/${bId}/lanes/dev-1/complete`, {
-        status: 'done',
-        reply: 'Login done',
+      assert.equal(missing.status, 404);
+      const legacy = await requestJson('POST', '/v1/parallel-batch/start', {
+        channel_name: 'general', workers: [{ agent: 'dev-1', task: 'Implement login' }],
       });
-      assert.equal(c1Res.status, 200);
-
-      // 4. Complete lane 2
-      const c2Res = await requestJson('POST', `/v1/workspaces/52hz/parallel-batches/${bId}/lanes/dev-2/complete`, {
-        status: 'done',
-        reply: 'Logout done',
-      });
-      assert.equal(c2Res.status, 200);
-      assert.equal(c2Res.data.run.batch.status, 'review');
-
-      // 5. Review complete
-      const revRes = await requestJson('POST', `/v1/workspaces/52hz/parallel-batches/${bId}/lanes/dev-1/review/complete`, {
-        verdict: 'approved',
-        notes: 'Great work',
-      });
-      assert.equal(revRes.status, 200);
-
-      // 6. Merge batch
-      const mergeRes = await requestJson('POST', `/v1/workspaces/52hz/parallel-batches/${bId}/merge`);
-      assert.equal(mergeRes.status, 200);
-      assert.equal(mergeRes.data.run.batch.status, 'done');
+      assert.equal(legacy.status, 404);
+      const forged = await requestJson('POST', '/v1/workspaces/52hz/parallel-batches/forged/lanes/dev-1/complete', { status: 'done' });
+      assert.equal(forged.status, 409);
     });
   });
 });

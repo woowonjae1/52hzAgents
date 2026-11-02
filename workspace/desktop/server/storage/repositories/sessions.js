@@ -9,22 +9,22 @@ class SessionsRepository {
     this.db = manager.db;
   }
 
-  create({ id, projectId, title, mode = 'chat', status = 'active', workingDir, master, runtimeConfig }) {
+  create({ id, projectId, title, mode = 'chat', status = 'active', workingDir, master, runtimeConfig, agentId = 'agent-local' }) {
     const sessionId = id || `sess_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
     const configJson = runtimeConfig ? JSON.stringify(runtimeConfig) : null;
 
     this.db.prepare(`
-      INSERT INTO sessions (id, project_id, title, mode, status, working_dir, master, runtime_config_json, last_event_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(sessionId, projectId || null, title || 'New Session', mode, status, workingDir || null, master || null, configJson, Date.now(), now, now);
+      INSERT INTO sessions (id, project_id, title, mode, status, working_dir, master, runtime_config_json, last_event_at, created_at, updated_at, agent_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(sessionId, projectId || null, title || 'New Session', mode, status, workingDir || null, master || null, configJson, Date.now(), now, now, agentId);
 
     return this.get(sessionId);
   }
 
   get(id) {
     const row = this.db.prepare(`
-      SELECT id, project_id, title, mode, status, working_dir, master, runtime_config_json, last_event_at, created_at, updated_at
+      SELECT id, project_id, title, mode, status, working_dir, master, runtime_config_json, last_event_at, created_at, updated_at, agent_id
       FROM sessions
       WHERE id = ?
     `).get(id);
@@ -34,7 +34,7 @@ class SessionsRepository {
   }
 
   list({ projectId, status = 'active', limit = 100, offset = 0 } = {}) {
-    let sql = 'SELECT id, project_id, title, mode, status, working_dir, master, runtime_config_json, last_event_at, created_at, updated_at FROM sessions';
+    let sql = 'SELECT id, project_id, title, mode, status, working_dir, master, runtime_config_json, last_event_at, created_at, updated_at, agent_id FROM sessions';
     const conditions = [];
     const params = [];
 
@@ -58,7 +58,7 @@ class SessionsRepository {
   }
 
   update(id, fields = {}) {
-    const allowed = ['title', 'mode', 'status', 'working_dir', 'master', 'runtime_config', 'project_id'];
+    const allowed = ['title', 'mode', 'status', 'working_dir', 'master', 'runtime_config', 'project_id', 'agent_id'];
     const sets = [];
     const params = [];
 
@@ -108,6 +108,7 @@ class SessionsRepository {
       id: row.id,
       sessionId: row.id,
       projectId: row.project_id,
+      agentId: row.agent_id,
       title: row.title,
       mode: row.mode,
       status: row.status,
