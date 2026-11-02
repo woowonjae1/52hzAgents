@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const { Store } = require('./store');
 const { AgentRunner } = require('./agent-runner');
+const { Collaboration } = require('./collaboration');
 const { serveStatic } = require('./static-handler');
 const { sessionUsage } = require('./usage');
 const crypto = require('crypto');
@@ -84,6 +85,8 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
 
   const mcpManager = new McpManager({ storage: store.storage });
   const agentRunner = new AgentRunner(store, broadcaster, { ...runtimeOptions, configManager, mcpManager });
+  const collaboration = new Collaboration(store, agentRunner, broadcaster);
+  agentRunner.collaboration = collaboration;
   const worktrees = new Worktrees(store,agentRunner,broadcaster);
   const scheduler = new SchedulerEngine({ storage: store.storage, agentRunner, broadcaster });
   scheduler.start();
@@ -175,6 +178,47 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
     // 2. REST API Routes (/v1/...)
     if (pathname.startsWith('/v1/')) {
       try {
+        // Local Agent identities are independent of model connections and work profiles.
+        const agentDefinitionMatch = pathname.match(/^\/v1\/agent-definitions(?:\/([^/]+))?$/);
+        if (agentDefinitionMatch) {
+          const repository = store.storage?.agentDefinitions;
+          if (!repository) return sendJson(res, 503, { error: 'Agent storage unavailable.' });
+          const id = agentDefinitionMatch[1] ? decodeURIComponent(agentDefinitionMatch[1]) : null;
+          if (req.method === 'GET') {
+            if (!id) return sendJson(res, 200, { agents: repository.list({ includeDisabled: query.includeDisabled === 'true' }) });
+            const agent = repository.get(id);
+            return sendJson(res, agent ? 200 : 404, agent || { error: 'Agent not found.' });
+          }
+          if (req.method === 'POST' && !id) {
+            const body = await parseBody(req); agentRunner.validateDefinitionResource(body);
+            return sendJson(res, 201, repository.create(body));
+          }
+          if (req.method === 'PATCH' && id) {
+            const body = await parseBody(req); agentRunner.validateDefinitionResource(body);
+            return sendJson(res, 200, repository.update(id, body));
+          }
+          if (req.method === 'DELETE' && id) {
+            const body = await parseBody(req);
+            repository.delete(id, body.expectedRevision);
+            return sendJson(res, 200, { deleted: true });
+          }
+          return sendJson(res, 405, { error: 'Method not allowed.' });
+        }
+        if (pathname === '/v1/runtime/session/agent' && req.method === 'PATCH') {
+          const body = await parseBody(req);
+          if (typeof body.channel !== 'string' || !body.channel) return sendJson(res, 400, { error: 'Choose a session.' });
+          if (typeof body.agentId !== 'string' || !body.agentId) return sendJson(res, 400, { error: 'Choose an Agent.' });
+          if (!store.getChannel(body.channel)) return sendJson(res, 404, { error: 'Session not found.' });
+          const busy = [...agentRunner.active.values()].some(run => run.snapshot.channel === body.channel)
+            || [...agentRunner.queues.keys()].some(key => key === body.channel || key.startsWith(`${body.channel}:lane:`))
+            || agentRunner.workspaceOperations.has(body.channel);
+          if (busy) return sendJson(res, 409, { error: 'Stop all session tasks before changing its Agent.' });
+          if (body.keepSessionOverrides !== undefined && typeof body.keepSessionOverrides !== 'boolean') return sendJson(res, 400, { error: 'keepSessionOverrides must be boolean.' });
+          store.updateChannel(body.channel, { agent_id: body.agentId,
+            ...(body.keepSessionOverrides ? {} : { runtime_config: { inheritAgent: true } }),
+          });
+          return sendJson(res, 200, { agent: agentRunner.identity(body.channel), config: agentRunner.config(body.channel) });
+        }
         if(pathname==='/v1/runtime/worktree') {
           if(req.method==='GET')return sendJson(res,200,await worktrees.state(query.channel));
           if(req.method==='POST'){
@@ -191,7 +235,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         }
         if (pathname === '/v1/runtime/recovery' && req.method === 'GET') {
           const runs=store.data.runtime_runs.filter(row=>row.channel===query.channel).slice(-20);
-          return sendJson(res,200,{storage:store.recovery || null,runs:await Promise.all(runs.map(async row=>({...row,checkpoint:await (async()=>{const checkpoint=await agentRunner.checkpoints.describe(row.id,query.channel);if(!checkpoint)return null;let root='';try{root=fs.realpathSync.native(store.getChannel(query.channel)?.working_dir||'');}catch{}return {...checkpoint,root_matches:process.platform==='win32'?root.toLowerCase()===checkpoint.root.toLowerCase():root===checkpoint.root};})()})))});
+          return sendJson(res,200,{storage:store.recovery || null,runs:await Promise.all(runs.map(async row=>({...row,checkpoint:await agentRunner.recoveryCheckpoint(query.channel,row)})))});
         }
         if (pathname === '/v1/runtime/restore' && req.method === 'POST') {
           const body=await parseBody(req);
@@ -212,12 +256,13 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           if (req.method === 'PATCH') {
             if (!store.getChannel(channel)) return sendJson(res, 404, { error: 'Session not found.' });
             if (agentRunner.active.has(channel) || agentRunner.workspaceOperations.has(channel)) return sendJson(res, 409, { error: 'Stop the current response before changing its model or mode.' });
-            const config = agentRunner.validateConfig(await parseBody(req));
+            const config = agentRunner.validateSessionConfig(await parseBody(req));
             store.updateChannel(channel, { runtime_config: config });
           } else if (req.method !== 'GET') return sendJson(res, 405, { error: 'Method not allowed.' });
           const lastRun=store.data.runtime_runs.filter(row=>row.channel===channel).at(-1);
-          return sendJson(res, 200, { config: agentRunner.config(channel), providers: agentRunner.providers(),run:lastRun || null,
-            running: agentRunner.active.has(channel), queued: agentRunner.queues.get(channel)?.length || 0 });
+          return sendJson(res, 200, { agent: agentRunner.identity(channel), config: agentRunner.config(channel),
+            configSource: store.getChannel(channel)?.runtime_config && !store.getChannel(channel).runtime_config.inheritAgent ? 'session' : 'agent', providers: agentRunner.providers(),run:lastRun || null,
+            running: [...agentRunner.active.values()].some(run => run.snapshot.channel === channel), queued: [...agentRunner.queues].filter(([key]) => key === channel || key.startsWith(`${channel}:lane:`)).reduce((sum, [, events]) => sum + events.length, 0) });
         }
         if (pathname === '/v1/runtime/stop' && req.method === 'POST') {
           const body = await parseBody(req);
@@ -509,10 +554,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           if (req.method === 'POST') {
             const body = await parseBody(req);
             if (!store.storage?.pipelines) return sendJson(res, 501, { error: 'Pipeline storage unavailable' });
-            const created = store.storage.pipelines.save(chName, body);
-            if (agentRunner?.dispatchPipelineStep) {
-              agentRunner.dispatchPipelineStep(chName, created);
-            }
+            const created = collaboration.startPipeline(chName, body);
             return sendJson(res, 200, created);
           }
         }
@@ -525,10 +567,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         if (/^\/v1\/channels\/[^/]+\/pipeline\/resume$/.test(pathname) && req.method === 'POST') {
           const chName = pathname.split('/')[3];
           if (!store.storage?.pipelines) return sendJson(res, 501, { error: 'Pipeline storage unavailable' });
-          const resumed = store.storage.pipelines.resume(chName);
-          if (agentRunner?.dispatchPipelineStep) {
-            agentRunner.dispatchPipelineStep(chName, resumed);
-          }
+          const resumed = collaboration.resumePipeline(chName);
           return sendJson(res, 200, resumed);
         }
 
@@ -575,7 +614,9 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         if (pathname === '/v1/parallel-batch' && req.method === 'GET') {
           const channel = query.channel || query.channelName || 'general';
           if (store.storage?.orchestration) {
-            return sendJson(res, 200, store.storage.orchestration.getParallelBatch(channel));
+            const batch = store.storage.orchestration.getParallelBatch(channel);
+            if (!batch.run) batch.review_agent = store.getChannel(channel)?.review_agent || '';
+            return sendJson(res, 200, batch.run?.batch.runtime_version === 1 ? collaboration.view(batch.run.batch.id) : batch);
           }
           return sendJson(res, 200, {
             mode: 'agent',
@@ -593,48 +634,55 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           const body = await parseBody(req);
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
           const channel = body.channel_name || body.channel || 'general';
-          const batch = store.storage.orchestration.createBatch({
-            ...body,
-            channel_name: channel,
-          });
+          const batch = collaboration.start(channel, body);
           return sendJson(res, 200, batch);
         }
 
         // Parallel batch control actions
-        const batchActionMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/(merge|discard|stop)$/);
+        const batchActionMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/(merge|discard|stop|cleanup)$/);
         if (batchActionMatch && req.method === 'POST') {
           const [, ws, batchId, action] = batchActionMatch;
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
           let result;
-          if (action === 'merge') result = store.storage.orchestration.mergeParallelBatch(batchId);
-          else if (action === 'discard') result = store.storage.orchestration.discardParallelBatch(batchId);
-          else if (action === 'stop') result = store.storage.orchestration.stopParallelBatch(batchId);
+          if (ws !== '52hz') return sendJson(res, 404, { error: 'Workspace not found.' });
+          if (action === 'merge') result = collaboration.merge(batchId);
+          else if (action === 'discard') result = await collaboration.discard(batchId);
+          else if (action === 'stop') result = await collaboration.stop(batchId);
+          else if (action === 'cleanup') result = collaboration.cleanup(batchId);
           return sendJson(res, 200, result || { success: true });
+        }
+
+                // Parallel batch lane delivery diff
+        const laneDiffMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/lanes\/([^/]+)\/diff$/);
+        if (laneDiffMatch && req.method === 'GET') {
+          const [, ws, batchId, rawAgent] = laneDiffMatch;
+          if (ws !== '52hz') return sendJson(res, 404, { error: 'Workspace not found.' });
+          const agent = decodeURIComponent(rawAgent);
+          if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
+          const diffResult = collaboration.deliveryDiff(batchId, agent);
+          return sendJson(res, 200, diffResult);
         }
 
         // Parallel batch lane actions
         const laneActionMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/lanes\/([^/]+)\/(retry|review|send-back|complete)$/);
         if (laneActionMatch && req.method === 'POST') {
           const [, ws, batchId, rawAgent, action] = laneActionMatch;
+          if (ws !== '52hz') return sendJson(res, 404, { error: 'Workspace not found.' });
           const agent = decodeURIComponent(rawAgent);
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
 
           if (action === 'retry') {
-            const updated = store.storage.orchestration.retryParallelLane(batchId, agent);
+            const updated = collaboration.retry(batchId, agent);
             return sendJson(res, 200, updated);
           }
           if (action === 'review') {
-            store.storage.orchestration.retryLaneReview(batchId, agent);
-            return sendJson(res, 200, { success: true });
+            return sendJson(res, 200, collaboration.review(batchId, agent));
           }
           if (action === 'send-back') {
-            store.storage.orchestration.sendBackParallelLane(batchId, agent);
-            return sendJson(res, 200, { success: true });
+            return sendJson(res, 200, collaboration.retry(batchId, agent));
           }
           if (action === 'complete') {
-            const body = await parseBody(req);
-            const updated = store.storage.orchestration.completeLane(batchId, agent, body);
-            return sendJson(res, 200, updated);
+            return sendJson(res, 409, { error: 'Lane completion is recorded by the actual Agent execution.' });
           }
         }
 
@@ -642,15 +690,11 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         const reviewCompleteMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/lanes\/([^/]+)\/review\/complete$/);
         if (reviewCompleteMatch && req.method === 'POST') {
           const [, ws, batchId, rawAgent] = reviewCompleteMatch;
+          if (ws !== '52hz') return sendJson(res, 404, { error: 'Workspace not found.' });
           const agent = decodeURIComponent(rawAgent);
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
           const body = await parseBody(req);
-          store.storage.orchestration.completeLaneReview(batchId, agent, {
-            status: body.verdict || body.status || 'approved',
-            notes: body.notes || '',
-            reviewer: body.reviewer || 'reviewer',
-          });
-          return sendJson(res, 200, { success: true });
+          return sendJson(res, 200, collaboration.humanReview(batchId, agent, body));
         }
 
         // Work Profiles API
@@ -715,10 +759,11 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
           const chName = pathname.replace('/v1/workspaces/52hz/channels/', '');
           if (req.method === 'PATCH') {
             const body = await parseBody(req);
-            if (body.working_dir !== undefined && agentRunner.active.has(chName)) return sendJson(res, 409, { error: 'Stop the run before changing its project folder.' });
+            if (body.agent_id !== undefined) return sendJson(res, 400, { error: 'Use /v1/runtime/session/agent to change the session Agent.' });
+            if (body.working_dir !== undefined && [...agentRunner.active.values()].some(run => run.snapshot.channel === chName)) return sendJson(res, 409, { error: 'Stop the run before changing its project folder.' });
             if (body.runtime_config !== undefined) {
-              if (agentRunner.active.has(chName)) return sendJson(res, 409, { error: 'Stop the current response before changing its model or mode.' });
-              body.runtime_config = agentRunner.validateConfig(body.runtime_config);
+              if ([...agentRunner.active.values()].some(run => run.snapshot.channel === chName)) return sendJson(res, 409, { error: 'Stop the current response before changing its model or mode.' });
+              body.runtime_config = agentRunner.validateSessionConfig(body.runtime_config);
             }
             const updated = store.updateChannel(chName, body);
             return sendJson(res, 200, updated);
@@ -737,7 +782,11 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         }
         if (pathname.includes('/agents/runtime')) {
           return sendJson(res, 200, {
-            runtimes: agentRunner.providers().map(p => ({ agent_name: p.id, process_status: 'stopped', health_status: 'unknown' })),
+            runtimes: (store.storage?.agentDefinitions?.list({ includeDisabled: true }) || []).map(agent => ({
+              agent_name: agent.id, display_name: agent.name,
+              process_status: [...agentRunner.active.values()].some(run => run.agent === agent.id) ? 'running' : 'stopped',
+              health_status: 'unknown',
+            })),
           });
         }
 
@@ -750,11 +799,21 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
               const existing = body.client_message_id && store.data.events.find(e => e.client_message_id === body.client_message_id);
               if (existing) return sendJson(res, 200, { event_id: existing.event_id, timestamp: existing.timestamp, status: 'confirmed', metadata: existing.metadata, duplicate: true });
               const name = `session-${crypto.randomUUID()}`;
-              const runtimeConfig = body.payload?.runtime_config ? agentRunner.validateConfig(body.payload.runtime_config) : agentRunner.config(name);
+              const runtimeConfig = body.payload?.runtime_config ? agentRunner.validateSessionConfig(body.payload.runtime_config) : { inheritAgent: true };
               store.updateChannel(name, { title: body.payload?.title || 'New Session', runtime_config: runtimeConfig,
+                agent_id: body.payload?.agent_id || 'agent-local',
                 participants: body.payload?.participants || [], master: body.payload?.master || null,
                 created_at: new Date().toISOString() });
               body.metadata = { ...body.metadata, channel_name: name };
+            }
+            const previouslyDelivered = body.client_message_id && store.data.events.some(event => event.client_message_id === body.client_message_id);
+            const messageType = body.type || 'workspace.message.posted';
+            const messageSource = body.source || 'human:user';
+            const messageTarget = body.target || 'channel/general';
+            if (!previouslyDelivered && messageType === 'workspace.message.posted' && messageSource.startsWith('human:') && messageTarget.startsWith('channel/')) {
+              const channel = messageTarget.slice('channel/'.length);
+              agentRunner.identity(channel, { requireActive: true });
+              agentRunner.validateConfig(agentRunner.config(channel));
             }
             const saved = store.addEvent(body);
             if (!saved.duplicate) broadcaster.broadcast(saved);
@@ -801,15 +860,18 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, runtimeOp
         if (pathname === '/v1/discover') {
           const ws = store.getWorkspace();
           return sendJson(res, 200, {
-            agents: agentRunner.providers().map((p) => ({
-              name: p.id,
-              agent_name: p.id,
+            agents: (store.storage?.agentDefinitions?.list() || []).map((agent) => ({
+              name: agent.id,
+              agent_name: agent.id,
+              display_name: agent.name,
+              agent_id: agent.id,
+              agent_revision: agent.revision,
+              role: agent.role,
               agent_type: 'embedded',
               status: 'offline',
-              connection_configured: p.configured,
               health_status: 'unknown',
               capabilities: ['chat', 'plan', 'agent', 'project-tools', 'command-approval'],
-              description: p.id === 'ollama' ? 'Local Ollama endpoint; availability is checked when sending.' : `${p.label} direct API; ${p.configured ? 'API key configured' : 'API key missing'}.`,
+              description: agent.description,
             })),
             channels: ws.channels.filter(c => c.status !== 'deleted').map(c => ({ ...c, channel_name: c.name })),
           });
