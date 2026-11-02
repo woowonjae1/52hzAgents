@@ -24,13 +24,27 @@
 
 ## 30 秒跑起来
 
+### 方式一：独立桌面端（开箱即用，推荐）
+
+桌面端自带内嵌轻量服务端（基于 Node.js 原生 `node:sqlite` WAL 模式，无需外部 CGO/Go 编译依赖），已完整打包装配：
+
+```powershell
+# 启动桌面端开发调试
+npm --prefix workspace/desktop run dev
+
+# 或直接运行打包生成的独立免安装程序
+.\workspace\desktop\preview-dist\20261102035518727-61552\win-unpacked\52hzAgents.exe
+```
+
+### 方式二：全栈本地集群开发（Go 后端 + wwj 连接器）
+
 ```powershell
 .\workspace\dev-sqlite.ps1
 ```
 
-后端、前端、Agent 连接器一起拉起来,然后打开 <http://localhost:3005>。首次运行 `go run` 冷编译约一分钟,之后就快了。想要原生桌面窗口就跑 `.\workspace\start-desktop.ps1`。
+后端、前端、Agent 连接器一起拉起来，然后打开 <http://localhost:3005>。首次运行 `go run` 冷编译约一分钟，之后就快了。想要原生桌面窗口就跑 `.\workspace\start-desktop.ps1`。
 
-停止:`.\workspace\dev-sqlite.ps1 -Stop`。不用 Docker,数据落在本地 SQLite 里。
+停止：`.\workspace\dev-sqlite.ps1 -Stop`。不用 Docker，数据落在本地 SQLite 里。
 
 ## 它解决什么
 
@@ -83,19 +97,24 @@ wwj connect my-agent <workspace-token>  # 接进工作区
                  │
         Next.js 前端 (workspace/frontend)
                  │  HTTP · SSE · WebSocket
-         Go 后端 (workspace/backend)
+  ┌──────────────┴──────────────────────────────┐
+  │ 独立桌面模式                                │ 分布式 / 团队模式
+  ▼                                             ▼
+内嵌 Node 服务 (workspace/desktop/server)     Go 后端 (workspace/backend)
+  │  (node:sqlite WAL 模式, 零原生依赖)           │  (纯 Go, 无 CGO, 或 PostgreSQL)
+  │                                             ▲
+  │                                             │  join + WebSocket / stdin↔stdout
+  │                                    Agent 连接器 wwj (Node)
+  │                                             │
+  └──────────────┬──────────────────────────────┘
                  │
-        SQLite (纯 Go,无 CGO) 或 PostgreSQL
-                 ▲
-                 │  join + WebSocket / stdin↔stdout
-        Agent 连接器  wwj (Node)
-                 │
-   Claude Code · Codex · Cursor · Copilot · DeepSeek · …
+   Claude Code · Codex · Cursor · Pi · DeepSeek · …
 ```
 
-仓库主要分为三部分:`workspace/`(后端 + 前端 + Electron 外壳)、`packages/`(Agent 连接器 wwj 与配套组件)、`.github/workflows/`(CI)。
-
-后端是 Go 1.21 + Gin + GORM,前端是 Next.js 16 + React 19 + Tailwind 4,桌面壳是 Electron。
+仓库包含两种部署与运行形态：
+1. **轻量桌面端 (`workspace/desktop`)**：内嵌 Node.js 服务 + `node:sqlite` WAL 模式 + Next.js 16 静态导出，零原生编译依赖，开箱即用。
+2. **多机与团队版 (`workspace/backend` + `packages/wwj`)**：Go 1.21 + Gin + GORM 与配套连接器，适用于大型分布式环境。
+前端统一基于 Next.js 16 + React 19 + Tailwind 4，桌面外壳采用 Electron。
 
 ## 想深入
 
