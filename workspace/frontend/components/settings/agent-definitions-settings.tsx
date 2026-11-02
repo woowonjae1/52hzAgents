@@ -23,6 +23,7 @@ import {
   Loader2,
   Check,
   MessageSquare,
+  Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -144,6 +145,54 @@ export function AgentDefinitionsSettings({
     setLimitSteps('');
     setLimitDuration('');
     setLimitCost('');
+    setConflictDraft(null);
+    setIsEditing(true);
+  };
+
+  const openDuplicate = (agent: AgentDefinition) => {
+    setEditingAgent(null);
+    setFormName(`${agent.name} (副本)`);
+    setFormRole(agent.role || 'assistant');
+    setFormDescription(agent.description || '');
+    setFormInstructions(agent.instructions || '');
+    setFormDefaultMode(agent.defaultMode || 'chat');
+    setFormMaxMode(agent.maxMode || 'agent');
+    setFormStatus('active');
+
+    // Permissions
+    setPermReadFiles(agent.permissions?.readFiles ?? true);
+    setPermWriteFiles(agent.permissions?.writeFiles ?? false);
+    setPermExecuteCommands(agent.permissions?.executeCommands ?? false);
+    setPermKnowledge(agent.permissions?.knowledge ?? true);
+    setPermMcp(agent.permissions?.mcp ?? false);
+    setPermDelegate(agent.permissions?.delegate ?? false);
+
+    // Resource
+    if (agent.modelResource) {
+      setHasCustomResource(true);
+      setFormConnectionId(agent.modelResource.connectionId);
+      setFormModelId(agent.modelResource.modelId);
+      setFormMaxOutputTokens(agent.modelResource.maxOutputTokens ? String(agent.modelResource.maxOutputTokens) : '');
+    } else {
+      setHasCustomResource(false);
+      if (connections.length > 0) {
+        setFormConnectionId(connections[0].id);
+        setFormModelId(connections[0].defaultModel || '');
+      } else {
+        setFormConnectionId('');
+        setFormModelId('');
+      }
+      setFormMaxOutputTokens('');
+    }
+
+    // Limits
+    const lim = agent.limits || {};
+    const hasAnyLimit = Boolean(lim.maxTokensPerRun || lim.maxStepsPerRun || lim.maxDurationSeconds || lim.maxCostPerRun);
+    setShowLimits(hasAnyLimit);
+    setLimitTokens(lim.maxTokensPerRun ? String(lim.maxTokensPerRun) : '');
+    setLimitSteps(lim.maxStepsPerRun ? String(lim.maxStepsPerRun) : '');
+    setLimitDuration(lim.maxDurationSeconds ? String(lim.maxDurationSeconds) : '');
+    setLimitCost(lim.maxCostPerRun ? String(lim.maxCostPerRun) : '');
     setConflictDraft(null);
     setIsEditing(true);
   };
@@ -534,6 +583,16 @@ export function AgentDefinitionsSettings({
                     >
                       <Edit2 className="size-3" />
                       <span>编辑</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openDuplicate(agent)}
+                      className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
+                      title="复制为新 Agent"
+                    >
+                      <Copy className="size-3" />
+                      <span>复制</span>
                     </Button>
                     <Button
                       variant="ghost"

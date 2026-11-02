@@ -70,6 +70,7 @@ export function SessionRuntimeControls({
   const [selectingAgent, setSelectingAgent] = React.useState(false);
   const [agentList, setAgentList] = React.useState<AgentDefinition[]>([]);
   const [loadingAgents, setLoadingAgents] = React.useState(false);
+  const [pendingAgentSwitch, setPendingAgentSwitch] = React.useState<AgentDefinition | null>(null);
 
   const activeSession = React.useRef(sessionId);
   activeSession.current = sessionId;
@@ -81,6 +82,7 @@ export function SessionRuntimeControls({
     setOpen(false);
     setSaving(false);
     setSelectingAgent(false);
+    setPendingAgentSwitch(null);
     if (!sessionId) return;
     const controller = new AbortController();
     void workspaceApi
@@ -199,7 +201,18 @@ export function SessionRuntimeControls({
     }
   };
 
-  const handleSelectAgent = async (agent: AgentDefinition) => {
+  const handleSelectAgent = (agent: AgentDefinition) => {
+    if (!sessionId || busy) return;
+    const currentId = runtime.agent?.id || "agent-local";
+    if (agent.id === currentId) {
+      setSelectingAgent(false);
+      setPendingAgentSwitch(null);
+      return;
+    }
+    setPendingAgentSwitch(agent);
+  };
+
+  const executeAgentSwitch = async (agent: AgentDefinition) => {
     if (!sessionId || busy) return;
     const targetSession = sessionId;
     setSaving(true);
@@ -232,6 +245,7 @@ export function SessionRuntimeControls({
         toast.success(`会话执行主体已切换为：${res.agent.name}`);
       }
       setSelectingAgent(false);
+      setPendingAgentSwitch(null);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "无法绑定 Agent");
     } finally {
@@ -270,6 +284,7 @@ export function SessionRuntimeControls({
         if (next) {
           setForm(runtime.config);
           setSelectingAgent(false);
+          setPendingAgentSwitch(null);
         }
         setOpen(next);
       }}
@@ -277,13 +292,19 @@ export function SessionRuntimeControls({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`当前 Agent：${agentName}，工作模式：${modeLabels[runtime.config.mode]}`}
+          aria-label={`当前 Agent：${agentName}，工作模式：${modeLabels[runtime.config.mode]}${busy ? '（执行中）' : ''}`}
           className="inline-flex h-8 min-w-0 max-w-72 items-center gap-1.5 rounded-lg px-2.5 text-xs text-foreground-muted transition-colors hover:bg-surface2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <Bot className="size-3.5 text-primary shrink-0" />
+          {busy ? (
+            <Loader2 className="size-3.5 text-primary animate-spin shrink-0" />
+          ) : (
+            <Bot className="size-3.5 text-primary shrink-0" />
+          )}
           <span className="truncate font-medium text-foreground">{agentName}</span>
           <span aria-hidden="true" className="h-3 w-px shrink-0 bg-border/70 mx-0.5" />
-          <span className="shrink-0 text-foreground-muted">{modeLabels[runtime.config.mode]}</span>
+          <span className={cn("shrink-0", busy ? "text-primary font-medium" : "text-foreground-muted")}>
+            {busy ? '执行中' : modeLabels[runtime.config.mode]}
+          </span>
           <ChevronDown className="size-3.5 shrink-0 text-foreground-extra-muted ml-0.5" />
           {runtime.queued > 0 && (
             <span className="shrink-0 text-3xs text-foreground-extra-muted">
@@ -302,17 +323,47 @@ export function SessionRuntimeControls({
         {selectingAgent ? (
           /* Agent Selection View */
           <div className="space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-border/50">
-              <button
-                type="button"
-                onClick={() => setSelectingAgent(false)}
-                className="inline-flex items-center gap-1 text-2xs text-foreground-muted hover:text-foreground"
-              >
-                <ArrowLeft className="size-3" />
-                <span>返回</span>
-              </button>
-              <span className="text-2xs font-semibold text-foreground">选择会话 Agent</span>
-            </div>
+            {pendingAgentSwitch ? (
+              <div className="space-y-3 py-1">
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                  <Bot className="size-4 text-primary shrink-0" />
+                  <span>确认切换执行 Agent</span>
+                </div>
+                <p className="text-2xs text-foreground-muted leading-relaxed">
+                  后续任务将由 <span className="font-semibold text-foreground">{pendingAgentSwitch.name}</span> 执行。历史对话作者和执行记录保持不变，不会被覆盖改写。
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => setPendingAgentSwitch(null)}
+                    className="px-2.5 py-1 text-2xs rounded-md border border-border/70 hover:bg-surface2 text-foreground-muted"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void executeAgentSwitch(pendingAgentSwitch)}
+                    className="px-2.5 py-1 text-2xs rounded-md bg-primary text-primary-foreground font-medium hover:bg-primary/90 flex items-center gap-1.5"
+                  >
+                    {saving && <Loader2 className="size-3 animate-spin" />}
+                    <span>确认切换</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                  <button
+                    type="button"
+                    onClick={() => setSelectingAgent(false)}
+                    className="inline-flex items-center gap-1 text-2xs text-foreground-muted hover:text-foreground"
+                  >
+                    <ArrowLeft className="size-3" />
+                    <span>返回</span>
+                  </button>
+                  <span className="text-2xs font-semibold text-foreground">选择会话 Agent</span>
+                </div>
 
             {loadingAgents ? (
               <div className="py-8 text-center text-2xs text-foreground-muted flex items-center justify-center gap-2">
@@ -365,6 +416,8 @@ export function SessionRuntimeControls({
             <p className="text-3xs text-foreground-extra-muted leading-4">
               更换 Agent 不会修改历史消息记录，仅对后续任务生效。
             </p>
+              </>
+            )}
           </div>
         ) : (
           /* Normal Popover View */

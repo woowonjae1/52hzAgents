@@ -67,9 +67,12 @@ class Collaboration {
   }
   lane(batchId, reference) {
     this.batch(batchId);
-    const rows = this.db.prepare('SELECT * FROM parallel_lanes WHERE batch_id = ? AND (id = ? OR agent = ?)').all(batchId, reference, reference);
-    if (rows.length !== 1) throw fail('Lane not found.', 404);
-    return rows[0];
+    const byId = this.db.prepare('SELECT * FROM parallel_lanes WHERE batch_id = ? AND id = ?').get(batchId, reference);
+    if (byId) return byId;
+    const rows = this.db.prepare('SELECT * FROM parallel_lanes WHERE batch_id = ? AND agent = ?').all(batchId, reference);
+    if (rows.length === 1) return rows[0];
+    if (rows.length > 1) throw fail('Multiple lanes match this agent name. Use the specific lane ID.', 400);
+    throw fail('Lane not found.', 404);
   }
   view(batchId) {
     const batch = this.batch(batchId);

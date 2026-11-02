@@ -122,9 +122,12 @@ export function PipelineStepper({
   const doneCount = steps.filter((s, i) => s.status === 'done' || (i < currentIdx && s.status !== 'failed')).length;
   const verify = verificationCmd?.trim() || '';
 
-  // What the pill's tooltip says: the instruction, then why it is retrying or failed.
+  // What the pill's tooltip says: the instruction, delivery summary, then why it is retrying or failed.
   const stepHint = (step: PipelineStepItem) => {
     const parts = [step.instruction?.trim().split(/\r?\n/)[0]?.slice(0, 200)];
+    if (step.deliverable?.summary) {
+      parts.push(`交付: ${step.deliverable.summary.trim().split(/\r?\n/)[0].slice(0, 200)}`);
+    }
     if (step.last_error && (step.status === 'retrying' || step.status === 'failed')) {
       parts.push(`${verify ? 'Verification failed' : 'Failed'}: ${step.last_error.trim().split(/\r?\n/)[0].slice(0, 200)}`);
     }
@@ -197,6 +200,12 @@ export function PipelineStepper({
                   {isRetrying && (
                     <span className="font-mono text-3xs px-1 rounded bg-status-warning/20 text-status-warning shrink-0">
                       Retry {step.retry_count || 1}/{step.max_retries || 3}
+                    </span>
+                  )}
+
+                  {isDone && step.deliverable?.summary && (
+                    <span className="font-mono text-3xs px-1 rounded bg-status-success/20 text-status-success shrink-0" title={step.deliverable.summary}>
+                      已交付
                     </span>
                   )}
                 </div>

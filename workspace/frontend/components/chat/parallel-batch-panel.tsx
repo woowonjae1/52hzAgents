@@ -401,11 +401,11 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
                 {lane.status === 'failed' && (
                   <button
                     type="button"
-                    disabled={retrying === lane.agent}
-                    onClick={() => void retry(lane.agent)}
+                    disabled={retrying === (lane.id || lane.agent)}
+                    onClick={() => void retry(lane.id || lane.agent)}
                     className="mt-1 inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs text-foreground hover:bg-muted disabled:opacity-60"
                   >
-                    <RotateCw className={cn('size-3', retrying === lane.agent && 'animate-spin')} />
+                    <RotateCw className={cn('size-3', retrying === (lane.id || lane.agent) && 'animate-spin')} />
                     Retry this part
                   </button>
                 )}
@@ -504,7 +504,7 @@ function LaneReview({
   const submitHumanReview = async (verdict: 'approved' | 'changes_requested') => {
     setBusy('review');
     try {
-      await workspaceApi.completeLaneReview(batchId, lane.agent, {
+      await workspaceApi.completeLaneReview(batchId, lane.id || lane.agent, {
         verdict,
         notes: manualNotes.trim() || undefined,
       });
@@ -528,10 +528,10 @@ function LaneReview({
     setBusy(action);
     try {
       if (action === 'send') {
-        await workspaceApi.sendBackParallelLane(batchId, lane.agent);
+        await workspaceApi.sendBackParallelLane(batchId, lane.id || lane.agent);
         toast.success(`Sent back to ${lane.agent_name || lane.agent} with the review`);
       } else {
-        await workspaceApi.retryLaneReview(batchId, lane.agent);
+        await workspaceApi.retryLaneReview(batchId, lane.id || lane.agent);
         toast.success(`Reviewing ${lane.agent_name || lane.agent}'s part again`);
       }
       onChanged();
@@ -669,7 +669,7 @@ function LaneDeliveryDiffModal({
     let cancelled = false;
     setLoading(true);
     workspaceApi
-      .getLaneDeliveryDiff(batchId, lane.agent)
+      .getLaneDeliveryDiff(batchId, lane.id || lane.agent)
       .then((data) => {
         if (!cancelled) setResult(data);
       })
@@ -692,7 +692,7 @@ function LaneDeliveryDiffModal({
     return () => {
       cancelled = true;
     };
-  }, [batchId, lane.agent, lane.commit_hash]);
+  }, [batchId, lane.id, lane.agent, lane.commit_hash]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">

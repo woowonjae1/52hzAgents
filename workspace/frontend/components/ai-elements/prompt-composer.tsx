@@ -45,7 +45,6 @@ import { AgentModelSwitcher } from '@/components/chat/agent-model-switcher';
 import { SessionRuntimeControls } from '@/components/chat/session-runtime-controls';
 import { composerPillClass } from './composer-pill';
 import { OrchestrationControl, ORCHESTRATION_MODES } from '@/components/chat/orchestration-control';
-import { AgentProfileControl } from '@/components/chat/agent-profile-control';
 import { ContextHealthIndicator } from '@/components/chat/context-health-indicator';
 import { CURATED_SKILLS, type CuratedSkill } from '@/lib/curated-skills';
 import { workspaceApi } from '@/lib/api';

@@ -391,9 +391,9 @@ class OrchestrationRepository {
         UPDATE parallel_lanes SET
           status = ?, reply = ?, commit_hash = ?, diffstat = ?, changed_files = ?,
           error = ?, finished_at = ?
-        WHERE batch_id = ? AND agent = ?
+        WHERE batch_id = ? AND (id = ? OR agent = ?)
       `);
-      updateLane.run(status, reply, commit_hash, diffstat, changed_files, error, now, batchId, agent);
+      updateLane.run(status, reply, commit_hash, diffstat, changed_files, error, now, batchId, agent, agent);
 
       if (tokens > 0) {
         db.prepare(`UPDATE parallel_batches SET used_tokens = used_tokens + ? WHERE id = ?`).run(tokens, batchId);
@@ -426,8 +426,8 @@ class OrchestrationRepository {
           error = '',
           attempts = attempts + 1,
           finished_at = NULL
-        WHERE batch_id = ? AND agent = ?
-      `).run(batchId, agent);
+        WHERE batch_id = ? AND (id = ? OR agent = ?)
+      `).run(batchId, agent, agent);
 
       db.prepare(`
         UPDATE parallel_batches SET status = 'running', finished_at = NULL WHERE id = ?
@@ -642,9 +642,9 @@ class OrchestrationRepository {
     const now = new Date().toISOString();
     const stmt = this.db.prepare(`
       UPDATE parallel_lanes SET review_status = 'running', review_started_at = ?
-      WHERE batch_id = ? AND agent = ?
+      WHERE batch_id = ? AND (id = ? OR agent = ?)
     `);
-    stmt.run(now, batchId, agent);
+    stmt.run(now, batchId, agent, agent);
   }
 
   completeLaneReview(batchId, agent, {
@@ -659,9 +659,9 @@ class OrchestrationRepository {
         review_notes = ?,
         reviewer = ?,
         review_info = ?
-      WHERE batch_id = ? AND agent = ?
+      WHERE batch_id = ? AND (id = ? OR agent = ?)
     `);
-    stmt.run(status, notes, reviewer, info, batchId, agent);
+    stmt.run(status, notes, reviewer, info, batchId, agent, agent);
   }
 
   sendBackParallelLane(batchId, agent) {
@@ -670,9 +670,9 @@ class OrchestrationRepository {
         status = 'running',
         review_status = 'changes_requested',
         finished_at = NULL
-      WHERE batch_id = ? AND agent = ?
+      WHERE batch_id = ? AND (id = ? OR agent = ?)
     `);
-    stmt.run(batchId, agent);
+    stmt.run(batchId, agent, agent);
   }
 
   // -------------------------------------------------------------

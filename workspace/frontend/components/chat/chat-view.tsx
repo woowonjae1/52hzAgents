@@ -61,7 +61,6 @@ import { CreateRoutineDialog } from '@/components/routines/create-routine-dialog
 import { SEND_FIRST_MESSAGE_EVENT, consumePendingFirstMessage, type FirstMessageRequest } from '@/lib/first-message';
 import { useGitStatus } from '@/lib/use-git-status';
 
-import { AgentModelSwitcher } from './agent-model-switcher';
 import { getSnapshot, currentModelFor } from '@/lib/agent-model-store';
 import { threadAgentMode } from '@/lib/agent-profiles';
 import { PipelineStepper } from './pipeline-stepper';
