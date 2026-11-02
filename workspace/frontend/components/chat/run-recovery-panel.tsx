@@ -7,7 +7,7 @@ import { useVisibilityPolling } from '@/lib/use-visibility-polling';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from '@/lib/toast';
 
-interface Checkpoint { id: string; scope?: string; files: string[]; restored_at: number | null; partial?: boolean; pending_command?: boolean; root_matches?: boolean; coverage?: string }
+interface Checkpoint { id: string; scope?: string; files: string[]; restored_at: number | null; partial?: boolean; pending_command?: boolean; root_matches?: boolean; coverage?: string; worktree?: boolean; restore_error?: string }
 interface RecoveryRun { id: string; channel: string; outcome: string | null; checkpoint: Checkpoint | null; started_at: number; error?: { code: string; message: string }; evidence?: { files_modified?: string[]; commands?: { command: string; exitCode?: number }[] } }
 interface Recovery { storage: { recovered: boolean } | null; runs: RecoveryRun[] }
 const labels: Record<string, string> = { interrupted: '应用退出导致任务中断', cancelled: '任务已停止', timed_out: '任务超时', failed: '任务失败', denied: '命令已拒绝', expired: '命令审批已过期', limited: '达到执行上限', finished: '运行已结束' };
@@ -46,14 +46,15 @@ export function RunRecoveryPanel({ channel, running }: { channel: string | null;
     {!!runs.length && <details><summary className="cursor-pointer text-foreground-muted">{labels[runs[0].outcome || ''] || '任务记录'} · 修改恢复记录</summary>
       <p className="mt-2 leading-5 text-foreground-muted">中断后不会自动重放命令。可查看当前修改，再发送新消息继续；Agent 会重新检查项目，命令仍需审批。</p>
       <div className="mt-2 max-h-52 overflow-y-auto space-y-3">{runs.map(run => <div key={run.id} className="border-t border-border pt-2">
-        <div className="flex flex-wrap items-center justify-between gap-2"><span>{labels[run.outcome || ''] || run.outcome} · {new Date(run.started_at).toLocaleString()}</span><button type="button" onClick={() => setActiveRightTab('diff')} className="underline underline-offset-2">查看修改</button></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><span>{labels[run.outcome || ''] || run.outcome} · {new Date(run.started_at).toLocaleString()}</span>{!run.checkpoint?.worktree && <button type="button" onClick={() => setActiveRightTab('diff')} className="underline underline-offset-2">查看修改</button>}</div>
         {run.error && <p className="mt-2 break-words text-foreground-muted">{run.error.message}{['AUTH_FAILED','MODEL_ACCESS_DENIED','MODEL_NOT_FOUND','NETWORK_ERROR','QUOTA_EXHAUSTED','RATE_LIMITED','SERVER_ERROR'].includes(run.error.code) && <button type="button" onClick={() => openSettings('agents')} className="ml-2 underline underline-offset-2">检查模型连接</button>}</p>}
         {run.evidence?.commands?.some(command => command.exitCode === undefined) && <p className="mt-1 text-amber-500">存在未获得退出结果的命令，请先确认其实际影响。</p>}
         {run.checkpoint && <><p className="mt-1 break-all text-foreground-muted">检查点文件：{run.checkpoint.files.join('、') || '未记录文件变更'}</p>
           {run.checkpoint.coverage && <p className="mt-1 leading-5 text-foreground-muted">覆盖范围：{run.checkpoint.coverage}</p>}
           {run.checkpoint.partial && <p className="mt-1 text-amber-500">快照仅覆盖部分文件，超限或忽略文件需要人工检查。</p>}
           {run.checkpoint.pending_command && <p className="mt-1 text-amber-500">命令缺少执行后快照，自动恢复已禁用。请先人工检查进程与文件。</p>}
-          {run.checkpoint.root_matches === false && <p className="mt-1 text-foreground-muted">检查点属于另一个工作目录，切回该目录后可恢复。</p>}
+          {run.checkpoint.worktree && <p className="mt-1 text-foreground-muted">恢复目标为此子任务的独立工作区。恢复后需要重试任务并重新审阅。</p>}
+          {run.checkpoint.root_matches === false && <p className="mt-1 text-foreground-muted">{run.checkpoint.restore_error || '检查点属于另一个工作目录，切回该目录后可恢复。'}</p>}
           <button type="button" disabled={running || busy || !!run.checkpoint.restored_at || !!run.checkpoint.pending_command || run.checkpoint.root_matches === false || !run.checkpoint.files.length} onClick={() => setTarget(run)} className="mt-2 rounded border border-border px-2 py-1 disabled:opacity-40">{run.checkpoint.restored_at ? '检查点文件已恢复' : '恢复此任务的检查点文件'}</button></>}
       </div>)}</div>
       <p className="mt-2 leading-5 text-foreground-muted">恢复仅覆盖记录在检查点中的项目文件；忽略或超限文件、进程、数据库与外部服务操作不在范围内。文件有后续改动时会阻止恢复。</p>

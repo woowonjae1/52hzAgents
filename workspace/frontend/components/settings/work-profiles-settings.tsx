@@ -1,31 +1,19 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Loader2, Pencil, Plus, Trash2, Bot, Layers, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { workspaceApi } from '@/lib/api';
+import { workspaceApi, type AgentDefinition } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
-import { useWorkspace } from '@/lib/workspace-context';
-import { modelsFor, useAgentModels } from '@/lib/agent-model-store';
-import { AGENT_PROFILES, isReadOnlyEnforced, type AgentMode } from '@/lib/agent-profiles';
+import { AGENT_PROFILES, type AgentMode } from '@/lib/agent-profiles';
 import type { WorkProfile, WorkMode } from '@/lib/api/orchestration';
-
-/**
- * Saved profiles: the presets orchestrating agents choose from when they
- * delegate (workspace_list_profiles → workspace_delegate).
- *
- * A profile is an agent, an optional model and Fix or Review — the same two
- * modes as the composer's switch, with the same labels and the same honesty
- * about where Review is enforced — plus a line saying when to use it, which is
- * what the agent picks by. The agent reads only these fields, so the line is
- * written for an agent, not for the settings page.
- */
+import { Badge } from '@/components/ui/badge';
 
 const MODE_OPTIONS = AGENT_PROFILES.map((p) => ({ value: p.settings.agentMode, label: p.label, icon: p.icon }));
 
@@ -36,18 +24,15 @@ interface Draft {
   id: string | null;
   name: string;
   agent: string;
-  model: string;
   mode: WorkMode;
   whenToUse: string;
 }
 
-const EMPTY_DRAFT: Draft = { id: null, name: '', agent: '', model: '', mode: 'execute', whenToUse: '' };
+const EMPTY_DRAFT: Draft = { id: null, name: '', agent: '', mode: 'execute', whenToUse: '' };
 
 export function WorkProfilesSettings() {
-  const { agents } = useWorkspace();
-  const modelSnapshot = useAgentModels();
   const [profiles, setProfiles] = React.useState<WorkProfile[]>([]);
-  const [agentStatus, setAgentStatus] = React.useState<Record<string, string>>({});
+  const [agents, setAgents] = React.useState<AgentDefinition[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [draft, setDraft] = React.useState<Draft | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -55,11 +40,14 @@ export function WorkProfilesSettings() {
 
   const load = React.useCallback(async () => {
     try {
-      const res = await workspaceApi.listWorkProfiles();
-      setProfiles(res.profiles ?? []);
-      setAgentStatus(res.agent_status ?? {});
+      const [profilesRes, agentsRes] = await Promise.all([
+        workspaceApi.listWorkProfiles(),
+        workspaceApi.listAgentDefinitions(true),
+      ]);
+      setProfiles(profilesRes.profiles ?? []);
+      setAgents(agentsRes.agents ?? []);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not load profiles');
+      toast.error(e instanceof Error ? e.message : '加载工作配置失败');
     } finally {
       setLoading(false);
     }
@@ -69,14 +57,11 @@ export function WorkProfilesSettings() {
     void load();
   }, [load]);
 
-  // Deleting is a two-step click, like discarding a batch.
   React.useEffect(() => {
     if (!confirmDelete) return;
     const t = setTimeout(() => setConfirmDelete(null), 4000);
     return () => clearTimeout(t);
   }, [confirmDelete]);
-
-  const agentNames = React.useMemo(() => agents.map((a) => a.agentName).sort((a, b) => a.localeCompare(b)), [agents]);
 
   const save = async () => {
     if (!draft) return;
@@ -85,17 +70,17 @@ export function WorkProfilesSettings() {
       const input = {
         name: draft.name.trim(),
         agent: draft.agent,
-        model: draft.model.trim(),
+        model: '',
         mode: draft.mode,
         when_to_use: draft.whenToUse.trim(),
       };
       if (draft.id) await workspaceApi.updateWorkProfile(draft.id, input);
       else await workspaceApi.createWorkProfile(input);
-      toast.success(draft.id ? 'Profile saved' : 'Profile added');
+      toast.success(draft.id ? '工作配置已保存' : '工作配置已创建');
       setDraft(null);
       await load();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not save the profile');
+      toast.error(e instanceof Error ? e.message : '无法保存工作配置');
     } finally {
       setSaving(false);
     }
@@ -105,8 +90,9 @@ export function WorkProfilesSettings() {
     try {
       await workspaceApi.deleteWorkProfile(id);
       setProfiles((prev) => prev.filter((p) => p.id !== id));
+      toast.success('已删除工作配置');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not delete the profile');
+      toast.error(e instanceof Error ? e.message : '删除失败');
     } finally {
       setConfirmDelete(null);
     }
@@ -116,17 +102,23 @@ export function WorkProfilesSettings() {
     <div className="rounded-2xl border border-border/60 bg-surface1 p-6 space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">Profiles</h3>
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+            <Layers className="size-4 text-primary" />
+            <span>协作工作配置 (Work Profiles)</span>
+          </h3>
           <p className="text-xs text-foreground-muted mt-1 leading-relaxed">
-            Named ways to run an agent — which agent, which model, Fix or Review — and when to use each. Agents
-            pick from these when they delegate: every task runs in its own worktree, and nothing is merged until
-            you approve it.
+            为主协调 Agent 提供委派预设方案。每个配置引用一个真实已保存的 Agent 身份，并收窄其任务方式与使用时机。不再维护独立的模型覆盖体系。
           </p>
         </div>
         {!draft && (
-          <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => setDraft({ ...EMPTY_DRAFT, agent: agentNames[0] ?? '' })}>
-            <Plus className="size-3.5 mr-1" />
-            Add profile
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs shrink-0 gap-1.5"
+            onClick={() => setDraft({ ...EMPTY_DRAFT, agent: agents[0]?.id ?? '' })}
+          >
+            <Plus className="size-3.5" />
+            <span>添加工作配置</span>
           </Button>
         )}
       </div>
@@ -135,74 +127,90 @@ export function WorkProfilesSettings() {
         <ProfileForm
           draft={draft}
           setDraft={setDraft}
-          agentNames={agentNames}
-          agentType={agents.find((a) => a.agentName === draft.agent)?.agentType ?? null}
-          modelOptions={draft.agent ? modelsFor(modelSnapshot, draft.agent).map((m) => m.id) : []}
+          agents={agents}
           saving={saving}
-          onSave={() => void save()}
+          onSave={save}
           onCancel={() => setDraft(null)}
         />
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-foreground-muted">
-          <Loader2 className="size-3.5 animate-spin" /> Loading profiles…
+        <div className="py-8 text-center text-xs text-foreground-muted flex items-center justify-center gap-2">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span>正在加载工作配置...</span>
         </div>
       ) : profiles.length === 0 ? (
-        !draft && (
-          <p className="text-2xs text-foreground-muted leading-snug">
-            No profiles yet. Agents can still delegate by naming an agent; a profile adds the model, the mode and a
-            line on when to use it.
-          </p>
-        )
+        <p className="text-xs text-foreground-muted text-center py-6">暂无工作配置预设。</p>
       ) : (
-        <ul className="divide-y divide-border/60 rounded-lg border border-border/60">
+        <ul className="divide-y divide-border/40 rounded-xl border border-border/60 bg-surface0 overflow-hidden">
           {profiles.map((p) => {
-            const mode = modeOf(p.mode);
-            const ModeIcon = mode.icon;
-            const status = agentStatus[p.agent];
+            const boundAgent = agents.find((a) => a.id === p.agent);
+            const isInvalidRef = !boundAgent;
+
             return (
-              <li key={p.id} className="flex items-start gap-3 px-3 py-2.5">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <code className="text-xs font-medium text-foreground">{p.name}</code>
-                    <span className="text-2xs text-foreground-muted">@{p.agent}</span>
-                    <span className="inline-flex items-center gap-1 text-2xs text-foreground-muted">
-                      <ModeIcon className="size-3" />
-                      {mode.label}
-                    </span>
-                    <span className="text-2xs text-foreground-muted font-mono truncate">{p.model || "agent's own model"}</span>
-                    {status && status !== 'online' && (
-                      <span className="inline-flex items-center gap-1 text-2xs text-status-warning">
-                        <AlertTriangle className="size-3" />
-                        {status === 'missing' ? 'agent no longer in workspace' : 'agent offline'}
+              <li key={p.id} className="p-3 flex items-start justify-between gap-3 text-xs">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-foreground font-mono">{p.name}</span>
+                    <Badge variant="outline" size="sm" className="text-3xs uppercase">
+                      {p.mode}
+                    </Badge>
+                    {isInvalidRef ? (
+                      <span className="inline-flex items-center gap-1 text-3xs px-1.5 py-0.5 rounded border border-status-warning/40 bg-status-warning/10 text-status-warning">
+                        <AlertTriangle className="size-2.5" />
+                        <span>引用的 Agent ({p.agent}) 不存在，需重新绑定</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-3xs text-foreground-muted">
+                        <Bot className="size-3 text-primary" />
+                        <span>{boundAgent.name}</span>
                       </span>
                     )}
                   </div>
-                  {p.when_to_use && <p className="mt-0.5 text-2xs text-foreground-muted leading-snug">{p.when_to_use}</p>}
+                  {p.when_to_use && (
+                    <p className="text-2xs text-foreground-muted line-clamp-2 leading-relaxed">
+                      {p.when_to_use}
+                    </p>
+                  )}
+                  {boundAgent?.modelResource && (
+                    <p className="text-3xs text-foreground-extra-muted font-mono">
+                      继承模型：{boundAgent.modelResource.connectionId} / {boundAgent.modelResource.modelId}
+                    </p>
+                  )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label={`Edit profile ${p.name}`}
+
+                <div className="flex items-center gap-1 shrink-0 self-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-2xs gap-1"
                     onClick={() =>
-                      setDraft({ id: p.id, name: p.name, agent: p.agent, model: p.model, mode: p.mode, whenToUse: p.when_to_use })
+                      setDraft({
+                        id: p.id,
+                        name: p.name,
+                        agent: p.agent,
+                        mode: p.mode,
+                        whenToUse: p.when_to_use,
+                      })
                     }
-                    className="rounded-md p-1 text-foreground-muted hover:bg-surface2 hover:text-foreground"
                   >
-                    <Pencil className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={confirmDelete === p.id ? `Click again to delete ${p.name}` : `Delete profile ${p.name}`}
-                    onClick={() => (confirmDelete === p.id ? void remove(p.id) : setConfirmDelete(p.id))}
+                    <Pencil className="size-3" />
+                    <span>编辑</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className={cn(
-                      'rounded-md p-1 hover:bg-surface2',
-                      confirmDelete === p.id ? 'text-status-danger' : 'text-foreground-muted hover:text-foreground',
+                      'h-7 px-2 text-2xs gap-1',
+                      confirmDelete === p.id
+                        ? 'text-status-danger hover:bg-status-danger/10'
+                        : 'text-foreground-muted hover:text-status-danger'
                     )}
+                    onClick={() => (confirmDelete === p.id ? void remove(p.id) : setConfirmDelete(p.id))}
                   >
-                    <Trash2 className="size-3.5" />
-                  </button>
+                    <Trash2 className="size-3" />
+                    <span>{confirmDelete === p.id ? '再次确认' : '删除'}</span>
+                  </Button>
                 </div>
               </li>
             );
@@ -216,51 +224,48 @@ export function WorkProfilesSettings() {
 interface FormProps {
   draft: Draft;
   setDraft: (d: Draft) => void;
-  agentNames: string[];
-  agentType: string | null;
-  modelOptions: string[];
+  agents: AgentDefinition[];
   saving: boolean;
   onSave: () => void;
   onCancel: () => void;
 }
 
-function ProfileForm({ draft, setDraft, agentNames, agentType, modelOptions, saving, onSave, onCancel }: FormProps) {
-  const listId = React.useId();
+function ProfileForm({ draft, setDraft, agents, saving, onSave, onCancel }: FormProps) {
   const set = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
-  const reviewOnlyAsked = draft.mode === 'plan' && draft.agent !== '' && !isReadOnlyEnforced(agentType, draft.agent);
+  const selectedAgent = agents.find((a) => a.id === draft.agent);
 
   return (
     <div className="rounded-lg border border-border bg-surface2/40 p-3 space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label className="text-xs" htmlFor="profile-name">
-            Name
+            配置名称 (Profile Name) *
           </Label>
           <Input
             id="profile-name"
             value={draft.name}
             onChange={(e) => set({ name: e.target.value })}
-            placeholder="reviewer"
-            className="h-8 text-xs font-mono"
+            placeholder="例如：code-reviewer, architect"
+            className="h-8 text-xs font-mono bg-surface0"
           />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Agent</Label>
-          <Select value={draft.agent || undefined} onValueChange={(agent) => set({ agent, model: '' })}>
-            <SelectTrigger size="sm" aria-label="Agent">
-              <SelectValue placeholder="Choose an agent" />
+          <Label className="text-xs">绑定的 Agent 执行主体 *</Label>
+          <Select value={draft.agent || undefined} onValueChange={(agent) => set({ agent })}>
+            <SelectTrigger size="sm" aria-label="Agent" className="h-8 text-xs bg-surface0">
+              <SelectValue placeholder="选择已保存的 Agent" />
             </SelectTrigger>
             <SelectContent>
-              {agentNames.map((name) => (
-                <SelectItem key={name} value={name}>
-                  @{name}
+              {agents.map((ag) => (
+                <SelectItem key={ag.id} value={ag.id}>
+                  {ag.name} ({ag.role})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Mode</Label>
+          <Label className="text-xs">执行方式</Label>
           <div>
             <SegmentedControl<AgentMode>
               size="xs"
@@ -271,48 +276,46 @@ function ProfileForm({ draft, setDraft, agentNames, agentType, modelOptions, sav
           </div>
           <p className="text-2xs text-foreground-muted leading-snug">
             {modeOf(draft.mode).whenToUse}
-            {reviewOnlyAsked && ` @${draft.agent} is only asked not to edit.`}
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs" htmlFor="profile-model">
-            Model
-          </Label>
-          <Input
-            id="profile-model"
-            list={listId}
-            value={draft.model}
-            onChange={(e) => set({ model: e.target.value })}
-            placeholder="Agent's own model"
-            className="h-8 text-xs font-mono"
-          />
-          <datalist id={listId}>
-            {modelOptions.map((m) => (
-              <option key={m} value={m} />
-            ))}
-          </datalist>
+          <Label className="text-xs">执行资源模型</Label>
+          <div className="h-8 rounded-lg border border-border bg-surface0/60 px-2.5 flex items-center text-xs text-foreground-muted font-mono">
+            {selectedAgent?.modelResource ? (
+              <span>
+                {selectedAgent.modelResource.connectionId} · {selectedAgent.modelResource.modelId}
+              </span>
+            ) : (
+              <span className="text-foreground-extra-muted italic">继承全局连接 (无独立模型资源)</span>
+            )}
+          </div>
+          <p className="text-3xs text-foreground-extra-muted">模型由所选 Agent 的配置决定，不在此处重复覆盖。</p>
         </div>
         <div className="space-y-1.5 sm:col-span-2">
           <Label className="text-xs" htmlFor="profile-when">
-            When to use
+            适用时机 (When to use)
           </Label>
           <Textarea
             id="profile-when"
             value={draft.whenToUse}
             onChange={(e) => set({ whenToUse: e.target.value })}
-            placeholder="Independent code review before a merge; reads and reports, never edits."
-            className="min-h-16 text-xs"
+            placeholder="说明在何种场景下委派此任务（主 Agent 会读取此段说明进行判断）..."
+            className="min-h-16 text-xs bg-surface0"
           />
-          <p className="text-2xs text-foreground-muted">The delegating agent reads this line to decide.</p>
         </div>
       </div>
       <div className="flex items-center justify-end gap-2">
         <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={onCancel} disabled={saving}>
-          Cancel
+          取消
         </Button>
-        <Button size="sm" className="h-8 text-xs" onClick={onSave} disabled={saving || !draft.name.trim() || !draft.agent}>
+        <Button
+          size="sm"
+          className="h-8 text-xs bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={onSave}
+          disabled={saving || !draft.name.trim() || !draft.agent}
+        >
           {saving && <Loader2 className="size-3.5 mr-1.5 animate-spin" />}
-          {draft.id ? 'Save profile' : 'Add profile'}
+          <span>{draft.id ? '保存修改' : '创建配置'}</span>
         </Button>
       </div>
     </div>

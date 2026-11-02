@@ -159,7 +159,7 @@ export function NeedsAttentionPanel({
         <HomeRow
           key={`lane-${key}`}
           icon={<CircleAlert className="size-3.5 text-destructive" />}
-          title={`@${lane.agent}'s lane failed`}
+          title={`${lane.agent_name || lane.agent}'s lane failed`}
           detail={`${lane.error || 'No error was reported'} · ${threadTitle(session.sessionId) || title}`}
           onClick={() => onOpenThread(session.sessionId)}
           actions={

@@ -17,7 +17,18 @@ import { BaseWorkspaceApi } from './base';
  */
 type Narrow<T, N extends { [K in keyof N]: K extends keyof T ? T[K] : never }> = Omit<T, keyof N> & N;
 
-export type ParallelBatchState = 'idle' | 'running' | 'blocked' | 'done';
+export interface DeliveryDiffResult {
+  available: boolean;
+  reason?: string;
+  baseCommit: string;
+  deliveryCommit: string | null;
+  diffstat?: string;
+  files: { status: string; path: string }[];
+  diff: string;
+  truncated: boolean;
+}
+
+export type ParallelBatchState = 'idle' | 'running' | 'blocked' | 'done' | 'failed' | 'cancelled';
 
 /** A task in a worker's lane: the whole todo row, as the server sends it. */
 export type ParallelTask = Wire.TodoRecord;
@@ -43,7 +54,16 @@ export type LaneReviewStatus =
   | 'cancelled';
 
 /** One agent's share of a started batch. `port` 0 = no dev-server port reserved. */
-export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus; review_status: LaneReviewStatus }>;
+export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLaneStatus; review_status: LaneReviewStatus }> & {
+  agent_id?: string;
+  agent_name?: string;
+  agent_revision?: number;
+  run_id?: string | null;
+  context_key?: string | null;
+  used_tokens?: number;
+  commit_hash?: string;
+  delivery?: { baseCommit: string; commit: string; changedFiles: string[]; diffstat: string } | null;
+};
 
 /** A batch that was actually started, with its lanes. */
 export type ParallelRun = Narrow<
@@ -56,7 +76,7 @@ export type ParallelRun = Narrow<
         /** `agent`: an agent delegated (workspace_delegate, or naming agents in a parallel thread); see `delegated_by`. */
         origin: 'board' | 'mention' | 'agent';
         /** `review`: every lane ended and there is something to merge; waiting for the user. */
-        status: 'running' | 'review' | 'done';
+        status: 'running' | 'review' | 'done' | 'blocked' | 'cancelled' | 'failed';
       }
     >;
     lanes: ParallelLane[];
@@ -138,6 +158,11 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     );
   }
 
+  /** Remove clean managed worktrees after integration; retain delivery records. */
+  async cleanupParallelBatch(batchId: string): Promise<void> {
+    await this.request(`/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/cleanup`, { method: 'POST' });
+  }
+
   /** Review a lane again, after its review failed, timed out, was skipped or cancelled. */
   async retryLaneReview(batchId: string, agent: string): Promise<void> {
     await this.request(
@@ -159,6 +184,25 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     await this.request(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/stop`,
       { method: 'POST' }
+    );
+  }
+
+    /** Read structured diff for a lane's delivery. */
+  async getLaneDeliveryDiff(batchId: string, agent: string): Promise<DeliveryDiffResult> {
+    return this.request<DeliveryDiffResult>(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/diff`
+    );
+  }
+
+  /** Complete human review for a lane with approval or requested changes. */
+  async completeLaneReview(
+    batchId: string,
+    agent: string,
+    result: { verdict: 'approved' | 'changes_requested'; notes?: string }
+  ): Promise<ParallelBatch> {
+    return this.request<ParallelBatch>(
+      `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/review/complete`,
+      { method: 'POST', body: JSON.stringify(result) }
     );
   }
 

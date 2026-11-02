@@ -9,6 +9,8 @@ import { AgentsApi } from './api/agents';
 import { GitApi } from './api/git';
 import { OrchestrationApi } from './api/orchestration';
 import { ActivityApi } from './api/activity';
+import { AgentDefinitionsApi } from './api/agent-definitions';
+export type { AgentDefinition, AgentIdentityInput, AgentExecutionPolicy, AgentModelResource, AgentPermissions, AgentLimits } from './api/agent-definitions';
 
 export { mapCustomSkill, parseScheduleDays, mapFileResponse };
 export type { FSEntry, FSTreeResponse, FSContentResponse };
@@ -38,7 +40,8 @@ export interface WorkspaceApi extends
   AgentsApi,
   GitApi,
   OrchestrationApi,
-  ActivityApi {}
+  ActivityApi,
+  AgentDefinitionsApi {}
 
 export class WorkspaceApi extends BaseWorkspaceApi {}
 
@@ -53,6 +56,7 @@ applyMixins(WorkspaceApi, [
   GitApi,
   OrchestrationApi,
   ActivityApi,
+  AgentDefinitionsApi,
 ]);
 
 export const workspaceApi = new WorkspaceApi();

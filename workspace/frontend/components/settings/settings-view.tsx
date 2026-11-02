@@ -52,6 +52,7 @@ import { SignalMark } from '@/components/brand/signal-mark';
 import { useMarkColor } from '@/hooks/use-mark-color';
 import { MARK_COLOR_PRESETS, DEFAULT_MARK_COLOR } from '@/lib/mark-color-store';
 import { RouterProviderSettings } from './router-provider-settings';
+import { AgentDefinitionsSettings } from './agent-definitions-settings';
 import { WorkProfilesSettings } from './work-profiles-settings';
 import { SavedWorkflowsSettings } from './saved-workflows-settings';
 import { BackupRecoverySettings } from './backup-recovery-settings';
@@ -103,6 +104,7 @@ export function SettingsView() {
   const [autostart, setAutostart] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [agentSubTab, setAgentSubTab] = useState<'agents' | 'connections'>('agents');
   const [showConnectAgent, setShowConnectAgent] = useState(false);
   const [markColor, setMarkColor] = useMarkColor();
   const [localRuntime,setLocalRuntime] = useState<boolean|null>(null);
@@ -120,7 +122,7 @@ export function SettingsView() {
 
   const SETTINGS_NAV_ITEMS: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
     { id: 'general', label: 'General & Desktop', icon: Settings },
-    { id: 'agents', label: embeddedRuntime ? 'Models & Connections' : 'Manage Agents', icon: Users },
+    { id: 'agents', label: 'Agent', icon: Bot },
     { id: 'panels', label: 'Panels & Display', icon: PanelRight },
     { id: 'export', label: '导出', icon: Download },
   ];
@@ -530,185 +532,33 @@ export function SettingsView() {
           {/* Tab 2: Manage Agents & Runtimes */}
           {settingsTab === 'agents' && (
             <div className="max-w-4xl w-full mx-auto px-8 py-8 space-y-6 animate-[fadeIn_0.15s_ease-out]">
-              {localRuntime === null ? <p className="text-xs text-foreground-muted">Loading model settings…</p> : embeddedRuntime ? <RouterProviderSettings /> : <>
-              {/* How agents get chosen belongs beside who the agents are. */}
-              {!showConnectAgent && <RouterProviderSettings />}
-              {/* Who delegated work goes to, and how: agents pick from these. */}
-              {!showConnectAgent && <WorkProfilesSettings />}
-              {/* Reusable multi-agent relay pipelines */}
-              {!showConnectAgent && <SavedWorkflowsSettings />}
-              {showConnectAgent ? (
+              {localRuntime === null ? (
+                <p className="text-xs text-foreground-muted">正在加载 Agent 设置…</p>
+              ) : agentSubTab === 'connections' ? (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/60">
                     <button
-                      onClick={() => setShowConnectAgent(false)}
+                      onClick={() => setAgentSubTab('agents')}
                       className="inline-flex items-center gap-1.5 text-xs text-foreground-muted hover:text-foreground font-medium"
                     >
                       <ArrowLeft className="size-3.5" />
-                      <span>Back to agents</span>
+                      <span>返回 Agent 列表</span>
                     </button>
+                    <h3 className="text-xs font-semibold text-foreground">底层执行资源连接 (Models & Connections)</h3>
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-surface1 p-6">
-                    <ConnectAgentView />
-                  </div>
+                  <RouterProviderSettings />
                 </div>
               ) : (
-                <>
-                  <div className="flex items-center justify-between p-6 rounded-2xl bg-surface1 border border-border/60 shadow-sm">
-                    <div>
-                      <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                        <Users className="size-5 text-primary" />
-                        Agents & roles
-                      </h2>
-                      <p className="text-xs text-foreground-muted mt-1">
-                        {agents.filter(a => a.status === 'online').length} of {agents.length} agents online. Name a thread leader, give an agent a role, or connect a new one.
-                      </p>
-                    </div>
-
-                    <Button
-                      onClick={() => setShowConnectAgent(true)}
-                      className="bg-primary text-primary-foreground text-xs h-8.5 px-3.5 flex items-center gap-1.5 shadow-xs"
-                    >
-                      <Plug className="size-3.5" />
-                      <span>Connect agent</span>
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {agents.length === 0 ? (
-                      <div className="col-span-2 p-10 rounded-2xl bg-surface1 border border-border/60 text-center space-y-3">
-                        <div className="size-12 rounded-2xl bg-surface2 mx-auto flex items-center justify-center text-foreground-muted">
-                          <Bot className="size-6" />
-                        </div>
-                        <h3 className="text-sm font-semibold text-foreground">No agents online</h3>
-                        <p className="text-xs text-foreground-muted max-w-sm mx-auto">
-                          No agent is connected yet. Use Connect agent, top right, to hook up Claude CLI, Antigravity, OpenClaw, or a custom agent.
-                        </p>
-                        <Button
-                          onClick={() => setShowConnectAgent(true)}
-                          size="sm"
-                          className="text-xs mt-2"
-                        >
-                          Connect an agent
-                        </Button>
-                      </div>
-                    ) : (
-                      agents.map((agent) => {
-                        const isOnline = agent.status === 'online';
-                        const isMaster = currentSession?.master === agent.agentName;
-                        const inCurrentSession = currentSession?.participants?.includes(agent.agentName);
-
-                        return (
-                          <div
-                            key={agent.agentName}
-                            className="p-4 rounded-2xl bg-surface1 border border-border/60 flex flex-col justify-between space-y-3 hover:border-border transition-colors"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className="relative">
-                                  <AgentAvatar name={agent.agentName} size={36} />
-                                  <span className={cn(
-                                    'absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-surface1',
-                                    isOnline ? 'bg-status-success' : 'bg-foreground-extra-muted'
-                                  )} />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-foreground truncate">{agent.agentName}</span>
-                                    {isMaster && (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-3xs font-medium bg-status-warning/10 text-status-warning border border-status-warning/20">
-                                        <Crown className="size-2.5" /> Leader
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-2xs text-foreground-extra-muted uppercase font-mono">
-                                    {agent.agentType || 'Local Agent'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Hint label={agent.autostart ? 'Connects on launch — click to turn off' : 'Does not connect on launch — click to turn on'}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleAgentAutostart(agent.agentName, !!agent.autostart)}
-                                    className={cn(
-                                      'inline-flex items-center gap-1 text-3xs px-2 py-0.5 rounded-full font-medium transition-colors border',
-                                      agent.autostart
-                                        ? 'bg-primary/10 border-primary/30 text-primary hover:bg-primary/20'
-                                        : 'bg-surface2/60 border-border/60 text-foreground-extra-muted hover:text-foreground-muted'
-                                    )}
-                                  >
-                                    <Power className="size-2.5" />
-                                    <span>{agent.autostart ? 'Auto' : 'Manual'}</span>
-                                  </button>
-                                </Hint>
-
-                                <span className={cn(
-                                  'text-3xs px-2 py-0.5 rounded-full font-medium',
-                                  isOnline ? 'bg-status-success/10 text-status-success' : 'bg-surface2 text-foreground-muted'
-                                )}>
-                                  {isOnline ? 'Online' : 'Offline'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <p className="text-xs text-foreground-muted line-clamp-2 leading-relaxed">
-                              {agent.description || 'No description. Use the role settings below to give this agent a prompt and a remit.'}
-                            </p>
-
-                            <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5">
-                                {currentSessionId && (
-                                  <Hint label="Make this the leader of the thread">
-                                    <button
-                                      onClick={() => setSessionMaster(currentSessionId, agent.agentName)}
-                                      className={cn(
-                                        'px-2 py-1 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1',
-                                        isMaster ? 'bg-status-warning/15 text-status-warning font-medium' : 'bg-surface2 text-foreground-muted hover:text-foreground'
-                                      )}
-                                    >
-                                      <Crown className="size-3" />
-                                      <span>{isMaster ? 'Leader' : 'Make leader'}</span>
-                                    </button>
-                                  </Hint>
-                                )}
-
-                                {currentSessionId && (
-                                  inCurrentSession ? (
-                                    <button
-                                      onClick={() => removeParticipant(currentSessionId, agent.agentName)}
-                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-status-danger hover:bg-status-danger/10 transition-colors"
-                                    >
-                                      Remove from thread
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={() => addParticipant(currentSessionId, agent.agentName)}
-                                      className="px-2 py-1 rounded-lg text-xs font-medium bg-surface2 text-primary hover:bg-primary/10 transition-colors"
-                                    >
-                                      Add to thread
-                                    </button>
-                                  )
-                                )}
-                              </div>
-
-                              <button
-                                onClick={() => setSelectedAgentName(agent.agentName)}
-                                className="text-xs text-foreground-muted hover:text-foreground inline-flex items-center gap-1"
-                              >
-                                <span>Role</span>
-                                <ChevronRight className="size-3" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </>
+                <AgentDefinitionsSettings
+                  onManageConnections={() => setAgentSubTab('connections')}
+                  onSelectAgentForChat={(agentId) => {
+                    if (currentSessionId) {
+                      void workspaceApi.assignSessionAgent(currentSessionId, agentId).catch(() => {});
+                    }
+                    setViewMode('threads');
+                  }}
+                />
               )}
-              </>}
             </div>
           )}
 

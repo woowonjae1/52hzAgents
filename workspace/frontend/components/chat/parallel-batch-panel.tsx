@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff, ShieldCheck, Clock, SkipForward, Undo2, MessagesSquare, Ban } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, GitMerge, GitBranch, XCircle, RotateCw, PauseCircle, Trash2, FileDiff, ShieldCheck, Clock, SkipForward, Undo2, MessagesSquare, Ban, FolderMinus, Check, X, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { workspaceApi } from '@/lib/api';
-import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane, LaneReviewStatus } from '@/lib/api/orchestration';
+import type { ParallelBatch, ParallelWorker, ParallelRun, ParallelLane, LaneReviewStatus, DeliveryDiffResult } from '@/lib/api/orchestration';
+import type { AgentDefinition } from '@/lib/api/agent-definitions';
 import { useWorkspace } from '@/lib/workspace-context';
 import { toast } from '@/lib/toast';
 
@@ -57,7 +58,7 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
             setError(null);
             return;
           }
-          const isLiveOrReview = next?.run?.batch.status === 'running' || next?.run?.batch.status === 'review';
+          const isLiveOrReview = next?.run && ['running', 'review', 'blocked', 'cancelled'].includes(next.run.batch.status);
           if (active || isLiveOrReview) {
             setBatch(next);
           } else {
@@ -85,7 +86,7 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
   const run = batch.run;
   // A batch under review still owns the channel -- no new batch can start
   // until it is merged or discarded -- so the next-batch preview stays hidden.
-  const runLive = run?.batch.status === 'running' || run?.batch.status === 'review';
+  const runLive = Boolean(run && ['running', 'review', 'blocked', 'cancelled'].includes(run.batch.status));
   if (!active && !runLive) return null;
   const reload = async () => {
     try {
@@ -113,7 +114,7 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
           assign tasks on the board. Everyone starts at once.{' '}
           {batch.isolated
             ? 'This project is a git repository, so each agent works in its own worktree and the results are merged back when all of them finish.'
-            : 'This folder is not a git repository, so the agents share it: give each task the folder it owns (or name it in the task) so no two overlap.'}
+            : 'Choose a Git project before starting parallel tasks. Each Agent needs an isolated worktree.'}
         </p>
         {batch.isolated && (
           <ReviewSetting channelName={channelName} value={batch.review_agent} onSaved={reload} className="mt-2" />
@@ -205,26 +206,37 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
   const [retrying, setRetrying] = React.useState<string | null>(null);
   const [deciding, setDeciding] = React.useState<'merge' | 'discard' | null>(null);
   const [confirmDiscard, setConfirmDiscard] = React.useState(false);
-  const [confirmMerge, setConfirmMerge] = React.useState(false);
   const [stopping, setStopping] = React.useState(false);
+  const [cleaning, setCleaning] = React.useState(false);
+  const [selectedDiffLane, setSelectedDiffLane] = React.useState<ParallelLane | null>(null);
+
+  const cleanWorktrees = async () => {
+    setCleaning(true);
+    try {
+      await workspaceApi.cleanupParallelBatch(run.batch.id);
+      toast.success('已清理该批次临时托管工作区');
+      onRetried();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '清理工作区失败');
+    } finally {
+      setCleaning(false);
+    }
+  };
   const live = run.batch.status === 'running';
   const reviewing = run.batch.status === 'review';
   const finished = run.lanes.filter((l) => l.status !== 'running').length;
   const base = run.batch.base_branch || 'the base branch';
-  // Merging while a reviewer is still reading cancels that review, so it takes
-  // a second, deliberate click -- like Discard.
   const reviewsRunning = run.lanes.filter((l) => l.review_status === 'running').length;
 
   // Discard is a two-step click: it deletes every lane's worktree and branch,
   // and the second click has to be deliberate.
   React.useEffect(() => {
-    if (!confirmDiscard && !confirmMerge) return;
+    if (!confirmDiscard) return;
     const t = setTimeout(() => {
       setConfirmDiscard(false);
-      setConfirmMerge(false);
     }, 4000);
     return () => clearTimeout(t);
-  }, [confirmDiscard, confirmMerge]);
+  }, [confirmDiscard]);
 
   const stopBatch = async () => {
     setStopping(true);
@@ -255,7 +267,6 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
     } finally {
       setDeciding(null);
       setConfirmDiscard(false);
-      setConfirmMerge(false);
     }
   };
 
@@ -324,7 +335,7 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="flex items-baseline gap-1.5 min-w-0">
-                    <span className="text-2xs font-medium text-foreground truncate">{lane.agent}</span>
+                    <span className="text-2xs font-medium text-foreground truncate" title={lane.agent_id}>{lane.agent_name || lane.agent}</span>
                     {(lane.profile || lane.mode === 'plan') && (
                       <span
                         className="text-2xs text-muted-foreground shrink-0"
@@ -356,6 +367,19 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
                     <GitBranch className="size-3 shrink-0" />
                     {lane.branch}
                   </code>
+                )}
+                {lane.commit_hash && (
+                  <div className="mt-1 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDiffLane(lane)}
+                      className="inline-flex items-center gap-1 text-2xs text-primary hover:underline font-mono"
+                      title="查看此任务交付的代码改动 Diff"
+                    >
+                      <FileDiff className="size-3" />
+                      <span>查看改动 {lane.commit_hash.slice(0, 7)}</span>
+                    </button>
+                  </div>
                 )}
                 {reviewing && lane.diffstat && (
                   <details className="mt-0.5 group">
@@ -393,8 +417,20 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
           );
         })}
       </ul>
-      {reviewing && (
+      {(reviewing || run.batch.status === 'blocked' || run.batch.status === 'cancelled' || run.batch.status === 'done') && (
         <footer className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-border pt-2.5">
+          {(run.batch.status === 'done' || run.batch.status === 'cancelled') && (
+            <button
+              type="button"
+              disabled={cleaning}
+              onClick={() => void cleanWorktrees()}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-2xs text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-60"
+              title="清理此批次的临时 Git 工作区，历史执行记录将完整保留"
+            >
+              {cleaning ? <Loader2 className="size-3 animate-spin" /> : <FolderMinus className="size-3" />}
+              <span>清理工作区</span>
+            </button>
+          )}
           <button
             type="button"
             disabled={deciding !== null}
@@ -409,20 +445,23 @@ function RunView({ run, onRetried, setting }: { run: ParallelRun; onRetried: () 
             <Trash2 className="size-3" />
             {confirmDiscard ? 'Click again to discard all' : 'Discard'}
           </button>
-          <button
+          {reviewing && <button
             type="button"
-            disabled={deciding !== null}
-            onClick={() => (reviewsRunning > 0 && !confirmMerge ? setConfirmMerge(true) : void decide('merge'))}
+            disabled={deciding !== null || reviewsRunning > 0 || run.lanes.some(lane => lane.review_status && lane.review_status !== 'approved')}
+            onClick={() => void decide('merge')}
             className="inline-flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-2xs font-medium text-background hover:opacity-90 disabled:opacity-60"
           >
             {deciding === 'merge' ? <Loader2 className="size-3 animate-spin" /> : <GitMerge className="size-3" />}
-            {reviewsRunning === 0
-              ? `Merge into ${base}`
-              : confirmMerge
-              ? `Click again — cancels ${reviewsRunning === 1 ? 'the review' : `${reviewsRunning} reviews`}`
-              : 'Merge without waiting'}
-          </button>
+            {reviewsRunning > 0 ? 'Waiting for review' : `Merge into ${base}`}
+          </button>}
         </footer>
+      )}
+          {selectedDiffLane && (
+        <LaneDeliveryDiffModal
+          batchId={run.batch.id}
+          lane={selectedDiffLane}
+          onClose={() => setSelectedDiffLane(null)}
+        />
       )}
     </div>
   );
@@ -457,8 +496,27 @@ function LaneReview({
   onChanged: () => void;
 }) {
   const { setCurrentSessionId } = useWorkspace();
-  const [busy, setBusy] = React.useState<'send' | 'retry' | null>(null);
+  const [busy, setBusy] = React.useState<'send' | 'retry' | 'review' | null>(null);
+  const [manualReviewOpen, setManualReviewOpen] = React.useState(false);
+  const [manualNotes, setManualNotes] = React.useState('');
   const status = lane.review_status;
+
+  const submitHumanReview = async (verdict: 'approved' | 'changes_requested') => {
+    setBusy('review');
+    try {
+      await workspaceApi.completeLaneReview(batchId, lane.agent, {
+        verdict,
+        notes: manualNotes.trim() || undefined,
+      });
+      toast.success(verdict === 'approved' ? '已通过该交付' : '已要求修改该交付');
+      setManualReviewOpen(false);
+      onChanged();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '提交审阅失败');
+    } finally {
+      setBusy(null);
+    }
+  };
   if (!status) return null;
   const st = REVIEW_STATUS[status];
   const Icon = st.icon;
@@ -471,10 +529,10 @@ function LaneReview({
     try {
       if (action === 'send') {
         await workspaceApi.sendBackParallelLane(batchId, lane.agent);
-        toast.success(`Sent back to @${lane.agent} with the review`);
+        toast.success(`Sent back to ${lane.agent_name || lane.agent} with the review`);
       } else {
         await workspaceApi.retryLaneReview(batchId, lane.agent);
-        toast.success(`Reviewing @${lane.agent}'s part again`);
+        toast.success(`Reviewing ${lane.agent_name || lane.agent}'s part again`);
       }
       onChanged();
     } catch (e) {
@@ -505,8 +563,51 @@ function LaneReview({
           </p>
         </details>
       )}
+            {manualReviewOpen && (
+        <div className="mt-2 p-2.5 rounded-lg border border-border/80 bg-surface0 space-y-2 text-2xs font-sans">
+          <p className="font-semibold text-foreground">人工审阅交付结果</p>
+          <textarea
+            value={manualNotes}
+            onChange={(e) => setManualNotes(e.target.value)}
+            placeholder="输入审阅意见或修改要求（选填）..."
+            rows={2}
+            className="w-full rounded-md border border-border bg-surface1 p-1.5 text-3xs text-foreground resize-y"
+          />
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void submitHumanReview('changes_requested')}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-3xs border border-status-warning/40 text-status-warning hover:bg-status-warning/10 disabled:opacity-60"
+            >
+              <AlertTriangle className="size-2.5" />
+              <span>要求修改</span>
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void submitHumanReview('approved')}
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-3xs bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            >
+              {busy === 'review' ? <Loader2 className="size-2.5 animate-spin" /> : <Check className="size-2.5" />}
+              <span>通过 (Approve)</span>
+            </button>
+          </div>
+        </div>
+      )}
       {(canSendBack || canRetry || lane.review_channel) && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          {actionable && lane.status === 'done' && (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => setManualReviewOpen(!manualReviewOpen)}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs text-foreground hover:bg-muted disabled:opacity-60 font-medium"
+            >
+              <ShieldCheck className="size-3 text-primary" />
+              <span>人工审阅</span>
+            </button>
+          )}
           {canSendBack && (
             <button
               type="button"
@@ -515,7 +616,7 @@ function LaneReview({
               className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs text-foreground hover:bg-muted disabled:opacity-60"
             >
               {busy === 'send' ? <Loader2 className="size-3 animate-spin" /> : <Undo2 className="size-3" />}
-              Send back to @{lane.agent}
+              Send back to {lane.agent_name || lane.agent}
             </button>
           )}
           {canRetry && (
@@ -550,6 +651,180 @@ function LaneReview({
  * before the user is asked to merge. Off, or an agent; the backend never lets
  * a lane's author review itself and falls back to another online agent.
  */
+
+/** Modal to inspect structured Git delivery diffs without touching source files. */
+function LaneDeliveryDiffModal({
+  batchId,
+  lane,
+  onClose,
+}: {
+  batchId: string;
+  lane: ParallelLane;
+  onClose: () => void;
+}) {
+  const [loading, setLoading] = React.useState(true);
+  const [result, setResult] = React.useState<DeliveryDiffResult | null>(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    workspaceApi
+      .getLaneDeliveryDiff(batchId, lane.agent)
+      .then((data) => {
+        if (!cancelled) setResult(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setResult({
+            available: false,
+            reason: err instanceof Error ? err.message : '加载 Diff 失败',
+            baseCommit: '',
+            deliveryCommit: lane.commit_hash || null,
+            files: [],
+            diff: '',
+            truncated: false,
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [batchId, lane.agent, lane.commit_hash]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+      <div className="flex flex-col w-full max-w-3xl max-h-[85vh] rounded-2xl border border-border bg-surface-raised shadow-2xl overflow-hidden">
+        {/* Header */}
+        <header className="flex items-center justify-between border-b border-border/80 px-4 py-3 bg-surface0">
+          <div className="flex items-center gap-2 min-w-0">
+            <FileDiff className="size-4 text-primary shrink-0" />
+            <h3 className="text-xs font-semibold text-foreground truncate">
+              任务交付改动 · {lane.agent_name || lane.agent}
+            </h3>
+            {lane.commit_hash && (
+              <code className="text-3xs font-mono bg-surface2 px-1.5 py-0.5 rounded text-muted-foreground">
+                {lane.commit_hash.slice(0, 8)}
+              </code>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xs p-1 rounded-md"
+          >
+            <X className="size-4" />
+          </button>
+        </header>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-2xs">
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="size-4 animate-spin text-primary" />
+              <span>正在读取 Git 交付快照与比较基线...</span>
+            </div>
+          ) : !result?.available ? (
+            <div className="p-4 rounded-xl border border-status-warning/40 bg-status-warning/10 text-status-warning space-y-1">
+              <p className="font-semibold flex items-center gap-1.5">
+                <AlertTriangle className="size-4" />
+                <span>无法查看代码改动</span>
+              </p>
+              <p className="text-3xs font-sans opacity-90">{result?.reason || '无可用改动。'}</p>
+            </div>
+          ) : (
+            <>
+              {/* Diff summary stats */}
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-surface0 border border-border/60 text-3xs font-sans text-muted-foreground">
+                <div>
+                  <span className="font-medium text-foreground">基准 commit:</span>{' '}
+                  <code className="font-mono">{result.baseCommit?.slice(0, 8)}</code>
+                  <span className="mx-2">→</span>
+                  <span className="font-medium text-foreground">交付 commit:</span>{' '}
+                  <code className="font-mono">{result.deliveryCommit?.slice(0, 8)}</code>
+                </div>
+                {result.diffstat && <div className="text-foreground">{result.diffstat}</div>}
+              </div>
+
+              {/* Changed files */}
+              {result.files.length > 0 && (
+                <div className="space-y-1 font-sans">
+                  <div className="text-3xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    变更文件 ({result.files.length})
+                  </div>
+                  <div className="max-h-32 overflow-y-auto divide-y divide-border/40 rounded-lg border border-border/60 bg-surface0">
+                    {result.files.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 px-2.5 py-1 text-3xs">
+                        <span
+                          className={cn(
+                            'font-mono font-bold text-4xs px-1 rounded',
+                            f.status === 'A'
+                              ? 'bg-status-success/20 text-status-success'
+                              : f.status === 'D'
+                              ? 'bg-status-danger/20 text-status-danger'
+                              : 'bg-primary/20 text-primary'
+                          )}
+                        >
+                          {f.status}
+                        </span>
+                        <span className="truncate font-mono text-foreground">{f.path}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw Diff */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-3xs font-sans text-muted-foreground">
+                  <span className="font-semibold uppercase tracking-wider">代码 Diff</span>
+                  {result.truncated && (
+                    <span className="text-status-warning">已截断至 64KB</span>
+                  )}
+                </div>
+                <div className="rounded-lg border border-border bg-surface0 p-3 overflow-x-auto max-h-96">
+                  <pre className="text-3xs leading-relaxed font-mono whitespace-pre text-foreground/90">
+                    {result.diff.split('\n').map((line, idx) => {
+                      const isAdd = line.startsWith('+') && !line.startsWith('+++');
+                      const isDel = line.startsWith('-') && !line.startsWith('---');
+                      const isHunk = line.startsWith('@@');
+                      return (
+                        <div
+                          key={idx}
+                          className={cn(
+                            isAdd && 'bg-status-success/10 text-status-success',
+                            isDel && 'bg-status-danger/10 text-status-danger',
+                            isHunk && 'text-primary font-semibold'
+                          )}
+                        >
+                          {line || ' '}
+                        </div>
+                      );
+                    })}
+                  </pre>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <footer className="flex items-center justify-end px-4 py-2.5 border-t border-border/80 bg-surface0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 rounded-md bg-foreground text-background text-2xs font-medium hover:opacity-90"
+          >
+            关闭
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 function ReviewSetting({
   channelName,
   value,
@@ -561,19 +836,24 @@ function ReviewSetting({
   onSaved: () => void;
   className?: string;
 }) {
-  const { agents } = useWorkspace();
+  const [agents, setAgents] = React.useState<AgentDefinition[]>([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    workspaceApi.listAgentDefinitions().then(result => { if (!cancelled) setAgents(result.agents); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [channelName]);
   const [saving, setSaving] = React.useState(false);
   const options = React.useMemo(
-    () => [...agents].sort((a, b) => Number(b.status === 'online') - Number(a.status === 'online') || a.agentName.localeCompare(b.agentName)),
+    () => [...agents].filter(agent => agent.modelResource).sort((a, b) => a.name.localeCompare(b.name)),
     [agents]
   );
-  const known = !value || options.some((a) => a.agentName.toLowerCase() === value.toLowerCase());
+  const known = !value || options.some((agent) => agent.id === value);
 
   const save = async (next: string) => {
     setSaving(true);
     try {
       await workspaceApi.updateChannel(channelName, { reviewAgent: next || null });
-      toast.success(next ? `@${next} reviews each part before you merge` : 'Review before merge is off');
+      toast.success(next ? `${options.find(agent => agent.id === next)?.name || next} will review the next batch` : 'Review before merge is off');
       onSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save the reviewer');
@@ -587,7 +867,7 @@ function ReviewSetting({
     <div className={cn('flex items-center gap-2', className)}>
       <ShieldCheck className="size-3.5 shrink-0 text-muted-foreground" />
       <label htmlFor={id} className="text-2xs text-muted-foreground shrink-0">
-        Review before merge
+        Next batch reviewer
       </label>
       <select
         id={id}
@@ -599,9 +879,8 @@ function ReviewSetting({
         <option value="">Off</option>
         {!known && <option value={value}>@{value} (not in workspace)</option>}
         {options.map((a) => (
-          <option key={a.agentName} value={a.agentName}>
-            @{a.agentName}
-            {a.status !== 'online' ? ' (offline)' : ''}
+          <option key={a.id} value={a.id}>
+            {a.name}
           </option>
         ))}
       </select>
@@ -616,6 +895,8 @@ function StateBadge({ state }: { state: ParallelBatch['state'] }) {
     running: { label: 'Running', className: 'text-status-info border-status-info/40' },
     blocked: { label: 'Blocked', className: 'text-status-warning border-status-warning/40' },
     done: { label: 'Complete', className: 'text-status-success border-status-success/40' },
+    failed: { label: 'Failed', className: 'text-status-danger border-status-danger/40' },
+    cancelled: { label: 'Stopped', className: 'text-muted-foreground border-border' },
   };
   const badge = map[state];
   return (
