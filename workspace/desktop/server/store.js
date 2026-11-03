@@ -173,7 +173,7 @@ class Store {
           source: 'openagents:system',
           target: 'channel/general',
           payload: {
-            content: '欢迎使用 **52hzAgents Studio**。先配置模型连接，再选择本地项目。Chat 用于对话，Plan 只读分析，Agent 可以修改文件并在审批后执行命令。',
+            content: '欢迎使用 **52hzAgents Studio**。您可以直接添加本机已配置好的 Agent（如 Pi、Codex）或使用内置助手。任务执行严格遵循文件读写与命令执行的权限审批保护。',
             sender_name: 'System',
             sender_type: 'agent',
           },

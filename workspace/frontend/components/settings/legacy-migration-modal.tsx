@@ -126,7 +126,7 @@ export function LegacyMigrationModal({ isOpen, onClose, onMigrated }: Props) {
           <div className="flex items-center gap-2.5">
             <ShieldAlert className="size-5 text-status-warning" />
             <div>
-              <h3 className="text-sm font-semibold text-foreground">旧配置与 Agent 体系兼容迁移 (R4)</h3>
+              <h3 className="text-sm font-semibold text-foreground">旧配置与 Agent 体系兼容迁移</h3>
               <p className="text-2xs text-muted-foreground mt-0.5">
                 将历史工作配置、流水线模板中引用的旧角色或旧模型，规范化绑定到独立的 Agent 实体
               </p>
