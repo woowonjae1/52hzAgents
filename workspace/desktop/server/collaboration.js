@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { restrictMode } = require('./agent-policy');
+const { createNativeBudgetPolicy, allowsNativeBudgetPolicy } = require('./native-budget-policy');
 
 const fail = (message, status = 409) => Object.assign(new Error(message), { status });
 const canonical = value => {
@@ -23,7 +24,7 @@ class Collaboration {
     if (typeof reference !== 'string' || !reference) throw fail('Choose a saved Agent ID for each task.', 400);
     const profile = this.repository.getProfile(reference);
     const agent = this.store.storage.agentDefinitions.requireActive(profile ? profile.agent : reference);
-    if (agent.runtimeKind === 'pi' && !agent.modelResource) throw fail(`Configure a model resource for Agent ${agent.name} before collaboration.`, 400);
+    if (agent.runtimeKind === 'pi' && !agent.connectionId && !agent.modelResource) throw fail(`Configure an execution resource for the compatibility Agent ${agent.name} before collaboration.`, 400);
     this.runner.validateDefinitionResource(agent);
     const result = structuredClone(agent);
     if (profile) {
@@ -43,6 +44,17 @@ class Collaboration {
   }
   actorConfig(agent) {
     return this.runner.validateConfig({ provider: agent.modelResource?.connectionId, model: agent.modelResource?.modelId, mode: agent.defaultMode, autoCompact: true }, agent);
+  }
+  assertAvailable() { if(this.runner.isRecoveryBlocked?.())throw fail('System recovery is in progress.'); }
+  reviewActor(actor, verification = false) {
+    const result = structuredClone(actor);
+    if (verification && (actor.maxMode !== 'agent' || !actor.permissions.executeCommands || actor.execution?.connectionKind === 'native-pi')) {
+      throw fail('验证型审阅需要具备命令权限的实施级 Agent；原生 Pi 尚无命令执行前审批桥接，不支持此能力。', 400);
+    }
+    result.maxMode = verification ? actor.maxMode : restrictMode('plan', actor.maxMode);
+    result.defaultMode = verification ? 'agent' : result.maxMode;
+    Object.assign(result.permissions, { writeFiles:false, delegate:false, mcp:false });
+    return result;
   }
   git(root, args) { return this.repository._execGitSync(root, ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', ...args]); }
   assertIdle(root) {
@@ -82,9 +94,16 @@ class Collaboration {
       const actor = JSON.parse(row.agent_snapshot_json);
       return { ...lane, agent_id: row.agent_id, agent_name: actor.name, agent_revision: actor.revision,
         run_id: row.run_id, context_key: row.context_key, used_tokens: row.used_tokens,
-        delivery: row.delivery_json ? JSON.parse(row.delivery_json) : null };
+        delivery: row.delivery_json ? JSON.parse(row.delivery_json) : null,
+        delivery_version: row.delivery_version, reviewed_version: row.reviewed_version, review_worktree_path: row.review_worktree_path,
+        review_history: this.db.prepare('SELECT * FROM collaboration_reviews WHERE lane_id=? ORDER BY created_at DESC,id DESC').all(row.id).map(r=>({...r,verification:JSON.parse(r.verification_json)})) };
     });
     view.workers = view.workers.map((worker, index) => ({ ...worker, agent_id: view.run.lanes[index].agent_id, display_name: view.run.lanes[index].agent_name }));
+    const policy = JSON.parse(batch.native_budget_policy_json || 'null');
+    view.run.batch.native_budget_policy = policy && { ...policy, valid: policy.limits.participants.every(p => allowsNativeBudgetPolicy(this.store,policy,batch.channel_name,this.store.storage.agentDefinitions.get(p.id) || {})) };
+    view.run.batch.review_verification = Boolean(batch.review_verification);
+    const totals = this.db.prepare('SELECT COUNT(*) AS n,SUM(usage_known) AS known,COUNT(estimated_cost) AS priced,SUM(estimated_cost) AS cost FROM collaboration_run_usage WHERE lane_id IN (SELECT id FROM parallel_lanes WHERE batch_id=?)').get(batchId);
+    view.run.batch.accounting = { tokensKnown:totals.n===totals.known, costKnown:totals.n>0 && totals.n===totals.priced, estimatedCost:totals.n>0 && totals.n===totals.priced?totals.cost:null };
     return view;
   }
   publish(batchId) {
@@ -104,12 +123,16 @@ class Collaboration {
       if (worker.scope !== undefined && (typeof worker.scope !== 'string' || worker.scope.length > 500)) throw fail('Invalid worker scope.', 400);
       const actor = this.actor(worker.agent_id || worker.profile || worker.agent || worker.assignee);
       const config = this.actorConfig(actor);
-      this.runner.validateNativeExecution?.(actor, config, { channel, execution: { kind: 'lane' } });
       return { actor, config, task: worker.task, alias: `worker-${index + 1}`, scope: worker.scope || '' };
     });
     const reviewReference = input.review_agent !== undefined ? input.review_agent : this.store.getChannel(channel).review_agent;
     const reviewer = reviewReference ? this.actor(reviewReference) : null;
-    if (reviewer) this.runner.validateNativeExecution?.(reviewer, this.actorConfig(reviewer), { channel, execution: { kind: 'review' } });
+    if (input.review_verification !== undefined && typeof input.review_verification !== 'boolean') throw fail('Invalid review verification policy.',400);
+    const verification = input.review_verification === true;
+    if (verification && !reviewer) throw fail('Choose a reviewer before enabling test verification.',400);
+    const policy = createNativeBudgetPolicy(this.store,channel,[...prepared.map(w=>w.actor),...(reviewer?[reviewer]:[])],input.native_budget_policy,parentRun);
+    for (const worker of prepared) this.runner.validateNativeExecution?.(worker.actor,worker.config,{channel,execution:{kind:'lane'},nativeBudgetPolicy:policy});
+    if (reviewer) { const actor=this.reviewActor(reviewer,verification); this.runner.validateNativeExecution?.(actor,this.actorConfig(actor),{channel,execution:{kind:'review',verification},nativeBudgetPolicy:policy}); }
     const project = this.store.getChannel(channel).working_dir;
     if (!project || !fs.existsSync(project)) throw fail('Choose a Git project before starting collaboration.', 400);
     const repo = this.git(project, ['rev-parse', '--show-toplevel']).trim();
@@ -127,8 +150,9 @@ class Collaboration {
     });
     const id = result.run.batch.id;
     this.store.storage.transaction(db => {
-      db.prepare('UPDATE parallel_batches SET runtime_version = 1, base_commit = ?, base_branch = ?, review_snapshot_json = ? WHERE id = ?')
-        .run(base, branch, reviewer ? JSON.stringify(reviewer) : null, id);
+      if (policy) policy.batchId=id;
+      db.prepare('UPDATE parallel_batches SET runtime_version = 1, base_commit = ?, base_branch = ?, review_snapshot_json = ?,native_budget_policy_json=?,review_verification=? WHERE id = ?')
+        .run(base, branch, reviewer ? JSON.stringify(reviewer) : null,policy?JSON.stringify(policy):null,verification?1:0, id);
       result.run.lanes.forEach((lane, index) => db.prepare('UPDATE parallel_lanes SET agent_id = ?, agent_snapshot_json = ? WHERE id = ?')
         .run(prepared[index].actor.id, JSON.stringify(prepared[index].actor), lane.id));
     });
@@ -161,11 +185,14 @@ class Collaboration {
     this.owned(lane.worktree_path, batch.repo_dir);
     const actor = JSON.parse(review ? lane.review_snapshot_json : lane.agent_snapshot_json);
     this.store.storage.agentDefinitions.requireActive(actor.id);
-    if (review) { actor.maxMode = restrictMode('plan', actor.maxMode); actor.defaultMode = actor.maxMode; Object.assign(actor.permissions, { writeFiles: false, executeCommands: false, delegate: false, mcp: false }); }
+    const effectiveActor = review ? this.reviewActor(actor,Boolean(batch.review_verification)) : actor;
+    const executionRoot = review ? lane.review_worktree_path : lane.worktree_path;
+    this.owned(executionRoot,batch.repo_dir);
     return { kind: review ? 'review' : 'lane', batchId: batch.id, laneId: lane.id,
-      actor, config: this.actorConfig(actor), projectDir: lane.worktree_path,
+      actor:effectiveActor, config: this.actorConfig(effectiveActor), projectDir: executionRoot,
       contextKey: review ? `${lane.context_key}:review:${event.id}` : lane.context_key,
-      executionKey: `${channel}:lane:${lane.id}${review ? ':review' : ''}`, reviewedCommit: review ? lane.commit_hash : null };
+      executionKey: `${channel}:lane:${lane.id}${review ? ':review' : ''}`, reviewedCommit: review ? lane.commit_hash : null,
+      reviewedVersion: review ? lane.delivery_version : null, verification:review && Boolean(batch.review_verification) };
   }
   begin(context, runId) {
     if (context.kind === 'pipeline') {
@@ -199,7 +226,7 @@ class Collaboration {
   settle(context, run) {
     this.store.storage.transaction(db => {
       const tokens = run.usage?.total_tokens || 0;
-      const added = db.prepare('INSERT OR IGNORE INTO collaboration_run_usage (run_id, lane_id, tokens) VALUES (?, ?, ?)').run(run.runId, context.laneId, tokens);
+      const added = db.prepare('INSERT OR IGNORE INTO collaboration_run_usage (run_id, lane_id, tokens,usage_known,estimated_cost) VALUES (?, ?, ?, ?, ?)').run(run.runId, context.laneId, tokens,(run.usageKnown ?? Boolean(run.usage))?1:0,run.reportedCost ?? null);
       if (added.changes) db.prepare('UPDATE parallel_lanes SET used_tokens = used_tokens + ?, attempt_tokens = 0, reserved_tokens = 0 WHERE id = ?').run(tokens, context.laneId);
       db.prepare('UPDATE parallel_batches SET used_tokens = (SELECT SUM(used_tokens) FROM parallel_lanes WHERE batch_id = ?) WHERE id = ?').run(context.batchId, context.batchId);
     });
@@ -220,6 +247,7 @@ class Collaboration {
     const batch = this.batch(context.batchId), lane = this.lane(batch.id, context.laneId);
     this.settle(context, run);
     if (context.kind === 'review') {
+      if (lane.review_run_id!==run.runId || lane.delivery_version!==context.reviewedVersion || lane.commit_hash!==context.reviewedCommit) return;
       let verdict = 'failed', notes = result?.content || record.error?.message || '';
       if (record.outcome === 'finished' && !result?.isError) {
         try {
@@ -227,17 +255,28 @@ class Collaboration {
           if (['approved', 'changes_requested'].includes(parsed.verdict) && typeof parsed.notes === 'string') { verdict = parsed.verdict; notes = parsed.notes; }
         } catch { /* Non-structured text is never an approval. */ }
       }
-      try { this.owned(lane.worktree_path, batch.repo_dir); if (this.git(lane.worktree_path, ['rev-parse', 'HEAD']).trim() !== context.reviewedCommit || this.git(lane.worktree_path, ['status', '--porcelain']).trim()) verdict = 'failed'; }
+      try {
+        this.owned(lane.worktree_path, batch.repo_dir); this.owned(context.projectDir,batch.repo_dir);
+        if (this.git(lane.worktree_path, ['rev-parse', 'HEAD']).trim() !== context.reviewedCommit || this.git(lane.worktree_path, ['status', '--porcelain']).trim()
+          || this.git(context.projectDir,['rev-parse','HEAD']).trim()!==context.reviewedCommit || this.git(context.projectDir,['diff','HEAD','--']).trim()) {
+          verdict='failed';notes+='\nDelivery or tracked review files changed during review; approval is invalid.';
+        }
+      }
       catch (error) { verdict = 'failed'; notes += `\n${error.message}`; }
+      const verificationCommands=[...run.tools?.values() || []].filter(tool=>['bash','powershell'].includes(tool.tool));
+      if(context.verification && verificationCommands.some(tool=>tool.status!=='completed' || tool.result?.exit_code!==0)) {
+        verdict='failed';notes+='\nVerification command failed, was declined, or has no confirmed zero exit code.';
+      }
       if (['cancelled', 'interrupted'].includes(record.outcome)) verdict = 'cancelled';
-      this.db.prepare('UPDATE parallel_lanes SET review_status = ?, review_notes = ?, reviewer = ?, reviewed_commit = ? WHERE id = ? AND review_run_id = ?')
-        .run(verdict, notes, context.actor.id, context.reviewedCommit, lane.id, run.runId);
+      if(verdict==='failed' && record.outcome==='finished'){record.outcome='failed';record.error={code:'REVIEW_FAILED',message:notes};}
+      this.recordReview(lane,verdict,notes,context.actor.id,run.runId,verificationCommands.map(tool=>({command:tool.args?.command || '(command unavailable)',exitCode:tool.result?.exit_code,status:tool.status})));
     } else if (lane.run_id === run.runId && lane.status === 'running') {
       let success = record.outcome === 'finished' && !result?.isError;
       let delivery = null, error = record.error?.message || result?.content || '';
       if (success) { try { delivery = this.capture(batch, lane); } catch (err) { success = false; error = err.message; record.outcome = 'failed'; record.error = { code: 'DELIVERY_FAILED', message: error }; } }
-      this.db.prepare(`UPDATE parallel_lanes SET status = ?, reply = ?, error = ?, commit_hash = ?, diffstat = ?, changed_files = ?, delivery_json = ?, finished_at = ? WHERE id = ? AND run_id = ?`)
-        .run(success ? 'done' : 'failed', result?.content || '', success ? '' : error, delivery?.commit || '', delivery?.diffstat || '', delivery?.changedFiles.join('\n') || '', delivery ? JSON.stringify(delivery) : null, new Date().toISOString(), lane.id, run.runId);
+      if (delivery) Object.assign(delivery,{version:lane.delivery_version+1,runId:run.runId,evidence:record.evidence || null,agentId:lane.agent_id});
+      this.db.prepare(`UPDATE parallel_lanes SET status = ?, reply = ?, error = ?, commit_hash = ?, diffstat = ?, changed_files = ?, delivery_json = ?, finished_at = ?,delivery_version=delivery_version+? WHERE id = ? AND run_id = ?`)
+        .run(success ? 'done' : 'failed', result?.content || '', success ? '' : error, delivery?.commit || '', delivery?.diffstat || '', delivery?.changedFiles.join('\n') || '', delivery ? JSON.stringify(delivery) : null, new Date().toISOString(),success?1:0, lane.id, run.runId);
     }
     this.refresh(batch.id); this.publish(batch.id);
   }
@@ -260,7 +299,33 @@ class Collaboration {
     this.db.prepare("UPDATE parallel_lanes SET status = 'failed', error = ? WHERE id = ? AND run_id IS NULL").run(error.message, laneId);
     this.refresh(batchId); this.publish(batchId);
   }
+  recordReview(lane,verdict,notes,reviewer,runId=null,commands=[]) {
+    this.store.storage.transaction(db=>{
+      const current=db.prepare('SELECT * FROM parallel_lanes WHERE id=?').get(lane.id);
+      if(current.commit_hash!==lane.commit_hash || current.delivery_version!==lane.delivery_version || (runId && current.review_run_id!==runId))throw fail('交付或审阅执行已变化，旧结论已拒绝。');
+      db.prepare('INSERT INTO collaboration_reviews (id,lane_id,delivery_version,delivery_commit,reviewer_id,run_id,verdict,notes,verification_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .run(crypto.randomUUID(),lane.id,lane.delivery_version,lane.commit_hash,reviewer,runId,verdict,notes,
+          JSON.stringify({commands,worktree:lane.review_worktree_path || null}),new Date().toISOString());
+      db.prepare('UPDATE parallel_lanes SET review_status=?,review_notes=?,reviewer=?,reviewed_commit=?,reviewed_version=? WHERE id=?')
+        .run(verdict,notes,reviewer,lane.commit_hash,lane.delivery_version,lane.id);
+    });
+  }
+  authorizeNativeBudget(batchId,input) {
+    this.assertAvailable();
+    const batch=this.batch(batchId);
+    if (!['running','review','blocked','cancelled'].includes(batch.status)) throw fail('This batch no longer accepts budget authorization.');
+    const lanes=this.db.prepare('SELECT * FROM parallel_lanes WHERE batch_id=?').all(batchId);
+    for (const lane of lanes) {this.assertIdle(lane.worktree_path);if(lane.review_worktree_path)this.assertIdle(lane.review_worktree_path);}
+    const agents=lanes.map(l=>this.actor(l.agent_id));
+    if(batch.review_snapshot_json){const a=JSON.parse(batch.review_snapshot_json);agents.push(this.actor(a.profileId || a.id));}
+    const policy=createNativeBudgetPolicy(this.store,batch.channel_name,agents,input,null);
+    if(!policy)throw fail('请明确确认本批次的原生预算策略。',400);
+    policy.batchId=batch.id;
+    this.db.prepare('UPDATE parallel_batches SET native_budget_policy_json=? WHERE id=?').run(JSON.stringify(policy),batch.id);
+    return this.publish(batch.id);
+  }
   review(batchId, reference) {
+    this.assertAvailable();
     const batch = this.batch(batchId), lane = this.lane(batchId, reference);
     this.assertIdle(lane.worktree_path);
     if (!batch.review_snapshot_json) throw fail('Choose a reviewer Agent when creating the batch.', 400);
@@ -269,10 +334,18 @@ class Collaboration {
     if (this.git(lane.worktree_path, ['status', '--porcelain']).trim()) throw fail('Lane changed after delivery. Retry before review.');
     const id = `review-${crypto.randomUUID()}`, referenceActor = JSON.parse(batch.review_snapshot_json);
     const actor = this.actor(referenceActor.profileId || referenceActor.id);
+    const effective=this.reviewActor(actor,Boolean(batch.review_verification));
+    this.runner.validateNativeExecution?.(effective,this.actorConfig(effective),{channel:batch.channel_name,execution:{kind:'review',batchId,verification:Boolean(batch.review_verification)}});
+    if(this.git(lane.worktree_path,['rev-parse','HEAD']).trim()!==lane.commit_hash)throw fail('Delivery changed; retry before review.');
+    if(lane.review_worktree_path && !this.db.prepare('SELECT 1 FROM collaboration_reviews WHERE lane_id=? AND run_id IS ?').get(lane.id,lane.review_run_id)){
+      this.recordReview(lane,lane.review_status || 'failed',lane.review_notes || 'Previous review did not complete.',lane.reviewer || referenceActor.id,lane.review_run_id);
+    }
+    const reviewRoot=path.join(this.root,crypto.randomUUID(),'review');
+    this.git(batch.repo_dir,['worktree','add','--detach',reviewRoot,lane.commit_hash]);
     const patch = this.git(lane.worktree_path, ['diff', '--no-ext-diff', '--no-textconv', batch.base_commit, lane.commit_hash]).slice(0, 32000);
-    this.db.prepare("UPDATE parallel_lanes SET review_status = 'running', review_event_id = ?, review_run_id = NULL, review_snapshot_json = ? WHERE id = ?").run(id, JSON.stringify(actor), lane.id);
+    this.db.prepare("UPDATE parallel_lanes SET review_status = 'running', reviewed_commit='',reviewed_version=0,review_event_id = ?, review_run_id = NULL, review_snapshot_json = ?,review_worktree_path=? WHERE id = ?").run(id, JSON.stringify(actor),reviewRoot, lane.id);
     const saved = this.store.addEvent({ id, type: 'workspace.message.posted', source: `orchestration:review:${lane.id}`, target: `channel/${batch.channel_name}`,
-      payload: { content: `Review delivery ${lane.commit_hash} against ${batch.base_commit}. Inspect the actual diff below (up to 32000 characters; read files for further context). Do not change files or run commands. Return only JSON {"verdict":"approved"|"changes_requested","notes":"evidence and findings"}.\nTask: ${lane.task}\nAuthor delivery:\n${lane.reply}\nChanged files:\n${lane.changed_files}\nActual diff:\n${patch}`, sender_name: actor.name, sender_type: 'agent' },
+      payload: { content: `Review delivery version ${lane.delivery_version}, commit ${lane.commit_hash} against ${batch.base_commit}. You are in a separate review checkout. Inspect the actual diff below (up to 32000 characters; read files for further context). Never change tracked source files. ${batch.review_verification?'You may request verification commands; each command requires explicit user approval. Test artifacts must stay in this review checkout.':'Do not run commands.'} Ask the user through the structured question tool if acceptance criteria are unclear. Return only JSON {"verdict":"approved"|"changes_requested","notes":"evidence and findings"}.\nTask and acceptance criteria: ${lane.task}\nAuthor delivery:\n${lane.reply}\nExecution evidence:\n${JSON.stringify(lane.delivery_json?JSON.parse(lane.delivery_json).evidence:null).slice(0,16000)}\nChanged files:\n${lane.changed_files}\nActual diff:\n${patch}`, sender_name: actor.name, sender_type: 'agent' },
       metadata: { batch_id: batchId, lane_id: lane.id } });
     this.broadcaster.broadcast(saved);
     queueMicrotask(() => this.runner.handleUserMessage(saved).catch(error => {
@@ -281,26 +354,36 @@ class Collaboration {
     return this.view(batchId);
   }
   humanReview(batchId, reference, input) {
+    this.assertAvailable();
     const lane = this.lane(batchId, reference), batch = this.batch(batchId);
     this.assertIdle(lane.worktree_path);
     if (lane.status !== 'done' || lane.review_status === 'running') throw fail('Wait for this lane to finish before reviewing.');
     if (!['approved', 'changes_requested'].includes(input.verdict || input.status)) throw fail('Invalid review verdict.', 400);
+    if(input.expected_commit!==lane.commit_hash || input.expected_version!==lane.delivery_version)throw fail('交付版本已变化或未提供版本，请刷新后重新审阅。');
+    if((input.verdict || input.status)==='changes_requested' && (typeof input.notes!=='string' || !input.notes.trim()))throw fail('要求修改时请提供具体反馈。',400);
     this.owned(lane.worktree_path, batch.repo_dir);
     if (this.git(lane.worktree_path, ['rev-parse', 'HEAD']).trim() !== lane.commit_hash || this.git(lane.worktree_path, ['status', '--porcelain']).trim()) throw fail('Delivery changed; review is stale.');
-    this.db.prepare('UPDATE parallel_lanes SET review_status = ?, review_notes = ?, reviewer = ?, reviewed_commit = ? WHERE id = ?')
-      .run(input.verdict || input.status, String(input.notes || '').slice(0, 16000), 'human:user', lane.commit_hash, lane.id);
+    this.recordReview(lane,input.verdict || input.status,String(input.notes || '').slice(0,16000),'human:user');
     return this.publish(batchId);
   }
-  retry(batchId, reference) {
+  sendBack(batchId,reference,input={}) {
+    const lane=this.lane(batchId,reference);
+    if(lane.review_status!=='changes_requested' || !lane.review_notes?.trim())throw fail('先对当前交付提交具体修改意见，再退回原实现 Agent。');
+    return this.retry(batchId,reference,input);
+  }
+  retry(batchId, reference,input={}) {
+    this.assertAvailable();
     const batch = this.batch(batchId), lane = this.lane(batchId, reference);
     this.assertIdle(lane.worktree_path);
     if (batch.status === 'done' || lane.status === 'running' || lane.review_status === 'running') throw fail('This lane cannot be retried now.');
+    if(lane.status==='done' && (input.expected_commit!==lane.commit_hash || input.expected_version!==lane.delivery_version))throw fail('交付版本已变化，请刷新后再退回修改。');
     if (this.db.prepare("SELECT 1 FROM parallel_batches WHERE channel_name = ? AND runtime_version = 1 AND id != ? AND status IN ('running','review','blocked')").get(batch.channel_name, batchId)) throw fail('Another batch is active in this session.');
     this.owned(lane.worktree_path, batch.repo_dir);
     const previous = JSON.parse(lane.agent_snapshot_json);
     const actor = this.actor(previous.profileId || lane.agent_id);
+    this.runner.validateNativeExecution?.(actor,this.actorConfig(actor),{channel:batch.channel_name,execution:{kind:'lane',batchId}});
     this.db.prepare(`UPDATE parallel_lanes SET status = 'running', agent_id = ?, agent_snapshot_json = ?, run_id = NULL, claim_token = NULL, dispatch_event_id = NULL, attempts = attempts + 1,
-      review_status = '', review_run_id = NULL, review_event_id = NULL, reviewed_commit = '', delivery_json = NULL, error = '', reserved_tokens = 0, attempt_tokens = 0 WHERE id = ?`).run(actor.id, JSON.stringify(actor), lane.id);
+      review_status = '', review_run_id = NULL, review_event_id = NULL, reviewed_commit = '',reviewed_version=0, delivery_json = NULL, error = '', reserved_tokens = 0, attempt_tokens = 0 WHERE id = ?`).run(actor.id, JSON.stringify(actor), lane.id);
     this.db.prepare('DELETE FROM parallel_conflicts WHERE batch_id = ?').run(batchId);
     this.db.prepare("UPDATE parallel_batches SET status = 'running', finished_at = NULL WHERE id = ?").run(batchId);
     this.dispatch(batchId); return this.publish(batchId);
@@ -315,15 +398,19 @@ class Collaboration {
     this.db.prepare("UPDATE parallel_lanes SET status = CASE WHEN status = 'running' THEN 'failed' ELSE status END, review_status = CASE WHEN review_status = 'running' THEN 'cancelled' ELSE review_status END, error = CASE WHEN status = 'running' THEN 'Stopped by user' ELSE error END, reserved_tokens = 0, attempt_tokens = 0 WHERE batch_id = ?").run(batchId);
     return this.publish(batchId);
   }
-  merge(batchId) {
+  merge(batchId,expectedDeliveries=null) {
+    this.assertAvailable();
     const batch = this.batch(batchId), lanes = this.db.prepare('SELECT * FROM parallel_lanes WHERE batch_id = ?').all(batchId);
     if (batch.status !== 'review' || !lanes.length || lanes.some(lane => lane.status !== 'done' || lane.review_status === 'running')) throw fail('Complete all lanes and reviews before integration.');
+    if(expectedDeliveries!==null && (!Array.isArray(expectedDeliveries) || expectedDeliveries.length!==lanes.length
+      || new Set(expectedDeliveries.map(item=>item?.id)).size!==lanes.length
+      || lanes.some(lane=>!expectedDeliveries.some(item=>item?.id===lane.id && item.commit===lane.commit_hash && item.version===lane.delivery_version))))throw fail('交付列表已变化，请刷新并检查当前版本后再验收。');
     this.assertIdle(batch.repo_dir);
     for (const lane of lanes) {
       this.assertIdle(lane.worktree_path);
       this.owned(lane.worktree_path, batch.repo_dir);
       if (!lane.commit_hash || this.git(lane.worktree_path, ['rev-parse', 'HEAD']).trim() !== lane.commit_hash || this.git(lane.worktree_path, ['status', '--porcelain']).trim()) throw fail('A delivery changed after review. Retry or review it again.');
-      if ((batch.review_snapshot_json || lane.review_status) && (lane.review_status !== 'approved' || lane.reviewed_commit !== lane.commit_hash)) throw fail('Every required review must approve the current delivery.');
+      if (lane.review_status !== 'approved' || lane.reviewed_commit !== lane.commit_hash || lane.reviewed_version!==lane.delivery_version) throw fail('Every required review must approve the current delivery version.');
     }
     const unchanged = () => {
       if (this.git(batch.repo_dir, ['rev-parse', 'HEAD']).trim() !== batch.base_commit || this.git(batch.repo_dir, ['symbolic-ref', '--short', 'HEAD']).trim() !== batch.base_branch || this.git(batch.repo_dir, ['status', '--porcelain']).trim()) throw fail('Source project changed or has uncommitted files. Integration is blocked.');
@@ -359,6 +446,10 @@ class Collaboration {
   }
   cleanup(batchId) {
     const batch = this.batch(batchId), paths = this.db.prepare('SELECT worktree_path FROM parallel_lanes WHERE batch_id = ?').all(batchId).map(row => row.worktree_path);
+    for(const row of this.db.prepare('SELECT review_worktree_path FROM parallel_lanes WHERE batch_id=?').all(batchId))if(row.review_worktree_path)paths.push(row.review_worktree_path);
+    for(const row of this.db.prepare('SELECT verification_json FROM collaboration_reviews WHERE lane_id IN (SELECT id FROM parallel_lanes WHERE batch_id=?)').all(batchId)){
+      const root=JSON.parse(row.verification_json).worktree;if(root && !paths.includes(root))paths.push(root);
+    }
     if (!['done', 'cancelled'].includes(batch.status)) throw fail('Finish or stop the batch before cleaning worktrees.');
     if (batch.integration_path) paths.push(batch.integration_path);
     // Preflight every worktree before deleting any. Git also refuses dirty/ignored files.
@@ -385,7 +476,7 @@ class Collaboration {
   invalidateRestoredDelivery(channel, runId) {
     const target = this.restoreTarget(channel, runId);
     this.db.prepare(`UPDATE parallel_lanes SET status = 'failed', error = 'Checkpoint restored; retry this task before review or merge.',
-      delivery_json = NULL, commit_hash = '', diffstat = '', changed_files = '', review_status = '', reviewed_commit = '', review_notes = '', review_run_id = NULL, review_event_id = NULL WHERE id = ? AND run_id = ?`).run(target.laneId, runId);
+      delivery_json = NULL, commit_hash = '', diffstat = '', changed_files = '', review_status = '', reviewed_commit = '',reviewed_version=0, review_notes = '', review_run_id = NULL, review_event_id = NULL WHERE id = ? AND run_id = ?`).run(target.laneId, runId);
     this.refresh(target.batchId); this.publish(target.batchId);
   }
   cancelSession(channel) {
@@ -394,6 +485,10 @@ class Collaboration {
   }
   recover() {
     if (!this.store.storage) return;
+    for(const lane of this.db.prepare("SELECT * FROM parallel_lanes WHERE review_status='running' AND batch_id IN (SELECT id FROM parallel_batches WHERE runtime_version=1)").all()){
+      const reviewer=lane.review_snapshot_json?JSON.parse(lane.review_snapshot_json).id:lane.reviewer || 'unknown';
+      this.recordReview(lane,'failed','Review interrupted by application restart; previous approval is invalid.',reviewer,lane.review_run_id);
+    }
     this.db.prepare("UPDATE parallel_lanes SET status = 'failed', error = 'Interrupted by application restart', reserved_tokens = 0, attempt_tokens = 0 WHERE batch_id IN (SELECT id FROM parallel_batches WHERE runtime_version = 1) AND status = 'running'").run();
     this.db.prepare("UPDATE parallel_lanes SET review_status = 'failed', review_notes = 'Review interrupted by restart' WHERE batch_id IN (SELECT id FROM parallel_batches WHERE runtime_version = 1) AND review_status = 'running'").run();
     this.db.prepare("UPDATE parallel_batches SET status = 'blocked' WHERE runtime_version = 1 AND status = 'running'").run();

@@ -13,7 +13,8 @@ import { closeDatabasesUnder } from './storage/database.js';
 import { startServer } from './index.js';
 
 const waitFor = async predicate => {
-  const end = Date.now() + 10000;
+  // Real Git worktree creation and delivery capture are part of these integration tests.
+  const end = Date.now() + 60000;
   while (!predicate()) { if (Date.now() > end) throw new Error('Timed out waiting for collaboration'); await new Promise(resolve => setTimeout(resolve, 10)); }
 };
 function fixture(t, runtime) {
@@ -25,7 +26,7 @@ function fixture(t, runtime) {
   const store = new Store(path.join(root, 'data'));
   store.updateChannel('general', { working_dir: project, runtime_config: { provider: 'ollama', model: 'coordinator-model', mode: 'chat' } });
   const bus = { broadcast() {}, broadcastComposing() {} }, calls = [];
-  const runner = new AgentRunner(store, bus, { env: {}, timeoutMs: 10000,
+  const runner = new AgentRunner(store, bus, { env: {}, timeoutMs: 30000,
     piRuntime: async options => { calls.push(options); return runtime(options, calls); },
   });
   const collaboration = new Collaboration(store, runner, bus); runner.collaboration = collaboration;
@@ -49,11 +50,12 @@ async function actualPi(options, responses) {
   return runPiAgent({ ...options, model: { ...faux.getModel() }, streamFn: faux.streamSimple });
 }
 const tool = (name, args) => fauxAssistantMessage(fauxToolCall(name, args), { stopReason: 'toolUse' });
+const deliveryVersion = lane => ({ expected_commit:lane.commit_hash, expected_version:lane.delivery_version });
 
 test('authenticated HTTP dispatch, real completion, human review, merge, cleanup and pipeline use saved Agents', async t => {
   const f = fixture(t, async () => ({ content: 'unused' }));
   const { server, port } = await startServer({ port: 0, userDataPath: f.store.userDataPath, staticDir: f.root,
-    runtimeOptions: { apiToken: 'collaboration-test-token', env: {}, timeoutMs: 10000,
+    runtimeOptions: { apiToken: 'collaboration-test-token', env: {}, timeoutMs: 30000,
       piRuntime: options => actualPi(options, options.contextKey.includes(':step:')
         ? [fauxAssistantMessage(`Pipeline handoff from ${options.agentPolicy.name}`)]
         : [tool('write', { path: 'http-delivery.txt', content: 'verified HTTP delivery' }), fauxAssistantMessage('HTTP delivery complete')]),
@@ -88,9 +90,9 @@ test('authenticated HTTP dispatch, real completion, human review, merge, cleanup
   assert.equal(recoverable.checkpoint.root_matches, true);
   const wrongWorkspace = await request(`/v1/workspaces/other/parallel-batches/${batchId}/lanes/${lane.id}/review/complete`, 'POST', { verdict: 'approved' });
   assert.equal(wrongWorkspace.status, 404);
-  const review = await request(`${base}/lanes/${lane.id}/review/complete`, 'POST', { verdict: 'approved', notes: 'Reviewed', reviewer: 'forged-agent' });
+  const review = await request(`${base}/lanes/${lane.id}/review/complete`, 'POST', { verdict: 'approved', notes: 'Reviewed', reviewer: 'forged-agent',...deliveryVersion(polled.body.run.lanes[0]) });
   assert.equal(review.status, 200); assert.equal(review.body.run.lanes[0].reviewer, 'human:user');
-  assert.equal((await request(`${base}/merge`, 'POST')).status, 200);
+  assert.equal((await request(`${base}/merge`, 'POST',{expected_deliveries:review.body.run.lanes.map(l=>({id:l.id,commit:l.commit_hash,version:l.delivery_version}))})).status, 200);
   assert.equal((await request('/v1/runtime/restore', 'POST', { channel: 'general', run_id: lane.run_id || recoverable.id })).status, 409);
   assert.equal(fs.readFileSync(path.join(f.project, 'http-delivery.txt'), 'utf8'), 'verified HTTP delivery');
   const diffBeforeCleanup = await request(`${base}/lanes/${lane.id}/diff`);
@@ -167,6 +169,7 @@ test('merge conflicts and dirty source never erase worker deliveries or mutate s
   const a = f.actor('conflict-a', true), b = f.actor('conflict-b', true), originalHead = f.git('rev-parse', 'HEAD').trim();
   const id = f.collaboration.start('general', { workers: [{ agent: a.id, task: 'Change shared file A' }, { agent: b.id, task: 'Change shared file B' }] }).run.batch.id;
   await waitFor(() => f.runner.active.size === 0 && f.collaboration.view(id).run.batch.status === 'review');
+  for(const lane of f.collaboration.view(id).run.lanes)f.collaboration.humanReview(id,lane.id,{verdict:'approved',...deliveryVersion(lane)});
   fs.writeFileSync(path.join(f.project, 'user-unsaved.txt'), 'preserve user work');
   assert.throws(() => f.collaboration.merge(id), /uncommitted/);
   assert.equal(fs.readFileSync(path.join(f.project, 'user-unsaved.txt'), 'utf8'), 'preserve user work');
@@ -265,7 +268,7 @@ test('worker checkpoint restoration targets the owned worktree and invalidates i
   const batchId = f.collaboration.start('general', { workers: [{ agent_id: worker.id, task: 'Write result' }] }).run.batch.id;
   await waitFor(() => f.runner.active.size === 0 && f.collaboration.view(batchId).run.lanes[0].status === 'done');
   let lane = f.collaboration.view(batchId).run.lanes[0];
-  f.collaboration.humanReview(batchId, lane.id, { verdict: 'approved' });
+  f.collaboration.humanReview(batchId, lane.id, { verdict: 'approved',...deliveryVersion(lane) });
   const run = f.store.data.runtime_runs.find(row => row.id === lane.run_id);
   const checkpoint = await f.runner.recoveryCheckpoint('general', run);
   assert.equal(checkpoint.worktree, true); assert.equal(checkpoint.root_matches, true);
@@ -298,6 +301,7 @@ test('worker checkpoint restoration targets the owned worktree and invalidates i
   await waitFor(() => f.runner.active.size === 0 && f.collaboration.view(batchId).run.lanes[0].status === 'done');
   await assert.rejects(f.runner.restore('general', oldRun), /older task attempt/);
   lane = f.collaboration.view(batchId).run.lanes[0];
+  f.collaboration.humanReview(batchId,lane.id,{verdict:'approved',...deliveryVersion(lane)});
   f.collaboration.merge(batchId);
   await assert.rejects(f.runner.restore('general', lane.run_id), /integrated deliveries/);
 });

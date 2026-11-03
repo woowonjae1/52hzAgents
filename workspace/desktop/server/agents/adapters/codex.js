@@ -214,7 +214,7 @@ async function runCodex(options, { launch = locate('codex', options?.env || proc
         const tool = message.method.includes('commandExecution') ? 'bash' : 'write';
         const item = items.get(p.itemId);
         let allowed = false;
-        if (tool === 'write' && options.config.mode === 'agent' && safeFileChanges(item, options.projectDir, p.grantRoot)) {
+        if (tool === 'write' && options.agentPolicy.permissions?.writeFiles === true && options.config.mode === 'agent' && safeFileChanges(item, options.projectDir, p.grantRoot)) {
           options.onTool?.({ phase: 'update', toolCallId: p.itemId, tool, patch: filePatch(item), path: item.changes[0].path });
           allowed = Boolean(
             await options.onApproval?.(
@@ -228,6 +228,18 @@ async function runCodex(options, { launch = locate('codex', options?.env || proc
             )
           );
           allowed &&= !options.signal?.aborted && safeFileChanges(item, options.projectDir, p.grantRoot);
+        }
+        if (tool==='bash' && options.reviewVerification && options.config.mode==='agent' && options.agentPolicy.permissions.executeCommands) {
+          const command=typeof p.command==='string'?p.command:item?.command;
+          const cwd=p.cwd || item?.cwd;
+          if(typeof command==='string' && command && typeof cwd==='string' && typeof p.itemId==='string'
+            && p.threadId===threadId && (!turnId || p.turnId===turnId) && !p.environmentId && !p.networkApprovalContext
+            && (!item || item.type==='commandExecution') && (!item?.command || item.command===command) && (!item?.cwd || path.resolve(item.cwd)===path.resolve(options.projectDir))
+            && path.resolve(cwd)===path.resolve(options.projectDir)) {
+            options.onTool?.({phase:item?'update':'start',toolCallId:p.itemId,tool,args:{command},path:options.projectDir});
+            allowed=Boolean(await options.onApproval?.({toolCallId:p.itemId,tool,command,cwd:options.projectDir},options.signal));
+            allowed &&= !options.signal?.aborted;
+          }
         }
         if (!allowed) {
           denied = true;

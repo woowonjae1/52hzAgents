@@ -215,6 +215,29 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
           return sendJson(res, 200, { interaction: agentRunner.interactions.answer(decodeURIComponent(interactionAction[1]), body, interactionAction[2]) });
         }
         // Local Agent identities are independent of model connections and work profiles.
+        if(pathname==='/v1/runtime/native-budget-policy'){
+          const {createNativeBudgetPolicy,allowsNativeBudgetPolicy,sessionPolicyKey,previewNativeBudgetPolicy}=require('./native-budget-policy');
+          const body=req.method==='POST'?await parseBody(req):{};
+          if(!body || typeof body!=='object' || Array.isArray(body))return sendJson(res,400,{error:'Expected an object.'});
+          const channel=body.channel || query.channel;
+          if(typeof channel!=='string' || !store.getChannel(channel))return sendJson(res,404,{error:'Session not found.'});
+          const actor=agentRunner.identity(channel,{requireActive:true});
+          if(!agentRunner.isNativeIdentity(actor))return sendJson(res,200,{native:false});
+          const preview=previewNativeBudgetPolicy(store,channel,[actor]);
+          const key=sessionPolicyKey(channel);
+          if(['POST','DELETE'].includes(req.method)){
+            agentRunner.assertRecoveryReady();
+            if([...agentRunner.active.values()].some(run=>run.snapshot.channel===channel) || agentRunner.queues.get(channel)?.length)return sendJson(res,409,{error:'Stop current tasks before changing budget policy.'});
+            if(req.method==='DELETE')store.storage.settings.delete(key);
+            else{
+              if(body.expectedFingerprint!==preview.fingerprint)return sendJson(res,409,{error:'Agent or budget configuration changed; refresh before confirming.'});
+              store.storage.settings.set(key,createNativeBudgetPolicy(store,channel,[actor],body,null,'session'));
+            }
+          }else if(req.method!=='GET')return sendJson(res,405,{error:'Method not allowed.'});
+          const policy=store.storage.settings.get(key);
+          return sendJson(res,200,{native:true,agentName:actor.name,agentId:actor.id,fingerprint:preview.fingerprint,policy,
+            valid:policy?.scope==='session' && allowsNativeBudgetPolicy(store,policy,channel,actor)});
+        }
         if (pathname === '/v1/agent-runtimes' && req.method === 'GET') {
           const budget = store.storage?.budgets.get();
           const hardBudget = Boolean(budget && (budget.maxTokensPerRun || budget.maxStepsPerRun || budget.maxCostPerSession || budget.maxCostPerDay));
@@ -745,6 +768,7 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
               await credentialVault.reload();
             }
             agentRunner.interactions?.recover({ force: true });
+            agentRunner.collaboration?.recover();
             agentRunner.completeRecovery();
             if (typeof broadcaster?.broadcast === 'function') {
               broadcaster.broadcast({ type: 'workspace.updated', source: 'system', target: 'all', payload: store.data.workspace });
@@ -1070,13 +1094,23 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
         }
 
         // Parallel batch control actions
+        const batchBudgetMatch=pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/native-budget-policy$/);
+        if(batchBudgetMatch && req.method==='POST'){
+          if(batchBudgetMatch[1]!=='52hz')return sendJson(res,404,{error:'Workspace not found.'});
+          const body=await parseBody(req);
+          return sendJson(res,200,collaboration.authorizeNativeBudget(batchBudgetMatch[2],body));
+        }
         const batchActionMatch = pathname.match(/^\/v1\/workspaces\/([^/]+)\/parallel-batches\/([^/]+)\/(merge|discard|stop|cleanup)$/);
         if (batchActionMatch && req.method === 'POST') {
           const [, ws, batchId, action] = batchActionMatch;
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
           let result;
           if (ws !== '52hz') return sendJson(res, 404, { error: 'Workspace not found.' });
-          if (action === 'merge') result = collaboration.merge(batchId);
+          if (action === 'merge') {
+            const body=await parseBody(req);
+            if(!Array.isArray(body?.expected_deliveries))return sendJson(res,409,{error:'请提交本次验收的交付版本列表。'});
+            result = collaboration.merge(batchId,body.expected_deliveries);
+          }
           else if (action === 'discard') result = await collaboration.discard(batchId);
           else if (action === 'stop') result = await collaboration.stop(batchId);
           else if (action === 'cleanup') result = collaboration.cleanup(batchId);
@@ -1103,14 +1137,16 @@ function startServer({ port = 8000, userDataPath, staticDir, apiToken, env: topE
           if (!store.storage?.orchestration) return sendJson(res, 501, { error: 'Orchestration storage unavailable' });
 
           if (action === 'retry') {
-            const updated = collaboration.retry(batchId, agent);
+            const body=await parseBody(req);
+            const updated = collaboration.retry(batchId, agent, body);
             return sendJson(res, 200, updated);
           }
           if (action === 'review') {
             return sendJson(res, 200, collaboration.review(batchId, agent));
           }
           if (action === 'send-back') {
-            return sendJson(res, 200, collaboration.retry(batchId, agent));
+            const body=await parseBody(req);
+            return sendJson(res, 200, collaboration.sendBack(batchId, agent, body));
           }
           if (action === 'complete') {
             return sendJson(res, 409, { error: 'Lane completion is recorded by the actual Agent execution.' });

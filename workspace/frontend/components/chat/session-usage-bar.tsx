@@ -27,6 +27,7 @@ import type { WorkspaceMessage } from "@/lib/types";
 import { toast } from '@/lib/toast';
 import { RunRecoveryPanel } from './run-recovery-panel';
 import { AgentInteractionsPanel } from './agent-interactions-panel';
+import { NativeQuotaControls } from './native-quota-controls';
 import { WorktreeControls } from './worktree-controls';
 
 interface RuntimeStatus {
@@ -76,6 +77,7 @@ interface UsageSummary {
   totalTokens: number;
   estimatedCost: number | null;
   hasUnknownCost: boolean;
+  hasUnknownUsage?: boolean;
   recordCount: number;
   byModel: ModelUsageBreakdown[];
 }
@@ -213,7 +215,7 @@ export function SessionUsageBar({
   const known = usage.measured_turns > 0 || (summary && summary.totalTokens > 0);
 
   const costDisplay = React.useMemo(() => {
-    if (!summary || summary.totalTokens === 0) return null;
+    if (!summary || (summary.totalTokens === 0 && !summary.hasUnknownCost)) return null;
     if (summary.hasUnknownCost || summary.estimatedCost === null) {
       return {
         label: "待核算",
@@ -236,6 +238,7 @@ export function SessionUsageBar({
       <WorktreeControls channel={channelName} running={running} />
       <RunRecoveryPanel channel={channelName} running={running} />
       <AgentInteractionsPanel channel={channelName} running={running} />
+      <NativeQuotaControls channel={channelName} running={running} />
       <div
         className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 text-[10px] text-foreground-extra-muted"
         data-testid="session-usage-bar"
@@ -253,6 +256,7 @@ export function SessionUsageBar({
                 ? '正在压缩'
                 : '运行中'
             : '空闲'}
+          {summary?.hasUnknownUsage && <span className="text-foreground-muted">· 部分用量未知</span>}
           {usage.last?.model && (
             <span className="hidden sm:inline max-w-48 truncate font-mono">
               · {usage.last.model}

@@ -131,6 +131,7 @@ class UsageRepository {
     cacheWriteTokens = 0,
     totalTokens = null,
     estimatedCost = null,
+    usageKnown = true,
     currency = 'USD',
     createdAt = new Date().toISOString(),
   }) {
@@ -143,8 +144,8 @@ class UsageRepository {
       INSERT INTO usage_records (
         id, session_id, run_id, model,
         prompt_tokens, completion_tokens, cache_read_tokens, cache_write_tokens,
-        total_tokens, estimated_cost, currency, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total_tokens, estimated_cost, currency, created_at, usage_known
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       usageId,
       sessionId,
@@ -157,7 +158,8 @@ class UsageRepository {
       calculatedTotal,
       estimatedCost,
       currency,
-      createdAt
+      createdAt,
+      usageKnown ? 1 : 0
     );
 
     return usageId;
@@ -172,7 +174,8 @@ class UsageRepository {
         COALESCE(SUM(cache_write_tokens), 0) AS total_cache_write_tokens,
         COALESCE(SUM(total_tokens), 0) AS grand_total_tokens,
         COALESCE(SUM(estimated_cost), 0) AS total_estimated_cost,
-        COUNT(CASE WHEN estimated_cost IS NULL AND total_tokens > 0 THEN 1 END) AS unknown_cost_count,
+        COUNT(CASE WHEN estimated_cost IS NULL THEN 1 END) AS unknown_cost_count,
+        COUNT(CASE WHEN usage_known=0 THEN 1 END) AS unknown_usage_count,
         COUNT(*) AS record_count
       FROM usage_records
       WHERE session_id = ?
@@ -188,7 +191,8 @@ class UsageRepository {
         SUM(cache_write_tokens) AS cache_write_tokens,
         SUM(total_tokens) AS total_tokens,
         SUM(estimated_cost) AS estimated_cost,
-        COUNT(CASE WHEN estimated_cost IS NULL AND total_tokens > 0 THEN 1 END) AS unknown_cost_count,
+        COUNT(CASE WHEN estimated_cost IS NULL THEN 1 END) AS unknown_cost_count,
+        COUNT(CASE WHEN usage_known=0 THEN 1 END) AS unknown_usage_count,
         COUNT(*) AS call_count
       FROM usage_records
       WHERE session_id = ?
@@ -206,6 +210,7 @@ class UsageRepository {
       totalTokens: Number(row.grand_total_tokens),
       estimatedCost: hasUnknownCost ? null : Number(Number(row.total_estimated_cost).toFixed(4)),
       hasUnknownCost,
+      hasUnknownUsage: Number(row.unknown_usage_count)>0,
       recordCount: Number(row.record_count),
       byModel: modelBreakdown.map(m => ({
         model: m.model,
@@ -216,6 +221,7 @@ class UsageRepository {
         totalTokens: Number(m.total_tokens),
         estimatedCost: Number(m.unknown_cost_count) > 0 ? null : Number(Number(m.estimated_cost).toFixed(4)),
         hasUnknownCost: Number(m.unknown_cost_count) > 0,
+        hasUnknownUsage: Number(m.unknown_usage_count)>0,
         callCount: Number(m.call_count),
       })),
     };

@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const { streamModel } = require("./model-stream");
 const { RuntimeTools } = require('./runtime-tools');
 const { HumanInteractions } = require('./agents/human-interactions');
+const { allowsNativeBudgetPolicy, sessionPolicyKey } = require('./native-budget-policy');
 const {projectSnapshot,changesSince} = require('./project-evidence');
 const {normalizeUrl} = require('./config-manager');
 const { Checkpoints } = require('./checkpoints');
@@ -216,8 +217,12 @@ class AgentRunner {
   }
   validateNativeExecution(agent, config, options = {}) {
     if (!this.isNativeIdentity(agent)) return;
+    const policy = options.execution?.batchId
+      ? JSON.parse(this.collaboration.batch(options.execution.batchId).native_budget_policy_json || 'null')
+      : options.nativeBudgetPolicy || (!options.execution && options.channel ? this.store.storage.settings.get(sessionPolicyKey(options.channel)) : null);
+    const nativeBudgetAuthorized = (!options.execution?.batchId || policy?.batchId===options.execution.batchId) && allowsNativeBudgetPolicy(this.store,policy,options.channel,agent);
     for (const budgets of [this.store.storage?.budgets.get(), this.store.storage?.budgets.getForSession(options.channel)]) {
-      assertNativePolicy(agent, config, { ...options, env: this.env, budgets });
+      assertNativePolicy(agent, config, { ...options, env: this.env, budgets, nativeBudgetAuthorized });
     }
   }
   identity(channel, { requireActive = false } = {}) {
@@ -598,6 +603,8 @@ class AgentRunner {
       if (native) {
         this.validateNativeExecution(agentIdentity, config, { channel, execution, compactOnly });
         run.snapshot.accountingScope = 'native-turn';
+        if(execution?.batchId)run.snapshot.nativeBudgetPolicy=JSON.parse(this.collaboration.batch(execution.batchId).native_budget_policy_json || 'null');
+        else if(!execution)run.snapshot.nativeBudgetPolicy=this.store.storage.settings.get(sessionPolicyKey(channel));
         run.hasUnknownCost = true;
       }
       const conn = this.configManager ? this.configManager.getConnection(config.provider) : null;
@@ -753,7 +760,7 @@ class AgentRunner {
         ? this.store.storage.agentConnections.get(agentIdentity.connectionId)
         : null;
       const invokeEngine = native
-        ? opts => this.nativeRuntime(agentIdentity, { ...opts, runId: run.runId, agentId: agentIdentity.id, connection: nativeConnection, sessionBindings: this.store.storage?.nativeSessionBindings || null, env: this.env })
+        ? opts => {run.nativeInvocationStarted=true;return this.nativeRuntime(agentIdentity, { ...opts, runId: run.runId, agentId: agentIdentity.id, connection: nativeConnection, sessionBindings: this.store.storage?.nativeSessionBindings || null, env: this.env });}
         : this.piRuntime;
       const result = native || usesPi ? await invokeEngine({
         nativeModel: agentIdentity.runtimeModel || undefined,
@@ -763,6 +770,7 @@ class AgentRunner {
         agentPolicy: structuredClone(executionPolicy),
         agentName: agentIdentity.name,
         agentRole: agentIdentity.role,
+        reviewVerification: execution?.kind === 'review' && execution.verification === true,
         maxOutputTokens,
         maxToolCalls: executionPolicy.limits.maxStepsPerRun,
         channel,
@@ -946,6 +954,8 @@ class AgentRunner {
       if (this.interactions?.isWaiting(run.runId)) throw Object.assign(new Error('任务仍有未处理或未投递的用户交互，不能标记完成。'), { code: 'INTERACTION_PENDING' });
       if (run.controller.signal.aborted) throw new Error("Aborted");
       if (result?.usage) run.usage = result.usage;
+      run.usageKnown = Boolean(result?.usage);
+      run.reportedCost = native ? (result?.costKnown && typeof result.estimatedCost === 'number' ? result.estimatedCost : null) : run.hasUnknownCost ? null : run.accumulatedCost ?? null;
       if (result?.nativeSessionId || result?.nativeThreadId) {
         run.snapshot.nativeSessionId = result.nativeSessionId || result.nativeThreadId;
       }
@@ -957,6 +967,11 @@ class AgentRunner {
       }
       if (native && result?.costKnown && typeof result.estimatedCost === 'number') {
         run.hasUnknownCost = false;
+      }
+      if(this.store.storage && native && !result?.usage){
+        this.store.storage.usage.recordUsage({sessionId:channel,runId:run.runId,model:result?.model || config.model,
+          usageKnown:false,estimatedCost:run.reportedCost});
+        run.nativeUsageRecorded=true;
       }
       if (this.store.storage && result?.usage) {
         try {
@@ -980,6 +995,7 @@ class AgentRunner {
             estimatedCost: pricingInfo.estimatedCost,
             currency: pricingInfo.currency || 'USD',
           });
+          if(native)run.nativeUsageRecorded=true;
 
           if (!native && !run.requestUsageCount) this.store.storage.usage.recordModelRequest({
             runId: run.runId,
@@ -1002,9 +1018,11 @@ class AgentRunner {
         } catch (_) {}
       }
       record.outcome=result.denied ? ([...run.tools?.values()||[]].some(row=>row.status==='expired')?'expired':'denied') : result.limited?'limited':'finished';
+      record.evidence=await evidence(record.outcome);
       if (execution) { this.collaboration.finish(execution, run, record, result); run.collaborationFinished = true; }
+      if(record.outcome==='failed' && record.error){result.content=record.error.message;result.isError=true;}
       if(record.outcome==='expired') result.content='Command approval expired. No pending command was executed.';
-      const facts=await evidence(record.outcome);record.evidence=facts;
+      const facts=record.evidence;facts.outcome=record.outcome;
       this.post(
         channel,
         agent,
@@ -1064,6 +1082,16 @@ class AgentRunner {
         isError: result ? result.isError : false,
       };
     } catch (error) {
+      if(native && run.nativeInvocationStarted && !run.nativeUsageRecorded && this.store.storage){
+        run.usageKnown=false;
+        try{
+          this.store.storage.usage.recordUsage({sessionId:channel,runId:run.runId,model:run.snapshot.effectiveModel || config.model,
+            usageKnown:false,promptTokens:run.usage?.prompt_tokens || 0,completionTokens:run.usage?.completion_tokens || 0,
+            cacheReadTokens:run.usage?.cache_read_tokens || 0,cacheWriteTokens:run.usage?.cache_write_tokens || 0,
+            totalTokens:run.usage?.total_tokens ?? null,estimatedCost:null});
+          run.nativeUsageRecorded=true;
+        }catch(accountingError){run.snapshot.accountingError=accountingError.message;}
+      }
       const stopped = (run.controller.signal.aborted || error.code === 'ABORT_ERR') && !run.timedOut;
       const budgetExceeded = error.code === 'BUDGET_EXCEEDED';
       const nativeFailure = typeof error.code === 'string' && (error.code.startsWith('RUNTIME_') || error.code.startsWith('INTERACTION_') || ['INVALID_NATIVE_QUESTION','AUTH_INPUT_NOT_ALLOWED'].includes(error.code));

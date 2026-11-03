@@ -305,6 +305,9 @@ test('R3 AgentRunner + HTTP + native child retain waiting phase and continue the
   assert.equal(rejectedRow.state,'invalidated');
   assert.equal(server.store.data.runtime_runs.find(r=>r.id===rejectedRow.runId).outcome,'failed');
   assert.equal(server.store.data.runtime_runs.find(r=>r.id===rejectedRow.runId).error.code,'INTERACTION_PENDING');
+  const unknown=server.store.storage.db.prepare('SELECT usage_known,estimated_cost FROM usage_records WHERE run_id=?').all(rejectedRow.runId);
+  assert.equal(unknown.length,1,'native failure must produce exactly one unknown accounting entry');
+  assert.equal(unknown[0].usage_known,0);assert.equal(unknown[0].estimated_cost,null);
 });
 
 test('R3 installed Pi runs the workbench question tool through real RPC without any model request', { timeout: 45000 }, async t => {

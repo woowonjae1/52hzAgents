@@ -173,6 +173,7 @@ test('bounded native file approval exposes the proposed patch before approval an
   const h = harness(t, 'file-approval'), events = [], checkpoints = [];
   let approvals = 0;
   const result = await runCodex({ ...h.options, config: { mode: 'agent' },
+    agentPolicy:{...h.options.agentPolicy,permissions:{readFiles:true,writeFiles:true,executeCommands:true}},
     beforeCommand: () => checkpoints.push('before'), afterCommand: () => checkpoints.push('after'),
     onTool: value => events.push(value), onApproval: async request => {
       approvals++;

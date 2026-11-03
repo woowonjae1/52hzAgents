@@ -62,6 +62,10 @@ export type ParallelLane = Narrow<Wire.ParallelLaneRecord, { status: ParallelLan
   context_key?: string | null;
   used_tokens?: number;
   commit_hash?: string;
+  delivery_version?: number;
+  reviewed_version?: number;
+  review_worktree_path?: string | null;
+  review_history?: { id: string; delivery_version: number; delivery_commit: string; reviewer_id: string; verdict: string; notes: string; verification: { worktree?: string | null; commands?: { command: string; exitCode?: number }[] } }[];
   delivery?: { baseCommit: string; commit: string; changedFiles: string[]; diffstat: string } | null;
 };
 
@@ -78,7 +82,8 @@ export type ParallelRun = Narrow<
         /** `review`: every lane ended and there is something to merge; waiting for the user. */
         status: 'running' | 'review' | 'done' | 'blocked' | 'cancelled' | 'failed';
       }
-    >;
+    > & { native_budget_policy?: { mode: string; valid: boolean; notice: string; approvedAt: string } | null;
+      review_verification?: boolean; accounting?: { tokensKnown: boolean; costKnown: boolean; estimatedCost: number | null } };
     lanes: ParallelLane[];
   }
 >;
@@ -141,6 +146,8 @@ export class OrchestrationApi extends BaseWorkspaceApi {
     review_agent?: string;
     total_budget_tokens?: number;
     isolation?: string;
+    native_budget_policy?: { mode: 'native-managed'; acknowledged: true };
+    review_verification?: boolean;
   }): Promise<ParallelRun> {
     return this.request<ParallelRun>('/v1/parallel-batch/start', {
       method: 'POST',
@@ -157,10 +164,10 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   }
 
   /** The user approved a batch under review: merge its lanes into the base branch. */
-  async mergeParallelBatch(batchId: string): Promise<void> {
+  async mergeParallelBatch(batchId: string, deliveries: { id: string; commit: string; version: number }[]): Promise<void> {
     await this.request(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/merge`,
-      { method: 'POST' }
+      { method: 'POST', body: JSON.stringify({ expected_deliveries:deliveries }) }
     );
   }
 
@@ -186,10 +193,10 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   }
 
   /** Send a reviewed lane back to its author with the review; it is reviewed again when it returns. */
-  async sendBackParallelLane(batchId: string, agent: string): Promise<void> {
+  async sendBackParallelLane(batchId: string, agent: string, delivery: { expected_commit: string; expected_version: number }): Promise<void> {
     await this.request(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/send-back`,
-      { method: 'POST' }
+      { method: 'POST', body: JSON.stringify(delivery) }
     );
   }
 
@@ -212,7 +219,7 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   async completeLaneReview(
     batchId: string,
     agent: string,
-    result: { verdict: 'approved' | 'changes_requested'; notes?: string }
+    result: { verdict: 'approved' | 'changes_requested'; notes?: string; expected_commit: string; expected_version: number }
   ): Promise<ParallelBatch> {
     return this.request<ParallelBatch>(
       `/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/lanes/${encodeURIComponent(agent)}/review/complete`,
@@ -221,6 +228,12 @@ export class OrchestrationApi extends BaseWorkspaceApi {
   }
 
   /** Saved profiles orchestrating agents pick from when they delegate. */
+  async authorizeBatchNativeBudget(batchId: string): Promise<ParallelBatch> {
+    return this.request(`/v1/workspaces/${this.requireWorkspace()}/parallel-batches/${encodeURIComponent(batchId)}/native-budget-policy`, {
+      method:'POST',body:JSON.stringify({mode:'native-managed',acknowledged:true}),
+    });
+  }
+
   async listWorkProfiles(): Promise<WorkProfilesResponse> {
     return this.request<WorkProfilesResponse>(`/v1/workspaces/${this.requireWorkspace()}/profiles`);
   }

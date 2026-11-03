@@ -61,7 +61,7 @@ function resolveDefaultRuntimeStatus(agent, env = process.env) {
 function assertNativePolicy(
   agent,
   config,
-  { budgets, execution, compactOnly = false, env = process.env, runtime = resolveDefaultRuntimeStatus(agent, env) } = {}
+  { budgets, execution, compactOnly = false, nativeBudgetAuthorized = false, env = process.env, runtime = resolveDefaultRuntimeStatus(agent, env) } = {}
 ) {
   if (!runtime?.installed || !runtime.supported) throw fail(runtime?.reason || 'Unsupported runtime.');
   if (compactOnly) throw fail('此客户端自行管理上下文，工作台压缩暂不适用。', 'RUNTIME_CAPABILITY');
@@ -91,7 +91,7 @@ function assertNativePolicy(
     if (
       !p.readFiles ||
       !p.executeCommands ||
-      (config.mode === 'agent' && !p.writeFiles) ||
+      (config.mode === 'agent' && !p.writeFiles && !(execution?.kind === 'review' && execution.verification)) ||
       p.mcp ||
       p.delegate ||
       p.knowledge ||
@@ -106,15 +106,15 @@ function assertNativePolicy(
 
   const limits = agent.limits || {};
   const budget = budgets;
-  if (
+  if (!nativeBudgetAuthorized && (
     limits.maxTokensPerRun ||
     limits.maxStepsPerRun ||
     limits.maxCostPerRun ||
     (budget && (budget.maxTokensPerRun || budget.maxStepsPerRun || budget.maxCostPerSession || budget.maxCostPerDay)) ||
     (execution && execution.kind !== 'pipeline')
-  ) {
+  )) {
     throw fail(
-      '原生客户端无法在每次模型请求前预留 Token/费用。当前硬预算或协作批次预算无法保证，已阻止执行；请使用 Pi 执行有硬预算的任务。',
+      '原生客户端不能保证逐请求 Token/费用硬预算。请使用内置 SDK 助手，或由用户明确确认仅本批次采用原生配额；工作台全局预算不会被自动关闭。',
       'RUNTIME_BUDGET_UNSUPPORTED'
     );
   }

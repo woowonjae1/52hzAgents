@@ -218,7 +218,7 @@ export function ParallelBatchPanel({ channelName, active, className, onReviewSta
 
 const LANE_STATUS: Record<ParallelLane['status'], { label: string; icon: React.ElementType; className: string }> = {
   running: { label: 'Working', icon: Loader2, className: 'text-status-info' },
-  done: { label: 'Finished', icon: CheckCircle2, className: 'text-status-success' },
+  done: { label: '已交付', icon: CheckCircle2, className: 'text-status-success' },
   merged: { label: 'Merged', icon: GitMerge, className: 'text-status-success' },
   kept: { label: 'Branch kept', icon: PauseCircle, className: 'text-status-warning' },
   conflict: { label: 'Conflict', icon: AlertTriangle, className: 'text-status-warning' },
@@ -237,6 +237,8 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
   const [stopping, setStopping] = React.useState(false);
   const [cleaning, setCleaning] = React.useState(false);
   const [selectedDiffLane, setSelectedDiffLane] = React.useState<ParallelLane | null>(null);
+  const [budgetConfirm,setBudgetConfirm]=React.useState(false);
+  const [budgetBusy,setBudgetBusy]=React.useState(false);
 
   const cleanWorktrees = async () => {
     setCleaning(true);
@@ -283,7 +285,7 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
     setDeciding(action);
     try {
       if (action === 'merge') {
-        await workspaceApi.mergeParallelBatch(run.batch.id);
+        await workspaceApi.mergeParallelBatch(run.batch.id,run.lanes.map(lane=>({id:lane.id,commit:lane.commit_hash || '',version:lane.delivery_version || 0})));
         toast.success(`Merging into ${base}`);
       } else {
         await workspaceApi.discardParallelBatch(run.batch.id);
@@ -312,11 +314,20 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
   };
 
   return (
-    <div className="rounded-lg border border-border bg-surface-raised/60 p-3">
+    <div className="max-h-[45vh] overflow-y-auto rounded-lg border border-border bg-surface-raised/60 p-3">
+      {run.batch.native_budget_policy && <div className="mb-3 rounded-md border border-border p-3 text-xs">
+        <p className="font-medium">本批次原生配额管理 · {run.batch.native_budget_policy.valid?'已确认':'配置已变化，需要重新确认'}</p>
+        <p className="mt-1 text-foreground-muted">{run.batch.native_budget_policy.notice}</p>
+        {run.batch.accounting && <p className="mt-1 text-foreground-muted">{run.batch.accounting.tokensKnown?'返回的 Token 用量已记录':'存在未知 Token 用量，仅显示已知部分'} · {run.batch.accounting.costKnown?`累计费用 $${run.batch.accounting.estimatedCost?.toFixed(4)}`:'累计费用待核算'}</p>}
+        {!run.batch.native_budget_policy.valid && <>
+          <label className="mt-2 flex gap-2"><input type="checkbox" checked={budgetConfirm} onChange={e=>setBudgetConfirm(e.target.checked)} />我确认仅本批次继续使用原生配额，Token、步数与费用无法逐请求硬拦截。</label>
+          <button type="button" disabled={!budgetConfirm || budgetBusy} className="mt-2 rounded border border-border px-2 py-1 disabled:opacity-40" onClick={async()=>{setBudgetBusy(true);try{await workspaceApi.authorizeBatchNativeBudget(run.batch.id);onRetried();setBudgetConfirm(false);}catch(e){toast.error(e instanceof Error?e.message:'确认失败');}finally{setBudgetBusy(false);}}}>重新确认本批次策略</button>
+        </>}
+      </div>}
       <header className="flex items-center justify-between gap-2 mb-2.5">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-xs font-medium text-foreground">
-            {live ? 'Working in parallel' : reviewing ? 'Ready for review' : 'Last parallel batch'}
+            {live ? 'Working in parallel' : reviewing ? (run.lanes.some(l=>l.review_status==='changes_requested')?'等待修改与复审':run.lanes.every(l=>l.review_status==='approved')?'等待人工验收':'等待审阅') : 'Last parallel batch'}
           </span>
           {run.batch.delegated_by && (
             <span className="text-2xs text-foreground shrink-0" title="An agent delegated this work; it is told when the lanes finish.">
@@ -333,7 +344,7 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-2xs tabular-nums text-muted-foreground">
-            {finished}/{run.lanes.length} finished
+            {finished}/{run.lanes.length} 已交付
           </span>
           {live && (
             <button
@@ -352,8 +363,8 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
       <ul className="space-y-2">
         {run.lanes.map((lane) => {
           const st =
-            reviewing && lane.status === 'done' && lane.diffstat
-              ? { label: 'Ready to merge', icon: FileDiff, className: 'text-status-info' }
+            reviewing && lane.status === 'done' && lane.diffstat && lane.review_status==='approved' && lane.reviewed_version===lane.delivery_version
+              ? { label: '已审阅，待验收', icon: FileDiff, className: 'text-status-info' }
               : LANE_STATUS[lane.status] ?? LANE_STATUS.running;
           const Icon = st.icon;
           const firstLine = lane.task.replace(/^- /, '').split(/\r?\n/)[0];
@@ -485,7 +496,7 @@ function RunView({ run, onRetried, onNewBatch, setting }: { run: ParallelRun; on
           </button>
           {reviewing && <button
             type="button"
-            disabled={deciding !== null || reviewsRunning > 0 || run.lanes.some(lane => lane.review_status && lane.review_status !== 'approved')}
+            disabled={deciding !== null || reviewsRunning > 0 || run.lanes.some(lane => lane.review_status !== 'approved' || lane.reviewed_version !== lane.delivery_version)}
             onClick={() => void decide('merge')}
             className="inline-flex items-center gap-1 rounded-md bg-foreground px-2 py-1 text-2xs font-medium text-background hover:opacity-90 disabled:opacity-60"
           >
@@ -536,15 +547,19 @@ function LaneReview({
   const { setCurrentSessionId } = useWorkspace();
   const [busy, setBusy] = React.useState<'send' | 'retry' | 'review' | null>(null);
   const [manualReviewOpen, setManualReviewOpen] = React.useState(false);
+  const [manualTarget,setManualTarget]=React.useState<{expected_commit:string;expected_version:number}|null>(null);
+  React.useEffect(()=>{setManualReviewOpen(false);setManualTarget(null);},[lane.commit_hash,lane.delivery_version]);
   const [manualNotes, setManualNotes] = React.useState('');
   const status = lane.review_status;
 
   const submitHumanReview = async (verdict: 'approved' | 'changes_requested') => {
+    if(!manualTarget)return;
     setBusy('review');
     try {
       await workspaceApi.completeLaneReview(batchId, lane.id || lane.agent, {
         verdict,
         notes: manualNotes.trim() || undefined,
+        ...manualTarget,
       });
       toast.success(verdict === 'approved' ? '已通过该交付' : '已要求修改该交付');
       setManualReviewOpen(false);
@@ -563,14 +578,14 @@ function LaneReview({
   };
   const Icon = st.icon;
   const notes = lane.review_notes.trim();
-  const canSendBack = actionable && status !== 'running' && notes !== '';
+  const canSendBack = actionable && status === 'changes_requested' && notes !== '';
   const canRetry = actionable && (status === 'failed' || status === 'timed_out' || status === 'skipped' || status === 'cancelled');
 
   const act = async (action: 'send' | 'retry') => {
     setBusy(action);
     try {
       if (action === 'send') {
-        await workspaceApi.sendBackParallelLane(batchId, lane.id || lane.agent);
+        await workspaceApi.sendBackParallelLane(batchId, lane.id || lane.agent, {expected_commit:lane.commit_hash || '',expected_version:lane.delivery_version || 0});
         toast.success(`Sent back to ${lane.agent_name || lane.agent} with the review`);
       } else {
         await workspaceApi.retryLaneReview(batchId, lane.id || lane.agent);
@@ -586,6 +601,12 @@ function LaneReview({
 
   return (
     <div className="mt-1 rounded-md border border-border/70 bg-background/40 px-2 py-1.5">
+      <p className="mb-1 text-2xs text-foreground-muted">交付 v{lane.delivery_version || 0} · {lane.commit_hash?.slice(0,8)}</p>
+      {!!lane.review_history?.length && <details className="mb-2 text-2xs text-foreground-muted"><summary className="cursor-pointer">审阅与验证记录 ({lane.review_history.length})</summary>
+        {lane.review_history.map(review=><div key={review.id} className="mt-2 border-t border-border pt-2"><p>v{review.delivery_version} · {review.delivery_commit.slice(0,8)} · {review.reviewer_id} · {review.verdict}</p><p className="whitespace-pre-wrap">{review.notes}</p>
+          {review.verification.worktree && <p className="break-all font-mono">检视工作区：{review.verification.worktree}</p>}
+          {review.verification.commands?.map((command,index)=><p key={index} className="font-mono">{command.command} · {command.exitCode===undefined?'退出结果未知':`exit ${command.exitCode}`}</p>)}</div>)}
+      </details>}
       <div className="flex items-center gap-1.5 min-w-0">
         <Icon className={cn('size-3 shrink-0', st.className, status === 'running' && 'animate-spin')} />
         <span className={cn('text-2xs font-medium shrink-0', st.className)}>{st.label(lane.reviewer)}</span>
@@ -611,14 +632,14 @@ function LaneReview({
           <textarea
             value={manualNotes}
             onChange={(e) => setManualNotes(e.target.value)}
-            placeholder="输入审阅意见或修改要求（选填）..."
+            placeholder="通过时意见可选；要求修改时请填写具体反馈。"
             rows={2}
             className="w-full rounded-md border border-border bg-surface1 p-1.5 text-3xs text-foreground resize-y"
           />
           <div className="flex items-center justify-end gap-1.5">
             <button
               type="button"
-              disabled={busy !== null}
+              disabled={busy !== null || !manualNotes.trim()}
               onClick={() => void submitHumanReview('changes_requested')}
               className="inline-flex items-center gap-1 rounded px-2 py-1 text-3xs border border-status-warning/40 text-status-warning hover:bg-status-warning/10 disabled:opacity-60"
             >
@@ -643,7 +664,7 @@ function LaneReview({
             <button
               type="button"
               disabled={busy !== null}
-              onClick={() => setManualReviewOpen(!manualReviewOpen)}
+              onClick={() => {setManualTarget({expected_commit:lane.commit_hash || '',expected_version:lane.delivery_version || 0});setManualReviewOpen(!manualReviewOpen);}}
               className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-2xs text-foreground hover:bg-muted disabled:opacity-60 font-medium"
             >
               <ShieldCheck className="size-3 text-primary" />
@@ -1006,6 +1027,14 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
   ]);
   const [reviewerId, setReviewerId] = React.useState<string>('');
   const [budgetTokens, setBudgetTokens] = React.useState<string>('128000');
+  const [nativeBudgetAcknowledged,setNativeBudgetAcknowledged]=React.useState(false);
+  const [verifyReview,setVerifyReview]=React.useState(false);
+  const hasNative=agents.some(a=>(workers.some(w=>w.agent_id===a.id)||reviewerId===a.id) && (Boolean(a.connectionId)||a.runtimeKind!=='pi'));
+  const selectedReviewer=agents.find(a=>a.id===reviewerId);
+  const canVerify=Boolean(selectedReviewer?.permissions.executeCommands && selectedReviewer.maxMode==='agent' && !(selectedReviewer.runtimeKind==='pi'&&selectedReviewer.connectionId));
+  const participantKey=[...workers.map(w=>w.agent_id),reviewerId].join('|');
+  React.useEffect(()=>{setNativeBudgetAcknowledged(false);},[participantKey]);
+  React.useEffect(()=>{setVerifyReview(false);},[reviewerId]);
   const [submitting, setSubmitting] = React.useState(false);
 
   React.useEffect(() => {
@@ -1067,9 +1096,11 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
           task: w.task.trim(),
           scope: w.scope.trim() || undefined,
         })),
-        review_agent: reviewerId || undefined,
+        review_agent: reviewerId,
         total_budget_tokens: parseInt(budgetTokens, 10) || 128000,
         isolation: 'worktree',
+        ...(hasNative && nativeBudgetAcknowledged?{native_budget_policy:{mode:'native-managed' as const,acknowledged:true as const}}:{}),
+        review_verification:verifyReview,
       });
       toast.success('已启动多 Agent 协作批次');
       onCreated();
@@ -1207,7 +1238,7 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
             </div>
 
             <div className="space-y-1">
-              <label className="text-2xs font-medium text-foreground">批次 Token 预算上限</label>
+              <label className="text-2xs font-medium text-foreground">{hasNative?'批次 Token 观测额度（非逐请求硬上限）':'批次 Token 预算上限'}</label>
               <input
                 type="number"
                 value={budgetTokens}
@@ -1221,6 +1252,10 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
           </div>
 
           {/* Footer buttons */}
+          {hasNative && <label className="flex items-start gap-2 rounded-lg border border-border p-3 text-xs text-foreground-muted"><input type="checkbox" checked={nativeBudgetAcknowledged} onChange={e=>setNativeBudgetAcknowledged(e.target.checked)} className="mt-0.5" />
+            我确认仅本批次原生 Agent 使用原生配额：不受工作台 Token、步数和费用硬上限约束，可能使累计费用超过全局阈值。全局配置保持不变，时间限制与操作审批继续生效。
+          </label>}
+          {reviewerId && <label className="flex items-start gap-2 text-xs text-foreground-muted"><input type="checkbox" checked={verifyReview} disabled={!canVerify} onChange={e=>setVerifyReview(e.target.checked)} />{canVerify?'允许审阅 Agent 在独立检视工作区请求运行验证命令，每条命令仍需审批。':'此审阅 Agent 不支持受控验证命令，将仅检视交付；原生 Pi 命令能力暂不开放。'}</label>}
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/60">
             <button
               type="button"
@@ -1232,7 +1267,7 @@ function CreateParallelBatchModal({ channelName, isIsolated, onClose, onCreated 
             </button>
             <button
               type="submit"
-              disabled={submitting || !isIsolated || loadingAgents}
+              disabled={submitting || !isIsolated || loadingAgents || (hasNative && !nativeBudgetAcknowledged)}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 disabled:opacity-50 shadow-xs"
             >
               {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <GitMerge className="size-3.5" />}
