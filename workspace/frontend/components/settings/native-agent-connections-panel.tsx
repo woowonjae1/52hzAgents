@@ -16,6 +16,7 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import {
   CheckCircle2,
+  Cpu,
   RefreshCw,
   Plus,
   Settings2,
@@ -30,11 +31,13 @@ import {
 interface NativeAgentConnectionsPanelProps {
   onMemberCreated?: () => void;
   selectedConnectionId?: string | null;
+  onSelectAgentDetail?: (connectionId: string) => void;
 }
 
 export function NativeAgentConnectionsPanel({
   onMemberCreated,
   selectedConnectionId = null,
+  onSelectAgentDetail,
 }: NativeAgentConnectionsPanelProps) {
   const [candidates, setCandidates] = useState<AgentConnectionCandidate[]>([]);
   const [connections, setConnections] = useState<AgentConnection[]>([]);
@@ -234,11 +237,11 @@ export function NativeAgentConnectionsPanel({
       <div className="flex items-center justify-between gap-2">
         <div>
           <h3 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5 text-primary" />
-            <span>添加已配置的本机 Agent 与原生配置管理</span>
+            <Cpu className="size-3.5 text-primary" />
+            <span>添加与连接真实 Agent (Native Agents)</span>
           </h3>
           <p className="text-2xs text-foreground-muted mt-0.5">
-            直接关联本机已安装的 Pi、Codex 等客户端及其原生配置，无需在工作台重复创建模型供应商与密钥。
+            探测并连接本机已安装的真实客户端（Pi、Codex 等），直接复用本地配置与认证凭据，作为工作台真实原生 Agent 接入。
           </p>
         </div>
         <Button
@@ -283,7 +286,7 @@ export function NativeAgentConnectionsPanel({
                       }}
                     >
                       <Plus className="size-3" />
-                      <span>添加 Agent</span>
+                      <span>连接此 Agent</span>
                     </Button>
                   )}
                 </div>
@@ -388,7 +391,7 @@ export function NativeAgentConnectionsPanel({
                         size="sm"
                         className="h-6 px-2 text-3xs gap-1"
                         onClick={() =>
-                          setActiveConnectionId(activeConnectionId === rc.id ? null : rc.id)
+                          { setActiveConnectionId(activeConnectionId === rc.id ? null : rc.id); onSelectAgentDetail?.(rc.id); }
                         }
                       >
                         <Settings2 className="size-3" />

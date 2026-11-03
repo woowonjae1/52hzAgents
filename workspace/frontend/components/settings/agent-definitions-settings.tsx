@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronDown,
+  ChevronUp,
+  Sliders,
   ChevronRight,
   Info,
   Loader2,
@@ -38,6 +40,7 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 import type { ConnectionItem } from './router-provider-settings';
 import { NativeAgentConnectionsPanel } from './native-agent-connections-panel';
+import { AgentSecondaryDetail } from './agent-secondary-detail';
 
 const agentStarters = [
   { name: '开发助手', role: 'developer', description: '分析实现方案，完成有权限执行的代码修改。', maxMode: 'agent' as const,
@@ -64,6 +67,20 @@ export function AgentDefinitionsSettings({
   const [formRuntimeModel, setFormRuntimeModel] = React.useState('');
   const [formNativeConnectionId, setFormNativeConnectionId] = React.useState<string | null>(null);
   const [focusedConnectionId, setFocusedConnectionId] = React.useState<string | null>(null);
+  const [expandedAgentId, setExpandedAgentId] = React.useState<string | null>(null);
+
+  const toggleExpand = (id: string) => {
+    setExpandedAgentId((prev) => (prev === id ? null : id));
+  };
+
+  React.useEffect(() => {
+    if (focusedConnectionId) {
+      const matched = agents.find((a) => a.connectionId === focusedConnectionId);
+      if (matched) {
+        setExpandedAgentId(matched.id);
+      }
+    }
+  }, [focusedConnectionId, agents]);
   const [connections, setConnections] = React.useState<ConnectionItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -562,6 +579,225 @@ export function AgentDefinitionsSettings({
     };
   };
 
+
+  const renderAgentCard = (agent: AgentDefinition, isNative: boolean) => {
+    const readiness = checkReadiness(agent);
+    const isBuiltIn = agent.builtIn;
+    const isDisabled = agent.status === 'disabled';
+    const isExpanded = expandedAgentId === agent.id;
+
+    return (
+      <div
+        key={agent.id}
+        className={cn(
+          'rounded-xl border border-border/70 bg-surface1/60 p-4 transition-all duration-150 hover:border-border hover:shadow-xs',
+          isDisabled && 'opacity-65 bg-surface1/30',
+          isExpanded && 'border-primary/50 shadow-xs ring-1 ring-primary/20'
+        )}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="size-9 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+              {isNative ? (
+                <Cpu className={cn('size-4', isBuiltIn ? 'text-primary' : 'text-foreground')} />
+              ) : (
+                <Bot className={cn('size-4', isBuiltIn ? 'text-primary' : 'text-foreground')} />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-medium text-xs sm:text-sm text-foreground truncate">
+                  {agent.name}
+                </span>
+                {isNative ? (
+                  <Badge variant="outline" size="sm" className="text-3xs text-primary border-primary/40 gap-1">
+                    <Cpu className="size-2.5" />
+                    真实原生 Agent
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted gap-1">
+                    <Bot className="size-2.5" />
+                    兼容内置助手 (builtin-pi-sdk)
+                  </Badge>
+                )}
+                {isBuiltIn && (
+                  <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
+                    内置
+                  </Badge>
+                )}
+                <Badge
+                  variant="outline"
+                  size="sm"
+                  className="text-3xs uppercase tracking-wider text-foreground-muted"
+                >
+                  {agent.role}
+                </Badge>
+                <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
+                  {agent.execution?.label || runtimes.find((item) => item.kind === agent.runtimeKind)?.name || agent.runtimeKind}
+                  {agent.execution?.compatibility === 'legacy-builtin' ? ' · 兼容' : ''}
+                </Badge>
+                {isDisabled && (
+                  <Badge variant="warning" size="sm" className="text-3xs">
+                    已停用
+                  </Badge>
+                )}
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.5 rounded-md border',
+                    readiness.ready
+                      ? 'border-status-success/30 bg-status-success/10 text-status-success'
+                      : readiness.warning
+                      ? 'border-status-warning/40 bg-status-warning/10 text-status-warning'
+                      : 'border-border/60 bg-surface2 text-foreground-muted'
+                  )}
+                  title={readiness.reason}
+                >
+                  {readiness.ready ? (
+                    <CheckCircle2 className="size-2.5" />
+                  ) : (
+                    <AlertTriangle className="size-2.5" />
+                  )}
+                  <span>{readiness.label}</span>
+                </span>
+              </div>
+
+              {agent.description ? (
+                <p className="text-2xs text-foreground-muted mt-1 line-clamp-2">
+                  {agent.description}
+                </p>
+              ) : (
+                <p className="text-2xs text-foreground-extra-muted mt-1 italic">
+                  暂无描述
+                </p>
+              )}
+
+              {/* Capabilities pill tags */}
+              <div className="flex items-center gap-2 mt-2.5 flex-wrap text-3xs text-foreground-extra-muted">
+                <span className="flex items-center gap-1" title="默认与最高模式">
+                  <Layers className="size-3 text-foreground-muted" />
+                  <span>
+                    {modeNames[agent.defaultMode]} · 上限：{modeNames[agent.maxMode]}
+                  </span>
+                </span>
+                <span className="text-border/70">·</span>
+                <span className="flex items-center gap-1">
+                  <FileCode
+                    className={cn(
+                      'size-3',
+                      agent.permissions.writeFiles ? 'text-primary' : 'text-foreground-extra-muted'
+                    )}
+                  />
+                  <span>
+                    {agent.permissions.writeFiles ? '写文件' : '只读'}
+                  </span>
+                </span>
+                <span className="text-border/70">·</span>
+                <span className="flex items-center gap-1">
+                  <Terminal
+                    className={cn(
+                      'size-3',
+                      agent.permissions.executeCommands ? 'text-status-warning' : 'text-foreground-extra-muted'
+                    )}
+                  />
+                  <span>
+                    {agent.permissions.executeCommands ? '终端命令' : '无终端'}
+                  </span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Row Operations */}
+          <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+            <Button
+              variant={isExpanded ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => toggleExpand(agent.id)}
+              className="h-7 px-2 text-2xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
+              title="查看与修改当前 Agent 的配置文件路径、作用范围与模型配置"
+            >
+              <Sliders className="size-3" />
+              <span>{isExpanded ? '收起配置' : '次级详情与模型'}</span>
+              {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+            </Button>
+            {onSelectAgentForChat && !isDisabled && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onSelectAgentForChat(agent.id)}
+                className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
+                title="以此 Agent 新建会话"
+              >
+                <MessageSquare className="size-3" />
+                <span>对话</span>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openEdit(agent)}
+              className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
+              title="编辑配置"
+            >
+              <Edit2 className="size-3" />
+              <span>编辑</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openDuplicate(agent)}
+              className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
+              title="复制为新 Agent"
+            >
+              <Copy className="size-3" />
+              <span>复制</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleToggleStatus(agent)}
+              disabled={isBuiltIn}
+              className={cn(
+                'h-7 px-2 text-2xs gap-1',
+                isDisabled
+                  ? 'text-status-success hover:text-status-success hover:bg-status-success/10'
+                  : 'text-foreground-muted hover:text-status-warning'
+              )}
+              title={isDisabled ? '启用此 Agent' : '停用此 Agent'}
+            >
+              <Power className="size-3" />
+              <span>{isDisabled ? '启用' : '停用'}</span>
+            </Button>
+            {!isBuiltIn && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void handleDelete(agent)}
+                className="h-7 px-2 text-2xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                title="删除 Agent"
+              >
+                <Trash2 className="size-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Secondary Detail Dropdown Panel */}
+        {isExpanded && (
+          <div className="mt-3 pt-3 border-t border-border/60">
+            <AgentSecondaryDetail
+              agent={agent}
+              connections={connections}
+              runtimes={runtimes}
+              onUpdated={() => void loadData(true)}
+              onClose={() => setExpandedAgentId(null)}
+            />
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Banner / Actions */}
@@ -599,38 +835,16 @@ export function AgentDefinitionsSettings({
       </div>
 
       {!loading && (
-        <NativeAgentConnectionsPanel onMemberCreated={() => void loadData(true)} selectedConnectionId={focusedConnectionId} />
-      )}
-      {!loading && (
-        <section className="rounded-lg border border-border px-4 py-3 space-y-3" aria-label="本地执行客户端">
-          <h3 className="text-xs font-medium">本地执行客户端</h3>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {runtimes.map(runtime => (
-              <div key={runtime.kind} className="rounded-md border border-border/60 px-3 py-2 space-y-1">
-                <div className="flex items-center justify-between text-xs"><span>{runtime.name}</span><span className="text-2xs text-foreground-muted">{runtime.kind === 'pi' ? '内置' : runtime.installed ? runtime.supported ? '已检测' : '适配待完成' : '未安装'}</span></div>
-                <p className="text-2xs text-foreground-muted">{runtime.reason}</p>
-                {runtime.installed && runtime.supported && <button type="button" className="text-2xs underline underline-offset-2" onClick={() => {
-                  openCreate(); setFormRuntime(runtime.kind); setFormName(`${runtime.name} 助手`);
-                  if (runtime.kind !== 'pi') {
-                    setFormDefaultMode('plan'); setFormMaxMode('plan'); setPermReadFiles(false); setPermExecuteCommands(true); setPermKnowledge(false);
-                  }
-                }}>{runtime.kind === 'pi' ? '添加为协作成员' : '创建 Agent（接入预览）'}</button>}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-      {!loading && (
-        <section className="rounded-lg border border-border px-4 py-3 space-y-3" aria-label="添加协作成员">
-          <div>
-            <h3 className="text-xs font-medium">添加协作成员</h3>
-            <p className="mt-1 text-xs leading-5 text-foreground-muted">{agents.filter(agent => agent.status === 'active').length < 2 ? '当前尚未组成多 Agent 团队。' : ''}选择职责后可检查指令与权限，保存才会创建成员，不会自动执行任务。</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {agentStarters.map(starter => <Button key={starter.role} type="button" variant="outline" size="sm" onClick={() => openCreate(starter)}>{starter.name}</Button>)}
-          </div>
-          <p className="text-2xs text-foreground-muted">默认仅允许读取与分析。文件修改、命令执行和委派需在能力设置中分别开启。</p>
-        </section>
+        <NativeAgentConnectionsPanel
+          onMemberCreated={() => void loadData(true)}
+          selectedConnectionId={focusedConnectionId}
+          onSelectAgentDetail={(connId) => {
+            const matched = agents.find((a) => a.connectionId === connId);
+            if (matched) {
+              setExpandedAgentId(matched.id);
+            }
+          }}
+        />
       )}
 
       {/* Draft Recovery Banner */}
@@ -669,9 +883,9 @@ export function AgentDefinitionsSettings({
       ) : agents.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 p-10 text-center">
           <Bot className="size-8 mx-auto text-foreground-muted/40 mb-3" />
-          <h3 className="text-xs font-medium text-foreground">暂无自定义 Agent</h3>
+          <h3 className="text-xs font-medium text-foreground">暂无 Agent</h3>
           <p className="text-2xs text-foreground-muted mt-1 max-w-sm mx-auto">
-            创建具有特定职责和工具权限的 Agent，协同完成复杂的编码与分析任务。
+            请在上方连接本机已安装的真实 Agent（Pi、Codex 等），或创建新的 Agent 成员。
           </p>
           <Button size="sm" onClick={() => openCreate()} className="mt-4 text-xs h-8 gap-1.5">
             <Plus className="size-3.5" />
@@ -679,195 +893,93 @@ export function AgentDefinitionsSettings({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3.5">
-          {agents.map((agent) => {
-            const readiness = checkReadiness(agent);
-            const isBuiltIn = agent.builtIn;
-            const isDisabled = agent.status === 'disabled';
-
+        <div className="space-y-6">
+          {/* Section A: 真实原生 Agent (Native Agents) */}
+          {(() => {
+            const nativeAgents = agents.filter(
+              (a) => Boolean(a.connectionId) || (a.execution?.connectionKind && a.execution.connectionKind !== 'builtin-pi-sdk') || a.runtimeKind !== 'pi'
+            );
+            if (nativeAgents.length === 0) return null;
             return (
-              <div
-                key={agent.id}
-                className={cn(
-                  'rounded-xl border border-border/70 bg-surface1/60 p-4 transition-all duration-150 hover:border-border hover:shadow-xs',
-                  isDisabled && 'opacity-65 bg-surface1/30'
-                )}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className="size-9 rounded-lg bg-surface2 border border-border/60 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                      <Bot className={cn('size-4', isBuiltIn ? 'text-primary' : 'text-foreground')} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-xs sm:text-sm text-foreground truncate">
-                          {agent.name}
-                        </span>
-                        {isBuiltIn && (
-                          <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
-                            内置
-                          </Badge>
-                        )}
-                        <Badge
-                          variant="outline"
-                          size="sm"
-                          className="text-3xs uppercase tracking-wider text-foreground-muted"
-                        >
-                          {agent.role}
-                        </Badge>
-                        <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
-                          {agent.execution?.label || runtimes.find(item => item.kind === agent.runtimeKind)?.name || agent.runtimeKind}{agent.execution?.compatibility === 'legacy-builtin' ? ' · 兼容' : ''}
-                        </Badge>
-                        {isDisabled && (
-                          <Badge variant="warning" size="sm" className="text-3xs">
-                            已停用
-                          </Badge>
-                        )}
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 text-3xs font-medium px-1.5 py-0.5 rounded-md border',
-                            readiness.ready
-                              ? 'border-status-success/30 bg-status-success/10 text-status-success'
-                              : readiness.warning
-                              ? 'border-status-warning/40 bg-status-warning/10 text-status-warning'
-                              : 'border-border/60 bg-surface2 text-foreground-muted'
-                          )}
-                          title={readiness.reason}
-                        >
-                          {readiness.ready ? (
-                            <CheckCircle2 className="size-2.5" />
-                          ) : (
-                            <AlertTriangle className="size-2.5" />
-                          )}
-                          <span>{readiness.label}</span>
-                        </span>
-                      </div>
-
-                      {agent.description ? (
-                        <p className="text-2xs text-foreground-muted mt-1 line-clamp-2">
-                          {agent.description}
-                        </p>
-                      ) : (
-                        <p className="text-2xs text-foreground-extra-muted mt-1 italic">
-                          暂无描述
-                        </p>
-                      )}
-
-                      {/* Capabilities pill tags */}
-                      <div className="flex items-center gap-2 mt-2.5 flex-wrap text-3xs text-foreground-extra-muted">
-                        <span className="flex items-center gap-1" title="默认与最高模式">
-                          <Layers className="size-3 text-foreground-muted" />
-                          <span>
-                            {modeNames[agent.defaultMode]} · 上限：{modeNames[agent.maxMode]}
-                          </span>
-                        </span>
-                        <span className="text-border/70">·</span>
-                        <span className="flex items-center gap-1">
-                          <FileCode
-                            className={cn(
-                              'size-3',
-                              agent.permissions.writeFiles ? 'text-primary' : 'text-foreground-extra-muted'
-                            )}
-                          />
-                          <span>
-                            {agent.permissions.writeFiles ? '写文件' : '只读'}
-                          </span>
-                        </span>
-                        <span className="text-border/70">·</span>
-                        <span className="flex items-center gap-1">
-                          <Terminal
-                            className={cn(
-                              'size-3',
-                              agent.permissions.executeCommands ? 'text-status-warning' : 'text-foreground-extra-muted'
-                            )}
-                          />
-                          <span>
-                            {agent.permissions.executeCommands ? '终端命令' : '无终端'}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="size-3.5 text-primary" />
+                    <h3 className="text-xs font-semibold text-foreground">真实原生 Agent (Native Agents)</h3>
+                    <Badge variant="outline" size="sm" className="text-3xs text-primary font-medium border-primary/40">
+                      本机客户端 ({nativeAgents.length})
+                    </Badge>
                   </div>
+                  <span className="text-3xs text-foreground-muted">直接挂接本机客户端配置与凭据 · 独立进程运行</span>
+                </div>
 
-                  {/* Row Operations */}
-                  <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
-                    {agent.connectionId && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFocusedConnectionId(agent.connectionId || null)}
-                        className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
-                        title="查看或修改关联的原生客户端配置"
-                      >
-                        <Cpu className="size-3" />
-                        <span>原生配置</span>
-                      </Button>
-                    )}
-                    {onSelectAgentForChat && !isDisabled && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onSelectAgentForChat(agent.id)}
-                        className="h-7 px-2 text-2xs gap-1 text-primary hover:text-primary hover:bg-primary/10"
-                        title="以此 Agent 新建会话"
-                      >
-                        <MessageSquare className="size-3" />
-                        <span>对话</span>
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEdit(agent)}
-                      className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
-                      title="编辑配置"
-                    >
-                      <Edit2 className="size-3" />
-                      <span>编辑</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openDuplicate(agent)}
-                      className="h-7 px-2 text-2xs gap-1 text-foreground-muted hover:text-foreground"
-                      title="复制为新 Agent"
-                    >
-                      <Copy className="size-3" />
-                      <span>复制</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void handleToggleStatus(agent)}
-                      disabled={isBuiltIn}
-                      className={cn(
-                        'h-7 px-2 text-2xs gap-1',
-                        isDisabled
-                          ? 'text-status-success hover:text-status-success hover:bg-status-success/10'
-                          : 'text-foreground-muted hover:text-status-warning'
-                      )}
-                      title={isDisabled ? '启用此 Agent' : '停用此 Agent'}
-                    >
-                      <Power className="size-3" />
-                      <span>{isDisabled ? '启用' : '停用'}</span>
-                    </Button>
-                    {!isBuiltIn && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void handleDelete(agent)}
-                        className="h-7 px-2 text-2xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        title="删除 Agent"
-                      >
-                        <Trash2 className="size-3" />
-                      </Button>
-                    )}
-                  </div>
+                <div className="grid grid-cols-1 gap-3.5">
+                  {nativeAgents.map((agent) => renderAgentCard(agent, true))}
                 </div>
               </div>
             );
-          })}
+          })()}
+
+          {/* Section B: 兼容内置助手 (Compatibility Built-in Assistants) */}
+          {(() => {
+            const builtinAssistants = agents.filter(
+              (a) => !a.connectionId && (a.runtimeKind === 'pi' || a.execution?.connectionKind === 'builtin-pi-sdk')
+            );
+            if (builtinAssistants.length === 0) return null;
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between pb-1.5 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <Bot className="size-3.5 text-foreground-muted" />
+                    <h3 className="text-xs font-semibold text-foreground">兼容内置助手 (Compatibility Assistants)</h3>
+                    <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
+                      内置兼容模式 · 非本机安装 ({builtinAssistants.length})
+                    </Badge>
+                  </div>
+                  <span className="text-3xs text-foreground-muted">运行于工作台托管兼容沙箱 · 明确标识为内置兼容</span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3.5">
+                  {builtinAssistants.map((agent) => renderAgentCard(agent, false))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
+      )}
+
+      {/* Role Auxiliary Presets Section (Downgraded to auxiliary assistant) */}
+      {!loading && (
+        <section className="rounded-xl border border-border/70 bg-surface1/40 p-4 space-y-3" aria-label="职责辅助预设">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Layers className="size-3.5 text-primary" />
+              <h3 className="text-xs font-semibold text-foreground">职责辅助预设 (辅助模板)</h3>
+              <Badge variant="outline" size="sm" className="text-3xs text-foreground-muted">
+                辅助填充，不新增真实客户端连接
+              </Badge>
+            </div>
+          </div>
+          <p className="text-2xs text-foreground-muted leading-relaxed">
+            职责辅助预设仅用于为 Agent 快速填充工作指令与安全权限模板（如开发助手、代码审阅、测试验证），不创建新的底层客户端连接。创建后可自由指定底层运行客户端。
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {agentStarters.map((starter) => (
+              <Button
+                key={starter.role}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => openCreate(starter)}
+                className="text-2xs h-7 gap-1"
+              >
+                <Plus className="size-3" />
+                <span>以「{starter.name}」预设新建</span>
+              </Button>
+            ))}
+          </div>
+          <p className="text-3xs text-foreground-extra-muted">默认仅开启只读分析权限；文件修改与终端命令执行需在能力设置中单独开启。</p>
+        </section>
       )}
 
       {/* Edit / Create Form Modal */}
