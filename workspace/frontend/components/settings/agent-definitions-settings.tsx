@@ -43,14 +43,28 @@ import { NativeAgentConnectionsPanel } from './native-agent-connections-panel';
 import { AgentSecondaryDetail } from './agent-secondary-detail';
 
 const agentStarters = [
-  { name: '开发助手', role: 'developer', description: '分析实现方案，完成有权限执行的代码修改。', maxMode: 'agent' as const,
-    instructions: '先读取项目规范与相关代码，给出范围明确的实现方案。仅在已获文件修改权限时编辑，命令执行必须遵守审批。报告实际完成的修改、验证结果和未完成项。' },
-  { name: '代码审阅', role: 'reviewer', description: '检查变更、潜在缺陷与回归风险，不修改代码。', maxMode: 'plan' as const,
-    instructions: '只读检查项目与代码变更。优先报告有证据的缺陷、影响范围、文件位置及验证建议；区分确定的问题与待验证的推断，不声称执行未运行的检查。' },
-  { name: '测试验证', role: 'tester', description: '梳理测试场景，检查行为和交付证据。', maxMode: 'agent' as const,
-    instructions: '根据需求检查实现与测试覆盖，设计能发现实际缺陷的验证场景。未获命令权限和审批时只做分析；获准执行后记录实际结果，不把模拟结果当作真实环境验收。' },
+  {
+    name: '开发助手',
+    role: 'developer',
+    description: '分析实现方案，完成有权限执行的代码修改。',
+    instructions: '先读取项目规范与相关代码，给出范围明确的实现方案。仅在已获文件修改权限时编辑，命令执行必须遵守审批。报告实际完成的修改、验证结果和未完成项。',
+    permissions: { readFiles: true, writeFiles: true, executeCommands: true, knowledge: true, mcp: false, delegate: false },
+  },
+  {
+    name: '代码审阅',
+    role: 'reviewer',
+    description: '检查变更、潜在缺陷与回归风险，不修改代码。',
+    instructions: '检查项目与代码变更。优先报告有证据的缺陷、影响范围、文件位置及验证建议；区分确定的问题与待验证的推断，不声称执行未运行的检查。',
+    permissions: { readFiles: true, writeFiles: false, executeCommands: false, knowledge: true, mcp: false, delegate: false },
+  },
+  {
+    name: '测试验证',
+    role: 'tester',
+    description: '梳理测试场景，检查行为和交付证据。',
+    instructions: '根据需求检查实现与测试覆盖，设计能发现实际缺陷的验证场景。未获命令权限和审批时只做分析；获准执行后记录实际结果，不把模拟结果当作真实环境验收。',
+    permissions: { readFiles: true, writeFiles: false, executeCommands: true, knowledge: true, mcp: false, delegate: false },
+  },
 ];
-const modeNames = { chat: '对话', plan: '只读分析', agent: '实施' };
 
 interface AgentDefinitionsSettingsProps {
   onManageConnections?: () => void;
@@ -293,16 +307,23 @@ export function AgentDefinitionsSettings({
     setFormRole(starter?.role || 'assistant');
     setFormDescription(starter?.description || '');
     setFormInstructions(starter?.instructions || '');
-    setFormDefaultMode(starter ? 'plan' : 'chat');
-    setFormMaxMode(starter?.maxMode || 'agent');
     setFormStatus('active');
-    // Conservative defaults
-    setPermReadFiles(true);
-    setPermWriteFiles(false);
-    setPermExecuteCommands(false);
-    setPermKnowledge(true);
-    setPermMcp(false);
-    setPermDelegate(false);
+    // Starter permissions or conservative defaults
+    if (starter?.permissions) {
+      setPermReadFiles(starter.permissions.readFiles);
+      setPermWriteFiles(starter.permissions.writeFiles);
+      setPermExecuteCommands(starter.permissions.executeCommands);
+      setPermKnowledge(starter.permissions.knowledge);
+      setPermMcp(starter.permissions.mcp);
+      setPermDelegate(starter.permissions.delegate);
+    } else {
+      setPermReadFiles(true);
+      setPermWriteFiles(false);
+      setPermExecuteCommands(false);
+      setPermKnowledge(true);
+      setPermMcp(false);
+      setPermDelegate(false);
+    }
 
     // Default resource if any connection exists
     if (connections.length > 0) {
@@ -436,6 +457,13 @@ export function AgentDefinitionsSettings({
       return;
     }
 
+    const derivedMaxMode: 'chat' | 'plan' | 'agent' = (permWriteFiles || permExecuteCommands)
+      ? 'agent'
+      : (permReadFiles ? 'plan' : 'chat');
+    const derivedDefaultMode: 'chat' | 'plan' | 'agent' = editingAgent?.defaultMode && ['chat', 'plan', 'agent'].indexOf(editingAgent.defaultMode) <= ['chat', 'plan', 'agent'].indexOf(derivedMaxMode)
+      ? editingAgent.defaultMode
+      : derivedMaxMode;
+
     const payload: AgentIdentityInput = {
       runtimeKind: formRuntime,
       connectionId: formNativeConnectionId,
@@ -444,8 +472,8 @@ export function AgentDefinitionsSettings({
       role: formRole.trim() || 'assistant',
       description: formDescription.trim(),
       instructions: formInstructions,
-      defaultMode: formDefaultMode,
-      maxMode: formMaxMode,
+      defaultMode: derivedDefaultMode,
+      maxMode: derivedMaxMode,
       status: formStatus,
       permissions: {
         readFiles: permReadFiles,
@@ -673,13 +701,6 @@ export function AgentDefinitionsSettings({
 
               {/* Capabilities pill tags */}
               <div className="flex items-center gap-2 mt-2.5 flex-wrap text-3xs text-foreground-extra-muted">
-                <span className="flex items-center gap-1" title="默认与最高模式">
-                  <Layers className="size-3 text-foreground-muted" />
-                  <span>
-                    {modeNames[agent.defaultMode]} · 上限：{modeNames[agent.maxMode]}
-                  </span>
-                </span>
-                <span className="text-border/70">·</span>
                 <span className="flex items-center gap-1">
                   <FileCode
                     className={cn(
@@ -688,7 +709,7 @@ export function AgentDefinitionsSettings({
                     )}
                   />
                   <span>
-                    {agent.permissions.writeFiles ? '写文件' : '只读'}
+                    {agent.permissions.writeFiles ? '可改写文件 (需审批)' : '禁止改写 (只读保护)'}
                   </span>
                 </span>
                 <span className="text-border/70">·</span>
@@ -700,9 +721,20 @@ export function AgentDefinitionsSettings({
                     )}
                   />
                   <span>
-                    {agent.permissions.executeCommands ? '终端命令' : '无终端'}
+                    {agent.permissions.executeCommands ? '终端执行 (需审批)' : '禁用终端'}
                   </span>
                 </span>
+                {agent.connectionId ? (
+                  <>
+                    <span className="text-border/70">·</span>
+                    <span className="text-foreground-muted">原生客户端</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-border/70">·</span>
+                    <span className="text-foreground-extra-muted">兼容内置</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -978,7 +1010,7 @@ export function AgentDefinitionsSettings({
               </Button>
             ))}
           </div>
-          <p className="text-3xs text-foreground-extra-muted">默认仅开启只读分析权限；文件修改与终端命令执行需在能力设置中单独开启。</p>
+          <p className="text-3xs text-foreground-extra-muted">以预设创建的 Agent 默认仅开放只读权限；修改项目文件与执行终端命令需在能力权限中单独开启并受执行前审批保护。</p>
         </section>
       )}
 
@@ -1077,6 +1109,13 @@ export function AgentDefinitionsSettings({
                         try {
                           const latest = await workspaceApi.getAgentDefinition(editingAgent.id);
                           const trimmedName = formName.trim();
+                          const derivedMaxMode: 'chat' | 'plan' | 'agent' = (permWriteFiles || permExecuteCommands)
+                            ? 'agent'
+                            : (permReadFiles ? 'plan' : 'chat');
+                          const derivedDefaultMode: 'chat' | 'plan' | 'agent' = editingAgent?.defaultMode && ['chat', 'plan', 'agent'].indexOf(editingAgent.defaultMode) <= ['chat', 'plan', 'agent'].indexOf(derivedMaxMode)
+                            ? editingAgent.defaultMode
+                            : derivedMaxMode;
+
                           const payload: AgentIdentityInput = {
                             runtimeKind: formRuntime,
                             connectionId: formNativeConnectionId,
@@ -1086,8 +1125,8 @@ export function AgentDefinitionsSettings({
                             description: formDescription.trim(),
                             status: formStatus,
                             instructions: formInstructions.trim(),
-                            defaultMode: formDefaultMode,
-                            maxMode: formMaxMode,
+                            defaultMode: derivedDefaultMode,
+                            maxMode: derivedMaxMode,
                             permissions: {
                               readFiles: permReadFiles,
                               writeFiles: permWriteFiles,
@@ -1170,7 +1209,7 @@ export function AgentDefinitionsSettings({
                 }}>
                   {runtimes.map(runtime => <option key={runtime.kind} value={runtime.kind} disabled={!runtime.installed || !runtime.supported}>{runtime.name}{!runtime.installed ? ' · 未安装' : !runtime.supported ? ' · 适配待完成' : ''}</option>)}
                 </select>
-                {formRuntime !== 'pi' && <p className="text-2xs text-foreground-muted">复用客户端现有登录与资源。当前版本可能读取项目外文件，需在下方明确开启读取权限后才能执行。暂不支持工作台 MCP、委派、知识工具及逐请求硬预算；不兼容的任务会被拦截。只读模式禁止写入；实施需写入和命令权限。</p>}
+                {formRuntime !== 'pi' && <p className="text-2xs text-foreground-muted">复用客户端现有登录与资源。当前版本可能读取项目外文件，需在下方明确开启读取权限后才能执行。暂不支持工作台 MCP、委派、知识工具及逐请求硬预算；不兼容的任务会被拦截。文件修改与终端命令须在下方权限中开启并在执行前经过审批。</p>}
               </div>
               {/* Group 1: 身份与职责 */}
               <div className="space-y-3">
@@ -1292,41 +1331,12 @@ export function AgentDefinitionsSettings({
                     <span>委派子任务</span>
                   </label>
                 </div>
+                <p className="text-3xs text-foreground-extra-muted">
+                  文件修改与外部命令执行受逐项执行审批保护；未授权写文件权限时，Agent 处于只读安全环境。
+                </p>
               </div>
 
-              {/* Group 4: 默认工作方式 */}
-              <div className="space-y-2.5">
-                <h4 className="text-2xs font-semibold uppercase tracking-wider text-foreground-extra-muted flex items-center gap-1.5">
-                  <Layers className="size-3 text-primary" />
-                  <span>工作方式限制</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-2xs text-foreground-muted">默认工作模式</Label>
-                    <select
-                      value={formDefaultMode}
-                      onChange={(e) => setFormDefaultMode(e.target.value as 'chat' | 'plan' | 'agent')}
-                      className="w-full h-8 rounded-lg border border-border bg-surface0 px-2 text-xs text-foreground"
-                    >
-                      <option value="chat">对话 (Chat)</option>
-                      <option value="plan">只读分析 (Plan)</option>
-                      <option value="agent">实施修改 (Agent)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-2xs text-foreground-muted">允许最高模式</Label>
-                    <select
-                      value={formMaxMode}
-                      onChange={(e) => setFormMaxMode(e.target.value as 'chat' | 'plan' | 'agent')}
-                      className="w-full h-8 rounded-lg border border-border bg-surface0 px-2 text-xs text-foreground"
-                    >
-                      <option value="chat">对话 (Chat)</option>
-                      <option value="plan">只读分析 (Plan)</option>
-                      <option value="agent">实施修改 (Agent)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
+
 
               {/* Group 5: 执行资源 (高级) */}
               {(formRuntime !== 'pi' || Boolean(formNativeConnectionId)) && <details className="space-y-2.5 pt-2 border-t border-border/50">

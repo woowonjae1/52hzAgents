@@ -228,8 +228,6 @@ export function AgentSecondaryDetail({
     }
   };
 
-  // Derive mode display names
-  const modeLabel = { chat: '对话', plan: '只读分析', agent: '实施' };
 
   return (
     <div className="rounded-xl border border-border/80 bg-surface2/40 p-4 space-y-4 text-xs">
@@ -789,13 +787,8 @@ export function AgentSecondaryDetail({
           <span>实际能力与安全边界限制标签</span>
         </span>
 
-        {/* Permissions & Mode Tags */}
+        {/* Permissions & Policy Tags */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <Badge variant="outline" size="sm" className="text-3xs gap-1 bg-surface0">
-            <Layers className="size-2.5 text-primary" />
-            <span>默认模式: {modeLabel[agent.defaultMode]} · 上限: {modeLabel[agent.maxMode]}</span>
-          </Badge>
-
           <Badge
             variant="outline"
             size="sm"
@@ -805,7 +798,7 @@ export function AgentSecondaryDetail({
             )}
           >
             <FileText className="size-2.5" />
-            <span>{agent.permissions.writeFiles ? '可修改项目文件' : '只读分析 (禁止写文件)'}</span>
+            <span>{agent.permissions.writeFiles ? '文件改写需审批' : '禁止写文件 (只读保护)'}</span>
           </Badge>
 
           <Badge
@@ -817,7 +810,7 @@ export function AgentSecondaryDetail({
             )}
           >
             <Terminal className="size-2.5" />
-            <span>{agent.permissions.executeCommands ? '允许执行终端命令' : '禁止终端执行'}</span>
+            <span>{agent.permissions.executeCommands ? '终端命令需审批' : '禁止终端执行'}</span>
           </Badge>
 
           <Badge

@@ -71,7 +71,6 @@ export const updateDraftRuntime = (id: string, patch: Record<string, unknown>) =
   return next;
 };
 const modes = ["chat", "plan", "agent"] as const;
-const modeLabels = { chat: "对话", plan: "只读分析", agent: "实施" };
 
 export function SessionRuntimeControls({
   sessionId,
@@ -188,48 +187,8 @@ export function SessionRuntimeControls({
   if (!runtime || !form) return <>{fallback}</>;
   const busy = Boolean(running || runtime.running || saving);
   const agentName = runtime.agent?.name || "52hz Agent";
-  const maxMode = runtime.agent?.maxMode || "agent";
   const hasCustomOverride = runtime.configSource === "session";
   const nativeClient = runtime.agent && runtime.agent.runtimeKind !== 'pi';
-
-  const applyModeChange = async (targetMode: "chat" | "plan" | "agent") => {
-    if (!sessionId || busy) return;
-    const ceiling = modes.indexOf(maxMode);
-    if (modes.indexOf(targetMode) > ceiling) {
-      toast.error("超出当前 Agent 允许的最高工作模式");
-      return;
-    }
-    const targetSession = sessionId;
-    const inherit = runtime.configSource === "agent";
-    const payload = inherit
-      ? { inheritAgent: true, mode: targetMode, autoCompact: form.autoCompact !== false }
-      : { ...form, mode: targetMode };
-
-    setSaving(true);
-    try {
-      if (isDraftSessionId(sessionId)) {
-        updateDraftRuntime(sessionId, payload);
-        setRuntime({
-          ...runtime,
-          config: { ...runtime.config, mode: targetMode },
-        });
-        setForm({ ...form, mode: targetMode });
-      } else {
-        const saved = await workspaceApi.request<Runtime>(
-          `/v1/runtime/session?channel=${encodeURIComponent(sessionId)}`,
-          { method: "PATCH", body: JSON.stringify(payload) },
-        );
-        if (activeSession.current !== targetSession) return;
-        setRuntime(saved);
-        setForm(saved.config);
-      }
-      toast.success(`已切换为【${modeLabels[targetMode]}】模式`);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "无法更新工作模式");
-    } finally {
-      if (activeSession.current === targetSession) setSaving(false);
-    }
-  };
 
   const handleSelectAgent = (agent: AgentDefinition) => {
     if (!sessionId || busy) return;
@@ -527,7 +486,7 @@ export function SessionRuntimeControls({
                 <div className="flex items-center gap-1.5 text-foreground-muted">
                   <FileCode2 className="size-3 shrink-0 text-foreground-extra-muted" />
                   <span>
-                    {runtime.agent?.permissions?.writeFiles !== false ? "修改文件需审批" : "只读 (禁止改写)"}
+                    {runtime.agent?.permissions?.writeFiles !== false ? "修改文件需审批" : "禁止修改文件 (只读保护)"}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-foreground-muted">
